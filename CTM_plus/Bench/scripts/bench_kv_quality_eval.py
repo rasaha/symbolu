@@ -75,7 +75,10 @@ def verdict(rows):
             continue
         d = ppl_delta(base, r["ppl"])
         tag = "OK" if d <= PPL_GO else "DEGRADED"
-        notes.append(f"{dt}: PPL {r['ppl']:.4f} = {d*100:+.2f}% vs bf16 [{tag}]  (n={r.get('n','?')} tok)")
+        nll_txt = ""
+        if "nll" in r and "nll" in rows.get("auto", {}):
+            nll_txt = f"  ({r['nll'] - rows['auto']['nll']:+.4f} nats/tok abs)"
+        notes.append(f"{dt}: PPL {r['ppl']:.4f} = {d*100:+.2f}% vs bf16 [{tag}]  (n={r.get('n','?')} tok){nll_txt}")
         if dt.startswith("fp8") and d <= PPL_GO:
             fp8_ok = True
     return notes, fp8_ok
@@ -111,7 +114,7 @@ def main(argv=None):
     # prompt position, several GB), NOT a big KV pool — one sequence's KV is <1 GB. At high gpu_util
     # vLLM reserves ~40 GB of idle KV cache that starves the logprobs peak and OOMs.
     ap.add_argument("--gpu-util", type=float, default=0.30)
-    ap.add_argument("--text-file", default=None, help="held-out text file; default = built-in varied prose tiled to length")
+    ap.add_argument("--text-file", default=None, help="held-out text file; default = wikitext-2 (needs `datasets`), else tiled prose (INVALID)")
     ap.add_argument("--dtypes", default="auto,fp8", help="comma list: auto (bf16), fp8, fp8_e5m2")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -122,17 +125,32 @@ def main(argv=None):
     from vllm import LLM, SamplingParams
     from transformers import AutoTokenizer
 
-    # Build ONE fixed prompt (same tokens for every dtype) truncated to the target context length.
-    if args.text_file:
-        with open(args.text_file, "r") as f:
-            text = f.read()
-    else:
-        text = _PROSE
+    # Build ONE fixed prompt (same tokens for every dtype). REAL, non-repetitive text is REQUIRED:
+    # tiling a short passage makes the tail a memorized loop -> bf16 PPL ~1.0 -> the relative delta
+    # explodes for ANY perturbation (division by ~0) and the gate is meaningless. Default to wikitext-2
+    # (the standard PPL benchmark); --text-file overrides; the built-in prose is a last resort and is
+    # flagged INVALID because it must be tiled.
     tk = AutoTokenizer.from_pretrained(args.model)
+
+    def _load_text():
+        if args.text_file:
+            with open(args.text_file, "r") as f:
+                return f.read(), f"file:{args.text_file}"
+        try:
+            from datasets import load_dataset
+            ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+            return "\n\n".join(t for t in ds["text"] if t.strip()), "wikitext-2-raw-v1"
+        except Exception as e:
+            print(f"  WARNING: could not load wikitext ({type(e).__name__}: {e}).\n"
+                  "  Falling back to built-in prose, which must be TILED -> repetitive -> bf16 PPL ~1.0\n"
+                  "  -> the delta metric is INVALID. Fix with:  pip install datasets   (or pass\n"
+                  "  --text-file <a few thousand tokens of real held-out text>).")
+            return _PROSE, "built-in prose (TILED — INVALID)"
+
+    text, source = _load_text()
     full = tk(text)["input_ids"]
-    if len(full) < args.context_tokens:                      # tile to reach the target length
-        reps = args.context_tokens // max(1, len(full)) + 1
-        full = (full * reps)
+    if len(full) < args.context_tokens:                      # last-resort tile (only the prose fallback)
+        full = full * (args.context_tokens // max(1, len(full)) + 1)
     ids = full[:args.context_tokens]
     prompt = tk.decode(ids)
     mml = args.context_tokens + 64
@@ -180,19 +198,31 @@ def main(argv=None):
                 nlls.append(-float(lp))
             except (TypeError, ValueError):
                 continue
+        mean_nll = sum(nlls) / len(nlls) if nlls else float("inf")
         del llm
         torch.cuda.empty_cache()
-        return {"ppl": perplexity(nlls), "n": len(nlls), "blocks": blocks}
+        return {"ppl": perplexity(nlls), "nll": mean_nll, "n": len(nlls), "blocks": blocks}
 
     dtypes = [d.strip() for d in args.dtypes.split(",") if d.strip()]
     print(f"\nKV quality eval (perplexity) — {args.model.split('/')[-1]} ctx={args.context_tokens} "
-          f"tail>={args.ppl_start_frac:.0%}  source={'file:'+args.text_file if args.text_file else 'built-in prose (tiled)'}")
+          f"tail>={args.ppl_start_frac:.0%}  source={source}")
     results = {}
     for dt in dtypes:
         r = measure(dt)
         results[dt] = r
         b = r["blocks"]
-        print(f"  {dt:<10} PPL {r['ppl']:9.4f}  over {r['n']:>5} tok   KV blocks {b if b is not None else '?':>7}")
+        print(f"  {dt:<10} PPL {r['ppl']:9.4f}  (NLL {r['nll']:.4f} nats/tok)  over {r['n']:>5} tok   "
+              f"KV blocks {b if b is not None else '?':>7}")
+    # Guard: a near-1.0 baseline means the text is too predictable (tiled/repetitive) -> the relative
+    # delta is a division-by-~0 artifact, NOT a quality signal. Refuse to emit a verdict on it.
+    base_ppl = results.get("auto", {}).get("ppl")
+    if base_ppl is not None and not math.isinf(base_ppl) and base_ppl < 1.5:
+        print("\n-- verdict --")
+        print(f"  [INVALID] bf16 baseline PPL {base_ppl:.4f} < 1.5 -> text too predictable "
+              "(tiled/repetitive).\n  The model memorizes it (NLL~0), so the relative delta explodes for "
+              "any perturbation and says\n  NOTHING about fp8 quality. Re-run with real text: "
+              "`pip install datasets` (wikitext default) or --text-file.")
+        return 2
     print("\n-- verdict --")
     notes, fp8_ok = verdict(results)
     for nt in notes:
