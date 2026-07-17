@@ -8,7 +8,7 @@ implementation complexity, **Port** = portability, **Gather** = interaction with
 
 | # | strategy | Reg | Lat | Risk | Cx | in-repo? | verdict |
 |---|---|---|---|---|---|---|---|
-| 4 | **smem-stage scale/xmin as float (pre-convert at load)** | small | **high** | **low** (bit-identical) | low | **yes** | **M1A core (L1)** |
+| 4 | **smem-stage scale/xmin as float (pre-convert at load)** | small | med | **low** (value-identical) | low | yes | deferred (M1A.2 if unroll helps) |
 | 9 | type-narrow / tighten Phase F live ranges | small | med | low | low | yes | **M1A (L2)** |
 | 5 | recompute indices vs retain | small | low | low | low | yes | fold into M1A |
 | 1 | **late unpack** (unpack inside GEMM K-consumption; never materialize bf16 tile) | med | **high** | med | high | **[POD]** | **M1A.2** (after extraction) |
@@ -21,27 +21,29 @@ implementation complexity, **Port** = portability, **Gather** = interaction with
 
 ## Chosen for Milestone 1
 
-**K2-M1A — staged reconstruction + reduced live ranges (no gather fusion).** Refined after reading
-the base loop (`extract_target_kernel.sh` section 1): the reconstruction writes the **full bf16 tile
-into `sK` smem** and the **cute MMA then reads `sK`** (`flash_fwd_kernel.h:184,203` `tSrK/tSsK`), so
-"late unpack into the MMA" would rewrite the core `flash::gemm` K-fragment path — **too invasive for a
-narrow M1; deferred to M2.** M1A is therefore entirely inside `int4_packed_load_K_block` (in-repo):
+**K2-M1A — bounded Phase F unroll, same-wheel control + sweep (no gather fusion).** Finalized after
+the measured baseline (`K2_M1_BASELINE_MEASURED.md`: the int4-packed kernel truly spills, `LDL
+223–1218`) and a design review. The reconstruction writes the **full bf16 tile into `sK` smem** and the
+**cute MMA reads `sK`** (`flash_fwd_kernel.h:184,203`), so "late unpack into the MMA" would rewrite the
+core `flash::gemm` path — **too invasive; deferred to M2.** M1A is the one lever that directly cuts the
+measured spill: **bound the Phase F outer `#pragma unroll`** so fewer per-element temporaries are
+simultaneously live.
 
-- **M1A.1 — pre-convert scale/xmin to float in smem.** A cooperative pass converts `k_scale`/`k_xmin`
-  bf16→**float** **once** at load; Phase F reads the ready float (drops 2 `int4_inline_to_float`/elem).
-  **Bit-identical** (same deterministic conversion, same affine math). Shortens the dependency chain.
-- **M1A.1b — reduce Phase F peak live-state.** Bound the triple `#pragma unroll` (e.g. `unroll 4` on
-  the inner level), narrow index types, hoist the per-`d` `protect_slot` read. Targets the spill
-  (STACK→0) at the *same* ~255 regs. Register count stays base-dominated — **latency is the gate**.
+- **Implemented as a template split, not a runtime branch.** Register allocation is per-compiled-kernel;
+  a runtime `if (use_m1)` keeps *both* loop bodies live → the full-unroll pressure dominates → **zero
+  spill reduction**. So `int kM1Unroll` is threaded `run_flash_splitkv_fwd → DEFINE macro →
+  compute_attn_splitkv → compute_attn_1rowblock_splitkv`, and each factor is its own compiled kernel.
+- **Unroll sweep {1, 2, 4} + a same-wheel control (kM1Unroll=0).** One wheel carries the freshly-compiled
+  control *and* the M1 factors, so the comparison isolates the single compile-time difference (no
+  cross-wheel compiler/link nondeterminism). Too little unroll = loop overhead; too much = spills
+  return; the optimum is usually between — hence a small sweep, not one guessed factor.
+- **Numerics: value-identical, verified not promised.** Each `tKsK` element is computed independently
+  (no cross-element accumulation), so the unroll factor cannot change any value — expected bit-identical,
+  but `bench_k2_m1_op.py` confirms it by exact output-token match before any perf claim.
 
-**Flag mechanism (decided from section 1):** no new template instantiation is needed for M1A (it is a
-runtime-param branch, not a new specialization), so `KVPRO_K2_M1` is plumbed as a **runtime
-`params.k2m1` field set host-side from `getenv` in `flash_api.cpp`**, gated by a **build macro**
-`KVPRO_K2_M1_BUILD` so "requested-but-not-built" fails loudly (`TORCH_CHECK`). This touches only
-`flash_api.cpp` + `flash.h` (field) + `int4_packed_load.h` (loader) + the 2 loader call-sites — far
-less than template threading. Caveat: a runtime branch compiles both paths into the kernel, so the M1
-**register count** is not a clean isolated number; the clean split (template bool) is an M2 cleanup if
-the M1 **latency** wins. That is acceptable because the verdict is latency, not register count.
+**Flag/selection:** `flash_api.cpp` reads `getenv("KVPRO_K2_M1")` → `params.k2m1_unroll` (validated
+∈ {0,1,2,4}) and dispatches the matching compiled kernel; `flash.h` defines `KVPRO_K2_M1_BUILD` (all
+TUs) so a mis-built wheel fails loud (`TORCH_CHECK`). Production path byte-identical + default.
 
 **K2-M1B — M1A + in-kernel paged gather**, added **only if** it does not raise the target symbol's
 register count/spill. The gather lives in the Python launcher (`get_packed_view_batched`), so fusing

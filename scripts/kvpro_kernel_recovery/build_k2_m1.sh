@@ -73,4 +73,6 @@ if so:
     print("installed .so sha256:", hashlib.sha256(open(p,"rb").read()).hexdigest()[:16], f"({os.path.getsize(p)//(1024*1024)}M)")
 print("NOTE: default path is production; KVPRO_K2_M1=1 selects M1 at runtime (verify with a decode call).")
 PY
-echo "== build done. Next: inspect_k2_m1.sh (static gate) then the correctness + latency harnesses. =="
+echo "== build done (control + unroll sweep {1,2,4} in ONE wheel; select via KVPRO_K2_M1=0|1|2|4)."
+echo "   Next: inspect_k2_m1.sh (static spill per factor vs same-wheel control), then"
+echo "         bench_k2_m1_op.py (op/decode latency + token-match) BEFORE any full-model work. =="

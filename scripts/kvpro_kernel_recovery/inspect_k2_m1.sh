@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# K2-M1 Phase F — static-resource gate for the built K2-M1 kernel.
-# Reports regs/thread, stack, local, shared, text size, and SASS spill traffic (LDL/STL)
-# for the M1 target symbol, and applies the PRE-REGISTERED static gate. Register count is a
-# SIGNAL, not the verdict — the gate is measured latency (Phase H). POD-ONLY.
+# K2-M1 Phase F — static-resource gate for the built K2-M1 wheel (control + unroll sweep).
+# The int kM1Unroll param makes each factor a distinct symbol in ONE wheel:
+#   Lb1ELb1ELi0E = control (full unroll, freshly compiled)   <- the clean baseline
+#   Lb1ELb1ELi{1,2,4}E = M1 unroll factors
+# Reports REG/STACK/SHARED + SASS LDL/STL per factor and compares each M1 factor to the
+# SAME-WHEEL control. Register count is a signal, not the verdict; runtime latency
+# (bench_k2_m1_op.py, then the 16K/32K bench) is authoritative. POD-ONLY.
 #
 #   bash scripts/kvpro_kernel_recovery/inspect_k2_m1.sh
 set -u
 PY="${PYBIN:-python3}"; command -v "$PY" >/dev/null 2>&1 || PY="$(command -v python3 || true)"
-# Pre-registered static gate (from the task):
-GATE_PREFERRED=128; GATE_MIN_USEFUL=160
+TMP="$(mktemp -d 2>/dev/null || echo /tmp)"
 
 SO="$("$PY" - <<'PY' 2>/dev/null || true
 import os
@@ -24,44 +26,85 @@ PY
 command -v cuobjdump >/dev/null 2>&1 || { echo "[UNAVAILABLE] cuobjdump (export PATH=\$PATH:/usr/local/cuda/bin)"; exit 3; }
 echo "[.so] $SO"
 
-echo; echo "== static resources — int4kv_packed splitkv target (demangled) =="
-HAVE_FILT=0; command -v c++filt >/dev/null 2>&1 && HAVE_FILT=1
-cuobjdump -res-usage "$SO" 2>/dev/null | "$PY" - "$HAVE_FILT" "$GATE_PREFERRED" "$GATE_MIN_USEFUL" <<'PY'
-import sys, subprocess, re
-have_filt = sys.argv[1]=="1"; PREF=int(sys.argv[2]); MINU=int(sys.argv[3])
-def dm(s):
-    if not have_filt: return s
-    try: return subprocess.run(["c++filt", s], capture_output=True, text=True).stdout.strip()
-    except Exception: return s
-cur=None; tgt=[]
-for ln in sys.stdin.read().splitlines():
-    m=re.search(r"Function\s+(\S+)", ln)
-    if m: cur=m.group(1); continue
-    m=re.search(r"REG:(\d+).*STACK:(\d+).*SHARED:(\d+)", ln)
-    if m and cur:
-        d=dm(cur)
-        if "flash_fwd_splitkv_kernel" in d and (re.search(r"true,\s*true>\s*\(", d) or d.rstrip().endswith("true, true>")):
-            tgt.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), d))
-if not tgt:
-    print("  (no int4kv_packed symbol matched — check c++filt / that KVPRO_K2_M1 variant was built)"); raise SystemExit(0)
-worst=max(t[0] for t in tgt)
-for reg,stack,sh,d in tgt:
-    occ=int(65536/(reg*32)); print(f"  REG={reg} STACK={stack} SHARED={sh}  occ={occ}/64={100*occ/64:.0f}%  {d[:110]}")
+cuobjdump -res-usage "$SO" > "$TMP/res.txt" 2>/dev/null || true
+cuobjdump -sass      "$SO" > "$TMP/sass.txt" 2>/dev/null || true
+
+"$PY" - "$TMP/res.txt" "$TMP/sass.txt" <<'PY'
+import re, sys
+res = open(sys.argv[1]).read() if len(sys.argv) > 1 else ""
+sass = open(sys.argv[2]).read() if len(sys.argv) > 2 else ""
+# int4-packed target carries Lb1ELb1E (int4kv,packed) then Li<N>E (K2-M1 unroll factor).
+TGT = re.compile(r"Lb1ELb1ELi(\d+)E.*?vNS_16Flash_fwd_params")
+
+# --- static resources per factor (from -res-usage) ---
+cur = None
+res_by = {}
+for ln in res.splitlines():
+    m = re.search(r"Function\s+(\S+?):?\s*$", ln)
+    if m: cur = m.group(1); continue
+    m = re.search(r"REG:(\d+).*STACK:(\d+).*SHARED:(\d+)", ln)
+    if m and cur and "flash_fwd_splitkv_kernel" in cur:
+        t = TGT.search(cur)
+        if t:
+            res_by.setdefault(int(t.group(1)), []).append(
+                (int(m.group(1)), int(m.group(2)), int(m.group(3))))
+
+# --- LDL/STL per factor (from -sass) ---
+sass_by = {}
+cur = None; keep = False
+for ln in sass.splitlines():
+    m = re.search(r"Function :\s+(\S+)", ln)
+    if m:
+        cur = m.group(1); t = TGT.search(cur)
+        keep = ("flash_fwd_splitkv_kernel" in cur) and bool(t)
+        if keep: sass_by.setdefault(int(t.group(1)), []).append([0, 0])  # [ldl, stl]
+        continue
+    if keep and cur:
+        if "LDL" in ln: sass_by[int(TGT.search(cur).group(1))][-1][0] += 1
+        if "STL" in ln: sass_by[int(TGT.search(cur).group(1))][-1][1] += 1
+
+if not res_by:
+    print("  (no int4kv_packed Li<N> symbols — did KVPRO_K2_M1_BUILD compile? check the wheel)")
+    raise SystemExit(0)
+
+def rng(vals, i):
+    xs = [v[i] for v in vals]
+    return f"{min(xs)}-{max(xs)}" if xs else "-", (max(xs) if xs else 0)
+
+print(f"\n{'factor':<10}{'#sym':>6}{'REG':>10}{'STACK':>12}{'SHARED':>9}{'LDL(max)':>12}{'STL(max)':>10}")
+maxldl, maxstl = {}, {}
+for f in sorted(res_by):
+    rvals = res_by[f]
+    reg_r, _ = rng(rvals, 0); stk_r, _ = rng(rvals, 1)
+    shared = rvals[0][2] if rvals else 0
+    svals = sass_by.get(f, [])
+    ldl_r, ldl_max = rng(svals, 0); stl_r, stl_max = rng(svals, 1)
+    maxldl[f] = ldl_max; maxstl[f] = stl_max
+    name = "control" if f == 0 else f"U{f}"
+    print(f"{name:<10}{len(rvals):>6}{reg_r:>10}{stk_r:>12}{shared:>9}{ldl_r:>12}{stl_r:>10}")
+
+# --- gate: compare each M1 factor's worst spill to the same-wheel control (factor 0) ---
+print("\n-- static gate (advisory; runtime latency is authoritative) --")
+if 0 not in maxldl:
+    print("  no control (Li0E) symbol found — cannot compute reduction"); raise SystemExit(0)
+c_ldl, c_stl = maxldl[0], maxstl[0]
+advance = []
+for f in (1, 2, 4):
+    if f not in maxldl:
+        continue
+    dl = (c_ldl - maxldl[f]) / c_ldl if c_ldl else 0.0
+    ds = (c_stl - maxstl[f]) / c_stl if c_stl else 0.0
+    ok = (dl >= 0.25) or (ds >= 0.25)
+    print(f"  U{f}: max LDL {maxldl[f]} ({dl*100:+.0f}% vs control {c_ldl}), "
+          f"max STL {maxstl[f]} ({ds*100:+.0f}% vs {c_stl})  -> "
+          f"{'spill materially reduced' if ok else 'little static change'}")
+    if ok: advance.append(f)
 print()
-verdict = ("PASS-preferred (<=%d)"%PREF if worst<=PREF else
-           "PASS-min-useful (<=%d)"%MINU if worst<=MINU else
-           "OVER-160 — NOT a fail by itself: only fails if measured latency ALSO misses the gate")
-print(f"STATIC GATE: worst target REG={worst} -> {verdict}")
-print("REMINDER: register count cannot produce GO/NO-GO. The verdict is Phase H latency (>=20% @16K,32K).")
+if advance:
+    print(f"STATIC: spill reduced for {['U'+str(f) for f in advance]} -> run bench_k2_m1_op.py to "
+          "confirm on DECODE latency (the real gate).")
+else:
+    print("STATIC: no factor cut spill >=25%. Still run bench_k2_m1_op.py once — latency can move "
+          "even at similar static counts; if it does not, that is a measured NO-GO.")
+print("Next: python CTM_plus/Bench/scripts/bench_k2_m1_op.py --context-tokens 16000 --batch 8 --gen 64")
 PY
-
-echo; echo "== text size (target) =="
-cuobjdump -res-usage "$SO" 2>/dev/null | grep -iE "splitkv" -A1 | grep -iE "text|size" | head -6 || echo "  (text-size line not in -res-usage on this toolkit; use 'cuobjdump -elf' if needed)"
-
-echo; echo "== SASS spill evidence — LDL/STL (the real proof; STACK alone is not) =="
-cuobjdump -sass "$SO" 2>/dev/null | awk '
-  /\.text\._ZN5flash24flash_fwd_splitkv_kernel/ {f=$NF; ldl[f]=0; stl[f]=0; seen[f]=1}
-  /LDL/ {ldl[f]++} /STL/ {stl[f]++}
-  END {for (k in seen) printf "  LDL=%-5d STL=%-5d  %s\n", ldl[k], stl[k], substr(k,1,80)}' | sort || true
-echo "  (compare LDL/STL against the production baseline from extract_target_kernel.sh section 3:"
-echo "   fewer LDL/STL on the M1 symbol = spill reduced. This is the honest spill metric.)"
