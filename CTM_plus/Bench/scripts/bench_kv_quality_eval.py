@@ -45,6 +45,31 @@ _PROSE = (
     "accounts. The clinic reported that a new screening program had caught several cases early, when "
     "treatment is simplest and most effective. Late in the evening the power flickered once and held, and "
     "the town settled into an ordinary, unremarkable calm. "
+    "A cartographer redrawing the coastline found that a small island had vanished from the latest survey, "
+    "reclaimed by a decade of rising tides. The bakery on the corner switched to a slower fermentation, and "
+    "regulars swore the bread tasted of patience. Engineers testing the new bridge loaded it with trucks "
+    "full of water barrels, measuring how the deck flexed under a weight it might never carry. In the "
+    "archive basement, a curator catalogued photographs whose subjects no one alive could name. The comet, "
+    "visible for the first time in eighty years, drew crowds to rooftops who otherwise never looked up. A "
+    "teacher in the mountain village taught forty children across six grades in a single room warmed by a "
+    "wood stove. The startup abandoned its flagship feature after discovering that users wanted the opposite "
+    "of what the founders had assumed. Divers surveying the wreck reported that the cold had preserved the "
+    "ship's timbers far better than anyone expected. A court in the coastal province ruled that the ancient "
+    "right to gather seaweed could not be sold to the new resort. The pianist practiced the same four bars "
+    "for an hour, chasing a phrasing she could hear but not yet play. After the drought broke, the river "
+    "carried so much silt that the water ran the color of weak tea for a week. A linguist recording the last "
+    "fluent speakers of a dialect noticed they disagreed, gently, about the word for dusk. The observatory "
+    "postponed its public night when smoke from distant fires turned the stars to smudges. Volunteers "
+    "replanting the burned hillside chose species that would hold the soil before ones that would look "
+    "beautiful. The auditor found the discrepancy not in the large accounts but in a rounding rule applied "
+    "inconsistently for years. A chef known for excess surprised the critics with a menu of five plain "
+    "dishes, each nearly perfect. The train was late again, and the commuters had long since stopped "
+    "pretending to be surprised. Researchers found that the birds had learned to open the cafe's sugar "
+    "packets, a skill that spread across the city in a single summer. The museum lit the sculpture from "
+    "below, and a face that had looked stern for centuries suddenly seemed to be listening. A retired "
+    "engineer spent his mornings fixing the neighborhood's broken radios, refusing payment but accepting "
+    "coffee. The negotiators signed at dawn, too tired to smile for the single photograph that would outlast "
+    "them all. "
 )
 
 
@@ -149,11 +174,16 @@ def main(argv=None):
 
     text, source = _load_text()
     full = tk(text)["input_ids"]
-    if len(full) < args.context_tokens:                      # last-resort tile (only the prose fallback)
-        full = full * (args.context_tokens // max(1, len(full)) + 1)
-    ids = full[:args.context_tokens]
+    # NEVER tile: repeating a short passage makes the tail a memorized loop -> degenerate baseline.
+    # Cap the context to however much REAL text we have; a shorter valid test beats a long invalid one.
+    eff_ctx = min(args.context_tokens, len(full))
+    if eff_ctx < args.context_tokens:
+        print(f"  NOTE: only {len(full)} real tokens available (< {args.context_tokens} requested) -> "
+              f"measuring at ctx={eff_ctx} (still valid, just shallower). For a deeper long-context test, "
+              "`pip install datasets` (wikitext) or pass a longer --text-file.")
+    ids = full[:eff_ctx]
     prompt = tk.decode(ids)
-    mml = args.context_tokens + 64
+    mml = eff_ctx + 64
 
     def _has_flashinfer():
         try:
@@ -204,7 +234,7 @@ def main(argv=None):
         return {"ppl": perplexity(nlls), "nll": mean_nll, "n": len(nlls), "blocks": blocks}
 
     dtypes = [d.strip() for d in args.dtypes.split(",") if d.strip()]
-    print(f"\nKV quality eval (perplexity) — {args.model.split('/')[-1]} ctx={args.context_tokens} "
+    print(f"\nKV quality eval (perplexity) — {args.model.split('/')[-1]} ctx={eff_ctx} "
           f"tail>={args.ppl_start_frac:.0%}  source={source}")
     results = {}
     for dt in dtypes:
