@@ -57,6 +57,29 @@ python -c "import flashinfer" 2>/dev/null || pip install flashinfer-python   # m
 python CTM_plus/Bench/scripts/bench_kv_tier_eval.py --context-tokens 16000 --batch 8 --gen 64 --dtypes auto,fp8
 ```
 
+## ✅ Measured (2026-07-17, VALID — fp8 on FlashInfer)
+
+Re-run with fp8 forced onto FlashInfer (flashinfer **0.6.15** worked with vLLM 0.7.3 — no fallback),
+Qwen2.5-7B, ctx 16000, B=8, gen 64, eager:
+
+| dtype | decode ms/tok | vs bf16 | KV blocks | token-match |
+|---|--:|--:|--:|--:|
+| auto (bf16, FA2) | 16.82 | 1.00× | 45,008 | — |
+| **fp8 (FlashInfer)** | **16.87** | **1.00×** | 89,647 (**2.0×**) | 2% (confounded — see below) |
+| int4-protected (ref) | 152 | 9.0× | ~4–8× cap | — |
+
+- **Latency: GO.** fp8 KV is bf16 speed (1.00×). The earlier 119.5 ms/tok "7.24×" was a pure XFormers
+  fallback artifact, now eliminated by forcing FlashInfer.
+- **Capacity: 2.0×** KV blocks at fixed GPU-mem (half the KV bytes), vs int4's 4–8×.
+- **Quality: the 2% token-match is NOT a quality signal.** Greedy decoding diverges completely after one
+  early token flip, so a benign sub-percent fp8 rounding reads as ~2% match; it came out ~the same
+  (1.6–2%) on BOTH backends, confirming it tracks precision *drift*, not damage. The real gate is
+  **perplexity** — `bench_kv_quality_eval.py`, teacher-forced NLL over fixed text (not confounded by
+  drift), **PPL delta ≤ 1% frozen before measurement**. **Run that next; it is the last open leg.**
+
+Environment: fp8 KV needs FlashInfer in this stack; flashinfer 0.6.15 installed against torch 2.5.1+cu121
+and served fp8 at bf16 speed (protobuf downgraded 7.35.1→6.33.6, harmless; int4 op unaffected).
+
 ## The evaluation (before funding more int4 or committing the speed tier)
 
 Run `bench_kv_tier_eval.py` on the A100 to measure, at matched operating points, `kv_cache_dtype ∈
@@ -69,6 +92,10 @@ FlashInfer (above) or the latency is invalid:**
 3. **capacity** — KV blocks / max concurrency at fixed GPU-mem (fp8 ≈ 2× bf16; int4 ≈ 4–8×).
 
 ### Pre-registered decision
+
+**Status (2026-07-17): latency ✅ (1.00×) · capacity ✅ (2.0×) · quality ⏳ pending PPL
+(`bench_kv_quality_eval.py`). Two of three legs pass; fp8 is a confirmed speed candidate awaiting the
+perplexity gate.**
 
 - **fp8 GO as speed tier** if decode ≈ bf16 (≤ ~1.2×) **and** quality loss is acceptable for the
   target workload (fraction-matching high / small perplexity delta). → ship two tiers: int4=capacity,
