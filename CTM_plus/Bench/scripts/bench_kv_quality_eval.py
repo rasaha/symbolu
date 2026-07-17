@@ -209,10 +209,13 @@ def main(argv=None):
             os.environ.pop("VLLM_ATTENTION_BACKEND", None)
         llm_kw = dict(model=args.model, max_model_len=mml, gpu_memory_utilization=args.gpu_util,
                       dtype="bfloat16", kv_cache_dtype=dtype, enforce_eager=True, max_num_seqs=1)
-        if args.calibrate and dtype.startswith("fp8"):
+        calibrating = args.calibrate and dtype.startswith("fp8")
+        if calibrating:
             # runtime KV-scale calculation (vLLM 0.7.3+): rescues models whose KV outliers saturate the
             # default scale=1.0. Same lever bench_8bit_kv_gate.py used for fp8_e4m3.
             llm_kw["calculate_kv_scales"] = True
+            print(f"  [CALIBRATION] --calibrate ON -> passing calculate_kv_scales=True for {dtype} "
+                  "(the make-or-break lever vs default scale=1.0).")
         llm = LLM(**llm_kw)
         try:
             blocks = llm.llm_engine.cache_config.num_gpu_blocks
@@ -238,6 +241,27 @@ def main(argv=None):
             except (TypeError, ValueError):
                 continue
         mean_nll = sum(nlls) / len(nlls) if nlls else float("inf")
+        if calibrating:                                          # prove calibration engaged (1.0 == no-op)
+            try:
+                mdl = llm.llm_engine.model_executor.driver_worker.model_runner.model
+                sc = []
+                for _, mod in mdl.named_modules():
+                    for a in ("_k_scale", "_v_scale"):
+                        v = getattr(mod, a, None)
+                        if v is not None:
+                            try: sc.append(round(float(v.item() if hasattr(v, "item") else v), 5))
+                            except Exception: pass
+                    if len(sc) >= 4: break
+                if sc and any(abs(s - 1.0) > 1e-5 for s in sc):
+                    print(f"  [CALIBRATION] ACTIVE — sample KV scales {sc[:4]} (non-default -> it took effect).")
+                elif sc:
+                    print(f"  [CALIBRATION] NO-OP — KV scales still {sc[:4]} (~1.0): calculate_kv_scales had "
+                          "NO effect on this path -> need OFFLINE scales (--quantization-param-path).")
+                else:
+                    print("  [CALIBRATION] could not read scales; judge by whether PPL moved off the "
+                          "uncalibrated 798.6.")
+            except Exception as ex:
+                print(f"  [CALIBRATION] scale introspection failed ({type(ex).__name__}); judge by PPL.")
         del llm
         torch.cuda.empty_cache()
         return {"ppl": perplexity(nlls), "nll": mean_nll, "n": len(nlls), "blocks": blocks}
