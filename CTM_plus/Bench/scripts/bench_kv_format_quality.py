@@ -59,8 +59,11 @@ def _fp8_qdq(x):
     return _round_e4m3(x / scale) * scale
 
 
-def _nvfp4_qdq(x, block=16):
-    """NVFP4: E2M1 elements, per-`block` e4m3 scale, per-tensor fp32 global scale (two-level)."""
+def _nvfp4_qdq(x, block=16, diag=None):
+    """NVFP4: E2M1 elements, per-`block` e4m3 scale, per-tensor fp32 global scale (two-level).
+    If `diag` is a dict, record observation-only diagnostics (numerics unchanged): the e4m3 block-scale
+    UNDERFLOW rate (blocks whose stored scale collapsed toward the 1e-8 floor — the hypothesised cause of
+    the NVFP4-protected 2% anomaly) and the e2m1 element clip rate."""
     import torch
     D = x.shape[-1]
     if D % block:
@@ -69,9 +72,21 @@ def _nvfp4_qdq(x, block=16):
     g_scale = g_amax / (_E2M1_MAX * _E4M3_MAX)                     # per-tensor fp32 scale
     xb = x.reshape(*x.shape[:-1], D // block, block)
     b_amax = xb.abs().amax(dim=-1, keepdim=True).clamp(min=1e-8)
-    b_scale = (b_amax / _E2M1_MAX)                                 # fp32 per-block scale (map amax->6.0)
-    b_scale = (_round_e4m3(b_scale / g_scale) * g_scale).clamp(min=1e-8)   # store block scale in e4m3
+    b_scale_raw = (b_amax / _E2M1_MAX)                            # fp32 per-block scale (map amax->6.0)
+    b_scale = (_round_e4m3(b_scale_raw / g_scale) * g_scale).clamp(min=1e-8)   # store block scale in e4m3
     xq = _round_e2m1(xb / b_scale) * b_scale
+    if diag is not None:
+        # underflow: the e4m3-stored block scale rounded to (near) zero relative to the ideal fp32 scale,
+        # so the block reconstructs toward zero. Measured as stored/ideal < 1/16 (>=4 e4m3 exponent steps
+        # down) OR the 1e-8 floor being the binding value.
+        ideal = b_scale_raw.clamp(min=1e-8)
+        ratio = (b_scale / ideal)
+        underflow = ((ratio < 0.0625) | (b_scale <= 1.0000001e-8)).float()
+        clip_hi = (xb.abs() / b_scale > _E2M1_MAX + 1e-6).float()
+        diag["nvfp4_blocks"] = int(underflow.numel())
+        diag["nvfp4_underflow_rate"] = float(underflow.mean().item())
+        diag["nvfp4_e2m1_cliphi_rate"] = float(clip_hi.mean().item())
+        diag["nvfp4_g_amax"] = float(g_amax.item())
     return xq.reshape_as(x)
 
 
@@ -297,34 +312,18 @@ def _selftest():
     return 0 if not fails else 1
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description="KV-format quality: NVFP4 (+protected) vs int4-protected via emulation")
-    ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
-    ap.add_argument("--formats", default="bf16,fp8,int4_protected,nvfp4,nvfp4_protected")
-    ap.add_argument("--context", type=int, default=4096)
-    ap.add_argument("--ppl-start-frac", type=float, default=0.5)
-    ap.add_argument("--protect-frac", type=float, default=0.04)
-    ap.add_argument("--text-file", default=None)
-    ap.add_argument("--selftest", action="store_true")
-    args = ap.parse_args(argv)
-    if args.selftest:
-        return _selftest()
-
-    import torch
-    import torch.nn.functional as F
-
-    # --- pod env-fix: newer transformers EAGERLY imports torchaudio (via its RNNT-loss module) when it
-    # loads ANY model. If torchaudio's CUDA build mismatches torch (e.g. torchaudio cu124 vs torch cu121)
-    # that import raises and cascades to "Could not import module 'Qwen2ForCausalLM'". We never use
-    # torchaudio here, so if it can't import cleanly, stub it in sys.modules BEFORE transformers loads. ---
+def ensure_torchaudio_importable():
+    """Pod env-fix: newer transformers EAGERLY imports torchaudio (via its RNNT-loss module) when it
+    loads ANY model. If torchaudio's CUDA build mismatches torch (e.g. torchaudio cu124 vs torch cu121)
+    that import raises and cascades to "Could not import module 'Qwen2ForCausalLM'". We never use
+    torchaudio here, so if it can't import cleanly, stub it in sys.modules BEFORE transformers loads.
+    Shared by main() and the Step-2/3 instrument (bench_kv_format_instrument.py)."""
     import types, importlib.machinery
     from unittest.mock import MagicMock
     try:
         import torchaudio  # noqa: F401  (use the real one when it imports cleanly)
-        _ta_ok, _ta_err = True, None
+        return False
     except Exception as _e:
-        _ta_ok, _ta_err = False, _e            # save it: the `as` target is cleared after the except block
-    if not _ta_ok:
         for _name in [m for m in list(sys.modules) if m == "torchaudio" or m.startswith("torchaudio.")]:
             del sys.modules[_name]                                # drop any partial import
         def _mk_ta_stub(_name):
@@ -341,8 +340,27 @@ def main(argv=None):
         sys.modules["torchaudio"] = _mk_ta_stub("torchaudio")
         for _sub in ("functional", "_extension", "transforms", "models", "io", "compliance", "datasets"):
             sys.modules[f"torchaudio.{_sub}"] = _mk_ta_stub(f"torchaudio.{_sub}")
-        print(f"  [env-fix] torchaudio unusable ({type(_ta_err).__name__}: {_ta_err}); stubbed it "
+        print(f"  [env-fix] torchaudio unusable ({type(_e).__name__}: {_e}); stubbed it "
               f"(unused by this bench) so the model can load.")
+        return True
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="KV-format quality: NVFP4 (+protected) vs int4-protected via emulation")
+    ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
+    ap.add_argument("--formats", default="bf16,fp8,int4_protected,nvfp4,nvfp4_protected")
+    ap.add_argument("--context", type=int, default=4096)
+    ap.add_argument("--ppl-start-frac", type=float, default=0.5)
+    ap.add_argument("--protect-frac", type=float, default=0.04)
+    ap.add_argument("--text-file", default=None)
+    ap.add_argument("--selftest", action="store_true")
+    args = ap.parse_args(argv)
+    if args.selftest:
+        return _selftest()
+
+    import torch
+    import torch.nn.functional as F
+    ensure_torchaudio_importable()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
