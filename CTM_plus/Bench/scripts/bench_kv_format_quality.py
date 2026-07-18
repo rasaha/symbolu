@@ -166,6 +166,11 @@ def quant_dequant(x, fmt, protect_frac=0.04, is_key=False):
         return _nvfp4_qdq(x)                                      # both K & V, no protect
     if fmt == "nvfp4_protected":                                  # swap base quantizer, same K-only protect
         return _protected(x, _nvfp4_qdq, protect_frac) if is_key else _nvfp4_qdq(x)
+    if fmt == "nvfp4k_int4v_protected":
+        # DECISIVE format-transfer isolation (Step 4): swap ONLY the K base quantizer (per-channel int4 ->
+        # per-block NVFP4), holding V IDENTICAL to int4_protected (int4 per-32-channel group). vs
+        # int4_protected this differs in exactly one variable — K's format — so it removes the V confound.
+        return _protected(x, _nvfp4_qdq, protect_frac) if is_key else _int4_v_prod(x)
     raise ValueError(f"unknown format {fmt!r}")
 
 
@@ -283,6 +288,13 @@ def _selftest():
     ck("inv2b 100% protect == bf16 (nvfp4)", torch.equal(quant_dequant(K, "nvfp4_protected", 1.0, is_key=True), K))
     kp = quant_dequant(K, "int4_protected", 0.04, is_key=True)     # top-5 per head incl. outlier ch5
     ck("inv3 protected channel == bf16 source exactly", torch.equal(kp[..., 5], K[..., 5]))
+    # isolated-K format (Step 4): K == nvfp4_protected's K, V == int4_protected's V (one-variable swap)
+    ck("nvfp4k_int4v: K matches nvfp4_protected",
+       torch.equal(quant_dequant(K, "nvfp4k_int4v_protected", 0.04, is_key=True),
+                   quant_dequant(K, "nvfp4_protected", 0.04, is_key=True)))
+    ck("nvfp4k_int4v: V matches int4_protected",
+       torch.equal(quant_dequant(K, "nvfp4k_int4v_protected", 0.04, is_key=False),
+                   quant_dequant(K, "int4_protected", 0.04, is_key=False)))
     _mse = lambda fmt, pf: (quant_dequant(K, fmt, pf, is_key=True) - K).pow(2).mean().item()
     mse_i = [_mse("int4_protected", pf) for pf in (0.0, 0.02, 0.04, 0.08, 0.16)]
     ck("inv4a int4-K MSE non-increasing in protection", all(mse_i[i + 1] <= mse_i[i] + 1e-9 for i in range(4)))
