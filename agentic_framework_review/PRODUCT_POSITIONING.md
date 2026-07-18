@@ -9,7 +9,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
 ## 0. A required correction about the taxonomy in the question
 
 **FACT.** The task asks us to place the Agentic Framework among three product families — *Specialized AI Systems*, *AI Control Plane*, *AI Infrastructure*. Two of these three labels are **not** how the repo currently organizes itself:
-- The current authoritative framing (`docs/XOZENCE_PITCHBOOK.md`) is **"AI Infrastructure Platform | Five Composing Modules + Two Standalone Verticals."** The Agentic Framework is module #3.
+- The current authoritative framing (`docs/UGENCE_PITCHBOOK.md`) is **"AI Infrastructure Platform | Five Composing Modules + Two Standalone Verticals."** The Agentic Framework is module #3.
 - **"AI Control Plane"** appears **only** in the internal `acp/` docs describing the Context-Min + ActionGate + ACP composition — it is *not* a pitchbook product category.
 - **"Specialized AI Systems"** appears **nowhere** in the repo (repo-wide grep: no matches). The closest concept is "two standalone verticals" (PSE, Robotics).
 

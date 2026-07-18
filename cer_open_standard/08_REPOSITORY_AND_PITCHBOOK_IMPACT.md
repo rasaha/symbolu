@@ -23,7 +23,7 @@ Labels: `FACT` (repo-verified) · `INTERPRETATION` · `RECOMMENDATION`.
 
 ## 2. Product positioning impact — a genuine inversion
 
-**FACT (the current framing).** The pitchbook sells "governance as a **runtime contract, not middleware**" where the contract is *internal to the Ugence runtime* — "the execution ordering `cancel → budget → approve → execute` is pinned by the test suite" (`docs/XOZENCE_PITCHBOOK.md:827,853`), and "we control both the adapter interface" (`:781`). Governance is a *property of our runtime*.
+**FACT (the current framing).** The pitchbook sells "governance as a **runtime contract, not middleware**" where the contract is *internal to the Ugence runtime* — "the execution ordering `cancel → budget → approve → execute` is pinned by the test suite" (`docs/UGENCE_PITCHBOOK.md:827,853`), and "we control both the adapter interface" (`:781`). Governance is a *property of our runtime*.
 
 **INTERPRETATION — CER inverts this.** If governance is an *open contract any runtime emits into*, the value proposition moves from:
 - **Before:** "our runtime enforces governance as a tested contract" (runtime-centric; competes with LangGraph et al. on runtime quality — where Ugence is behind, `FACT`).
