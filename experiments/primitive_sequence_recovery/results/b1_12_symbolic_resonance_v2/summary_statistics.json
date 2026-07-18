@@ -1,0 +1,44 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "model_identity_dependence": "SIGNIFICANT_ROLE_DEPENDENCE",
+  "component": {
+    "n_components": 60,
+    "exact_agreement": 0.5333,
+    "within_one_step_agreement": 0.85,
+    "mean_abs_diff": 15.42,
+    "median_abs_diff": 0.0,
+    "signed_mean_diff_Qwen_minus_Mistral": -4.58
+  },
+  "verdict": {
+    "exact_verdict_agreement": 0.5,
+    "model_sensitive_words": [
+      "akrodha",
+      "bhrama",
+      "cintā",
+      "kapāla"
+    ]
+  },
+  "relationship": {
+    "exact": 36,
+    "compatible": 7,
+    "incompatible": 17
+  },
+  "score_distributions": {
+    "Qwen": {
+      "0": 15,
+      "25": 28,
+      "50": 6,
+      "75": 10,
+      "100": 1
+    },
+    "Mistral": {
+      "0": 7,
+      "25": 31,
+      "50": 12,
+      "75": 10,
+      "100": 0
+    }
+  },
+  "profile_material_disagreements": 2,
+  "n_strongest_disagreements_ge50": 9
+}

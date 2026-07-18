@@ -1,7 +1,10 @@
 # KVPro — Investor Brief
 
-**Cognade Labs**
+**Ugence Labs**
 *Quality-safe KV-cache compression for long-context LLM serving*
+
+> **Product family.** KVPro is an **AI Infrastructure** product in the Ugence Labs platform, alongside
+> the Cloud Scaling Controller. Canonical platform architecture: `UGENCE_PLATFORM_OVERVIEW.md`.
 
 > This is the investor-facing brief. It states **measured results** and the **market**; it does
 > **not** disclose the method. KVPro's compression mechanism is **proprietary and patent-pending** —

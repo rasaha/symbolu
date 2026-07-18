@@ -1,0 +1,56 @@
+{
+  "actiongate_policy": "0.1.0-ref:b93b95d182bf796c",
+  "checksums": {
+    "REAL_LLM_RESULTS.md": "sha256:1bd0ebe81eeb188a8dc3c1bc305687d94e1f88e0a21473546bed3a6d5dc055be",
+    "environment_probe.json": "sha256:0665e3b56f5787e2c0c62234f5e537d6f728367b9fa24864e7a017b7b0d82c64",
+    "records.jsonl": "sha256:4d2b3a5b561d81e2f5dd4626366e7e9ae4783eea70ad424646775cc593e43c26",
+    "results.csv": "sha256:201c67c8b7a075eaa9957db2b5fff094bc74a69f5ac3910f7ed511ea2785ff6c",
+    "results.json": "sha256:bb5f1286bbea3b9e6f39933609d376cda76929395fae1cdf2bc7bbfec6712029",
+    "run_config.json": "sha256:aacb029805477cbfd1dca5455ee2973d20618526fdaf9cc1c42b6ba73122678c",
+    "verify_report.json": "sha256:f009b4c5140baf42c23d4cd677e54f89acb5c61918b4de8c92d9fe67d6b9a3e7"
+  },
+  "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+  "git": {
+    "branch": "claude/token-compression-enterprise-0koy0r",
+    "commit": "0e5931034453a70bd38011f919c9c420f7ed5e16",
+    "dirty": true
+  },
+  "is_real": true,
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "model_revision": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+  "n_records": 3808,
+  "note": "",
+  "records_per_cell": {
+    "original@0.0": 476,
+    "protected@0.2": 476,
+    "protected@0.3": 476,
+    "protected@0.4": 476,
+    "protection_unaware@0.2": 476,
+    "protection_unaware@0.3": 476,
+    "protection_unaware@0.4": 476,
+    "structural_only@0.0": 476
+  },
+  "run_config": {
+    "budgets": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "dtype": "auto",
+    "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+    "max_new_tokens": 64,
+    "methods": [
+      "original",
+      "structural_only",
+      "protected",
+      "protection_unaware"
+    ],
+    "model_id": "Qwen/Qwen2.5-14B-Instruct",
+    "model_revision": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+    "run_id": "xmodel_Qwen2.5-14B-Instruct",
+    "run_kind": "PRIMARY",
+    "system_hash": "sha256:0131598f9a531c02e142a8cc2ad178a82f5c0472963059d2a18fa9f72499a564"
+  },
+  "run_id": "xmodel_Qwen2.5-14B-Instruct",
+  "run_kind": "PRIMARY"
+}

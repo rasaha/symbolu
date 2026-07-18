@@ -1,0 +1,726 @@
+{
+  "_about": "Domain metadata only. annotation_source=manual_domain_metadata. NO governance decision, NO MATCH scores. All domains are in registry.DOMAIN_REGISTRY.",
+  "annotation_source": "manual_domain_metadata",
+  "tasks": {
+    "wt_00": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "wt_01": {
+      "requested_domain": "law",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "medicine",
+      "action_domain": "medicine"
+    },
+    "wt_02": {
+      "requested_domain": "biology",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "wt_03": {
+      "requested_domain": "astronomy",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "wt_04": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "medicine",
+      "action_domain": "medicine"
+    },
+    "wt_05": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "wt_06": {
+      "requested_domain": "programming",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "tool_domain": "agriculture",
+      "action_domain": "agriculture"
+    },
+    "wt_07": {
+      "requested_domain": "religion",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "wt_08": {
+      "requested_domain": "agriculture",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "tool_domain": "law",
+      "action_domain": "law"
+    },
+    "wt_09": {
+      "requested_domain": "security",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "fruit",
+      "action_domain": "fruit"
+    },
+    "am_00": {
+      "requested_domain": "fruit",
+      "primary_domain": "fruit",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "tool_domain": "fruit",
+      "action_domain": "fruit"
+    },
+    "am_01": {
+      "requested_domain": "programming",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "programming",
+      "action_domain": "programming"
+    },
+    "am_02": {
+      "requested_domain": "astronomy",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "mythology"
+      ],
+      "tool_domain": "astronomy",
+      "action_domain": "astronomy"
+    },
+    "am_03": {
+      "requested_domain": "commerce",
+      "primary_domain": "commerce",
+      "secondary_domains": [
+        "nature"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "am_04": {
+      "requested_domain": "biology",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "biology",
+      "action_domain": "biology"
+    },
+    "am_05": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "nature"
+      ],
+      "rejected_domains": [
+        "religion"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "am_06": {
+      "requested_domain": "construction",
+      "primary_domain": "construction",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "tool_domain": "construction",
+      "action_domain": "construction"
+    },
+    "am_07": {
+      "requested_domain": "biology",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "security"
+      ],
+      "tool_domain": "biology",
+      "action_domain": "biology"
+    },
+    "am_08": {
+      "requested_domain": "chemistry",
+      "primary_domain": "chemistry",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "construction"
+      ],
+      "tool_domain": "chemistry",
+      "action_domain": "chemistry"
+    },
+    "am_09": {
+      "requested_domain": "nature",
+      "primary_domain": "nature",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "nature",
+      "action_domain": "nature"
+    },
+    "bn_00": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "medicine",
+      "action_domain": "medicine"
+    },
+    "bn_01": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "bn_02": {
+      "requested_domain": "law",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "law",
+      "action_domain": "law"
+    },
+    "bn_03": {
+      "requested_domain": "education",
+      "primary_domain": "education",
+      "secondary_domains": [
+        "service"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "education",
+      "action_domain": "education"
+    },
+    "bn_04": {
+      "requested_domain": "technology",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "tool_domain": "technology",
+      "action_domain": "technology"
+    },
+    "bn_05": {
+      "requested_domain": "agriculture",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "nature"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "agriculture",
+      "action_domain": "agriculture"
+    },
+    "bn_06": {
+      "requested_domain": "commerce",
+      "primary_domain": "commerce",
+      "secondary_domains": [
+        "finance"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "bn_07": {
+      "requested_domain": "security",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "security",
+      "action_domain": "security"
+    },
+    "bn_08": {
+      "requested_domain": "care",
+      "primary_domain": "care",
+      "secondary_domains": [
+        "medicine"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "care",
+      "action_domain": "care"
+    },
+    "bn_09": {
+      "requested_domain": "programming",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "tool_domain": "programming",
+      "action_domain": "programming"
+    },
+    "hr_00": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "hr_01": {
+      "requested_domain": "security",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "security",
+      "action_domain": "security"
+    },
+    "hr_02": {
+      "requested_domain": "technology",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "tool_domain": "technology",
+      "action_domain": "technology"
+    },
+    "hr_03": {
+      "requested_domain": "construction",
+      "primary_domain": "construction",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "construction",
+      "action_domain": "construction"
+    },
+    "hr_04": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "medicine",
+      "action_domain": "medicine"
+    },
+    "hr_05": {
+      "requested_domain": "authority",
+      "primary_domain": "authority",
+      "secondary_domains": [
+        "law"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "authority",
+      "action_domain": "authority"
+    },
+    "hr_06": {
+      "requested_domain": "service",
+      "primary_domain": "service",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "service",
+      "action_domain": "service"
+    },
+    "hr_07": {
+      "requested_domain": "law",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "law",
+      "action_domain": "law"
+    },
+    "hr_08": {
+      "requested_domain": "heat",
+      "primary_domain": "heat",
+      "secondary_domains": [
+        "danger"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "heat",
+      "action_domain": "heat"
+    },
+    "hr_09": {
+      "requested_domain": "danger",
+      "primary_domain": "danger",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "danger",
+      "action_domain": "danger"
+    },
+    "lr_00": {
+      "requested_domain": "education",
+      "primary_domain": "education",
+      "secondary_domains": [
+        "service"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "education",
+      "action_domain": "education"
+    },
+    "lr_01": {
+      "requested_domain": "biology",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "medicine"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "biology",
+      "action_domain": "biology"
+    },
+    "lr_02": {
+      "requested_domain": "astronomy",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "tool_domain": "astronomy",
+      "action_domain": "astronomy"
+    },
+    "lr_03": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "lr_04": {
+      "requested_domain": "law",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "tool_domain": "law",
+      "action_domain": "law"
+    },
+    "lr_05": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "medicine",
+      "action_domain": "medicine"
+    },
+    "lr_06": {
+      "requested_domain": "commerce",
+      "primary_domain": "commerce",
+      "secondary_domains": [
+        "finance"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "lr_07": {
+      "requested_domain": "programming",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "tool_domain": "programming",
+      "action_domain": "programming"
+    },
+    "lr_08": {
+      "requested_domain": "chemistry",
+      "primary_domain": "chemistry",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "chemistry",
+      "action_domain": "chemistry"
+    },
+    "lr_09": {
+      "requested_domain": "nature",
+      "primary_domain": "nature",
+      "secondary_domains": [
+        "agriculture"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "nature",
+      "action_domain": "nature"
+    },
+    "pi_00": {
+      "requested_domain": "finance",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "security"
+      ],
+      "tool_domain": "security",
+      "action_domain": "security"
+    },
+    "pi_01": {
+      "requested_domain": "medicine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "pi_02": {
+      "requested_domain": "education",
+      "primary_domain": "education",
+      "secondary_domains": [
+        "service"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "pi_03": {
+      "requested_domain": "agriculture",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "nature"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "pi_04": {
+      "requested_domain": "astronomy",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "pi_05": {
+      "requested_domain": "law",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "pi_06": {
+      "requested_domain": "chemistry",
+      "primary_domain": "chemistry",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "danger"
+      ],
+      "tool_domain": "danger",
+      "action_domain": "danger"
+    },
+    "pi_07": {
+      "requested_domain": "technology",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "tool_domain": "commerce",
+      "action_domain": "commerce"
+    },
+    "pi_08": {
+      "requested_domain": "religion",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "service"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "tool_domain": "finance",
+      "action_domain": "finance"
+    },
+    "pi_09": {
+      "requested_domain": "construction",
+      "primary_domain": "construction",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "security"
+      ],
+      "tool_domain": "security",
+      "action_domain": "security"
+    }
+  }
+}

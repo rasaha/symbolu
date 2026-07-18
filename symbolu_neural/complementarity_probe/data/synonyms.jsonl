@@ -1,0 +1,32 @@
+{"concept": "happy", "words": ["happy", "glad", "joyful", "cheerful", "merry", "elated", "delighted"]}
+{"concept": "sad", "words": ["sad", "unhappy", "sorrowful", "miserable", "gloomy", "dejected", "mournful"]}
+{"concept": "big", "words": ["big", "large", "huge", "enormous", "massive", "gigantic", "immense"]}
+{"concept": "small", "words": ["small", "little", "tiny", "miniature", "petite", "minute", "compact"]}
+{"concept": "fast", "words": ["fast", "quick", "rapid", "swift", "speedy", "hasty", "brisk"]}
+{"concept": "slow", "words": ["slow", "sluggish", "leisurely", "unhurried", "gradual", "tardy"]}
+{"concept": "smart", "words": ["smart", "clever", "intelligent", "bright", "brilliant", "sharp", "wise"]}
+{"concept": "stupid", "words": ["stupid", "foolish", "dumb", "idiotic", "dense", "obtuse", "dull"]}
+{"concept": "beautiful", "words": ["beautiful", "pretty", "gorgeous", "lovely", "attractive", "stunning", "elegant"]}
+{"concept": "ugly", "words": ["ugly", "hideous", "unsightly", "repulsive", "grotesque", "homely"]}
+{"concept": "angry", "words": ["angry", "furious", "irate", "enraged", "livid", "incensed", "mad"]}
+{"concept": "calm", "words": ["calm", "peaceful", "serene", "tranquil", "placid", "relaxed", "composed"]}
+{"concept": "brave", "words": ["brave", "courageous", "fearless", "bold", "valiant", "heroic", "daring"]}
+{"concept": "afraid", "words": ["afraid", "scared", "fearful", "frightened", "terrified", "anxious", "timid"]}
+{"concept": "rich", "words": ["rich", "wealthy", "affluent", "prosperous", "opulent", "loaded"]}
+{"concept": "poor", "words": ["poor", "destitute", "impoverished", "needy", "penniless", "broke"]}
+{"concept": "strong", "words": ["strong", "powerful", "mighty", "robust", "sturdy", "muscular", "forceful"]}
+{"concept": "weak", "words": ["weak", "feeble", "frail", "fragile", "delicate", "flimsy", "puny"]}
+{"concept": "old", "words": ["old", "ancient", "aged", "elderly", "antique", "vintage"]}
+{"concept": "new", "words": ["new", "fresh", "novel", "modern", "recent", "current", "contemporary"]}
+{"concept": "cold", "words": ["cold", "chilly", "frigid", "freezing", "icy", "frosty", "cool"]}
+{"concept": "hot", "words": ["hot", "warm", "scorching", "burning", "boiling", "torrid", "sweltering"]}
+{"concept": "good", "words": ["good", "fine", "excellent", "great", "superb", "wonderful", "splendid"]}
+{"concept": "bad", "words": ["bad", "awful", "terrible", "horrible", "dreadful", "atrocious", "lousy"]}
+{"concept": "loud", "words": ["loud", "noisy", "booming", "deafening", "thunderous", "blaring"]}
+{"concept": "quiet", "words": ["quiet", "silent", "hushed", "muted", "soft", "noiseless", "still"]}
+{"concept": "easy", "words": ["easy", "simple", "effortless", "straightforward", "painless", "facile"]}
+{"concept": "hard", "words": ["hard", "difficult", "tough", "challenging", "arduous", "demanding", "tricky"]}
+{"concept": "begin", "words": ["begin", "start", "commence", "initiate", "launch", "originate"]}
+{"concept": "end", "words": ["end", "finish", "conclude", "terminate", "cease", "complete", "halt"]}
+{"concept": "rejoice", "words": ["rejoice", "delight", "exult", "revel", "celebrate"]}
+{"concept": "tired", "words": ["tired", "exhausted", "weary", "fatigued", "drained", "sleepy", "spent"]}

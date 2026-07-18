@@ -1,0 +1,70 @@
+{
+  "artifact": "b1_3_concrete_object_llm_freeze_review_manifest_v2_after_polish",
+  "status": "FREEZE_REVIEW_V2_COMPLETE_NOT_FROZEN",
+  "review_type": "EVIDENCE_FREEZE readiness review after global register-polish (review only; freeze NOT declared here)",
+  "evidence_freeze_declared": false,
+  "evidence_judge_run": false,
+  "real_scoring_run": false,
+  "prior_results_preserved": true,
+  "study_object": "Dictionary meaning fixes the object; varṇa/vṛtti supplies modulation tags, not a definition. Blinded LLM judges compare which option better fits the object-function without changing denotation.",
+  "v2_supersedes_v1": true,
+  "v1_status": "PRESERVED as historical draft; NOT bound as active freeze inputs",
+  "active_freeze_artifacts_sha256": {
+    "b1_3_concrete_object_final_primary_wordlist.json": "c8cf24c4af7a26cd0dbd26d2040d9fafde6150ad37cc53e85eb061b2d26bf01e",
+    "b1_3_concrete_object_deranged_source_map.json": "123a86aa8fb30f57d64c9e1f337cb613d567253680314ddb607d7984c0551eda",
+    "b1_3_concrete_object_generation_template_spec.json": "59b09eb8c5c07b0035ccbd00572f2b85053f5ac8eb75d000193132a05741ae44",
+    "b1_3_concrete_object_arm_construction_spec.json": "f4a52635b2229ccb1d0abb2f2458fb41bc0fd856a08b2a872f4497d572477d22",
+    "b1_3_concrete_object_semantic_baseline_spec.json": "3f88056b133371fda3b0b0690280598d99362068a52207cd0e9a43a1108affa1",
+    "b1_3_concrete_object_deranged_stratification_spec.json": "dcaafe22ac22edeb37e13c0fcdf9ae2ad00c3f8a4205df4fb4d9d1b3531eadc1",
+    "b1_3_concrete_object_llm_scoring_contract_v2.json": "b55bc91f63a8b7fb57672ddef479a5e49c50fbebda31ae618b71ca4adcb04a25",
+    "b1_3_concrete_object_llm_style_audit_protocol_draft.json": "156008bc85702a318a679813d7e73cccc9a84a9eee4426cadfa0fe7f3eb7275c",
+    "b1_3_concrete_object_llm_judge_spec.json": "8f49f26e82cea78533e35e09c9b18a46012ab4f8c34848d41619a40b2224a16f",
+    "score_b1_3_concrete_object_llm.py": "dbdf6f4b36fe70a175a428caac048fb0e492dc683331c4cf5d105195d38fe8d7",
+    "test_score_b1_3_concrete_object_llm.py": "6b9fc03a0b9d315384225fe65158cdf1809ee6bd768662f17ac327513a74c41c",
+    "b1_3_concrete_object_llm_scoring_script_manifest.json": "d15f7da365a0830cc0d661ffdbad046a28258cb698ccb2d263d12390977ac8e7",
+    "b1_3_concrete_object_final_stimuli_draft_v2.jsonl": "20f1ab619e1bc5ef5f06bb9f1b42e1221e941636e8387bd78fc853b0b64a04e9",
+    "b1_3_concrete_object_style_audit_report_v2.json": "f27666313692a325f239aeaea901b16c2318868a2121410c03a6288efd4f273a",
+    "b1_3_concrete_object_style_audit_report_v2.md": "1b9fc85c1a403082114f8b152d0f7c4fd22c73af54d52b1a42da241e5b74f7f2",
+    "b1_3_concrete_object_stimulus_generation_manifest_v2.json": "559c9213e92946782c0b6baa69b92465e1f7b01af01eec7849d8477d04e031f2",
+    "b1_3_concrete_object_llm_judge_model_config_v2.json": "ee50403377decec940bef2f664e7a3310ce23f08e4cad8dfb12d2b9160a80fd1"
+  },
+  "self_hash_status": "PENDING (this manifest's own sha256 is bound by the operator at the freeze step, after final content is fixed)",
+  "v1_historical_reference_hashes": {
+    "b1_3_concrete_object_final_stimuli_draft.jsonl": "48beaf88f32bf11e89d8909c860b1adea7abd528f01c8fd5b0f9e678ec00bbbf",
+    "b1_3_concrete_object_style_audit_report.json": "fe3a04a1a0df27d429ab1ee42262a41fb281fe758b891409d2206f0ac666b4f8",
+    "note": "listed as HISTORICAL only; NOT active freeze inputs"
+  },
+  "v2_stimulus_status": {"n_records": 371, "n_primary_objects": 53, "comparisons_per_object": 7, "evidence_judging_done": false},
+  "v2_audit_summary": {
+    "style_parity": "PASS (mean |char-len diff| 1.87)",
+    "style_tell": "PASS (balanced accuracy 0.532 <= 0.55)",
+    "denotation_leakage": "PASS", "quality_parity": "PASS", "semantic_baseline": "PASS",
+    "forbidden_token_scan": "PASS (0 Sanskrit, 0 over-band)",
+    "duplicate_tag_scan": "PASS", "tag_length_parity_by_arm": "PASS (spread 0.557)",
+    "over_band_tokens": 0, "garrulous_eliminated": true, "all_fixes_global": true, "per_item_rescue": false
+  },
+  "readiness_assessment": {
+    "v2_stimuli_ready": true,
+    "v2_audits_passed": true,
+    "scorer_implemented_and_tested": true,
+    "thresholds_final": true,
+    "judge_prompt_final": true,
+    "judge_model_config_final": "POLICY final; operator pins exact runtime model identifiers at freeze (sanctioned fallback)",
+    "hashes_bound": true,
+    "operator_evidence_freeze_still_required": true
+  },
+  "judge_model_config": "b1_3_concrete_object_llm_judge_model_config_v2.json (constrained model-family policy; temp 0.0; forced A/B; blinded; operator pins runtime IDs)",
+  "decision": "FREEZE_REVIEW_V2_AFTER_POLISH_READY_AWAITING_OPERATOR_CONFIRMATION",
+  "operator_next_step": "A separate explicit operator instruction: 'Declare EVIDENCE_FREEZE for the B1.3 concrete-object LLM judged-modulation study using the v2 polished stimuli,' pinning the exact runtime model identifiers. After freeze, NO artifact may change except via a new versioned study.",
+  "post_freeze_rule": "no changes to stimuli, thresholds, prompts, scoring rules, or judge config after freeze; post-freeze changes spawn a new version and cannot retro-rescue a run",
+  "prior_results": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)", "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED", "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)", "Track_F": "CORRECTNESS_DEGRADED", "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["freeze readiness review only", "not evidence", "no judge run", "no real scoring", "EVIDENCE_FREEZE not declared", "no positive label earned"]
+}

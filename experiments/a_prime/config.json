@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "e_path": "",
+  "y_path": "",
+  "phonology_path": "",
+  "license_acknowledged": false,
+  "endpoint": "size",
+  "min_delta_r2": 0.01,
+  "shuffle_pctl": 95.0,
+  "n_eff_floor": 800
+}

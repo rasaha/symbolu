@@ -1,0 +1,62 @@
+# DOCS_ONLY — TRACK B/H2 RUNTIME MODEL LOCK RECORD — FILLED_OPERATOR_LOCK — NOT FROZEN
+#
+# Operator runtime-lock record for the H2 Track B B1 evaluation. Filled from RunPod metadata-only
+# checks (huggingface_hub.model_info + installed package versions); no weights loaded, no .generate,
+# no model text produced. This records the intended model pair + decode/seed policy + operator
+# signoff. It LOCKS THE INPUTS ONLY — it does NOT freeze B0, approve B1, or unblock Track B.
+#
+# Provenance: prereg d3a32e2 · parity fix 64b0f40 · prereg arithmetic e147575 ·
+#             B1 dry-run harness 0dd6460 · real conditioning wiring d8c3be3 · Track G negative 1fe5562
+#
+# Execution boundary: this record does NOT run models · does NOT generate outputs · does NOT score ·
+#   does NOT freeze B0 · does NOT approve B1 · does NOT unblock Track B.
+# Guardrails: no ontology validation · no Sanskrit privilege · no semantic-truth claim ·
+#   no Track G rescue · no Track B unblock. Informed-negative prior preserved:
+#   Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075) · Track F CORRECTNESS_DEGRADED.
+# Current status: B0_NOT_FROZEN · B1_NOT_APPROVED · TRACK_B_BLOCKED · NO_MODEL_CALL · NO_RESULT_CHANGE
+
+RUNTIME_MODEL_LOCK:
+  lock_state: FILLED_OPERATOR_LOCK
+  frozen: false
+  model_A:
+    id: mistralai/Mistral-7B-Instruct-v0.3
+    family: Mistral
+    revision_or_api_version: c170c708c41dac9275d15a8fff4eca08d52bab71
+    tokenizer_version: 0.22.2
+    backend_runtime: transformers
+    backend_version: 5.13.0
+    availability_check_command: "huggingface_hub.model_info(mistralai/Mistral-7B-Instruct-v0.3).sha  # metadata only, no weights, no generation"
+    availability_result: OK
+    no_model_output_produced: YES
+  model_B:
+    id: Qwen/Qwen2.5-7B-Instruct
+    family: Qwen
+    revision_or_api_version: a09a35458c702b33eeacc393d103063234e8bc28
+    tokenizer_version: 0.22.2
+    backend_runtime: transformers
+    backend_version: 5.13.0
+    availability_check_command: "huggingface_hub.model_info(Qwen/Qwen2.5-7B-Instruct).sha  # metadata only, no weights, no generation"
+    availability_result: OK
+    no_model_output_produced: YES
+  distinct_families: YES
+  decode:
+    temperature: 0.7
+    top_p: 0.95
+    max_tokens: 300
+    frequency_penalty: 0
+    presence_penalty: 0
+    system_prompt: none
+    stop_sequences: none
+    arm_specific_decoding: false
+    best_of_n: false
+    rerun_until_pass: false
+  seeds:
+    generation: [1101, 2027]
+    output_randomization: 40411
+    judge_packet_randomization: 50513
+    bootstrap_statistical: 60617
+  operator_decision: LOCK_AND_CONTINUE_TO_B0_FINALIZE
+  operator_name: Rakesh Mohan
+  date: 2026-07-04
+  runtime_environment: Linux x86_64 py3.12.3 device=NVIDIA RTX 6000 Ada Generation
+  operator_signoff: Rakesh Mohan / 2026-07-04

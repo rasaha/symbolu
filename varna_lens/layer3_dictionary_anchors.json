@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "artifact": "layer3_dictionary_anchors",
+    "warning": "DEV/INSPECTION-ONLY. Not scored. Not evidence. Not semantic proof. Anchors are frozen local examples authored from a standard English dictionary sense, BLIND to Layer 2 output. NOT used for evaluation. Not a runtime lookup, no web, no model. Interpretive only, not ontology, not Sanskrit privilege.",
+    "source": "hand-frozen from a standard English dictionary core sense; committed once",
+    "frozen": true,
+    "used_for_evaluation": false,
+    "used_for_scoring": false
+  },
+  "anchors": {
+    "mercy": {
+      "anchor_phrase": "compassion or forbearance shown toward another",
+      "anchor_keywords": ["compassion", "forbearance", "gentleness", "restraint", "leniency", "containment"],
+      "opposite_keywords": ["cruelty", "harshness", "vengeance", "severity"],
+      "source_note": "standard English dictionary core sense; frozen"
+    },
+    "love": {
+      "anchor_phrase": "deep affection or attachment",
+      "anchor_keywords": ["affection", "attachment", "gentleness", "care", "tenderness", "compassion"],
+      "opposite_keywords": ["harshness", "cruelty", "indifference", "separation"],
+      "source_note": "standard English dictionary core sense; frozen"
+    },
+    "anger": {
+      "anchor_phrase": "strong displeasure or hostility",
+      "anchor_keywords": ["displeasure", "hostility", "rage", "vanity", "agitation"],
+      "opposite_keywords": ["humility", "stillness", "calm"],
+      "source_note": "standard English dictionary core sense; frozen"
+    },
+    "peace": {
+      "anchor_phrase": "freedom from disturbance; calm",
+      "anchor_keywords": ["calm", "friendliness", "affection", "clarity", "stillness", "liberation"],
+      "opposite_keywords": ["hatred", "revulsion", "agitation", "disturbance"],
+      "source_note": "standard English dictionary core sense; frozen"
+    }
+  }
+}

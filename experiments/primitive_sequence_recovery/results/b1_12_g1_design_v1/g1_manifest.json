@@ -1,0 +1,37 @@
+{
+  "controlling_commits": {
+    "g0_audit": "1713311",
+    "pool_curator": "d50fbb9",
+    "prereg": "2c613f4",
+    "v1_1": "6f197fd",
+    "v1_2": "7935f48"
+  },
+  "evaluator_real_model_usability": "UNRESOLVED_NO_JUDGE_AVAILABLE",
+  "g0_verdict": "G0_PASS",
+  "label": "DIAGNOSTIC_ONLY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "leakage_all_checks_pass": true,
+  "narrowed_claim": "The B1.12 instrument can support a WITHIN-word ORDER-DISCRIMINATION task on leakage-safe opaque varṇa compositions: it can test whether the true ordered composition is distinguishable from its own order-scrambled and unordered-inventory versions. It CANNOT, with this leakage-safe opaque encoding, support direct SEMANTIC word recovery — that would require a keyed/training phase (Model 1) or semantic glosses (Model 4, which reintroduces B1.10 prose confounds). Evaluator real-model usability is UNRESOLVED pending an available judge panel; the verdict rests on deterministic structural + leakage feasibility.",
+  "no_g0_pool_threshold_parser_map_change": true,
+  "opaque_map_sha256_from_g0": "7f6e6f8fd7e2ebabcc010c3e5442a2cd929cddd5d646041a6d192a66529b300b",
+  "primary_encoding": "OPT_A_D_POSITIONAL_OPAQUE",
+  "primary_task_model": "MODEL_3_SAME_WORD_ORDER_DISCRIMINATION",
+  "schema": "b1_12_g1_manifest_v1",
+  "scramble_seed_feasibility_only": 20260101,
+  "selected_set_classification": "MIXED_ORDER_AND_INVENTORY",
+  "selected_six": [
+    "W03",
+    "W15",
+    "W20",
+    "W23",
+    "W30",
+    "W35"
+  ],
+  "structural_feasibility_all_ok": true,
+  "unresolved_dependencies": [
+    "real-model (or human) evaluator usability of opaque order-discrimination",
+    "confirmatory Arm-B scramble seed freeze",
+    "final control/context design (post-G1)",
+    "whether a keyed/semantic secondary arm is ever introduced (risks B1.10 confound)"
+  ],
+  "verdict": "G1_PASS_WITH_LIMITED_CLAIM"
+}

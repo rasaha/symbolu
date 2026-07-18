@@ -1,0 +1,14 @@
+{
+  "controlling_commits": {
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG.md": "2c613f4",
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG_V1_1.md": "6f197fd",
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG_V1_2.md": "7935f48",
+    "b1_12_candidate_pool_v1/b1_12_candidate_pool_v1.json": "d50fbb9"
+  },
+  "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "parser_sha256_expected": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "parser_spec_version": "PARSER_SPEC_v1",
+  "pool_file": "b1_12_candidate_pool_v1/b1_12_candidate_pool_v1.json",
+  "pool_sha256": "8cf857891f95bb07e66a3048f7eabe4f1e5814777889abdf6dadb0d5d296d0b4",
+  "pool_sha256_expected": "8cf857891f95bb07e66a3048f7eabe4f1e5814777889abdf6dadb0d5d296d0b4"
+}

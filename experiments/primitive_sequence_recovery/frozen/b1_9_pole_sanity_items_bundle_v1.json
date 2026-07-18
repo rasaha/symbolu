@@ -1,0 +1,1711 @@
+{
+  "artifact_type": "b1_9_pole_sanity_items",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "aspiration_applied": false,
+  "status": "DRAFT_REQUIRES_FRESH_OPERATOR_SIGNOFF_UNDER_BUNDLE_V1",
+  "representation_version": "B1.9_pole_sanity",
+  "word_groups_approved": false,
+  "fresh_approval_note": "Mapping changed (v2/v1 -> fidelity_bundle_v1). word_groups_approved does NOT carry over; operator must re-approve the synonym/opposite table on the NEW packets.",
+  "packet_source": "v3 table pole facets; sequences from the active bundle bridge.",
+  "not_comparable_note": "Bundle-era packets differ from v2/v1-era; results are NOT direct deltas. A more faithful mapping does not reopen prior nulls.",
+  "source_hashes": {
+    "varna_polarity_table_v3.json": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+    "b1_9_pole_did_items_bundle_v1.json": "b46d43f038607a86276cff5c6748a3b1165f3300961be61e80c902f71da6248b"
+  },
+  "n_items": 24,
+  "n_need_manual": 24,
+  "coverage_flags": [
+    {
+      "item_id": "pd-01",
+      "word": "surrender",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-02",
+      "word": "release",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-03",
+      "word": "forgiveness",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-04",
+      "word": "awakening",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-05",
+      "word": "acceptance",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-06",
+      "word": "clarity",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "opposites 3/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-07",
+      "word": "insight",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-08",
+      "word": "letting-go",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-09",
+      "word": "peace",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-10",
+      "word": "compassion",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-11",
+      "word": "equanimity",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 3/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-12",
+      "word": "liberation",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-13",
+      "word": "anchor",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-14",
+      "word": "cage",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-15",
+      "word": "chain",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-16",
+      "word": "wall",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-17",
+      "word": "lock",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 2/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-18",
+      "word": "weight",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-19",
+      "word": "terror",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-20",
+      "word": "craving",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-21",
+      "word": "dread",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 2/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-22",
+      "word": "resentment",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-23",
+      "word": "obsession",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-24",
+      "word": "panic",
+      "status": "NEEDS_MANUAL_REPLACEMENT",
+      "issues": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    }
+  ],
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "track_b_status": "BLOCKED",
+  "items": [
+    {
+      "item_id": "pd-01",
+      "target_text": "surrender",
+      "context_text": "After years of resisting, his surrender softened the fear and opened him to peace.",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "sa",
+          "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        },
+        {
+          "varna": "ra",
+          "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        },
+        {
+          "varna": "da",
+          "text": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "resignation",
+          "role": "synonym",
+          "gloss": "acceptance of despair",
+          "synset": "resignation.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "resist",
+          "role": "opposite",
+          "gloss": "elude, especially in a baffling way",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "surrender",
+        "resignation",
+        "resist"
+      ],
+      "forbidden_words": [
+        "resignation",
+        "resist",
+        "surrender"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-02",
+      "target_text": "release",
+      "context_text": "With one quiet breath, release moved through her body and the old clinging fell away.",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ra",
+        "la",
+        "sa"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ra",
+          "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+        },
+        {
+          "varna": "la",
+          "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+        },
+        {
+          "varna": "sa",
+          "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [
+        {
+          "word": "hold",
+          "role": "opposite",
+          "gloss": "the act of grasping",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "confine",
+          "role": "opposite",
+          "gloss": "place limits on (extent or access)",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "block",
+          "role": "opposite",
+          "gloss": "a solid piece of something (usually having flat rectangular sides)",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "freeze",
+          "role": "opposite",
+          "gloss": "the withdrawal of heat to change something from a liquid to a solid",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        }
+      ],
+      "candidate_words": [
+        "release",
+        "hold",
+        "confine",
+        "block",
+        "freeze"
+      ],
+      "forbidden_words": [
+        "block",
+        "confine",
+        "freeze",
+        "hold",
+        "release"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-03",
+      "target_text": "forgiveness",
+      "context_text": "Forgiveness arose in him, not as approval of the wound, but as freedom from carrying it.",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ra",
+          "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+        },
+        {
+          "varna": "ga",
+          "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+        },
+        {
+          "varna": "va",
+          "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        },
+        {
+          "varna": "sa",
+          "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [],
+      "candidate_words": [
+        "forgiveness"
+      ],
+      "forbidden_words": [
+        "forgiveness"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-04",
+      "target_text": "awakening",
+      "context_text": "The awakening came silently, as if a veil had lifted and the mind became clear.",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "va",
+          "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+        },
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        },
+        {
+          "varna": "nga",
+          "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "wakening",
+          "role": "synonym",
+          "gloss": "the act of waking",
+          "synset": "awakening.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "awakening",
+        "wakening"
+      ],
+      "forbidden_words": [
+        "awakening",
+        "wakening"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-05",
+      "target_text": "acceptance",
+      "context_text": "Acceptance settled in her heart, and the struggle against what had happened began to dissolve.",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "varna": "pa",
+          "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "credence",
+          "role": "synonym",
+          "gloss": "the mental attitude that something is believable and should be accepted as true",
+          "synset": "credence.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "rejection",
+          "role": "opposite",
+          "gloss": "the act of rejecting something",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        }
+      ],
+      "candidate_words": [
+        "acceptance",
+        "credence",
+        "rejection"
+      ],
+      "forbidden_words": [
+        "acceptance",
+        "credence",
+        "rejection"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-06",
+      "target_text": "clarity",
+      "context_text": "In stillness, clarity appeared, and the tangled fear no longer ruled his choices.",
+      "plane": "intellectual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "varna": "la",
+          "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+        },
+        {
+          "varna": "ra",
+          "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        },
+        {
+          "varna": "ya",
+          "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "lucidity",
+          "role": "synonym",
+          "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
+          "synset": "clarity.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "lucidness",
+          "role": "synonym",
+          "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
+          "synset": "clarity.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "pellucidity",
+          "role": "synonym",
+          "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
+          "synset": "clarity.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "clearness",
+          "role": "synonym",
+          "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
+          "synset": "clarity.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "obscurity",
+          "role": "opposite",
+          "gloss": "the quality of being unclear or abstruse and hard to understand",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "unclearness",
+          "role": "opposite",
+          "gloss": "incomprehensibility as a result of not being clear",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "opacity",
+          "role": "opposite",
+          "gloss": "the phenomenon of not permitting the passage of electromagnetic radiation",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        }
+      ],
+      "candidate_words": [
+        "clarity",
+        "lucidity",
+        "lucidness",
+        "pellucidity",
+        "clearness",
+        "obscurity",
+        "unclearness",
+        "opacity"
+      ],
+      "forbidden_words": [
+        "clarity",
+        "clearness",
+        "lucidity",
+        "lucidness",
+        "obscurity",
+        "opacity",
+        "pellucidity",
+        "unclearness"
+      ],
+      "needs_manual_replacement": [
+        "opposites 3/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-07",
+      "target_text": "insight",
+      "context_text": "The insight broke through his old pattern, showing him he was not bound by the thought.",
+      "plane": "intellectual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        },
+        {
+          "varna": "sa",
+          "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        },
+        {
+          "varna": "ga",
+          "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "penetration",
+          "role": "synonym",
+          "gloss": "clear or deep perception of a situation",
+          "synset": "penetration.n.02",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "insight",
+        "penetration"
+      ],
+      "forbidden_words": [
+        "insight",
+        "penetration"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-08",
+      "target_text": "letting-go",
+      "context_text": "Letting-go was not defeat; it was the moment the grip of craving loosened.",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "la",
+          "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        },
+        {
+          "varna": "nga",
+          "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+        },
+        {
+          "varna": "ga",
+          "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [],
+      "candidate_words": [
+        "letting-go"
+      ],
+      "forbidden_words": [
+        "letting-go"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-09",
+      "target_text": "peace",
+      "context_text": "Peace arose within him when the need to win finally disappeared.",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "pa",
+        "ka"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "pa",
+          "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+        },
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [
+        {
+          "word": "war",
+          "role": "opposite",
+          "gloss": "the waging of armed conflict against an enemy",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        }
+      ],
+      "candidate_words": [
+        "peace",
+        "war"
+      ],
+      "forbidden_words": [
+        "peace",
+        "war"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-10",
+      "target_text": "compassion",
+      "context_text": "Compassion opened where judgment had been, and the heart no longer felt closed.",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "varna": "ma",
+          "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+        },
+        {
+          "varna": "pa",
+          "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+        },
+        {
+          "varna": "sa",
+          "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "compassionateness",
+          "role": "synonym",
+          "gloss": "a deep awareness of and sympathy for another's suffering",
+          "synset": "compassion.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "compassion",
+        "compassionateness"
+      ],
+      "forbidden_words": [
+        "compassion",
+        "compassionateness"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-11",
+      "target_text": "equanimity",
+      "context_text": "Equanimity held steady even as praise and blame rose and passed.",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "varna": "va",
+          "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        },
+        {
+          "varna": "ma",
+          "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        },
+        {
+          "varna": "ya",
+          "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "composure",
+          "role": "synonym",
+          "gloss": "steadiness of mind under stress",
+          "synset": "composure.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "calm",
+          "role": "synonym",
+          "gloss": "steadiness of mind under stress",
+          "synset": "composure.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "calmness",
+          "role": "synonym",
+          "gloss": "steadiness of mind under stress",
+          "synset": "composure.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "discomposure",
+          "role": "opposite",
+          "gloss": "anxious embarrassment",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "agitate",
+          "role": "opposite",
+          "gloss": "try to stir up public opinion",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "stimulate",
+          "role": "opposite",
+          "gloss": "act as a stimulant",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "stormy",
+          "role": "opposite",
+          "gloss": "(especially of weather) affected or characterized by storms or commotion",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "equanimity",
+        "composure",
+        "calm",
+        "calmness",
+        "discomposure",
+        "agitate",
+        "stimulate",
+        "stormy"
+      ],
+      "forbidden_words": [
+        "agitate",
+        "calm",
+        "calmness",
+        "composure",
+        "discomposure",
+        "equanimity",
+        "stimulate",
+        "stormy"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 3/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-12",
+      "target_text": "liberation",
+      "context_text": "Liberation was felt as the end of inner bondage, not as escape from the world.",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "la",
+          "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+        },
+        {
+          "varna": "ba",
+          "text": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+        },
+        {
+          "varna": "ra",
+          "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+        },
+        {
+          "varna": "ta",
+          "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+        },
+        {
+          "varna": "na",
+          "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "freeing",
+          "role": "synonym",
+          "gloss": "the act of liberating someone or something",
+          "synset": "liberation.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "confine",
+          "role": "opposite",
+          "gloss": "place limits on (extent or access)",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "lodge",
+          "role": "opposite",
+          "gloss": "English physicist who studied electromagnetic radiation and was a pioneer of radiotelegraphy (1851-1940)",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": true
+        },
+        {
+          "word": "enforce",
+          "role": "opposite",
+          "gloss": "ensure observance of laws and rules",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "obstruct",
+          "role": "opposite",
+          "gloss": "hinder or prevent the progress or accomplishment of",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "liberation",
+        "freeing",
+        "confine",
+        "lodge",
+        "enforce",
+        "obstruct"
+      ],
+      "forbidden_words": [
+        "confine",
+        "enforce",
+        "freeing",
+        "liberation",
+        "lodge",
+        "obstruct"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-13",
+      "target_text": "anchor",
+      "context_text": "The iron anchor lay embedded in the seabed, its heavy flukes gripping the mud and holding the hull fast.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "na",
+          "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "ca",
+          "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+        },
+        {
+          "varna": "ra",
+          "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [],
+      "candidate_words": [
+        "anchor"
+      ],
+      "forbidden_words": [
+        "anchor"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-14",
+      "target_text": "cage",
+      "context_text": "The steel cage stood bolted to the floor, its bars fixed and immovable.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "ga"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "ga",
+          "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "coop",
+          "role": "synonym",
+          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
+          "synset": "cage.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "cage",
+        "coop"
+      ],
+      "forbidden_words": [
+        "cage",
+        "coop"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-15",
+      "target_text": "chain",
+      "context_text": "The rusted chain bound the gate shut, each link clamped hard to the next.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ca",
+        "na"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ca",
+          "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+        },
+        {
+          "varna": "na",
+          "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "concatenation",
+          "role": "synonym",
+          "gloss": "a series of things depending on each other as if linked together",
+          "synset": "chain.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [
+        {
+          "word": "unchain",
+          "role": "opposite",
+          "gloss": "remove the chains from",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "chain",
+        "concatenation",
+        "unchain"
+      ],
+      "forbidden_words": [
+        "chain",
+        "concatenation",
+        "unchain"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-16",
+      "target_text": "wall",
+      "context_text": "The concrete wall sealed off the yard, blocking every path through it.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "va",
+        "la",
+        "la"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "va",
+          "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "la",
+          "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [],
+      "candidate_words": [
+        "wall"
+      ],
+      "forbidden_words": [
+        "wall"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-17",
+      "target_text": "lock",
+      "context_text": "The padlock held the door shut, its bolt seized and unyielding.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "la",
+        "ka"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "la",
+          "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        },
+        {
+          "varna": "ka",
+          "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [
+        {
+          "word": "unlock",
+          "role": "opposite",
+          "gloss": "open the lock of",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        },
+        {
+          "word": "disengage",
+          "role": "opposite",
+          "gloss": "release from something that holds fast, connects, or entangles",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "lock",
+        "unlock",
+        "disengage"
+      ],
+      "forbidden_words": [
+        "disengage",
+        "lock",
+        "unlock"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 2/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-18",
+      "target_text": "weight",
+      "context_text": "The lead weight pressed down on the lid, pinning it in place.",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "va",
+        "ga",
+        "ta"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "va",
+          "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "ga",
+          "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+        },
+        {
+          "varna": "ta",
+          "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [
+        {
+          "word": "unburden",
+          "role": "opposite",
+          "gloss": "free or relieve (someone) of a burden",
+          "synset": null,
+          "source": "wordnet_antonym",
+          "noun_sense": false
+        }
+      ],
+      "candidate_words": [
+        "weight",
+        "unburden"
+      ],
+      "forbidden_words": [
+        "unburden",
+        "weight"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 1/4 — curate via overrides"
+      ]
+    },
+    {
+      "item_id": "pd-19",
+      "target_text": "terror",
+      "context_text": "Terror seized him and froze him at the threshold, unable to step forward.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ta",
+          "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        },
+        {
+          "varna": "ra",
+          "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "affright",
+          "role": "synonym",
+          "gloss": "an overwhelming feeling of fear and anxiety",
+          "synset": "panic.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "terror",
+        "affright"
+      ],
+      "forbidden_words": [
+        "affright",
+        "terror"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-20",
+      "target_text": "craving",
+      "context_text": "Craving gnawed at her, driving one grasping purchase after another.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ka",
+          "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "ra",
+          "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "va",
+          "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "nga",
+          "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+        }
+      ],
+      "synonyms": [],
+      "opposites": [],
+      "candidate_words": [
+        "craving"
+      ],
+      "forbidden_words": [
+        "craving"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-21",
+      "target_text": "dread",
+      "context_text": "A cold dread of failure kept him clinging and rigid, unable to move.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "dda",
+        "ra",
+        "da"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "dda",
+          "text": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct"
+        },
+        {
+          "varna": "ra",
+          "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "da",
+          "text": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "apprehension",
+          "role": "synonym",
+          "gloss": "fearful expectation or anticipation",
+          "synset": "apprehension.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "apprehensiveness",
+          "role": "synonym",
+          "gloss": "fearful expectation or anticipation",
+          "synset": "apprehension.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "dread",
+        "apprehension",
+        "apprehensiveness"
+      ],
+      "forbidden_words": [
+        "apprehension",
+        "apprehensiveness",
+        "dread"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 2/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-22",
+      "target_text": "resentment",
+      "context_text": "Resentment hardened in him, replaying the wrong and refusing to let it go.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ra",
+          "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "sa",
+          "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "na",
+          "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "ta",
+          "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        },
+        {
+          "varna": "ma",
+          "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "bitterness",
+          "role": "synonym",
+          "gloss": "a feeling of deep and bitter anger and ill-will",
+          "synset": "resentment.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "gall",
+          "role": "synonym",
+          "gloss": "a feeling of deep and bitter anger and ill-will",
+          "synset": "resentment.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "rancor",
+          "role": "synonym",
+          "gloss": "a feeling of deep and bitter anger and ill-will",
+          "synset": "resentment.n.01",
+          "source": "wordnet_primary_synset"
+        },
+        {
+          "word": "rancour",
+          "role": "synonym",
+          "gloss": "a feeling of deep and bitter anger and ill-will",
+          "synset": "resentment.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "resentment",
+        "bitterness",
+        "gall",
+        "rancor",
+        "rancour"
+      ],
+      "forbidden_words": [
+        "bitterness",
+        "gall",
+        "rancor",
+        "rancour",
+        "resentment"
+      ],
+      "needs_manual_replacement": [
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-23",
+      "target_text": "obsession",
+      "context_text": "The obsession fixed his mind on a single thought he could not release.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "ba",
+          "text": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+        },
+        {
+          "varna": "sa",
+          "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "na",
+          "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "compulsion",
+          "role": "synonym",
+          "gloss": "an irrational motive for performing trivial or repetitive actions, even against your will",
+          "synset": "compulsion.n.02",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "obsession",
+        "compulsion"
+      ],
+      "forbidden_words": [
+        "compulsion",
+        "obsession"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    },
+    {
+      "item_id": "pd-24",
+      "target_text": "panic",
+      "context_text": "Panic seized the crowd, each person gripping toward the exit in blind urgency.",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "pa",
+        "na",
+        "ka"
+      ],
+      "correct_pole_facets": [
+        {
+          "varna": "pa",
+          "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+        },
+        {
+          "varna": "na",
+          "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "ka",
+          "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        }
+      ],
+      "synonyms": [
+        {
+          "word": "affright",
+          "role": "synonym",
+          "gloss": "an overwhelming feeling of fear and anxiety",
+          "synset": "panic.n.01",
+          "source": "wordnet_primary_synset"
+        }
+      ],
+      "opposites": [],
+      "candidate_words": [
+        "panic",
+        "affright"
+      ],
+      "forbidden_words": [
+        "affright",
+        "panic"
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 — curate via overrides",
+        "opposites 0/4 — curate via overrides",
+        "NO opposites — item cannot form D_opposite / INT until curated"
+      ]
+    }
+  ]
+}

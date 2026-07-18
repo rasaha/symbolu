@@ -1,0 +1,87 @@
+{
+  "schema": "symbol_u_bridge_manifest_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "readiness_status": "BRIDGE_SEED_V1_FROZEN",
+  "timestamp": "2026-07-16",
+  "commit": "recorded in git log for this commit (a manifest cannot contain its own commit hash)",
+  "bridge_specification": {
+    "path": "SYMBOL_U_CONCERN_TO_CONCEPT_BRIDGE_SPEC_V1.md",
+    "sha256": "4cf3c7f534bd572660828c97b3ad0bfb4548637be23ca21d9d9bdc6dffc909e9"
+  },
+  "ontology_schema": {
+    "path": "symbol_u_bridge/concern_ontology.schema.json",
+    "sha256": "aa5f5ad07c0dd4b10610f064ceba49cf9fb7ea3f7a855d05db3536a9d5f07f1b"
+  },
+  "concept_mapping_schema": {
+    "path": "symbol_u_bridge/concept_mapping.schema.json",
+    "sha256": "14fcd44860aaf01a53fd76ee03d5551355ea57bac78c5d69b06d63d4fb1de0ad"
+  },
+  "abstention_rules": {
+    "path": "symbol_u_bridge/abstention_rules.json",
+    "sha256": "90dca16b00218e262480a0c1856a5afaf826d79eaf43a7975d8c6bccd91fe3c2"
+  },
+  "lexical_sources": [
+    "Monier-Williams Sanskrit-English Dictionary (MW)"
+  ],
+  "candidate_pool": {
+    "path": "symbol_u_bridge/concern_candidate_pool_v1.json",
+    "sha256": "a408ce5c75a2f93dfbc399d703fa857d56ca8343292646103b0021b3c61d0e4b",
+    "n_candidates": 45
+  },
+  "final_ontology": {
+    "path": "symbol_u_bridge/concern_ontology_v1.json",
+    "sha256": "39de5d4d2f0252634948b4f15e6486494094479dfe013131aa17807207cfe168",
+    "n_concerns": 25
+  },
+  "final_concept_table": {
+    "path": "symbol_u_bridge/concern_to_sanskrit_concept_v1.json",
+    "sha256": "04e8c4e4ffd48b364b8efeae407070c14c9f332b9f1c6b772a19e3f827103e4d",
+    "n_entries": 25
+  },
+  "companion_extraction_aids": {
+    "path": "symbol_u_bridge/concern_extraction_aids_v1.json",
+    "sha256": "c12aac254921b1ba255e7d0f81ca8190c9a56431f6f36f654a4182411f1e67db"
+  },
+  "companion_concept_provenance": {
+    "path": "symbol_u_bridge/concern_concept_provenance_v1.json",
+    "sha256": "39c8546fc3e123c6406731dfc0cdbe78558155115f3f521cc22a7569de0fb903"
+  },
+  "exclusions": {
+    "path": "symbol_u_bridge/concern_exclusions_v1.json",
+    "sha256": "89781a3593576e9d5673cfe6ef2ff0388870aff7f0704cbee36782b688e7c914"
+  },
+  "ambiguity_audit": {
+    "path": "symbol_u_bridge/concern_concept_ambiguity_audit_v1.json",
+    "sha256": "b0601dafed75ea0fb161a50b7ae39c3e8dc364f46f1532a21d675b06c246dbf1"
+  },
+  "parser_coverage_audit": {
+    "path": "symbol_u_bridge/concern_concept_parser_coverage_v1.json",
+    "sha256": "ebfe6399131eb71baace8f71dac936be47f63fecdf3a98e2f279f99bb9c262a2"
+  },
+  "exclusion_taxonomy": [
+    "DUPLICATE_CONCERN",
+    "OVERLAPPING_DEFINITION",
+    "NO_CLEAR_SANSKRIT_CONCEPT",
+    "EXCESSIVE_POLYSEMY",
+    "TECHNICAL_OR_DOCTRINAL",
+    "TOO_CONTEXT_DEPENDENT",
+    "NOT_SUITABLE_FOR_SEED_SCOPE"
+  ],
+  "deterministic_selection_rules": "V1: each concern has exactly ONE primary Sanskrit concept, authored by ordinary semantic fit + lexical clarity + attestation (rank 1). Alternatives documented (rank>=2) but NEVER used at runtime. Ties (none in V1) break by ascending IAST codepoint. Varna coverage and B1.12 stability were NOT used to select concepts; they inform only Stage-6 confidence.",
+  "parser": {
+    "path": "sanskrit_stage1_parser.py",
+    "sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947"
+  },
+  "mapping_table": {
+    "path": "frozen/varna_native_stage1_merged_v3.json",
+    "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f"
+  },
+  "selection_firewall_attestation": "concept selection used ONLY ordinary meaning/lexical clarity/attestation/personal-assistant relevance/semantic fit; varna glosses, B1.12 resonance scores, mapping stability rankings, Tier-1 varna membership, and anticipated product benefit were NOT consulted for selection. Parser coverage was computed post-freeze (membership only) and altered no choice.",
+  "interpretation_limits": [
+    "does not prove the chosen Sanskrit concept is the only valid representation",
+    "does not prove the varna mappings are objectively true",
+    "does not prove concern extraction is solved",
+    "does not prove the symbolic layer improves assistant behavior",
+    "defines only a reproducible input bridge for later testing"
+  ]
+}

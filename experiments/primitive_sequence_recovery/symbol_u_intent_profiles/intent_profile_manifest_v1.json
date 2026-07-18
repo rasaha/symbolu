@@ -1,0 +1,65 @@
+{
+  "schema": "symbol_u_intent_profiles_manifest_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "readiness_status": "INTENT_PROFILES_V1_FROZEN",
+  "timestamp": "2026-07-16",
+  "commit": "recorded in git log for this commit",
+  "artifact": {
+    "path": "symbol_u_intent_profiles/intent_profiles_v1.json",
+    "sha256": "5f4be4361fde25920cb4c6b581454e7e0050e8d830e28b01594e502a419c190e",
+    "intent_profiles_sha256": "96d2512ba54a15660ce6bd028f81663aa937e968009b37bcc166aa95427b2907",
+    "n_profiles": 25
+  },
+  "schema_file": {
+    "path": "symbol_u_intent_profiles/intent_profile.schema.json",
+    "sha256": "3e0e014c676b0fe44ffd97498928ce30c602463150dc70e9197847cde329e036"
+  },
+  "frozen_upstream_inputs": {
+    "parser": {
+      "path": "sanskrit_stage1_parser.py",
+      "sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947"
+    },
+    "varna_mappings_v3": {
+      "path": "frozen/varna_native_stage1_merged_v3.json",
+      "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f"
+    },
+    "concern_ontology_v1": {
+      "path": "symbol_u_bridge/concern_ontology_v1.json",
+      "sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840"
+    },
+    "concern_to_sanskrit_concept_v1": {
+      "path": "symbol_u_bridge/concern_to_sanskrit_concept_v1.json",
+      "sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4"
+    },
+    "bridge_core": {
+      "path": "symbol_u_bridge/bridge_core.py",
+      "sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+    },
+    "arm_contracts_v1": {
+      "path": "symbol_u_utility_study/arm_contracts_v1.json",
+      "sha256": "999aff7eefc42d85e8d6502adcdfe3e790966d7c7496b17dc64c8d651d70e40c"
+    }
+  },
+  "validation": {
+    "n_profiles": 25,
+    "one_per_frozen_concern": true,
+    "schema_valid": true,
+    "reproducible_from_frozen_inputs": true,
+    "drives_verbatim_frozen": true,
+    "no_authored_response_content": true,
+    "no_concern_specific_advice": true,
+    "no_frozen_artifacts_modified": "verified via git status at commit"
+  },
+  "confidence_levels": {
+    "HIGH": 13,
+    "MEDIUM": 12,
+    "LOW": 0
+  },
+  "interpretation_limits": [
+    "not claims about the user",
+    "not psychological assessments",
+    "not generated from the current prompt",
+    "do not demonstrate utility",
+    "only define the deterministic symbolic payload available to Arm D in the preregistered study"
+  ]
+}

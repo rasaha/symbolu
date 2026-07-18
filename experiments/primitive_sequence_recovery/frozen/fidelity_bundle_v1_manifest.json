@@ -1,0 +1,93 @@
+{
+  "artifact_type": "fidelity_bundle_manifest",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "aspiration_applied": false,
+  "status": "ACTIVE_APPLIED",
+  "summary": "Fidelity Bundle v1 = v3 classically-grounded varṇa polarity table + combined context-aware bridge (retroflex t/d before r -> ṭa/ḍa; merged /θ,ð/ 'th' -> ta, 'dh' -> da pre-wired). Aspiration rule EXCLUDED (recommend-against). G2P decomposer UNTOUCHED. Resonance / phonetic-fidelity refinement only; not a meaning-validation.",
+  "components": {
+    "v3_table": "corrects v2 pole errors + the śa↔ṣa sibilant swap; 34/34 primary-text verified; zero inversions.",
+    "retroflex_bridge_v2": "t/d before r -> ṭa/ḍa; /r/ survives (Route B, bridge-level, G2P untouched).",
+    "theta_eth_ta": "merged 'th' phoneme -> ta (dental unaspirated, off the aspirate 'tha' series); 'dh' -> da pre-wired for a future G2P that emits dh."
+  },
+  "excluded": {
+    "aspiration_rule": "NOT applied (recommend-against: compounds the /θ,ð/ mis-map, large blast radius). See G2P_ASPIRATION_RULE_PROPOSAL.md."
+  },
+  "active_artifacts": {
+    "active_table": {"file": "frozen/varna_polarity_table_v3.json", "sha256": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3"},
+    "active_bridge_manifest": {"file": "frozen/varna_polarity_bridge_v3.json", "sha256": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102"},
+    "active_bridge_module": {"file": "varna_bridge_active.py", "sha256": "5d9f090fe7b656193ad880b8f2d928a3c407101f75e0943978aa1978fe38a6ef"},
+    "retroflex_module": {"file": "varna_bridge_v2.py", "sha256": "148b01d39e8ea15733903baf0a939e101d13809526bc3078db568ac8b8704887"},
+    "thfix_module": {"file": "varna_bridge_thfix.py", "sha256": "0ec9ce91a72c6b023cf8b22224af19b58c79c83c082789f3f911ba82647c270d"},
+    "decomposer_UNCHANGED": {"file": "stage_a_prime_coverage.py", "sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"}
+  },
+  "regenerated_frozen_diagnostics": {
+    "pole_did_items": {"file": "frozen/b1_9_pole_did_items_bundle_v1.json", "sha256": "b46d43f038607a86276cff5c6748a3b1165f3300961be61e80c902f71da6248b"},
+    "pole_did_scaffold": {"file": "frozen/b1_9_pole_did_scaffold_bundle_v1.json", "sha256": "b6a1b1ed1ca6cbbf0f0d8840c9f4d2b611ae7ff95ac3ebd95e76e012764720f8"},
+    "pole_sanity_items": {"file": "frozen/b1_9_pole_sanity_items_bundle_v1.json", "sha256": "410a85ffb3fcf429c36dc5046edb6f10f5a8f349b4a1eae963cd0d03dfd7f600"},
+    "pole_sanity_scaffold": {"file": "frozen/b1_9_pole_sanity_scaffold_bundle_v1.json", "sha256": "668a8c045507330a28ee4501f7f2e439b0f974317ec11d46b76de21cc52350f3"}
+  },
+  "not_re_derived_deliberately": {
+    "reason": "These belong to blocked/nulled tracks (Track B blocked; B1.8/B1.9 generation content nulls; pilot/perspective probes). No bundle-era run is planned (promotion step 14 forbids running real experiments). They are NOT silently covered — they remain v2/v1-era historical artifacts and would only be re-derived if/when a bundle-era run of that specific track is separately authorized.",
+    "artifacts": [
+      "frozen/b1_9_gen_targets_scaffolds.json",
+      "frozen/b1_9_pole_scaffold.json",
+      "frozen/b1_9_targets.json",
+      "frozen/b1_6_pilot_targets_scaffolds*.json",
+      "frozen/b1_6_pilot_randomized_control_manifest*.json",
+      "frozen/b1_7_perspective_lens_targets_v1.json"
+    ]
+  },
+  "bundle_era_harness_hash_inputs": {
+    "note": "Refreshed HASH_INPUTS set for a FUTURE bundle-era run of the pole diagnostics. NOT wired into the live v2-era runners (run_b1_9_pole_did.py / run_b1_9_pole_sanity.py keep their v2 table + v1 bridge HASH_INPUTS so the v2/v1-era harness stays reproducible, per promotion step 1). A bundle-era runner (or a clearly-versioned addendum) would consume these once a run is separately authorized. A fresh EVIDENCE_FREEZE_DECLARED + fresh prereg must be created at that time.",
+    "pole_did": {
+      "items_sha256": "b46d43f038607a86276cff5c6748a3b1165f3300961be61e80c902f71da6248b",
+      "scaffold_sha256": "b6a1b1ed1ca6cbbf0f0d8840c9f4d2b611ae7ff95ac3ebd95e76e012764720f8",
+      "v3_table_sha256": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+      "bridge_manifest_sha256": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102",
+      "decomposer_sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+      "classification_approved": false
+    },
+    "pole_sanity": {
+      "items_sha256": "410a85ffb3fcf429c36dc5046edb6f10f5a8f349b4a1eae963cd0d03dfd7f600",
+      "scaffold_sha256": "668a8c045507330a28ee4501f7f2e439b0f974317ec11d46b76de21cc52350f3",
+      "v3_table_sha256": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+      "bridge_manifest_sha256": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102",
+      "decomposer_sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+      "word_groups_approved": false
+    }
+  },
+  "sequence_impact": {
+    "changed_words": ["dread"],
+    "dread": {"v2_v1": ["da", "ra", "da"], "bundle_v1": ["dda", "ra", "da"], "token_note": "'dda' is the ASCII token for the retroflex ḍa (IAST ḍa) used throughout the frozen artifacts and v3 table keys.", "cause": "retroflex t/d-before-r rule"},
+    "all_other_frozen_sequences": "identical under the bundle",
+    "theta_eth_impact_on_frozen_items": "zero (no frozen pole-DiD / target / pole-sanity word contains 'th')"
+  },
+  "packet_impact": {
+    "pole_did_facet_packets_changed": "24 / 24",
+    "pole_sanity_facet_packets_changed": "24 / 24",
+    "cause": "v3 rewrote the pole texts (and swapped śa↔ṣa); facet packet text regenerates even where the sequence is unchanged.",
+    "consequence": "Any bundle-era run is a NEW experiment, not a delta on the v2/v1-era run."
+  },
+  "historical_preservation": {
+    "byte_unchanged": {
+      "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+      "frozen/b1_6_phoneme_to_varna_bridge_manifest.json": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+      "frozen/b1_9_pole_did_items.json": "ea8e41d405f8c8aeb3264f778429a66db2df1cbdaa1372f8290970017fe068f1",
+      "frozen/b1_9_pole_did_scaffold.json": "862b19c21bfaa6182732b1d60d20839859f96a364fa801d6328c86efeb792182",
+      "frozen/b1_9_pole_sanity_items.json": "dae9497455e648860e50264a83e4924299801a94e737634a17d2d64b4fd79bab",
+      "frozen/b1_9_pole_sanity_scaffold.json": "1c3674cf7438f4df3afae474c137b71e5d5a38b672604a663d0e025885bcfc12"
+    },
+    "decomposer_G2P": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd (UNCHANGED — G2P not touched by the bundle)"
+  },
+  "result_interpretation": {
+    "prior_results_status": "All committed v2/v1-era results (B1.4b′ NULL_RETURN_BOTTOM; B1.9 embedding distant-source null; B1.8/B1.9 generation content nulls; pole-DiD inconclusive) remain valid records OF THE v2/v1-era mapping. Promotion created NEW files; it did not overwrite them.",
+    "not_deltas": "Bundle-era results are NOT direct deltas against v2/v1-era results (packets differ).",
+    "nulls_not_reopened": "A more faithful mapping changes WHICH resonance a word receives, not WHETHER the resonance is validated. Content-level nulls are not reopened.",
+    "b1_4b_prime_status": "NULL_RETURN_BOTTOM (before and after promotion)",
+    "track_b_status": "BLOCKED",
+    "original_b1_4b_status": "BLOCKED"
+  },
+  "guardrails": "Resonance / phonetic-fidelity refinement only. No GENUTILITY_*. No ONTOLOGICAL_SIGNAL. No semantic-truth / ontology / Sanskrit-privilege claim. Structure, not validated meaning."
+}

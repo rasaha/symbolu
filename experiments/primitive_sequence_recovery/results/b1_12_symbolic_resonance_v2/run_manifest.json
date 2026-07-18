@@ -1,0 +1,12 @@
+{
+  "schema": "b1_12_bsr_v2_run_manifest",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "status": "COMPLETED",
+  "mode": "vllm_independent_two_model_no_crossover",
+  "controlling_preregistration": "VARNA_SYMBOLIC_RESONANCE_PREREG_V2_1.md",
+  "amends": "VARNA_SYMBOLIC_RESONANCE_PREREG_V2.md",
+  "freeze_record": "B1_12_V2_1_PREREG_FREEZE.md",
+  "wordlist_sha256": "7a558008a22151a48f7770790bbfb01cdef190b64d3ae6feb8677b0b360457b4",
+  "model_identity_dependence": "SIGNIFICANT_ROLE_DEPENDENCE",
+  "no_forced_consensus": true
+}

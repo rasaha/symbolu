@@ -1,0 +1,229 @@
+{
+  "algorithm": "sha-256",
+  "cer_version": "0.2",
+  "identity_profile": "v2",
+  "note": "Public conformance vectors. Each includes the full CER input and its expected v2 action digest. A conformant implementation must reproduce the normalized payload, canonical bytes, and digest.",
+  "vectors": [
+    {
+      "cer": {
+        "actuation": {
+          "arguments": {
+            "replicas": "12"
+          },
+          "operation": "DEPLOY",
+          "requested_state_transition": {
+            "replicas": {
+              "from": "10",
+              "to": "12"
+            }
+          },
+          "reversibility": "REVERSIBLE",
+          "target": {
+            "cluster": "fixture",
+            "deployment": "web",
+            "namespace": "protected"
+          }
+        },
+        "authority": {
+          "delegation_chain": [
+            {
+              "grant": "*"
+            }
+          ],
+          "delegator": {
+            "id": "sre",
+            "type": "HUMAN"
+          },
+          "permissions": [
+            "deploy"
+          ],
+          "principal": "agent:web-ops"
+        },
+        "cer_version": "0.2",
+        "policy_ref": {
+          "digest": "pd",
+          "version": "1.0.0+abc"
+        },
+        "profile": "kubernetes.scale.v1",
+        "provenance": {
+          "model_provider": "example",
+          "objective": "example",
+          "runtime": "example"
+        },
+        "risk_tier": "GOVERNED",
+        "state_binding": {
+          "as_of": "2026-01-01T00:09:30.000Z",
+          "correlation_id": "protected/web",
+          "operational": {
+            "active_rollback_watches": 0,
+            "available_replicas": 10,
+            "current_replicas": 10,
+            "dependency_healthy": true,
+            "desired_replicas": 10,
+            "freeze_active": false,
+            "generation": 1,
+            "observation_time_s": 600.0,
+            "readiness_plasticity": 0.95,
+            "seconds_since_last_action": 600.0
+          },
+          "resource_version": "1001",
+          "sequence_id": "1",
+          "source": "kubernetes",
+          "state_hash": "sha-256:abababababababababababababababababababababababababababababababab"
+        }
+      },
+      "expected_canonical_bytes_sha256_prefix": null,
+      "expected_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "name": "kubernetes.scale.v1"
+    },
+    {
+      "cer": {
+        "actuation": {
+          "current_manifest_digest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+          "image_digest": "sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+          "max_surge": "1",
+          "max_unavailable": "0",
+          "operation": "DEPLOY",
+          "reversibility": "REVERSIBLE_WITH_COST",
+          "rollback_ref": "web-rev-41",
+          "rollout_strategy": "RollingUpdate",
+          "target": {
+            "cluster": "fixture",
+            "deployment": "web",
+            "namespace": "protected"
+          },
+          "timeout_s": "600"
+        },
+        "authority": {
+          "delegation_chain": [
+            {
+              "grant": "*"
+            }
+          ],
+          "delegator": {
+            "id": "sre",
+            "type": "HUMAN"
+          },
+          "permissions": [
+            "deploy"
+          ],
+          "principal": "agent:web-ops"
+        },
+        "cer_version": "0.2",
+        "policy_ref": {
+          "digest": "pd",
+          "version": "1.0.0+abc"
+        },
+        "profile": "kubernetes.rollout.v1",
+        "provenance": {
+          "model_provider": "example",
+          "objective": "example",
+          "runtime": "example"
+        },
+        "risk_tier": "GOVERNED",
+        "state_binding": {
+          "as_of": "2026-01-01T00:09:30.000Z",
+          "correlation_id": "protected/web",
+          "operational": {
+            "active_rollback_watches": 0,
+            "available_replicas": 10,
+            "current_replicas": 10,
+            "dependency_healthy": true,
+            "desired_replicas": 10,
+            "freeze_active": false,
+            "generation": 1,
+            "observation_time_s": 600.0,
+            "readiness_plasticity": 0.95,
+            "seconds_since_last_action": 600.0
+          },
+          "resource_version": "1001",
+          "sequence_id": "1",
+          "source": "kubernetes",
+          "state_hash": "sha-256:abababababababababababababababababababababababababababababababab"
+        }
+      },
+      "expected_canonical_bytes_sha256_prefix": null,
+      "expected_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+      "name": "kubernetes.rollout.v1"
+    },
+    {
+      "cer": {
+        "actuation": {
+          "affected_scope": {
+            "estimated_rows": "42",
+            "unbounded": false
+          },
+          "compensation_ref": "backup:orders:2026-01-01",
+          "expected_row_version": "orders@v17",
+          "operation": "DB_MUTATION",
+          "reversibility": "REVERSIBLE_WITH_COST",
+          "sql_operation": "UPDATE",
+          "statement_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target": {
+            "connection_ref": "prod-orders",
+            "schema": "public",
+            "table": "orders"
+          },
+          "transaction": {
+            "isolation": "SERIALIZABLE",
+            "mode": "in_transaction"
+          }
+        },
+        "authority": {
+          "delegation_chain": [
+            {
+              "grant": "*"
+            }
+          ],
+          "delegator": {
+            "id": "dba",
+            "type": "HUMAN"
+          },
+          "permissions": [
+            "db.write"
+          ],
+          "principal": "agent:data-ops"
+        },
+        "cer_version": "0.2",
+        "policy_ref": {
+          "digest": "pd",
+          "version": "1.0.0+abc"
+        },
+        "profile": "database.mutation.v1",
+        "provenance": {
+          "model_provider": "example",
+          "objective": "example",
+          "runtime": "example"
+        },
+        "risk_tier": "GOVERNED",
+        "state_binding": {
+          "as_of": "2026-01-01T00:09:30.000Z",
+          "correlation_id": "prod-orders/public/orders",
+          "operational": {
+            "active_transactions": 3,
+            "backup_available": true,
+            "freeze_active": false,
+            "healthy": true,
+            "lock_contention_ok": true,
+            "max_affected_rows": 10000,
+            "max_replication_lag_s": 5.0,
+            "max_transactions": 100,
+            "migration_active": false,
+            "observation_time_s": 600.0,
+            "observed_row_version": "orders@v17",
+            "reachable": true,
+            "replication_healthy": true,
+            "replication_lag_s": 0.5
+          },
+          "resource_version": "row-1001",
+          "sequence_id": "1",
+          "source": "database",
+          "state_hash": "sha-256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expected_canonical_bytes_sha256_prefix": null,
+      "expected_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "name": "database.mutation.v1"
+    }
+  ]
+}

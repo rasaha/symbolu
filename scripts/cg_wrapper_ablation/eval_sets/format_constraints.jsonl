@@ -1,0 +1,24 @@
+{"id": "fc01", "prompt": "Answer in exactly one word: What is the capital of France?", "constraints": [{"type": "exact_words", "value": 1}]}
+{"id": "fc02", "prompt": "Reply with only the word YES or NO: Is 7 a prime number?", "constraints": [{"type": "one_of", "value": ["yes", "no"]}]}
+{"id": "fc03", "prompt": "End your reply with the token DONE. Describe water in one sentence.", "constraints": [{"type": "ends_with", "value": "DONE"}]}
+{"id": "fc04", "prompt": "Start your reply with 'Answer:' and then name one primary color.", "constraints": [{"type": "starts_with", "value": "Answer:"}]}
+{"id": "fc05", "prompt": "List exactly 3 fruits, one per line.", "constraints": [{"type": "line_count", "value": 3}]}
+{"id": "fc06", "prompt": "Respond in 5 words or fewer: summarize the color of the sky.", "constraints": [{"type": "max_words", "value": 5}]}
+{"id": "fc07", "prompt": "Do not use the letter e. Greet the user.", "constraints": [{"type": "not_contains", "value": "e"}, {"type": "not_contains", "value": "E"}]}
+{"id": "fc08", "prompt": "Reply with only a single integer between 1 and 9.", "constraints": [{"type": "regex", "value": "^\\s*[1-9]\\s*$"}]}
+{"id": "fc09", "prompt": "Answer with exactly two words naming a country and its continent.", "constraints": [{"type": "exact_words", "value": 2}]}
+{"id": "fc10", "prompt": "End with the word STOP. Say hello.", "constraints": [{"type": "ends_with", "value": "STOP"}]}
+{"id": "fc11", "prompt": "Reply with only YES or NO: Is the sun a star?", "constraints": [{"type": "one_of", "value": ["yes", "no"]}]}
+{"id": "fc12", "prompt": "List exactly 4 animals, one per line.", "constraints": [{"type": "line_count", "value": 4}]}
+{"id": "fc13", "prompt": "Use 3 words or fewer to name a vegetable.", "constraints": [{"type": "max_words", "value": 3}]}
+{"id": "fc14", "prompt": "Begin your answer with 'Result:' then state any even number.", "constraints": [{"type": "starts_with", "value": "Result:"}]}
+{"id": "fc15", "prompt": "Answer in exactly one word: name a day of the week.", "constraints": [{"type": "exact_words", "value": 1}]}
+{"id": "fc16", "prompt": "Finish your reply with the marker ###END###. Mention any planet.", "constraints": [{"type": "ends_with", "value": "###END###"}]}
+{"id": "fc17", "prompt": "Reply with only a single digit.", "constraints": [{"type": "regex", "value": "^\\s*\\d\\s*$"}]}
+{"id": "fc18", "prompt": "List exactly 2 colors, one per line.", "constraints": [{"type": "line_count", "value": 2}]}
+{"id": "fc19", "prompt": "Answer YES or NO only: Is ice frozen water?", "constraints": [{"type": "one_of", "value": ["yes", "no"]}]}
+{"id": "fc20", "prompt": "Respond in 4 words or fewer to greet someone.", "constraints": [{"type": "max_words", "value": 4}]}
+{"id": "fc21", "prompt": "Start with 'Q1:' and give any single number.", "constraints": [{"type": "starts_with", "value": "Q1:"}]}
+{"id": "fc22", "prompt": "End the reply with the word FINISH. Name a metal.", "constraints": [{"type": "ends_with", "value": "FINISH"}]}
+{"id": "fc23", "prompt": "Answer with exactly three words describing a sunset.", "constraints": [{"type": "exact_words", "value": 3}]}
+{"id": "fc24", "prompt": "Reply with only the word TRUE or FALSE: The earth orbits the sun.", "constraints": [{"type": "one_of", "value": ["true", "false"]}]}

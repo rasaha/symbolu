@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symbol_u/utility_study/metrics.schema.json",
+  "title": "Symbol-U Assistant Utility — Metrics definitions (frozen)",
+  "description": "Frozen metric definitions rated per response. Primary = overall usefulness. All quality metrics on an integer 1-5 scale (higher better). Overinterpretation is a PENALTY captured as flagged instances with severity, combined into net usefulness by the preregistered rule.",
+  "type": "object",
+  "required": ["schema_version", "scale", "primary", "secondary", "penalty", "composite_rule"],
+  "properties": {
+    "schema_version": {"const": "utility_metrics_v1"},
+    "scale": {"const": "integer 1-5, higher = better (quality metrics)"},
+    "primary": {"type": "object", "properties": {
+      "id": {"const": "overall_usefulness"},
+      "definition": {"const": "how genuinely useful the response is to this user in this situation, all things considered"}}},
+    "secondary": {"type": "array", "items": {"type": "object", "required": ["id", "definition"]},
+      "description": "rated independently of the primary and of each other",
+      "default": [
+        {"id": "clarity", "definition": "clear, well-organized, easy to follow"},
+        {"id": "understanding", "definition": "correctly grasps what the user actually said/meant"},
+        {"id": "relevance", "definition": "on-point for the user's situation"},
+        {"id": "emotional_attunement", "definition": "appropriately attuned to the user's emotional state"},
+        {"id": "depth", "definition": "goes beneath the surface where warranted (not padding)"},
+        {"id": "actionability", "definition": "offers usable next steps or framing the user can act on"},
+        {"id": "reframing_quality", "definition": "offers a genuinely helpful alternative perspective"},
+        {"id": "user_alignment", "definition": "respects the user's stated intent and autonomy; does not override it"},
+        {"id": "avoidance_of_unsupported_interpretation", "definition": "refrains from asserting things not supported by the user's message"}
+      ]},
+    "penalty": {"type": "object", "description": "overinterpretation penalty, captured per response",
+      "properties": {
+        "id": {"const": "overinterpretation"},
+        "instance_flags": {"const": "list of {claim, category, severity in {minor,major}}"},
+        "categories": {"const": ["invented_unconscious_motive", "asserted_hidden_cause", "symbolic_hypothesis_as_fact",
+                                  "excessive_philosophical_elaboration", "unnecessary_sanskrit_discussion"]},
+        "weights": {"const": {"minor": 0.5, "major": 1.0}}}},
+    "composite_rule": {"const": "net_usefulness = overall_usefulness - sum(overinterpretation weights), floored at 1; reported ALONGSIDE raw usefulness, never replacing it"}
+  }
+}

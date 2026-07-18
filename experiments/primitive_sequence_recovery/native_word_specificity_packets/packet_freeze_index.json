@@ -1,0 +1,41 @@
+{
+  "artifact_type": "word_specificity_packet_freeze",
+  "n_confirmatory_rows_paraphrased": 17,
+  "packet_counts_per_set_arm": {
+    "A/F": 6,
+    "A/G": 6,
+    "A/R": 30,
+    "A/S": 6,
+    "A/T": 6,
+    "A/X": 6,
+    "B/F": 6,
+    "B/G": 6,
+    "B/R": 30,
+    "B/S": 6,
+    "B/T": 6,
+    "B/X": 6
+  },
+  "n_trials_evaluator_facing": 120,
+  "leakage_flags": 0,
+  "equivalence_all_preserved": true,
+  "seeds": {
+    "derangement": 20260901,
+    "random_assignment": 20260902,
+    "generic": 20260903,
+    "candidate_order": 20260904,
+    "repeats": 20260905
+  },
+  "packet_verdict": "PACKETS_AUTHORED_FROZEN_AND_LEAKAGE_CLEAN",
+  "readiness_verdict": "READY_FOR_BLIND_EVALUATOR_RUN",
+  "frozen_hashes": {
+    "paraphrase_table.json": "99d4e6d054dfa0fb1a04e25de4a9630748f6a416efe8be71023a3b03eaf76687",
+    "candidate_gloss_table.json": "0568f0b7494e9adfc4ade254d13a43a9df99e2893ffb36cf3308fa623781d211",
+    "leakage_audit.json": "5b22891f7fabce828fd5ee0f0766713b0cf7021e73f8aaa92f0740736e7d3f2d",
+    "equivalence_audit.json": "cd33e16ec61d51f4407d34ac564d005c31ef1be992888c6839ac5a3b8376d13d",
+    "evaluator_facing/trials.json": "35e90057840f2bf38ef4ed08d5ff75c351019656de93c493e056bfd520f619ad",
+    "internal/answer_key.json": "12c38ffe9bbf8554cdb3c52a14f999ef36cdd9585ea8f53b71e3d0f066e7b85e",
+    "internal/blind_authoring_input.json": "5dc75fdd1c95b360ece67f79b72272792d3951066573630cb734afd09ffa1f15",
+    "internal/rowid_to_consonant_map.json": "1c53c3db8cc0eeb3be0e1b3c62df23fa37851faa4b2302cfac3e04f8fdad7609"
+  },
+  "guardrails": "no evaluator run; no result; confirmatory backbone only; no vowel in packets; evaluator-facing exposes no Devanāgarī/IAST/consonant/rowid/arm/word/path"
+}

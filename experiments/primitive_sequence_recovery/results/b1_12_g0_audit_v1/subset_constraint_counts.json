@@ -1,0 +1,35 @@
+{
+  "n_eligible_candidates": 35,
+  "n_satisfying_all_constraints": 178234,
+  "principal_eliminating_constraint_counts": {
+    "edit_floor": 199960,
+    "endpoint": 1243569,
+    "length_span": 1397
+  },
+  "satisfying_each_constraint_independently": {
+    "bigram": 1582240,
+    "edit_floor": 1423200,
+    "endpoint": 186718,
+    "length_span": 1582240,
+    "selforder": 1623160,
+    "trigram": 1582240
+  },
+  "schema": "b1_12_subset_constraint_counts_v1",
+  "sequential_order": [
+    "edit_floor",
+    "selforder",
+    "endpoint",
+    "bigram",
+    "trigram",
+    "length_span"
+  ],
+  "surviving_sequential_order": {
+    "bigram": 179631,
+    "edit_floor": 1423200,
+    "endpoint": 179631,
+    "length_span": 178234,
+    "selforder": 1423200,
+    "trigram": 179631
+  },
+  "total_size6_subsets": 1623160
+}

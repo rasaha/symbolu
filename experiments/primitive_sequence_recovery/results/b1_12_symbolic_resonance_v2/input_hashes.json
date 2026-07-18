@@ -1,0 +1,32 @@
+{
+  "schema": "b1_12_bsr_v2_input_hashes",
+  "wordlist_sha256": "7a558008a22151a48f7770790bbfb01cdef190b64d3ae6feb8677b0b360457b4",
+  "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "lexicon_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+  "prereg_v2_1_sha256": "1c89584de2f0b89883a7f8276f5176256fe6eb528df7c60dd09b31781178724f",
+  "prereg_v2_referenced_sha256": "831e48ecc409140f64a943c0331242043424045c703d01be1cd4c55dcfb59550",
+  "freeze_record_sha256": "26d0d9b0da43624805d9f1d2109520bb5bc5f227033f46725a4d1bafd9853637",
+  "n_words": 20,
+  "words": [
+    "akrodha",
+    "asūyā",
+    "audārya",
+    "bhrama",
+    "chāyā",
+    "cintā",
+    "cāpa",
+    "dama",
+    "darpaṇa",
+    "dhvani",
+    "dhṛti",
+    "jaṅghā",
+    "kapāla",
+    "kuṇḍala",
+    "kārpaṇya",
+    "kūrma",
+    "lalāṭa",
+    "mukura",
+    "pavana",
+    "pralaya"
+  ]
+}

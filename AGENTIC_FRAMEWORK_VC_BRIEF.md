@@ -1,301 +1,380 @@
-# Agentic Framework — VC Brief
+# Agent Runtime — VC Brief
 
-**Cognade Labs | Governed Runtime for Autonomous AI Agents**
-*Version 1.9.0 — Prepared April 2026*
+**Ugence Labs | Agent Runtime**
+*The Agent Runtime that turns AI reasoning — planning, memory, reflection, tool orchestration — into a **deterministic, governable Canonical Execution Request**.*
+*Version 2.1.0 — Refined July 2026 (external / evidence-based)*
+
+> **Product family.** The Agent Runtime is a **Specialized AI System** in the Ugence Labs
+> portfolio, which spans three layers: **Specialized AI Systems** (Hybrid LLM · LLM Steering Controller · Agent
+> Runtime · Autonomous Runtime — this runtime is one of them), the
+> **AI Control Plane** (Context Minimization · ActionGate · Autonomous Control Plane — its own
+> product, `AI_CONTROL_PLANE_VC_BRIEF.md`), and **AI Infrastructure** (KVPro · Cloud Scaling Controller — canonical taxonomy in
+> `UGENCE_PLATFORM_OVERVIEW.md`). The runtime is the **native reference producer** for the Control Plane. This
+> document positions the runtime; it does **not** carry the Control Plane story, and the two
+> products are **not** merged.
 
 ---
 
 ## Page 1 — The Problem
 
-### Enterprises want autonomous agents. Governance is blocking deployment.
+### Enterprises cannot consistently trust execution across AI runtimes
 
-The last 18 months produced a wave of agent frameworks — LangChain,
-LangGraph, CrewAI, AutoGen, AWS Bedrock Agents, Vertex AI Agent Builder.
-They have made it straightforward to wire an LLM to a tool-calling loop.
-What remains genuinely hard is the layer between *"the model decided to
-act"* and *"the action executed against a production system"* — the
-governance, approval, budget, and audit layer that regulated buyers
-require before an autonomous agent can be put in front of customers,
-money, or infrastructure.
+The last two years produced a wave of agent runtimes — LangGraph, CrewAI, AutoGen, AWS Bedrock
+Agents, Vertex AI Agent Builder — alongside coding and desktop agents such as Claude Code and the
+OpenAI Agents SDK. They made it straightforward to wire an LLM to a tool-calling loop. But **every
+runtime reasons differently, and every runtime represents a chosen action differently**, and each
+one enforces policy inside its own framework-specific loop.
 
-In enterprise pilots we and our design partners have observed, four
-questions consistently come up early — and most current frameworks
-answer them only partially:
+Enterprises **increasingly run more than one runtime**: LangGraph in one team, a hosted Bedrock
+agent in another, a coding agent on the desktop, a home-grown runtime in a fourth. Because each
+carries **its own action representation and its own enforcement seam**, governance **fragments**.
+There is no single, stable answer to the only questions a risk team actually cares about:
 
-| The question an enterprise buyer asks | What most current frameworks offer |
+| The question an enterprise buyer asks | Why coupled runtimes answer it inconsistently |
 |---|---|
-| *"Can this agent be stopped before it does something unsafe, not after?"* | Primarily post-hoc content filters and output moderation. |
-| *"Can a human approve destructive actions without a custom rewrite?"* | Middleware patterns that vary per framework and per integration. |
-| *"Can I reconstruct what the agent did, step by step, for audit?"* | External telemetry or prompt logs — rarely a structured causal trace. |
-| *"Can I cap token and dollar spend as a hard stop, not a warning?"* | Usage dashboards and soft alerts, not terminal budget events. |
+| *"What exactly is this agent about to do — as a stable, signed object?"* | Each framework has its own internal action shape; there is no canonical, hashable request. |
+| *"Who authorized this specific action, and can that authorization be replayed or transferred?"* | Authorization is entangled with the runtime loop, so it varies per framework and per integration. |
+| *"Is this operationally safe against live state right now — independent of who generated it?"* | Operational safety, when present at all, is bolted into the same loop that chose the action. |
+| *"Can I reconstruct and audit the decision the same way across every runtime we run?"* | The trace shape is framework-specific; there is no shared identity from proposal to execution. |
 
-In practice, a large share of enterprise AI pilots stall before
-production, and the blockers our design partners cite most often are not
-model quality — they are trust, auditability, approval workflow, and
-spend control. Agents are now capable enough to be genuinely useful and
-unpredictable enough to be difficult to insure and certify.
+The market does not need *another* runtime with its own embedded governance. It needs **one
+trustworthy execution contract** that any runtime can produce and **one** governance layer can
+authorize. That is the architecture Ugence builds toward:
 
-### Why retrofitting governance onto existing loops is hard
+> **Runtime → Canonical Execution Request (CER) → AI Control Plane.**
+> The runtime **proposes**; the Control Plane **governs**. One contract, one governor, many runtimes.
 
-In most current frameworks, governance is layered *around* a core loop
-that was designed primarily to "call the LLM and dispatch tools." Safety,
-approvals, budgets, and audit logs tend to be composed as middleware.
-The ordering in which these checks run — and how they interact with
-cancellation and streaming — is often framework-specific and not always
-pinned by tests. The result is that the seam between *"the model asked
-to act"* and *"the action executed"* can be porous under edge cases:
-prompt injection, hallucinated tool names, partial failures, concurrent
-approvals.
+### The runtime's role in the decoupled architecture
 
-Our view is that the market needs a runtime where governance is a
-**first-class property of the execution path itself** — where the
-action loop ordering is pinned by tests, every tool call passes through
-explicit risk classification, every action can be gated for human
-approval as a runtime argument, and every run produces a replayable
-in-memory trace. That is the category we are building for.
+The **Ugence Agent Runtime** creates structured, **evidence-rich execution requests** rather than
+treating a model-selected action as authorized execution. It plans, decomposes, remembers,
+reflects, and orchestrates tools — and at the moment of actuation it emits a **Canonical Execution
+Request (CER)**: a runtime-independent, hashable object describing exactly what should happen.
+Whether and how that request executes is decided **outside** the runtime, by the Ugence AI Control
+Plane. The result returns to the runtime for observation, memory, and reflection — so the runtime
+stays **stateful and iterative**, not a one-way proposal generator.
+
+`FACT.` The CER contract at the center of this architecture is not a slideware concept. **CER V0.3
+has been validated across multiple runtimes** (a native Ugence producer plus LangGraph and OpenAI
+Agents adapters, all yielding identical action identity), **multiple execution profiles** (two
+Kubernetes profiles and a database-mutation profile), **deterministic identity** (a content hash
+that is stable from proposal to execution), and an **independent clean-room implementation** that
+reproduces byte-identical canonical payloads and digests. Details are in the appendix; the headline
+is that the contract already works across independent producers.
 
 ---
 
 ## Page 2 — The Architecture
 
-### Agentic Framework — governance wired into the execution path
+### Native Execution Proposal Engine
 
-Agentic Framework is a **code-first Python library** that wraps any LLM
-adapter (OpenAI, Anthropic, Mistral, local models via a common
-`BaseLLMAdapter`) and turns it into a governed autonomous agent. Every
-action is observable, auditable, and interruptible because those
-properties are enforced by the runtime contract, not by optional
-middleware.
+Unlike existing runtimes — which hand the framework's internal action object straight to
+execution — the Ugence Agent Runtime **converts reasoning into a Canonical Execution Request** as
+its native output. The CER is the runtime's **native execution contract**: the artifact the runtime
+exists to produce. Each CER carries:
 
-### The governed execution path (pinned by the test suite)
+| CER carries | What it is |
+|---|---|
+| **Intended action** | The specific operation the agent proposes (e.g. scale a deployment, mutate a table). |
+| **Normalized parameters** | Canonicalized arguments, so identical intent produces an identical object. |
+| **Execution target** | The concrete resource / surface the action would touch. |
+| **Supporting evidence** | Structured planning, decomposition, and advisory risk/uncertainty signals. |
+| **Provenance** | Which runtime and adapter produced the proposal (excluded from identity — see below). |
+| **Deterministic identity** | A content hash that is stable and reproducible from proposal to execution. |
+
+Because the CER is emitted **natively**, there is **no translation layer** between the runtime and
+the governor: what the runtime proposes is exactly the object the Control Plane authorizes.
+
+> **Not an industry standard — the runtime's native execution contract.** CER is a versioned
+> interoperability contract that Ugence implements; it is not (yet) a market-adopted standard. The
+> long-term vision for CER as a shared contract is on Page 4.
+
+### The full loop (proposer → governor → execution → observation)
 
 ```
-  user_input
-      │
-      ▼
-  GoalDecomposition  ──► structured ActionItems
-      │
-      ▼
-  ReflectiveGenerator ──► LLM response (+ optional self-revision)
-      │
-      ▼
-  CoherenceEngine    ──► turn-level coherence state
-      │
-      ▼
-  SafetyGate         ──► eligible actions  (turn-level pre-gate)
-      │
-      ▼
-  For each eligible action:
-      ├── 1. Cancellation check      (async stop at checkpoints)
-      ├── 2. Budget check            (hard token + cost caps)
-      ├── 3. Approval gate           (human-in-the-loop, per action type)
-      ├── 4. ACTION_STARTED event
-      ├── 5. SafeMCPGateway          (per-tool risk + confidence + audit)
-      └── 6. ACTION_COMPLETED event
-      │
-      ▼
-  RUN_COMPLETED  +  AgentRunTrace   (in-memory, replayable)
+  Enterprise Goal
+        │
+        ▼
+  Agent Runtime  (PROPOSES)
+   • planning            • memory
+   • decomposition       • reflection
+   • tool orchestration  • advisory risk evidence
+        │
+        ▼
+  Canonical Execution Request  (CER)   ── runtime-independent, hashable
+        │
+        ▼
+  AI Control Plane  (GOVERNS — separate product)
+   • Context Minimization (where applicable)
+   • ActionGate authorization      (allow / deny / approve / escalate)
+   • ACP operational safety        (safe-now / hold)
+        │
+        ▼
+  Governed execution result
+        │
+        ▼
+  Tool / API / cloud / database / robot
+        │
+        ▼
+  Observation & outcome
+        └────────────────────────► Agent Runtime  (memory & reflection)
 ```
 
-The ordering — **cancel → budget → approve → execute** — is a runtime
-invariant verified by the test suite, not a configurable option. A run
-that is already cancelled does not reach the budget check. A run that
-exceeds the budget does not reach the approval gate. A denied approval
-does not reach tool execution. This is a deliberately narrow, tested
-contract — one of the things we think enterprise buyers will care about
-most during diligence.
+The **return arrow is essential**. Authorization and operational safety live in the Control Plane;
+the runtime remains the stateful planner that learns from the governed outcome. Exact **action
+identity** is preserved from proposal to execution: the CER the runtime emits is the same object
+ActionGate authorizes and ACP clears, bound by a content hash — so what was proposed is provably
+what was governed and what executed.
 
-### Two complementary governance layers
+### Runtime independence — the Control Plane does not require the Ugence Runtime
 
-| Layer | Scope | What it decides |
+`FACT.` CER is a runtime-independent contract. The AI Control Plane governs **any** conformant
+producer; it does **not** require the Ugence Runtime. Today CER can be emitted by:
+
+| Producer | Integration | Status |
 |---|---|---|
-| **SafetyGate** | Turn-level | *"Given the current coherence state, is any action allowed to run this turn?"* |
-| **SafeMCPGateway** | Per tool call | *"Given this tool's declared risk level, the model's confidence, and enriched signals, should this specific call proceed?"* |
+| **Ugence Agent Runtime** | Native | The **native reference producer** — emits CER as its execution seam. |
+| **LangGraph** | Adapter | Real adapter; produces identical action identity in conformance testing. |
+| **OpenAI Agents** | Adapter | Real adapter; produces identical action identity in conformance testing. |
+| **Future runtimes** | Adapter | The contract is versioned and documented for third-party emitters. |
 
-Every tool registered with the agent declares a `risk_level`
-(`read_only → write → execute → destructive → privileged`), a
-`min_confidence`, and whether it `requires_confirmation`. The gateway
-enforces these at call time; the LLM cannot route around them. Turn-level
-and per-call governance are complementary — one protects the turn, the
-other protects the specific action.
+The Ugence Runtime is the **native reference producer**, not a gatekeeper. Other runtimes reach the
+same governance layer through a thin adapter. *(This is architectural interoperability demonstrated
+in the repository — it is **not** a claim of broad market adoption.)*
 
-### Signal-enriched governance (our differentiation)
+### Runtime advantages vs. Platform advantages — kept separate on purpose
 
-When the agent is backed by a **CG-capable adapter** (our
-`MistralCGAdapter`, or the Phase Quad LLM from our broader stack),
-governance decisions can be enriched with *model-internal runtime
-signals* — entropy and vritti (coherence-fluctuation) values derived
-from the model's internal state after inference. These are
-state-derived uncertainty and coherence signals, not prompt-level
-self-reported confidence scores, and they are not available to
-frameworks that only see the text output of a closed API. Our approach
-is differentiated here because we control both the adapter interface
-and, in the CG path, the model internals.
+These are two products. Their advantages are stated in two tables so the boundary stays crystal
+clear — the runtime's value is **proposal quality**; the platform's value is **governance
+authority**.
 
-When a non-CG adapter is used (OpenAI, Anthropic, etc.), the same
-governance path still runs — it falls back to text-level signals
-(quality scores and coherence metrics). Customers can therefore start
-on commercial APIs today and move to the CG path later without rewiring.
+**Agent Runtime advantages (the proposer):**
 
-### Developer surface — one call, full governance
+| Advantage | What it means |
+|---|---|
+| **Planning** | Turns an enterprise goal into an ordered, inspectable plan. |
+| **Decomposition** | Breaks goals into discrete, individually governable actions. |
+| **Memory** | Carries state across turns; the runtime is stateful, not one-shot. |
+| **Reflection** | Learns from governed outcomes via the observation-return loop. |
+| **Tool orchestration** | Coordinates tool calls into a coherent execution proposal. |
+| **Native CER generation** | Emits the canonical, hashable request directly — no translation step. |
+| **Richer execution evidence** | Structured planning + advisory risk/uncertainty travel *with* the request. |
+
+**AI Control Plane advantages (the governor — separate product):**
+
+| Advantage | What it means |
+|---|---|
+| **ActionGate** | Authoritative allow / deny / approve / escalate on a specific action. |
+| **ACP** | Operational-safety clearance against live state (safe-now / hold). |
+| **Runtime-independent governance** | One governance layer fronts many runtimes. |
+| **Operational safety** | Replay protection, execution-eligibility, commit-time validation. |
+| **Deterministic authorization** | The same CER identity yields the same decision, auditable end-to-end. |
+| **Runtime independence** | Governs any conformant producer, native or adapter. |
+
+Nothing in the left/first table is enterprise authorization; nothing in the second is produced by
+the runtime. A denied or unsafe CER does not execute regardless of what the runtime "decided," and
+the runtime cannot mint its own authorization.
+
+### What the runtime owns — and what it does not
+
+| Owned by the **Agent Runtime** (safeguards & evidence) | Owned by the **AI Control Plane** (authority) |
+|---|---|
+| Early / structural validation of a proposed action | **Authoritative allow / deny** decisions |
+| Local cancellation (async stop at checkpoints) | **Action authorization** and approval binding |
+| Budget-accounting safeguards (advisory caps) | **Operational-safety** decisions (safe-now / hold) |
+| User-interaction controls (human-in-the-loop UX) | **Replay protection** and execution-token creation |
+| **Advisory risk evidence** (uncertainty / confidence) | **Commit-time state validation** |
+| Proposal-completeness checks | **Policy enforcement as final authority** |
+
+The runtime does **not** own authorization, operational safety, execution authority, policy
+enforcement, or replay protection. Those belong **exclusively** to the AI Control Plane.
+
+### SafetyGate and SafeMCPGateway, reframed
+
+The runtime's legacy governance modules are **not** peers of ActionGate. Each is reclassified:
+
+| Module | New role | Notes |
+|---|---|---|
+| **SafetyGate** | **Proposal validation** + **advisory evidence production** | Verifies a request is structurally complete and emits turn-level risk/coherence evidence for ActionGate. It no longer makes the authoritative turn-level allow/deny. |
+| **SafeMCPGateway** | **Proposal validation** + **compatibility shim** | Structural per-tool checks and a temporary shim for existing users; its risk taxonomy becomes **advisory evidence** attached to the CER. Any duplicated final-authorization logic is **deprecated** in favor of ActionGate. |
+
+Neither module is equivalent to ActionGate. Where they duplicated authoritative governance, that
+duplication is on the deprecation path; where they produce useful signal, that signal becomes
+advisory evidence in the CER.
+
+### Model-uncertainty signals — advisory evidence, not authority
+
+The runtime can attach **model-internal uncertainty signals** to a proposal as **advisory
+evidence**. The measured, provider-agnostic one is **raw next-token predictive entropy** and a
+derived **confidence-risk gap** (the model *says* safe but is internally uncertain). This evidence
+**may raise scrutiny — it may never grant authorization.** Deeper research signals remain
+**research-only**, off the product path, where the evidence is weak or negative (see the appendix).
+**The runtime's commercial thesis does not depend on any of them.**
+
+### Developer surface — plan, propose, govern, observe
 
 ```python
-from agentic.agentic_framework import build_agent, ToolSpec, ToolRiskLevel
+runtime = build_runtime(model=..., tools={...})
 
-agent = build_agent(
-    adapter=AnthropicAdapter(auth_token=...),
-    tools={
-        "search":      ToolSpec(handler=search_fn,  risk_level=ToolRiskLevel.READ_ONLY),
-        "send_email":  ToolSpec(handler=email_fn,   risk_level=ToolRiskLevel.WRITE,
-                                requires_confirmation=True),
-        "run_payment": ToolSpec(handler=payment_fn, risk_level=ToolRiskLevel.DESTRUCTIVE,
-                                requires_confirmation=True),
-    },
-)
-trace = agent.run_with_trace("Process the refund queue")
+cer    = runtime.propose("Process the refund queue")   # native Canonical Execution Request
+result = control_plane.govern_and_execute(cer)          # ActionGate + ACP decide (external)
+runtime.observe(result)                                 # stateful loop closes; memory + reflection
 ```
 
-One factory call composes the full stack: adapter, safety gate,
-dispatcher, gateway, tracing, budget, and approvals. The same code runs
-against a `MockLLMAdapter` (no cost, no API keys) and a live Anthropic
-or OpenAI endpoint with no wiring changes — which makes the library
-easy to evaluate before any procurement conversation.
+The runtime is **compatible with commercial and local models through a common adapter interface** —
+the same code evaluates against a stub model (no cost, no keys) and a live provider with no wiring
+changes. Because the CER is emitted **natively**, the runtime integrates with the Control Plane with
+no adapter translation step.
 
 ---
 
 ## Page 3 — Competitive Landscape
 
-Agentic Framework sits in a crowded category — "agent tooling" is one
-of the noisiest spaces in enterprise AI right now — but most of that
-crowd is solving a different problem. Most current frameworks are
-built to make it **easy to wire an LLM to a tool-calling loop**. We
-are built to make the layer *between* that tool loop and a production
-action **governed, auditable, and interruptible by default**. The
-table below positions us against each family of competitor, stating
-for every row both *how* we differ and *why* that difference is an
-advantage for a regulated enterprise buyer.
+The Agent Runtime is **not** "a runtime with governance baked in" — that claim is architecturally
+inaccurate, because final governance lives outside the runtime. The honest and stronger position:
+**the Agent Runtime is a best-in-class proposer and the native reference producer for a
+runtime-independent governance contract.** The right comparison is therefore not feature-by-feature;
+it is **execution architecture**.
 
-| Category | Representative players | What they ship | How Agentic Framework differs — and why it is better |
-|---|---|---|---|
-| **Open-source agent frameworks** | LangChain / LangGraph, CrewAI, AutoGen, SmolAgents | Python (and JS) libraries that wire an LLM to a tool-calling loop, with middleware-composed safety, approvals, and logging. Multi-agent orchestration and ecosystem breadth are their strengths. | We treat governance as a **runtime contract, not middleware.** The execution ordering `cancel → budget → approve → execute` is pinned by the test suite and cannot be silently reordered; per-tool risk classification runs at the gateway; human approvals are a runtime argument, not a framework rewrite. **Better because:** a regulated buyer can point to a specific test that proves the agent cannot execute a denied or over-budget action, rather than reasoning about middleware composition order — which is exactly the property that closes enterprise diligence. |
-| **Cloud-native managed agent platforms** | AWS Bedrock Agents, Vertex AI Agent Builder, Azure AI Studio Agents | Provider-hosted agent runtimes with console-driven tool registration, managed approval workflows, and observability tied to the cloud's logging stack. | We are code-first, portable across LLM providers, and emit a **replayable in-memory `AgentRunTrace`** that is not tied to a single cloud's telemetry. Approvals are per-action-type runtime arguments rather than console flows. **Better because:** customers who run multi-cloud or hybrid — which is most of BFSI and healthcare — can adopt us without provider lock-in, and the audit story is a single trace the customer owns, not a provider-specific log pipeline that evaporates the day they switch clouds. |
-| **LLM-native tool / function-calling APIs** | OpenAI Assistants & Tools, Anthropic Tool Use, Mistral Function Calling | Provider-side tool-calling primitives exposed through a proprietary API. They decide *which* tool the model wants to call. | These are **substrate**, not a governance layer. They do not decide whether the call is allowed, affordable, approved, or in-scope for the current turn. **Better because:** Agentic Framework consumes these APIs through `BaseLLMAdapter` and *adds* the governance contract on top, so a customer using OpenAI Tool Use today gets SafetyGate, SafeMCPGateway, hard budget caps, and runtime approvals without migrating off their existing provider. We are additive to, not competitive with, the primitives they already pay for. |
-| **Post-hoc guardrails & moderation** | NeMo Guardrails, Guardrails AI, Llama Guard, OpenAI Moderation API | Content-level filters and output classifiers applied *after* the model has produced a response. | Guardrails protect **text**, not **actions**. A hallucinated tool name, a budget breach, a denied approval, or a destructive side effect is not something a content filter is in a position to catch. **Better because:** we intervene at the action boundary — the thing that actually touches production systems — and we compose with a content-level guardrail rather than replacing it; a customer can still run NeMo Guardrails on the LLM output and use Agentic Framework for the tool-execution path. |
-| **Observability & eval platforms** | LangSmith, Langfuse, Helicone, Arize Phoenix, W&B Traces | Instrumentation layers that record prompts, responses, latencies, and evals for after-the-fact debugging and scoring. | Observability tools answer *"what did the agent do?"* after the fact. We answer *"what is the agent allowed to do right now, and can we stop it?"* at execution time. **Better because:** the `AgentRunTrace` we emit is a first-class replayable object produced by the runtime contract itself — the same structure governance decisions were made against, not an out-of-band log pulled from a SaaS dashboard. Observability platforms remain useful on top; they become a *consumer* of the trace rather than a substitute for governance. |
-| **Workflow / orchestration platforms** | Temporal, Airflow, Prefect, n8n, Zapier AI | Durable workflow engines (often retrofitted with LLM steps) that execute business processes with retry, state machines, and fan-out. | Workflow engines assume steps are **deterministic and pre-approved** — they are strong at durability and weak at *"the next action is chosen by an LLM and might be unsafe."* We assume steps are **LLM-chosen and must be gated**. **Better because:** we live exactly at the gap workflow engines do not cover — between *"the model decided to act"* and *"the action touched the system"* — and we can be invoked from inside a Temporal activity the same way a workflow engine calls any Python library. |
+### Compared by execution architecture
 
-### Feature-level differentiation on governance primitives
+| Runtime | Proposal mechanism | Governance location | Execution authority | Representative examples |
+|---|---|---|---|---|
+| **LangGraph** | Graph / state-machine of LLM + tool nodes | In-runtime (developer-coded guards, interrupts) | Runtime executes tool nodes directly | LangChain / LangGraph |
+| **CrewAI** | Role-based crew agents with task delegation | In-runtime (agent-level rules) | Runtime executes | CrewAI |
+| **Claude Code** | Model tool-calls in an agentic loop | In-runtime (permission prompts / policy) | Runtime executes (with user approval) | Claude Code, IDE agents |
+| **OpenAI Agents** | Model tool-calls + handoffs | In-runtime (guardrails) | Runtime executes | OpenAI Agents SDK |
+| **Ugence Runtime** | Plan → decompose → **emit CER** | **External** AI Control Plane (ActionGate + ACP) | **Control Plane** grants execution eligibility; runtime does not self-authorize | Ugence Agent Runtime + AI Control Plane |
 
-For buyers who want the one-page side-by-side on the primitives that
-come up in procurement conversations, here is the honest feature
-comparison against the two most common competitor families:
+*These are architectural characterizations, not feature judgments. The distinguishing axis is
+**where governance lives and who holds execution authority** — in-runtime for the established
+frameworks, in an external, runtime-independent control plane for Ugence. Note that those same
+runtimes can also emit CER **through an adapter**; the difference is native vs. adapter production,
+not exclusivity.*
 
-| Area | Agentic Framework | LangGraph / CrewAI / AutoGen | Bedrock / Vertex Agents |
-|---|---|---|---|
-| Action loop ordering pinned by tests | **Yes** | Varies; typically middleware-composed | Provider-opaque |
-| Per-tool risk classification at the gateway | **Yes** | Partial / per-integration | Partial |
-| Human-in-the-loop as a runtime argument | **Yes** | Bolt-on patterns | Console-driven |
-| Hard budget caps as terminal events | **Yes** | Typically soft / dashboard | Partial |
-| Signal enrichment from model-internal state | **Differentiated** (requires CG adapter) | Not available without model-internal access | Not exposed |
-| Multi-agent orchestration | Not yet — on roadmap | **Mature** | **Mature** |
-| Managed / hosted runtime | Not yet — on roadmap | Partial | **Mature** |
-| Ecosystem breadth (integrations, templates) | Narrow, focused | **Broad** | **Broad** |
+### Where competitors may be stronger (stated plainly)
 
-### Why the overall bet is better, not just different
+Established runtimes lead on **multi-agent orchestration, durability, graph tooling, hosted runtime,
+ecosystem breadth, integrations, developer adoption, and observability.** We do not claim to beat
+them on those in year one. Our edge is architectural: **clean proposer/governor separation and
+native, evidence-rich CER production** for a control plane that can front many runtimes.
 
-- **Governance *is* the execution path, not a wrapper around it.** The `cancel → budget → approve → execute` invariant is a tested runtime contract. No other framework in this landscape makes that a first-class, diff-testable property of the library itself — which is exactly what an enterprise risk team needs in order to sign off an autonomous agent.
-- **Portable across LLM providers by construction.** `BaseLLMAdapter` lets a customer start on OpenAI or Anthropic today and move to a self-hosted or CG-enabled model later with no application rewrite. Managed platforms on the list lock the buyer into a single cloud; open-source frameworks leave portability to the user.
-- **Signal enrichment from model internals is a category of one.** Because we ship our own CG-capable adapter (`MistralCGAdapter`) alongside the framework, governance can read entropy and vritti signals straight from the model's 32D state rather than trusting a text-level self-reported confidence. No wrapper on top of a closed API can reproduce this, and no closed API currently exposes it.
-- **Composes with, rather than replaces, the rest of the stack.** A customer can keep LangChain for its ecosystem, Temporal for durability, LangSmith for observability, NeMo Guardrails for content filtering — and still put Agentic Framework at the tool-execution boundary. We are the missing layer, not a rival to every layer.
-- **Honest scope on where we do not compete (year one).** We are not trying to win on ecosystem breadth, managed infrastructure, or multi-agent orchestration in the first twelve months. We are trying to win on the governance properties that regulated enterprises often cannot ship without: pinned action-loop ordering, per-tool risk classification, runtime approvals, hard budget caps, replayable traces, and — where customers adopt the CG path — signal enrichment from model-internal state.
+### Why use the Ugence Runtime if I already use LangGraph?
+
+The most important commercial question, answered honestly — and **without** attacking LangGraph
+(which you can keep, and front with the same Control Plane via its adapter):
+
+| Reason | What you gain |
+|---|---|
+| **Native CER generation** | The execution contract is the runtime's native output — nothing to translate or reconcile. |
+| **Richer execution evidence** | Structured planning, decomposition, and advisory uncertainty travel *with* the proposal. |
+| **No translation layer** | The object the runtime proposes is exactly the object the governor authorizes. |
+| **Better planning** | Decomposition into individually governable actions, not opaque tool calls. |
+| **Better reflection** | A first-class observation-return loop folds the governed outcome back into memory. |
+| **Tighter AI Control Plane integration** | Built against ActionGate + ACP as the native governance seam. |
+
+If you already run LangGraph, the Control Plane still governs it through the LangGraph adapter. The
+Ugence Runtime is the option when you want the **cleanest, most evidence-rich native producer** for
+that governance layer — not a rip-and-replace mandate.
 
 ### In one sentence
 
-Agent frameworks make it easy to call an LLM and run a tool. Managed
-platforms make it easy to host an agent on one cloud. Guardrails make
-it easy to filter text. Agentic Framework makes it **safe for a
-regulated enterprise to let an autonomous agent touch production** —
-and that is a different product category than any of the incumbents
-in this table are building for.
+Agent frameworks make it easy to call an LLM and run a tool. The Ugence Agent Runtime makes it easy
+to **produce a rich, canonical request that an external control plane can deterministically
+govern** — and to fold the governed result back into a stateful planning loop.
 
 ---
 
-## Page 4 — Evidence & Roadmap
+## Page 4 — Evidence, Roadmap, and Appendix
 
-### What is proved today (v1.9.0, internal evidence)
+### What is proved today (internal evidence)
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 1,550+ tests passing across core runtime and R1–R11 runtime primitives |
-| **Runtime primitives** | Streaming, async cancellation, approvals, structured output, tool discovery, budgets, tracing — all implemented and tested |
-| **Test evidence per primitive** | Streaming: 28 · Cancel: 31 · Approvals: 33 · Structured output: 44 · Discovery: 38 · Budget: 37 · Tracing: 26 · Cross-feature: 23 |
-| **Action loop ordering invariant** | Pinned by tests: cancel → budget → approve → execute |
-| **Live-adapter end-to-end validation** | 3/3 phases pass against stock Anthropic API with exact usage accounting |
-| **Realistic-mock regression** | 60/60 checks across 5 LLM output-format variations |
-| **Adoption pilots shipped** | 2 internal pilots — Research Assistant (tool composition + governance) and Internal Copilot (per-action-type approval boundary) |
-| **Known fragility points** | 3 of 4 surfaced in real-LLM pilots resolved (goal-alignment gate, action vocabulary normalization, usage accounting). The 4th is low-risk and tracked. |
-| **Signal-enriched governance (CG path)** | Operator-validated on `MistralCGAdapter` in a torch/GPU environment; not yet repo-validated end-to-end. |
-| **LLM adapters shipped** | OpenAI · Anthropic · Mistral (CG) · Mock — all behind a common `BaseLLMAdapter` |
+| **Runtime primitives** | Planning/decomposition, memory, reflection, streaming, async cancellation, structured output, tool discovery, budget accounting, tracing — implemented and tested |
+| **Test suite** | 1,550+ tests across the runtime and its primitives (internal / CI) |
+| **CER production (native seam)** | The runtime emits CER as its native execution seam; **CER V0.3 is proven cross-runtime and cross-domain** (appendix) |
+| **Runtime independence** | Real **LangGraph** and **OpenAI Agents** adapters emit CER with identical action identity (conformance-tested) |
+| **Clean-room implementation** | An independent second implementation reproduces byte-identical canonical payloads and digests |
+| **Observation-return loop** | Governed result returns to runtime memory/reflection — preserved as a first-class path |
+| **Model integration** | Commercial and local models via a common adapter interface (stub model for zero-cost evaluation) |
+| **Advisory evidence** | Raw next-token entropy + confidence-risk gap wired as advisory evidence (never authorization) |
 
-All numbers above are from our own repository and CI — not third-party
-benchmarks. An external benchmark is planned (see roadmap).
+All numbers are from our own repository and CI, not third-party benchmarks. An external benchmark
+and a live cross-runtime demo are on the roadmap.
 
-### Developer-surface improvements (v1.7 → v1.9)
+### Roadmap — product-centric
 
-| Measure | Before `build_agent()` (v1.7) | After (v1.9) |
+| Phase | Product | Focus |
 |---|---|---|
-| Lines to build a governed agent | ~70 | ~10 |
-| Files to touch to add approvals | 3 | 0 (runtime arg) |
-| Switching mock → real LLM | Rewire several components | Swap adapter only |
-| Preview which actions are gated | Manual inspection | `describe_approval_coverage()` |
-| Human-readable trace | Custom print loop | `format_trace(trace)` |
-
-### 12-month roadmap
-
-**Quarter 1 — Adoption and external proof**
-- Add 3 external design-partner pilots (target sectors: BFSI and healthcare)
-- OpenTelemetry export adapter for `AgentRunTrace` (the most common
-  gap raised by enterprise evaluators)
-- Publish an external governance benchmark vs LangGraph / CrewAI across
-  a standardized safety + approval + budget scenario suite
-
-**Quarter 2 — Developer console and managed preview**
-- Ship the Low-Code Developer Interface (design spec complete at
-  `docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md`) — tool registration,
-  approval-policy editor, trace replay
-- Launch a managed cloud preview for teams that prefer a hosted runtime
-
-**Quarter 3 — Multi-agent and retrieval**
-- Agent-to-agent handoffs that preserve governance across the handoff
-  boundary
-- First-party retrieval adapter with coherence-scored provenance
-- Phase Quad LLM integration as a first-class CG adapter, enabling
-  signal-enriched governance by default for Cognade customers
-
-**Quarter 4 — Scale and certification**
-- Begin SOC 2 Type II process on the managed runtime
-- Enterprise audit-log persistence (Postgres + S3-backed)
-- Target a production reference customer on the managed runtime
+| **Phase 1** | **Agent Runtime** | Productize the proposer: durable workflow state, memory, reflection, proposal quality, and the native CER seam. |
+| **Phase 2** | **CER SDK** | Package the execution contract so any team or third party can emit conformant CER. |
+| **Phase 3** | **Runtime adapters** | First-class LangGraph / OpenAI Agents (and future) emitters. *(LangGraph and OpenAI Agents adapters already exist in conformance testing — this phase productizes them.)* |
+| **Phase 4** | **Enterprise orchestration** | Multi-runtime coordination, long-running workflow persistence, enterprise console, audit/OpenTelemetry export. |
+| **Phase 5** | **Hierarchical proposal generation** | Multi-agent, hierarchical proposing and governed hand-offs under one execution contract. |
 
 ### The ask
 
-We are raising seed to evolve Agentic Framework from a tested
-code-first library into a managed governed-runtime product. The
-technology is live, internally tested, and validated in two pilots and
-on live commercial LLM APIs today. The capital is earmarked for:
-external design-partner pilots, the managed runtime and low-code
-console, multi-agent and retrieval support, and the compliance and
-audit-persistence work required for regulated enterprise deployment.
+Ugence is building **two complementary products**:
 
-Governance is increasingly becoming a procurement requirement for
-autonomous agents, not just a nice-to-have. We think the next 12–18 months are the right
-window to establish a credible default for that layer, and we believe
-the combination of a tested runtime contract, a clean developer
-surface, and a path to model-internal signal enrichment gives Agentic
-Framework a defensible position in it.
+1. **Agent Runtime** — the native reference producer (this brief): workflow durability, memory,
+   orchestration, proposal quality, and enterprise integrations.
+2. **AI Control Plane** — the runtime-independent governor (`AI_CONTROL_PLANE_VC_BRIEF.md`):
+   ActionGate, ACP, CER conformance and adapters, live pilots, and production signing/audit.
+
+They **may be purchased independently or deployed together.** A team can adopt the Agent Runtime for
+better proposals without the Control Plane, adopt the Control Plane to govern an existing runtime
+(LangGraph, OpenAI Agents) without the Agent Runtime, or deploy both for the native end-to-end path.
+This brief funds product (1) and **references** product (2); it does not fold the Control Plane story
+into the runtime, and it does not merge the two products.
+
+### Long-term vision — a common execution contract (architectural vision, not adoption)
+
+`VISION.` Ugence believes AI execution will need a **common execution contract**, analogous to how
+**OCI** standardized container images and **CloudEvents** standardized event envelopes — a stable,
+vendor-neutral object that any producer can emit and any governor can authorize. CER is Ugence's
+candidate for that contract, and the cross-runtime / clean-room evidence shows it is
+*implementable* independently.
+
+**This is the architectural vision, not a claim of present-day industry adoption.** CER today is a
+versioned interoperability contract implemented by Ugence and proven across our own producers. Any
+future standardization would be an outcome to earn, not a status we assert.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
-*Repo: `rasaha/symbolu` · Module: `agentic/agentic_framework/`*
-*v1.9.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated*
+### Appendix — model-internal signal research status (evidence only)
+
+Advisory-evidence signals are held to a measured bar. Advisory means **may raise scrutiny, may never
+authorize.** Current status:
+
+| Signal | Evidence | Status |
+|---|---|---|
+| **Risk taxonomy** | Strongest single feature across pilots (standalone AUROC ≈ 0.82) | **MEASURED** — advisory, default |
+| **Raw next-token entropy** | Strongest measured uncertainty signal; fooled-subset AUROC 0.857 | **MEASURED** — advisory, default |
+| **Confidence-risk gap** | End-to-end validated wiring (escalation + audit + negative control) | **MEASURED** (wiring) / **DIRECTIONAL** (value) — advisory |
+| **CG entropy (32-D state)** | Fooled-subset AUROC 0.457 (anti-predictive); beaten by raw entropy | **RESEARCH** — off product path |
+| **C×R×S semantic-frame (agentic governance)** | Real ranking signal but over-gates benign; fails pre-registered gate `AGENTIC_CRS_INCREASES_FALSE_BLOCKS` | **RESEARCH** — off product path |
+| **JEPA / coherence** | Standalone AUROC ≈ 0.70 / 0.68; no value *over* raw entropy | **RESEARCH** — off by default |
+| **Vritti** | Standalone AUROC 0.500 (non-discriminative) | **RESEARCH** — candidate for removal |
+
+*Classification key: **MEASURED** = supported by repo/CI or our own experiments; **DIRECTIONAL** =
+plausible, not yet at statistical power; **RESEARCH** = open question, off the product path. None of
+these grants authorization; all authoritative decisions are made by ActionGate/ACP.*
+
+### Appendix — the CER contract this runtime produces (see the AI Control Plane brief)
+
+The runtime emits a **Canonical Execution Request** that the AI Control Plane governs. CER V0.3 has
+been proven with: **three real runtimes** (native Ugence producer + LangGraph and OpenAI Agents
+adapters) producing identical action identity for identical actuation; **three execution profiles**
+(Kubernetes scale, Kubernetes rollout, and database mutation); an **independent clean-room second
+implementation** reproducing byte-identical canonical payloads and digests; and runtime-independent
+authorization with **no runtime-specific branch in the control plane**. CER is a **versioned
+interoperability contract implemented by the Ugence AI Control Plane** — **not** an industry standard
+already adopted by the market. Full evidence lives in the AI Control Plane brief and the CER
+public-draft package.
+
+---
+
+*Contact: Rakesh Mohan — Ugence Labs*
+*Repo: `rasaha/symbolu` · Module: `agentic/` (Agent Runtime) · Governance: Ugence AI Control Plane*
+*Positioning: Specialized AI System · native reference producer for the AI Control Plane · proposer, not final governor*

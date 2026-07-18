@@ -41,6 +41,7 @@ from agentic.agentic_framework.mcp_gateway import (
     MCPToolCall,
     create_mock_mcp_gateway,
 )
+from agentic.agentic_framework.signal_config import SignalConfig
 from agentic.entropy.entropy_engine import EntropyEngine
 from agentic.entropy.config import TIER_2_CONFIG
 from agentic.entropy.types import (
@@ -454,8 +455,13 @@ class TestMCPGatewayEntropyHookup:
 
         With high entropy (penalty ≈ 0.11), effective_confidence should
         be strictly lower than the baseline run without entropy.
+
+        NOTE: the CG 32-D sovereign-state entropy is EXPERIMENTAL since the 2026-06
+        pivot (raw next-token entropy is the default signal). This test exercises the
+        CG path, so it opts in via enable_cg_state_signals=True.
         """
         gateway = create_mock_mcp_gateway()
+        gateway._signal_config = SignalConfig(enable_cg_state_signals=True)
         high_result = _high_entropy_result()
 
         baseline_call = MCPToolCall(

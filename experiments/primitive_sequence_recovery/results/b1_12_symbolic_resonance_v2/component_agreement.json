@@ -1,0 +1,8 @@
+{
+  "n_components": 60,
+  "exact_agreement": 0.5333,
+  "within_one_step_agreement": 0.85,
+  "mean_abs_diff": 15.42,
+  "median_abs_diff": 0.0,
+  "signed_mean_diff_Qwen_minus_Mistral": -4.58
+}

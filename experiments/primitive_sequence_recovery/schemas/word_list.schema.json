@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.word_list.schema.json",
+  "title": "word_list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "words"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "words": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["word_id", "spelling", "varna_sequence", "family_id", "sense_id", "exclude_flag"],
+        "properties": {
+          "word_id": { "type": "string" },
+          "spelling": { "type": "string" },
+          "varna_sequence": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "family_id": { "type": "string" },
+          "sense_id": { "type": "string" },
+          "exclude_flag": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

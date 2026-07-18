@@ -1,0 +1,3403 @@
+{
+  "schema": "b1_12_parser_outputs_v1",
+  "words": [
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0
+          ],
+          "codepoints": [
+            "U+0905"
+          ],
+          "devanagari": "अ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "a"
+        },
+        {
+          "atomic_varna_indices": [
+            1,
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0917",
+            "U+094D",
+            "U+0928",
+            "U+093F"
+          ],
+          "devanagari": "ग्नि",
+          "index": 1,
+          "source_span": [
+            1,
+            5
+          ],
+          "translit": "gni"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "independent_vowel",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "अग्नि",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "agni",
+      "id": "W01",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "g": 1,
+        "i": 1,
+        "n": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0
+          ],
+          "codepoints": [
+            "U+0905"
+          ],
+          "devanagari": "अ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "a"
+        },
+        {
+          "atomic_varna_indices": [
+            1,
+            2
+          ],
+          "codepoints": [
+            "U+091C"
+          ],
+          "devanagari": "ज",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "ja"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "independent_vowel",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "j",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "अज",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "aja",
+      "id": "W02",
+      "length": 3,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "j": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0
+          ],
+          "codepoints": [
+            "U+0905"
+          ],
+          "devanagari": "अ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "a"
+        },
+        {
+          "atomic_varna_indices": [
+            1,
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0938",
+            "U+094D",
+            "U+0925",
+            "U+093F"
+          ],
+          "devanagari": "स्थि",
+          "index": 1,
+          "source_span": [
+            1,
+            5
+          ],
+          "translit": "sthi"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "independent_vowel",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": true,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "th",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "अस्थि",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "asthi",
+      "id": "W03",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "i": 1,
+        "s": 1,
+        "th": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0
+          ],
+          "codepoints": [
+            "U+0905"
+          ],
+          "devanagari": "अ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "a"
+        },
+        {
+          "atomic_varna_indices": [
+            1,
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0936",
+            "U+094D",
+            "U+092E"
+          ],
+          "devanagari": "श्म",
+          "index": 1,
+          "source_span": [
+            1,
+            4
+          ],
+          "translit": "śma"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "independent_vowel",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "ś",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "अश्म",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "aśma",
+      "id": "W04",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "m": 1,
+        "ś": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0
+          ],
+          "codepoints": [
+            "U+0905"
+          ],
+          "devanagari": "अ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "a"
+        },
+        {
+          "atomic_varna_indices": [
+            1,
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0936",
+            "U+094D",
+            "U+0935"
+          ],
+          "devanagari": "श्व",
+          "index": 1,
+          "source_span": [
+            1,
+            4
+          ],
+          "translit": "śva"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "independent_vowel",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "ś",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "v",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "अश्व",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "aśva",
+      "id": "W05",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "v": 1,
+        "ś": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092C"
+          ],
+          "devanagari": "ब",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ba"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0932"
+          ],
+          "devanagari": "ल",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "la"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "b",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "l",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "बल",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "bala",
+      "id": "W06",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "b": 1,
+        "l": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092D"
+          ],
+          "devanagari": "भ",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "bha"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+092F"
+          ],
+          "devanagari": "य",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "ya"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": true,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "bh",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "y",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "भय",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "bhaya",
+      "id": "W07",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "bh": 1,
+        "y": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092C",
+            "U+0940"
+          ],
+          "devanagari": "बी",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "bī"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+091C"
+          ],
+          "devanagari": "ज",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "ja"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "b",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ī",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "j",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "बीज",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "bīja",
+      "id": "W08",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "b": 1,
+        "j": 1,
+        "ī": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+091A"
+          ],
+          "devanagari": "च",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ca"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "codepoints": [
+            "U+0928",
+            "U+094D",
+            "U+0926",
+            "U+094D",
+            "U+0930"
+          ],
+          "devanagari": "न्द्र",
+          "index": 1,
+          "source_span": [
+            1,
+            6
+          ],
+          "translit": "ndra"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "c",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "d",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "चन्द्र",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "candra",
+      "id": "W09",
+      "length": 6,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "c": 1,
+        "d": 1,
+        "n": 1,
+        "r": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0926"
+          ],
+          "devanagari": "द",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "da"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0928",
+            "U+094D",
+            "U+0924"
+          ],
+          "devanagari": "न्त",
+          "index": 1,
+          "source_span": [
+            1,
+            4
+          ],
+          "translit": "nta"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "d",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "t",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "दन्त",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "danta",
+      "id": "W10",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "d": 1,
+        "n": 1,
+        "t": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0926",
+            "U+093E"
+          ],
+          "devanagari": "दा",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "dā"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0928"
+          ],
+          "devanagari": "न",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "na"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "d",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "दान",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "dāna",
+      "id": "W11",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "d": 1,
+        "n": 1,
+        "ā": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0917"
+          ],
+          "devanagari": "ग",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ga"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+091C"
+          ],
+          "devanagari": "ज",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "ja"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "j",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "गज",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "gaja",
+      "id": "W12",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "g": 1,
+        "j": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0917"
+          ],
+          "devanagari": "ग",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ga"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0924",
+            "U+093F"
+          ],
+          "devanagari": "ति",
+          "index": 1,
+          "source_span": [
+            1,
+            3
+          ],
+          "translit": "ti"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "t",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "गति",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "gati",
+      "id": "W13",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "g": 1,
+        "i": 1,
+        "t": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0917",
+            "U+093F"
+          ],
+          "devanagari": "गि",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "gi"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0930",
+            "U+093F"
+          ],
+          "devanagari": "रि",
+          "index": 1,
+          "source_span": [
+            2,
+            4
+          ],
+          "translit": "ri"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "गिरि",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "giri",
+      "id": "W14",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "g": 1,
+        "i": 2,
+        "r": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1,
+            2
+          ],
+          "codepoints": [
+            "U+0917",
+            "U+094D",
+            "U+0930",
+            "U+0940"
+          ],
+          "devanagari": "ग्री",
+          "index": 0,
+          "source_span": [
+            0,
+            4
+          ],
+          "translit": "grī"
+        },
+        {
+          "atomic_varna_indices": [
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0935",
+            "U+093E"
+          ],
+          "devanagari": "वा",
+          "index": 1,
+          "source_span": [
+            4,
+            6
+          ],
+          "translit": "vā"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "virama_terminated",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ī",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "v",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        }
+      ],
+      "devanagari": "ग्रीवा",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "grīvā",
+      "id": "W15",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "g": 1,
+        "r": 1,
+        "v": 1,
+        "ā": 1,
+        "ī": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1,
+            2
+          ],
+          "codepoints": [
+            "U+0939",
+            "U+0902"
+          ],
+          "devanagari": "हं",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "haṃ"
+        },
+        {
+          "atomic_varna_indices": [
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0938"
+          ],
+          "devanagari": "स",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "sa"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "h",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "anusvara",
+          "source_akshara_index": 0,
+          "type": "anusvara",
+          "unit": "ṃ",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "हंस",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "haṃsa",
+      "id": "W16",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "h": 1,
+        "s": 1,
+        "ṃ": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0939",
+            "U+093F"
+          ],
+          "devanagari": "हि",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "hi"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+092E"
+          ],
+          "devanagari": "म",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "ma"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "h",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "हिम",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "hima",
+      "id": "W17",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "h": 1,
+        "i": 1,
+        "m": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0939",
+            "U+093E"
+          ],
+          "devanagari": "हा",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "hā"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0938"
+          ],
+          "devanagari": "स",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "sa"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "h",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "हास",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "hāsa",
+      "id": "W18",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "h": 1,
+        "s": 1,
+        "ā": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+091C"
+          ],
+          "devanagari": "ज",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ja"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0932"
+          ],
+          "devanagari": "ल",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "la"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "j",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "l",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "जल",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "jala",
+      "id": "W19",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "j": 1,
+        "l": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1,
+            2
+          ],
+          "codepoints": [
+            "U+091C",
+            "U+094D",
+            "U+091E",
+            "U+093E"
+          ],
+          "devanagari": "ज्ञा",
+          "index": 0,
+          "source_span": [
+            0,
+            4
+          ],
+          "translit": "jñā"
+        },
+        {
+          "atomic_varna_indices": [
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0928"
+          ],
+          "devanagari": "न",
+          "index": 1,
+          "source_span": [
+            4,
+            5
+          ],
+          "translit": "na"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "virama_terminated",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "j",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "ñ",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "ज्ञान",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "jñāna",
+      "id": "W20",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "j": 1,
+        "n": 1,
+        "ñ": 1,
+        "ā": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0915"
+          ],
+          "devanagari": "क",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ka"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0930"
+          ],
+          "devanagari": "र",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "ra"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "k",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "कर",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "kara",
+      "id": "W21",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "k": 1,
+        "r": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0915"
+          ],
+          "devanagari": "क",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ka"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0930",
+            "U+094D",
+            "U+0923"
+          ],
+          "devanagari": "र्ण",
+          "index": 1,
+          "source_span": [
+            1,
+            4
+          ],
+          "translit": "rṇa"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "k",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "ṇ",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "कर्ण",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "karṇa",
+      "id": "W22",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "k": 1,
+        "r": 1,
+        "ṇ": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0915",
+            "U+0947"
+          ],
+          "devanagari": "के",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "ke"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0936"
+          ],
+          "devanagari": "श",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "śa"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "k",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "e",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "ś",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "केश",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "keśa",
+      "id": "W23",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "e": 1,
+        "k": 1,
+        "ś": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0916"
+          ],
+          "devanagari": "ख",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "kha"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0917"
+          ],
+          "devanagari": "ग",
+          "index": 1,
+          "source_span": [
+            1,
+            2
+          ],
+          "translit": "ga"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": true,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "kh",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "खग",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "khaga",
+      "id": "W24",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "g": 1,
+        "kh": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0932"
+          ],
+          "devanagari": "ल",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "la"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0924",
+            "U+093E"
+          ],
+          "devanagari": "ता",
+          "index": 1,
+          "source_span": [
+            1,
+            3
+          ],
+          "translit": "tā"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "l",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "t",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        }
+      ],
+      "devanagari": "लता",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "latā",
+      "id": "W25",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "l": 1,
+        "t": 1,
+        "ā": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092E"
+          ],
+          "devanagari": "म",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "ma"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0923",
+            "U+093F"
+          ],
+          "devanagari": "णि",
+          "index": 1,
+          "source_span": [
+            1,
+            3
+          ],
+          "translit": "ṇi"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "ṇ",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "i",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "मणि",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "maṇi",
+      "id": "W26",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "i": 1,
+        "m": 1,
+        "ṇ": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092E",
+            "U+0947"
+          ],
+          "devanagari": "मे",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "me"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0918"
+          ],
+          "devanagari": "घ",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "gha"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "e",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": true,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "gh",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "मेघ",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "megha",
+      "id": "W27",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "e": 1,
+        "gh": 1,
+        "m": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092E",
+            "U+0940"
+          ],
+          "devanagari": "मी",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "mī"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0928"
+          ],
+          "devanagari": "न",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "na"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ī",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "मीन",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "mīna",
+      "id": "W28",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "m": 1,
+        "n": 1,
+        "ī": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092E",
+            "U+0943"
+          ],
+          "devanagari": "मृ",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "mṛ"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0917"
+          ],
+          "devanagari": "ग",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "ga"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "m",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ṛ",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "g",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "मृग",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "mṛga",
+      "id": "W29",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "g": 1,
+        "m": 1,
+        "ṛ": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0928"
+          ],
+          "devanagari": "न",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "na"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0926",
+            "U+0940"
+          ],
+          "devanagari": "दी",
+          "index": 1,
+          "source_span": [
+            1,
+            3
+          ],
+          "translit": "dī"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "d",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "ī",
+          "vowel_length": "long"
+        }
+      ],
+      "devanagari": "नदी",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "nadī",
+      "id": "W30",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "d": 1,
+        "n": 1,
+        "ī": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0928",
+            "U+0943"
+          ],
+          "devanagari": "नृ",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "nṛ"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0924",
+            "U+094D",
+            "U+092F"
+          ],
+          "devanagari": "त्य",
+          "index": 1,
+          "source_span": [
+            2,
+            5
+          ],
+          "translit": "tya"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ṛ",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "t",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "y",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "नृत्य",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "nṛtya",
+      "id": "W31",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "n": 1,
+        "t": 1,
+        "y": 1,
+        "ṛ": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+092A",
+            "U+093E"
+          ],
+          "devanagari": "पा",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "pā"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0928"
+          ],
+          "devanagari": "न",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "na"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "p",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ā",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "n",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "पान",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "pāna",
+      "id": "W32",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "n": 1,
+        "p": 1,
+        "ā": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0938"
+          ],
+          "devanagari": "स",
+          "index": 0,
+          "source_span": [
+            0,
+            1
+          ],
+          "translit": "sa"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0924",
+            "U+094D",
+            "U+092F"
+          ],
+          "devanagari": "त्य",
+          "index": 1,
+          "source_span": [
+            1,
+            4
+          ],
+          "translit": "tya"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "t",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "y",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "सत्य",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "satya",
+      "id": "W33",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 2,
+        "s": 1,
+        "t": 1,
+        "y": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0938",
+            "U+0941"
+          ],
+          "devanagari": "सु",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "su"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3
+          ],
+          "codepoints": [
+            "U+0916"
+          ],
+          "devanagari": "ख",
+          "index": 1,
+          "source_span": [
+            2,
+            3
+          ],
+          "translit": "kha"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "u",
+          "vowel_length": "short"
+        },
+        {
+          "aspirated": true,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "kh",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "सुख",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "sukha",
+      "id": "W34",
+      "length": 4,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "kh": 1,
+        "s": 1,
+        "u": 1
+      },
+      "warnings": []
+    },
+    {
+      "aksharas": [
+        {
+          "atomic_varna_indices": [
+            0,
+            1
+          ],
+          "codepoints": [
+            "U+0938",
+            "U+0942"
+          ],
+          "devanagari": "सू",
+          "index": 0,
+          "source_span": [
+            0,
+            2
+          ],
+          "translit": "sū"
+        },
+        {
+          "atomic_varna_indices": [
+            2,
+            3,
+            4
+          ],
+          "codepoints": [
+            "U+0930",
+            "U+094D",
+            "U+092F"
+          ],
+          "devanagari": "र्य",
+          "index": 1,
+          "source_span": [
+            2,
+            5
+          ],
+          "translit": "rya"
+        }
+      ],
+      "atomic_varnas": [
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": true,
+          "origin": "consonant",
+          "source_akshara_index": 0,
+          "type": "consonant",
+          "unit": "s",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "dependent_vowel_sign",
+          "source_akshara_index": 0,
+          "type": "vowel",
+          "unit": "ū",
+          "vowel_length": "long"
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "virama_terminated",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "r",
+          "vowel_length": null
+        },
+        {
+          "aspirated": false,
+          "is_final": false,
+          "is_initial": false,
+          "origin": "consonant",
+          "source_akshara_index": 1,
+          "type": "consonant",
+          "unit": "y",
+          "vowel_length": null
+        },
+        {
+          "aspirated": null,
+          "is_final": true,
+          "is_initial": false,
+          "origin": "inherent_a",
+          "source_akshara_index": 1,
+          "type": "vowel",
+          "unit": "a",
+          "vowel_length": "short"
+        }
+      ],
+      "devanagari": "सूर्य",
+      "forbidden_unit_types_present": [],
+      "geminations": [],
+      "iast": "sūrya",
+      "id": "W35",
+      "length": 5,
+      "length_in_band": true,
+      "parser_valid": true,
+      "varna_counts": {
+        "a": 1,
+        "r": 1,
+        "s": 1,
+        "y": 1,
+        "ū": 1
+      },
+      "warnings": []
+    }
+  ]
+}

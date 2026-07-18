@@ -1,0 +1,244 @@
+{
+  "now": "2026-07-12T14:05:00.000Z",
+  "policy_hash": "b93b95d182bf796c1f83407ff7d94d51ae62ed83f00e9f2b7fe25e9fdc2ddd90",
+  "transitions": [
+    {
+      "action_hash": "9f2120dc11af24cb658994f293c7366f17dc40473a3550e48550cc0a8aa6816e",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R1"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F1",
+      "operation": "IAM_GRANT_ADMIN",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "009355f0aac214efefa59ea60d6529d37557bd305ec3949938c603e30782969a",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R2"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F2",
+      "operation": "DEPLOY",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "1a1c8e9e862a449e6b25c2152cdffc2beb899bfe7de7d7eadc36406f8f776419",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R3"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F3",
+      "operation": "DB_DELETE",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "355bcf26b4d750602c9c6c5c6984f1c86139d87be8579b88c9581edde6ed62e8",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R4"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F4",
+      "operation": "NET_EXPOSE",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "2483a3f613ecdd04c57d06e5d3ac73c63903e60622413eedbee5283e54c355dd",
+      "applied_constraints": {
+        "post_read_rotation": true
+      },
+      "dispositive_rules": [
+        "R5"
+      ],
+      "expected_outcome": "ALLOW_WITH_CONSTRAINTS",
+      "id": "F5",
+      "operation": "SECRET_READ",
+      "outcome": "ALLOW_WITH_CONSTRAINTS",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "1e9a96719fe88a4b8289ecc7323a4e9bed1c61c0ad6d5934a7dd8fe1084d3e48",
+      "applied_constraints": {
+        "auto_reenable": true
+      },
+      "dispositive_rules": [
+        "R6"
+      ],
+      "expected_outcome": "ALLOW_WITH_CONSTRAINTS",
+      "id": "F6",
+      "operation": "MONITORING_DISABLE",
+      "outcome": "ALLOW_WITH_CONSTRAINTS",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "6b9965edc028183b1e7d41708a378ac8ebe040b693aa776750ffe5d1b30d3ed5",
+      "applied_constraints": {
+        "in_transaction": true
+      },
+      "dispositive_rules": [
+        "R7"
+      ],
+      "expected_outcome": "ALLOW_WITH_CONSTRAINTS",
+      "id": "F7",
+      "operation": "DB_MUTATION",
+      "outcome": "ALLOW_WITH_CONSTRAINTS",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "c481c5245eb2713646423ba1371e6a971585284a93815d9bc840d76ad24efcda",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R8"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F8",
+      "operation": "KEY_ROTATE",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "74742f5a36b5eeee9146717b350900d7e06b01a96f5cdcbed73a99acd525f7b0",
+      "applied_constraints": null,
+      "dispositive_rules": [
+        "R9"
+      ],
+      "expected_outcome": "ALLOW",
+      "id": "F9",
+      "operation": "CLOUD_SPEND_INCREASE",
+      "outcome": "ALLOW",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    },
+    {
+      "action_hash": "255f369c6ff0338aaab331e251d5e35fee0005b8465029d12999224ca07290ba",
+      "applied_constraints": {
+        "approved_template": true
+      },
+      "dispositive_rules": [
+        "R10"
+      ],
+      "expected_outcome": "ALLOW_WITH_CONSTRAINTS",
+      "id": "F10",
+      "operation": "EXTERNAL_COMMS",
+      "outcome": "ALLOW_WITH_CONSTRAINTS",
+      "state_trace": [
+        "RECEIVED",
+        "VALIDATED",
+        "INVARIANT_CHECK",
+        "SIMULATION_CHECK",
+        "CONSEQUENCE_CHECK",
+        "APPROVAL_CHECK",
+        "FINAL_DECISION",
+        "AUDIT_LOGGED",
+        "COMMITTED"
+      ],
+      "terminal": "COMMITTED"
+    }
+  ]
+}

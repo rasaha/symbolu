@@ -1,0 +1,18 @@
+# signal_gov experiment harness — dependencies
+#
+# Required (smoke test + mock/cached modes):
+numpy>=1.23
+matplotlib>=3.6
+pytest>=7.4
+
+# real_cg via --real-cg-stub (plumbing validation): needs ONLY numpy + the in-repo
+#   agentic package (torch NOT required). `make signal-gov-realcg-smoke` skips cleanly
+#   if the agentic package is not importable.
+#
+# Optional:
+#   scikit-learn  -> cross-check AUROC/AP in tests (harness implements its own in numpy)
+#   pandas,pyarrow -> read/write features.parquet for the `cached` mode
+#   torch + a CG checkpoint + symbolu_training -> LIVE `real_cg` (real MistralCGAdapter)
+# scikit-learn>=1.2
+# pandas>=1.5
+# pyarrow>=12

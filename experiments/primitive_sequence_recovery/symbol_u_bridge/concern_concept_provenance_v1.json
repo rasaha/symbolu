@@ -1,0 +1,633 @@
+{
+  "schema": "symbol_u_bridge_concept_provenance_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+  "note": "Provenance for concern_to_sanskrit_concept_v1.json (rich fields beyond the frozen concept schema).",
+  "by_concern": {
+    "C0001": {
+      "concern_label": "fear",
+      "concept_iast": "bhaya",
+      "concept_devanagari": "भय",
+      "controlling_gloss": "fear",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. bhaya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'bhaya' is the ordinary Sanskrit word for fear/dread.",
+      "alternatives": [
+        {
+          "iast": "bhīti",
+          "devanagari": "भीति",
+          "why_not_selected": "near-synonym; bhaya is the commoner headword"
+        },
+        {
+          "iast": "trāsa",
+          "devanagari": "त्रास",
+          "why_not_selected": "sudden terror, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0002": {
+      "concern_label": "anxiety",
+      "concept_iast": "cintā",
+      "concept_devanagari": "चिन्ता",
+      "controlling_gloss": "anxious thought, worry",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. cintā",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'cintā' denotes anxious/worried thought, the ordinary word for worry.",
+      "alternatives": [
+        {
+          "iast": "udvega",
+          "devanagari": "उद्वेग",
+          "why_not_selected": "agitation/distress, broader"
+        },
+        {
+          "iast": "vyākulatā",
+          "devanagari": "व्याकुलता",
+          "why_not_selected": "perturbation, less specific"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0003": {
+      "concern_label": "anger",
+      "concept_iast": "krodha",
+      "concept_devanagari": "क्रोध",
+      "controlling_gloss": "anger, wrath",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. krodha",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'krodha' is the standard Sanskrit word for anger.",
+      "alternatives": [
+        {
+          "iast": "kopa",
+          "devanagari": "कोप",
+          "why_not_selected": "near-synonym, often milder"
+        },
+        {
+          "iast": "roṣa",
+          "devanagari": "रोष",
+          "why_not_selected": "fury/indignation, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0004": {
+      "concern_label": "resentment",
+      "concept_iast": "dveṣa",
+      "concept_devanagari": "द्वेष",
+      "controlling_gloss": "aversion, hatred",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. dveṣa",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'dveṣa' is the ordinary word for aversion/hatred, the settled counterpart to krodha.",
+      "alternatives": [
+        {
+          "iast": "vaira",
+          "devanagari": "वैर",
+          "why_not_selected": "enmity/feud, stronger"
+        },
+        {
+          "iast": "ghṛṇā",
+          "devanagari": "घृणा",
+          "why_not_selected": "disgust/contempt, narrower"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0005": {
+      "concern_label": "attachment",
+      "concept_iast": "āsakti",
+      "concept_devanagari": "आसक्ति",
+      "controlling_gloss": "attachment, clinging",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. āsakti",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'āsakti' is the ordinary word for clinging/attachment in classical ethics.",
+      "alternatives": [
+        {
+          "iast": "mamatā",
+          "devanagari": "ममता",
+          "why_not_selected": "'mine-ness'/possessiveness, narrower"
+        },
+        {
+          "iast": "rāga",
+          "devanagari": "राग",
+          "why_not_selected": "passion; polysemous (color, musical mode)"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0006": {
+      "concern_label": "grief",
+      "concept_iast": "śoka",
+      "concept_devanagari": "शोक",
+      "controlling_gloss": "grief, sorrow",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. śoka",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'śoka' is the standard Sanskrit word for grief/sorrow.",
+      "alternatives": [
+        {
+          "iast": "duḥkha",
+          "devanagari": "दुःख",
+          "why_not_selected": "suffering in general, far broader"
+        },
+        {
+          "iast": "viṣāda",
+          "devanagari": "विषाद",
+          "why_not_selected": "dejection, a mood not a loss-response"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0007": {
+      "concern_label": "craving",
+      "concept_iast": "kāma",
+      "concept_devanagari": "काम",
+      "controlling_gloss": "desire, longing",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. kāma",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'kāma' is the ordinary word for desire/longing.",
+      "alternatives": [
+        {
+          "iast": "icchā",
+          "devanagari": "इच्छा",
+          "why_not_selected": "wish, more neutral/generic"
+        },
+        {
+          "iast": "spṛhā",
+          "devanagari": "स्पृहा",
+          "why_not_selected": "eager longing, less common headword"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0008": {
+      "concern_label": "greed",
+      "concept_iast": "lobha",
+      "concept_devanagari": "लोभ",
+      "controlling_gloss": "greed, covetousness",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. lobha",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'lobha' is the standard word for greed/covetousness.",
+      "alternatives": [
+        {
+          "iast": "tṛṣṇā",
+          "devanagari": "तृष्णा",
+          "why_not_selected": "thirst/craving, overlaps craving"
+        },
+        {
+          "iast": "matsara",
+          "devanagari": "मत्सर",
+          "why_not_selected": "envious grasping, narrower"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0009": {
+      "concern_label": "confusion",
+      "concept_iast": "moha",
+      "concept_devanagari": "मोह",
+      "controlling_gloss": "delusion, confusion",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. moha",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'moha' is the ordinary word for mental confusion/delusion.",
+      "alternatives": [
+        {
+          "iast": "bhrama",
+          "devanagari": "भ्रम",
+          "why_not_selected": "error/confusion; also 'whirling', polysemous"
+        },
+        {
+          "iast": "sammoha",
+          "devanagari": "सम्मोह",
+          "why_not_selected": "stronger bewilderment"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0010": {
+      "concern_label": "doubt",
+      "concept_iast": "saṃśaya",
+      "concept_devanagari": "संशय",
+      "controlling_gloss": "doubt, uncertainty",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. saṃśaya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'saṃśaya' is the standard word for doubt between alternatives.",
+      "alternatives": [
+        {
+          "iast": "vicikitsā",
+          "devanagari": "विचिकित्सा",
+          "why_not_selected": "doubt in a technical/ethical sense"
+        },
+        {
+          "iast": "aniścaya",
+          "devanagari": "अनिश्चय",
+          "why_not_selected": "indecision, overlaps"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0011": {
+      "concern_label": "pride",
+      "concept_iast": "garva",
+      "concept_devanagari": "गर्व",
+      "controlling_gloss": "pride, arrogance",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. garva",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'garva' is the ordinary word for pride/arrogance.",
+      "alternatives": [
+        {
+          "iast": "māna",
+          "devanagari": "मान",
+          "why_not_selected": "pride/honor; polysemous (also 'respect')"
+        },
+        {
+          "iast": "ahaṃkāra",
+          "devanagari": "अहंकार",
+          "why_not_selected": "'I-maker' ego, technical/doctrinal"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0012": {
+      "concern_label": "shame",
+      "concept_iast": "lajjā",
+      "concept_devanagari": "लज्जा",
+      "controlling_gloss": "shame, modesty",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. lajjā",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'lajjā' is the standard word for shame/modesty.",
+      "alternatives": [
+        {
+          "iast": "hrī",
+          "devanagari": "ह्री",
+          "why_not_selected": "modesty/bashfulness, more archaic"
+        },
+        {
+          "iast": "vrīḍā",
+          "devanagari": "व्रीडा",
+          "why_not_selected": "bashful embarrassment, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0013": {
+      "concern_label": "separation-longing",
+      "concept_iast": "viraha",
+      "concept_devanagari": "विरह",
+      "controlling_gloss": "separation (from a beloved)",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. viraha",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'viraha' is the classical ordinary word for the pain of separation from a beloved.",
+      "alternatives": [
+        {
+          "iast": "utkaṇṭhā",
+          "devanagari": "उत्कण्ठा",
+          "why_not_selected": "longing/yearning, less tied to separation"
+        },
+        {
+          "iast": "virahavyathā",
+          "devanagari": "विरहव्यथा",
+          "why_not_selected": "compound, avoided"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0014": {
+      "concern_label": "duty",
+      "concept_iast": "kartavya",
+      "concept_devanagari": "कर्तव्य",
+      "controlling_gloss": "duty, that which ought to be done",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. kartavya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'kartavya' is the ordinary gerundive noun for duty ('what is to be done'); preferred over polysemous 'dharma'.",
+      "alternatives": [
+        {
+          "iast": "dharma",
+          "devanagari": "धर्म",
+          "why_not_selected": "hugely polysemous/doctrinal, excluded"
+        },
+        {
+          "iast": "kārya",
+          "devanagari": "कार्य",
+          "why_not_selected": "task/that-to-be-done, more generic"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0015": {
+      "concern_label": "burden",
+      "concept_iast": "bhāra",
+      "concept_devanagari": "भार",
+      "controlling_gloss": "burden, load",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. bhāra",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'bhāra' is the ordinary word for a load/burden, apt for felt responsibility-as-weight.",
+      "alternatives": [
+        {
+          "iast": "gurutā",
+          "devanagari": "गुरुता",
+          "why_not_selected": "heaviness, more literal/physical"
+        },
+        {
+          "iast": "bhārabhūta",
+          "devanagari": "भारभूत",
+          "why_not_selected": "compound, avoided"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0016": {
+      "concern_label": "money-concern",
+      "concept_iast": "dhana",
+      "concept_devanagari": "धन",
+      "controlling_gloss": "wealth, money",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. dhana",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'dhana' is the ordinary word for wealth/money; preferred over polysemous 'artha'.",
+      "alternatives": [
+        {
+          "iast": "artha",
+          "devanagari": "अर्थ",
+          "why_not_selected": "polysemous: wealth, aim, meaning"
+        },
+        {
+          "iast": "vitta",
+          "devanagari": "वित्त",
+          "why_not_selected": "wealth/property, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "HIGH"
+    },
+    "C0017": {
+      "concern_label": "poverty",
+      "concept_iast": "dāridrya",
+      "concept_devanagari": "दारिद्र्य",
+      "controlling_gloss": "poverty, indigence",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. dāridrya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'dāridrya' is the standard abstract noun for poverty/indigence.",
+      "alternatives": [
+        {
+          "iast": "daridratā",
+          "devanagari": "दरिद्रता",
+          "why_not_selected": "near-synonym abstract"
+        },
+        {
+          "iast": "nirdhanatā",
+          "devanagari": "निर्धनता",
+          "why_not_selected": "'moneylessness', less common"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0018": {
+      "concern_label": "diligence",
+      "concept_iast": "udyoga",
+      "concept_devanagari": "उद्योग",
+      "controlling_gloss": "effort, industry, diligence",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. udyoga",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'udyoga' ordinarily denotes effort/industry/diligence.",
+      "alternatives": [
+        {
+          "iast": "prayatna",
+          "devanagari": "प्रयत्न",
+          "why_not_selected": "effort/exertion, near-synonym"
+        },
+        {
+          "iast": "śrama",
+          "devanagari": "श्रम",
+          "why_not_selected": "toil/labor, connotes fatigue"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0019": {
+      "concern_label": "laziness",
+      "concept_iast": "ālasya",
+      "concept_devanagari": "आलस्य",
+      "controlling_gloss": "sloth, laziness",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. ālasya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'ālasya' is the standard word for sloth/laziness.",
+      "alternatives": [
+        {
+          "iast": "tandrī",
+          "devanagari": "तन्द्री",
+          "why_not_selected": "drowsiness/lassitude, narrower"
+        },
+        {
+          "iast": "jāḍya",
+          "devanagari": "जाड्य",
+          "why_not_selected": "torpor/dullness, more physical"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0020": {
+      "concern_label": "purpose",
+      "concept_iast": "lakṣya",
+      "concept_devanagari": "लक्ष्य",
+      "controlling_gloss": "aim, goal, target",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. lakṣya",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'lakṣya' ordinarily means aim/goal/target.",
+      "alternatives": [
+        {
+          "iast": "uddeśya",
+          "devanagari": "उद्देश्य",
+          "why_not_selected": "objective/intention, near-synonym"
+        },
+        {
+          "iast": "prayojana",
+          "devanagari": "प्रयोजन",
+          "why_not_selected": "purpose/motive, more 'reason'"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0021": {
+      "concern_label": "curiosity",
+      "concept_iast": "jijñāsā",
+      "concept_devanagari": "जिज्ञासा",
+      "controlling_gloss": "desire to know, curiosity",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. jijñāsā",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'jijñāsā' (desiderative of jñā) is the ordinary word for the desire to know.",
+      "alternatives": [
+        {
+          "iast": "kautūhala",
+          "devanagari": "कौतूहल",
+          "why_not_selected": "curiosity/eagerness, more 'wonder'"
+        },
+        {
+          "iast": "autsukya",
+          "devanagari": "औत्सुक्य",
+          "why_not_selected": "eagerness, broader"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0022": {
+      "concern_label": "knowledge",
+      "concept_iast": "jñāna",
+      "concept_devanagari": "ज्ञान",
+      "controlling_gloss": "knowledge, understanding",
+      "grammatical_category": "n.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. jñāna",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'jñāna' is the ordinary word for knowledge/understanding.",
+      "alternatives": [
+        {
+          "iast": "vidyā",
+          "devanagari": "विद्या",
+          "why_not_selected": "knowledge/learning, overlaps; also 'a science'"
+        },
+        {
+          "iast": "bodha",
+          "devanagari": "बोध",
+          "why_not_selected": "understanding/awareness, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0023": {
+      "concern_label": "patience",
+      "concept_iast": "kṣamā",
+      "concept_devanagari": "क्षमा",
+      "controlling_gloss": "patience, forbearance",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. kṣamā",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'kṣamā' ordinarily means patience/forbearance (and forgiveness).",
+      "alternatives": [
+        {
+          "iast": "titikṣā",
+          "devanagari": "तितिक्षा",
+          "why_not_selected": "endurance of hardship, narrower"
+        },
+        {
+          "iast": "sahiṣṇutā",
+          "devanagari": "सहिष्णुता",
+          "why_not_selected": "tolerance, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "confidence": "MEDIUM"
+    },
+    "C0024": {
+      "concern_label": "contentment",
+      "concept_iast": "santoṣa",
+      "concept_devanagari": "सन्तोष",
+      "controlling_gloss": "contentment, satisfaction",
+      "grammatical_category": "m.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. santoṣa",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'santoṣa' is the standard word for contentment/satisfaction.",
+      "alternatives": [
+        {
+          "iast": "tṛpti",
+          "devanagari": "तृप्ति",
+          "why_not_selected": "satiation, more 'sated'"
+        },
+        {
+          "iast": "tuṣṭi",
+          "devanagari": "तुष्टि",
+          "why_not_selected": "satisfaction, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    },
+    "C0025": {
+      "concern_label": "calm",
+      "concept_iast": "śānti",
+      "concept_devanagari": "शान्ति",
+      "controlling_gloss": "peace, tranquility",
+      "grammatical_category": "f.",
+      "lexical_source": "Monier-Williams Sanskrit-English Dictionary (MW)",
+      "citation": "MW s.v. śānti",
+      "attestation_status": "attested_classical",
+      "reason_for_fit": "'śānti' is the ordinary word for peace/tranquility.",
+      "alternatives": [
+        {
+          "iast": "praśānti",
+          "devanagari": "प्रशान्ति",
+          "why_not_selected": "deep calm, intensive"
+        },
+        {
+          "iast": "śama",
+          "devanagari": "शम",
+          "why_not_selected": "quietude/restraint, more technical"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "confidence": "HIGH"
+    }
+  }
+}

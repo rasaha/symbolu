@@ -1,0 +1,964 @@
+{
+  "key": [
+    {
+      "trial_id": "A_T001",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T002",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T003",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T004",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T005",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "aśva",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T006",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "aśva",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T007",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "aśva",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "A_T008",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "aśva",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T009",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T010",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "aśva",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T011",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T012",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T013",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T014",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T015",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "bala",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T016",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "bala",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T017",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "bala",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T018",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "bala",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T019",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T020",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "bala",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T021",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T022",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T023",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T024",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T025",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "bhaya",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T026",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "bhaya",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T027",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "bhaya",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T028",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "bhaya",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T029",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T030",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "bhaya",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T031",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T032",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T033",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T034",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T035",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "duḥkha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T036",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "duḥkha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T037",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "duḥkha",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T038",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "duḥkha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T039",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T040",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "duḥkha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T041",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T042",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T043",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T044",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T045",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "gaja",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T046",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "gaja",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T047",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "gaja",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T048",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "gaja",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T049",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T050",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "gaja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T051",
+      "set": "A",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "A_T052",
+      "set": "A",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "A_T053",
+      "set": "A",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T054",
+      "set": "A",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "A_T055",
+      "set": "A",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "megha",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "A_T056",
+      "set": "A",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "megha",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "A_T057",
+      "set": "A",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "megha",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T058",
+      "set": "A",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "megha",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "A_T059",
+      "set": "A",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "A_T060",
+      "set": "A",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "megha",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "B_T001",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T002",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T003",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T004",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T005",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "bīja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T006",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "bīja",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T007",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "bīja",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "B_T008",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "bīja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T009",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T010",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "bīja",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T011",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T012",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T013",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T014",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T015",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "sukha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T016",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "sukha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T017",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "sukha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T018",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "sukha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T019",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T020",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "sukha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T021",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T022",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T023",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T024",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T025",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "deha",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T026",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "deha",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T027",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "deha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T028",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "deha",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T029",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T030",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "deha",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T031",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T032",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T033",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T034",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T035",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "lavaṇa",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T036",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "lavaṇa",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T037",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "lavaṇa",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T038",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "lavaṇa",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T039",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T040",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "lavaṇa",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T041",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T042",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T043",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T044",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T045",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "yoga",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T046",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "yoga",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T047",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "yoga",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T048",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "yoga",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T049",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T050",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "yoga",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T051",
+      "set": "B",
+      "arm": "T",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W6"
+    },
+    {
+      "trial_id": "B_T052",
+      "set": "B",
+      "arm": "X",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W3"
+    },
+    {
+      "trial_id": "B_T053",
+      "set": "B",
+      "arm": "S",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T054",
+      "set": "B",
+      "arm": "R",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W4"
+    },
+    {
+      "trial_id": "B_T055",
+      "set": "B",
+      "arm": "R",
+      "instance": 1,
+      "target_word": "vṛkṣa",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "B_T056",
+      "set": "B",
+      "arm": "R",
+      "instance": 2,
+      "target_word": "vṛkṣa",
+      "correct_label": "W2"
+    },
+    {
+      "trial_id": "B_T057",
+      "set": "B",
+      "arm": "R",
+      "instance": 3,
+      "target_word": "vṛkṣa",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T058",
+      "set": "B",
+      "arm": "R",
+      "instance": 4,
+      "target_word": "vṛkṣa",
+      "correct_label": "W1"
+    },
+    {
+      "trial_id": "B_T059",
+      "set": "B",
+      "arm": "G",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W5"
+    },
+    {
+      "trial_id": "B_T060",
+      "set": "B",
+      "arm": "F",
+      "instance": 0,
+      "target_word": "vṛkṣa",
+      "correct_label": "W2"
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+{
+  "consonants": [
+    "d",
+    "g",
+    "j",
+    "k",
+    "n",
+    "r",
+    "s",
+    "th",
+    "v",
+    "y",
+    "ñ",
+    "ś"
+  ],
+  "fixed_pole": "binding",
+  "identities": [
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "d"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "g"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "j"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "k"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 2,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "n"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 2,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "r"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 2,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "s"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": true,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "th"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "v"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "y"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "ñ"
+    },
+    {
+      "activation_scope": "CONFIRMATORY_BACKBONE",
+      "aspirated": false,
+      "category": "consonant",
+      "identity_type": "consonant",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "ś"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 5,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "a"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "e"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "i"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 2,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "ā"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 2,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "ī"
+    },
+    {
+      "activation_scope": "DEVELOPMENT_ONLY",
+      "aspirated": null,
+      "category": "vowel",
+      "identity_type": "vowel",
+      "in_frozen_lexicon": true,
+      "occurrences": 1,
+      "source_backed": true,
+      "source_tier": "A_SOURCE_BACKED",
+      "unit": "ū"
+    }
+  ],
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_developmental_gap": 0,
+  "n_distinct_identities": 18,
+  "n_source_backed": 18,
+  "provenance": {
+    "g0_parser_outputs_sha256": "4b300395c28713ff6b612e121b14af12a30cd7e768b6fa1976a423d18dfc154f",
+    "lexicon_sha256": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96"
+  },
+  "role": "A_INVENTORY_EXTRACTOR (did NOT read selected-word meanings)",
+  "schema": "b1_12_required_varna_inventory_v1",
+  "selected_six": [
+    "W03",
+    "W15",
+    "W20",
+    "W23",
+    "W30",
+    "W35"
+  ],
+  "vowels": [
+    "a",
+    "e",
+    "i",
+    "ā",
+    "ī",
+    "ū"
+  ]
+}

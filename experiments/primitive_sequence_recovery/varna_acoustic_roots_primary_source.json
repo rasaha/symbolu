@@ -1,0 +1,611 @@
+{
+  "schema": "varna_primary_source_reconciliation_v1",
+  "label": "READ_ONLY_RECONCILIATION / NO_FROZEN_MODIFICATION",
+  "primary_source": "P.R. Sarkar, 'The Acoustic Roots of the Indo-Aryan Alphabet', Ánanda Márga Philosophy in a Nutshell Part 8 (1984-85, Calcutta)",
+  "romanization_key": "apostrophe = retroflex/cerebral (ṭ=t', ḍ=d', ṇ=n', ṣ=s', kṣ=ks'); palatal ś='sha'; dental s='sa'",
+  "merged_sha256": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+  "headline_findings": [
+    "ś/ṣ SWAP_ERROR: frozen merged has ś=kāma/tamoguṇa and ṣ=artha/rajoguṇa; primary source says ś(sha)=artha/rajoguṇa and ṣ(s'a)=kāma/tamoguṇa. The two are INVERTED in the frozen artifact.",
+    "This REVERSES the prior VARNA_SHA_SWAP_PROVENANCE_AUDIT verdict (SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR) — a data error IS present.",
+    "VOWELS ARE A TWO-LAYER CASE (correcting the earlier 'entirely intuition' framing): Sarkar gives each vowel a MUSICAL-NOTE root AND, for several, a distinct SEMANTIC import. The operator's vowel glosses are GROUNDED in that semantic import for a=creation, e=vauṣaṭ/knowledge, ai=vaṣaṭ/welfare, o=svāhā/completion, au=namaḥ/surrender (near-verbatim), and are the operator's own AUTHORED reasoning only where Sarkar gives just a note (ā,i,ī,u,ū). The MUSICAL-NOTE layer is separately set aside as out-of-domain.",
+    "Sarkar-backed vowel semantics NOT yet mapped (optional to add): ṝ=oṃ, ḷ=hummm, ḹ=phaṭ."
+  ],
+  "counts": {
+    "sibilant_swap_errors": 2,
+    "vowels_sarkar_semantic_grounded": 5,
+    "vowels_operator_authored": 7,
+    "vowels_sarkar_semantic_not_yet_mapped": 3,
+    "vowels_operator_absent": 1,
+    "consonant_vritti_match": 31
+  },
+  "rows": [
+    {
+      "iast": "a",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "creation; controller of the seven notes (surasaptaka); 1st note ṣaḍja",
+        "sarkar_semantic_import": "creation",
+        "operator_liberating": "Birth of cognition / raw potential",
+        "operator_binding": "restless starting without sustaining",
+        "grounding": "GROUNDED"
+      },
+      "merged_binding_vritti": "restless starting without sustaining",
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'creation' (not intuition): liberating='Birth of cognition / raw potential'. The MUSICAL-NOTE layer is separately set aside."
+    },
+    {
+      "iast": "ā",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "ṛṣabha — the 2nd musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Ongoing thought / expansion",
+        "operator_binding": "overextension, inflation",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": "overextension, inflation",
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Ongoing thought / expansion' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "i",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "gāndhāra — the 3rd musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "I-ness, doing self",
+        "operator_binding": "self-absorption, ego-centric doing",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": "self-absorption, ego-centric doing",
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='I-ness, doing self' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "ī",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "madhyama — the 4th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Specialization of self",
+        "operator_binding": "over-specialization, isolation",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": "over-specialization, isolation",
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Specialization of self' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "u",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "pañcama — the 5th musical note (+ 'a few other factors, the force of…')",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Zoom, contraction",
+        "operator_binding": "tunnel vision, missing the whole picture",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": "tunnel vision, missing the whole picture",
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Zoom, contraction' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "ū",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "dhaivata — the 6th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Sustained attention, holding",
+        "operator_binding": "fixation, obsessive holding",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": "fixation, obsessive holding",
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Sustained attention, holding' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "ṛ",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "niṣāda — the 7th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "OPERATOR_ABSENT"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_OPERATOR_ABSENT",
+      "detail": "Sarkar gives only a musical note (niṣāda); operator has no gloss."
+    },
+    {
+      "iast": "ṝ",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "oṃ (onm) — creation/preservation/destruction; Saguṇa & Nirguṇa",
+        "sarkar_semantic_import": "oṃ — creation/preservation/destruction; Saguṇa & Nirguṇa",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'oṃ — creation/preservation/destruction; Saguṇa & Nirguṇa' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
+    },
+    {
+      "iast": "ḷ",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "the sound hummm — struggle, sādhanā, kuṇḍalinī (Tantra); the 'battle cry'",
+        "sarkar_semantic_import": "hummm — struggle, sādhanā, kuṇḍalinī",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'hummm — struggle, sādhanā, kuṇḍalinī' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
+    },
+    {
+      "iast": "ḹ",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "phaṭ — putting theory into practice; the atibīja/mahābīja of phaṭ",
+        "sarkar_semantic_import": "phaṭ — putting a theory into practice",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'phaṭ — putting a theory into practice' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
+    },
+    {
+      "iast": "e",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "vauṣaṭ (mahābīja) — mundane knowledge/welfare and its sprouting",
+        "sarkar_semantic_import": "vauṣaṭ — mundane knowledge / welfare",
+        "operator_liberating": "Practical thought, benefit",
+        "operator_binding": "overthinking, nitpicking",
+        "grounding": "GROUNDED"
+      },
+      "merged_binding_vritti": "overthinking, nitpicking",
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'vauṣaṭ — mundane knowledge / welfare' (not intuition): liberating='Practical thought, benefit'. The MUSICAL-NOTE layer is separately set aside."
+    },
+    {
+      "iast": "ai",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "vaṣaṭ — welfare in the subtler sphere; six stages of vocalization (parā/paśyantī/madhyamā…)",
+        "sarkar_semantic_import": "vaṣaṭ — welfare in the subtler sphere",
+        "operator_liberating": "Welfare, materialization",
+        "operator_binding": "paternalism, overcontrol 'for your own good'",
+        "grounding": "GROUNDED"
+      },
+      "merged_binding_vritti": "paternalism, overcontrol 'for your own good'",
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'vaṣaṭ — welfare in the subtler sphere' (not intuition): liberating='Welfare, materialization'. The MUSICAL-NOTE layer is separately set aside."
+    },
+    {
+      "iast": "o",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "svāhā — completion of an action (total effacement into the fire)",
+        "sarkar_semantic_import": "svāhā — completion of an action",
+        "operator_liberating": "Completion, closure",
+        "operator_binding": "premature closure, stagnation",
+        "grounding": "GROUNDED"
+      },
+      "merged_binding_vritti": "premature closure, stagnation",
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'svāhā — completion of an action' (not intuition): liberating='Completion, closure'. The MUSICAL-NOTE layer is separately set aside."
+    },
+    {
+      "iast": "au",
+      "category": "vowel",
+      "primary_source": {
+        "assoc": "namaḥ mudrā — surrender to the greatness of another/Supreme",
+        "sarkar_semantic_import": "namaḥ — surrender to greatness",
+        "operator_liberating": "Surrender, Letting-go",
+        "operator_binding": "abandonment, cutting off prematurely",
+        "grounding": "GROUNDED"
+      },
+      "merged_binding_vritti": "abandonment, cutting off prematurely",
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'namaḥ — surrender to greatness' (not intuition): liberating='Surrender, Letting-go'. The MUSICAL-NOTE layer is separately set aside."
+    },
+    {
+      "iast": "aṃ",
+      "category": "anusvara",
+      "primary_source": {
+        "assoc": "an idea (same sound, different ideation → different meaning)",
+        "sarkar_semantic_import": "an idea",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='None' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "aḥ",
+      "category": "visarga",
+      "primary_source": {
+        "assoc": "words neither good nor bad — positive/negative by utterance",
+        "sarkar_semantic_import": "positive/negative by utterance",
+        "operator_liberating": "Attraction, Nectar-pull",
+        "operator_binding": "compulsion, clinging pull",
+        "grounding": "AUTHORED"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Attraction, Nectar-pull' is the operator's own authored reasoning here."
+    },
+    {
+      "iast": "k",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "āśā (hope)",
+        "other": "Kārya Brahma; 'that which produces sound'; flowing water; Nārāyaṇa (kesha)"
+      },
+      "merged_binding_vritti": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "kh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "cintā (worry/objective thought)",
+        "other": "means 'sky'/'heaven' (crude); transcendent = kṣa"
+      },
+      "merged_binding_vritti": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "g",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "ceṣṭā (effort to arouse dormant potential)"
+      },
+      "merged_binding_vritti": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "gh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "mamatā (love/possessive attachment)"
+      },
+      "merged_binding_vritti": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ṅ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "dambha (vanity)",
+        "other": "Vashiṣṭha/China legend; Tárā-cult transmission"
+      },
+      "merged_binding_vritti": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "c",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "viveka (conscience)"
+      },
+      "merged_binding_vritti": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ch",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "vikalatā (nervous breakdown)"
+      },
+      "merged_binding_vritti": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "j",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "ahaṃkāra (ego)"
+      },
+      "merged_binding_vritti": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "jh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "lolupatā/lobha/lolatā (greed/avarice)"
+      },
+      "merged_binding_vritti": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ñ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "kapaṭatā (hypocrisy)"
+      },
+      "merged_binding_vritti": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ṭ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "vitarka (overstatement/garrulousness)"
+      },
+      "merged_binding_vritti": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ṭh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "anutāpa (repentance)",
+        "other": "nighttime, moon, bhúvarloka, kāmamaya kośa (opposite of ha)"
+      },
+      "merged_binding_vritti": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ḍ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "lajjā (shyness)"
+      },
+      "merged_binding_vritti": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ḍh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "piśunatā (sadistic cruelty)"
+      },
+      "merged_binding_vritti": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ṇ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "īrṣyā (envy)"
+      },
+      "merged_binding_vritti": "envy — the sting at another's success; covetous resentment at another's good fortune",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "t",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "jāḍya/staticity, long/deep sleep, dullness, inertness"
+      },
+      "merged_binding_vritti": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "th",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "viṣāda (melancholy)"
+      },
+      "merged_binding_vritti": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "d",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "peevishness (krodha/karkaśatā)"
+      },
+      "merged_binding_vritti": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "dh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "tṛṣṇā (thirst for acquisition; NOT thirst for water)"
+      },
+      "merged_binding_vritti": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "n",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "moha (blind attachment; four categories)"
+      },
+      "merged_binding_vritti": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "p",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "ghṛṇā (hatred/revulsion)",
+        "other": "six ripus; fetter of hatred"
+      },
+      "merged_binding_vritti": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ph",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "bhaya (fear; born of moha ripu)"
+      },
+      "merged_binding_vritti": "bhaya — fear: collapse or flight before danger; the shrinking, dread and panic under threat",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "b",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "avajñā (indifference)",
+        "other": "brahmavihāra four attitudes"
+      },
+      "merged_binding_vritti": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "bh",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "mūrcchā (loss of common sense under a ripu's spell)"
+      },
+      "merged_binding_vritti": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "m",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "praṇāśa (annihilation) + praśraya (indulgence)"
+      },
+      "merged_binding_vritti": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "y",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "aviśvāsa (lack of confidence)",
+        "tattva": "constant movement / air"
+      },
+      "merged_binding_vritti": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "r",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "sarvanāśa (annihilation-thought)",
+        "tattva": "agnitattva / prāṇaśakti (vitality)",
+        "other": "RAM bīja (triangular, red)"
+      },
+      "merged_binding_vritti": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "l",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "krūratā (cruelty)",
+        "note": "this text gives ONLY krūratā; la=kṣititattva is from a different Sarkar passage"
+      },
+      "merged_binding_vritti": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "v",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "dharma (ensconcement)",
+        "purushartha": "dharma",
+        "tattva": "jalatattva (water)",
+        "deity": "Varuṇa Deva"
+      },
+      "merged_binding_vritti": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "ś",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "artha (psychic longing)",
+        "guna": "rajoguṇa (mutative)",
+        "purushartha": "artha",
+        "quote": "'Sha is the acoustic root of rajoguṇa … also the acoustic root of artha.'"
+      },
+      "merged_binding_vritti": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+      "reconciliation_status": "SWAP_ERROR",
+      "detail": "primary: ś=rajoguṇa+artha; merged binding = kāma/tamasic → SWAPPED with ṣ"
+    },
+    {
+      "iast": "ṣ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "kāma (physical/worldly desire)",
+        "guna": "tamoguṇa (static)",
+        "purushartha": "kāma",
+        "quote": "'S'a is the acoustic root of tamoguṇa … all kinds of worldly desires … kāma.'"
+      },
+      "merged_binding_vritti": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+      "reconciliation_status": "SWAP_ERROR",
+      "detail": "primary: ṣ=tamoguṇa+kāma; merged binding = artha/rajasic → SWAPPED with ś"
+    },
+    {
+      "iast": "s",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "mokṣa (liberation)",
+        "guna": "sattvaguṇa (sentient)",
+        "purushartha": "mokṣa"
+      },
+      "merged_binding_vritti": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "h",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "parā-vidyā",
+        "tattva": "ākāśa/ether",
+        "other": "daytime, sun, svarloka; opposite ṭha; Shiva (via hao)"
+      },
+      "merged_binding_vritti": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+      "reconciliation_status": "MATCH_VRITTI",
+      "detail": "consonant vṛtti agrees with merged; some extra associations left on the table"
+    },
+    {
+      "iast": "kṣ",
+      "category": "consonant",
+      "primary_source": {
+        "vritti": "mundane knowledge / material science (aparā-vidyā)",
+        "note": "conjunct k+ṣ; not an atomic backbone unit"
+      },
+      "merged_binding_vritti": null,
+      "reconciliation_status": "OUT_OF_ATOMIC_SCOPE",
+      "detail": "conjunct; not one of the 33 atomic backbone consonants"
+    }
+  ]
+}

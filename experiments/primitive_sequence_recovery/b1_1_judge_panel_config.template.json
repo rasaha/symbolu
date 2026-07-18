@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "artifact": "b1_1_judge_panel_config",
+    "status": "TEMPLATE_NOT_FROZEN",
+    "note": "Template with placeholders. NOT final, NOT frozen, does NOT authorize judging.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "judge_model_ids": ["PLACEHOLDER_REQUIRED", "PLACEHOLDER_REQUIRED", "PLACEHOLDER_REQUIRED"],
+  "reference_b1_judges": {
+    "note": "For reference only; MUST be explicitly declared/frozen before scoring, not assumed.",
+    "b1_judge_panel_v2": ["Llama-3.1-8B-Instruct", "Meta-Llama-3-8B-Instruct", "gemma-2-9b-it"]
+  },
+  "judge_prompt": "PLACEHOLDER_REQUIRED (blinded pairwise; JSON-only output)",
+  "output_schema": {
+    "choice": "output_1_better | output_2_better | tie_no_preference | both_bad",
+    "correctness_flag": "none | output_1_problem | output_2_problem | both_problem"
+  },
+  "parser_rules": "PLACEHOLDER_REQUIRED (declare any narrow repair rule up front, e.g. missing-final-brace only)",
+  "qc_rules": {
+    "attention_checks": "PLACEHOLDER_REQUIRED",
+    "exclusion_rule": "PLACEHOLDER_REQUIRED (e.g. exclude judge if attention fails > threshold)"
+  },
+  "replacement_policy": "PLACEHOLDER_REQUIRED (predeclared; how a failed judge is replaced)",
+  "exclusion_policy": "PLACEHOLDER_REQUIRED",
+  "no_post_hoc_judge_selection": true,
+  "judging_authorized": false
+}

@@ -1,0 +1,17 @@
+# Varna-lens predict/check word list — run, then fill the 'verdict' column offline.
+# one word per line; optional: word <TAB> actual_meaning. '#' lines ignored.
+kāla
+kamala
+dharma
+mokṣa
+ānanda
+yoga
+guru
+māyā
+manas
+karma
+satya
+prema
+krodha
+moha
+viveka

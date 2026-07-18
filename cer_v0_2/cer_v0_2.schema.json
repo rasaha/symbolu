@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.example/cer/v0.2/cer_v0_2.schema.json",
+  "title": "Canonical Execution Request (CER) V0.2 — universal envelope + domain profiles",
+  "description": "Machine-readable mirror of the CER V0.2 envelope. Structural only; the ENFORCED validator (envelope.validate_cer) additionally fails closed on unknown profiles/extensions and enforces per-profile required/optional/prohibited actuation fields. Identity = ActionGate v2 action_hash of the profile's envelope projection (provenance excluded).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cer_version", "profile", "authority", "state_binding", "policy_ref", "actuation"],
+  "properties": {
+    "cer_version": {"const": "0.2"},
+    "profile": {"enum": ["kubernetes.scale.v1", "kubernetes.rollout.v1"]},
+    "risk_tier": {"enum": ["GOVERNED", "LOW_RISK"]},
+    "authority": {
+      "type": "object",
+      "required": ["principal", "permissions"],
+      "properties": {
+        "principal": {"type": "string"},
+        "permissions": {"type": "array", "items": {"type": "string"}},
+        "key_id": {"type": "string"},
+        "delegator": {"type": "object"},
+        "delegation_chain": {"type": "array"}
+      }
+    },
+    "state_binding": {
+      "type": "object",
+      "required": ["resource_version", "state_hash", "as_of", "operational"],
+      "properties": {
+        "resource_version": {"type": "string"},
+        "state_hash": {"type": "string", "pattern": "^(?:sha-?256:)?[0-9a-f]{64}$"},
+        "as_of": {"type": "string"},
+        "source": {"type": "string"},
+        "correlation_id": {"type": "string"},
+        "sequence_id": {"type": "string"},
+        "live_resource_version": {"type": "string"},
+        "rollback_ref": {"type": "string"},
+        "operational": {"type": "object"}
+      }
+    },
+    "policy_ref": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {"version": {"type": "string"}, "digest": {"type": "string"}}
+    },
+    "actuation": {
+      "type": "object",
+      "description": "Profile-specific identity-bearing payload. See profiles/*.schema.json.",
+      "required": ["operation", "target", "reversibility"],
+      "properties": {
+        "operation": {"type": "string"},
+        "target": {
+          "type": "object",
+          "required": ["cluster", "namespace", "deployment"],
+          "properties": {
+            "cluster": {"type": "string"},
+            "namespace": {"type": "string"},
+            "deployment": {"type": "string"}
+          }
+        },
+        "reversibility": {"enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Non-identity. Retained for audit; MUST NOT affect the action digest.",
+      "properties": {
+        "runtime": {"type": "string"}, "runtime_version": {"type": "string"},
+        "model_provider": {"type": "string"}, "model": {"type": "string"},
+        "planner": {"type": "string"}, "objective": {"type": "string"},
+        "reasoning_trace_ref": {"type": "string"}, "adapter_version": {"type": "string"},
+        "explanation": {"type": "string"}
+      }
+    },
+    "extensions": {"type": "object", "description": "Reserved; non-empty unrecognized -> fail closed."}
+  }
+}

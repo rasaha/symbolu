@@ -1,0 +1,18 @@
+{
+  "blocked_upstream_by": "PREREG_BLOCKED_BY_UNDEFINED_PACKET_PROJECTION",
+  "operationalization_options_to_choose_from": [
+    "set intersection of asserted attributes",
+    "element-wise minimum support (fuzzy AND)",
+    "element-wise product",
+    "logical constraint satisfaction"
+  ],
+  "operator_requirements": [
+    "consume ALL eligible mappings (no facet cherry-picking)",
+    "record contradictions rather than discard",
+    "produce ONE reproducible profile",
+    "identical across words",
+    "non-adaptive to target meaning",
+    "byte-identical across two independent implementations"
+  ],
+  "status": "DEFINABLE in the abstract, but INERT: it operates on per-varṇa attribute vectors that only exist AFTER the packet-projection maps each mapping into the attribute space. Since the projection gate is not satisfied (see packet_projection_spec), the AND operator has no admissible inputs."
+}

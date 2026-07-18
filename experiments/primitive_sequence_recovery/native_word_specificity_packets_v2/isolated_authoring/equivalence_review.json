@@ -1,0 +1,91 @@
+{
+  "all_preserved_after_remediation": true,
+  "result": {
+    "r01": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r02": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r03": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r04": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r05": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r06": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r07": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r08": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r09": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r10": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r11": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r12": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": "initial blind review flagged r12 binding DRIFT (dropped the 'or even harming what lies outside it' escalation); remediated by the SAME isolated author (still blind to words/glosses); now preserves intensity"
+    },
+    "r13": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r14": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r15": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r16": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    },
+    "r17": {
+      "binding": "PRESERVED",
+      "liberating": "PRESERVED",
+      "note": ""
+    }
+  },
+  "reviewer": "separate genuinely context-isolated general-purpose subagent (given only opaque IDs + source/paraphrase pairs; no words/glosses/bridge)"
+}

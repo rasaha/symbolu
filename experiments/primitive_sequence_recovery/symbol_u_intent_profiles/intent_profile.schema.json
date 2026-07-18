@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symbol_u/intent_profiles/intent_profile.schema.json",
+  "title": "Symbol-U V1 Intent Profile (frozen data contract)",
+  "description": "One immutable, deterministic symbolic-state profile per frozen concern. It is a DATA CONTRACT, not a prompt: it carries symbolic state only and MUST NOT contain assistant advice, stance hints, reframing, coaching, response templates, inferred emotions/motivations, psychological interpretation, drive ranking/weighting, or any per-prompt dynamic analysis. additionalProperties:false enforces exclusion.",
+  "type": "object",
+  "required": ["schema","status","universal_usage_rule","n_profiles","intent_profiles_sha256","profiles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "symbol_u_intent_profiles_v1"},
+    "label": {"type": "string"},
+    "status": {"const": "INTENT_PROFILES_V1_FROZEN"},
+    "universal_usage_rule": {"type": "string", "description": "identical for every profile; auxiliary-hypothesis-only rule"},
+    "usage_rule_note": {"type": "string"},
+    "n_profiles": {"type": "integer"},
+    "intent_profiles_sha256": {"type": "string"},
+    "profiles": {"type": "array", "items": {"$ref": "#/$defs/profile"}}
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["concern_id","concern_name","canonical_sanskrit_concept","pronunciation_used_iast",
+                   "frozen_varna_sequence","mapped_varnas","frozen_drives","n_drives","varna_multiplicity",
+                   "mapping_coverage","parser_status","bridge_confidence","abstention_status","provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "concern_id": {"type": "string", "pattern": "^C[0-9]{4}$"},
+        "concern_name": {"type": "string"},
+        "canonical_sanskrit_concept": {"type": "object", "required": ["iast","devanagari"], "additionalProperties": false,
+          "properties": {"iast": {"type": "string"}, "devanagari": {"type": "string"}}},
+        "pronunciation_used_iast": {"type": "string"},
+        "frozen_varna_sequence": {"type": "array", "items": {"type": "object", "required": ["unit","type"],
+          "additionalProperties": false, "properties": {"unit": {"type": "string"}, "type": {"type": "string"}}}},
+        "mapped_varnas": {"type": "array", "items": {"type": "string"}},
+        "frozen_drives": {"type": "array", "description": "verbatim frozen binding-vritti glosses, occurrence-level, in varna order; NO ranking/weighting",
+          "items": {"type": "object", "required": ["varna","vritti_gloss"], "additionalProperties": false,
+            "properties": {"varna": {"type": "string"}, "vritti_gloss": {"type": "string"}}}},
+        "n_drives": {"type": "integer"},
+        "varna_multiplicity": {"type": "object"},
+        "mapping_coverage": {"type": "number"},
+        "parser_status": {"type": "object"},
+        "bridge_confidence": {"type": "object", "description": "mechanical function of frozen numbers; documented rule; NOT an authored judgement"},
+        "abstention_status": {"enum": ["NONE","NO_APPLICABLE_CONCEPT","NO_MAPPED_VARNA"]},
+        "provenance": {"type": "object"}
+      }
+    }
+  }
+}

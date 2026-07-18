@@ -1,0 +1,127 @@
+{
+  "artifact": "b1_3_concrete_object_llm_scoring_protocol_draft",
+  "status": "PROTOCOL_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "construct": "Dictionary meaning fixes the object; varṇa/vṛtti supplies modulation-field, not definition. LLM judges assess whether the real varṇa-derived modulation better fits the fixed object-function than control modulations.",
+  "instrument": "LLM judge panel (blinded), forced binary choice, objective object-function modulation-fit",
+  "target_set": "primary concrete objects (tier=primary) from b1_3_human_modulation_concrete_object_candidate_wordlist.json",
+  "judge_wording": {
+    "primary": "Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?",
+    "plain_variant": "Which option is more naturally suited to the object's ordinary function?",
+    "forbidden": ["which is deeper", "which is spiritual", "which is poetic", "which is Sanskritic", "which defines the object"]
+  },
+  "judge_panel": {
+    "multiple_model_families": true,
+    "fixed_prompts": true,
+    "temperature": "deterministic or low, controlled and recorded",
+    "chain_of_thought_required": false,
+    "rationale": "optional, diagnostic-only, never part of scored outcome",
+    "position_balanced": true,
+    "item_order_randomized": true,
+    "arm_labels_blinded": true
+  },
+  "primary_endpoint": "A_real win-rate vs R_deranged (forced choice) on the primary concrete-object set",
+  "primary_endpoint_reason": "R_deranged (another object's real varṇa field) tests object-SPECIFICITY vs merely coherent symbolic prose; B1.1/B1.2 found real ~ deranged",
+  "required_comparisons": ["A_real_vs_R_deranged", "A_real_vs_R_scrambled", "A_real_vs_R_random", "A_real_vs_X_neutral"],
+  "optional_comparisons": ["A_real_vs_R_semantic_near", "A_real_vs_R_varna_near"],
+  "semantic_baseline_check": {
+    "required": true,
+    "method_a": "judge given dictionary anchor + neutral object-function descriptors only, WITHOUT varṇa modulation",
+    "method_b": "compare A_real against a simple object-function heuristic baseline derived from the dictionary meaning",
+    "purpose": "detect whether the LLM is merely matching ordinary object semantics read off the anchor",
+    "fail_rule": "if the dictionary/object-function baseline performs as well as A_real, the Symbol-U-specific claim FAILS"
+  },
+  "analysis_methods": {
+    "outcome": "forced-choice binary per (item, comparison, judge)",
+    "aggregate": "win rates per comparison with confidence intervals",
+    "reporting_strata": ["item-level", "model-family-level", "object-family-level", "tier-level (primary/secondary/diagnostic)"],
+    "model": "mixed-effects logistic (item + judge random effects) if feasible; win-rate + CI otherwise",
+    "multiplicity_correction": "Holm (or equivalent) across required controls",
+    "invalid_response_handling": "predeclared: unparseable/refused/tie -> predeclared rule; counted, not silently dropped",
+    "post_hoc_exclusions": "none except predeclared invalid cases"
+  },
+  "draft_thresholds": {
+    "primary_A_real_vs_R_deranged_lower_CI_bound": "> 0.50",
+    "directional_vs_all_required_controls": "> 0.50",
+    "significance_rule": "corrected significance or preregistered CI rule",
+    "no_single_item_family_dominance": true,
+    "no_single_model_family_dominance": true,
+    "semantic_only_baseline_must_not_match_A_real": true,
+    "note": "DRAFT thresholds, revisable until explicit EVIDENCE_FREEZE; NOT evidence-freeze thresholds"
+  },
+  "success_criteria_all_must_hold": [
+    "A_real beats R_deranged",
+    "A_real beats R_scrambled",
+    "A_real beats R_random",
+    "A_real beats X_neutral",
+    "A_real beats or adds beyond the semantic-only/object-function baseline",
+    "style-tell audit passes",
+    "denotation-leakage audit passes",
+    "quality-parity audit passes",
+    "result holds on primary concrete objects",
+    "result not driven by secondary/diagnostic words",
+    "result not driven by one LLM judge family",
+    "survives multiplicity correction or preregistered CI rule"
+  ],
+  "kill_criteria_any": [
+    "A_real ~ R_deranged",
+    "A_real ~ R_scrambled",
+    "A_real ~ R_random",
+    "A_real ~ X_neutral",
+    "R_scrambled matches or beats A_real",
+    "semantic-only/object-function baseline matches A_real",
+    "style-tell audit fails",
+    "denotation-leakage audit fails",
+    "controls lower-quality or nonsensical",
+    "result appears only in diagnostic/high-confound set",
+    "result depends on one judge model only",
+    "thresholds changed after results"
+  ],
+  "exclusion_rules": {
+    "predeclared_invalid_only": true,
+    "no_post_hoc_word_removal": "unless pre-specified",
+    "no_threshold_change_after_results": true,
+    "no_per_item_hand_rescue": true,
+    "global_template_fixes_only_before_freeze": true,
+    "secondary_diagnostic_wins_not_primary_evidence": true
+  },
+  "judge_output_format": {
+    "item_id": "string",
+    "comparison_id": "string",
+    "model_id": "string",
+    "left_arm": "hidden internally, revealed at scoring",
+    "right_arm": "hidden internally, revealed at scoring",
+    "selected_option": "left|right",
+    "confidence": "optional",
+    "rationale": "optional, diagnostic-only",
+    "parse_status": "ok|unparseable|refused",
+    "invalid_flag": "bool"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "allowed_future_label_meaning": "LLM judges, under fixed dictionary anchors for concrete objects, prefer real varṇa-derived modulation over deranged/scrambled/random/neutral controls for object-function fit; LLM object-fit ceiling only, NOT human/ontology/truth",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LLM_PROPENSITY_FIELD_DISCRIMINATION", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "VRITTI_PROPENSITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "llm_judges_run": false, "scoring_run": false},
+  "prior_results_preserved": {
+    "B1.1": "LLM null on earlier mixed/loaded design",
+    "B1.2_B1.3_automated": "nulls (real~deranged; scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED",
+    "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED"
+  },
+  "remaining_blockers": [
+    "final screened primary object list",
+    "final generation/arm artifacts",
+    "actual style-audit execution and result",
+    "semantic baseline construction",
+    "final judge model list",
+    "final scoring script",
+    "final thresholds",
+    "manifest hash binding",
+    "explicit EVIDENCE_FREEZE declaration"
+  ],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["protocol draft, not frozen", "not evidence", "no judges run", "no scoring", "LLM object-fit ceiling only", "no prior-result reversal", "no positive label earned"]
+}

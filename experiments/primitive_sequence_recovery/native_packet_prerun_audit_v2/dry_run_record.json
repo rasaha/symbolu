@@ -1,0 +1,166 @@
+{
+  "artifact": "v2_dry_run_infrastructure_validation",
+  "no_model_calls": true,
+  "no_real_accuracy": true,
+  "protocol_source": "native_word_specificity_packets_v2/evaluator_protocol.json",
+  "micro_scenarios": {
+    "valid_first_try": {
+      "result": {
+        "status": "answered",
+        "choice": "W3",
+        "attempts": 1
+      },
+      "expected": {
+        "status": "answered",
+        "choice": "W3",
+        "attempts": 1
+      },
+      "pass": true
+    },
+    "invalid_then_valid": {
+      "result": {
+        "status": "answered",
+        "choice": "W2",
+        "attempts": 2
+      },
+      "expected": {
+        "status": "answered",
+        "choice": "W2",
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "invalid_twice_missing": {
+      "result": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "expected": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "timeout_then_valid": {
+      "result": {
+        "status": "answered",
+        "choice": "W5",
+        "attempts": 2
+      },
+      "expected": {
+        "status": "answered",
+        "choice": "W5",
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "timeout_twice_missing": {
+      "result": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "expected": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "duplicate_choice_invalid": {
+      "result": {
+        "status": "answered",
+        "choice": "W1",
+        "attempts": 2
+      },
+      "expected": {
+        "status": "answered",
+        "choice": "W1",
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "list_choice_invalid_then_missing": {
+      "result": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "expected": {
+        "status": "missing",
+        "choice": null,
+        "attempts": 2
+      },
+      "pass": true
+    },
+    "prose_wrapped_invalid_then_valid": {
+      "result": {
+        "status": "answered",
+        "choice": "W4",
+        "attempts": 2
+      },
+      "expected": {
+        "status": "answered",
+        "choice": "W4",
+        "attempts": 2
+      },
+      "pass": true
+    }
+  },
+  "micro_all_pass": true,
+  "sweeps": {
+    "oracle_all_correct": {
+      "label": "oracle_all_correct",
+      "raw_frozen_sha256": "474a6b10a4f3f7e7b86d6697f62b7eec1bfb76ed0a56fe2f0d50e106753a2280",
+      "n": 720,
+      "overall_accuracy": 1.0,
+      "per_arm_accuracy": {
+        "T": 1.0,
+        "R": 1.0,
+        "X": 1.0,
+        "F": 1.0,
+        "G": 1.0,
+        "S": 1.0
+      }
+    },
+    "always_W1": {
+      "label": "always_W1",
+      "raw_frozen_sha256": "7fb7db9e7b9e9bb03efec027ac9485feaaa8121be816d4225c68e17de75317f5",
+      "n": 720,
+      "overall_accuracy": 0.166667,
+      "per_arm_accuracy": {
+        "T": 0.166667,
+        "R": 0.166667,
+        "X": 0.166667,
+        "F": 0.166667,
+        "G": 0.166667,
+        "S": 0.166667
+      }
+    },
+    "all_invalid": {
+      "label": "all_invalid",
+      "raw_frozen_sha256": "2b72b9145d27dd6a09cd9ed66100ba258c26933243c333cc4c89f1a24b0edd05",
+      "n": 720,
+      "overall_accuracy": 0.0,
+      "per_arm_accuracy": {
+        "T": 0.0,
+        "R": 0.0,
+        "X": 0.0,
+        "F": 0.0,
+        "G": 0.0,
+        "S": 0.0
+      }
+    }
+  },
+  "sweeps_reproduce_expected": true,
+  "structural_guarantees": {
+    "runner_never_reads_key": true,
+    "score_is_separate_from_run": true,
+    "freeze_precedes_score_in_sweep": true,
+    "no_result_dependent_prompt_mod": true,
+    "retry_cap_one": true
+  },
+  "dry_run_pass": true
+}

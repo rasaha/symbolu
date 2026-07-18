@@ -1,0 +1,476 @@
+{
+  "all_passed": true,
+  "base_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+  "cases": [
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "01_valid_scale",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "digest_vs_base_same": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Identical valid scale (web 10->12) from both runtimes",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "DENY",
+        "ug": "DENY"
+      },
+      "case_id": "02_unauthorized",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "BLOCKED_BY_AUTHORIZATION",
+        "ug": "BLOCKED_BY_AUTHORIZATION"
+      },
+      "description": "Identical unauthorized scale (deploy not covered by delegation)",
+      "eligible": {
+        "lg": false,
+        "ug": false
+      },
+      "lg_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.NO_SAFE_ACTION",
+        "ug": "ActionDecision.NO_SAFE_ACTION"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "03_operationally_unsafe",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "HELD_BY_ACP",
+        "ug": "HELD_BY_ACP"
+      },
+      "description": "Identical scale during an active freeze window",
+      "eligible": {
+        "lg": false,
+        "ug": false
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "04_diff_actuation_surface",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "deterministic": true,
+        "digest_vs_base_differs": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Same intent (more web capacity) via a physically distinct target -> different identity",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "7f531bc82d0453040020255448f9e19c1efda2bbc2a0ab73d68d1d86ce812fdf",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "7f531bc82d0453040020255448f9e19c1efda2bbc2a0ab73d68d1d86ce812fdf"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "05_diff_runtime_provenance",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "digest_vs_base_same": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Same action; runtime=ugence vs runtime=langgraph",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "ugence!=langgraph provenance",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "06_diff_objective_prose",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "deterministic": true,
+        "digest_vs_base_same": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Same action; different objective prose per runtime",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "different objective prose",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "07_modified_replicas",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "deterministic": true,
+        "digest_vs_base_differs": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Same target, replicas 12 -> 13 -> different identity",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "08_modified_target",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "deterministic": true,
+        "digest_vs_base_differs": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "Target web -> api -> different identity",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.NO_SAFE_ACTION",
+        "ug": "ActionDecision.NO_SAFE_ACTION"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "09_stale_state",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "state_drift_rejected": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "HELD_BY_ACP",
+        "ug": "HELD_BY_ACP"
+      },
+      "description": "Stale observation: old as_of + live resourceVersion advanced",
+      "eligible": {
+        "lg": false,
+        "ug": false
+      },
+      "lg_digest": "6e8d3a6419052b9b9a5911de4d98bc5264b8ebf83f45412add7991ab2f1c921c",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "6e8d3a6419052b9b9a5911de4d98bc5264b8ebf83f45412add7991ab2f1c921c"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "DENY",
+        "ug": "DENY"
+      },
+      "case_id": "10_policy_update",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true
+      },
+      "composed": {
+        "lg": "BLOCKED_BY_AUTHORIZATION",
+        "ug": "BLOCKED_BY_AUTHORIZATION"
+      },
+      "description": "Same action under a restrictive policy update -> different verdict",
+      "eligible": {
+        "lg": false,
+        "ug": false
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "ugence",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "REQUEST_MORE_EVIDENCE",
+        "ug": "REQUEST_MORE_EVIDENCE"
+      },
+      "case_id": "11_missing_evidence",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "schema_validation_ok": true,
+        "ug_eq_lg": true
+      },
+      "composed": {
+        "lg": "PENDING_AUTHORIZATION",
+        "ug": "PENDING_AUTHORIZATION"
+      },
+      "description": "Valid scale but required evidence absent",
+      "eligible": {
+        "lg": false,
+        "ug": false
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case_id": "12_direct_bypass",
+      "checks": {
+        "bypass_prevented": true,
+        "deterministic": true,
+        "schema_validation_ok": true
+      },
+      "description": "Runtime attempts to execute the tool without a CER/verdict",
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "passed": true,
+      "provenance": "langgraph",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case_id": "13_adapter_drops_field",
+      "checks": {
+        "validation_fails_closed": true
+      },
+      "description": "Adapter omits identity.target -> CER validation fails closed",
+      "passed": true,
+      "provenance": "ugence(faulty)"
+    },
+    {
+      "case_id": "14_adapter_injects_extension",
+      "checks": {
+        "validation_fails_closed": true
+      },
+      "description": "Adapter injects an unsupported extension -> fail closed",
+      "passed": true,
+      "provenance": "ugence(faulty)"
+    },
+    {
+      "acp": {
+        "lg": "ActionDecision.EXECUTE",
+        "ug": "ActionDecision.EXECUTE"
+      },
+      "actiongate": {
+        "lg": "ALLOW",
+        "ug": "ALLOW"
+      },
+      "case_id": "15_observation_return",
+      "checks": {
+        "acp_verdict_equiv": true,
+        "ag_verdict_equiv": true,
+        "composition_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "gate_action_hash_equiv": true,
+        "observation_return": true,
+        "schema_validation_ok": true
+      },
+      "composed": {
+        "lg": "PROCEED",
+        "ug": "PROCEED"
+      },
+      "description": "After a governed PROCEED, both runtimes observe/reflect",
+      "eligible": {
+        "lg": true,
+        "ug": true
+      },
+      "lg_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+      "observation": {
+        "langgraph": "await_execution_result_then_verify",
+        "ugence": "await_execution_result_then_verify"
+      },
+      "passed": true,
+      "provenance": "ugence+langgraph",
+      "ug_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    }
+  ],
+  "cases_passed": 15,
+  "cases_total": 15,
+  "cer_version": "0.1",
+  "identity_profile": "v2",
+  "metrics": {
+    "acp_verdict_equiv": 12,
+    "adapter_information_loss": 1,
+    "ag_verdict_equiv": 12,
+    "bypass_prevented": 1,
+    "cases": 15,
+    "composition_equiv": 12,
+    "cp_class_correct": 7,
+    "cp_class_total": 7,
+    "cross_runtime_digest_equiv": 10,
+    "cross_runtime_digest_equiv_expected": 10,
+    "deterministic_ok": 13,
+    "expected_difference_correct": 6,
+    "expected_difference_total": 6,
+    "modified_action_rejected": 2,
+    "observation_return_ok": 1,
+    "ownership_violations": 0,
+    "schema_validation_ok": 13,
+    "state_drift_rejected": 1,
+    "unsupported_extension_rejected": 1
+  },
+  "ownership_no_runtime_switch": true
+}

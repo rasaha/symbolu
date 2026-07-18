@@ -1,0 +1,12 @@
+# RunPod runtime outputs — never commit weights, results, secrets, caches
+models/
+results/
+*.log
+*.tar.gz
+*.sha256
+__pycache__/
+*.pyc
+.env
+hf_token*
+*token*.txt
+run_config.local.json

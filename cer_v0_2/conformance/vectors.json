@@ -1,0 +1,290 @@
+{
+  "cer_version": "0.2",
+  "identity_profile": "v2",
+  "algorithm": "sha-256",
+  "note": "Frozen CER V0.2 action_digest vectors by runtime x profile. Any conforming implementation must reproduce these.",
+  "vectors": [
+    {
+      "case": "01_scale_valid_all_runtimes",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "01_scale_valid_all_runtimes",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "01_scale_valid_all_runtimes",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "02_rollout_valid_all_runtimes",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "02_rollout_valid_all_runtimes",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "02_rollout_valid_all_runtimes",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "03_scale_diff_provenance",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "03_scale_diff_provenance",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "03_scale_diff_provenance",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "04_rollout_diff_objective",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "04_rollout_diff_objective",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "04_rollout_diff_objective",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "05_scale_changed_target",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "case": "05_scale_changed_target",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "case": "05_scale_changed_target",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "case": "06_scale_changed_replicas",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "case": "06_scale_changed_replicas",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "case": "06_scale_changed_replicas",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "case": "07_rollout_changed_image",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508"
+    },
+    {
+      "case": "07_rollout_changed_image",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508"
+    },
+    {
+      "case": "07_rollout_changed_image",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508"
+    },
+    {
+      "case": "08_rollout_changed_strategy",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4"
+    },
+    {
+      "case": "08_rollout_changed_strategy",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4"
+    },
+    {
+      "case": "08_rollout_changed_strategy",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4"
+    },
+    {
+      "case": "09_same_intent_diff_surface",
+      "runtime": "scale",
+      "profile": null,
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "09_same_intent_diff_surface",
+      "runtime": "rollout",
+      "profile": null,
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "10_rollout_stale",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88"
+    },
+    {
+      "case": "10_rollout_stale",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88"
+    },
+    {
+      "case": "10_rollout_stale",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88"
+    },
+    {
+      "case": "11_scale_policy_update",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "11_scale_policy_update",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "11_scale_policy_update",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "12_rollout_missing_evidence",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "12_rollout_missing_evidence",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "12_rollout_missing_evidence",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "13_scale_auth_deny_acp_pass",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "case": "13_scale_auth_deny_acp_pass",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "case": "13_scale_auth_deny_acp_pass",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "case": "14_rollout_auth_pass_acp_hold",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "14_rollout_auth_pass_acp_hold",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "14_rollout_auth_pass_acp_hold",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "19_direct_bypass",
+      "runtime": "ugence",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "19_direct_bypass",
+      "runtime": "langgraph",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "19_direct_bypass",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.scale.v1",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "20_observation_return",
+      "runtime": "ugence",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "20_observation_return",
+      "runtime": "langgraph",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    },
+    {
+      "case": "20_observation_return",
+      "runtime": "openai-agents",
+      "profile": "kubernetes.rollout.v1",
+      "action_digest": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+    }
+  ]
+}

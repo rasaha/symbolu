@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "artifact": "b1_1_seeds_config",
+    "status": "TEMPLATE_NOT_FROZEN",
+    "note": "Template with placeholders. NOT final, NOT frozen, does NOT authorize generation.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "arm_construction_seed": "PLACEHOLDER_REQUIRED",
+  "task_order_seed": "PLACEHOLDER_REQUIRED",
+  "prompt_order_seed": "PLACEHOLDER_REQUIRED",
+  "generation_seed": "PLACEHOLDER_REQUIRED_IF_SUPPORTED",
+  "judge_packet_shuffle_seed": "PLACEHOLDER_REQUIRED",
+  "scoring_bootstrap_seed": "PLACEHOLDER_REQUIRED",
+  "policy": {
+    "deterministic": true,
+    "frozen_before_generation": true,
+    "no_post_hoc_seed_changes": true
+  },
+  "generation_authorized": false
+}

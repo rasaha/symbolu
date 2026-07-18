@@ -1,0 +1,57 @@
+{
+  "artifact": "b1_1_generation_loop_dry_check_report",
+  "status": "PASS_DRY_CHECK",
+  "scope": "Local dry checks of the implemented B1.1 generation loop. No real model call, no download, no generation evidence, no judging, no scoring. Structure, not validated meaning.",
+  "environment": "egress-denied prep environment (no CUDA, huggingface.co denied) — real generation intentionally refused here",
+  "allowed_validations": {
+    "manifest_verifier": "MANIFEST_VERIFIED (b1_1_freeze_manifest.json, FROZEN)",
+    "freeze_artifact_validator": "READY_FOR_FREEZE_REVIEW (0 blockers, 1 judge warning)",
+    "render_only": "PASS_RENDER_ONLY (200 cores, leak_total 0, 0 empty arms)"
+  },
+  "refusal_path_tests": [
+    {"id": "T1", "case": "--execute-generation without B1_1_GENERATION_APPROVED=YES", "result": "REFUSED", "pass": true},
+    {"id": "T2", "case": "--execute-generation with approval but no --out", "result": "REFUSED", "pass": true},
+    {"id": "T3", "case": "--execute-generation with approval + --out; render/leak validated OK, then no CUDA/egress", "result": "REFUSED (no model contacted; render/leak ran first: leak_total 0, 200 cores)", "pass": true},
+    {"id": "T7", "case": "existing output without --resume", "result": "REFUSED (never overwrites)", "pass": true}
+  ],
+  "mock_loop_check": {
+    "note": "MOCK_ONLY adapter — deterministic non-model placeholder; NO model, NO network; NOT B1.1 evidence; written to a scratchpad 'mock' path (never committed).",
+    "rows_written": 4800,
+    "expected_rows": 4800,
+    "matrix": "25 words × 8 arms × 6 tasks × 2 models × 2 seeds",
+    "errors": 0,
+    "arms": ["A", "C", "D", "R_deranged", "R_domain", "R_same", "S", "X"],
+    "models": ["Qwen/Qwen2.5-7B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3"],
+    "seeds": [1101, 2027],
+    "tasks": ["T1", "T2", "T3", "T4", "T5", "T6"],
+    "schema_fields_present": ["run_id", "manifest_sha256", "manifest_path", "freeze_commit", "model_id", "model_revision", "task_id", "target_word", "arm", "prompt_id", "prompt_text", "conditioning_text", "generation_text", "decoding", "seed", "timestamp", "status", "error", "key", "mock", "is_b1_1_evidence"],
+    "missing_schema_fields": "NONE",
+    "all_mock_true": true,
+    "all_status_MOCK_ONLY": true,
+    "is_b1_1_evidence_all_false": true,
+    "prompt_text_leak_rows": 0,
+    "resume_test": "re-run with --resume skipped 4800/4800 completed keys, wrote 0, never overwrote"
+  },
+  "safety_confirmations": {
+    "real_model_called": false,
+    "generation_executed": false,
+    "huggingface_download": false,
+    "raw_outputs_in_repo": false,
+    "judging_run": false,
+    "scoring_run": false,
+    "frozen_artifacts_modified": false,
+    "manifest_edited": false,
+    "render_only_default_safe": true,
+    "refuses_in_this_environment": true
+  },
+  "anchors": {
+    "b1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "positive_cap": "LIMITED_GENERATION_UTILITY",
+    "crux": "R_deranged",
+    "embedding_gate": "BLOCKED_DEPENDENCY_UNAVAILABLE",
+    "fallback": "FALLBACK_QUALIFIED",
+    "track_g": {"commit": "1fe5562", "label": "RANDOM_POLARITY_EXPLAINS", "A_vs_R": -0.1917, "A_vs_X": -0.075}
+  },
+  "non_claims": ["no ontology validation", "no Sanskrit privilege", "no semantic truth", "mock output is not evidence"]
+}

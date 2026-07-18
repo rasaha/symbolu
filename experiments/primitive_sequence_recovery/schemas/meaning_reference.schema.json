@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.meaning_reference.schema.json",
+  "title": "meaning_reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "meanings"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "meanings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["word_id", "canonical_meaning", "realization_specific_reference"],
+        "properties": {
+          "word_id": { "type": "string" },
+          "canonical_meaning": { "type": "string" },
+          "realization_specific_reference": {
+            "type": "object", "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

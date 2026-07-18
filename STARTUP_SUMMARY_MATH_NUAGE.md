@@ -1,4 +1,4 @@
-# Cognade Labs — Startup Summary for MATH Nuage Program
+# Ugence Labs — Startup Summary for MATH Nuage Program
 
 ## One-liner
 

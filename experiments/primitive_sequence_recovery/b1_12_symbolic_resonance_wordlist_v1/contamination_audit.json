@@ -1,0 +1,164 @@
+{
+  "schema": "b1_12_bsr_contamination_audit_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "sources_checked": [
+    "60word_symbolic_resonance",
+    "resolution_pilot",
+    "feature_lift",
+    "b1_12_dev(G0/G1/descriptor)"
+  ],
+  "n_previously_seen_words_indexed": 122,
+  "included_all_fresh": true,
+  "audit": [
+    {
+      "iast": "kapaṭa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "garva",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "vaira",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "ālasya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kleśa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "droha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "santoṣa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "śraddhā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "vinaya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "titikṣā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "prema",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "sneha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "vastra",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "dīpa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "śayyā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "yaṣṭi",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "setu",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "naukā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "uṣṭra",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "mayūra",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kāka",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "nāsā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "bāhu",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "udara",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "bhūmi",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "ākāśa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "tuṣāra",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "snāna",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "pāṭha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "rūpa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    }
+  ]
+}

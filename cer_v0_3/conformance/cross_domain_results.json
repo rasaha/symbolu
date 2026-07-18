@@ -1,0 +1,373 @@
+{
+  "all_passed": true,
+  "base_db_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+  "cases": [
+    {
+      "case_id": "D01_valid_both_producers",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "cleanroom_agrees": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "no_cross_domain_collision": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "equal",
+      "passed": true
+    },
+    {
+      "case_id": "D02_diff_provenance",
+      "checks": {
+        "all_equal": true,
+        "cleanroom_agrees": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "equal",
+      "passed": true
+    },
+    {
+      "case_id": "D03_diff_objective",
+      "checks": {
+        "all_equal": true,
+        "cleanroom_agrees": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "equal",
+      "passed": true
+    },
+    {
+      "case_id": "D04_argument_order",
+      "checks": {
+        "all_equal": true,
+        "cleanroom_agrees": true
+      },
+      "digests": {
+        "reordered": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "equal",
+      "passed": true
+    },
+    {
+      "case_id": "D10_changed_database",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "17b2236913b3777f",
+        "ugence": "17b2236913b3777f"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D11_changed_table",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "0d64eb7a89fd3a82",
+        "ugence": "0d64eb7a89fd3a82"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D12_changed_operation",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "59ba5db2d0ed9650",
+        "ugence": "59ba5db2d0ed9650"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D13_changed_statement",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "8a5a0260e5d5db2c",
+        "ugence": "8a5a0260e5d5db2c"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D14_changed_scope",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "ff80674742ba493c",
+        "ugence": "ff80674742ba493c"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D16_changed_state_binding",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "9ddb1cee9bd6b6ae",
+        "ugence": "9ddb1cee9bd6b6ae"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D17_changed_compensation",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "648eafc1b89c2760",
+        "ugence": "648eafc1b89c2760"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D18_optional_present",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "527ec750fd23fa16",
+        "ugence": "527ec750fd23fa16"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "D15_changed_principal",
+      "checks": {
+        "cleanroom_agrees": true,
+        "differs_from_base": true
+      },
+      "digests": {
+        "tool-runtime": "ece3019410fd48d0",
+        "ugence": "ece3019410fd48d0"
+      },
+      "expect": "different",
+      "passed": true
+    },
+    {
+      "case_id": "I01_raw_credential",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I02_unsupported_operation",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I03_ambiguous_target",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I04_malformed_identifier",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I05_bad_numeric",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I06_unknown_profile",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I07_unsupported_extension",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I08_missing_state_binding",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I13_profile_downgrade",
+      "checks": {
+        "fails_closed_both": true
+      },
+      "expect": "invalid",
+      "passed": true
+    },
+    {
+      "case_id": "I09_stale_db_state",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "cleanroom_agrees": true,
+        "comp_equiv": true,
+        "cp_class": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "governance",
+      "passed": true
+    },
+    {
+      "case_id": "I15_unbounded",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "cleanroom_agrees": true,
+        "comp_equiv": true,
+        "cp_class": true
+      },
+      "digests": {
+        "tool-runtime": "8237eb3094a3c6be",
+        "ugence": "8237eb3094a3c6be"
+      },
+      "expect": "deny",
+      "passed": true
+    },
+    {
+      "case_id": "D20_missing_simulation",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "cleanroom_agrees": true,
+        "comp_equiv": true,
+        "cp_class": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "governance",
+      "passed": true
+    },
+    {
+      "case_id": "I11_k8s_evidence_to_db",
+      "checks": {
+        "evidence_transfer_rejected": true
+      },
+      "expect": "invalid_transfer",
+      "passed": true
+    },
+    {
+      "case_id": "I12_db_evidence_to_k8s",
+      "checks": {
+        "evidence_transfer_rejected": true
+      },
+      "expect": "invalid_transfer",
+      "passed": true
+    },
+    {
+      "case_id": "I10_modified_after_approval",
+      "checks": {
+        "approval_replay_rejected": true
+      },
+      "expect": "invalid_transfer",
+      "passed": true
+    },
+    {
+      "case_id": "I14_direct_bypass",
+      "checks": {
+        "all_equal": true,
+        "bypass_prevented": true,
+        "cleanroom_agrees": true
+      },
+      "digests": {
+        "tool-runtime": "05ad2c021a6256a0",
+        "ugence": "05ad2c021a6256a0"
+      },
+      "expect": "equal",
+      "passed": true
+    }
+  ],
+  "cases_passed": 29,
+  "cases_total": 29,
+  "cer_version": "0.3",
+  "domain": "database.mutation.v1",
+  "metrics": {
+    "acp_equiv": 4,
+    "ag_equiv": 4,
+    "approval_replay_rejected": 1,
+    "bypass_prevented": 1,
+    "cleanroom_agreement": 17,
+    "comp_equiv": 4,
+    "cp_class_ok": 4,
+    "cross_profile_collisions": 0,
+    "deny_ok": 1,
+    "deny_total": 1,
+    "different_ok": 9,
+    "different_total": 9,
+    "equal_ok": 5,
+    "equal_total": 5,
+    "evidence_transfer_rejected": 3,
+    "evidence_transfer_total": 3,
+    "governance_ok": 2,
+    "governance_total": 2,
+    "invalid_ok": 9,
+    "invalid_total": 9,
+    "producer_agreement": 4,
+    "provenance_invariant": 4
+  },
+  "ownership_no_runtime_switch": true,
+  "producers": [
+    "ugence",
+    "tool-runtime"
+  ],
+  "regression_rollout_unchanged": true,
+  "regression_scale_unchanged": true
+}

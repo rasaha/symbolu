@@ -1,0 +1,121 @@
+{
+  "assessment": "the only in-set-exploitable hit is r15 (source 'physically-seen, outward-facing world') -> body, which is a pre-flagged SOURCE-INTRINSIC adjacency (deha uses this row), faithfully carried from the frozen lexicon, NOT introduced at packet authoring; no exact-name leak; no new lexical leakage.",
+  "broad_hits": [
+    {
+      "gloss_nbhd": "pain",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r04",
+      "term": "pain"
+    },
+    {
+      "gloss_nbhd": "happiness",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r04",
+      "term": "glad"
+    },
+    {
+      "gloss_nbhd": "union",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r05",
+      "term": "merge"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": false,
+      "pole": "binding",
+      "row": "r06",
+      "term": "physical"
+    },
+    {
+      "gloss_nbhd": "pain",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r06",
+      "term": "misery"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": false,
+      "pole": "binding",
+      "row": "r09",
+      "term": "outward"
+    },
+    {
+      "gloss_nbhd": "strength",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r09",
+      "term": "potent"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r10",
+      "term": "physical"
+    },
+    {
+      "gloss_nbhd": "fear",
+      "in_set_exploitable": false,
+      "pole": "binding",
+      "row": "r13",
+      "term": "anxious"
+    },
+    {
+      "gloss_nbhd": "fear",
+      "in_set_exploitable": false,
+      "pole": "liberating",
+      "row": "r13",
+      "term": "anxious"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "outward"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "visible"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "physical"
+    }
+  ],
+  "exact_candidate_name_hits": [],
+  "in_set_exploitable_hits": [
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "outward"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "visible"
+    },
+    {
+      "gloss_nbhd": "body",
+      "in_set_exploitable": true,
+      "pole": "binding",
+      "row": "r15",
+      "term": "physical"
+    }
+  ],
+  "method": "independent broad semantic-neighborhood scan (synonym/hypernym/hyponym/association) of every final paraphrase vs all 12 candidate glosses; a hit is EXPLOITABLE only if the gloss is an in-set candidate of a word using that consonant (a hit on a non-using word is only a distractor pull that lowers T)"
+}

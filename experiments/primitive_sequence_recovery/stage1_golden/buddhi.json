@@ -1,0 +1,146 @@
+{
+  "word_devanagari": "बुद्धि",
+  "normalized_devanagari": "बुद्धि",
+  "transliteration_iast": "buddhi",
+  "normalization": {
+    "form": "NFC",
+    "changed": false,
+    "notes": []
+  },
+  "aksharas": [
+    {
+      "index": 0,
+      "devanagari": "बु",
+      "translit": "bu",
+      "codepoints": [
+        "U+092C",
+        "U+0941"
+      ],
+      "source_span": [
+        0,
+        2
+      ],
+      "atomic_varna_indices": [
+        0,
+        1
+      ]
+    },
+    {
+      "index": 1,
+      "devanagari": "द्धि",
+      "translit": "ddhi",
+      "codepoints": [
+        "U+0926",
+        "U+094D",
+        "U+0927",
+        "U+093F"
+      ],
+      "source_span": [
+        2,
+        6
+      ],
+      "atomic_varna_indices": [
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "atomic_varnas": [
+    {
+      "index": 0,
+      "unit": "b",
+      "devanagari": "ब",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "onset",
+      "is_initial": true,
+      "is_final": false,
+      "source_akshara_index": 0
+    },
+    {
+      "index": 1,
+      "unit": "u",
+      "devanagari": "ु",
+      "type": "vowel",
+      "origin": "dependent_vowel_sign",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": false,
+      "orthographic_source": "dependent_vowel_sign",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 0
+    },
+    {
+      "index": 2,
+      "unit": "d",
+      "devanagari": "द",
+      "type": "consonant",
+      "origin": "virama_terminated",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "conjunct_constituent",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 1
+    },
+    {
+      "index": 3,
+      "unit": "dh",
+      "devanagari": "ध",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": true,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 1
+    },
+    {
+      "index": 4,
+      "unit": "i",
+      "devanagari": "ि",
+      "type": "vowel",
+      "origin": "dependent_vowel_sign",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": false,
+      "orthographic_source": "dependent_vowel_sign",
+      "position": "final",
+      "is_initial": false,
+      "is_final": true,
+      "source_akshara_index": 1
+    }
+  ],
+  "inherent_vowel_insertions": {
+    "count": 0,
+    "atomic_indices": []
+  },
+  "multiplicity": {
+    "varna_counts": {
+      "b": 1,
+      "u": 1,
+      "d": 1,
+      "dh": 1,
+      "i": 1
+    },
+    "geminations": []
+  },
+  "derived_noncanonical": {
+    "resolved_pronunciation_candidate": null
+  },
+  "warnings": [],
+  "parser_spec_version": "PARSER_SPEC_v1",
+  "schema_version": "1.1"
+}

@@ -1,0 +1,4804 @@
+{
+  "trials": [
+    {
+      "trial_id": "A_T001",
+      "packet": [
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "strength"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T002",
+      "packet": [
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T003",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T004",
+      "packet": [
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T005",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T006",
+      "packet": [
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T007",
+      "packet": [
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T008",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T009",
+      "packet": [
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        },
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T010",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T011",
+      "packet": [
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T012",
+      "packet": [
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T013",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T014",
+      "packet": [
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T015",
+      "packet": [
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        },
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T016",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T017",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T018",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T019",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "strength"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T020",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T021",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T022",
+      "packet": [
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "strength"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T023",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T024",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T025",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "strength"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T026",
+      "packet": [
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T027",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T028",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T029",
+      "packet": [
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        },
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T030",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T031",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T032",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "strength"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T033",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T034",
+      "packet": [
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T035",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T036",
+      "packet": [
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T037",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T038",
+      "packet": [
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T039",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T040",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T041",
+      "packet": [
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T042",
+      "packet": [
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T043",
+      "packet": [
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "strength"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T044",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T045",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "horse"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T046",
+      "packet": [
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        },
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "strength"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T047",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T048",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "horse"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "strength"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T049",
+      "packet": [
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        },
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T050",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "fear"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T051",
+      "packet": [
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "pain"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "cloud"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T052",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "strength"
+        },
+        {
+          "label": "W3",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "pain"
+        },
+        {
+          "label": "W6",
+          "gloss": "fear"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T053",
+      "packet": [
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "horse"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T054",
+      "packet": [
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "fear"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W4",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T055",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "strength"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "horse"
+        },
+        {
+          "label": "W6",
+          "gloss": "pain"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T056",
+      "packet": [
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "strength"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T057",
+      "packet": [
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "fear"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T058",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W2",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "pain"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "strength"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T059",
+      "packet": [
+        {
+          "binding": "a contingent unease that depends on shifting outside conditions",
+          "liberating": "a steady inner poise that does not depend on outside conditions"
+        },
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "strength"
+        },
+        {
+          "label": "W2",
+          "gloss": "pain"
+        },
+        {
+          "label": "W3",
+          "gloss": "horse"
+        },
+        {
+          "label": "W4",
+          "gloss": "fear"
+        },
+        {
+          "label": "W5",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W6",
+          "gloss": "elephant"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "A_T060",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "strength"
+        },
+        {
+          "label": "W2",
+          "gloss": "cloud"
+        },
+        {
+          "label": "W3",
+          "gloss": "pain"
+        },
+        {
+          "label": "W4",
+          "gloss": "elephant"
+        },
+        {
+          "label": "W5",
+          "gloss": "fear"
+        },
+        {
+          "label": "W6",
+          "gloss": "horse"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T001",
+      "packet": [
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T002",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T003",
+      "packet": [
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T004",
+      "packet": [
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T005",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T006",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T007",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T008",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T009",
+      "packet": [
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        },
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T010",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T011",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T012",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T013",
+      "packet": [
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T014",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T015",
+      "packet": [
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T016",
+      "packet": [
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T017",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T018",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T019",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T020",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T021",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T022",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T023",
+      "packet": [
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T024",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T025",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T026",
+      "packet": [
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T027",
+      "packet": [
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T028",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T029",
+      "packet": [
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        },
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T030",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T031",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T032",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T033",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T034",
+      "packet": [
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T035",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        },
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T036",
+      "packet": [
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T037",
+      "packet": [
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T038",
+      "packet": [
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        },
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T039",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        },
+        {
+          "binding": "a narrowing fixation that closes around one concern",
+          "liberating": "an open, unforced attention that stays broad"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T040",
+      "packet_metadata_only": {
+        "n_features": 3,
+        "length_band": "medium"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T041",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T042",
+      "packet": [
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T043",
+      "packet": [
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        },
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T044",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T045",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "seed"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T046",
+      "packet": [
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T047",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "a pull toward physical wanting — grasping for possessions, status, and renown",
+          "liberating": "physical wanting redirected upward, its grip on worldly objects released"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T048",
+      "packet": [
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "possessive mine-ness bounded to one's own — clinging to what is one's own while excluding the rest",
+          "liberating": "affection widened past its own boundaries into open-handed, universal care"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "seed"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T049",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a contingent unease that depends on shifting outside conditions",
+          "liberating": "a steady inner poise that does not depend on outside conditions"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T050",
+      "packet_metadata_only": {
+        "n_features": 2,
+        "length_band": "short"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "body"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T051",
+      "packet": [
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "salt"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "tree"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T052",
+      "packet": [
+        {
+          "binding": "harshness that harms the weak — crude, cruel thought and conduct",
+          "liberating": "protective kindness toward the vulnerable — the will to reduce another's hardship"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W3",
+          "gloss": "tree"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "salt"
+        },
+        {
+          "label": "W6",
+          "gloss": "body"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T053",
+      "packet": [
+        {
+          "binding": "clinging hope fixed on a particular outcome — a downward pull of attached wanting",
+          "liberating": "forward hope held loosely — acting while releasing the grip on the result"
+        },
+        {
+          "binding": "possessive acquisition — pursuing and gripping worldly aims as status or control",
+          "liberating": "purposeful action pursued without possessive clinging"
+        },
+        {
+          "binding": "a rigid over-holding — clinging to what one has, resisting movement toward the subtle",
+          "liberating": "resting firmly in one's true stance — a sustaining steadiness that keeps moving toward the subtle"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "seed"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T054",
+      "packet": [
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        },
+        {
+          "binding": "the sting of resentment at another's good fortune",
+          "liberating": "warm fellow-feeling that welcomes another's good fortune"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "body"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "union"
+        },
+        {
+          "label": "W4",
+          "gloss": "tree"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T055",
+      "packet": [
+        {
+          "binding": "wavering self-doubt that cannot commit — distrust of oneself and others",
+          "liberating": "steady self-reliance — the confidence to commit and to trust"
+        },
+        {
+          "binding": "a spellbound daze in which judgment is suspended under an overpowering fixation",
+          "liberating": "the daze broken into clear sense — the mind drawn back onto a steady path"
+        },
+        {
+          "binding": "fixation on the outward, visible surface of things",
+          "liberating": "an inner, subtle seeing that looks past the surface"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "seed"
+        },
+        {
+          "label": "W6",
+          "gloss": "salt"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T056",
+      "packet": [
+        {
+          "binding": "clarity or purity clung to as superiority — a subtle attachment to one's own attainment",
+          "liberating": "clear, unattached openness — clarity held without clinging to it"
+        },
+        {
+          "binding": "disregard for what genuinely matters — real worth left unattended through misplaced indifference",
+          "liberating": "attentive regard that recognizes and honors genuine worth"
+        },
+        {
+          "binding": "uneasy churning over unresolved what-ifs and personal consequences",
+          "liberating": "composed, impersonal reflection that holds a situation open without forcing an end"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "union"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T057",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "an inflated sense of sole doership — the swollen self claiming all agency",
+          "liberating": "acting effectively without claiming sole doership"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "body"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "union"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T058",
+      "packet": [
+        {
+          "binding": "reactive irritability — contrary offence taken and discharged at others",
+          "liberating": "an even temper that absorbs provocation without discharging it"
+        },
+        {
+          "binding": "indulgence given so much latitude that it runs to collapse",
+          "liberating": "disciplined restraint that keeps its form and contains the collapsing tendency"
+        },
+        {
+          "binding": "restless striving that cannot stop — effort compulsively driven outward",
+          "liberating": "purposeful effort that acts and then settles into alert repose"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "tree"
+        },
+        {
+          "label": "W2",
+          "gloss": "union"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "salt"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "happiness"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T059",
+      "packet": [
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a grasping tension that keeps reaching for more",
+          "liberating": "a settled sufficiency that no longer needs to reach"
+        },
+        {
+          "binding": "a reactive push discharged outward under pressure",
+          "liberating": "a contained composure that holds under pressure"
+        }
+      ],
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W2",
+          "gloss": "salt"
+        },
+        {
+          "label": "W3",
+          "gloss": "seed"
+        },
+        {
+          "label": "W4",
+          "gloss": "body"
+        },
+        {
+          "label": "W5",
+          "gloss": "tree"
+        },
+        {
+          "label": "W6",
+          "gloss": "union"
+        }
+      ],
+      "instruction": "One of the six options is the word this packet describes. Choose exactly one label."
+    },
+    {
+      "trial_id": "B_T060",
+      "packet_metadata_only": {
+        "n_features": 3,
+        "length_band": "medium"
+      },
+      "candidates": [
+        {
+          "label": "W1",
+          "gloss": "happiness"
+        },
+        {
+          "label": "W2",
+          "gloss": "tree"
+        },
+        {
+          "label": "W3",
+          "gloss": "salt"
+        },
+        {
+          "label": "W4",
+          "gloss": "union"
+        },
+        {
+          "label": "W5",
+          "gloss": "body"
+        },
+        {
+          "label": "W6",
+          "gloss": "seed"
+        }
+      ],
+      "instruction": "Only structural metadata is given (no descriptions). Choose exactly one label."
+    }
+  ]
+}

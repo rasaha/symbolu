@@ -1,0 +1,8 @@
+# FIXTURE — test-only, NOT for claims (far too few examples). Schema/loader exercise only.
+{"id": "c1", "prompt": "Q: 6 x 8 = ? A:", "expected": "48", "label": 1, "label_type": "correctness", "metadata": {}}
+{"id": "c2", "prompt": "Q: 7 x 9 = ? A:", "expected": "63", "label": 0, "label_type": "correctness", "metadata": {}}
+{"id": "f1", "prompt": "Reply with only YES or NO.", "expected": "YES", "label": 1, "label_type": "format_validity", "metadata": {}}
+{"id": "f2", "prompt": "Reply with only YES or NO.", "expected": "YES", "label": 0, "label_type": "format_validity", "metadata": {}}
+{"id": "k1", "prompt": "List exactly 3 fruits.", "expected": "3 lines", "label": 1, "label_type": "constraint_satisfaction", "metadata": {}}
+{"id": "g1", "prompt": "Summarize the passage.", "expected": "grounded", "label": 1, "label_type": "groundedness", "metadata": {}}
+{"id": "r1", "prompt": "If Tom has 5 and buys 3 more, how many?", "expected": "8", "label": 1, "label_type": "reasoning_correctness", "metadata": {}}

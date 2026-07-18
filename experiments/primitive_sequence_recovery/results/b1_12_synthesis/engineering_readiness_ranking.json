@@ -1,0 +1,63 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE — engineering readiness, NOT a truth ranking",
+  "basis": "pooled cross-evaluator agreement + resonance + no_relationship rate over V1 (54x2) and V2 (60x2) components; ranked by AGREEMENT/robustness, not absolute score (V1 and V2 used different frozen scale calibrations)",
+  "tier_1_high_confidence": {
+    "relationship_types": [
+      "no_relationship (cross-eval agreement 1.00 when shared — a trustworthy 'does-not-apply' signal)",
+      "opposition (agreement 0.79 when shared, 44 uses, avg resonance 55 — best substantive relationship)"
+    ],
+    "mappings_varna_n>=4": [
+      "d (peevishness/irritability; avg 52.5, cross-eval diff 5.0)",
+      "s (sattvic impulse; 51.8, diff 10.7)",
+      "v (over-holding/fixity; 40.6, diff 6.2)",
+      "y (avg 37.5, diff 8.3)"
+    ],
+    "use": "only where the bare word clearly OPPOSES an affliction mapping (virtue words) or clearly has NO relationship; both are the agreement-stable ends."
+  },
+  "tier_2_promising_but_evaluator_sensitive": {
+    "relationship_types": [
+      "implication (105 uses, lowest score variance, but agreement only 0.54 — reliable ONLY as a weak/low-signal indicator, not for magnitude)"
+    ],
+    "mappings_varna": [
+      "k (avg 41.7, diff 20.8)",
+      "r (41.1, 17.9)",
+      "t (41.1, 25.0)",
+      "n (31.9, 19.4)",
+      "p (30.7, 15.9)",
+      "m (35.7, 14.3)"
+    ],
+    "categories": [
+      "virtue_calm (avg 57.3) and afflictive (48.5) resonate strongly but have the LOWEST cross-eval agreement (afflictive exact 0.40) — high signal, high disagreement"
+    ],
+    "use": "surface as a tentative reflection with an explicit confidence caveat; do not act on magnitude."
+  },
+  "tier_3_experimental": {
+    "relationship_types": [
+      "characteristic_expression (agreement 0.40)",
+      "natural_consequence (0.0 when shared)",
+      "constitutive_property/embodiment/generation/regulation/resolution (too few uses)"
+    ],
+    "mappings_varna_low_power_n<=2": [
+      "g",
+      "ṣ",
+      "ṭ",
+      "bh",
+      "ś",
+      "ch",
+      "ṭh",
+      "c",
+      "b",
+      "ḍ",
+      "ṇ",
+      "dh",
+      "h",
+      "j",
+      "ṅ",
+      "gh"
+    ],
+    "categories": [
+      "concrete_object, animal_body_living, natural_action_abstract (low resonance; animal has the highest no_relationship rate 0.24)"
+    ],
+    "note": "the ego/ahaṃkāra-family mappings (j, ṅ, gh) drew UNANIMOUS no_relationship/0 on the (body-part) words carrying them — stable at zero, but n=1 each."
+  }
+}

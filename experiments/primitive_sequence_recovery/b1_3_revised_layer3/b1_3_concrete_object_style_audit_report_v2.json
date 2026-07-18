@@ -1,0 +1,109 @@
+{
+  "artifact": "b1_3_concrete_object_style_audit_report_v2",
+  "status": "AUDIT_COMPLETE_PRE_FREEZE",
+  "evidence": false,
+  "version": 2,
+  "generation_seed": "b1_3_concrete_object_stimgen_v2",
+  "global_register_polish": "reducer returns ONLY an in-band (4..8) plain-English token or None; NO out-of-band fallback; None -> caller backfills from the all-in-band global pool. Applied uniformly to every arm. Fixes 'garrulous' and any over-band fallback.",
+  "n_stimuli_records": 371,
+  "n_targets": 53,
+  "comparisons": [
+    "A_real_vs_R_deranged_mid",
+    "A_real_vs_R_deranged_far",
+    "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled",
+    "A_real_vs_R_random",
+    "A_real_vs_X_neutral",
+    "A_real_vs_semantic_only_baseline"
+  ],
+  "style_parity_audit": {
+    "all_options_4_tags": true,
+    "tag_count_distribution": {
+      "4": 742
+    },
+    "mean_abs_charlen_diff": 1.871,
+    "max_abs_charlen_diff": 9,
+    "mean_abs_tag_len_diff": 0.468,
+    "identical_syntax_template": true,
+    "pass": true
+  },
+  "style_tell_audit": {
+    "method": "mechanical leave-one-out nearest-centroid on FORMAT features [char_len, mean_tag_len] only (not content/fit)",
+    "balanced_accuracy": 0.5318,
+    "tpr_a_real": 0.566,
+    "tnr_other": 0.4977,
+    "n_a_real": 53,
+    "n_other": 213,
+    "threshold_draft": 0.55,
+    "pass": true,
+    "note": "this is the pre-judge style-tell gate, NOT the evidence judge (fit-to-object) task"
+  },
+  "denotation_leakage_audit": {
+    "option_repeats_target": 0,
+    "option_uses_target_synonym": 0,
+    "pass": true
+  },
+  "quality_parity_audit": {
+    "empty_tags": 0,
+    "nonascii_or_garbage": 0,
+    "within_option_duplicate_tags": 0,
+    "sanskrit_or_varna_tokens": 0,
+    "all_render_ok": true,
+    "pass": true
+  },
+  "semantic_baseline_audit": {
+    "present_for_every_primary_item": true,
+    "same_4_tag_format": true,
+    "no_varna_input": true,
+    "separated_from_X_neutral": true,
+    "not_used_as_A_real_or_control": true,
+    "pass": true
+  },
+  "forbidden_token_scan": {
+    "sanskrit_tokens": [],
+    "over_band_tokens": [],
+    "band": [
+      4,
+      8
+    ],
+    "n_sanskrit": 0,
+    "n_over_band": 0,
+    "distinct_over_band": [],
+    "pass": true
+  },
+  "duplicate_tag_scan": {
+    "options_with_duplicates": 0,
+    "pass": true
+  },
+  "tag_length_parity_by_arm": {
+    "per_arm_mean_tag_len": {
+      "R_deranged_mid": 5.373,
+      "A_real": 5.288,
+      "R_deranged_far": 5.193,
+      "R_deranged_near": 5.288,
+      "R_scrambled": 5.288,
+      "R_random": 5.368,
+      "X_neutral": 5.75,
+      "semantic_only_baseline": 5.642
+    },
+    "max_minus_min": 0.557,
+    "pass": true
+  },
+  "overall_audit_pass": true,
+  "decision": "GLOBAL_REGISTER_POLISH_PASS_READY_FOR_FREEZE_REVIEW",
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "evidence_freeze_declared": false,
+  "supersedes": "b1_3_concrete_object_final_stimuli_draft.jsonl (v1; preserved as previous draft)",
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "draft stimuli + mechanical audits only",
+    "not evidence",
+    "no evidence judge run",
+    "no positive label earned"
+  ]
+}

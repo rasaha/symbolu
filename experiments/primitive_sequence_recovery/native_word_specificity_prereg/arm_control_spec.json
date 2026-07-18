@@ -1,0 +1,17 @@
+{
+  "arms": {
+    "T_true": "the correct frozen packet for the target word",
+    "X_cross_word_mismatch": "a packet from another word in the SAME six-word set, assigned by a frozen derangement (seed 20260901)",
+    "S_scrambled_order": "the correct packet's rows in a permuted order (membership preserved); informative only for >1-consonant words; NOT overinterpreted for disjoint Set A",
+    "R_random_varna_assignment": "structure-preserving randomized consonant→row assignment; preserve feature count, consonant-class distribution where possible, marginal pole-gloss valence, frequency band; K=200 frozen randomizations (seed 20260902)",
+    "G_generic_matched": "a generic packet matched for feature count, gloss length, valence, formatting; not tied to any word (seed 20260903)",
+    "F_feature_only": "structural metadata only (feature count / frequency class), NO semantic rows — estimates the shortcut ceiling",
+    "O_order_ablation_optional": "bag-of-consonants vs ordered sequence; only if the renderer preserves order meaningfully; SECONDARY"
+  },
+  "control_arms_in_primary_contrast": [
+    "X_cross_word_mismatch",
+    "R_random_varna_assignment",
+    "G_generic_matched",
+    "F_feature_only"
+  ]
+}

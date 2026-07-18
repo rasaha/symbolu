@@ -1,0 +1,13 @@
+{
+  "artifact": "g_manifest",
+  "status": "STOP_NOW_G_IMPLEMENTATION_BLOCKED",
+  "evidence": false,
+  "stop_now_flags": [
+    "R3_STYLE_TELL_FAILED"
+  ],
+  "reason": "hard gate(s) failed after build",
+  "not_frozen": true,
+  "not_run_for_evidence": true,
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED"
+}

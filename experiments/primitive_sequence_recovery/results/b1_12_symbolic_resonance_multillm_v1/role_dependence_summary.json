@@ -1,0 +1,40 @@
+{
+  "role_dependence": "SIGNIFICANT_ROLE_DEPENDENCE",
+  "profile_agreement": {
+    "material_disagreements": 4,
+    "rows": [
+      {"word": "bhūmi", "similarity": 1.0, "agreement": "same"},
+      {"word": "bāhu", "similarity": 1.0, "agreement": "same"},
+      {"word": "droha", "similarity": 1.0, "agreement": "same"},
+      {"word": "dīpa", "similarity": 1.0, "agreement": "same"},
+      {"word": "garva", "similarity": 1.0, "agreement": "same"},
+      {"word": "kapaṭa", "similarity": 0.333, "agreement": "minor_difference"},
+      {"word": "kleśa", "similarity": 1.0, "agreement": "same"},
+      {"word": "kāka", "similarity": 1.0, "agreement": "same"},
+      {"word": "mayūra", "similarity": 0.5, "agreement": "minor_difference"},
+      {"word": "naukā", "similarity": 0.2, "agreement": "material_difference"},
+      {"word": "nāsā", "similarity": 1.0, "agreement": "same"},
+      {"word": "prema", "similarity": 1.0, "agreement": "same"},
+      {"word": "pāṭha", "similarity": 0.167, "agreement": "material_difference"},
+      {"word": "rūpa", "similarity": 0.143, "agreement": "material_difference"},
+      {"word": "santoṣa", "similarity": 1.0, "agreement": "same"},
+      {"word": "setu", "similarity": 1.0, "agreement": "same"},
+      {"word": "sneha", "similarity": 1.0, "agreement": "same"},
+      {"word": "snāna", "similarity": 1.0, "agreement": "same"},
+      {"word": "titikṣā", "similarity": 0.111, "agreement": "material_difference"},
+      {"word": "vastra", "similarity": 1.0, "agreement": "same"}
+    ]
+  },
+  "component_summary": {
+    "n_components": 54,
+    "exact_agreement": 0.5,
+    "within_one_step_agreement": 0.944,
+    "mean_abs_diff": 13.89,
+    "median_abs_diff": 12.5,
+    "signed_mean_diff_A_minus_B": -11.11
+  },
+  "verdict_summary": {
+    "exact_verdict_agreement": 0.5,
+    "evaluator_sensitive_words": ["dīpa", "kāka", "nāsā", "pāṭha"]
+  }
+}

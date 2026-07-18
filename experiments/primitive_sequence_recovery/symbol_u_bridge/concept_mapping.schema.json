@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symbol_u/concept_mapping.schema.json",
+  "title": "Symbol-U Concern -> Sanskrit Concept Mapping",
+  "description": "Frozen, versioned, table-driven mapping from each canonical concern id to one canonical Sanskrit concept word. Purely deterministic: no free generation. When multiple candidate concepts exist, a deterministic selection rule picks the canonical one.",
+  "type": "object",
+  "required": ["schema_version", "mapping_sha256", "concern_ontology_sha256", "selection_rule", "entries"],
+  "properties": {
+    "schema_version": {"const": "concept_mapping_v1"},
+    "mapping_sha256": {"type": "string"},
+    "concern_ontology_sha256": {"type": "string", "description": "the exact concern ontology this table is bound to"},
+    "selection_rule": {"type": "string",
+      "description": "deterministic rule to pick the canonical concept when >1 candidate: 1) prefer entry with rank=1; 2) tie-break by highest Tier-1 varna coverage; 3) tie-break by ascending IAST codepoint. Frozen."},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concern_id", "canonical_concept", "candidates"],
+        "additionalProperties": false,
+        "properties": {
+          "concern_id": {"type": "string", "pattern": "^C[0-9]{4}$"},
+          "canonical_concept": {
+            "type": "object",
+            "required": ["iast", "devanagari"],
+            "properties": {
+              "iast": {"type": "string"},
+              "devanagari": {"type": "string"},
+              "gloss": {"type": "string", "description": "ordinary meaning of the Sanskrit word (NOT a varna mapping)"}
+            }
+          },
+          "candidates": {
+            "type": "array", "minItems": 1,
+            "description": "all attested candidate concepts considered, with the deterministic rank used by selection_rule",
+            "items": {
+              "type": "object",
+              "required": ["iast", "devanagari", "rank"],
+              "properties": {
+                "iast": {"type": "string"}, "devanagari": {"type": "string"},
+                "rank": {"type": "integer", "minimum": 1},
+                "note": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

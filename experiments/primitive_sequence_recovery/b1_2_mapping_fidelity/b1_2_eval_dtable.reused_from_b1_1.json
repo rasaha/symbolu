@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "artifact": "b1_eval_dtable",
+    "note": "D-arm dictionary table transcribed VERBATIM from TRACK_B_B0_D_ARM_DICTIONARY_TABLE.md (bcb604e). Senses/synonyms unchanged — this is a loadable copy, not a re-authoring. Dictionary-only (no resonance/varṇa/Sanskrit/ontology). DRY-RUN input; NOT a frozen B0 package.",
+    "source": "TRACK_B_B0_D_ARM_DICTIONARY_TABLE.md (bcb604e)",
+    "core_format": "{word} — {gloss}; related senses: {synonyms}",
+    "frozen": false
+  },
+  "entries": {
+    "grief":      {"gloss": "deep sorrow after loss", "synonyms": ["sorrow", "mourning", "sadness", "bereavement"]},
+    "courage":    {"gloss": "the willingness to face fear or danger", "synonyms": ["bravery", "valor", "boldness", "fortitude"]},
+    "patience":   {"gloss": "calm tolerance of delay or difficulty", "synonyms": ["forbearance", "endurance", "tolerance", "composure"]},
+    "justice":    {"gloss": "fair treatment according to what is right", "synonyms": ["fairness", "equity", "impartiality", "righteousness"]},
+    "silence":    {"gloss": "the absence of sound", "synonyms": ["quiet", "stillness", "hush", "calm"]},
+    "mountain":   {"gloss": "a large natural elevation of land", "synonyms": ["peak", "summit", "height", "ridge"]},
+    "river":      {"gloss": "a large natural stream of flowing water", "synonyms": ["stream", "waterway", "current", "watercourse"]},
+    "music":      {"gloss": "arranged sound expressing feeling or ideas", "synonyms": ["melody", "tune", "harmony", "song"]},
+    "friendship": {"gloss": "a bond of mutual affection between people", "synonyms": ["companionship", "camaraderie", "fellowship", "closeness"]},
+    "teacher":    {"gloss": "a person who helps others learn", "synonyms": ["instructor", "educator", "tutor", "mentor"]},
+    "shadow":     {"gloss": "a dark shape cast by blocking light", "synonyms": ["shade", "silhouette", "darkness", "outline"]},
+    "freedom":    {"gloss": "the state of acting without constraint", "synonyms": ["liberty", "independence", "autonomy", "latitude"]},
+    "honesty":    {"gloss": "truthfulness and sincerity in conduct", "synonyms": ["truthfulness", "sincerity", "candor", "frankness"]},
+    "empathy":    {"gloss": "the ability to share another's feelings", "synonyms": ["compassion", "understanding", "sensitivity", "sympathy"]},
+    "ocean":      {"gloss": "a vast expanse of salt water", "synonyms": ["sea", "deep", "waters", "brine"]},
+    "envy":       {"gloss": "resentful longing for what another has", "synonyms": ["jealousy", "covetousness", "resentment", "begrudging"]},
+    "order":      {"gloss": "a state of arrangement or organization", "synonyms": ["arrangement", "orderliness", "structure", "sequence"]},
+    "integrity":  {"gloss": "firm adherence to moral principle", "synonyms": ["uprightness", "probity", "rectitude", "honor"]},
+    "autumn":     {"gloss": "the season between summer and winter", "synonyms": ["fall", "harvest season", "autumntime"]},
+    "echo":       {"gloss": "a sound reflected back to the listener", "synonyms": ["reverberation", "reflection", "repetition", "ring"]},
+    "amoral":     {"gloss": "not concerned with right or wrong", "synonyms": ["nonmoral", "unprincipled", "indifferent", "ethically neutral"]},
+    "apathy":     {"gloss": "a lack of interest or feeling", "synonyms": ["indifference", "unconcern", "detachment", "listlessness"]},
+    "asymmetry":  {"gloss": "a lack of balance between parts", "synonyms": ["imbalance", "irregularity", "unevenness", "disproportion"]},
+    "anarchy":    {"gloss": "the absence of government or order", "synonyms": ["disorder", "lawlessness", "chaos", "misrule"]},
+    "anonymity":  {"gloss": "the state of being unnamed or unknown", "synonyms": ["namelessness", "obscurity", "concealment", "unidentifiability"]}
+  }
+}

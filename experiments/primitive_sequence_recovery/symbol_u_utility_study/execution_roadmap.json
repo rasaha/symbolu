@@ -1,0 +1,13 @@
+{
+  "schema": "symbol_u_utility_execution_roadmap_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "note": "Roadmap only. This preregistration authorizes no runs. Prompts, model wiring, and judging harness are out of scope here and are built later against these frozen contracts.",
+  "milestones": [
+    {"m": 1, "name": "Freeze the scenario set", "deliverable": "~50 scenarios conforming to scenario.schema.json, balanced across the frozen ontology, hash-frozen BEFORE any arm runs; concern IDs + expected_bridge_output locked."},
+    {"m": 2, "name": "Freeze the four arms + model control", "deliverable": "arm definitions with identical model/temperature/context/token-budget/stopping/system-prompt-except-symbolic-modules; symbolic modules referenced by the frozen bridge hashes."},
+    {"m": 3, "name": "Generate responses", "deliverable": "4 responses per scenario (A/B/C/D), deterministic decoding, logged verbatim; arm labels sealed."},
+    {"m": 4, "name": "Blind judging", "deliverable": "randomized-order, arm-blind judgments (LLM judges; optional human) per metrics.schema.json + judge.schema.json; sealed arm key."},
+    {"m": 5, "name": "Unblind + analyze", "deliverable": "nested contrasts B-A, C-B, D-C (+ H4) per analysis_plan.json; IRR; blinding-integrity; engineering success/failure verdict."},
+    {"m": 6, "name": "Report", "deliverable": "utility study report; every contrast reported incl. nulls/failures; limitations restated."}
+  ]
+}

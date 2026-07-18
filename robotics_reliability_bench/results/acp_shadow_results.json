@@ -1,0 +1,482 @@
+{
+  "shadow_only": true,
+  "n_classify": 14,
+  "records": [
+    {
+      "call_site": "deliberative",
+      "world_state_identity": "928a09287e44270cd8ed5c1b6bc4e53ea15dadd5b6d8ef98d93161f317ada061",
+      "candidate_identities": [
+        "fb2dd4f170d2365180f76b5c6fa213156a82206d0bb69ca5ab1ec1b9629ef68b",
+        "159aac5450879430d154d503364784ac29e7e374e2179df1599418c4b41295ec"
+      ],
+      "bcvf_selected_candidate": "move",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "move",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 97.577
+    },
+    {
+      "call_site": "deliberative",
+      "world_state_identity": "218e1aa96b70467fdae8ecc9f7e85517e9398821c4f50a7b3b681fe061e5aced",
+      "candidate_identities": [
+        "7dd4d668ec717f25935fa6f4e6c11ffd9bd89de2a2c405d63f5ac0256ab95e2d",
+        "4340ce2c01065e7bafb36a5b6c4deaf24a830557af433196475103096f8a8b1a"
+      ],
+      "bcvf_selected_candidate": "move",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "wait",
+      "acp_rejected": [
+        [
+          "move",
+          "OBSTACLE_CLEARANCE"
+        ]
+      ],
+      "dispositive_reasons": [
+        "OBSTACLE_CLEARANCE"
+      ],
+      "bcvf_selected_inadmissible": true,
+      "bcvf_inadmissible_reason": "OBSTACLE_CLEARANCE",
+      "bcvf_inadmissible_kind": "REAL_VIOLATION",
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "BCVF_SELECTED_INADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 78.578
+    },
+    {
+      "call_site": "deliberative",
+      "world_state_identity": "92379ea11d5936eddf6533fea43564e626f02d6ab7978867bfc3a5be857aabd4",
+      "candidate_identities": [
+        "645939ff738687211fdacf67f37a70c9884c6c19abc3349d00599624c454a068",
+        "46441b7ceb17f68b4b7602eb0be1b6ccb4dd2eed3adf89da7004a4df8a733dbc"
+      ],
+      "bcvf_selected_candidate": "move",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "wait",
+      "acp_rejected": [
+        [
+          "move",
+          "MISSING_min_obstacle_distance_m"
+        ]
+      ],
+      "dispositive_reasons": [
+        "MISSING_min_obstacle_distance_m"
+      ],
+      "bcvf_selected_inadmissible": true,
+      "bcvf_inadmissible_reason": "MISSING_min_obstacle_distance_m",
+      "bcvf_inadmissible_kind": "UNEVALUABLE",
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [
+        "MISSING_min_obstacle_distance_m"
+      ],
+      "shadow_class": "BCVF_SELECTED_INADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 70.951
+    },
+    {
+      "call_site": "deliberative",
+      "world_state_identity": "1406910043e7cfa66d0ecb5eb551b9155126f13106acdcce76c7a9c97931079b",
+      "candidate_identities": [
+        "4adb0c04a3996de0a295dbe4150a550dcca99ea35872b1c1c9be473f8cf791d2",
+        "de884b27a210be52b00a76224f6ede196be9fbd05695e45635c1e73139869546"
+      ],
+      "bcvf_selected_candidate": "grasp",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "wait",
+      "acp_rejected": [
+        [
+          "grasp",
+          "NO_HARD_EVIDENCE"
+        ]
+      ],
+      "dispositive_reasons": [
+        "NO_HARD_EVIDENCE"
+      ],
+      "bcvf_selected_inadmissible": true,
+      "bcvf_inadmissible_reason": "NO_HARD_EVIDENCE",
+      "bcvf_inadmissible_kind": "UNEVALUABLE",
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "BCVF_SELECTED_INADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 62.48
+    },
+    {
+      "call_site": "deliberative",
+      "world_state_identity": "df4eabcd2da278a4f647ade35bea3525f8036df52e68e5a04b5788e1de9fa214",
+      "candidate_identities": [
+        "c900b79af14e198d61e7e2f9dd8daf857c22e3930f289cc92df2d373c415d533"
+      ],
+      "bcvf_selected_candidate": "wait",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "wait",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 60.026
+    },
+    {
+      "call_site": "conflict_resolution",
+      "world_state_identity": "a6fb3f094d756236f987c6b11d149354361bcff7e7dbbc2399727af6655fc101",
+      "candidate_identities": [
+        "e5d2eb72aab8b70ab55bc828f2162465b4b32615cce2baccfdd8bec8ca5e3065",
+        "9d41fbd308c1506637a790713e3456ecd4d34bdb1f94bbcf6164328f032193ed",
+        "cffca21037da6cf8b299a36663b4ce1244c0a0ce917a212870e725af047cda50"
+      ],
+      "bcvf_selected_candidate": "RESOURCE",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "MUTUAL_STOP",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "DIFFERENT_BOTH_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 71.179
+    },
+    {
+      "call_site": "conflict_resolution",
+      "world_state_identity": "984b8ec3397a4775a4d47c5d9d6b29f7c769b1da03da4939a5d7c78d6a35d0a2",
+      "candidate_identities": [
+        "7f215fb6b983a1fc392b7440e898c19f32352a4c68b3ddc1558a0dc2fbf89c07",
+        "b0d38a513920942dccea9b948166e0a1ba62730c278e0b796a683f07039c2c50"
+      ],
+      "bcvf_selected_candidate": "RISKY",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "SPATIAL",
+      "acp_rejected": [
+        [
+          "RISKY",
+          "SAFETY_SCORE_BELOW_FLOOR"
+        ]
+      ],
+      "dispositive_reasons": [
+        "SAFETY_SCORE_BELOW_FLOOR"
+      ],
+      "bcvf_selected_inadmissible": true,
+      "bcvf_inadmissible_reason": "SAFETY_SCORE_BELOW_FLOOR",
+      "bcvf_inadmissible_kind": "REAL_VIOLATION",
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "BCVF_SELECTED_INADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 69.771
+    },
+    {
+      "call_site": "conflict_resolution",
+      "world_state_identity": "1fa6c71b276439d4812b8bd00cd7d096ad19fc425755c820da66399e3c1f199a",
+      "candidate_identities": [
+        "347b56ae8653e2676dd50dacac66f3cda6c4fd6942364e953e08c41e81d501f5",
+        "a5667c3f7f9b69827713d978588b6b5255f44ef341b245028b391bc9a2f6c5c8"
+      ],
+      "bcvf_selected_candidate": "RESOURCE",
+      "acp_outcome": "NO_SAFE_ACTION",
+      "acp_selected_candidate": null,
+      "acp_rejected": [
+        [
+          "YIELD",
+          "SAFETY_SCORE_BELOW_FLOOR"
+        ],
+        [
+          "RESOURCE",
+          "SAFETY_SCORE_BELOW_FLOOR"
+        ]
+      ],
+      "dispositive_reasons": [
+        "SAFETY_SCORE_BELOW_FLOOR",
+        "SAFETY_SCORE_BELOW_FLOOR"
+      ],
+      "bcvf_selected_inadmissible": true,
+      "bcvf_inadmissible_reason": "SAFETY_SCORE_BELOW_FLOOR",
+      "bcvf_inadmissible_kind": "REAL_VIOLATION",
+      "acp_no_safe_action": true,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "BCVF_SELECTED_INADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 48.606
+    },
+    {
+      "call_site": "conflict_resolution",
+      "world_state_identity": "b355fbfcacfa44b86ea09a47e603c611f47fd62994dde2ec65ad74550026ee1e",
+      "candidate_identities": [
+        "c32463bf87485e4faeb5e2a81064a788549af6f17ca6c0d17bd7e3e029f5189c"
+      ],
+      "bcvf_selected_candidate": "MUTUAL_STOP",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "MUTUAL_STOP",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 67.661
+    },
+    {
+      "call_site": "conflict_resolution",
+      "world_state_identity": "0ad6888f69b7e981e1d8b56029115265568c3eb1aca1fb599b25800ae8b403c8",
+      "candidate_identities": [
+        "1f6276bfa773b96a52652599438c962ff9608db58422edb0488e1a4a1940ac98",
+        "8078bb0e787206b6a2d4d4589a7570d15c4e1f83c9118e1ea610ee7d8f95bbf6"
+      ],
+      "bcvf_selected_candidate": "A",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "A",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 90.058
+    },
+    {
+      "call_site": "task_allocation",
+      "world_state_identity": "28ade7bea6b88f4b46904f32b1166990d12c46575b1bfedfb402280eb70771cb",
+      "candidate_identities": [
+        "0ef990c8ee101293ed332fc235f240b1e659f5260ad54c4f2c400631c504b9ab",
+        "b1e4d1c98da6634a9f1bbff043038f63a5f329dfc2fc67ad289ece3c1e8cd2dc"
+      ],
+      "bcvf_selected_candidate": "r_close",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "r_close",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 94.678
+    },
+    {
+      "call_site": "task_allocation",
+      "world_state_identity": "cc4ec2de40249bca9bad71bc6901f1d090a641029e05c7d7346f904e5784dbf0",
+      "candidate_identities": [
+        "16906783b22017e96bb5eca49e6c378a6ef1f6800535ea78bca5744c111676c9",
+        "d7f75fefdd3bc10bcd7be099c6ebc83c0d5d22979ca8419c940ac2779c39eb8b"
+      ],
+      "bcvf_selected_candidate": "r_b",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "r_a",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": false,
+      "missing_evidence": [],
+      "shadow_class": "DIFFERENT_BOTH_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 68.486
+    },
+    {
+      "call_site": "task_allocation",
+      "world_state_identity": "85b1a3973ffccf68ead1216097d4a665deb8dbc69e2a4498f6a4944e5e0bf374",
+      "candidate_identities": [
+        "7da6cb34c52c9af92e318951193d410d76c40d51f502246f60f1a492211bf51a",
+        "2655fc902408bedebd1d3f88abe5ffe9b943e8e1dc319724c8953771fbd98c83"
+      ],
+      "bcvf_selected_candidate": "r_ok",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "r_ok",
+      "acp_rejected": [
+        [
+          "r_lowcap",
+          "CAPABILITY_BELOW_FLOOR"
+        ]
+      ],
+      "dispositive_reasons": [
+        "CAPABILITY_BELOW_FLOOR"
+      ],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 82.168
+    },
+    {
+      "call_site": "task_allocation",
+      "world_state_identity": "0c4dd75c8ddcf622b77f3b1e9c32947cbec0d3b85bad26ee2e1b3e2715b3d051",
+      "candidate_identities": [
+        "afd47513f19111097b45f9cb262a0d00c7ca8b97e915cae27cf28315c5b8a52c",
+        "dcbdf0d39454fef8b1feb1f93eb97d54711b15bdd6439d24cf4360de77bc2907"
+      ],
+      "bcvf_selected_candidate": "r_a",
+      "acp_outcome": "EXECUTE",
+      "acp_selected_candidate": "r_a",
+      "acp_rejected": [],
+      "dispositive_reasons": [],
+      "bcvf_selected_inadmissible": false,
+      "bcvf_inadmissible_reason": null,
+      "bcvf_inadmissible_kind": null,
+      "acp_no_safe_action": false,
+      "both_selected_same": true,
+      "missing_evidence": [],
+      "shadow_class": "AGREE_ADMISSIBLE",
+      "shadow_only": true,
+      "latency_us": 68.539
+    }
+  ],
+  "authorization": [
+    {
+      "scenario": "AUTH_stale_world",
+      "mutate": "world",
+      "revalidation_rejected": true,
+      "error": "StaleAuthorizationError",
+      "shadow_only": true
+    },
+    {
+      "scenario": "AUTH_modified_candidate",
+      "mutate": "candidate",
+      "revalidation_rejected": true,
+      "error": "AuthorizationBindingError",
+      "shadow_only": true
+    }
+  ],
+  "metrics": {
+    "overall": {
+      "n_sets": 14,
+      "evaluable_pct": 100.0,
+      "agreement_rate": 0.5,
+      "bcvf_selected_inadmissible_rate": 0.357,
+      "bcvf_inadmissible_real_violation": 3,
+      "bcvf_inadmissible_unevaluable": 2,
+      "acp_no_safe_action_rate": 0.071,
+      "insufficient_evidence_sets": 1,
+      "both_admissible_disagree_rate": 0.143,
+      "class_breakdown": {
+        "AGREE_ADMISSIBLE": 7,
+        "BCVF_SELECTED_INADMISSIBLE": 5,
+        "DIFFERENT_BOTH_ADMISSIBLE": 2
+      },
+      "hard_constraint_rejections": {
+        "OBSTACLE_CLEARANCE": 1,
+        "MISSING_min_obstacle_distance_m": 1,
+        "NO_HARD_EVIDENCE": 1,
+        "SAFETY_SCORE_BELOW_FLOOR": 3,
+        "CAPABILITY_BELOW_FLOOR": 1
+      },
+      "candidates_surviving_total": 20,
+      "tie_break_sets": 6,
+      "missing_evidence_sets": 1,
+      "mean_latency_us": 73.63
+    },
+    "per_call_site": {
+      "deliberative": {
+        "n_sets": 5,
+        "evaluable_pct": 100.0,
+        "agreement_rate": 0.4,
+        "bcvf_selected_inadmissible_rate": 0.6,
+        "bcvf_inadmissible_real_violation": 1,
+        "bcvf_inadmissible_unevaluable": 2,
+        "acp_no_safe_action_rate": 0.0,
+        "insufficient_evidence_sets": 1,
+        "both_admissible_disagree_rate": 0.0,
+        "class_breakdown": {
+          "AGREE_ADMISSIBLE": 2,
+          "BCVF_SELECTED_INADMISSIBLE": 3
+        },
+        "hard_constraint_rejections": {
+          "OBSTACLE_CLEARANCE": 1,
+          "MISSING_min_obstacle_distance_m": 1,
+          "NO_HARD_EVIDENCE": 1
+        },
+        "candidates_surviving_total": 6,
+        "tie_break_sets": 1,
+        "missing_evidence_sets": 1,
+        "mean_latency_us": 73.92
+      },
+      "conflict_resolution": {
+        "n_sets": 5,
+        "evaluable_pct": 100.0,
+        "agreement_rate": 0.4,
+        "bcvf_selected_inadmissible_rate": 0.4,
+        "bcvf_inadmissible_real_violation": 2,
+        "bcvf_inadmissible_unevaluable": 0,
+        "acp_no_safe_action_rate": 0.2,
+        "insufficient_evidence_sets": 0,
+        "both_admissible_disagree_rate": 0.2,
+        "class_breakdown": {
+          "DIFFERENT_BOTH_ADMISSIBLE": 1,
+          "BCVF_SELECTED_INADMISSIBLE": 2,
+          "AGREE_ADMISSIBLE": 2
+        },
+        "hard_constraint_rejections": {
+          "SAFETY_SCORE_BELOW_FLOOR": 3
+        },
+        "candidates_surviving_total": 7,
+        "tie_break_sets": 2,
+        "missing_evidence_sets": 0,
+        "mean_latency_us": 69.46
+      },
+      "task_allocation": {
+        "n_sets": 4,
+        "evaluable_pct": 100.0,
+        "agreement_rate": 0.75,
+        "bcvf_selected_inadmissible_rate": 0.0,
+        "bcvf_inadmissible_real_violation": 0,
+        "bcvf_inadmissible_unevaluable": 0,
+        "acp_no_safe_action_rate": 0.0,
+        "insufficient_evidence_sets": 0,
+        "both_admissible_disagree_rate": 0.25,
+        "class_breakdown": {
+          "AGREE_ADMISSIBLE": 3,
+          "DIFFERENT_BOTH_ADMISSIBLE": 1
+        },
+        "hard_constraint_rejections": {
+          "CAPABILITY_BELOW_FLOOR": 1
+        },
+        "candidates_surviving_total": 7,
+        "tie_break_sets": 3,
+        "missing_evidence_sets": 0,
+        "mean_latency_us": 78.47
+      }
+    },
+    "deterministic_rerun_identity_pct": 100.0,
+    "authorization_all_rejected": true,
+    "adapter_failure_rate": 0.0,
+    "current_runtime_behavior_change_count": 0
+  }
+}

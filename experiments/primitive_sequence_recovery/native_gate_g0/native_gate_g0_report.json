@@ -1,0 +1,140 @@
+{
+  "artifact_type": "native_gate_g0_recompute",
+  "not_a_polarity_test": true,
+  "packet_source": "frozen/varna_native_stage1_merged_v1.json :: CONFIRMATORY_BACKBONE consonants only",
+  "old_gate": {
+    "criteria": "K=6; per-word >=1 unique discriminating facet; max facet-Jaccard <= 0.34; mean <= 0.20; no best-effort set; caps not relaxed",
+    "why_failed": "facet render map covered ONLY 11 varṇas; 21/37 candidates invalid; no size-6 subset had per-word unique facet (ra alone in 9/16 valid words)",
+    "old_renderable_units": 11,
+    "old_status": "G0_NOT_TESTABLE_WITH_CURRENT_PROSE_PACKETS",
+    "preserved": "K, Jaccard caps, per-word-uniqueness, no-cap-relaxation, exhaustive-pool enumeration, facet↔varṇa bijection (Jaccard on consonant sets == facet-Jaccard)",
+    "revised": "substrate = native Devanāgarī consonant backbone (33 confirmatory units, not 11 rendered); added strengthened controls C5/C6 length-non-identifying, C8 same-valence, C10 rare-only flag"
+  },
+  "native_renderable_units": 33,
+  "old_blocker_removed": true,
+  "constants": {
+    "K": 6,
+    "MAX_JACCARD_CAP": 0.34,
+    "MEAN_JACCARD_CAP": 0.2,
+    "POOL_SIZE": 20,
+    "cons_len_range": [
+      2,
+      4
+    ]
+  },
+  "n_eligible_candidates": 107,
+  "n_core_pool": 20,
+  "core_pool": [
+    "bīja",
+    "phala",
+    "bala",
+    "lobha",
+    "khaḍga",
+    "bhaya",
+    "puṣpa",
+    "yajña",
+    "khaga",
+    "jala",
+    "kāṣṭha",
+    "gṛha",
+    "gaja",
+    "duḥkha",
+    "aśva",
+    "puṇya",
+    "sukha",
+    "jñāna",
+    "kṣudhā",
+    "megha"
+  ],
+  "n_eligible_sets": 17009,
+  "selected_set": {
+    "words": [
+      "aśva",
+      "bala",
+      "bhaya",
+      "duḥkha",
+      "gaja",
+      "megha"
+    ],
+    "eligible": true,
+    "c1_per_word_unique": true,
+    "c23_no_identical": true,
+    "c4_jaccard_caps": true,
+    "c56_length_not_identifying": true,
+    "c8_same_valence_pair": true,
+    "max_jaccard": 0.0,
+    "mean_jaccard": 0.0,
+    "rare_only_unique_words": [],
+    "unique_features": {
+      "aśva": [
+        "v",
+        "ś"
+      ],
+      "bala": [
+        "b",
+        "l"
+      ],
+      "bhaya": [
+        "bh",
+        "y"
+      ],
+      "duḥkha": [
+        "d",
+        "kh"
+      ],
+      "gaja": [
+        "g",
+        "j"
+      ],
+      "megha": [
+        "gh",
+        "m"
+      ]
+    }
+  },
+  "control_feasibility": {
+    "true_packet_arm": {
+      "feasible": true,
+      "note": "the frozen consonant-backbone packets themselves"
+    },
+    "cross_word_mismatch_arm": {
+      "feasible": true,
+      "note": "pair each word with another member's packet"
+    },
+    "scrambled_packet_arm": {
+      "feasible": true,
+      "note": "reassign packets across words / permute feature order"
+    },
+    "random_varna_assignment_arm": {
+      "feasible": true,
+      "note": "structure-preserving permutation of the 33 consonant→pole assignment"
+    },
+    "packet_length_matched_controls": {
+      "feasible": true,
+      "note": "requires >=2 words per length in the set (criterion C5/C6)"
+    },
+    "same_valence_comparisons": {
+      "feasible": true,
+      "note": "requires >=1 same-valence pair; valence is a balance label, not fit"
+    },
+    "consonant_frequency_matched": {
+      "feasible": true,
+      "note": "corpus consonant frequencies computable + matchable"
+    },
+    "no_per_word_polarity_selection": {
+      "feasible": true,
+      "note": "both poles fixed per word by construction"
+    },
+    "blind_word_identity_matching": {
+      "feasible": true,
+      "note": "forced-choice match packet→word among the set"
+    },
+    "no_open_ended_plausibility_endpoint": {
+      "feasible": true,
+      "note": "endpoint is forced-choice accuracy, not 'sounds plausible?'"
+    }
+  },
+  "controls_all_feasible": true,
+  "gate_verdict": "NATIVE_GATE_G0_PASS",
+  "guardrails": "Consonant backbone only; no vowel/marker pole in packets; no semantic fit in selection; no judges/scoring/prereg. B1.10 pole-legibility negative and the qualitative guarded prior preserved."
+}

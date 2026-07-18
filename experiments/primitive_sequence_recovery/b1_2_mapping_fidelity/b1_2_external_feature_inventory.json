@@ -1,0 +1,457 @@
+{
+  "artifact": "b1_2_external_feature_inventory",
+  "status": "EVALUATED_CANDIDATE_TOO_COARSE_NOT_FROZEN_AS_FINAL",
+  "evidence": false,
+  "source": "WordNet 3.0 lexicographer files (supersenses/lexnames)",
+  "wordnet_version": "3.0",
+  "n_features": 45,
+  "external": true,
+  "derived_from_varna": false,
+  "derived_from_bridge_pool": false,
+  "derived_from_symbolu_ontology": false,
+  "note": "WordNet lexnames are external, offline, versioned, and NOT varṇa-derived. Evaluated as the first candidate inventory but found TOO COARSE for near-neighbor separation (see near_neighbor_collisions). Not frozen as the final B1.2 inventory. No scoring run. Structure, not validated meaning.",
+  "near_neighbor_collisions": {
+    "father/guardian/teacher/hammer": {
+      "father": "noun.person",
+      "guardian": "noun.person",
+      "teacher": "noun.person",
+      "hammer": "noun.artifact"
+    },
+    "mother/caregiver": {
+      "mother": "noun.person",
+      "caregiver": "noun.person"
+    },
+    "water/ocean": {
+      "water": "noun.substance",
+      "ocean": "noun.object"
+    },
+    "fire/light": {
+      "fire": "noun.event",
+      "light": "noun.phenomenon"
+    },
+    "justice/law": {
+      "justice": "noun.attribute",
+      "law": "noun.group"
+    },
+    "freedom/power": {
+      "freedom": "noun.state",
+      "power": "noun.attribute"
+    }
+  },
+  "coarseness_finding": "father/guardian/teacher all -> noun.person; mother/caregiver both -> noun.person. The Axis-1 gradient (father>guardian>teacher) is impossible under this inventory.",
+  "features": [
+    {
+      "feature_id": "F00",
+      "feature_name": "adj.all",
+      "wordnet_lexname": "adj.all",
+      "pos": "adj",
+      "description": "all adjective clusters",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F01",
+      "feature_name": "adj.pert",
+      "wordnet_lexname": "adj.pert",
+      "pos": "adj",
+      "description": "relational adjectives (pertainyms)",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F02",
+      "feature_name": "adj.ppl",
+      "wordnet_lexname": "adj.ppl",
+      "pos": "adj",
+      "description": "participial adjectives",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F03",
+      "feature_name": "adv.all",
+      "wordnet_lexname": "adv.all",
+      "pos": "adv",
+      "description": "all adverbs",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F04",
+      "feature_name": "noun.Tops",
+      "wordnet_lexname": "noun.Tops",
+      "pos": "noun",
+      "description": "unique beginners / top ontological nouns",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F05",
+      "feature_name": "noun.act",
+      "wordnet_lexname": "noun.act",
+      "pos": "noun",
+      "description": "acts or actions",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F06",
+      "feature_name": "noun.animal",
+      "wordnet_lexname": "noun.animal",
+      "pos": "noun",
+      "description": "animals",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F07",
+      "feature_name": "noun.artifact",
+      "wordnet_lexname": "noun.artifact",
+      "pos": "noun",
+      "description": "man-made objects",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F08",
+      "feature_name": "noun.attribute",
+      "wordnet_lexname": "noun.attribute",
+      "pos": "noun",
+      "description": "attributes of people/objects",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F09",
+      "feature_name": "noun.body",
+      "wordnet_lexname": "noun.body",
+      "pos": "noun",
+      "description": "body parts",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F10",
+      "feature_name": "noun.cognition",
+      "wordnet_lexname": "noun.cognition",
+      "pos": "noun",
+      "description": "cognitive processes and contents",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F11",
+      "feature_name": "noun.communication",
+      "wordnet_lexname": "noun.communication",
+      "pos": "noun",
+      "description": "communicative processes/contents",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F12",
+      "feature_name": "noun.event",
+      "wordnet_lexname": "noun.event",
+      "pos": "noun",
+      "description": "natural events",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F13",
+      "feature_name": "noun.feeling",
+      "wordnet_lexname": "noun.feeling",
+      "pos": "noun",
+      "description": "feelings and emotions",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F14",
+      "feature_name": "noun.food",
+      "wordnet_lexname": "noun.food",
+      "pos": "noun",
+      "description": "foods and drinks",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F15",
+      "feature_name": "noun.group",
+      "wordnet_lexname": "noun.group",
+      "pos": "noun",
+      "description": "groupings of people or objects",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F16",
+      "feature_name": "noun.location",
+      "wordnet_lexname": "noun.location",
+      "pos": "noun",
+      "description": "spatial position",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F17",
+      "feature_name": "noun.motive",
+      "wordnet_lexname": "noun.motive",
+      "pos": "noun",
+      "description": "goals",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F18",
+      "feature_name": "noun.object",
+      "wordnet_lexname": "noun.object",
+      "pos": "noun",
+      "description": "natural objects (not man-made)",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F19",
+      "feature_name": "noun.person",
+      "wordnet_lexname": "noun.person",
+      "pos": "noun",
+      "description": "people",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F20",
+      "feature_name": "noun.phenomenon",
+      "wordnet_lexname": "noun.phenomenon",
+      "pos": "noun",
+      "description": "natural phenomena",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F21",
+      "feature_name": "noun.plant",
+      "wordnet_lexname": "noun.plant",
+      "pos": "noun",
+      "description": "plants",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F22",
+      "feature_name": "noun.possession",
+      "wordnet_lexname": "noun.possession",
+      "pos": "noun",
+      "description": "possession and transfer",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F23",
+      "feature_name": "noun.process",
+      "wordnet_lexname": "noun.process",
+      "pos": "noun",
+      "description": "natural processes",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F24",
+      "feature_name": "noun.quantity",
+      "wordnet_lexname": "noun.quantity",
+      "pos": "noun",
+      "description": "quantities and units of measure",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F25",
+      "feature_name": "noun.relation",
+      "wordnet_lexname": "noun.relation",
+      "pos": "noun",
+      "description": "relations between people/things/ideas",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F26",
+      "feature_name": "noun.shape",
+      "wordnet_lexname": "noun.shape",
+      "pos": "noun",
+      "description": "two/three dimensional shapes",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F27",
+      "feature_name": "noun.state",
+      "wordnet_lexname": "noun.state",
+      "pos": "noun",
+      "description": "stable states of affairs",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F28",
+      "feature_name": "noun.substance",
+      "wordnet_lexname": "noun.substance",
+      "pos": "noun",
+      "description": "substances",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F29",
+      "feature_name": "noun.time",
+      "wordnet_lexname": "noun.time",
+      "pos": "noun",
+      "description": "time and temporal relations",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F30",
+      "feature_name": "verb.body",
+      "wordnet_lexname": "verb.body",
+      "pos": "verb",
+      "description": "grooming/dressing/bodily care",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F31",
+      "feature_name": "verb.change",
+      "wordnet_lexname": "verb.change",
+      "pos": "verb",
+      "description": "change of size/temperature/intensity",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F32",
+      "feature_name": "verb.cognition",
+      "wordnet_lexname": "verb.cognition",
+      "pos": "verb",
+      "description": "thinking/judging/analyzing",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F33",
+      "feature_name": "verb.communication",
+      "wordnet_lexname": "verb.communication",
+      "pos": "verb",
+      "description": "telling/asking/ordering/singing",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F34",
+      "feature_name": "verb.competition",
+      "wordnet_lexname": "verb.competition",
+      "pos": "verb",
+      "description": "fighting/athletic activities",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F35",
+      "feature_name": "verb.consumption",
+      "wordnet_lexname": "verb.consumption",
+      "pos": "verb",
+      "description": "eating and drinking",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F36",
+      "feature_name": "verb.contact",
+      "wordnet_lexname": "verb.contact",
+      "pos": "verb",
+      "description": "touching/hitting/tying/digging",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F37",
+      "feature_name": "verb.creation",
+      "wordnet_lexname": "verb.creation",
+      "pos": "verb",
+      "description": "sewing/baking/painting/performing",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F38",
+      "feature_name": "verb.emotion",
+      "wordnet_lexname": "verb.emotion",
+      "pos": "verb",
+      "description": "feeling",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F39",
+      "feature_name": "verb.motion",
+      "wordnet_lexname": "verb.motion",
+      "pos": "verb",
+      "description": "walking/flying/swimming",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F40",
+      "feature_name": "verb.perception",
+      "wordnet_lexname": "verb.perception",
+      "pos": "verb",
+      "description": "seeing/hearing/feeling",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F41",
+      "feature_name": "verb.possession",
+      "wordnet_lexname": "verb.possession",
+      "pos": "verb",
+      "description": "buying/selling/owning",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F42",
+      "feature_name": "verb.social",
+      "wordnet_lexname": "verb.social",
+      "pos": "verb",
+      "description": "political/social activities",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F43",
+      "feature_name": "verb.stative",
+      "wordnet_lexname": "verb.stative",
+      "pos": "verb",
+      "description": "being/having/spatial relations",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    },
+    {
+      "feature_id": "F44",
+      "feature_name": "verb.weather",
+      "wordnet_lexname": "verb.weather",
+      "pos": "verb",
+      "description": "raining/snowing/thawing/thundering",
+      "source": "WordNet 3.0 lexicographer files (lexnames)",
+      "used_for": "both"
+    }
+  ],
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED",
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth",
+    "no mapping-fidelity signal"
+  ]
+}

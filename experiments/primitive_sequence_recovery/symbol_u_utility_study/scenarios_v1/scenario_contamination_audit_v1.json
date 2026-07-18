@@ -1,0 +1,16 @@
+{
+  "schema": "symbol_u_utility_contamination_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "exact_duplicates": [],
+  "near_duplicate_pairs_ge_0_6_jaccard": [],
+  "forbidden_terminology_hits": [],
+  "checks": [
+    "exact_duplicates",
+    "near_duplicate_paraphrase",
+    "repeated_templates",
+    "answer_leading_language",
+    "sanskrit_symbolu_varna_mapping_terminology",
+    "prior_utility_corpus_overlap(none_exists)"
+  ],
+  "prior_corpus_overlap": "none (this is the first utility scenario corpus)"
+}

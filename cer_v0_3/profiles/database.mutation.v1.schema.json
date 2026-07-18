@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.dev/cer/profiles/database.mutation.v1.schema.json",
+  "title": "CER database.mutation.v1 actuation",
+  "description": "Actuation payload for the database.mutation.v1 profile. Carries only non-secret identity: connection reference, schema/table, semantic SQL operation, statement/parameter digests, affected-row scope bound, transaction+isolation requirement, expected row-version, and an optional compensation reference. Raw SQL text and credentials are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "target", "sql_operation", "statement_digest",
+               "affected_scope", "transaction", "expected_row_version", "reversibility"],
+  "properties": {
+    "operation": {"const": "DB_MUTATION"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connection_ref", "schema", "table"],
+      "properties": {
+        "connection_ref": {"type": "string", "minLength": 1,
+          "description": "Non-secret logical connection identity (e.g. prod-orders). Never a DSN or credential."},
+        "schema": {"type": "string", "minLength": 1},
+        "table": {"type": "string", "minLength": 1}
+      }
+    },
+    "sql_operation": {"enum": ["INSERT", "UPDATE", "DDL"],
+      "description": "Semantic operation vocabulary. DELETE is reserved for a future database.delete.v1 (maps to the stricter DB_DELETE class)."},
+    "statement_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Digest of the normalized statement. The raw SQL is never in the CER."},
+    "parameters_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "predicate_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "affected_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated_rows", "unbounded"],
+      "properties": {
+        "estimated_rows": {"type": "string", "pattern": "^[0-9]+$",
+          "description": "Estimated affected-row count as a typed integer string (ActionGate R7 MAX_SCOPE fact affected_count; bound 10000)."},
+        "unbounded": {"type": "boolean",
+          "description": "True if the mutation is not row-bounded (ActionGate R7 FORBID fact -> DENY)."}
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "isolation"],
+      "properties": {
+        "mode": {"enum": ["in_transaction"]},
+        "isolation": {"enum": ["READ_COMMITTED", "REPEATABLE_READ", "SERIALIZABLE"]}
+      }
+    },
+    "expected_row_version": {"type": "string", "minLength": 1,
+      "description": "Optimistic-concurrency state binding: the row-version the mutation expects."},
+    "compensation_ref": {"type": "string",
+      "description": "Rollback/compensation reference (identity-bearing when present)."},
+    "reversibility": {"enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]}
+  },
+  "$comment": "Prohibited (fail closed): raw secret-bearing keys (password, dsn, connection_string, credentials, token, statement, sql, ...) anywhere in the actuation, and any Kubernetes-only field (replicas, image_digest, rollout_strategy, ...)."
+}

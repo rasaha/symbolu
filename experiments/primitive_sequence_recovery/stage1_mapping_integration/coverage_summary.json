@@ -1,0 +1,52 @@
+{
+  "unit_level": {
+    "parser_emittable_classical_units": 51,
+    "consonants_total": 34,
+    "vowels_total": 14,
+    "anusvara": 1,
+    "visarga": 1,
+    "candrabindu": 1,
+    "consonant_exact_active": 33,
+    "consonant_exact_inactive": 0,
+    "consonant_contradictory": 0,
+    "consonant_missing": 1,
+    "vowel_resolved": 0,
+    "vowel_missing": 14,
+    "anusvara_resolved": 0,
+    "visarga_resolved": 0,
+    "candrabindu_resolved": 0,
+    "aspirates_total": 10,
+    "aspirates_with_entry": 10,
+    "aspirates_active": 10,
+    "table_keys_without_parser_producer": [
+      "ksha"
+    ],
+    "native_reachable_but_table_inactive": [],
+    "english_bridge_inactive_but_native_reachable_historical": [
+      "bha",
+      "cha",
+      "dda",
+      "ddha",
+      "dha",
+      "gha",
+      "jha",
+      "kha",
+      "nna",
+      "nya",
+      "pha",
+      "ssa",
+      "tta",
+      "ttha"
+    ]
+  },
+  "frequency_weighted": {
+    "total_phonological_tokens": 518,
+    "by_status": {
+      "EXACT_ACTIVE": 285,
+      "MISSING_TABLE_ENTRY": 233
+    },
+    "pct_exact_active": 55.0,
+    "pct_any_table_entry": 55.0,
+    "pct_missing": 45.0
+  }
+}

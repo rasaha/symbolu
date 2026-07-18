@@ -1,0 +1,5 @@
+pride
+A: Sarah beamed with pride as she watched her son win the championship, knowing her years of coaching had paid off.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Mark felt a quiet pride in his ability to solve complex problems without needing external validation or praise.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural

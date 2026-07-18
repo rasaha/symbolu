@@ -1,0 +1,364 @@
+{
+  "schema": "b1_12_bsr_excluded_candidates_v2",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_excluded": 50,
+  "exclusion_taxonomy": [
+    "DEVELOPMENT_CONTAMINATED",
+    "OVER_CATEGORY_QUOTA",
+    "parser_invalid",
+    "no_mapped_consonant",
+    "incomplete_coverage"
+  ],
+  "excluded": [
+    {
+      "iast": "dveṣa",
+      "category": "afflictive",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "mada",
+      "category": "afflictive",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "mātsarya",
+      "category": "afflictive",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "rāga",
+      "category": "afflictive",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "īrṣyā",
+      "category": "afflictive",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "śoka",
+      "category": "afflictive",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "grīvā",
+      "category": "animal_body_living",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "mahiṣa",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "markaṭa",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "matsya",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "maṇḍūka",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "oṣṭha",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "pṛṣṭha",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "uṣṭra",
+      "category": "animal_body_living",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "vṛka",
+      "category": "animal_body_living",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "śṛgāla",
+      "category": "animal_body_living",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "ghaṭa",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "khaḍga",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "maṇi",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "pustaka",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "ratha",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "śara",
+      "category": "concrete_object",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "gamana",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "hima",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "kāla",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "megha",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "nidrā",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "parvata",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "samudra",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "smṛti",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "sṛṣṭi",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "taraṅga",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "taḍit",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "tejas",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "tuṣāra",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "vega",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "vāyu",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "vṛṣṭi",
+      "category": "natural_action_abstract",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "dāna",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "karuṇā",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "kṣamā",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "kṣānti",
+      "category": "virtue_calm",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "maitrī",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "mārdava",
+      "category": "virtue_calm",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "tyāga",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "vinaya",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "viveka",
+      "category": "virtue_calm",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "ārjava",
+      "category": "virtue_calm",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "śama",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    },
+    {
+      "iast": "śraddhā",
+      "category": "virtue_calm",
+      "exclusion_reason": "DEVELOPMENT_CONTAMINATED",
+      "missing_units": [],
+      "coverage": 1.0
+    }
+  ]
+}

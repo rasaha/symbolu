@@ -1,7 +1,13 @@
 # Hybrid LLM — VC Brief
 
-**Cognade Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
+**Ugence Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
 *Prepared April 2026*
+
+> **Product family.** Hybrid LLM is a **Specialized AI System** in the Ugence Labs platform — the
+> long-context reasoning substrate, sibling to the LLM Steering Controller, Agent Runtime, and
+> Autonomous Runtime. The canonical platform architecture is defined in `UGENCE_PLATFORM_OVERVIEW.md`.
+> (This product also traces to the broader SymbolU / Conscious Generation research lineage; each brief
+> describes a distinct product boundary, validation state, and commercialization path.)
 
 ---
 
@@ -254,6 +260,9 @@ limits that any solution to it will have to navigate.
 | Inference path | `symbolu/inference/` module with Fast / Standard / Sovereign modes, Phase State Cache for O(1) per-step phase update, and V11.0.0 inference filters (Vritti gate, Kosha depth control, Sovereign Bridge). `generate_sovereign.py` CLI is wired end-to-end. Status doc: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` — the inference stack is implemented end-to-end; remaining work is benchmark and scale validation. |
 | Training-time instrumentation | `SovereignPhaseController`, `AdaptiveTrainingController`, and `AdaptiveSlotLRController` — surgical gradient clipping per numerical regime (slot keys on unit sphere, phase sin/cos amplification, global norm), PPL-alpha curriculum, adaptive warmup on validation PPL rather than fixed steps. |
 
+> Terms such as Vritti gate, Kosha depth control, and Sovereign Bridge are architecture-component names
+> in this system; they are not claims that the model has validated cognitive or conscious states.
+
 ### Preliminary retrieval signal (separate research report)
 
 An internal phase-attention technical report documents a **small
@@ -329,6 +338,6 @@ into a first-class option behind the Agentic Framework.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Ugence Labs*
 *Repo: `rasaha/symbolu` · Modules: `symbolu/phase_transformer.py`, `train_hybrid_7b.py`, `symbolu_training/training/unified/mistral_hybrid_wrapper.py`, `symbolu/inference/`*
 *Architecture ref: `docs/HYBRID_PHASE_QUAD_ARCHITECTURE.md` · Training CLI: `docs/TRAIN_HYBRID_7B.md` · Inference status: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` · Mechanism report: `docs/PHASE_ATTENTION_PAPER.md`*

@@ -1,0 +1,26 @@
+{
+  "any_present": false,
+  "base_url_caveat": "IMPORTANT: for provider=openai the frozen adapter POSTs to '{RUNTIME_MODEL_BASE_URL}/v1/chat/completions'. The expected base 'https://api.mistral.ai/v1' would produce '.../v1/v1/chat/completions' (double /v1 -> 404). Set RUNTIME_MODEL_BASE_URL='https://api.mistral.ai' (NO trailing /v1).",
+  "conclusion": "BLOCKED_NO_REAL_MODEL",
+  "config_file_found": false,
+  "integrity": [
+    "did not fabricate a response",
+    "did not set the credential vars myself and claim the owner did",
+    "did not repurpose non-model credentials",
+    "did not modify any frozen artifact"
+  ],
+  "minimal_request_made": false,
+  "phase": "agent-runtime-phase-3-resume-2",
+  "reason": "The configured credentials/endpoint are NOT visible in this session's process environment: no RUNTIME_MODEL_* or key variables are set, no .env/config file is present, and the frozen resolver returns None (also under a login shell). No live adapter could be built, so no genuine Mistral request was attempted.",
+  "resolution_path": "agent_runtime_migration.model.live.build_live_model_from_env (frozen)",
+  "resolved_a_model": false,
+  "resolver_after_login_shell": false,
+  "runtime_env_vars_present": {
+    "MISTRAL_API_KEY": false,
+    "OPENAI_API_KEY": false,
+    "RUNTIME_MODEL_BASE_URL": false,
+    "RUNTIME_MODEL_ID": false,
+    "RUNTIME_MODEL_PROVIDER": false
+  },
+  "trigger": "owner reports Mistral endpoint+key configured (provider openai-compatible, model mistral-small-latest, base https://api.mistral.ai/v1)"
+}

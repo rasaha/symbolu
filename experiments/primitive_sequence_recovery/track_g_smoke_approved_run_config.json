@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "config_type": "track_g_smoke_approved_run_config",
+  "run_enabled": true,
+  "approval_status": "APPROVED",
+  "representation": "signed_polarity_boundary",
+  "four_sphere_integrated": false,
+  "track_b_status": "BLOCKED",
+  "arms": ["A", "R", "B", "I", "X", "D"],
+  "scorer_model": "<fill: e.g. mistralai/Mistral-7B-Instruct-v0.3>",
+  "generator_model": null,
+  "temperature": 0.0,
+  "max_tokens": 256,
+  "json_only": true,
+  "browsing": false,
+  "carryover": false,
+  "expected_packet_count": 90,
+  "output_paths": {
+    "outputs_json": "experiments/primitive_sequence_recovery/track_g_smoke_outputs.json",
+    "result_md": "experiments/primitive_sequence_recovery/TRACK_G_SMOKE_RESULT.md"
+  },
+  "approval_record": {
+    "approver": "<fill before run>",
+    "date": "<fill: YYYY-MM-DD>",
+    "signature": "<fill: explicit approval — Track G polarity-boundary smoke, exploratory triage only>",
+    "note": "TEMPLATE. Separate approved run config for a future Track G smoke: does NOT change the base smoke manifest (track_g_smoke_manifest.json stays run_enabled:false / NOT_APPROVED). A real run also requires env TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE, a filled scorer_model, and a leak-clean dry-run. frozen/manifest.json remains NOT_READY; Stage A untouched; four-sphere JSON not integrated; Track B remains BLOCKED regardless of result. A smoke result cannot validate the theory; polarity direction is frozen (post-hoc edits invalidate)."
+  },
+  "base_manifest_unchanged": true,
+  "run_lock": "operator must set env TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE and fill scorer_model + approval_record before any real run"
+}

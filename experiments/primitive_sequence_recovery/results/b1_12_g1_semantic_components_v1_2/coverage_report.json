@@ -1,0 +1,9 @@
+{
+  "coverage_outcome": "G1_COMPONENT_COVERAGE_COMPLETE",
+  "n_developmental_gap": 0,
+  "n_required": 18,
+  "n_source_backed": 18,
+  "n_unmapped": 0,
+  "schema": "b1_12_coverage_report_v1_2",
+  "selected_set_coverage_pct": 100.0
+}

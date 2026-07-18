@@ -1,0 +1,151 @@
+{
+  "scenarios": {
+    "unsafe_but_consistent_wins": {
+      "candidates": [
+        "charge_through",
+        "safe_detour",
+        "emergency_stop"
+      ],
+      "admissible": [
+        "safe_detour",
+        "emergency_stop"
+      ],
+      "selectors": {
+        "Lexicographic": {
+          "outcome": "SELECTED",
+          "pick": "emergency_stop",
+          "pick_hard_admissible": true,
+          "rationale": "lexicographic: margin > goal > cost > index"
+        },
+        "WeightedUtility": {
+          "outcome": "SELECTED",
+          "pick": "emergency_stop",
+          "pick_hard_admissible": true,
+          "rationale": "weighted utility over admissible set"
+        },
+        "ConstrainedOpt": {
+          "outcome": "SELECTED",
+          "pick": "safe_detour",
+          "pick_hard_admissible": true,
+          "rationale": "argmax goal s.t. margin constraint (comfortable pool)"
+        },
+        "BCVF": {
+          "outcome": "SELECTED",
+          "pick": "charge_through",
+          "pick_hard_admissible": false,
+          "rationale": "BCVF argmax normalized_weight (pre_filter=False)"
+        }
+      },
+      "bcvf_selected_unsafe": true
+    },
+    "all_candidates_unsafe": {
+      "candidates": [
+        "dash_left",
+        "dash_right",
+        "ram_ahead"
+      ],
+      "admissible": [],
+      "selectors": {
+        "Lexicographic": {
+          "outcome": "NO_SAFE_ACTION",
+          "pick": null,
+          "pick_hard_admissible": null,
+          "rationale": "no candidate passed hard safety+feasibility gate"
+        },
+        "WeightedUtility": {
+          "outcome": "NO_SAFE_ACTION",
+          "pick": null,
+          "pick_hard_admissible": null,
+          "rationale": "no candidate passed hard gate"
+        },
+        "ConstrainedOpt": {
+          "outcome": "NO_SAFE_ACTION",
+          "pick": null,
+          "pick_hard_admissible": null,
+          "rationale": "no candidate passed hard gate"
+        },
+        "BCVF": {
+          "outcome": "SELECTED",
+          "pick": "ram_ahead",
+          "pick_hard_admissible": false,
+          "rationale": "BCVF argmax normalized_weight (pre_filter=False)"
+        }
+      },
+      "bcvf_selected_unsafe": true
+    },
+    "only_stop_is_safe": {
+      "candidates": [
+        "weave",
+        "emergency_stop"
+      ],
+      "admissible": [
+        "emergency_stop"
+      ],
+      "selectors": {
+        "Lexicographic": {
+          "outcome": "SELECTED",
+          "pick": "emergency_stop",
+          "pick_hard_admissible": true,
+          "rationale": "lexicographic: margin > goal > cost > index"
+        },
+        "WeightedUtility": {
+          "outcome": "SELECTED",
+          "pick": "emergency_stop",
+          "pick_hard_admissible": true,
+          "rationale": "weighted utility over admissible set"
+        },
+        "ConstrainedOpt": {
+          "outcome": "SELECTED",
+          "pick": "emergency_stop",
+          "pick_hard_admissible": true,
+          "rationale": "argmax goal s.t. margin constraint (comfortable pool)"
+        },
+        "BCVF": {
+          "outcome": "SELECTED",
+          "pick": "weave",
+          "pick_hard_admissible": false,
+          "rationale": "BCVF argmax normalized_weight (pre_filter=False)"
+        }
+      },
+      "bcvf_selected_unsafe": true
+    },
+    "safe_tradeoff": {
+      "candidates": [
+        "fast_route",
+        "slow_route"
+      ],
+      "admissible": [
+        "fast_route",
+        "slow_route"
+      ],
+      "selectors": {
+        "Lexicographic": {
+          "outcome": "SELECTED",
+          "pick": "slow_route",
+          "pick_hard_admissible": true,
+          "rationale": "lexicographic: margin > goal > cost > index"
+        },
+        "WeightedUtility": {
+          "outcome": "SELECTED",
+          "pick": "slow_route",
+          "pick_hard_admissible": true,
+          "rationale": "weighted utility over admissible set"
+        },
+        "ConstrainedOpt": {
+          "outcome": "SELECTED",
+          "pick": "fast_route",
+          "pick_hard_admissible": true,
+          "rationale": "argmax goal s.t. margin constraint (comfortable pool)"
+        },
+        "BCVF": {
+          "outcome": "SELECTED",
+          "pick": "fast_route",
+          "pick_hard_admissible": true,
+          "rationale": "BCVF argmax normalized_weight (pre_filter=False)"
+        }
+      }
+    }
+  },
+  "deterministic_selected_unsafe_count": 0,
+  "deterministic_never_selects_unsafe": true
+}

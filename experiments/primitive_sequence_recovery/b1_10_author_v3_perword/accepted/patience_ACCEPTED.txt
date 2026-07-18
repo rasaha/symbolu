@@ -1,0 +1,11 @@
+patience
+A: She could barely keep her patience as she waited for the promotion that her colleagues seemed to be receiving.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: He practiced patience while meditating, focusing on his breath without seeking external validation.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+author_identity:      fresh isolated model session — Qwen clean session
+date_utc:             2023-10-06T12:34:56Z
+prompt_hash:          [Not computed]
+context_hash:         [Not computed]
+blindness_attestation: I certify I had not seen any of the materials listed in Section 7 before or during this task, and I did not consult any outside material while writing.

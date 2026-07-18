@@ -1,0 +1,158 @@
+{
+  "artifact": "b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED",
+  "evidence_freeze_declared": true,
+  "experiment_identity": {
+    "mode": "b1_10_control_ext",
+    "representation_version": "B1.10_control_ext_v3_qwen (approved non-Claude blind contexts)",
+    "mapping_era": "fidelity_bundle_v1",
+    "table": "v3",
+    "bridge": "bridge_v2_plus_theta_eth_ta",
+    "aspiration_applied": false,
+    "experiment_number": "B1.10 (unchanged; no new experiment number)",
+    "context_set": "NONCLAUDE_BLIND_AUTHORED_v3_AUDIT_APPROVED (Stage-3 packet-aware audit PASS 6/6)"
+  },
+  "pinned_input_hashes": {
+    "approved_context_source_file": {
+      "path": "B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md",
+      "sha256": "ea25d27eef9d99138ed3ea3cc289783441cb6e327577694822e92fc51116a103"
+    },
+    "approved_canonical_12_sentence_block": {
+      "derivation": "fenced block inside the source file",
+      "sha256": "e0a1477ebaaf41df95b489b7547a895369f115d5231c424fc8598d4f598c3046"
+    },
+    "rebuilt_v3_items_file": {
+      "path": "frozen/b1_10_control_ext_items_v3_qwen.json",
+      "sha256": "885fc2f95627b0d35612ef5acdfedde2e5f068b8fac577a373b05f2f4ec04f3a"
+    },
+    "tier1_control_definitions": {
+      "path": "build_b1_10_control_ext.py",
+      "sha256": "5a478df2155441db5294d1548d4ce8f309902ae870104da4fe56b2cc6ca32eaa",
+      "note": "defines TIER1_NEG/POS; resolved pools also embedded in the items file tier1_fixed"
+    },
+    "tier2_control_definitions": {
+      "path": "build_b1_10_control_ext.py",
+      "sha256": "5a478df2155441db5294d1548d4ce8f309902ae870104da4fe56b2cc6ca32eaa",
+      "note": "defines TIER2_OTHER/SELF; embedded in items file tier2_fixed"
+    },
+    "tier3_rendering_provenance_source": {
+      "path": "build_b1_10_control_ext.py",
+      "sha256": "5a478df2155441db5294d1548d4ce8f309902ae870104da4fe56b2cc6ca32eaa",
+      "note": "VARNA_PLAIN per-varṇa plain-English renders; hidden provenance_v3_facet resolved from the v3 table"
+    },
+    "v3_polarity_table": {
+      "path": "frozen/varna_polarity_table_v3.json",
+      "sha256": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3"
+    },
+    "active_bridge_manifest": {
+      "path": "frozen/varna_polarity_bridge_v3.json",
+      "sha256": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102"
+    },
+    "decomposer": {
+      "path": "stage_a_prime_coverage.py",
+      "sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"
+    },
+    "runner": {
+      "path": "run_b1_10_control_ext.py",
+      "sha256": "3ce5a05c6801f24ee7e008b51f0cd6504ae2ccbb8d82c2d0f634e012b36cac8d"
+    },
+    "builder_v3": {
+      "path": "build_b1_10_control_ext_v3_qwen.py",
+      "sha256": "ec23163ebb8d888228e6ad3e1a372f3869c87e900731641806c1d00700f24183"
+    },
+    "judge_panel_specification": {
+      "path": "B1_10_OFFICIAL_JUDGE_PANEL_SPEC.md",
+      "sha256": "d2230164bfd0942816b5c6ee33fa5039cd4940c64a28d04a902e06292bcc407b"
+    },
+    "control_hierarchy_specification": {
+      "path": "B1_10_CONTROL_HIERARCHY_SPEC.md",
+      "sha256": "9e1385205f4b9e0060433ca9abfd877bc21f970be08c9118b8186a11b93e052a"
+    },
+    "packet_aware_audit_prereg": {
+      "path": "B1_10_PACKET_AWARE_AUDIT_PREREG.md",
+      "sha256": "b34f7728c14814505dc98791f5ad2832bdb46872a8496ae4cac2813424955ec7"
+    },
+    "packet_aware_audit_report": {
+      "path": "B1_10_PACKET_AWARE_AUDIT_REPORT.md",
+      "sha256": "70c099d381ec05f9291550d0059d2c3f5499b1176bd9024cd187de4dccded953"
+    },
+    "dry_check_record": {
+      "path": "frozen/b1_10_control_ext_v3_dry_check.json",
+      "sha256": "32dd27008f6d930827c11cf283dd5a9101e5785a2664ee8758a54117f2c47f26"
+    }
+  },
+  "judge_configuration": {
+    "panel": [
+      {
+        "code": "J0",
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "family": "Llama",
+        "revision_resolved": null
+      },
+      {
+        "code": "J1",
+        "model_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+        "family": "Llama",
+        "revision_resolved": null
+      },
+      {
+        "code": "J2",
+        "model_id": "google/gemma-2-9b-it",
+        "family": "Gemma",
+        "revision_resolved": null
+      }
+    ],
+    "revision_note": "Judge HF revisions are NOT yet pinned; each judge's resolved commit MUST be recorded at real-run time and appended to this declaration before results are interpreted.",
+    "identical_panel_across_all_tiers": true,
+    "decoding": "greedy (temperature 0)",
+    "backend": "transformers via reused b1_6_llm_adapter (retry-on-unparseable, no output editing)",
+    "rating_rubric": "B1.10 single-question 0-6 source-condition fit (NOT the B1.8 1-7 rubric)",
+    "no_claude_judges": true,
+    "no_mistral_or_qwen_judges": true,
+    "family_disjointness": "panel is family-disjoint from the Tier-3 paraphrase author (Claude) and the context author (Qwen). Qwen/Mistral eligible only as context authors, never judges."
+  },
+  "run_structure": {
+    "cells_per_judge": 72,
+    "n_judges": 3,
+    "expected_total_ratings": 216,
+    "design": "6 words x 2 contexts x 3 tiers x 2 poles = 72 cells",
+    "deterministic_cell_shuffle_seeds": [
+      20260712,
+      20260713
+    ],
+    "seed_note": "DEFAULT_SEED 20260712; >=2 replicate seeds recommended for the cell-order shuffle (second 20260713).",
+    "output_directory_convention": "b1_10_control_ext_v3_run/ (per-judge subdirs; raw outputs + parsed scores)",
+    "no_missing_cell_imputation": true,
+    "missing_data_rule": "drop + re-draw up to MAX_REDRAWS=2; a word missing any cell is excluded from aggregate; >15% missing overall -> inconclusive_missing_data",
+    "items_file_for_real_run": "frozen/b1_10_control_ext_items_v3_qwen.json"
+  },
+  "primary_statistics": [
+    "specific_margin",
+    "valence_margin",
+    "generic_source_condition_margin",
+    "increment_over_valence",
+    "increment_over_source_condition"
+  ],
+  "interpretation_lock": {
+    "specific_margin_gt_0": "pole / source-condition LEGIBILITY to judges only",
+    "increment_over_valence_gt_0": "beyond generic positive/negative (hedonic) matching",
+    "increment_over_source_condition_gt_0": "beyond generic other-conditioned vs self-grounded framing",
+    "forbidden_claims": [
+      "no ontology claim",
+      "no semantic-truth claim",
+      "no Sanskrit-privilege claim",
+      "no generation-utility claim",
+      "no individual-varṇa attribution (packet is a bag of constituent-varṇa readings)"
+    ],
+    "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+    "track_b_status": "BLOCKED",
+    "ceiling": "Structure, not validated meaning. No GENUTILITY_*, no ONTOLOGICAL_SIGNAL."
+  },
+  "provenance": {
+    "declared_by": "rakeshmohan888@gmail.com (operator) — assembled in-session at operator direction; operator confirms before the real run",
+    "declared_at_utc": "2026-07-11T10:10:01+00:00",
+    "attestation": "B1.10 control-extension, approved v3 Qwen blind contexts; no-generation packet rating; 6 words x 2 contexts x 3 tiers x 2 poles = 72 cells; source-condition fit only (0-6); identical Llama/Gemma panel across all tiers; no Claude/Mistral/Qwen judges; contexts blind-authored by Qwen and PASSED the packet-aware audit (6/6); this declaration pins the exact approved inputs BEFORE any real judge run (anti-circularity). No semantic-truth / ontology / Sanskrit-privilege / generation-utility claim; no individual-varṇa attribution; B1.4b′ remains NULL_RETURN_BOTTOM; Track B blocked; structure, not validated meaning.",
+    "run_status": "NO real judge run has occurred. This declaration authorizes a gated real run ONLY after explicit operator approval; the runner additionally requires a real judge backend supplied programmatically.",
+    "evidence_freeze_declared": true
+  },
+  "guardrails": "no GENUTILITY_*; no ONTOLOGICAL_SIGNAL; B1.4b' NULL_RETURN_BOTTOM; original B1.4b blocked; Track B blocked; structure, not validated meaning"
+}

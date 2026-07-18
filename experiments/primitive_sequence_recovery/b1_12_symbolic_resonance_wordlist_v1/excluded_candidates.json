@@ -1,0 +1,94 @@
+{
+  "schema": "b1_12_bsr_excluded_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_excluded": 10,
+  "exclusion_taxonomy": [
+    "OVER_CATEGORY_QUOTA",
+    "DEVELOPMENT_CONTAMINATED",
+    "parser_invalid",
+    "no_mapped_consonant",
+    "incomplete_coverage"
+  ],
+  "excluded": [
+    {
+      "iast": "vaira",
+      "dev": "वैर",
+      "gloss": "enmity",
+      "category": "afflictive",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "ālasya",
+      "dev": "आलस्य",
+      "gloss": "sloth",
+      "category": "afflictive",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "vinaya",
+      "dev": "विनय",
+      "gloss": "humility",
+      "category": "virtue_calm",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "śraddhā",
+      "dev": "श्रद्धा",
+      "gloss": "faith",
+      "category": "virtue_calm",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "yaṣṭi",
+      "dev": "यष्टि",
+      "gloss": "staff",
+      "category": "concrete_object",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "śayyā",
+      "dev": "शय्या",
+      "gloss": "bed",
+      "category": "concrete_object",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "udara",
+      "dev": "उदर",
+      "gloss": "belly",
+      "category": "animal_body_living",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "uṣṭra",
+      "dev": "उष्ट्र",
+      "gloss": "camel",
+      "category": "animal_body_living",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "tuṣāra",
+      "dev": "तुषार",
+      "gloss": "frost",
+      "category": "natural_action_abstract",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    },
+    {
+      "iast": "ākāśa",
+      "dev": "आकाश",
+      "gloss": "sky",
+      "category": "natural_action_abstract",
+      "eligible": true,
+      "exclusion_reason": "OVER_CATEGORY_QUOTA (eligible; deterministic IAST order placed it beyond the frozen quota)"
+    }
+  ]
+}

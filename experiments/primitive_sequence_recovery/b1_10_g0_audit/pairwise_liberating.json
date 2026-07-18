@@ -1,0 +1,1030 @@
+{
+  "ambition|boredom": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.30303,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ba",
+      "ma"
+    ]
+  },
+  "ambition|calm": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.15625,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "ambition|contentment": {
+    "facet_jaccard_liberating": 0.6,
+    "lexical_jaccard_liberating": 0.615385,
+    "liberating_shared_facet_count": 3,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ma",
+      "na",
+      "ta"
+    ]
+  },
+  "ambition|control": {
+    "facet_jaccard_liberating": 0.125,
+    "lexical_jaccard_liberating": 0.136364,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": [
+      "na"
+    ]
+  },
+  "ambition|courage": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "ambition|doubt": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.423077,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ba",
+      "ta"
+    ]
+  },
+  "ambition|faith": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.285714,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "ambition|fear": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "ambition|freedom": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.151515,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "ambition|gratitude": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.153846,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "ambition|greed": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "ambition|grief": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "ambition|patience": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.333333,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "na",
+      "ta"
+    ]
+  },
+  "ambition|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "ambition|pride": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "boredom|calm": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.151515,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "boredom|contentment": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.131579,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "boredom|control": {
+    "facet_jaccard_liberating": 0.125,
+    "lexical_jaccard_liberating": 0.159091,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "boredom|courage": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.212121,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "boredom|doubt": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.357143,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ba",
+      "da"
+    ]
+  },
+  "boredom|faith": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "boredom|fear": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.318182,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "boredom|freedom": {
+    "facet_jaccard_liberating": 0.75,
+    "lexical_jaccard_liberating": 0.772727,
+    "liberating_shared_facet_count": 3,
+    "liberating_unique_facet_count": 1,
+    "shared_varnas": [
+      "da",
+      "ma",
+      "ra"
+    ]
+  },
+  "boredom|gratitude": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.352941,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "boredom|greed": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.428571,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "boredom|grief": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.25,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "boredom|patience": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 8,
+    "shared_varnas": []
+  },
+  "boredom|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "boredom|pride": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.413793,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "calm|contentment": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.37037,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ka",
+      "ma"
+    ]
+  },
+  "calm|control": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.323529,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ka",
+      "la"
+    ]
+  },
+  "calm|courage": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.172414,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "calm|doubt": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "calm|faith": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "calm|fear": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "calm|freedom": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.178571,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "calm|gratitude": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "calm|greed": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "calm|grief": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "calm|patience": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.147059,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "calm|peace": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.217391,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "calm|pride": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "contentment|control": {
+    "facet_jaccard_liberating": 0.285714,
+    "lexical_jaccard_liberating": 0.282051,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka",
+      "na"
+    ]
+  },
+  "contentment|courage": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.147059,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "contentment|doubt": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.193548,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "contentment|faith": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.285714,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "contentment|fear": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "contentment|freedom": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.151515,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ma"
+    ]
+  },
+  "contentment|gratitude": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.153846,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "contentment|greed": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "contentment|grief": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "contentment|patience": {
+    "facet_jaccard_liberating": 0.6,
+    "lexical_jaccard_liberating": 0.571429,
+    "liberating_shared_facet_count": 3,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ka",
+      "na",
+      "ta"
+    ]
+  },
+  "contentment|peace": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.178571,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "contentment|pride": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "control|courage": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.342857,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ka",
+      "ra"
+    ]
+  },
+  "control|doubt": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.022727,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 8,
+    "shared_varnas": []
+  },
+  "control|faith": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.029412,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "control|fear": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.241379,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "control|freedom": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.179487,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "control|gratitude": {
+    "facet_jaccard_liberating": 0.125,
+    "lexical_jaccard_liberating": 0.177778,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "control|greed": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.175,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "control|grief": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.2,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "control|patience": {
+    "facet_jaccard_liberating": 0.285714,
+    "lexical_jaccard_liberating": 0.268293,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka",
+      "na"
+    ]
+  },
+  "control|peace": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.138889,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "control|pride": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.170732,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "courage|doubt": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "courage|faith": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "courage|fear": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.388889,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "courage|freedom": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.25,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "courage|gratitude": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.448276,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ga",
+      "ra"
+    ]
+  },
+  "courage|greed": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.565217,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ga",
+      "ra"
+    ]
+  },
+  "courage|grief": {
+    "facet_jaccard_liberating": 0.666667,
+    "lexical_jaccard_liberating": 0.722222,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 1,
+    "shared_varnas": [
+      "ga",
+      "ra"
+    ]
+  },
+  "courage|patience": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.138889,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "courage|peace": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.2,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ka"
+    ]
+  },
+  "courage|pride": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.233333,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "doubt|faith": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.375,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "doubt|fear": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "doubt|freedom": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.178571,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "da"
+    ]
+  },
+  "doubt|gratitude": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.37931,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "da",
+      "ta"
+    ]
+  },
+  "doubt|greed": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.172414,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "da"
+    ]
+  },
+  "doubt|grief": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "doubt|patience": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.181818,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "doubt|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "doubt|pride": {
+    "facet_jaccard_liberating": 0.2,
+    "lexical_jaccard_liberating": 0.166667,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": [
+      "da"
+    ]
+  },
+  "faith|fear": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": []
+  },
+  "faith|freedom": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "faith|gratitude": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.25,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "faith|greed": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "faith|grief": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": []
+  },
+  "faith|patience": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.26087,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "faith|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": []
+  },
+  "faith|pride": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "fear|freedom": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.411765,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "fear|gratitude": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.291667,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "fear|greed": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.388889,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "fear|grief": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.538462,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 1,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "fear|patience": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "fear|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": []
+  },
+  "fear|pride": {
+    "facet_jaccard_liberating": 0.333333,
+    "lexical_jaccard_liberating": 0.368421,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "freedom|gratitude": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.413793,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "freedom|greed": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.521739,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "freedom|grief": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.304348,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "freedom|patience": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "freedom|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "freedom|pride": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.5,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "gratitude|greed": {
+    "facet_jaccard_liberating": 0.75,
+    "lexical_jaccard_liberating": 0.75,
+    "liberating_shared_facet_count": 3,
+    "liberating_unique_facet_count": 1,
+    "shared_varnas": [
+      "da",
+      "ga",
+      "ra"
+    ]
+  },
+  "gratitude|grief": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.541667,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ga",
+      "ra"
+    ]
+  },
+  "gratitude|patience": {
+    "facet_jaccard_liberating": 0.142857,
+    "lexical_jaccard_liberating": 0.146341,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": [
+      "ta"
+    ]
+  },
+  "gratitude|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "gratitude|pride": {
+    "facet_jaccard_liberating": 0.4,
+    "lexical_jaccard_liberating": 0.387097,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "greed|grief": {
+    "facet_jaccard_liberating": 0.666667,
+    "lexical_jaccard_liberating": 0.722222,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 1,
+    "shared_varnas": [
+      "ga",
+      "ra"
+    ]
+  },
+  "greed|patience": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 7,
+    "shared_varnas": []
+  },
+  "greed|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": []
+  },
+  "greed|pride": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.48,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "da",
+      "ra"
+    ]
+  },
+  "grief|patience": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 6,
+    "shared_varnas": []
+  },
+  "grief|peace": {
+    "facet_jaccard_liberating": 0.0,
+    "lexical_jaccard_liberating": 0.0,
+    "liberating_shared_facet_count": 0,
+    "liberating_unique_facet_count": 4,
+    "shared_varnas": []
+  },
+  "grief|pride": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.28,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "ra"
+    ]
+  },
+  "patience|peace": {
+    "facet_jaccard_liberating": 0.5,
+    "lexical_jaccard_liberating": 0.521739,
+    "liberating_shared_facet_count": 2,
+    "liberating_unique_facet_count": 2,
+    "shared_varnas": [
+      "ka",
+      "pa"
+    ]
+  },
+  "patience|pride": {
+    "facet_jaccard_liberating": 0.166667,
+    "lexical_jaccard_liberating": 0.2,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 5,
+    "shared_varnas": [
+      "pa"
+    ]
+  },
+  "peace|pride": {
+    "facet_jaccard_liberating": 0.25,
+    "lexical_jaccard_liberating": 0.291667,
+    "liberating_shared_facet_count": 1,
+    "liberating_unique_facet_count": 3,
+    "shared_varnas": [
+      "pa"
+    ]
+  }
+}

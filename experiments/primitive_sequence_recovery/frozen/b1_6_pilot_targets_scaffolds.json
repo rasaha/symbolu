@@ -1,0 +1,3818 @@
+{
+  "artifact_type": "b1_6_pilot_targets_scaffolds",
+  "schema_version": "1.0",
+  "status": "FROZEN_DATA_NOT_AN_EVIDENCE_FREEZE",
+  "generation_run": false,
+  "judging_run": false,
+  "evidence_freeze_declared": false,
+  "coverage_threshold": 0.6,
+  "global_scaffold_metadata": {
+    "KCPR_POLICY": "DUAL_POLE_RENDERING",
+    "KCPR_THEORY_STATUS": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "KOSHA": "DEFERRED",
+    "CSR_STL": "DEFERRED",
+    "POLARITY_INPUT_STATUS": "READOUT_SCAFFOLD_ONLY",
+    "STAGE_A_OPERATOR_POLARITY_STATUS": "POLARITY_FREE"
+  },
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "Track B unblocking",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM"
+  ],
+  "n_targets": 24,
+  "targets": [
+    {
+      "item_id": "b16-01",
+      "TARGET_TEXT": "river",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "river",
+      "phoneme_sequence": [
+        "r",
+        "i",
+        "v",
+        "e",
+        "r"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "va",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "va": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-02",
+      "TARGET_TEXT": "bridge",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "bridge",
+      "phoneme_sequence": [
+        "b",
+        "r",
+        "i",
+        "d",
+        "g",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ba": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "ascent_descent": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        },
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ba": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-03",
+      "TARGET_TEXT": "lantern",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "lantern",
+      "phoneme_sequence": [
+        "l",
+        "a",
+        "n",
+        "t",
+        "e",
+        "r",
+        "n"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "ta": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "clarity_obscuration": -1,
+            "ascent_descent": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-04",
+      "TARGET_TEXT": "mirror",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "mirror",
+      "phoneme_sequence": [
+        "m",
+        "i",
+        "r",
+        "r",
+        "o",
+        "r"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-05",
+      "TARGET_TEXT": "balance",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "balance",
+      "phoneme_sequence": [
+        "b",
+        "a",
+        "l",
+        "a",
+        "n",
+        "k",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ba": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "ascent_descent": -1
+          }
+        },
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "ka": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ba": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-06",
+      "TARGET_TEXT": "freedom",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "freedom",
+      "phoneme_sequence": [
+        "f",
+        "r",
+        "ii",
+        "d",
+        "o",
+        "m"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "f",
+          "status": "UNSUPPORTED_NO_VARNA"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "ii",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "da",
+        "ma"
+      ],
+      "consonant_coverage_rate": 0.75,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        },
+        "ma": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ma": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-07",
+      "TARGET_TEXT": "patience",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "patience",
+      "phoneme_sequence": [
+        "p",
+        "a",
+        "t",
+        "i",
+        "e",
+        "n",
+        "k",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "p",
+          "status": "SUPPORTED",
+          "varna": "pa"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "pa": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          }
+        },
+        "ta": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "clarity_obscuration": -1,
+            "ascent_descent": -1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "ka": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "pa": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-08",
+      "TARGET_TEXT": "threshold",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "threshold",
+      "phoneme_sequence": [
+        "th",
+        "r",
+        "e",
+        "sh",
+        "o",
+        "l",
+        "d"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "th",
+          "status": "SUPPORTED",
+          "varna": "tha"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "sh",
+          "status": "SUPPORTED",
+          "varna": "sha"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        }
+      ],
+      "supported_varna_sequence": [
+        "tha",
+        "ra",
+        "sha",
+        "la",
+        "da"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "tha": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "sha": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "desire_contentment": 1,
+            "expansion_contraction": 1
+          }
+        },
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "tha": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "sha": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-09",
+      "TARGET_TEXT": "Maya",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "maya",
+      "phoneme_sequence": [
+        "m",
+        "e",
+        "a"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-10",
+      "TARGET_TEXT": "Rowan",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "rowan",
+      "phoneme_sequence": [
+        "r",
+        "o",
+        "a",
+        "n"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-11",
+      "TARGET_TEXT": "Nova",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "nova",
+      "phoneme_sequence": [
+        "n",
+        "o",
+        "v",
+        "a"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "na",
+        "va"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "va": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-12",
+      "TARGET_TEXT": "Ira",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "ira",
+      "phoneme_sequence": [
+        "i",
+        "r",
+        "a"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-13",
+      "TARGET_TEXT": "lotus",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "lotus",
+      "phoneme_sequence": [
+        "l",
+        "o",
+        "t",
+        "u",
+        "s"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "s",
+          "status": "SUPPORTED",
+          "varna": "sa"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "ta": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "clarity_obscuration": -1,
+            "ascent_descent": -1
+          }
+        },
+        "sa": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "sa": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-14",
+      "TARGET_TEXT": "dawn",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "dawn",
+      "phoneme_sequence": [
+        "d",
+        "a",
+        "w",
+        "n"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "w",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "da",
+        "va",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        },
+        "va": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-15",
+      "TARGET_TEXT": "anchor",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "anchor",
+      "phoneme_sequence": [
+        "a",
+        "n",
+        "ch",
+        "o",
+        "r"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "ch",
+          "status": "SUPPORTED",
+          "varna": "ca"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "ca": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ca": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-16",
+      "TARGET_TEXT": "mandala",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "mandala",
+      "phoneme_sequence": [
+        "m",
+        "a",
+        "n",
+        "d",
+        "a",
+        "l",
+        "a"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma",
+        "na",
+        "da",
+        "la"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        },
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-17",
+      "TARGET_TEXT": "Lumen",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "lumen",
+      "phoneme_sequence": [
+        "l",
+        "u",
+        "m",
+        "e",
+        "n"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "ma": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ma": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-18",
+      "TARGET_TEXT": "Verba",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "verba",
+      "phoneme_sequence": [
+        "v",
+        "e",
+        "r",
+        "b",
+        "a"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "va",
+        "ra",
+        "ba"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "va": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "ba": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "ascent_descent": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "va": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ba": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-19",
+      "TARGET_TEXT": "Solace",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "solace",
+      "phoneme_sequence": [
+        "s",
+        "o",
+        "l",
+        "a",
+        "k",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "s",
+          "status": "SUPPORTED",
+          "varna": "sa"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "sa",
+        "la",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "sa": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          }
+        },
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "ka": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "sa": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-20",
+      "TARGET_TEXT": "Kite",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "kite",
+      "phoneme_sequence": [
+        "k",
+        "i",
+        "t",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ka",
+        "ta"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ka": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        },
+        "ta": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "clarity_obscuration": -1,
+            "ascent_descent": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-21",
+      "TARGET_TEXT": "grief",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "grief",
+      "phoneme_sequence": [
+        "g",
+        "r",
+        "i",
+        "e",
+        "f"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "f",
+          "status": "UNSUPPORTED_NO_VARNA"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ga",
+        "ra"
+      ],
+      "consonant_coverage_rate": 0.6667,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-22",
+      "TARGET_TEXT": "wonder",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "wonder",
+      "phoneme_sequence": [
+        "w",
+        "o",
+        "n",
+        "d",
+        "e",
+        "r"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "w",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "va": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          }
+        },
+        "na": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          }
+        },
+        "da": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "va": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-23",
+      "TARGET_TEXT": "longing",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "longing",
+      "phoneme_sequence": [
+        "l",
+        "o",
+        "ng",
+        "i",
+        "ng"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "ng",
+          "status": "SUPPORTED",
+          "varna": "nga"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "ng",
+          "status": "SUPPORTED",
+          "varna": "nga"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          }
+        },
+        "nga": {
+          "axis_contributions": {
+            "ascent_descent": 1,
+            "integration_fragmentation": -1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "nga": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-24",
+      "TARGET_TEXT": "courage",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "selection_note": "neutral selection; not chosen for expected Symbol-U success; non-obscure; non-high-stakes",
+      "normalized_text": "courage",
+      "phoneme_sequence": [
+        "k",
+        "a",
+        "u",
+        "r",
+        "a",
+        "g",
+        "e"
+      ],
+      "unmatched_segments": [],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ka",
+        "ra",
+        "ga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "eligible": true,
+      "VARNA_PROFILE_TABLE": {
+        "ka": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        },
+        "ra": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          }
+        },
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          }
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ]
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    }
+  ]
+}

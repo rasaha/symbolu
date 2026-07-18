@@ -1,0 +1,257 @@
+{
+  "schema_version": "1.0",
+  "toy_not_for_scoring": true,
+  "synthetic_only": true,
+  "note": "SYNTHETIC nonsense inputs that exercise Track E scoring/decision MECHANICS only. No real words and no real-language markers (see BANNED_REAL in track_e_harness.py), no LLM, no scoring of the hypothesis. Each case pre-computes a synthetic scorer's per-arm candidate scores so the harness metric+label path can be tested deterministically. 'expected_label' is what track_e_harness.decide() MUST return; cases with expected_label=REJECT MUST raise RejectedFixture. Real-language-token rejection is tested inline in test_track_e_harness.py (such a marker is deliberately NOT committed to this file).",
+  "arm_legend": {
+    "A": "real-boundary arm", "B": "scrambled-boundary arm", "X": "context-only",
+    "F": "etymology-only", "D": "dictionary-only", "I": "Barnum/generic boundary"
+  },
+  "score_legend": {
+    "R1": "c1 (context_correct) ranked 1 -> mrr 1.0",
+    "R2": "c1 ranked 2 (c2 wins) -> mrr 0.5"
+  },
+  "cases": [
+    {
+      "case_id": "E-SIGNAL",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "BOUNDARY_CONSTRAINT_SIGNAL",
+      "rationale": "A ranks c1 first; every control (X,B,F,D,I) ranks it second -> A beats all deltas > eps.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-CONTEXT-ONLY",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "CONTEXT_ONLY_EXPLAINS",
+      "rationale": "Context-only (X) ranks c1 first just as well as A -> A_vs_X <= eps (primary falsifier fires).",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-SCRAMBLE",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "SCRAMBLE_EQUIVALENT",
+      "rationale": "Scrambled boundary (B) ranks c1 first as well as A; A beats context -> A_vs_X > eps but A_vs_B <= eps.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-BARNUM",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "BARNUM_BOUNDARY",
+      "rationale": "Generic Barnum boundary (I) ranks c1 first as well as A; A beats context/scramble -> A_vs_I <= eps.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-ETYMOLOGY",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "ETYMOLOGY_EXPLAINS",
+      "rationale": "Etymology-only (F) ranks c1 first as well as A; A beats X,B,I -> A_vs_F <= eps (checked after Barnum).",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-NO-SIGNAL",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "NO_SIGNAL",
+      "rationale": "A beats X,B,F,I but the dictionary-only arm (D) ties A -> not all deltas > eps, and no earlier veto fires (D is not a veto tier) -> NO_SIGNAL.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.9, "c2": 0.3, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-INCONCLUSIVE",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "INCONCLUSIVE",
+      "rationale": "Every arm ranks c1 second -> all MRR equal -> arm span <= eps, arms not separable.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"},
+            {"candidate_id": "c4", "gloss": "morptic gloss", "role": "barnum_compatible"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2, "c4": 0.1}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-REJECT-MALFORMED",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "REJECT",
+      "reject_reason": "arm_scores omits required arm 'I' -> validate_case must raise RejectedFixture.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2}
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "E-REJECT-CONTAMINATION",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "contamination": true,
+      "expected_label": "REJECT",
+      "reject_reason": "contamination flag set -> validate_case must raise RejectedFixture.",
+      "items": [
+        {
+          "context_sentence": "The quandle drifts near the toft.",
+          "context_correct": "c1",
+          "candidates": [
+            {"candidate_id": "c1", "gloss": "glorptic notion", "role": "context_correct"},
+            {"candidate_id": "c2", "gloss": "blicket sense", "role": "hard_negative"},
+            {"candidate_id": "c3", "gloss": "fendle reading", "role": "dict_valid_context_wrong"}
+          ],
+          "arm_scores": {
+            "A": {"c1": 0.9, "c2": 0.3, "c3": 0.2},
+            "B": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "X": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "F": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "D": {"c1": 0.5, "c2": 0.9, "c3": 0.2},
+            "I": {"c1": 0.5, "c2": 0.9, "c3": 0.2}
+          }
+        }
+      ]
+    }
+  ]
+}

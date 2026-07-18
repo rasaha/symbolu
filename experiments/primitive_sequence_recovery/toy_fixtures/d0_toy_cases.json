@@ -1,0 +1,91 @@
+{
+  "toy_not_for_scoring": true,
+  "_README": "SYNTHETIC TOY DATA for D0 harness dry-run ONLY. No real Sanskrit words, no real varṇa decompositions, no real vṛtti table, no Track C corpus words. Compositions are nonsense tokens; profiles are generic placeholder descriptors. NOT for scoring and NOT evidence of anything.",
+  "cases": [
+    {
+      "target_id": "toy_beats_all",
+      "toy_not_for_scoring": true,
+      "compositions": {
+        "A": "blorn glim vantu",
+        "B": "vantu glim blorn",
+        "C": "quer frazl mube"
+      },
+      "profiles": {
+        "target": ["calm", "steady", "bright", "open"],
+        "I1": ["feeling", "mood", "affect", "tone"],
+        "I2": ["transformation", "journey", "awakening", "growth"],
+        "I3": ["wound", "hurt", "ache", "struggle"],
+        "I4": ["progress", "improvement", "development", "flourishing"]
+      },
+      "judge_behavior": {
+        "A": {"target": 0.90, "I1": 0.30, "I2": 0.25, "I3": 0.20, "I4": 0.28},
+        "B": {"target": 0.40, "I1": 0.35, "I2": 0.30, "I3": 0.25, "I4": 0.30},
+        "C": {"target": 0.35, "I1": 0.33, "I2": 0.31, "I3": 0.29, "I4": 0.32}
+      },
+      "expected_label": "LLM_PILOT_SUGGESTIVE"
+    },
+    {
+      "target_id": "toy_loses_barnum",
+      "toy_not_for_scoring": true,
+      "compositions": {
+        "A": "mube frazl quer",
+        "B": "quer mube frazl",
+        "C": "blorn vantu glim"
+      },
+      "profiles": {
+        "target": ["specific", "precise", "particular", "distinct"],
+        "I1": ["feeling", "mood", "affect", "tone"],
+        "I2": ["transformation", "journey", "awakening", "growth"],
+        "I3": ["wound", "hurt", "ache", "struggle"],
+        "I4": ["progress", "improvement", "development", "flourishing"]
+      },
+      "judge_behavior": {
+        "A": {"target": 0.45, "I1": 0.40, "I2": 0.55, "I3": 0.30, "I4": 0.35},
+        "B": {"target": 0.30, "I1": 0.38, "I2": 0.50, "I3": 0.28, "I4": 0.33},
+        "C": {"target": 0.32, "I1": 0.36, "I2": 0.48, "I3": 0.29, "I4": 0.31}
+      },
+      "expected_label": "LLM_PILOT_NO_SIGNAL"
+    },
+    {
+      "target_id": "toy_contaminated",
+      "toy_not_for_scoring": true,
+      "compositions": {
+        "A": "glim blorn vantu",
+        "B": "blorn vantu glim",
+        "C": "frazl quer mube"
+      },
+      "profiles": {
+        "target": ["calm", "steady", "bright", "open"],
+        "I1": ["feeling", "mood", "affect", "tone"],
+        "I2": ["transformation", "journey", "awakening", "growth"],
+        "I3": ["wound", "hurt", "ache", "struggle"],
+        "I4": ["progress", "improvement", "development", "flourishing"]
+      },
+      "judge_behavior": {
+        "A": {"target": 0.92, "I1": 0.20, "I2": 0.18, "I3": 0.15, "I4": 0.22},
+        "B": {"target": 0.30, "I1": 0.25, "I2": 0.20, "I3": 0.18, "I4": 0.24},
+        "C": {"target": 0.28, "I1": 0.26, "I2": 0.22, "I3": 0.19, "I4": 0.23}
+      },
+      "inject_judge_notes": "comp A is clearly the Sanskrit word for calmness (spiritual root)",
+      "expected_label": "LLM_PILOT_CONTAMINATED"
+    },
+    {
+      "target_id": "toy_malformed",
+      "toy_not_for_scoring": true,
+      "compositions": {
+        "A": "vantu glim blorn",
+        "B": "glim blorn vantu",
+        "C": "mube quer frazl"
+      },
+      "profiles": {
+        "target": ["calm", "steady", "bright", "open"],
+        "I1": ["feeling", "mood", "affect", "tone"],
+        "I2": ["transformation", "journey", "awakening", "growth"],
+        "I3": ["wound", "hurt", "ache", "struggle"],
+        "I4": ["progress", "improvement", "development", "flourishing"]
+      },
+      "raw_response": "{\"scores\": {\"comp_1\": {oops not valid json",
+      "expected_label": "LLM_PILOT_INCONCLUSIVE"
+    }
+  ]
+}

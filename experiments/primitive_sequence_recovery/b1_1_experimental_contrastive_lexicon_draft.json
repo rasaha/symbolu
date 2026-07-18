@@ -1,0 +1,695 @@
+{
+  "artifact": "b1_1_experimental_contrastive_lexicon_draft",
+  "status": "draft_not_frozen",
+  "schema": "binding_liberating_v2",
+  "scope": "consonants_only",
+  "vowels_out_of_scope": true,
+  "framing_note": "Poles are binding vs liberating EXPRESSION of the same source tendency — NOT good/bad, positive/negative, or vice/virtue. Restores lexicon _legend (states of expression, not moral judgements). See B1_1_BINDING_LIBERATING_POLE_LANGUAGE_ADDENDUM.md.",
+  "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_status": "BLOCKED",
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth claim",
+    "not a B1 rescue"
+  ],
+  "deferred_count": 0,
+  "resolved_count": 34,
+  "human_review_required_count": 0,
+  "rewrite_status_allowed": [
+    "source_preserved_counter_rewritten",
+    "exception_protected",
+    "theory_owner_resolved"
+  ],
+  "theory_owner_resolved": [
+    "Ra",
+    "Sa",
+    "Śa",
+    "Ha",
+    "Kṣa"
+  ],
+  "exception_protected": [
+    "Ca",
+    "Va"
+  ],
+  "source_files_consulted": [
+    "varna_lens/lexicon_authoritative.json (read-only)",
+    "classical source: P.R. Sarkar, Acoustic Roots of the Indo-Aryan Alphabet (uploaded PDF, read-only)"
+  ],
+  "governing_addenda": {
+    "proposal": "7c8fbfa",
+    "open_item_resolution": "5c851d3",
+    "guna_binding": "29cb457",
+    "vidya_binding": "ac88dc5",
+    "ca_va_distinction": "226da85",
+    "pole_language": "7b70240"
+  },
+  "entries": [
+    {
+      "lexicon_key": "ka",
+      "varna": "Ka",
+      "transliteration": "ka",
+      "source_attested_pole": {
+        "sanskrit_label": "Āśā",
+        "english_rendering": "Hope",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: Ka is the acoustic root of the abhīpsātmaka āśā vrtti (hope).",
+      "binding_expression": "hope as grasping / clinging to a specific outcome",
+      "liberating_expression": "forward-orientation held without attachment to the outcome",
+      "functional_operation": "aspires and acts while releasing the grip on the result",
+      "contrast_boundary": "not object-renunciation (Gha), not craving-cessation (Dha), not de-fascination (Na)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "kha",
+      "varna": "Kha",
+      "transliteration": "kha",
+      "source_attested_pole": {
+        "sanskrit_label": "Cintā",
+        "english_rendering": "Worry",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of cintā vrtti (worry / impersonal, objective thought).",
+      "binding_expression": "anxious impersonal rumination over open contingencies",
+      "liberating_expression": "composed openness within unresolved impersonal uncertainty",
+      "functional_operation": "holds an unsettled impersonal situation open without forcing premature closure",
+      "contrast_boundary": "not self-efficacy (Ya), not threat-steadiness (Pha), not firmness-under-strain (Cha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ga",
+      "varna": "Ga",
+      "transliteration": "ga",
+      "source_attested_pole": {
+        "sanskrit_label": "Ceṣṭā",
+        "english_rendering": "Effort / striving",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of ceṣṭā vrtti (effort to arouse dormant potential).",
+      "binding_expression": "striving driven by restlessness that cannot stop",
+      "liberating_expression": "effort that can rest — poised, alert stillness when action completes",
+      "functional_operation": "exerts, then ceases into stable alert repose without inertia",
+      "contrast_boundary": "not dull inertia (Ta), not outcome-release (Ka), not containment (Ma)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "gha",
+      "varna": "Gha",
+      "transliteration": "gha",
+      "source_attested_pole": {
+        "sanskrit_label": "Mamatā",
+        "english_rendering": "Attachment",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of mamatā (love/attachment bound by time, space, individuality).",
+      "binding_expression": "love owned as possession and mine-ness",
+      "liberating_expression": "care that holds the loved on an open hand",
+      "functional_operation": "loves while relinquishing ownership of the object",
+      "contrast_boundary": "not outcome-release (Ka), not thirst-cessation (Dha), not indifference (Ba)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "nga",
+      "varna": "Ṅa",
+      "transliteration": "ṅa",
+      "source_attested_pole": {
+        "sanskrit_label": "Dambha",
+        "english_rendering": "Vanity",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of dambha vrtti (vanity).",
+      "binding_expression": "self displayed and performed for others' eyes",
+      "liberating_expression": "conduct that stands without outward performance",
+      "functional_operation": "acts without staging the self for approval",
+      "contrast_boundary": "not inner I-claim deflation (Ja), not inner/outer honesty (Ña)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ca",
+      "varna": "Ca",
+      "transliteration": "ca",
+      "source_attested_pole": {
+        "sanskrit_label": "Viveka",
+        "english_rendering": "Discernment (real vs unreal, right vs wrong)",
+        "source_status": "classical_attested",
+        "classical_side": "liberating_oriented"
+      },
+      "source_note": "Sarkar: Ca is the acoustic root of viveka (conscience/discrimination); the discerning capacity is source-attested.",
+      "binding_expression": "discernment hardening into judgment / separation-pride",
+      "liberating_expression": "falsehood-discerning insight without egoic superiority",
+      "functional_operation": "separates truth from falsehood by detecting misperception, distortion, and false appearance",
+      "contrast_boundary": "not Va/dharma, not assent, not acceptance-as-true, not conduct-ordering",
+      "rewrite_status": "exception_protected",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": "Ca removes the false; Va installs the accepted-as-true. Distinct from Na (de-fascination)."
+    },
+    {
+      "lexicon_key": "cha",
+      "varna": "Cha",
+      "transliteration": "cha",
+      "source_attested_pole": {
+        "sanskrit_label": "Vikalatā",
+        "english_rendering": "Nervous breakdown",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of vikalatā vrtti (nervous breakdown).",
+      "binding_expression": "collapse of mental function under strain",
+      "liberating_expression": "steadiness that keeps function intact under load",
+      "functional_operation": "holds the mind operational under a load that would otherwise break it",
+      "contrast_boundary": "not threat-steadiness (Pha), not forbearance (Da), not poised rest (Ga)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ja",
+      "varna": "Ja",
+      "transliteration": "ja",
+      "source_attested_pole": {
+        "sanskrit_label": "Ahaṁkāra",
+        "english_rendering": "Ego inflation",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of ahaṁkāra vrtti (ego / inflated I-feeling).",
+      "binding_expression": "the inflated 'I did / I control this'",
+      "liberating_expression": "agency exercised without inflating the I",
+      "functional_operation": "acts while withdrawing the inflated I-claim from the account of events",
+      "contrast_boundary": "not outward display-dropping (Ṅa), not inner/outer honesty (Ña)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "jha",
+      "varna": "Jha",
+      "transliteration": "jha",
+      "source_attested_pole": {
+        "sanskrit_label": "Lolupatā / Lobha",
+        "english_rendering": "Greed",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of lolupatā, lobha (greed) and lolatā (avarice).",
+      "binding_expression": "hoarding accumulation without limit",
+      "liberating_expression": "sufficiency — appetite that releases at enough",
+      "functional_operation": "stops accumulation at sufficiency and releases the surplus grip",
+      "contrast_boundary": "not thirst-cessation (Dha), not non-possessive love (Gha), not outcome-release (Ka)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "nya",
+      "varna": "Ña",
+      "transliteration": "ña",
+      "source_attested_pole": {
+        "sanskrit_label": "Kapaṭatā",
+        "english_rendering": "Hypocrisy",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of kapaṭatā vrtti (hypocrisy).",
+      "binding_expression": "concealment — inner and outer diverging",
+      "liberating_expression": "transparency — inner intent and outer act coincide",
+      "functional_operation": "aligns inner intent with outer act, removing concealment",
+      "contrast_boundary": "not display-dropping (Ṅa), not I-claim deflation (Ja)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "tta",
+      "varna": "Ṭa",
+      "transliteration": "ṭa",
+      "source_attested_pole": {
+        "sanskrit_label": "Vitarka",
+        "english_rendering": "Overstatement",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of vitarka vrtti (overstating one's case).",
+      "binding_expression": "garrulous exaggeration beyond the warranted",
+      "liberating_expression": "measured speech saying only what is warranted",
+      "functional_operation": "trims expression to exactly the warranted amount",
+      "contrast_boundary": "not honesty of intent (Ña), not containment (Ma), not poised rest (Ga)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ttha",
+      "varna": "Ṭha",
+      "transliteration": "ṭha",
+      "source_attested_pole": {
+        "sanskrit_label": "Anutāpa",
+        "english_rendering": "Repentance",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of anutāpa vrtti (repentance).",
+      "binding_expression": "remorse that grips and repeats over one's own past act",
+      "liberating_expression": "self-directed release of remorse into acceptance",
+      "functional_operation": "discharges remorse over one's own past act into acceptance",
+      "contrast_boundary": "not other-directed forbearance (Da), not shame-release (Ḍa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "dda",
+      "varna": "Ḍa",
+      "transliteration": "ḍa",
+      "source_attested_pole": {
+        "sanskrit_label": "Lajjā",
+        "english_rendering": "Shyness",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of lajjā vrtti (shyness).",
+      "binding_expression": "action inhibited by others' regard",
+      "liberating_expression": "acting unhindered by social shame",
+      "functional_operation": "releases the inhibiting grip of others' regard on action",
+      "contrast_boundary": "not threat-steadiness (Pha), not remorse-release (Ṭha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ddha",
+      "varna": "Ḍha",
+      "transliteration": "ḍha",
+      "source_attested_pole": {
+        "sanskrit_label": "Piśunatā",
+        "english_rendering": "Sadistic cruelty",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of piśunatā (senseless / sadistic cruelty).",
+      "binding_expression": "malice — sadistic cruelty toward the maligned",
+      "liberating_expression": "compassion that shields the maligned",
+      "functional_operation": "turns malice-energy toward protecting the maligned (social harm)",
+      "contrast_boundary": "not protection of the physically weak (La), not goodwill against revulsion (Pa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "nna",
+      "varna": "Ṇa",
+      "transliteration": "ṇa",
+      "source_attested_pole": {
+        "sanskrit_label": "Īrṣyā",
+        "english_rendering": "Envy",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of īrṣyā vrtti (envy).",
+      "binding_expression": "the sting at another's success",
+      "liberating_expression": "sympathetic gladness at another's fortune",
+      "functional_operation": "converts the sting at another's fortune into shared gladness",
+      "contrast_boundary": "not goodwill against revulsion (Pa), not compassion for suffering (Ḍha/La)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ta",
+      "varna": "Ta",
+      "transliteration": "ta",
+      "source_attested_pole": {
+        "sanskrit_label": "Jāḍya / Nidrā",
+        "english_rendering": "Inertia, deep sleep",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of staticity, long sleep and deep sleep.",
+      "binding_expression": "dullness, torpor, deep sleep of mind",
+      "liberating_expression": "alert wakefulness rising from torpor",
+      "functional_operation": "lifts dullness and sleep into active alertness",
+      "contrast_boundary": "not breaking an induced spell (Bha), not poised rest (Ga), not discernment (Ca)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "tha",
+      "varna": "Tha",
+      "transliteration": "tha",
+      "source_attested_pole": {
+        "sanskrit_label": "Viṣāda",
+        "english_rendering": "Melancholy",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of viṣāda vrtti (melancholy).",
+      "binding_expression": "dejection that sinks one's own mood",
+      "liberating_expression": "warm buoyancy lifting one's own dejection",
+      "functional_operation": "raises one's own dejection into affectionate uplift",
+      "contrast_boundary": "not gladness at others' good (Ṇa), not goodwill toward others (Pa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "da",
+      "varna": "Da",
+      "transliteration": "da",
+      "source_attested_pole": {
+        "sanskrit_label": "Krodha / Karkaśatā",
+        "english_rendering": "Peevishness / irritability",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of peevishness (krodha / karkaśatā).",
+      "binding_expression": "reactive irritability discharged at others",
+      "liberating_expression": "forbearance that absorbs provocation",
+      "functional_operation": "absorbs present provocation from another without discharging it back",
+      "contrast_boundary": "not self-remorse-release (Ṭha), not shame-release (Ḍa), not poised rest (Ga)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "dha",
+      "varna": "Dha",
+      "transliteration": "dha",
+      "source_attested_pole": {
+        "sanskrit_label": "Tṛṣṇā",
+        "english_rendering": "Craving",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of thirst for acquisition (tṛṣṇā).",
+      "binding_expression": "limitless thirst to acquire",
+      "liberating_expression": "the acquisitive thirst quenched at its root",
+      "functional_operation": "extinguishes the thirst-to-acquire itself, not merely one object",
+      "contrast_boundary": "not outcome-release (Ka), not object non-possession (Gha), not anti-hoarding (Jha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "na",
+      "varna": "Na",
+      "transliteration": "na",
+      "source_attested_pole": {
+        "sanskrit_label": "Moha",
+        "english_rendering": "Blind attachment",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of moha vrtti (blind attachment / infatuation).",
+      "binding_expression": "infatuation that fixates on a compulsive attraction",
+      "liberating_expression": "de-fascination from false attraction",
+      "functional_operation": "breaks the spell of blind attachment by making the attractive object lose compulsive grip",
+      "contrast_boundary": "not Ca/Viveka, not general clarity, not renunciation, not disgust",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": "Distinct from Bha: Na = self-generated infatuation; Bha = externally induced spell."
+    },
+    {
+      "lexicon_key": "pa",
+      "varna": "Pa",
+      "transliteration": "pa",
+      "source_attested_pole": {
+        "sanskrit_label": "Ghṛṇā",
+        "english_rendering": "Hatred / revulsion",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of ghṛṇā vrtti (hatred / revulsion).",
+      "binding_expression": "revulsion turned against another",
+      "liberating_expression": "goodwill that dissolves revulsion",
+      "functional_operation": "converts revulsion toward another into active goodwill",
+      "contrast_boundary": "not compassion for the suffering (Ḍha/La), not gladness at fortune (Ṇa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "pha",
+      "varna": "Pha",
+      "transliteration": "pha",
+      "source_attested_pole": {
+        "sanskrit_label": "Bhaya",
+        "english_rendering": "Fear",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of bhaya vrtti (fear).",
+      "binding_expression": "collapse or flight before danger",
+      "liberating_expression": "steadiness meeting a genuine threat",
+      "functional_operation": "meets a real danger without collapse or flight",
+      "contrast_boundary": "not social-shame release (Ḍa), not composure under uncertainty (Kha), not firmness-under-strain (Cha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ba",
+      "varna": "Ba",
+      "transliteration": "ba",
+      "source_attested_pole": {
+        "sanskrit_label": "Avajñā",
+        "english_rendering": "Indifference",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of avajñā vrtti (indifference / neglect of the valuable).",
+      "binding_expression": "neglect of what actually has value",
+      "liberating_expression": "regard that recognizes and attends to worth",
+      "functional_operation": "attends to and honors what has real value instead of neglecting it",
+      "contrast_boundary": "not goodwill against revulsion (Pa), not gladness at fortune (Ṇa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "bha",
+      "varna": "Bha",
+      "transliteration": "bha",
+      "source_attested_pole": {
+        "sanskrit_label": "Mūrcchā",
+        "english_rendering": "Deluded obsession",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of mūrcchā vrtti (loss of common sense under a ripu's hypnotic spell).",
+      "binding_expression": "hypnotic entrancement, loss of common sense",
+      "liberating_expression": "breaking the entrancing spell into clear sense",
+      "functional_operation": "snaps an externally-induced hypnotic fixation and restores clear common sense",
+      "contrast_boundary": "not lifting dullness/sleep (Ta), not self-generated de-fascination (Na), not discernment (Ca)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": "Distinct from Na: Bha = externally induced; Na = self-generated infatuation."
+    },
+    {
+      "lexicon_key": "ma",
+      "varna": "Ma",
+      "transliteration": "ma",
+      "source_attested_pole": {
+        "sanskrit_label": "Praśraya / Praṇāśa",
+        "english_rendering": "Indulgence / annihilating collapse",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of praṇāśa (annihilation) and praśraya vrtti (giving latitude / indulgence).",
+      "binding_expression": "giving latitude to the point of dissolution",
+      "liberating_expression": "disciplined containment that holds form",
+      "functional_operation": "contains and holds a form against over-indulgence and dissolution",
+      "contrast_boundary": "not measured speech (Ṭa), not forbearance (Da), not poised rest (Ga)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ya",
+      "varna": "Ya",
+      "transliteration": "ya",
+      "source_attested_pole": {
+        "sanskrit_label": "Aviśvāsa",
+        "english_rendering": "Lack of confidence",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of aviśvāsa vrtti (lack of confidence in oneself and others).",
+      "binding_expression": "self-doubt that cannot commit",
+      "liberating_expression": "self-efficacy to commit and to rely",
+      "functional_operation": "musters the self-trust needed to commit to an action",
+      "contrast_boundary": "not composure under impersonal uncertainty (Kha), not threat-steadiness (Pha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ra",
+      "varna": "Ra",
+      "transliteration": "ra",
+      "source_attested_pole": {
+        "sanskrit_label": "Prāṇaśakti/Agnitattva + Sarvanāśa",
+        "english_rendering": "vitality / creative fire AND destructive-collapse tendency",
+        "source_status": "classical_attested",
+        "classical_side": "dual"
+      },
+      "source_note": "Sarkar (dual attestation): Ra = acoustic root of agnitattva/prāṇaśakti (vitality) AND of sarvanāśa (destructive collapse; the 'everything is lost / I am undone' tendency). Both classically attested; Sarvanāśa folded into the binding expression, kept visible for traceability — not dropped.",
+      "binding_expression": "rajasic activation driven by compulsion, desire, projection, or destructive collapse",
+      "liberating_expression": "directed energy without bondage",
+      "functional_operation": "converts force into non-compulsive action",
+      "contrast_boundary": "not mere vitality, not suppression, not passive calm, not destructive sarvanāśa-collapse",
+      "rewrite_status": "theory_owner_resolved",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "la",
+      "varna": "La",
+      "transliteration": "la",
+      "source_attested_pole": {
+        "sanskrit_label": "Krūratā",
+        "english_rendering": "Cruelty",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of krūratā vrtti (cruelty), countered by compassion.",
+      "binding_expression": "physical harm inflicted on the weak",
+      "liberating_expression": "compassion that protects the physically vulnerable",
+      "functional_operation": "turns harming-energy toward protecting the physically weak",
+      "contrast_boundary": "not shielding the maligned from slander (Ḍha), not goodwill against revulsion (Pa)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "va",
+      "varna": "Va",
+      "transliteration": "va",
+      "source_attested_pole": {
+        "sanskrit_label": "Dharma",
+        "english_rendering": "Accepted order / truth-status alignment",
+        "source_status": "classical_attested",
+        "classical_side": "liberating_oriented"
+      },
+      "source_note": "Sarkar: Va is the acoustic root of dharma (ensconcement in one's sustaining stance); source-attested.",
+      "binding_expression": "accepting-as-true without sufficient discernment",
+      "liberating_expression": "truth-assent purified by discernment, installing only what is non-bindingly recognized",
+      "functional_operation": "accepts-as-true and organizes conduct around what is granted reality/order status",
+      "contrast_boundary": "not Ca/viveka, not falsehood detection, not analysis, not verification",
+      "rewrite_status": "exception_protected",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": "Va installs the accepted-as-true; depends on Ca for purification (weak Ca + strong Va can bind)."
+    },
+    {
+      "lexicon_key": "sha",
+      "varna": "Śa",
+      "transliteration": "śa",
+      "source_attested_pole": {
+        "sanskrit_label": "rajoguṇa + artha",
+        "english_rendering": "mutative / worldly-directed principle",
+        "source_status": "classical_attested",
+        "classical_side": "neutral"
+      },
+      "source_note": "Sarkar: Śa = acoustic root of rajoguṇa (mutative principle) and artha (psychic / worldly longing). A neutral dynamic principle, not a virtue/vice.",
+      "binding_expression": "worldly purpose possessed as acquisition, status, or control",
+      "liberating_expression": "purposeful action without possessive bondage",
+      "functional_operation": "uses aim and worldly purpose without identity or ownership",
+      "contrast_boundary": "not greed/generosity pair, not anti-worldliness, not renunciation",
+      "rewrite_status": "theory_owner_resolved",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ssa",
+      "varna": "Ṣa",
+      "transliteration": "ṣa",
+      "source_attested_pole": {
+        "sanskrit_label": "Kāma / Tamoguṇa",
+        "english_rendering": "Physical desire / inertia",
+        "source_status": "classical_attested",
+        "classical_side": "binding"
+      },
+      "source_note": "Sarkar: acoustic root of tamoguṇa (static principle) and kāma (worldly / physical desire).",
+      "binding_expression": "sensory craving bound to inertia",
+      "liberating_expression": "raw desire transmuted into grounded, contained drive",
+      "functional_operation": "channels raw sensory desire into a grounded, contained drive",
+      "contrast_boundary": "not thirst-cessation (Dha), not anti-hoarding sufficiency (Jha), not non-possession (Gha)",
+      "rewrite_status": "source_preserved_counter_rewritten",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "sa",
+      "varna": "Sa",
+      "transliteration": "sa",
+      "source_attested_pole": {
+        "sanskrit_label": "Mokṣa / Sattvaguṇa",
+        "english_rendering": "sattvic clarity / order (mokṣa is trans-guṇa)",
+        "source_status": "classical_attested",
+        "classical_side": "liberating_oriented"
+      },
+      "source_note": "Sarkar: Sa = acoustic root of mokṣa (unqualified liberation) and sattvaguṇa. Sattva is still a guṇa (binds); mokṣa is trans-guṇa. Do not equate sattva with liberation.",
+      "binding_expression": "sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+      "liberating_expression": "clarity without attachment to clarity",
+      "functional_operation": "lets clarity function without identity, pride, or bondage to harmony",
+      "contrast_boundary": "not mokṣa as final endpoint, not tamas removal, not moral goodness",
+      "rewrite_status": "theory_owner_resolved",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ha",
+      "varna": "Ha",
+      "transliteration": "ha",
+      "source_attested_pole": {
+        "sanskrit_label": "Parā-vidyā",
+        "english_rendering": "higher / intuitional knowledge",
+        "source_status": "classical_attested",
+        "classical_side": "liberating_oriented"
+      },
+      "source_note": "Sarkar: Ha = acoustic root of parā-vidyā (intuitional science). Knowledge binds unless realized.",
+      "binding_expression": "higher knowledge owned as spiritual identity or subtle pride",
+      "liberating_expression": "realized knowing without ownership",
+      "functional_operation": "lets knowledge dissolve identity instead of forming spiritual ego",
+      "contrast_boundary": "not information, not doctrine, not intellectual certainty",
+      "rewrite_status": "theory_owner_resolved",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    },
+    {
+      "lexicon_key": "ksha",
+      "varna": "Kṣa",
+      "transliteration": "kṣa",
+      "source_attested_pole": {
+        "sanskrit_label": "Aparā-vidyā",
+        "english_rendering": "structured / worldly knowledge",
+        "source_status": "classical_attested",
+        "classical_side": "liberating_oriented"
+      },
+      "source_note": "Sarkar: Kṣa = acoustic root of mundane knowledge / material science (aparā-vidyā). Binds unless realized.",
+      "binding_expression": "structured knowledge owned as control, dogma, or intellectual identity",
+      "liberating_expression": "instrumental knowledge released from possession",
+      "functional_operation": "uses knowledge as tool without becoming the knower-identity",
+      "contrast_boundary": "not parā-vidyā, not dogma replacement, not technical pride",
+      "rewrite_status": "theory_owner_resolved",
+      "b1_1_use_status": "resolved",
+      "collision_resolution_notes": ""
+    }
+  ]
+}

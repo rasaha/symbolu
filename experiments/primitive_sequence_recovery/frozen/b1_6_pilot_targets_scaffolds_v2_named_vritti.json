@@ -1,0 +1,2166 @@
+{
+  "artifact_type": "b1_6_pilot_targets_scaffolds_v2_named_vritti",
+  "schema_version": "1.0",
+  "representation_version": "B1.6-v2_named_vritti",
+  "status": "FROZEN_DATA_NOT_AN_EVIDENCE_FREEZE",
+  "supersedes": "frozen/b1_6_pilot_targets_scaffolds.json (B1.6-v1; never run)",
+  "generation_run": false,
+  "evidence_freeze_declared": false,
+  "global_scaffold_metadata": {
+    "REPRESENTATION_VERSION": "B1.6-v2_named_vritti",
+    "KCPR_POLICY": "NAMED_VRTTI_DUAL_POLE_RENDERING",
+    "KCPR_THEORY_STATUS": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "KOSHA": "DEFERRED",
+    "CSR_STL": "DEFERRED",
+    "POLARITY_INPUT_STATUS": "READOUT_SCAFFOLD_ONLY",
+    "STAGE_A_OPERATOR_POLARITY_STATUS": "POLARITY_FREE"
+  },
+  "v2_table": "track_g_varna_polarity_table_v2_named_vritti.json",
+  "v2_table_sha256": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "validation",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM"
+  ],
+  "n_targets": 24,
+  "targets": [
+    {
+      "item_id": "b16-01",
+      "TARGET_TEXT": "river",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "river",
+      "phoneme_sequence": [
+        "r",
+        "i",
+        "v",
+        "e",
+        "r"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "va",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "va": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "va": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-02",
+      "TARGET_TEXT": "bridge",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "bridge",
+      "phoneme_sequence": [
+        "b",
+        "r",
+        "i",
+        "d",
+        "g",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ba": {
+          "named_attribute": "avajna / indifference, neglect",
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        },
+        "ga": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ba": {
+          "worldly_binding_pole": "indifference / neglect",
+          "spiritual_liberating_pole": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "ga": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-03",
+      "TARGET_TEXT": "lantern",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "lantern",
+      "phoneme_sequence": [
+        "l",
+        "a",
+        "n",
+        "t",
+        "e",
+        "r",
+        "n"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "ta": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "ta": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-04",
+      "TARGET_TEXT": "mirror",
+      "target_type": "common_word",
+      "category": "common concrete words",
+      "neutral_context": "A common noun.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "mirror",
+      "phoneme_sequence": [
+        "m",
+        "i",
+        "r",
+        "r",
+        "o",
+        "r"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-05",
+      "TARGET_TEXT": "balance",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "balance",
+      "phoneme_sequence": [
+        "b",
+        "a",
+        "l",
+        "a",
+        "n",
+        "k",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ba": {
+          "named_attribute": "avajna / indifference, neglect",
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction"
+        },
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "ka": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ba": {
+          "worldly_binding_pole": "indifference / neglect",
+          "spiritual_liberating_pole": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect"
+        },
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "ka": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-06",
+      "TARGET_TEXT": "freedom",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "freedom",
+      "phoneme_sequence": [
+        "f",
+        "r",
+        "ii",
+        "d",
+        "o",
+        "m"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "f",
+          "status": "UNSUPPORTED_NO_VARNA"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "ii",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "da",
+        "ma"
+      ],
+      "consonant_coverage_rate": 0.75,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        },
+        "ma": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "ma": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-07",
+      "TARGET_TEXT": "patience",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "patience",
+      "phoneme_sequence": [
+        "p",
+        "a",
+        "t",
+        "i",
+        "e",
+        "n",
+        "k",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "p",
+          "status": "SUPPORTED",
+          "varna": "pa"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "pa": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear"
+        },
+        "ta": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "ka": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "pa": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "ta": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "ka": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-08",
+      "TARGET_TEXT": "threshold",
+      "target_type": "abstract_concept",
+      "category": "abstract concepts",
+      "neutral_context": "An abstract quality.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "threshold",
+      "phoneme_sequence": [
+        "th",
+        "r",
+        "e",
+        "sh",
+        "o",
+        "l",
+        "d"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "th",
+          "status": "SUPPORTED",
+          "varna": "tha"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "sh",
+          "status": "SUPPORTED",
+          "varna": "sha"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        }
+      ],
+      "supported_varna_sequence": [
+        "tha",
+        "ra",
+        "sha",
+        "la",
+        "da"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "tha": {
+          "named_attribute": "vishada / melancholy",
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "sha": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement"
+        },
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "tha": {
+          "worldly_binding_pole": "melancholy / dejection",
+          "spiritual_liberating_pole": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "sha": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-09",
+      "TARGET_TEXT": "Maya",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "maya",
+      "phoneme_sequence": [
+        "m",
+        "e",
+        "a"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-10",
+      "TARGET_TEXT": "Rowan",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "rowan",
+      "phoneme_sequence": [
+        "r",
+        "o",
+        "a",
+        "n"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-11",
+      "TARGET_TEXT": "Nova",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "nova",
+      "phoneme_sequence": [
+        "n",
+        "o",
+        "v",
+        "a"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "na",
+        "va"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "va": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "va": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-12",
+      "TARGET_TEXT": "Ira",
+      "target_type": "name",
+      "category": "name-like terms",
+      "neutral_context": "A personal name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "ira",
+      "phoneme_sequence": [
+        "i",
+        "r",
+        "a"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-13",
+      "TARGET_TEXT": "lotus",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "lotus",
+      "phoneme_sequence": [
+        "l",
+        "o",
+        "t",
+        "u",
+        "s"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "s",
+          "status": "SUPPORTED",
+          "varna": "sa"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "ta": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "sa": {
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "ta": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "sa": {
+          "worldly_binding_pole": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_pole": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-14",
+      "TARGET_TEXT": "dawn",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "dawn",
+      "phoneme_sequence": [
+        "d",
+        "a",
+        "w",
+        "n"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "w",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "da",
+        "va",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        },
+        "va": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "va": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-15",
+      "TARGET_TEXT": "anchor",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "anchor",
+      "phoneme_sequence": [
+        "a",
+        "n",
+        "ch",
+        "o",
+        "r"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "ch",
+          "status": "SUPPORTED",
+          "varna": "ca"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "ca": {
+          "named_attribute": "viveka / conscience",
+          "worldly_binding_distortion": "lack of discrimination / confused discernment",
+          "spiritual_liberating_reading": "conscience as inner dharmic compass"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "ca": {
+          "worldly_binding_pole": "lack of discrimination / confused discernment",
+          "spiritual_liberating_pole": "conscience as inner dharmic compass",
+          "named_attribute": "viveka / conscience"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-16",
+      "TARGET_TEXT": "mandala",
+      "target_type": "symbolic_term",
+      "category": "symbolic/spiritual terms",
+      "neutral_context": "A symbolic term.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "mandala",
+      "phoneme_sequence": [
+        "m",
+        "a",
+        "n",
+        "d",
+        "a",
+        "l",
+        "a"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ma",
+        "na",
+        "da",
+        "la"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        },
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-17",
+      "TARGET_TEXT": "Lumen",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "lumen",
+      "phoneme_sequence": [
+        "l",
+        "u",
+        "m",
+        "e",
+        "n"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "m",
+          "status": "SUPPORTED",
+          "varna": "ma"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "ma": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "ma": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-18",
+      "TARGET_TEXT": "Verba",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "verba",
+      "phoneme_sequence": [
+        "v",
+        "e",
+        "r",
+        "b",
+        "a"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "v",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "b",
+          "status": "SUPPORTED",
+          "varna": "ba"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "va",
+        "ra",
+        "ba"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "va": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "ba": {
+          "named_attribute": "avajna / indifference, neglect",
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "va": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "ba": {
+          "worldly_binding_pole": "indifference / neglect",
+          "spiritual_liberating_pole": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-19",
+      "TARGET_TEXT": "Solace",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "solace",
+      "phoneme_sequence": [
+        "s",
+        "o",
+        "l",
+        "a",
+        "k",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "s",
+          "status": "SUPPORTED",
+          "varna": "sa"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "sa",
+        "la",
+        "ka"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "sa": {
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+        },
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "ka": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "sa": {
+          "worldly_binding_pole": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_pole": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+        },
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "ka": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-20",
+      "TARGET_TEXT": "Kite",
+      "target_type": "brand_product_term",
+      "category": "brand/product-like terms",
+      "neutral_context": "A product/brand name.",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "kite",
+      "phoneme_sequence": [
+        "k",
+        "i",
+        "t",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "t",
+          "status": "SUPPORTED",
+          "varna": "ta"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ka",
+        "ta"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ka": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation"
+        },
+        "ta": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ka": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        },
+        "ta": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-21",
+      "TARGET_TEXT": "grief",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "grief",
+      "phoneme_sequence": [
+        "g",
+        "r",
+        "i",
+        "e",
+        "f"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "f",
+          "status": "UNSUPPORTED_NO_VARNA"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ga",
+        "ra"
+      ],
+      "consonant_coverage_rate": 0.6667,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ga": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ga": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-22",
+      "TARGET_TEXT": "wonder",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "wonder",
+      "phoneme_sequence": [
+        "w",
+        "o",
+        "n",
+        "d",
+        "e",
+        "r"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "w",
+          "status": "SUPPORTED",
+          "varna": "va"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "n",
+          "status": "SUPPORTED",
+          "varna": "na"
+        },
+        {
+          "phoneme": "d",
+          "status": "SUPPORTED",
+          "varna": "da"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        }
+      ],
+      "supported_varna_sequence": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "va": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+        },
+        "na": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it"
+        },
+        "da": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "va": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        },
+        "na": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "da": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-23",
+      "TARGET_TEXT": "longing",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "longing",
+      "phoneme_sequence": [
+        "l",
+        "o",
+        "ng",
+        "i",
+        "ng"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "l",
+          "status": "SUPPORTED",
+          "varna": "la"
+        },
+        {
+          "phoneme": "o",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "ng",
+          "status": "SUPPORTED",
+          "varna": "nga"
+        },
+        {
+          "phoneme": "i",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "ng",
+          "status": "SUPPORTED",
+          "varna": "nga"
+        }
+      ],
+      "supported_varna_sequence": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it"
+        },
+        "nga": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "nga": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    },
+    {
+      "item_id": "b16-24",
+      "TARGET_TEXT": "courage",
+      "target_type": "emotionally_charged_word",
+      "category": "emotionally charged (non-clinical)",
+      "neutral_context": "An emotion word (non-clinical).",
+      "forbidden_hints": [
+        "no 'intended' reading",
+        "no dictionary gloss supplied to the Symbol-U arm",
+        "no evaluative adjectives",
+        "no etymology unless independently known (semantic arm only)"
+      ],
+      "language_mode": "ENGLISH",
+      "normalized_text": "courage",
+      "phoneme_sequence": [
+        "k",
+        "a",
+        "u",
+        "r",
+        "a",
+        "g",
+        "e"
+      ],
+      "VARNA_SEQUENCE": [
+        {
+          "phoneme": "k",
+          "status": "SUPPORTED",
+          "varna": "ka"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "u",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "r",
+          "status": "SUPPORTED",
+          "varna": "ra"
+        },
+        {
+          "phoneme": "a",
+          "status": "VOWEL_NO_PROFILE"
+        },
+        {
+          "phoneme": "g",
+          "status": "SUPPORTED",
+          "varna": "ga"
+        },
+        {
+          "phoneme": "e",
+          "status": "VOWEL_NO_PROFILE"
+        }
+      ],
+      "supported_varna_sequence": [
+        "ka",
+        "ra",
+        "ga"
+      ],
+      "consonant_coverage_rate": 1.0,
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ka": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation"
+        },
+        "ra": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "ga": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ka": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        },
+        "ra": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "ga": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        }
+      },
+      "CSR_STL_FRAME": "DEFERRED_NOT_POPULATED"
+    }
+  ]
+}

@@ -1,0 +1,995 @@
+{
+  "schema_version": "1.0",
+  "meanings": [
+    {
+      "word_id": "w000",
+      "canonical_meaning": "time",
+      "realization_specific_reference": {
+        "en_gloss": "time",
+        "sa_term": "kāla",
+        "concept_id": "wmc:098"
+      }
+    },
+    {
+      "word_id": "w001",
+      "canonical_meaning": "greed",
+      "realization_specific_reference": {
+        "en_gloss": "greed",
+        "sa_term": "lobha",
+        "concept_id": "wmc:046"
+      }
+    },
+    {
+      "word_id": "w002",
+      "canonical_meaning": "delusion",
+      "realization_specific_reference": {
+        "en_gloss": "delusion",
+        "sa_term": "moha",
+        "concept_id": "wmc:019"
+      }
+    },
+    {
+      "word_id": "w003",
+      "canonical_meaning": "desire",
+      "realization_specific_reference": {
+        "en_gloss": "desire",
+        "sa_term": "kāma",
+        "concept_id": "wmc:021"
+      }
+    },
+    {
+      "word_id": "w004",
+      "canonical_meaning": "anger",
+      "realization_specific_reference": {
+        "en_gloss": "anger",
+        "sa_term": "krodha",
+        "concept_id": "wmc:001"
+      }
+    },
+    {
+      "word_id": "w005",
+      "canonical_meaning": "fear",
+      "realization_specific_reference": {
+        "en_gloss": "fear",
+        "sa_term": "bhaya",
+        "concept_id": "wmc:032"
+      }
+    },
+    {
+      "word_id": "w006",
+      "canonical_meaning": "love",
+      "realization_specific_reference": {
+        "en_gloss": "love",
+        "sa_term": "prema",
+        "concept_id": "wmc:065"
+      }
+    },
+    {
+      "word_id": "w007",
+      "canonical_meaning": "water",
+      "realization_specific_reference": {
+        "en_gloss": "water",
+        "sa_term": "jala",
+        "concept_id": "wmc:104"
+      }
+    },
+    {
+      "word_id": "w008",
+      "canonical_meaning": "fire",
+      "realization_specific_reference": {
+        "en_gloss": "fire",
+        "sa_term": "agni",
+        "concept_id": "wmc:034"
+      }
+    },
+    {
+      "word_id": "w009",
+      "canonical_meaning": "wind",
+      "realization_specific_reference": {
+        "en_gloss": "wind",
+        "sa_term": "vāyu",
+        "concept_id": "wmc:106"
+      }
+    },
+    {
+      "word_id": "w010",
+      "canonical_meaning": "mind",
+      "realization_specific_reference": {
+        "en_gloss": "mind",
+        "sa_term": "manas",
+        "concept_id": "wmc:069"
+      }
+    },
+    {
+      "word_id": "w011",
+      "canonical_meaning": "body",
+      "realization_specific_reference": {
+        "en_gloss": "body",
+        "sa_term": "deha",
+        "concept_id": "wmc:007"
+      }
+    },
+    {
+      "word_id": "w012",
+      "canonical_meaning": "soul",
+      "realization_specific_reference": {
+        "en_gloss": "soul",
+        "sa_term": "jīva",
+        "concept_id": "wmc:091"
+      }
+    },
+    {
+      "word_id": "w013",
+      "canonical_meaning": "death",
+      "realization_specific_reference": {
+        "en_gloss": "death",
+        "sa_term": "mṛtyu",
+        "concept_id": "wmc:017"
+      }
+    },
+    {
+      "word_id": "w014",
+      "canonical_meaning": "truth",
+      "realization_specific_reference": {
+        "en_gloss": "truth",
+        "sa_term": "satya",
+        "concept_id": "wmc:100"
+      }
+    },
+    {
+      "word_id": "w015",
+      "canonical_meaning": "righteousness",
+      "realization_specific_reference": {
+        "en_gloss": "righteousness",
+        "sa_term": "dharma",
+        "concept_id": "wmc:079"
+      }
+    },
+    {
+      "word_id": "w016",
+      "canonical_meaning": "action",
+      "realization_specific_reference": {
+        "en_gloss": "action",
+        "sa_term": "karma",
+        "concept_id": "wmc:000"
+      }
+    },
+    {
+      "word_id": "w017",
+      "canonical_meaning": "illusion",
+      "realization_specific_reference": {
+        "en_gloss": "illusion",
+        "sa_term": "māyā",
+        "concept_id": "wmc:058"
+      }
+    },
+    {
+      "word_id": "w018",
+      "canonical_meaning": "peace",
+      "realization_specific_reference": {
+        "en_gloss": "peace",
+        "sa_term": "śānti",
+        "concept_id": "wmc:076"
+      }
+    },
+    {
+      "word_id": "w019",
+      "canonical_meaning": "bliss",
+      "realization_specific_reference": {
+        "en_gloss": "bliss",
+        "sa_term": "ānanda",
+        "concept_id": "wmc:005"
+      }
+    },
+    {
+      "word_id": "w020",
+      "canonical_meaning": "suffering",
+      "realization_specific_reference": {
+        "en_gloss": "suffering",
+        "sa_term": "duḥkha",
+        "concept_id": "wmc:094"
+      }
+    },
+    {
+      "word_id": "w021",
+      "canonical_meaning": "happiness",
+      "realization_specific_reference": {
+        "en_gloss": "happiness",
+        "sa_term": "sukha",
+        "concept_id": "wmc:048"
+      }
+    },
+    {
+      "word_id": "w022",
+      "canonical_meaning": "cognition",
+      "realization_specific_reference": {
+        "en_gloss": "cognition",
+        "sa_term": "jñāna",
+        "concept_id": "wmc:015"
+      }
+    },
+    {
+      "word_id": "w023",
+      "canonical_meaning": "devotion",
+      "realization_specific_reference": {
+        "en_gloss": "devotion",
+        "sa_term": "bhakti",
+        "concept_id": "wmc:022"
+      }
+    },
+    {
+      "word_id": "w024",
+      "canonical_meaning": "union",
+      "realization_specific_reference": {
+        "en_gloss": "union",
+        "sa_term": "yoga",
+        "concept_id": "wmc:101"
+      }
+    },
+    {
+      "word_id": "w025",
+      "canonical_meaning": "teacher",
+      "realization_specific_reference": {
+        "en_gloss": "teacher",
+        "sa_term": "guru",
+        "concept_id": "wmc:097"
+      }
+    },
+    {
+      "word_id": "w026",
+      "canonical_meaning": "king",
+      "realization_specific_reference": {
+        "en_gloss": "king",
+        "sa_term": "rāja",
+        "concept_id": "wmc:061"
+      }
+    },
+    {
+      "word_id": "w027",
+      "canonical_meaning": "god",
+      "realization_specific_reference": {
+        "en_gloss": "god",
+        "sa_term": "deva",
+        "concept_id": "wmc:043"
+      }
+    },
+    {
+      "word_id": "w028",
+      "canonical_meaning": "demon",
+      "realization_specific_reference": {
+        "en_gloss": "demon",
+        "sa_term": "asura",
+        "concept_id": "wmc:020"
+      }
+    },
+    {
+      "word_id": "w029",
+      "canonical_meaning": "man",
+      "realization_specific_reference": {
+        "en_gloss": "man",
+        "sa_term": "nara",
+        "concept_id": "wmc:066"
+      }
+    },
+    {
+      "word_id": "w030",
+      "canonical_meaning": "woman",
+      "realization_specific_reference": {
+        "en_gloss": "woman",
+        "sa_term": "nārī",
+        "concept_id": "wmc:107"
+      }
+    },
+    {
+      "word_id": "w031",
+      "canonical_meaning": "son",
+      "realization_specific_reference": {
+        "en_gloss": "son",
+        "sa_term": "putra",
+        "concept_id": "wmc:090"
+      }
+    },
+    {
+      "word_id": "w032",
+      "canonical_meaning": "mother",
+      "realization_specific_reference": {
+        "en_gloss": "mother",
+        "sa_term": "mātā",
+        "concept_id": "wmc:071"
+      }
+    },
+    {
+      "word_id": "w033",
+      "canonical_meaning": "father",
+      "realization_specific_reference": {
+        "en_gloss": "father",
+        "sa_term": "pitā",
+        "concept_id": "wmc:031"
+      }
+    },
+    {
+      "word_id": "w034",
+      "canonical_meaning": "house",
+      "realization_specific_reference": {
+        "en_gloss": "house",
+        "sa_term": "gṛha",
+        "concept_id": "wmc:055"
+      }
+    },
+    {
+      "word_id": "w035",
+      "canonical_meaning": "forest",
+      "realization_specific_reference": {
+        "en_gloss": "forest",
+        "sa_term": "vana",
+        "concept_id": "wmc:038"
+      }
+    },
+    {
+      "word_id": "w036",
+      "canonical_meaning": "mountain",
+      "realization_specific_reference": {
+        "en_gloss": "mountain",
+        "sa_term": "parvata",
+        "concept_id": "wmc:072"
+      }
+    },
+    {
+      "word_id": "w037",
+      "canonical_meaning": "river",
+      "realization_specific_reference": {
+        "en_gloss": "river",
+        "sa_term": "nadī",
+        "concept_id": "wmc:080"
+      }
+    },
+    {
+      "word_id": "w038",
+      "canonical_meaning": "sun",
+      "realization_specific_reference": {
+        "en_gloss": "sun",
+        "sa_term": "sūrya",
+        "concept_id": "wmc:095"
+      }
+    },
+    {
+      "word_id": "w039",
+      "canonical_meaning": "moon",
+      "realization_specific_reference": {
+        "en_gloss": "moon",
+        "sa_term": "candra",
+        "concept_id": "wmc:070"
+      }
+    },
+    {
+      "word_id": "w040",
+      "canonical_meaning": "star",
+      "realization_specific_reference": {
+        "en_gloss": "star",
+        "sa_term": "tārā",
+        "concept_id": "wmc:092"
+      }
+    },
+    {
+      "word_id": "w041",
+      "canonical_meaning": "flower",
+      "realization_specific_reference": {
+        "en_gloss": "flower",
+        "sa_term": "puṣpa",
+        "concept_id": "wmc:035"
+      }
+    },
+    {
+      "word_id": "w042",
+      "canonical_meaning": "tree",
+      "realization_specific_reference": {
+        "en_gloss": "tree",
+        "sa_term": "vṛkṣa",
+        "concept_id": "wmc:099"
+      }
+    },
+    {
+      "word_id": "w043",
+      "canonical_meaning": "fruit",
+      "realization_specific_reference": {
+        "en_gloss": "fruit",
+        "sa_term": "phala",
+        "concept_id": "wmc:042"
+      }
+    },
+    {
+      "word_id": "w044",
+      "canonical_meaning": "food",
+      "realization_specific_reference": {
+        "en_gloss": "food",
+        "sa_term": "anna",
+        "concept_id": "wmc:036"
+      }
+    },
+    {
+      "word_id": "w045",
+      "canonical_meaning": "hunger",
+      "realization_specific_reference": {
+        "en_gloss": "hunger",
+        "sa_term": "kṣudhā",
+        "concept_id": "wmc:056"
+      }
+    },
+    {
+      "word_id": "w046",
+      "canonical_meaning": "sleep",
+      "realization_specific_reference": {
+        "en_gloss": "sleep",
+        "sa_term": "nidrā",
+        "concept_id": "wmc:088"
+      }
+    },
+    {
+      "word_id": "w047",
+      "canonical_meaning": "dream",
+      "realization_specific_reference": {
+        "en_gloss": "dream",
+        "sa_term": "svapna",
+        "concept_id": "wmc:024"
+      }
+    },
+    {
+      "word_id": "w048",
+      "canonical_meaning": "eye",
+      "realization_specific_reference": {
+        "en_gloss": "eye",
+        "sa_term": "netra",
+        "concept_id": "wmc:029"
+      }
+    },
+    {
+      "word_id": "w049",
+      "canonical_meaning": "hand",
+      "realization_specific_reference": {
+        "en_gloss": "hand",
+        "sa_term": "hasta",
+        "concept_id": "wmc:047"
+      }
+    },
+    {
+      "word_id": "w050",
+      "canonical_meaning": "foot",
+      "realization_specific_reference": {
+        "en_gloss": "foot",
+        "sa_term": "pāda",
+        "concept_id": "wmc:037"
+      }
+    },
+    {
+      "word_id": "w051",
+      "canonical_meaning": "face",
+      "realization_specific_reference": {
+        "en_gloss": "face",
+        "sa_term": "mukha",
+        "concept_id": "wmc:030"
+      }
+    },
+    {
+      "word_id": "w052",
+      "canonical_meaning": "heart",
+      "realization_specific_reference": {
+        "en_gloss": "heart",
+        "sa_term": "hṛdaya",
+        "concept_id": "wmc:049"
+      }
+    },
+    {
+      "word_id": "w053",
+      "canonical_meaning": "blood",
+      "realization_specific_reference": {
+        "en_gloss": "blood",
+        "sa_term": "rakta",
+        "concept_id": "wmc:006"
+      }
+    },
+    {
+      "word_id": "w054",
+      "canonical_meaning": "form",
+      "realization_specific_reference": {
+        "en_gloss": "form",
+        "sa_term": "rūpa",
+        "concept_id": "wmc:040"
+      }
+    },
+    {
+      "word_id": "w055",
+      "canonical_meaning": "essence",
+      "realization_specific_reference": {
+        "en_gloss": "essence",
+        "sa_term": "rasa",
+        "concept_id": "wmc:028"
+      }
+    },
+    {
+      "word_id": "w056",
+      "canonical_meaning": "strength",
+      "realization_specific_reference": {
+        "en_gloss": "strength",
+        "sa_term": "bala",
+        "concept_id": "wmc:093"
+      }
+    },
+    {
+      "word_id": "w057",
+      "canonical_meaning": "knowledge",
+      "realization_specific_reference": {
+        "en_gloss": "knowledge",
+        "sa_term": "vidyā",
+        "concept_id": "wmc:062"
+      }
+    },
+    {
+      "word_id": "w058",
+      "canonical_meaning": "ignorance",
+      "realization_specific_reference": {
+        "en_gloss": "ignorance",
+        "sa_term": "avidyā",
+        "concept_id": "wmc:057"
+      }
+    },
+    {
+      "word_id": "w059",
+      "canonical_meaning": "enemy",
+      "realization_specific_reference": {
+        "en_gloss": "enemy",
+        "sa_term": "śatru",
+        "concept_id": "wmc:027"
+      }
+    },
+    {
+      "word_id": "w060",
+      "canonical_meaning": "friend",
+      "realization_specific_reference": {
+        "en_gloss": "friend",
+        "sa_term": "mitra",
+        "concept_id": "wmc:041"
+      }
+    },
+    {
+      "word_id": "w061",
+      "canonical_meaning": "world",
+      "realization_specific_reference": {
+        "en_gloss": "world",
+        "sa_term": "loka",
+        "concept_id": "wmc:109"
+      }
+    },
+    {
+      "word_id": "w062",
+      "canonical_meaning": "heaven",
+      "realization_specific_reference": {
+        "en_gloss": "heaven",
+        "sa_term": "svarga",
+        "concept_id": "wmc:050"
+      }
+    },
+    {
+      "word_id": "w063",
+      "canonical_meaning": "hell",
+      "realization_specific_reference": {
+        "en_gloss": "hell",
+        "sa_term": "naraka",
+        "concept_id": "wmc:051"
+      }
+    },
+    {
+      "word_id": "w064",
+      "canonical_meaning": "sin",
+      "realization_specific_reference": {
+        "en_gloss": "sin",
+        "sa_term": "pāpa",
+        "concept_id": "wmc:087"
+      }
+    },
+    {
+      "word_id": "w065",
+      "canonical_meaning": "merit",
+      "realization_specific_reference": {
+        "en_gloss": "merit",
+        "sa_term": "puṇya",
+        "concept_id": "wmc:067"
+      }
+    },
+    {
+      "word_id": "w066",
+      "canonical_meaning": "charity",
+      "realization_specific_reference": {
+        "en_gloss": "charity",
+        "sa_term": "dāna",
+        "concept_id": "wmc:011"
+      }
+    },
+    {
+      "word_id": "w067",
+      "canonical_meaning": "violence",
+      "realization_specific_reference": {
+        "en_gloss": "violence",
+        "sa_term": "himsā",
+        "concept_id": "wmc:103"
+      }
+    },
+    {
+      "word_id": "w068",
+      "canonical_meaning": "nonviolence",
+      "realization_specific_reference": {
+        "en_gloss": "nonviolence",
+        "sa_term": "ahimsā",
+        "concept_id": "wmc:073"
+      }
+    },
+    {
+      "word_id": "w069",
+      "canonical_meaning": "forgiveness",
+      "realization_specific_reference": {
+        "en_gloss": "forgiveness",
+        "sa_term": "kṣamā",
+        "concept_id": "wmc:039"
+      }
+    },
+    {
+      "word_id": "w070",
+      "canonical_meaning": "pride",
+      "realization_specific_reference": {
+        "en_gloss": "pride",
+        "sa_term": "māna",
+        "concept_id": "wmc:078"
+      }
+    },
+    {
+      "word_id": "w071",
+      "canonical_meaning": "power",
+      "realization_specific_reference": {
+        "en_gloss": "power",
+        "sa_term": "śakti",
+        "concept_id": "wmc:077"
+      }
+    },
+    {
+      "word_id": "w072",
+      "canonical_meaning": "hero",
+      "realization_specific_reference": {
+        "en_gloss": "hero",
+        "sa_term": "vīra",
+        "concept_id": "wmc:052"
+      }
+    },
+    {
+      "word_id": "w073",
+      "canonical_meaning": "horse",
+      "realization_specific_reference": {
+        "en_gloss": "horse",
+        "sa_term": "aśva",
+        "concept_id": "wmc:054"
+      }
+    },
+    {
+      "word_id": "w074",
+      "canonical_meaning": "elephant",
+      "realization_specific_reference": {
+        "en_gloss": "elephant",
+        "sa_term": "gaja",
+        "concept_id": "wmc:026"
+      }
+    },
+    {
+      "word_id": "w075",
+      "canonical_meaning": "lion",
+      "realization_specific_reference": {
+        "en_gloss": "lion",
+        "sa_term": "siṃha",
+        "concept_id": "wmc:064"
+      }
+    },
+    {
+      "word_id": "w076",
+      "canonical_meaning": "snake",
+      "realization_specific_reference": {
+        "en_gloss": "snake",
+        "sa_term": "sarpa",
+        "concept_id": "wmc:089"
+      }
+    },
+    {
+      "word_id": "w077",
+      "canonical_meaning": "bird",
+      "realization_specific_reference": {
+        "en_gloss": "bird",
+        "sa_term": "khaga",
+        "concept_id": "wmc:004"
+      }
+    },
+    {
+      "word_id": "w078",
+      "canonical_meaning": "deer",
+      "realization_specific_reference": {
+        "en_gloss": "deer",
+        "sa_term": "mṛga",
+        "concept_id": "wmc:018"
+      }
+    },
+    {
+      "word_id": "w079",
+      "canonical_meaning": "cow",
+      "realization_specific_reference": {
+        "en_gloss": "cow",
+        "sa_term": "go",
+        "concept_id": "wmc:016"
+      }
+    },
+    {
+      "word_id": "w080",
+      "canonical_meaning": "cloud",
+      "realization_specific_reference": {
+        "en_gloss": "cloud",
+        "sa_term": "megha",
+        "concept_id": "wmc:014"
+      }
+    },
+    {
+      "word_id": "w081",
+      "canonical_meaning": "lightning",
+      "realization_specific_reference": {
+        "en_gloss": "lightning",
+        "sa_term": "vidyut",
+        "concept_id": "wmc:063"
+      }
+    },
+    {
+      "word_id": "w082",
+      "canonical_meaning": "ocean",
+      "realization_specific_reference": {
+        "en_gloss": "ocean",
+        "sa_term": "samudra",
+        "concept_id": "wmc:074"
+      }
+    },
+    {
+      "word_id": "w083",
+      "canonical_meaning": "island",
+      "realization_specific_reference": {
+        "en_gloss": "island",
+        "sa_term": "dvīpa",
+        "concept_id": "wmc:059"
+      }
+    },
+    {
+      "word_id": "w084",
+      "canonical_meaning": "jewel",
+      "realization_specific_reference": {
+        "en_gloss": "jewel",
+        "sa_term": "ratna",
+        "concept_id": "wmc:060"
+      }
+    },
+    {
+      "word_id": "w085",
+      "canonical_meaning": "gold",
+      "realization_specific_reference": {
+        "en_gloss": "gold",
+        "sa_term": "suvarṇa",
+        "concept_id": "wmc:044"
+      }
+    },
+    {
+      "word_id": "w086",
+      "canonical_meaning": "silver",
+      "realization_specific_reference": {
+        "en_gloss": "silver",
+        "sa_term": "rajata",
+        "concept_id": "wmc:086"
+      }
+    },
+    {
+      "word_id": "w087",
+      "canonical_meaning": "wood",
+      "realization_specific_reference": {
+        "en_gloss": "wood",
+        "sa_term": "kāṣṭha",
+        "concept_id": "wmc:108"
+      }
+    },
+    {
+      "word_id": "w088",
+      "canonical_meaning": "grass",
+      "realization_specific_reference": {
+        "en_gloss": "grass",
+        "sa_term": "tṛṇa",
+        "concept_id": "wmc:045"
+      }
+    },
+    {
+      "word_id": "w089",
+      "canonical_meaning": "root",
+      "realization_specific_reference": {
+        "en_gloss": "root",
+        "sa_term": "mūla",
+        "concept_id": "wmc:082"
+      }
+    },
+    {
+      "word_id": "w090",
+      "canonical_meaning": "seed",
+      "realization_specific_reference": {
+        "en_gloss": "seed",
+        "sa_term": "bīja",
+        "concept_id": "wmc:085"
+      }
+    },
+    {
+      "word_id": "w091",
+      "canonical_meaning": "field",
+      "realization_specific_reference": {
+        "en_gloss": "field",
+        "sa_term": "kṣetra",
+        "concept_id": "wmc:033"
+      }
+    },
+    {
+      "word_id": "w092",
+      "canonical_meaning": "village",
+      "realization_specific_reference": {
+        "en_gloss": "village",
+        "sa_term": "grāma",
+        "concept_id": "wmc:102"
+      }
+    },
+    {
+      "word_id": "w093",
+      "canonical_meaning": "city",
+      "realization_specific_reference": {
+        "en_gloss": "city",
+        "sa_term": "nagara",
+        "concept_id": "wmc:012"
+      }
+    },
+    {
+      "word_id": "w094",
+      "canonical_meaning": "road",
+      "realization_specific_reference": {
+        "en_gloss": "road",
+        "sa_term": "mārga",
+        "concept_id": "wmc:081"
+      }
+    },
+    {
+      "word_id": "w095",
+      "canonical_meaning": "door",
+      "realization_specific_reference": {
+        "en_gloss": "door",
+        "sa_term": "dvāra",
+        "concept_id": "wmc:023"
+      }
+    },
+    {
+      "word_id": "w096",
+      "canonical_meaning": "bridge",
+      "realization_specific_reference": {
+        "en_gloss": "bridge",
+        "sa_term": "setu",
+        "concept_id": "wmc:009"
+      }
+    },
+    {
+      "word_id": "w097",
+      "canonical_meaning": "wheel",
+      "realization_specific_reference": {
+        "en_gloss": "wheel",
+        "sa_term": "cakra",
+        "concept_id": "wmc:105"
+      }
+    },
+    {
+      "word_id": "w098",
+      "canonical_meaning": "bow",
+      "realization_specific_reference": {
+        "en_gloss": "bow",
+        "sa_term": "dhanus",
+        "concept_id": "wmc:008"
+      }
+    },
+    {
+      "word_id": "w099",
+      "canonical_meaning": "arrow",
+      "realization_specific_reference": {
+        "en_gloss": "arrow",
+        "sa_term": "śara",
+        "concept_id": "wmc:002"
+      }
+    },
+    {
+      "word_id": "w100",
+      "canonical_meaning": "sword",
+      "realization_specific_reference": {
+        "en_gloss": "sword",
+        "sa_term": "khaḍga",
+        "concept_id": "wmc:096"
+      }
+    },
+    {
+      "word_id": "w101",
+      "canonical_meaning": "chariot",
+      "realization_specific_reference": {
+        "en_gloss": "chariot",
+        "sa_term": "ratha",
+        "concept_id": "wmc:010"
+      }
+    },
+    {
+      "word_id": "w102",
+      "canonical_meaning": "cloth",
+      "realization_specific_reference": {
+        "en_gloss": "cloth",
+        "sa_term": "vastra",
+        "concept_id": "wmc:013"
+      }
+    },
+    {
+      "word_id": "w103",
+      "canonical_meaning": "milk",
+      "realization_specific_reference": {
+        "en_gloss": "milk",
+        "sa_term": "kṣīra",
+        "concept_id": "wmc:068"
+      }
+    },
+    {
+      "word_id": "w104",
+      "canonical_meaning": "honey",
+      "realization_specific_reference": {
+        "en_gloss": "honey",
+        "sa_term": "madhu",
+        "concept_id": "wmc:053"
+      }
+    },
+    {
+      "word_id": "w105",
+      "canonical_meaning": "oil",
+      "realization_specific_reference": {
+        "en_gloss": "oil",
+        "sa_term": "taila",
+        "concept_id": "wmc:075"
+      }
+    },
+    {
+      "word_id": "w106",
+      "canonical_meaning": "salt",
+      "realization_specific_reference": {
+        "en_gloss": "salt",
+        "sa_term": "lavaṇa",
+        "concept_id": "wmc:084"
+      }
+    },
+    {
+      "word_id": "w107",
+      "canonical_meaning": "sacrifice",
+      "realization_specific_reference": {
+        "en_gloss": "sacrifice",
+        "sa_term": "yajña",
+        "concept_id": "wmc:083"
+      }
+    },
+    {
+      "word_id": "w108",
+      "canonical_meaning": "austerity",
+      "realization_specific_reference": {
+        "en_gloss": "austerity",
+        "sa_term": "tapas",
+        "concept_id": "wmc:003"
+      }
+    },
+    {
+      "word_id": "w109",
+      "canonical_meaning": "ear",
+      "realization_specific_reference": {
+        "en_gloss": "ear",
+        "sa_term": "karṇa",
+        "concept_id": "wmc:025"
+      }
+    }
+  ]
+}

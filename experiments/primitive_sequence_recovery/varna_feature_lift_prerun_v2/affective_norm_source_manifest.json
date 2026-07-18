@@ -1,0 +1,19 @@
+{
+  "committed_to_repo": false,
+  "dataset": "Warriner, Kuperman & Brysbaert (2013) VAD ratings",
+  "license": "research use (Behavior Research Methods 2013 supplementary; XANEW mirror)",
+  "lookup": "lowercase exact lemma; fuzzy PROHIBITED",
+  "n_lemmas": 13905,
+  "normalization": "raw mean; no transform frozen",
+  "note": "raw CSV pinned by checksum, not committed (size/license); per-word targets extracted into word_target_table.json",
+  "primary_field": "A.Mean.Sum (arousal/activation)",
+  "schema": "varna_lift_norm_source_v1",
+  "score_range": "1..9 (Likert mean)",
+  "secondary_fields": [
+    "V.Mean.Sum (valence)",
+    "D.Mean.Sum (dominance)"
+  ],
+  "sha256": "78ac8107c78e116bb96538fae4faa47281a155f5f8fe39f30bbc6ea3db05b446",
+  "source_url": "https://raw.githubusercontent.com/JULIELab/XANEW/master/Ratings_Warriner_et_al.csv",
+  "version": "original (13,915 lemmas)"
+}

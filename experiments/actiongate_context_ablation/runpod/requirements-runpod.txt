@@ -1,0 +1,12 @@
+# Pinned inference stack for the RunPod Qwen run (excludes torch — installed with a
+# CUDA wheel index in setup_runpod.sh). Versions chosen for Qwen2.5 + transformers
+# compatibility on CUDA 12.1.
+transformers==4.44.2
+accelerate==0.34.2
+safetensors==0.4.5
+sentencepiece==0.2.0
+huggingface_hub==0.25.1
+matplotlib==3.9.2
+numpy==1.26.4
+hf_transfer==0.1.8
+

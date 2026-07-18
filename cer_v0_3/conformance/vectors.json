@@ -1,0 +1,213 @@
+{
+  "algorithm": "sha-256",
+  "cer_version": "0.3",
+  "domain": "database.mutation.v1",
+  "identity_profile": "v2",
+  "note": "Frozen DB-domain digest vectors. Do not edit; corrections land as errata/new vectors.",
+  "vectors": [
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D01_valid_both_producers",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D01_valid_both_producers",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D02_diff_provenance",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D02_diff_provenance",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D03_diff_objective",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D03_diff_objective",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D04_argument_order",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D04_argument_order",
+      "producer": "reordered",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "17b2236913b3777fe67897e90a35e1e21a146281bb7460e616359fe6572a957c",
+      "case": "D10_changed_database",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "17b2236913b3777fe67897e90a35e1e21a146281bb7460e616359fe6572a957c",
+      "case": "D10_changed_database",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "0d64eb7a89fd3a821edf96943e5c7aad80041449077ea6fced223c81c0d198bd",
+      "case": "D11_changed_table",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "0d64eb7a89fd3a821edf96943e5c7aad80041449077ea6fced223c81c0d198bd",
+      "case": "D11_changed_table",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "59ba5db2d0ed96505a0c0bc23edfc674f018d7368af36899dbdad95b0e8adf32",
+      "case": "D12_changed_operation",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "59ba5db2d0ed96505a0c0bc23edfc674f018d7368af36899dbdad95b0e8adf32",
+      "case": "D12_changed_operation",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "8a5a0260e5d5db2c8a9973a4b0f4fbf38510ac424047af288f364de0845ba371",
+      "case": "D13_changed_statement",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "8a5a0260e5d5db2c8a9973a4b0f4fbf38510ac424047af288f364de0845ba371",
+      "case": "D13_changed_statement",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "ff80674742ba493cfbd905b5c86716e68fc64a3964fdcabb89dbfbe17b197f77",
+      "case": "D14_changed_scope",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "ff80674742ba493cfbd905b5c86716e68fc64a3964fdcabb89dbfbe17b197f77",
+      "case": "D14_changed_scope",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "9ddb1cee9bd6b6ae81feb5fa4dfae3c90481639d5c081f8d5b276b3011507aac",
+      "case": "D16_changed_state_binding",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "9ddb1cee9bd6b6ae81feb5fa4dfae3c90481639d5c081f8d5b276b3011507aac",
+      "case": "D16_changed_state_binding",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "648eafc1b89c27600a70aa16101d6e6ae1906b3e42d635ac42e0bcac2733ec54",
+      "case": "D17_changed_compensation",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "648eafc1b89c27600a70aa16101d6e6ae1906b3e42d635ac42e0bcac2733ec54",
+      "case": "D17_changed_compensation",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "527ec750fd23fa16f71e13afa217bea8c1dfbacfa7dc794cce8b2f16769b56ad",
+      "case": "D18_optional_present",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "527ec750fd23fa16f71e13afa217bea8c1dfbacfa7dc794cce8b2f16769b56ad",
+      "case": "D18_optional_present",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "ece3019410fd48d0dc08221896ac84aabdca0e543c2603ae91cfa85e97142ba3",
+      "case": "D15_changed_principal",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "ece3019410fd48d0dc08221896ac84aabdca0e543c2603ae91cfa85e97142ba3",
+      "case": "D15_changed_principal",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "I09_stale_db_state",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "I09_stale_db_state",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "8237eb3094a3c6be7c03a8295a878ade8830d6225107444533aac517eca7d27b",
+      "case": "I15_unbounded",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "8237eb3094a3c6be7c03a8295a878ade8830d6225107444533aac517eca7d27b",
+      "case": "I15_unbounded",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D20_missing_simulation",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "D20_missing_simulation",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "I14_direct_bypass",
+      "producer": "ugence",
+      "profile": "database.mutation.v1"
+    },
+    {
+      "action_digest": "05ad2c021a6256a0c6f94ac4a9213ec8373aed174c18151b412f206e58220880",
+      "case": "I14_direct_bypass",
+      "producer": "tool-runtime",
+      "profile": "database.mutation.v1"
+    }
+  ]
+}

@@ -1,0 +1,1589 @@
+[
+  {
+    "word": "śānti",
+    "gloss": "peace",
+    "category": "resolution",
+    "components": [
+      [
+        "ś",
+        100
+      ],
+      [
+        "n",
+        75
+      ],
+      [
+        "t",
+        75
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 83,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "mokṣa",
+    "gloss": "liberation",
+    "category": "resolution",
+    "components": [
+      [
+        "m",
+        100
+      ],
+      [
+        "k",
+        100
+      ],
+      [
+        "ṣ",
+        100
+      ]
+    ],
+    "mean": 100.0,
+    "min": 100,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 87,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "śama",
+    "gloss": "calm",
+    "category": "resolution",
+    "components": [
+      [
+        "ś",
+        100
+      ],
+      [
+        "m",
+        75
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 75,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "kṣamā",
+    "gloss": "forgiveness",
+    "category": "resolution",
+    "components": [
+      [
+        "k",
+        75
+      ],
+      [
+        "ṣ",
+        75
+      ],
+      [
+        "m",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "dhairya",
+    "gloss": "fortitude",
+    "category": "resolution",
+    "components": [
+      [
+        "dh",
+        75
+      ],
+      [
+        "r",
+        100
+      ],
+      [
+        "y",
+        100
+      ]
+    ],
+    "mean": 91.7,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "maitrī",
+    "gloss": "friendliness",
+    "category": "resolution",
+    "components": [
+      [
+        "m",
+        75
+      ],
+      [
+        "t",
+        75
+      ],
+      [
+        "r",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "karuṇā",
+    "gloss": "compassion",
+    "category": "resolution",
+    "components": [
+      [
+        "k",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "ṇ",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 70,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  },
+  {
+    "word": "tyāga",
+    "gloss": "renunciation",
+    "category": "resolution",
+    "components": [
+      [
+        "t",
+        75
+      ],
+      [
+        "y",
+        75
+      ],
+      [
+        "g",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 87,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "vairāgya",
+    "gloss": "dispassion",
+    "category": "resolution",
+    "components": [
+      [
+        "v",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "g",
+        100
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 81.2,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 2,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "ānanda",
+    "gloss": "bliss",
+    "category": "resolution",
+    "components": [
+      [
+        "n",
+        75
+      ],
+      [
+        "n",
+        75
+      ],
+      [
+        "d",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "krodha",
+    "gloss": "anger",
+    "category": "affliction",
+    "components": [
+      [
+        "k",
+        25
+      ],
+      [
+        "r",
+        0
+      ],
+      [
+        "dh",
+        25
+      ]
+    ],
+    "mean": 16.7,
+    "min": 0,
+    "emb": 3,
+    "verdict": "FAIL",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "kāma",
+    "gloss": "desire",
+    "category": "affliction",
+    "components": [
+      [
+        "k",
+        0
+      ],
+      [
+        "m",
+        25
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "lobha",
+    "gloss": "greed",
+    "category": "affliction",
+    "components": [
+      [
+        "l",
+        25
+      ],
+      [
+        "bh",
+        0
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "moha",
+    "gloss": "delusion",
+    "category": "affliction",
+    "components": [
+      [
+        "m",
+        25
+      ],
+      [
+        "h",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 75,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  },
+  {
+    "word": "mada",
+    "gloss": "pride",
+    "category": "affliction",
+    "components": [
+      [
+        "m",
+        25
+      ],
+      [
+        "d",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "dveṣa",
+    "gloss": "hatred",
+    "category": "affliction",
+    "components": [
+      [
+        "d",
+        25
+      ],
+      [
+        "v",
+        25
+      ],
+      [
+        "ṣ",
+        50
+      ]
+    ],
+    "mean": 33.3,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 87,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "bhaya",
+    "gloss": "fear",
+    "category": "affliction",
+    "components": [
+      [
+        "bh",
+        25
+      ],
+      [
+        "y",
+        0
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "īrṣyā",
+    "gloss": "jealousy",
+    "category": "affliction",
+    "components": [
+      [
+        "r",
+        25
+      ],
+      [
+        "ṣ",
+        25
+      ],
+      [
+        "y",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 3,
+    "verdict": "FAIL",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "ahaṃkāra",
+    "gloss": "ego",
+    "category": "affliction",
+    "components": [
+      [
+        "h",
+        25
+      ],
+      [
+        "k",
+        25
+      ],
+      [
+        "r",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 3,
+    "verdict": "FAIL",
+    "PMM": 70,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "mātsarya",
+    "gloss": "envy",
+    "category": "affliction",
+    "components": [
+      [
+        "m",
+        25
+      ],
+      [
+        "t",
+        50
+      ],
+      [
+        "s",
+        50
+      ],
+      [
+        "r",
+        25
+      ],
+      [
+        "y",
+        25
+      ]
+    ],
+    "mean": 35.0,
+    "min": 25,
+    "emb": 3,
+    "verdict": "FAIL",
+    "PMM": 92,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 4,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "jala",
+    "gloss": "water",
+    "category": "inanimate",
+    "components": [
+      [
+        "j",
+        100
+      ],
+      [
+        "l",
+        100
+      ]
+    ],
+    "mean": 100.0,
+    "min": 100,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "aśma",
+    "gloss": "stone",
+    "category": "inanimate",
+    "components": [
+      [
+        "ś",
+        100
+      ],
+      [
+        "m",
+        100
+      ]
+    ],
+    "mean": 100.0,
+    "min": 100,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 75,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "ghaṭa",
+    "gloss": "pot",
+    "category": "inanimate",
+    "components": [
+      [
+        "gh",
+        100
+      ],
+      [
+        "ṭ",
+        100
+      ]
+    ],
+    "mean": 100.0,
+    "min": 100,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "pustaka",
+    "gloss": "book",
+    "category": "inanimate",
+    "components": [
+      [
+        "p",
+        100
+      ],
+      [
+        "s",
+        75
+      ],
+      [
+        "t",
+        50
+      ],
+      [
+        "k",
+        100
+      ]
+    ],
+    "mean": 81.2,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 80,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2,
+      "INFERRED": 2
+    }
+  },
+  {
+    "word": "gṛha",
+    "gloss": "house",
+    "category": "inanimate",
+    "components": [
+      [
+        "g",
+        100
+      ],
+      [
+        "h",
+        50
+      ]
+    ],
+    "mean": 75.0,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 55,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  },
+  {
+    "word": "suvarṇa",
+    "gloss": "gold",
+    "category": "inanimate",
+    "components": [
+      [
+        "s",
+        50
+      ],
+      [
+        "v",
+        75
+      ],
+      [
+        "r",
+        100
+      ],
+      [
+        "ṇ",
+        50
+      ]
+    ],
+    "mean": 68.8,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 68,
+    "PMM_evidence": {
+      "INFERRED": 2,
+      "PRIMARY_ATTESTED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  },
+  {
+    "word": "gaja",
+    "gloss": "elephant",
+    "category": "animal",
+    "components": [
+      [
+        "g",
+        75
+      ],
+      [
+        "j",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "siṃha",
+    "gloss": "lion",
+    "category": "animal",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "h",
+        50
+      ]
+    ],
+    "mean": 62.5,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 55,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  },
+  {
+    "word": "sarpa",
+    "gloss": "snake",
+    "category": "animal",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "r",
+        25
+      ],
+      [
+        "p",
+        25
+      ]
+    ],
+    "mean": 41.7,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "vyāghra",
+    "gloss": "tiger",
+    "category": "animal",
+    "components": [
+      [
+        "v",
+        75
+      ],
+      [
+        "y",
+        100
+      ],
+      [
+        "gh",
+        50
+      ],
+      [
+        "r",
+        25
+      ]
+    ],
+    "mean": 62.5,
+    "min": 25,
+    "emb": 1,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 90,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "aśva",
+    "gloss": "horse",
+    "category": "animal",
+    "components": [
+      [
+        "ś",
+        75
+      ],
+      [
+        "v",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 55,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "go",
+    "gloss": "cow",
+    "category": "animal",
+    "components": [
+      [
+        "g",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 60,
+    "PMM_evidence": {
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "mṛga",
+    "gloss": "deer",
+    "category": "animal",
+    "components": [
+      [
+        "m",
+        75
+      ],
+      [
+        "g",
+        50
+      ]
+    ],
+    "mean": 62.5,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 80,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "vṛka",
+    "gloss": "wolf",
+    "category": "animal",
+    "components": [
+      [
+        "v",
+        75
+      ],
+      [
+        "k",
+        25
+      ]
+    ],
+    "mean": 50.0,
+    "min": 25,
+    "emb": 1,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 60,
+    "PMM_evidence": {
+      "INFERRED": 2
+    }
+  },
+  {
+    "word": "sukha",
+    "gloss": "happiness",
+    "category": "emotion",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "kh",
+        100
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 60,
+    "PMM_evidence": {
+      "INFERRED": 2
+    }
+  },
+  {
+    "word": "duḥkha",
+    "gloss": "sorrow",
+    "category": "emotion",
+    "components": [
+      [
+        "d",
+        25
+      ],
+      [
+        "kh",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 80,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "harṣa",
+    "gloss": "joy",
+    "category": "emotion",
+    "components": [
+      [
+        "h",
+        50
+      ],
+      [
+        "r",
+        100
+      ],
+      [
+        "ṣ",
+        50
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 83,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "śoka",
+    "gloss": "grief",
+    "category": "emotion",
+    "components": [
+      [
+        "ś",
+        25
+      ],
+      [
+        "k",
+        25
+      ]
+    ],
+    "mean": 25.0,
+    "min": 25,
+    "emb": 2,
+    "verdict": "FAIL",
+    "PMM": 55,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "satya",
+    "gloss": "truth",
+    "category": "virtue",
+    "components": [
+      [
+        "s",
+        50
+      ],
+      [
+        "t",
+        75
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "dāna",
+    "gloss": "charity",
+    "category": "virtue",
+    "components": [
+      [
+        "d",
+        75
+      ],
+      [
+        "n",
+        100
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "ahiṃsā",
+    "gloss": "non-violence",
+    "category": "virtue",
+    "components": [
+      [
+        "h",
+        75
+      ],
+      [
+        "s",
+        50
+      ]
+    ],
+    "mean": 62.5,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 55,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "dayā",
+    "gloss": "mercy",
+    "category": "virtue",
+    "components": [
+      [
+        "d",
+        100
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "bhakti",
+    "gloss": "devotion",
+    "category": "virtue",
+    "components": [
+      [
+        "bh",
+        25
+      ],
+      [
+        "k",
+        50
+      ],
+      [
+        "t",
+        75
+      ]
+    ],
+    "mean": 50.0,
+    "min": 25,
+    "emb": 1,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 87,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "jñāna",
+    "gloss": "knowledge",
+    "category": "abstract",
+    "components": [
+      [
+        "j",
+        50
+      ],
+      [
+        "ñ",
+        75
+      ],
+      [
+        "n",
+        100
+      ]
+    ],
+    "mean": 75.0,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "vidyā",
+    "gloss": "learning",
+    "category": "abstract",
+    "components": [
+      [
+        "v",
+        50
+      ],
+      [
+        "d",
+        75
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "buddhi",
+    "gloss": "intellect",
+    "category": "abstract",
+    "components": [
+      [
+        "b",
+        50
+      ],
+      [
+        "d",
+        75
+      ],
+      [
+        "dh",
+        75
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "smṛti",
+    "gloss": "memory",
+    "category": "abstract",
+    "components": [
+      [
+        "s",
+        50
+      ],
+      [
+        "m",
+        75
+      ],
+      [
+        "t",
+        50
+      ]
+    ],
+    "mean": 58.3,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "kāla",
+    "gloss": "time",
+    "category": "abstract",
+    "components": [
+      [
+        "k",
+        100
+      ],
+      [
+        "l",
+        25
+      ]
+    ],
+    "mean": 62.5,
+    "min": 25,
+    "emb": 1,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "agni",
+    "gloss": "fire",
+    "category": "natural",
+    "components": [
+      [
+        "g",
+        25
+      ],
+      [
+        "n",
+        75
+      ]
+    ],
+    "mean": 50.0,
+    "min": 25,
+    "emb": 1,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "vāyu",
+    "gloss": "wind",
+    "category": "natural",
+    "components": [
+      [
+        "v",
+        100
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 80,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "sūrya",
+    "gloss": "sun",
+    "category": "natural",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "y",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 87,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "candra",
+    "gloss": "moon",
+    "category": "natural",
+    "components": [
+      [
+        "c",
+        75
+      ],
+      [
+        "n",
+        50
+      ],
+      [
+        "d",
+        75
+      ],
+      [
+        "r",
+        75
+      ]
+    ],
+    "mean": 68.8,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 88,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "megha",
+    "gloss": "cloud",
+    "category": "natural",
+    "components": [
+      [
+        "m",
+        75
+      ],
+      [
+        "gh",
+        100
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "vidyut",
+    "gloss": "lightning",
+    "category": "natural",
+    "components": [
+      [
+        "v",
+        100
+      ],
+      [
+        "d",
+        50
+      ],
+      [
+        "y",
+        75
+      ],
+      [
+        "t",
+        100
+      ]
+    ],
+    "mean": 81.2,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 90,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "hasta",
+    "gloss": "hand",
+    "category": "body",
+    "components": [
+      [
+        "h",
+        50
+      ],
+      [
+        "s",
+        75
+      ],
+      [
+        "t",
+        50
+      ]
+    ],
+    "mean": 58.3,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 70,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1
+    }
+  },
+  {
+    "word": "netra",
+    "gloss": "eye",
+    "category": "body",
+    "components": [
+      [
+        "n",
+        50
+      ],
+      [
+        "t",
+        50
+      ],
+      [
+        "r",
+        75
+      ]
+    ],
+    "mean": 58.3,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 3
+    }
+  },
+  {
+    "word": "śiras",
+    "gloss": "head",
+    "category": "body",
+    "components": [
+      [
+        "ś",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "s",
+        50
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 70,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 1,
+      "INFERRED": 1
+    }
+  },
+  {
+    "word": "hṛdaya",
+    "gloss": "heart",
+    "category": "body",
+    "components": [
+      [
+        "h",
+        50
+      ],
+      [
+        "d",
+        50
+      ],
+      [
+        "y",
+        50
+      ]
+    ],
+    "mean": 50.0,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 83,
+    "PMM_evidence": {
+      "AUTHORED_PROVISIONAL": 1,
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "pāda",
+    "gloss": "foot",
+    "category": "body",
+    "components": [
+      [
+        "p",
+        50
+      ],
+      [
+        "d",
+        75
+      ]
+    ],
+    "mean": 62.5,
+    "min": 50,
+    "emb": 0,
+    "verdict": "PARTIAL_FIT",
+    "PMM": 100,
+    "PMM_evidence": {
+      "PRIMARY_ATTESTED": 2
+    }
+  },
+  {
+    "word": "karṇa",
+    "gloss": "ear",
+    "category": "body",
+    "components": [
+      [
+        "k",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "ṇ",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "emb": 0,
+    "verdict": "PASS",
+    "PMM": 70,
+    "PMM_evidence": {
+      "INFERRED": 1,
+      "PRIMARY_ATTESTED": 1,
+      "AUTHORED_PROVISIONAL": 1
+    }
+  }
+]

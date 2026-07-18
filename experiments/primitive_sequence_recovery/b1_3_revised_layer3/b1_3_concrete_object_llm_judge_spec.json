@@ -1,0 +1,63 @@
+{
+  "artifact": "b1_3_concrete_object_llm_judge_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "revision": "allow LLM judges as the PRIMARY pilot/evidence instrument for OBJECTIVE concrete-object function-fit",
+  "not_the_same_as": "B1.1 mixed/loaded-word LLM test (null); target here is objective object-function modulation on stable concrete objects, not felt resonance on loaded words",
+  "instrument": "LLM judges (blinded), scoring object-function fit under a fixed dictionary anchor",
+  "target_set": "primary concrete objects from b1_3_human_modulation_concrete_object_candidate_wordlist.json (tier=primary)",
+  "construct": "given a fixed dictionary meaning and clear function of a concrete object, does the REAL varṇa-derived modulation fit the object's function better than deranged/scrambled/random/neutral modulations?",
+  "new_future_label": {
+    "name": "LLM_OBJECT_MODULATION_SIGNAL",
+    "meaning": "LLM judges, under fixed dictionary anchors for concrete objects, prefer real varṇa-derived modulation over deranged, scrambled, random, and neutral controls for object-function fit",
+    "reachable_only_after": ["EVIDENCE_FREEZE declared", "run completed", "style-tell audit passed", "primary endpoint met on primary concrete objects", "no result driven by diagnostic loaded words"],
+    "explicitly_not": ["human felt validation", "HUMAN_PROPENSITY_MODULATION_SIGNAL", "ontology validation", "Sanskrit privilege", "semantic truth", "Track B unblock"]
+  },
+  "why_concrete_objects_defensible": {
+    "stable_denotation": "fixed unambiguous dictionary meaning; judge not guessing denotation",
+    "clear_object_function": "objects have a graspable function giving an objective referent for 'fit'",
+    "lower_emotional_projection": "objects carry little affect; less feeling-match contamination",
+    "lower_doctrinal_leakage": "objects carry no doctrine; not convention recall",
+    "easier_wrong_answer_controls": "with a concrete function, mismatched modulations are more clearly wrong; sharper controls"
+  },
+  "remaining_risks": {
+    "ordinary_object_semantics": "LLM may prefer A_real via learned object semantics re-derivable from the anchor alone, not varṇa; mitigate with identical anchors across arms, tags may not restate denotation, semantics-only baseline check",
+    "prose_preference": "LLM may prefer better-reading option; mitigate with hard style-tell audit, shared register normalization, equal length/tag count",
+    "scrambled_may_equal_real": "prior automated scrambled~real (cosine 0.967); order may again carry nothing",
+    "llm_object_fit_only": "even a clean positive is LLM object-fit evidence, not human felt validation; ceiling is LLM_OBJECT_MODULATION_SIGNAL"
+  },
+  "arms": ["A_real", "R_deranged", "R_scrambled", "R_random", "X_neutral", "(optional) R_semantic_near", "(optional) R_varna_near"],
+  "arms_unchanged": true,
+  "arm_construction_reference": "b1_3_human_modulation_arm_construction_spec.json (construction/seeding/determinism unchanged; only judge + scored construct change)",
+  "primary_endpoint": "A_real win-rate vs R_deranged (forced choice) on primary concrete objects",
+  "required_success_all_must_hold": [
+    "A_real beats R_deranged, R_scrambled, R_random, and X_neutral on primary concrete objects",
+    "style-tell audit passes (real arm not identifiable by surface style, else STOP)",
+    "no result driven by diagnostic loaded words (kinship/religious/affect/social-register are diagnostic only; drop-diagnostic sensitivity check)",
+    "no ontology or Sanskrit-truth claim attached to any outcome"
+  ],
+  "honest_prior": "automated probes found real~fake objects (scrambled~real 0.967; deranged~real); judge chooses between near-identical stimuli; prior is LOW; pre-register so a null is believable and a positive is not a prose/ordinary-semantics artifact",
+  "prior_results_preserved": {
+    "B1.1": "LLM null on earlier mixed/loaded design (RANDOM_OR_SCRAMBLED_MATCHES)",
+    "B1.2_B1.3_automated": "nulls (real~deranged; scrambled~real 0.967; order-invariant)",
+    "B1.3_register_field": "CLOSED (category mismatch)",
+    "B1.4_vritti": "CLOSED (ground truth absent)",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED",
+    "positive_label": "none earned yet"
+  },
+  "run_state": {"final_stimuli_generated": false, "llm_judges_run": false, "human_run_completed": false, "scoring_run": false, "evidence_freeze_declared": false},
+  "decision": "LLM_OBJECT_MODULATION_PROTOCOL_READY",
+  "decision_alternatives_not_taken": ["LLM_OBJECT_MODULATION_HIGH_RISK_NEEDS_REVISION", "LLM_OBJECT_MODULATION_REJECTED_HUMANS_REQUIRED"],
+  "remaining_blockers": [
+    "final frozen concrete-object list (screened)",
+    "LLM judge model + prompt + blinding protocol",
+    "final style-tell audit protocol + result (hard gate before judging)",
+    "semantics-only baseline check",
+    "final scoring script + decision thresholds",
+    "manifest hash binding of all frozen artifacts"
+  ],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["spec draft, not frozen", "not evidence", "no judges run", "LLM object-fit ceiling only, not human/ontology/truth", "no prior-result reversal", "no positive label earned"]
+}

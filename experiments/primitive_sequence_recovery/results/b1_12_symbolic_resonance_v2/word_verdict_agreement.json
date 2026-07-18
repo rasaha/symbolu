@@ -1,0 +1,212 @@
+{
+  "exact_verdict_agreement": 0.5,
+  "n_words": 20,
+  "rows": [
+    {
+      "word": "akrodha",
+      "category": "virtue_calm",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "STRONG_RESONANCE",
+      "mean_Qwen": 25.0,
+      "mean_Mistral": 75.0,
+      "agree": false,
+      "model_sensitive": true
+    },
+    {
+      "word": "asūyā",
+      "category": "afflictive",
+      "verdict_Qwen": "MODERATE_RESONANCE",
+      "verdict_Mistral": "MODERATE_RESONANCE",
+      "mean_Qwen": 50.0,
+      "mean_Mistral": 62.5,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "audārya",
+      "category": "virtue_calm",
+      "verdict_Qwen": "STRONG_RESONANCE",
+      "verdict_Mistral": "MODERATE_RESONANCE",
+      "mean_Qwen": 75.0,
+      "mean_Mistral": 66.67,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "bhrama",
+      "category": "afflictive",
+      "verdict_Qwen": "MODERATE_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 58.33,
+      "mean_Mistral": 25.0,
+      "agree": false,
+      "model_sensitive": true
+    },
+    {
+      "word": "chāyā",
+      "category": "natural_action_abstract",
+      "verdict_Qwen": "WEAK_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 37.5,
+      "mean_Mistral": 25.0,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "cintā",
+      "category": "afflictive",
+      "verdict_Qwen": "MODERATE_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 50.0,
+      "mean_Mistral": 25.0,
+      "agree": false,
+      "model_sensitive": true
+    },
+    {
+      "word": "cāpa",
+      "category": "concrete_object",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 25.0,
+      "mean_Mistral": 25.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "dama",
+      "category": "virtue_calm",
+      "verdict_Qwen": "STRONG_RESONANCE",
+      "verdict_Mistral": "STRONG_RESONANCE",
+      "mean_Qwen": 75.0,
+      "mean_Mistral": 75.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "darpaṇa",
+      "category": "concrete_object",
+      "verdict_Qwen": "NO_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 0.0,
+      "mean_Mistral": 18.75,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "dhvani",
+      "category": "natural_action_abstract",
+      "verdict_Qwen": "NO_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 0.0,
+      "mean_Mistral": 16.67,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "dhṛti",
+      "category": "virtue_calm",
+      "verdict_Qwen": "MODERATE_RESONANCE",
+      "verdict_Mistral": "STRONG_RESONANCE",
+      "mean_Qwen": 62.5,
+      "mean_Mistral": 75.0,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "jaṅghā",
+      "category": "animal_body_living",
+      "verdict_Qwen": "NO_RESONANCE",
+      "verdict_Mistral": "NO_RESONANCE",
+      "mean_Qwen": 0.0,
+      "mean_Mistral": 0.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "kapāla",
+      "category": "animal_body_living",
+      "verdict_Qwen": "NO_RESONANCE",
+      "verdict_Mistral": "MODERATE_RESONANCE",
+      "mean_Qwen": 0.0,
+      "mean_Mistral": 50.0,
+      "agree": false,
+      "model_sensitive": true
+    },
+    {
+      "word": "kuṇḍala",
+      "category": "concrete_object",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 18.75,
+      "mean_Mistral": 18.75,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "kārpaṇya",
+      "category": "afflictive",
+      "verdict_Qwen": "WEAK_RESONANCE",
+      "verdict_Mistral": "WEAK_RESONANCE",
+      "mean_Qwen": 40.0,
+      "mean_Mistral": 45.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "kūrma",
+      "category": "animal_body_living",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 25.0,
+      "mean_Mistral": 25.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "lalāṭa",
+      "category": "animal_body_living",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 25.0,
+      "mean_Mistral": 25.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "mukura",
+      "category": "concrete_object",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "WEAK_RESONANCE",
+      "mean_Qwen": 25.0,
+      "mean_Mistral": 33.33,
+      "agree": false,
+      "model_sensitive": false
+    },
+    {
+      "word": "pavana",
+      "category": "natural_action_abstract",
+      "verdict_Qwen": "MINIMAL_RESONANCE",
+      "verdict_Mistral": "MINIMAL_RESONANCE",
+      "mean_Qwen": 16.67,
+      "mean_Mistral": 25.0,
+      "agree": true,
+      "model_sensitive": false
+    },
+    {
+      "word": "pralaya",
+      "category": "natural_action_abstract",
+      "verdict_Qwen": "WEAK_RESONANCE",
+      "verdict_Mistral": "WEAK_RESONANCE",
+      "mean_Qwen": 43.75,
+      "mean_Mistral": 31.25,
+      "agree": true,
+      "model_sensitive": false
+    }
+  ],
+  "model_sensitive_words": [
+    "akrodha",
+    "bhrama",
+    "cintā",
+    "kapāla"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "artifact": "alt_inventory_empirical_probe",
+  "evidence": false,
+  "decision": "ALT_INVENTORY_V_PROJECTION_TRIVIAL_STOP_NOW",
+  "target_set_hash_verified": true,
+  "n_targets": 70,
+  "feature_space": "WordNet-3.0 hypernym-ancestor synsets (bag), fixed vocab from G-side target+neighbor lookups",
+  "vocab_size_union": 5391,
+  "vocab_size_g_side": 4588,
+  "v_projection_method": "C: deterministic WordNet noun-synset lookup of V BRIDGE GLOSS WORDS ONLY (target word never looked up; guard-asserted)",
+  "note_v_scrambled": "order-invariant bag projection => V_scrambled == V_real exactly; not a usable Axis-2 control in this representation (reported honestly).",
+  "similarities": {
+    "V_real_to_G_target": 0.5194,
+    "V_real_to_G_random_offtarget": 0.5147,
+    "V_deranged_to_G_target": 0.5118,
+    "V_random_to_G_target": 0.5651,
+    "on_minus_off_margin": 0.0046,
+    "V_real_top1_match_own_G_rate": 0.014
+  },
+  "controls": {
+    "beats_deranged_and_random_by_0.02": false
+  },
+  "triviality": {
+    "mean_density": 0.0338,
+    "mean_entropy": 4.85,
+    "mean_top_feature_dominance": 0.039,
+    "all_zero_rate": 0.0,
+    "n_universal_features_ge90pct": 16,
+    "universal_features": [
+      "attribute.n.02",
+      "psychological_feature.n.01",
+      "state.n.02",
+      "act.n.02",
+      "abstraction.n.06",
+      "event.n.01",
+      "entity.n.01",
+      "physical_entity.n.01",
+      "object.n.01",
+      "condition.n.01",
+      "whole.n.02",
+      "action.n.01"
+    ]
+  },
+  "near_neighbor_G_side_cosine": {
+    "father~teacher": 0.686,
+    "water~ocean": 0.556,
+    "justice~law": 0.465
+  },
+  "fail_flags": {
+    "collapsed": false,
+    "trivial_broad": true,
+    "control_equivalent": true
+  },
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED",
+  "non_claims": [
+    "no mapping-fidelity signal",
+    "no LIMITED_GENERATION_UTILITY",
+    "no ontology",
+    "no Sanskrit privilege",
+    "no semantic truth",
+    "feasibility probe only, not evidence"
+  ]
+}

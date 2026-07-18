@@ -1,0 +1,155 @@
+{
+  "models": [
+    {
+      "id": "A",
+      "name": "Full primitive symmetry",
+      "desc": "every vowel and marker receives a polar pole like consonants",
+      "source_support": "PARTIAL — S1 says vowels have acoustic roots, but NOT that the roots are polar; forcing full polar symmetry over-assumes (guardrail caution).",
+      "authored_parameters_required": "HIGH (2 poles × 18 units = ~36 authored, all currently MISSING)",
+      "parser_compatible": true,
+      "table_compatible": "requires large authored extension",
+      "falsifiability": "LOW (many free parameters invite post-hoc fit)",
+      "back_fit_risk": "HIGH",
+      "composition_effect": "every unit contributes a pole",
+      "explains_45pct_without_inventing": false
+    },
+    {
+      "id": "B",
+      "name": "Consonant semantics, vowel transitions",
+      "desc": "consonants carry propensity; vowels control transition/direction/activation/linkage",
+      "source_support": "PARTIAL — matches the patent FIELD/positional apparatus (S2, AUTHORED) but conflicts with S1 (Sarkar vowel roots).",
+      "authored_parameters_required": "MEDIUM (a transition rule, few parameters)",
+      "parser_compatible": true,
+      "table_compatible": "vowels get operator roles, not table rows",
+      "falsifiability": "MEDIUM",
+      "back_fit_risk": "MEDIUM",
+      "composition_effect": "vowels operate on consonant sequence",
+      "explains_45pct_without_inventing": true
+    },
+    {
+      "id": "C",
+      "name": "Hierarchical akṣara model",
+      "desc": "meaning arises at the consonant-vowel/akṣara unit; neither interpreted independently",
+      "source_support": "PARTIAL — the patent permits 'syllabic or phonetic units'; the parser already emits an akṣara layer. But no source gives akṣara-level meanings.",
+      "authored_parameters_required": "VERY HIGH (per-akṣara inventory is combinatorial)",
+      "parser_compatible": true,
+      "table_compatible": "orthogonal to a per-varṇa table",
+      "falsifiability": "LOW (huge space)",
+      "back_fit_risk": "HIGH",
+      "composition_effect": "unit of meaning = akṣara",
+      "explains_45pct_without_inventing": false
+    },
+    {
+      "id": "D",
+      "name": "Mixed typed inventory",
+      "desc": "consonants=primitives; vowels=operators/modulators; anusvāra/candrabindu=nasalization; visarga=release/boundary",
+      "source_support": "STRONGEST STRUCTURAL FIT — S4 (vowels load-bearing, heterogeneous from consonants) + guardrail (don't clone consonant model) + S1 (vowels have their OWN roots) → typed classes. Vowel role sub-cell (polar primitive vs operator) remains UNRESOLVED between S1 and S2.",
+      "authored_parameters_required": "LOW-MEDIUM (typed roles, vowel specifics deferred to a provenance study)",
+      "parser_compatible": true,
+      "table_compatible": "additive typed sections; no consonant change",
+      "falsifiability": "HIGH (each typed role is a distinct testable claim)",
+      "back_fit_risk": "LOW-MEDIUM",
+      "composition_effect": "heterogeneous per class",
+      "explains_45pct_without_inventing": true
+    },
+    {
+      "id": "E",
+      "name": "Consonant-only semantic core",
+      "desc": "vowels and markers preserved structurally but contribute NO semantic content",
+      "source_support": "REFUTED as COMPLETE by S4 (privative-a and length flip meaning); tenable ONLY as an explicit, declared partial scope, not as the theory.",
+      "authored_parameters_required": "ZERO (no new content)",
+      "parser_compatible": true,
+      "table_compatible": true,
+      "falsifiability": "HIGH but already contradicted for the a-privative/length cases",
+      "back_fit_risk": "NONE",
+      "composition_effect": "vowels/marks inert",
+      "explains_45pct_without_inventing": "only by declaring 45% out of semantic scope"
+    }
+  ],
+  "criteria": [
+    "source_fidelity",
+    "parameter_minimality",
+    "preservation_of_phonological_information",
+    "determinism",
+    "compatibility_with_ordered_parser_output",
+    "resistance_to_semantic_back_fitting",
+    "falsifiability",
+    "ability_to_preregister_composition",
+    "compatibility_with_native_before_english",
+    "separation_of_structure_from_validated_meaning"
+  ],
+  "criterion_ranking": {
+    "source_fidelity": [
+      "D",
+      "A",
+      "B",
+      "C",
+      "E"
+    ],
+    "parameter_minimality": [
+      "E",
+      "D",
+      "B",
+      "A",
+      "C"
+    ],
+    "preservation_of_phonological_information": [
+      "D",
+      "C",
+      "A",
+      "B",
+      "E"
+    ],
+    "determinism": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E"
+    ],
+    "compatibility_with_ordered_parser_output": [
+      "D",
+      "B",
+      "C",
+      "A",
+      "E"
+    ],
+    "resistance_to_semantic_back_fitting": [
+      "E",
+      "D",
+      "B",
+      "C",
+      "A"
+    ],
+    "falsifiability": [
+      "D",
+      "E",
+      "B",
+      "A",
+      "C"
+    ],
+    "ability_to_preregister_composition": [
+      "D",
+      "B",
+      "E",
+      "A",
+      "C"
+    ],
+    "compatibility_with_native_before_english": [
+      "D",
+      "A",
+      "C",
+      "E",
+      "B"
+    ],
+    "separation_of_structure_from_validated_meaning": [
+      "D",
+      "E",
+      "C",
+      "B",
+      "A"
+    ]
+  },
+  "architecture_verdict": "RECOMMEND_TYPED_MIXED_INVENTORY",
+  "architecture_reason": "Model D (typed-mixed) is the minimal structure jointly forced by the sources: S4 proves vowels/prefix/length are meaning-load-bearing (refuting E as a complete theory) yet heterogeneous from consonants (so not the consonant pole model, per the guardrail); S1 says vowels/aṃ/aḥ have their OWN roots (so not mere carriers). Typed classes with distinct roles fit all three while deferring the one genuinely conflicted sub-question — the vowel role cell (polar primitive per S1 vs positional operator per the deprecated English apparatus S2) — to a provenance study. Chosen for source fidelity + falsifiability + back-fit resistance, NOT coverage."
+}

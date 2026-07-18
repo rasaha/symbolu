@@ -1,0 +1,22 @@
+{
+  "arms": {
+    "D": "profile predicted from dictionary semantic class only (no varṇa)",
+    "G": "generic profile matched for valence/density/attribute prevalence",
+    "M": "profile predicted from independent morphology/etymology only",
+    "P": "true packet projections vs randomly reassigned word profiles (profile swap)",
+    "R": "structure-preserving randomized varṇa→mapping assignment",
+    "S": "same packet members, scrambled order (order-effect probe)",
+    "T": "true word profile vs its frozen true packet projection",
+    "X": "profile vs another eligible word's packet (frozen derangement)"
+  },
+  "matching": [
+    "profile density",
+    "attribute prevalence",
+    "word length",
+    "packet length",
+    "valence",
+    "concreteness",
+    "grammatical class where practical"
+  ],
+  "status": "constructible in the abstract; all semantic arms depend on the (blocked) packet projection."
+}

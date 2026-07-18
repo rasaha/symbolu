@@ -1,0 +1,928 @@
+{
+  "n_words": 33,
+  "rows": [
+    {
+      "category": "body/SELECTED",
+      "descriptor_full": [
+        "restless starting without sustaining",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+        "self-absorption, ego-centric doing"
+      ],
+      "descriptor_short": [
+        "restless starting without sustaining",
+        "the sentient / sattvic…",
+        "viśāda",
+        "self-absorption, ego-centric doing"
+      ],
+      "devanagari": "अस्थि",
+      "gloss": "bone",
+      "iast": "asthi",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "a",
+        "s",
+        "th",
+        "i"
+      ]
+    },
+    {
+      "category": "body/SELECTED",
+      "descriptor_full": [
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "over-specialization, isolation",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "overextension, inflation"
+      ],
+      "descriptor_short": [
+        "restless striving that cannot…",
+        "sarvanāśa",
+        "over-specialization, isolation",
+        "ensconcement gone rigid",
+        "overextension, inflation"
+      ],
+      "devanagari": "ग्रीवा",
+      "gloss": "neck",
+      "iast": "grīvā",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "g",
+        "r",
+        "ī",
+        "v",
+        "ā"
+      ]
+    },
+    {
+      "category": "abstract/SELECTED",
+      "descriptor_full": [
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "the inflated 'I did…",
+        "hypocrisy / concealment",
+        "overextension, inflation",
+        "moha",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "ज्ञान",
+      "gloss": "knowledge",
+      "iast": "jñāna",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "j",
+        "ñ",
+        "ā",
+        "n",
+        "a"
+      ]
+    },
+    {
+      "category": "body/SELECTED",
+      "descriptor_full": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "overthinking, nitpicking",
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "āśā as grasping /…",
+        "overthinking, nitpicking",
+        "kāma",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "केश",
+      "gloss": "hair",
+      "iast": "keśa",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "k",
+        "e",
+        "ś",
+        "a"
+      ]
+    },
+    {
+      "category": "natural/SELECTED",
+      "descriptor_full": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining",
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "over-specialization, isolation"
+      ],
+      "descriptor_short": [
+        "moha",
+        "restless starting without sustaining",
+        "peevishness / reactive irritability",
+        "over-specialization, isolation"
+      ],
+      "devanagari": "नदी",
+      "gloss": "river",
+      "iast": "nadī",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "n",
+        "a",
+        "d",
+        "ī"
+      ]
+    },
+    {
+      "category": "natural/SELECTED",
+      "descriptor_full": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "fixation, obsessive holding",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "the sentient / sattvic…",
+        "fixation, obsessive holding",
+        "sarvanāśa",
+        "aviśvāsa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "सूर्य",
+      "gloss": "sun",
+      "iast": "sūrya",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "s",
+        "ū",
+        "r",
+        "y",
+        "a"
+      ]
+    },
+    {
+      "category": "concrete_object",
+      "descriptor_full": [
+        "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+        "restless starting without sustaining",
+        "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "mamatā bounded by the…",
+        "restless starting without sustaining",
+        "vitarka",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "घट",
+      "gloss": "pot",
+      "iast": "ghaṭa",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "gh",
+        "a",
+        "ṭ",
+        "a"
+      ]
+    },
+    {
+      "category": "concrete_object",
+      "descriptor_full": [
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        null,
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "restless striving that cannot…",
+        "—(no frozen descriptor)",
+        "outward / visible vision",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "गृह",
+      "gloss": "house",
+      "iast": "gṛha",
+      "length": 4,
+      "units_without_descriptor": [
+        "ṛ"
+      ],
+      "varna_sequence": [
+        "g",
+        "ṛ",
+        "h",
+        "a"
+      ]
+    },
+    {
+      "category": "concrete_object",
+      "descriptor_full": [
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "restless starting without sustaining",
+        "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "sarvanāśa",
+        "restless starting without sustaining",
+        "viśāda",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "रथ",
+      "gloss": "chariot",
+      "iast": "ratha",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "r",
+        "a",
+        "th",
+        "a"
+      ]
+    },
+    {
+      "category": "body_part",
+      "descriptor_full": [
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "restless starting without sustaining",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "outward / visible vision",
+        "restless starting without sustaining",
+        "the sentient / sattvic…",
+        "jāḍya",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "हस्त",
+      "gloss": "hand",
+      "iast": "hasta",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "h",
+        "a",
+        "s",
+        "t",
+        "a"
+      ]
+    },
+    {
+      "category": "body_part",
+      "descriptor_full": [
+        "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+        "overextension, inflation",
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "ghṛṇā",
+        "overextension, inflation",
+        "peevishness / reactive irritability",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "पाद",
+      "gloss": "foot",
+      "iast": "pāda",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "p",
+        "ā",
+        "d",
+        "a"
+      ]
+    },
+    {
+      "category": "body_part",
+      "descriptor_full": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "overthinking, nitpicking",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "moha",
+        "overthinking, nitpicking",
+        "jāḍya",
+        "sarvanāśa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "नेत्र",
+      "gloss": "eye",
+      "iast": "netra",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "n",
+        "e",
+        "t",
+        "r",
+        "a"
+      ]
+    },
+    {
+      "category": "animal",
+      "descriptor_full": [
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "restless starting without sustaining",
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "restless striving that cannot…",
+        "restless starting without sustaining",
+        "the inflated 'I did…",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "गज",
+      "gloss": "elephant",
+      "iast": "gaja",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "g",
+        "a",
+        "j",
+        "a"
+      ]
+    },
+    {
+      "category": "animal",
+      "descriptor_full": [
+        "restless starting without sustaining",
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "restless starting without sustaining",
+        "kāma",
+        "ensconcement gone rigid",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "अश्व",
+      "gloss": "horse",
+      "iast": "aśva",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "a",
+        "ś",
+        "v",
+        "a"
+      ]
+    },
+    {
+      "category": "animal",
+      "descriptor_full": [
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "overextension, inflation",
+        "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "ensconcement gone rigid",
+        "aviśvāsa",
+        "overextension, inflation",
+        "mamatā bounded by the…",
+        "sarvanāśa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "व्याघ्र",
+      "gloss": "tiger",
+      "iast": "vyāghra",
+      "length": 6,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "v",
+        "y",
+        "ā",
+        "gh",
+        "r",
+        "a"
+      ]
+    },
+    {
+      "category": "plant",
+      "descriptor_full": [
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        null,
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "ensconcement gone rigid",
+        "—(no frozen descriptor)",
+        "āśā as grasping /…",
+        "artha as possessive acquisition",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "वृक्ष",
+      "gloss": "tree",
+      "iast": "vṛkṣa",
+      "length": 5,
+      "units_without_descriptor": [
+        "ṛ"
+      ],
+      "varna_sequence": [
+        "v",
+        "ṛ",
+        "k",
+        "ṣ",
+        "a"
+      ]
+    },
+    {
+      "category": "plant",
+      "descriptor_full": [
+        "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+        "tunnel vision, missing the whole picture",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "ghṛṇā",
+        "tunnel vision, missing the…",
+        "artha as possessive acquisition",
+        "ghṛṇā",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "पुष्प",
+      "gloss": "flower",
+      "iast": "puṣpa",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "p",
+        "u",
+        "ṣ",
+        "p",
+        "a"
+      ]
+    },
+    {
+      "category": "natural_phenomenon",
+      "descriptor_full": [
+        "restless starting without sustaining",
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "self-absorption, ego-centric doing"
+      ],
+      "descriptor_short": [
+        "restless starting without sustaining",
+        "restless striving that cannot…",
+        "moha",
+        "self-absorption, ego-centric doing"
+      ],
+      "devanagari": "अग्नि",
+      "gloss": "fire",
+      "iast": "agni",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "a",
+        "g",
+        "n",
+        "i"
+      ]
+    },
+    {
+      "category": "natural_phenomenon",
+      "descriptor_full": [
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "overextension, inflation",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "tunnel vision, missing the whole picture"
+      ],
+      "descriptor_short": [
+        "ensconcement gone rigid",
+        "overextension, inflation",
+        "aviśvāsa",
+        "tunnel vision, missing the…"
+      ],
+      "devanagari": "वायु",
+      "gloss": "wind",
+      "iast": "vāyu",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "v",
+        "ā",
+        "y",
+        "u"
+      ]
+    },
+    {
+      "category": "natural_phenomenon",
+      "descriptor_full": [
+        "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+        "restless starting without sustaining",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "restless starting without sustaining",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "ghṛṇā",
+        "restless starting without sustaining",
+        "sarvanāśa",
+        "ensconcement gone rigid",
+        "restless starting without sustaining",
+        "jāḍya",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "पर्वत",
+      "gloss": "mountain",
+      "iast": "parvata",
+      "length": 7,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "p",
+        "a",
+        "r",
+        "v",
+        "a",
+        "t",
+        "a"
+      ]
+    },
+    {
+      "category": "action",
+      "descriptor_full": [
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "restless starting without sustaining",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "restless striving that cannot…",
+        "restless starting without sustaining",
+        "praśraya / praṇāśa",
+        "restless starting without sustaining",
+        "moha",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "गमन",
+      "gloss": "going",
+      "iast": "gamana",
+      "length": 6,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "g",
+        "a",
+        "m",
+        "a",
+        "n",
+        "a"
+      ]
+    },
+    {
+      "category": "action",
+      "descriptor_full": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "peevishness / reactive irritability",
+        "overextension, inflation",
+        "moha",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "दान",
+      "gloss": "giving",
+      "iast": "dāna",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "d",
+        "ā",
+        "n",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_negative",
+      "descriptor_full": [
+        "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+        "restless starting without sustaining",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "mūrcchā",
+        "restless starting without sustaining",
+        "aviśvāsa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "भय",
+      "gloss": "fear",
+      "iast": "bhaya",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "bh",
+        "a",
+        "y",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_negative",
+      "descriptor_full": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "premature closure, stagnation",
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "āśā as grasping /…",
+        "sarvanāśa",
+        "premature closure, stagnation",
+        "tṛṣṇā",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "क्रोध",
+      "gloss": "anger",
+      "iast": "krodha",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "k",
+        "r",
+        "o",
+        "dh",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_negative",
+      "descriptor_full": [
+        "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+        "premature closure, stagnation",
+        "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "kruratā",
+        "premature closure, stagnation",
+        "mūrcchā",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "लोभ",
+      "gloss": "greed",
+      "iast": "lobha",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "l",
+        "o",
+        "bh",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_negative",
+      "descriptor_full": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "overextension, inflation",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "āśā as grasping /…",
+        "overextension, inflation",
+        "praśraya / praṇāśa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "काम",
+      "gloss": "desire",
+      "iast": "kāma",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "k",
+        "ā",
+        "m",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_positive",
+      "descriptor_full": [
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "restless starting without sustaining",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "outward / visible vision",
+        "restless starting without sustaining",
+        "sarvanāśa",
+        "artha as possessive acquisition",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "हर्ष",
+      "gloss": "joy",
+      "iast": "harṣa",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "h",
+        "a",
+        "r",
+        "ṣ",
+        "a"
+      ]
+    },
+    {
+      "category": "emotion_negative",
+      "descriptor_full": [
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "premature closure, stagnation",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "kāma",
+        "premature closure, stagnation",
+        "āśā as grasping /…",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "शोक",
+      "gloss": "grief",
+      "iast": "śoka",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "ś",
+        "o",
+        "k",
+        "a"
+      ]
+    },
+    {
+      "category": "abstract_positive",
+      "descriptor_full": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "restless starting without sustaining",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "the sentient / sattvic…",
+        "restless starting without sustaining",
+        "jāḍya",
+        "aviśvāsa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "सत्य",
+      "gloss": "truth",
+      "iast": "satya",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "s",
+        "a",
+        "t",
+        "y",
+        "a"
+      ]
+    },
+    {
+      "category": "abstract_positive",
+      "descriptor_full": [
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+        "restless starting without sustaining",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "tṛṣṇā",
+        "restless starting without sustaining",
+        "sarvanāśa",
+        "praśraya / praṇāśa",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "धर्म",
+      "gloss": "virtue/duty",
+      "iast": "dharma",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "dh",
+        "a",
+        "r",
+        "m",
+        "a"
+      ]
+    },
+    {
+      "category": "abstract_negative",
+      "descriptor_full": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "tunnel vision, missing the whole picture",
+        "compulsion, clinging pull",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "peevishness / reactive irritability",
+        "tunnel vision, missing the…",
+        "compulsion, clinging pull",
+        "cintā as anxious rumination",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "दुःख",
+      "gloss": "suffering",
+      "iast": "duḥkha",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "d",
+        "u",
+        "ḥ",
+        "kh",
+        "a"
+      ]
+    },
+    {
+      "category": "abstract_positive",
+      "descriptor_full": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "tunnel vision, missing the whole picture",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+        "restless starting without sustaining"
+      ],
+      "descriptor_short": [
+        "the sentient / sattvic…",
+        "tunnel vision, missing the…",
+        "cintā as anxious rumination",
+        "restless starting without sustaining"
+      ],
+      "devanagari": "सुख",
+      "gloss": "happiness",
+      "iast": "sukha",
+      "length": 4,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "s",
+        "u",
+        "kh",
+        "a"
+      ]
+    },
+    {
+      "category": "abstract_positive",
+      "descriptor_full": [
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "self-absorption, ego-centric doing"
+      ],
+      "descriptor_short": [
+        "kāma",
+        "overextension, inflation",
+        "moha",
+        "jāḍya",
+        "self-absorption, ego-centric doing"
+      ],
+      "devanagari": "शान्ति",
+      "gloss": "peace",
+      "iast": "śānti",
+      "length": 5,
+      "units_without_descriptor": [],
+      "varna_sequence": [
+        "ś",
+        "ā",
+        "n",
+        "t",
+        "i"
+      ]
+    }
+  ],
+  "schema": "b1_12_g1_descriptor_example_data"
+}

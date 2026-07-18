@@ -1,0 +1,5 @@
+{
+  "n_flags": 0,
+  "flags": [],
+  "method": "each paraphrase vs every candidate gloss (both sets): exact/stem/synonym + IAST-diacritic check"
+}

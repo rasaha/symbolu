@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.realization.schema.json",
+  "title": "realization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "realization_id", "language", "source",
+               "provenance", "version", "atom_content", "meaning_encoder"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "realization_id": { "type": "string" },
+    "language": { "type": "string" },
+    "source": { "type": "string" },
+    "provenance": { "type": "string" },
+    "version": { "type": "string" },
+    "atom_content": { "type": "object", "additionalProperties": { "type": "string" } },
+    "meaning_encoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": { "enum": ["gloss_text", "synset_id", "qid", "vector_ref"] },
+        "ref":  { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.example/cer/v0.2/profiles/kubernetes.rollout.v1.schema.json",
+  "title": "CER actuation payload — kubernetes.rollout.v1",
+  "description": "Materially distinct from scale. ActionGate tool.tool_name='rollout', operation DEPLOY. Identity-bearing: image/manifest digest, rollout strategy, surge/unavailable, timeout, rollback ref (via rollback_plan).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "target", "image_digest", "current_manifest_digest",
+               "rollout_strategy", "max_surge", "max_unavailable", "timeout_s", "reversibility"],
+  "properties": {
+    "operation": {"const": "DEPLOY"},
+    "target": {"type": "object", "required": ["cluster", "namespace", "deployment"]},
+    "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "proposed image (identity-bearing)"},
+    "current_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "observed manifest (identity-bearing)"},
+    "rollout_strategy": {"enum": ["RollingUpdate", "Recreate"]},
+    "max_surge": {"type": "string", "description": "integer string (count)"},
+    "max_unavailable": {"type": "string", "description": "integer string (count)"},
+    "timeout_s": {"type": "string", "description": "integer string (whole seconds)"},
+    "rollback_ref": {"type": "string", "description": "optional; identity-bearing via ActionGate rollback_plan"},
+    "reversibility": {"enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]}
+  },
+  "prohibited_fields_note": "requested_state_transition, replicas are PROHIBITED (scale-only; profile-downgrade guard)."
+}

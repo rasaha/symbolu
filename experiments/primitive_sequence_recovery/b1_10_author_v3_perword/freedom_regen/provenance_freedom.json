@@ -1,0 +1,47 @@
+{
+  "_transcription_note": "Verbatim transcription from the RunPod terminal paste (box could not git push). Authoritative artifact is the on-box provenance_freedom.json; accepted raw_output_sha256 = 02eec5e5...; the accepted ACCEPTED.txt was sha256sum-verified on the box against this value. This is the audit-driven re-authoring of freedom (fresh seed 20260821 via --seed-offset 100) after the first freedom pair was REJECTED by the packet-aware audit on condition-fit.",
+  "artifact": "b1_10_perword_author_run",
+  "word": "freedom",
+  "word_index_1based": 2,
+  "status": "ACCEPTED",
+  "accepted": {
+    "ladder_rung": 0,
+    "model_id": "Qwen/Qwen2.5-14B-Instruct",
+    "revision_requested": null,
+    "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+    "attempt_index": 0,
+    "seed": 20260821,
+    "raw_output_sha256": "02eec5e5f519cea426ab240553670138707ced73f6f731cc4104399e06911860"
+  },
+  "generation_settings": {
+    "backend": "transformers",
+    "dtype": "float16",
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 0,
+    "repetition_penalty": 1.0,
+    "do_sample": true,
+    "max_new_tokens": 400
+  },
+  "master_packet_sha256": "7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628",
+  "delivered_prompt_sha256": "1f1a63873494c52d4549120c97ae9600cebcda5bab3833ae65894271df9444f3",
+  "seed_offset": 100,
+  "attempts": [
+    {
+      "ladder_rung": 0,
+      "model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_requested": null,
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "attempt_index": 0,
+      "seed": 20260821,
+      "raw_output_sha256": "02eec5e5f519cea426ab240553670138707ced73f6f731cc4104399e06911860",
+      "surface_pass": true,
+      "issues": [],
+      "timestamp_utc": "2026-07-11T09:45:23.044528+00:00"
+    }
+  ],
+  "reason_for_escalation": "SURFACE_VALIDATION_FAILURE_ONLY",
+  "retry_budget_role": "operational safeguard only — NOT experimental, evidentiary, hypothesis-testing, or judging",
+  "blindness_attestation": "Structural blindness: this fresh isolated process received ONLY the unchanged master author packet (sha256 7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628) plus a per-word output-scope directive naming one of the six words. No Tier-1/Tier-2/Tier-3 packet, varṇa mapping, audit, prior context set, or result was provided as input.",
+  "timestamp_utc": "2026-07-11T09:45:23.044593+00:00"
+}

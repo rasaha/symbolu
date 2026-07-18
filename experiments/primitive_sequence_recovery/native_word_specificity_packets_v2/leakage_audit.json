@@ -1,0 +1,134 @@
+{
+  "n_flags": 14,
+  "n_exploitable_in_set": 3,
+  "n_new_exploitable_not_preflagged": 0,
+  "flags": [
+    {
+      "row": "r09",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:body:outward",
+      "gloss": "body",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "restless striving compulsively driven on, unable to cease, endlessly reaching outward toward worldly ends"
+    },
+    {
+      "row": "r09",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:strength:potent",
+      "gloss": "strength",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "purposeful effort applied to rouse dormant higher potential, then resting into alert repose without inertia"
+    },
+    {
+      "row": "r15",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:body:outward",
+      "gloss": "body",
+      "in_set_exploitable": true,
+      "source_intrinsic_preflagged": true,
+      "text": "fixation on the manifest, physically visible, outward-facing world of appearances"
+    },
+    {
+      "row": "r15",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:body:visible",
+      "gloss": "body",
+      "in_set_exploitable": true,
+      "source_intrinsic_preflagged": true,
+      "text": "fixation on the manifest, physically visible, outward-facing world of appearances"
+    },
+    {
+      "row": "r15",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:body:physical",
+      "gloss": "body",
+      "in_set_exploitable": true,
+      "source_intrinsic_preflagged": true,
+      "text": "fixation on the manifest, physically visible, outward-facing world of appearances"
+    },
+    {
+      "row": "r13",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:fear:anxious",
+      "gloss": "fear",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "anxious rumination, the mind churning over unresolved possibilities and personal consequences, gripping every worried what-if"
+    },
+    {
+      "row": "r13",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:fear:anxious",
+      "gloss": "fear",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "composed, impersonal reflection that holds an unsettled situation open without forcing premature closure or anxious grip"
+    },
+    {
+      "row": "r06",
+      "pole": "binding",
+      "issue": "gloss_neighborhood:body:physical",
+      "gloss": "body",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "cruelty toward the weak, inflicting physical harm, with crude and cruel thought and behaviour"
+    },
+    {
+      "row": "r06",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:pain:misery",
+      "gloss": "pain",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "compassion that protects the vulnerable, the wish to lessen another's misery and awaken their latent capacity"
+    },
+    {
+      "row": "r05",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:union:merge",
+      "gloss": "union",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "being settled in one's true stance, the sustaining principle, an unbroken movement toward subtlety and ultimate merger"
+    },
+    {
+      "row": "r05",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:union:merger",
+      "gloss": "union",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "being settled in one's true stance, the sustaining principle, an unbroken movement toward subtlety and ultimate merger"
+    },
+    {
+      "row": "r10",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:body:physical",
+      "gloss": "body",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "physical longing sublimated and redirected toward the higher aim of liberation, with worldly grasping released"
+    },
+    {
+      "row": "r04",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:pain:pain",
+      "gloss": "pain",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "sympathetic gladness at another's good fortune, rejoicing in others' success rather than being pained by it"
+    },
+    {
+      "row": "r04",
+      "pole": "liberating",
+      "issue": "gloss_neighborhood:happiness:glad",
+      "gloss": "happiness",
+      "in_set_exploitable": false,
+      "source_intrinsic_preflagged": false,
+      "text": "sympathetic gladness at another's good fortune, rejoicing in others' success rather than being pained by it"
+    }
+  ],
+  "method": "each paraphrase vs BROAD candidate-gloss neighborhoods (synonym/hypernym/hyponym/association) + IAST-diacritic check; a hit is exploitable ONLY if the gloss is an in-set candidate of a word using that consonant; source-intrinsic pre-flagged hits (the four flagged words) are carried by the precommitted flagged-word sensitivity analysis, not counted as new packet leakage"
+}

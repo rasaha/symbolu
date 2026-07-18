@@ -1,0 +1,30 @@
+{
+  "artifact_hashes": {
+    "affective_norm_source_manifest.json": "5c8b3f64e517db47990389d3055edc00b961e8f6e9802c36b9dff0abf5a9b7ad",
+    "base_representation_manifest.json": "021952d58b666b2f7d9e63a6057319e6fcdfcee519f66adc0b53be65222f4fec",
+    "candidate_source_list.json": "7dd41943aadca6e3b472936d8408cda2dc2b0dc4a95333039accc873bf02d3db",
+    "dependency_groups.json": "785e61ec6c1534bfd10e5792760747c21f48edf5ac4bf21a9b87a73ea15f9039",
+    "excluded_word_manifest.json": "fe1eb2f7c22d1e386ad68579072a45c1e6f44761e384187ec66c3faca80f4997",
+    "included_word_manifest.json": "ccad794d2a034b09f7b36f982e2d521a141ebe8471a31274e5b7864cae5fb7f1",
+    "sample_failure_funnel.json": "4b3561fcbd9c2eb7aff32c18adf49610312af96c5c0275bdd520c0b74a6984a7",
+    "shuffle_control_manifest.json": "35b7f89bad311214d2d357f4dd079ab951fa4a9b8702537399b7400f1ccad600",
+    "split_manifest.json": "b64dd1577069141436e2c81a4fdfbb9af1684db51cf138d3d9beb160bc58b84e",
+    "word_target_table.json": "9c1f76b38a62699aeea2b369ba34abdfbd08be0df0c6f1d9a261a9e8a6e20494"
+  },
+  "controlling_prereg": "VARNA_FEATURE_LIFT_PREREG_V1.md",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "lexicon_sha256": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+  "n_included": 88,
+  "n_included_floor": 30,
+  "no_embeddings_or_metrics_computed": true,
+  "no_target_informed_selection": true,
+  "norm_sha256": "78ac8107c78e116bb96538fae4faa47281a155f5f8fe39f30bbc6ea3db05b446",
+  "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "readiness": "READY_FOR_FEATURE_EXTRACTION_AND_LIFT_RUN",
+  "schema": "varna_lift_prerun_freeze_v1",
+  "split_sizes": {
+    "dev": 13,
+    "test": 26,
+    "train": 49
+  }
+}

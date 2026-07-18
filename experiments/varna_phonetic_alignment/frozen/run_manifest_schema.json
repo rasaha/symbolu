@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "b0_run_manifest_schema_v1",
+  "title": "B0 run manifest",
+  "description": "Schema a COMPLETED B0 run record must satisfy. This is the schema ONLY — no run has been performed, no values are present, no alignment is computed here.",
+  "type": "object",
+  "required": [
+    "schema_version", "design_doc_sha256", "frozen_artifacts", "feature_source",
+    "primary_T_status", "encodings", "P_distances", "seeds", "Ns",
+    "environment", "run_timestamp_utc", "results"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "b0_run_manifest_schema_v1" },
+    "design_doc_sha256": { "type": "string", "description": "sha256 of PREREG_VARNA_PHONETIC_ALIGNMENT.md at run time" },
+    "frozen_artifacts": {
+      "type": "object",
+      "description": "name -> sha256 of every §17 artifact actually loaded by the run",
+      "required": ["lexicon_wordformation", "iast_ipa_map", "ipa_feature_table", "decision_rule"],
+      "additionalProperties": { "type": "string" },
+      "properties": {
+        "lexicon_wordformation": { "type": "string" },
+        "iast_ipa_map": { "type": "string" },
+        "ipa_feature_table": { "type": "string" },
+        "decision_rule": { "type": "string" },
+        "embedding_model_weights": { "type": ["string", "null"] }
+      }
+    },
+    "feature_source": { "enum": ["approved_frozen_ipa_v1", "panphon"] },
+    "primary_T_status": {
+      "enum": ["enabled", "deferred"],
+      "description": "Pre-reg §12 makes T_embed the verdict-setting PRIMARY; a verdict run REQUIRES 'enabled'. 'deferred' => NOT_RUN."
+    },
+    "encodings": {
+      "type": "array",
+      "items": { "enum": ["embedding", "categorical"] },
+      "description": "T-encodings actually run; a verdict requires both"
+    },
+    "P_distances": {
+      "type": "array",
+      "items": { "enum": ["hamming", "cosine"] },
+      "description": "P distances actually run; a verdict requires both"
+    },
+    "seeds": {
+      "type": "object",
+      "required": ["scramble", "permutation", "bootstrap"],
+      "additionalProperties": false,
+      "properties": {
+        "scramble": { "type": "integer" },
+        "permutation": { "type": "integer" },
+        "bootstrap": { "type": "integer" }
+      }
+    },
+    "Ns": {
+      "type": "object",
+      "required": ["scramble_n", "permutation_n", "bootstrap_n"],
+      "additionalProperties": false,
+      "properties": {
+        "scramble_n": { "type": "integer", "minimum": 1000 },
+        "permutation_n": { "type": "integer", "minimum": 10000 },
+        "bootstrap_n": { "type": "integer", "minimum": 2000 }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["python", "numpy"],
+      "additionalProperties": true,
+      "properties": {
+        "python": { "type": "string" },
+        "numpy": { "type": "string" }
+      }
+    },
+    "run_timestamp_utc": {
+      "type": "string",
+      "description": "ISO-8601 UTC stamp PASSED IN to the run (not generated mid-pipeline)"
+    },
+    "results": {
+      "type": "object",
+      "description": "Populated ONLY by an approved run. Empty/absent fields => NOT_RUN.",
+      "required": ["status"],
+      "additionalProperties": true,
+      "properties": {
+        "status": { "enum": ["NOT_RUN", "COMPLETED"] },
+        "verdict": {
+          "type": ["string", "null"],
+          "enum": ["PHONETIC_ALIGNED", "PHONETICS_ONLY", "TABLE_NULL", "ENCODING_DEPENDENT", "INCONCLUSIVE", null]
+        },
+        "per_condition": {
+          "type": "array",
+          "description": "one record per (encoding × P-distance): raw_mantel_r, scramble_pctl, permutation_p, partial_mantel_r, partial_ci_lo, partial_ci_hi",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  }
+}

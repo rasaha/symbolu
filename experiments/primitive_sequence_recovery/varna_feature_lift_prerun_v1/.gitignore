@@ -1,0 +1,3 @@
+# Raw affective-norms source is pinned by checksum (see affective_norm_source_manifest.json),
+# NOT committed (size + license). Reconstruct from the pinned source_url + sha256.
+_norm_src/

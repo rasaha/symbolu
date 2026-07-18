@@ -1,0 +1,55 @@
+{
+  "track": "C_exploratory",
+  "status": "ACQUIRED",
+  "run_environment": "RunPod A100-SXM4-80GB (hostname 472e10a43793, Linux 6.8, Python 3.12.3); GPU unused, CPU scoring",
+  "asset": {
+    "name": "glove-wiki-gigaword-50",
+    "source": "GloVe (Wikipedia + Gigaword), distributed via gensim-data GitHub release",
+    "read_more": "https://nlp.stanford.edu/projects/glove/",
+    "license": "ODC Public Domain Dedication and License (PDDL)",
+    "dimensionality": 50,
+    "vocab_size": 400000,
+    "upstream_md5_cached_gz": "c289bc5d7f2f02c6dc9f2f9b67641813",
+    "upstream_md5_status": "MATCHES known-good gensim-data value",
+    "pinned_sha256_exported_text": "c7225dc6be8004c0451152074eb54ca7a0790e88614ac91384a7c67259736557",
+    "file_path_pod_local": "/workspace/track_c_assets/glove-wiki-gigaword-50.txt",
+    "committed_to_repo": false
+  },
+  "coverage": {
+    "channel": "en_gloss",
+    "tokens_needed": 203,
+    "coverage_en_gloss": 0.9803,
+    "coverage_sa_term": null,
+    "coverage_concept_id": null
+  },
+  "metrics_en_gloss": {
+    "n_words": 107,
+    "K": 8,
+    "n_scram": 1000,
+    "seed": 0,
+    "chance_mrr_k8": 0.3397,
+    "mrr_real": 0.3606,
+    "top1_real": 0.1495,
+    "mrr_scram_mean": 0.3347,
+    "scramble_delta": 0.0259,
+    "scramble_pct": 0.954,
+    "one_sided_p_approx": 0.046,
+    "label_seed0_gate": "ENGINE_REALIZATION_SIGNAL",
+    "label_note": "seed-0 gate pass only; borderline (delta just clears 0.02, p just clears 0.05)"
+  },
+  "robustness_diagnostic": {
+    "seed_p_glove": [0.047, 0.047, 0.043, 0.048, 0.064],
+    "seed_p_note": "unstable across seeds; one seed > 0.05",
+    "mrr_ci95_glove_family_bootstrap": [0.3076, 0.4171],
+    "ci_includes_chance": true,
+    "ci_low_above_chance": false,
+    "semantic_gain_over_lexical": 0.0128,
+    "lexical_mrr_ci95": [0.2967, 0.4033],
+    "final_verdict": "NOT_ROBUST — no robust semantic signal on the English channel; the seed-0 ENGINE_REALIZATION_SIGNAL is a boundary artifact. Negative-leaning, consistent with the null. English-only => REALIZATION_ARTIFACT ceiling; NOT ONTOLOGICAL_SIGNAL; Track B remains BLOCKED."
+  },
+  "channels": {
+    "en_gloss": "RUN",
+    "sa_term": "SKIPPED (no offline Sanskrit vectors)",
+    "concept_id": "SKIPPED (no non-circular concept resolver; Track B blocked)"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "config": {
+    "use_anchor_pairing": false,
+    "cost_order": "SECOND"
+  },
+  "invariance": {
+    "constant_offset": {
+      "noiseless_total_cost": 0.0,
+      "noiseless_max_accel_norm": 0.0,
+      "noisy_per_predictor_cost": [
+        21.357,
+        40.453,
+        19.131
+      ],
+      "noisy_argmax_is_biased_predictor": true
+    },
+    "linear_drift": {
+      "noiseless_total_cost": 0.0,
+      "noiseless_max_accel_norm": 4.4408920985006255e-14,
+      "noisy_per_predictor_cost": [
+        19.875,
+        36.032,
+        16.231
+      ],
+      "noisy_argmax_is_biased_predictor": true
+    },
+    "accelerating": {
+      "noiseless_total_cost": 0.3348874487054116,
+      "noiseless_max_accel_norm": 0.30000000000018895
+    }
+  },
+  "per_family": {
+    "gaussian_noise": {
+      "harm_class": "benign",
+      "fault_active": false,
+      "bcvf_visible_by_design": false,
+      "truth_label": null,
+      "median_margin": 1.073,
+      "attribution_hit_rate": null
+    },
+    "constant_bias": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.986,
+      "attribution_hit_rate": 1.0
+    },
+    "slow_bias": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.98,
+      "attribution_hit_rate": 1.0
+    },
+    "linear_drift": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.986,
+      "attribution_hit_rate": 1.0
+    },
+    "accelerating": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": true,
+      "truth_label": 1,
+      "median_margin": 1.984,
+      "attribution_hit_rate": 1.0
+    },
+    "abrupt_jump": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": true,
+      "truth_label": 1,
+      "median_margin": 1.979,
+      "attribution_hit_rate": 1.0
+    },
+    "stuck_sensor": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.986,
+      "attribution_hit_rate": 1.0
+    },
+    "delayed_predictor": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.989,
+      "attribution_hit_rate": 1.0
+    },
+    "stale_predictor": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 2,
+      "median_margin": 1.982,
+      "attribution_hit_rate": 1.0
+    },
+    "correlated_failure": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": null,
+      "median_margin": 1.986,
+      "attribution_hit_rate": null
+    },
+    "all_wrong": {
+      "harm_class": "common_mode",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": null,
+      "median_margin": 1.903,
+      "attribution_hit_rate": null
+    },
+    "precise_biased": {
+      "harm_class": "harmful_state_error",
+      "fault_active": true,
+      "bcvf_visible_by_design": false,
+      "truth_label": 1,
+      "median_margin": 1.104,
+      "attribution_hit_rate": 0.0
+    },
+    "noisy_unbiased": {
+      "harm_class": "benign",
+      "fault_active": false,
+      "bcvf_visible_by_design": true,
+      "truth_label": null,
+      "median_margin": 1.999,
+      "attribution_hit_rate": null
+    },
+    "calibration_drift": {
+      "harm_class": "benign",
+      "fault_active": false,
+      "bcvf_visible_by_design": true,
+      "truth_label": null,
+      "median_margin": 1.729,
+      "attribution_hit_rate": null
+    }
+  }
+}

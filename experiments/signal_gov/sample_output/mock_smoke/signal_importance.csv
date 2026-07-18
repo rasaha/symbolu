@@ -1,0 +1,7 @@
+feature,standalone_auroc
+inv_text_confidence,1.0000
+entropy,1.0000
+inv_coherence,1.0000
+vritti_risk,1.0000
+jepa_disagreement,1.0000
+risk_norm,0.8800

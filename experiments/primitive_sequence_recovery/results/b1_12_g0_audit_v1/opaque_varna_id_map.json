@@ -1,0 +1,166 @@
+{
+  "map": [
+    {
+      "opaque_id": "U01",
+      "type": "anusvara",
+      "unit": "ṃ"
+    },
+    {
+      "opaque_id": "U02",
+      "type": "consonant",
+      "unit": "b"
+    },
+    {
+      "opaque_id": "U03",
+      "type": "consonant",
+      "unit": "bh"
+    },
+    {
+      "opaque_id": "U04",
+      "type": "consonant",
+      "unit": "c"
+    },
+    {
+      "opaque_id": "U05",
+      "type": "consonant",
+      "unit": "d"
+    },
+    {
+      "opaque_id": "U06",
+      "type": "consonant",
+      "unit": "g"
+    },
+    {
+      "opaque_id": "U07",
+      "type": "consonant",
+      "unit": "gh"
+    },
+    {
+      "opaque_id": "U08",
+      "type": "consonant",
+      "unit": "h"
+    },
+    {
+      "opaque_id": "U09",
+      "type": "consonant",
+      "unit": "j"
+    },
+    {
+      "opaque_id": "U10",
+      "type": "consonant",
+      "unit": "k"
+    },
+    {
+      "opaque_id": "U11",
+      "type": "consonant",
+      "unit": "kh"
+    },
+    {
+      "opaque_id": "U12",
+      "type": "consonant",
+      "unit": "l"
+    },
+    {
+      "opaque_id": "U13",
+      "type": "consonant",
+      "unit": "m"
+    },
+    {
+      "opaque_id": "U14",
+      "type": "consonant",
+      "unit": "n"
+    },
+    {
+      "opaque_id": "U15",
+      "type": "consonant",
+      "unit": "p"
+    },
+    {
+      "opaque_id": "U16",
+      "type": "consonant",
+      "unit": "r"
+    },
+    {
+      "opaque_id": "U17",
+      "type": "consonant",
+      "unit": "s"
+    },
+    {
+      "opaque_id": "U18",
+      "type": "consonant",
+      "unit": "t"
+    },
+    {
+      "opaque_id": "U19",
+      "type": "consonant",
+      "unit": "th"
+    },
+    {
+      "opaque_id": "U20",
+      "type": "consonant",
+      "unit": "v"
+    },
+    {
+      "opaque_id": "U21",
+      "type": "consonant",
+      "unit": "y"
+    },
+    {
+      "opaque_id": "U22",
+      "type": "consonant",
+      "unit": "ñ"
+    },
+    {
+      "opaque_id": "U23",
+      "type": "consonant",
+      "unit": "ś"
+    },
+    {
+      "opaque_id": "U24",
+      "type": "consonant",
+      "unit": "ṇ"
+    },
+    {
+      "opaque_id": "U25",
+      "type": "vowel",
+      "unit": "a"
+    },
+    {
+      "opaque_id": "U26",
+      "type": "vowel",
+      "unit": "e"
+    },
+    {
+      "opaque_id": "U27",
+      "type": "vowel",
+      "unit": "i"
+    },
+    {
+      "opaque_id": "U28",
+      "type": "vowel",
+      "unit": "u"
+    },
+    {
+      "opaque_id": "U29",
+      "type": "vowel",
+      "unit": "ā"
+    },
+    {
+      "opaque_id": "U30",
+      "type": "vowel",
+      "unit": "ī"
+    },
+    {
+      "opaque_id": "U31",
+      "type": "vowel",
+      "unit": "ū"
+    },
+    {
+      "opaque_id": "U32",
+      "type": "vowel",
+      "unit": "ṛ"
+    }
+  ],
+  "n_identities": 32,
+  "schema": "b1_12_opaque_varna_id_map_v1"
+}

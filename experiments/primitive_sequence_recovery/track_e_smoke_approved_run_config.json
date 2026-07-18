@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "config_type": "track_e_smoke_approved_run_config",
+  "run_enabled": true,
+  "approval_status": "APPROVED",
+  "representation": "flat_boundary_constraint",
+  "four_sphere_integrated": false,
+  "arms": ["A", "B", "X", "F", "D", "I"],
+  "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+  "scorer_model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "generator_neq_scorer": true,
+  "temperature": 0.0,
+  "max_tokens": 256,
+  "json_only": true,
+  "browsing": false,
+  "carryover": false,
+  "seeds": {
+    "candidate_shuffle": 71011,
+    "boundary_scramble": 20260702,
+    "packet_order": 4242,
+    "barnum_variant_order": 1379,
+    "candidate_authoring_balanced": 8675309
+  },
+  "expected_packet_count": 108,
+  "expected_output_path": "experiments/primitive_sequence_recovery/track_e_smoke_result.json",
+  "approval_record": {
+    "approver": "repository owner",
+    "date": "2026-07-02",
+    "signature": "APPROVED via in-session operator instruction (Track E smoke pilot, exploratory triage only)",
+    "note": "Approves the flat-design Track E smoke pilot (12 cases, 108 packets) as EXPLORATORY TRIAGE ONLY, run manually by the operator on RunPod/local GPU with generator!=scorer. This is a SEPARATE run config: it does NOT change the base smoke manifest (track_e_smoke_manifest.json stays run_enabled:false / approval_status:NOT_APPROVED). frozen/manifest.json remains NOT_READY; Stage A untouched; four-sphere JSON not integrated; Track B remains BLOCKED regardless of result. A smoke result cannot validate the theory; any positive only justifies a larger pre-registered pilot."
+  },
+  "base_manifest_unchanged": true,
+  "run_lock": "operator must also set env TRACK_E_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_E_SMOKE before the GPU runner will load any model"
+}

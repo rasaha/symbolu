@@ -370,9 +370,9 @@ def _build_source_dataset(
             tokens = cached_data['train' if split == 'train' else 'val']
         else:
             if source_name == "wikitext103":
-                ds = load_dataset("wikitext", "wikitext-103-v1")
+                ds = load_dataset("Salesforce/wikitext", "wikitext-103-v1")
             else:
-                ds = load_dataset("wikitext", "wikitext-2-v1")
+                ds = load_dataset("Salesforce/wikitext", "wikitext-2-v1")
 
             hf_split = "train" if split == "train" else "validation"
             text = "\n".join(ds[hf_split]["text"])
@@ -537,7 +537,7 @@ def load_data(
             # Static WikiText datasets
             if config.dataset == "wikitext103":
                 try:
-                    ds = load_dataset("wikitext", "wikitext-103-v1")
+                    ds = load_dataset("Salesforce/wikitext", "wikitext-103-v1")
                 except Exception as e:
                     # Check full exception chain for disk space errors
                     _exc = e
@@ -549,11 +549,11 @@ def load_data(
                         _exc = getattr(_exc, '__cause__', None) or getattr(_exc, '__context__', None)
                     if _is_disk_full:
                         print(f"  ⚠️  WikiText-103 failed (disk full), falling back to WikiText-2...")
-                        ds = load_dataset("wikitext", "wikitext-2-v1")
+                        ds = load_dataset("Salesforce/wikitext", "wikitext-2-v1")
                     else:
                         raise
             else:
-                ds = load_dataset("wikitext", "wikitext-2-v1")
+                ds = load_dataset("Salesforce/wikitext", "wikitext-2-v1")
 
             def tokenize(split):
                 text = "\n".join(ds[split]["text"])

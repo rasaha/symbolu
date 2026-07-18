@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "artifact": "b1_1_scorer_config",
+    "status": "TEMPLATE_NOT_FROZEN",
+    "note": "Template with placeholders/defaults. NOT final, NOT frozen, does NOT authorize scoring.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "primary_comparisons": ["A_vs_R_deranged", "A_vs_R_domain", "A_vs_R_same"],
+  "secondary_comparisons": ["A_vs_D", "A_vs_S", "A_vs_C", "A_vs_X"],
+  "primary_success_rule": "A must beat ALL THREE primary R controls (corrected CI lower bound > 0.5)",
+  "ci_policy": {
+    "method": "item-clustered paired bootstrap",
+    "n_boot": "PLACEHOLDER_REQUIRED",
+    "seed": "PLACEHOLDER_REQUIRED (see seeds config scoring_bootstrap_seed)"
+  },
+  "multiplicity_correction": "Holm-Bonferroni across the co-primary set",
+  "task_level_diagnostics": true,
+  "correctness_tracking": {
+    "enabled": true,
+    "note": "T4 correctness degradation tracked/reported separately regardless of creative wins"
+  },
+  "verdict_label_rules": {
+    "LIMITED_GENERATION_UTILITY": "A beats R_deranged AND R_domain AND R_same (and D/S/C/X), multiplicity-corrected, no unacceptable correctness degradation",
+    "RANDOM_OR_SCRAMBLED_MATCHES": "R controls match A",
+    "DERANGED_RESONANCE_MATCHES": "A ties R_deranged",
+    "DOMAIN_RESONANCE_MATCHES": "A ties R_domain",
+    "SURFACE_STRUCTURE_EXPLAINS": "C explains",
+    "DICTIONARY_DOMINATES": "A fails D",
+    "CORRECTNESS_DEGRADED": "correctness worse for A",
+    "NO_SIGNAL": "A beats only X",
+    "NOT_ROBUST": "effect not robust",
+    "BLOCKED": "hard blocker"
+  },
+  "no_rescue": "A failure cannot be reinterpreted as ontology signal or unblock Track B",
+  "scoring_authorized": false
+}

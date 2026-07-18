@@ -1,0 +1,56 @@
+{
+  "exclusion_counts_by_reason": {
+    "DUPLICATE_ENGLISH_GLOSS": 3,
+    "MATERIAL_GLOSS_VALENCE_CONFLICT": 10,
+    "NO_EXACT_NORM_MATCH": 2,
+    "PROPER_NAME_OR_TECHNICAL_TERM": 3
+  },
+  "exclusion_counts_by_stage": {
+    "1": 13,
+    "4": 2,
+    "5": 3
+  },
+  "funnel": [
+    [
+      "considered",
+      106
+    ],
+    [
+      "scope_valid (stage1 pass)",
+      93
+    ],
+    [
+      "parser_valid",
+      93
+    ],
+    [
+      "gloss_frozen",
+      93
+    ],
+    [
+      "exact_norm_match",
+      91
+    ],
+    [
+      "dependence_clean",
+      88
+    ],
+    [
+      "included",
+      88
+    ]
+  ],
+  "included_category_distribution": {
+    "abstract": 5,
+    "action": 6,
+    "animal": 13,
+    "body": 11,
+    "cognitive": 4,
+    "emotion": 13,
+    "nature": 21,
+    "object": 7,
+    "person": 3,
+    "state": 5
+  },
+  "schema": "varna_lift_funnel_v1"
+}

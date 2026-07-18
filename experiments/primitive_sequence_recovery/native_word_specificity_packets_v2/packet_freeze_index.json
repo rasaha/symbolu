@@ -1,0 +1,55 @@
+{
+  "artifact_type": "word_specificity_packet_freeze_v2",
+  "corrects_audit_commit": "73030960",
+  "n_confirmatory_rows_paraphrased": 17,
+  "repeats_per_base_trial": 6,
+  "packet_counts_per_set_arm_presentations": {
+    "A/F": 36,
+    "A/G": 36,
+    "A/R": 180,
+    "A/S": 36,
+    "A/T": 36,
+    "A/X": 36,
+    "B/F": 36,
+    "B/G": 36,
+    "B/R": 180,
+    "B/S": 36,
+    "B/T": 36,
+    "B/X": 36
+  },
+  "n_trials_evaluator_facing": 720,
+  "position_all_arms_uniform_chi2_zero": true,
+  "position_agents_no_primary_edge": true,
+  "leakage_flags_total": 14,
+  "leakage_flags_in_set_exploitable": 3,
+  "leakage_flags_new_not_preflagged": 0,
+  "flagged_words_source_intrinsic": [
+    "bhaya",
+    "duḥkha",
+    "sukha",
+    "deha"
+  ],
+  "seeds": {
+    "derangement": 20260901,
+    "random_assignment": 20260902,
+    "generic": 20260903,
+    "base_order": 20260906
+  },
+  "packet_verdict": "V2_PACKETS_REFROZEN_AND_BALANCED",
+  "readiness_verdict": "READY_FOR_FOCUSED_V2_PRERUN_AUDIT",
+  "frozen_hashes": {
+    "paraphrase_table.json": "f310e5e8e75fe9cbab38efffebf1577ea5160c4872b7525a83bdc0fd90b2579c",
+    "paraphrase_table_v2_authored.json": "f310e5e8e75fe9cbab38efffebf1577ea5160c4872b7525a83bdc0fd90b2579c",
+    "candidate_gloss_table.json": "0568f0b7494e9adfc4ade254d13a43a9df99e2893ffb36cf3308fa623781d211",
+    "leakage_audit.json": "3b477c8120f7e83cf25ec12c46bb1a556d3143c2735144c326843e0368a0d51a",
+    "position_balance.json": "7cf1ee349aea48ed379a5d22709362cc62964e77bca25dd058ab3141df8b8613",
+    "evaluator_facing/trials.json": "ebb441a0c9c41d6a0e0f8514efa9b8df23cf15cb9515a32ae1e452bca00f344d",
+    "internal/answer_key.json": "2dcd16973f2eb56bf8b183e846bcf67d5936304831f60c0a29359d4c02c6e016",
+    "isolated_authoring/authoring_input.json": "5c7fb1a5fbc258118e314fb9775ded2f6eaf5cf377d8bad35dec0def46995a0f",
+    "isolated_authoring/equivalence_review.json": "7e2fa01bf456d378c0f562832bffbd9678f7219617b5030c13ca5e0175343f12",
+    "isolated_authoring/leakage_review.json": "13fd51c8d22efa363981c927fa2dd98f7e0d9459a6a7c5e1f3b7be4261d64b22",
+    "evaluator_protocol.json": "6b11bc958aae9319f45c04fe876026ad61525ccdcbe45538037d81101e55e00a",
+    "analysis_plan_flagged_words.json": "9b3134a6877c1ffd63711ec11f53a3eea1a00f3695c3af2aec2c499108e48fa5"
+  },
+  "guardrails": "no evaluator run; no result; confirmatory backbone only; no vowel in packets; evaluator-facing exposes no Devanāgarī/IAST/consonant/rowid/arm/word/path"
+}

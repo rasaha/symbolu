@@ -1,0 +1,11 @@
+{
+  "schema": "b1_12_bsr_run_manifest_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "status": "COMPLETED",
+  "mode": "vllm_sequential_single_gpu",
+  "controlling_preregistration": "VARNA_SYMBOLIC_RESONANCE_PREREG_V1.md",
+  "verdict_role_freeze": "B1_12_BSR_VERDICT_AND_ROLE_STABILITY_FREEZE.md",
+  "wordlist_sha256": "9779384dcb82e0c6d86fa88ed1f000317ed387ea5f227cb32f96f38b95f8a6ba",
+  "role_dependence": "SIGNIFICANT_ROLE_DEPENDENCE",
+  "no_forced_consensus": true
+}

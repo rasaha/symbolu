@@ -1,0 +1,17 @@
+{
+  "leakage_tolerance": "any ablation baseline at or above chance (1/6) beyond CI => CONTROL_LEAKAGE",
+  "primary_task": "candidate-relative semantic matching; choose the ordinary meaning best represented",
+  "required_ablations": [
+    "first_position_only",
+    "last_position_only",
+    "unordered_descriptor_inventory",
+    "single_most_diagnostic_descriptor",
+    "descriptor_content_masked",
+    "candidate_meanings_without_component_info"
+  ],
+  "schema": "b1_12_leakage_control_spec_v1",
+  "spec_level_findings": {
+    "descriptor_length_leaks_cv_pattern": true,
+    "note": "with the frozen descriptors, vowel vs consonant descriptor LENGTH is perfectly separable, so content-UNmasked formatting already exposes each word's consonant/vowel skeleton (a strong structural fingerprint) BEFORE any judge is run — a pre-run leakage failure."
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "artifact_type": "b1_12_v1_2_order_distinctness_validation",
+  "descriptive_only": true,
+  "frozen_metric": "d_ord|inv(x,y) = max(0, Lev(x,y) - Lev(sort(x),sort(y))) / max(|x|,|y|)",
+  "candidate_pool": {
+    "source": "native_gate_g0/candidate_inventory.json (complete eligible pool)",
+    "n_candidates": 107,
+    "x_definition": "ordered consonant sequence (cons_seq) per candidate",
+    "pairs_basis": "unique unordered off-diagonal pairs = C(n,2)"
+  },
+  "statistics": {
+    "n_pairs": 5671,
+    "min": 0.0,
+    "max": 1.0,
+    "mean": 0.036766,
+    "median": 0.0,
+    "q1": 0.0,
+    "q2": 0.0,
+    "q3": 0.0,
+    "pct_exactly_0": 89.7373,
+    "pct_gt_0": 10.2627,
+    "pct_gt_0_25": 8.2172,
+    "pct_gt_0_5": 0.4937,
+    "pct_gt_0_75": 0.0529
+  },
+  "correlations_descriptive": {
+    "vs_edit_distance": {
+      "pearson": 0.0884,
+      "spearman": 0.1253
+    },
+    "vs_inventory_overlap": {
+      "pearson": 0.4766,
+      "spearman": 0.4595
+    },
+    "vs_length_diff": {
+      "pearson": -0.0593,
+      "spearman": -0.0297
+    },
+    "interpretation": "Descriptive Pearson/Spearman over unordered off-diagonal pairs. NOT used for any thresholding, selection, or optimization."
+  },
+  "self_metric_equality": {
+    "claim": "d_ord|inv(x, sort(x)) == V1.1 self-order = Lev(x, sort(x)) / |x|",
+    "all_candidates_equal": true,
+    "n_candidates_checked": 107,
+    "proof": "sort(sort(x)) == sort(x) and Lev(a,a) == 0 and |sort(x)| == |x|, so the V1.2 formula with y = sort(x) reduces to max(0, Lev(x,sort(x)) - 0)/|x| = Lev(x, sort(x))/|x|, which is exactly the V1.1 self-order measure."
+  },
+  "unchanged_confirmation": {
+    "pinned_vs_report": true,
+    "module_vs_pinned": true,
+    "constants": {
+      "K": 6,
+      "MAX_JACCARD_CAP": 0.34,
+      "MEAN_JACCARD_CAP": 0.2,
+      "POOL_SIZE": 20,
+      "cons_len_range": [
+        2,
+        4
+      ]
+    },
+    "selected_subset": [
+      "aśva",
+      "bala",
+      "bhaya",
+      "duḥkha",
+      "gaja",
+      "megha"
+    ],
+    "selected_subset_matches_report": true,
+    "core_pool_size": 20,
+    "n_eligible_candidates": 107
+  },
+  "examples_anonymous": {
+    "note": "Anonymous IDs only; no spelling/identity revealed. Illustrative, not 'good'/'bad'.",
+    "highest_scoring_pair": {
+      "pair": [
+        "C002",
+        "C074"
+      ],
+      "d_ord": 1.0,
+      "edit_distance": 2,
+      "inventory_overlap": 1.0,
+      "length_diff": 0,
+      "same_inventory": true,
+      "n_tokens": [
+        2,
+        2
+      ],
+      "n_distinct": [
+        2,
+        2
+      ],
+      "repeated_either": false
+    },
+    "lowest_non_zero_pair": {
+      "pair": [
+        "C001",
+        "C079"
+      ],
+      "d_ord": 0.25,
+      "edit_distance": 3,
+      "inventory_overlap": 0.4,
+      "length_diff": 1,
+      "same_inventory": false,
+      "n_tokens": [
+        3,
+        4
+      ],
+      "n_distinct": [
+        3,
+        4
+      ],
+      "repeated_either": false
+    },
+    "repeated_symbol_pair": {
+      "pair": [
+        "C003",
+        "C102"
+      ],
+      "d_ord": 0.333333,
+      "edit_distance": 3,
+      "inventory_overlap": 0.25,
+      "length_diff": 0,
+      "same_inventory": false,
+      "n_tokens": [
+        3,
+        3
+      ],
+      "n_distinct": [
+        3,
+        2
+      ],
+      "repeated_either": true
+    },
+    "inventory_different_but_order_identical_pair": {
+      "pair": [
+        "C000",
+        "C001"
+      ],
+      "d_ord": 0.0,
+      "edit_distance": 3,
+      "inventory_overlap": 0.0,
+      "length_diff": 1,
+      "same_inventory": false,
+      "n_tokens": [
+        2,
+        3
+      ],
+      "n_distinct": [
+        2,
+        3
+      ],
+      "repeated_either": false
+    },
+    "same_inventory_maximally_reordered_pair": {
+      "pair": [
+        "C002",
+        "C074"
+      ],
+      "d_ord": 1.0,
+      "edit_distance": 2,
+      "inventory_overlap": 1.0,
+      "length_diff": 0,
+      "same_inventory": true,
+      "n_tokens": [
+        2,
+        2
+      ],
+      "n_distinct": [
+        2,
+        2
+      ],
+      "repeated_either": false
+    }
+  },
+  "no_optimization_attestation": {
+    "search_performed": false,
+    "optimization_performed": false,
+    "tuning_performed": false,
+    "threshold_adjustment_performed": false,
+    "subset_reselection_performed": false,
+    "candidate_ranking_performed": false,
+    "frozen_artifacts_modified": false,
+    "experiment_outputs_modified": false,
+    "note": "This script only reads frozen inputs and computes descriptive statistics; it writes exclusively the three new validation artifacts."
+  }
+}

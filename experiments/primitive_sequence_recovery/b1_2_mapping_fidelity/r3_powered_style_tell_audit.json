@@ -1,0 +1,67 @@
+{
+  "artifact": "r3_powered_style_tell_audit",
+  "status": "STOP_NOW_R3_STYLE_TELL_ROBUST_FAIL",
+  "evidence": false,
+  "target_set_hash_verified": true,
+  "target_set_hash": "fe7aa7ac0081d4dcf6db788ca1fe94449844b40467d78bb7e23d7370f8d82fda",
+  "n_targets": 70,
+  "n_signatures": 140,
+  "renderer": "committed symmetric matched-length keyword schema (run_b1_2_g_builder.py); 2-step None->cap6; applied maxlen=6; NO tuning",
+  "base_rendering_ba_maxlen_None": 0.65,
+  "method": "leave-one-out nearest-centroid on style-only surface features (content-blind); word-clustered bootstrap CI",
+  "balanced_accuracy": 0.7,
+  "confusion_matrix": {
+    "V_as_V": 53,
+    "V_as_G": 17,
+    "G_as_V": 25,
+    "G_as_G": 45
+  },
+  "V_recall": 0.7571,
+  "G_recall": 0.6429,
+  "bootstrap_ci_95": [
+    0.5929,
+    0.7929
+  ],
+  "n_boot": 1000,
+  "boot_seed": 80809,
+  "criterion_conflict": {
+    "r3_adjudication_s4": "PASS = ba<=0.55 AND CI touching 0.5 (AND; stricter)",
+    "task_criterion5_phrasing": "PASS = ba<=0.55 OR CI includes/touches 0.5 (OR; easier)",
+    "freeze_memo_supersedes": false,
+    "applied": "STRICTER AND (freeze memo did not explicitly supersede)",
+    "would_pass_under_easier_OR": false
+  },
+  "acceptance": {
+    "ba_le_0.55": false,
+    "ci_includes_0.5": false,
+    "pass_strict_AND": false
+  },
+  "feature_tells": {
+    "dims": [
+      "n_features",
+      "n_constraints",
+      "summary_wordcount",
+      "mean_feature_wordcount",
+      "mean_feature_charlen",
+      "total_charlen",
+      "comma_count",
+      "other_punct"
+    ]
+  },
+  "integrity": {
+    "renderer_tuned": false,
+    "targets_changed": false,
+    "mapping_fidelity_scored": false,
+    "threshold_relaxed": false,
+    "v_modified": false,
+    "g_logic_modified": false
+  },
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED",
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth",
+    "no mapping-fidelity/LIMITED_GENERATION_UTILITY claim"
+  ]
+}

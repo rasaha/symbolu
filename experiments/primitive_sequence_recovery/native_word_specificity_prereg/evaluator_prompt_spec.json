@@ -1,0 +1,25 @@
+{
+  "task": "closed six-way forced-choice word identification",
+  "candidate_representation": "anonymized ID (W1..W6, order randomized per trial by frozen seed) + independently-sourced ENGLISH dictionary gloss ONLY",
+  "candidate_representation_rationale": "no Devanāgarī / IAST / spelling shown → the task cannot be solved by matching visible phonemes; the packet shows vṛtti glosses, never consonant symbols",
+  "trial": [
+    "present ONE rendered packet",
+    "present the six candidate IDs + glosses in frozen-seed-randomized order",
+    "ask which candidate the packet belongs to",
+    "require exactly ONE choice",
+    "NO open-ended plausibility prose as the endpoint"
+  ],
+  "evaluators": {
+    "policy": "at least 3 FAMILY-DIVERSE, blind LLM evaluators; family-disjoint from any authoring model; human evaluation deferred per project policy",
+    "temperature": 0,
+    "repeats": "N>=? per (packet,arm) with candidate order reshuffled per frozen seed",
+    "blind_to": [
+      "arm identity",
+      "mapping keys",
+      "repository",
+      "which packet is 'true'",
+      "Devanāgarī/IAST/consonant symbols"
+    ]
+  },
+  "determinism": "fixed prompt template, fixed seeds for candidate order and repeats"
+}

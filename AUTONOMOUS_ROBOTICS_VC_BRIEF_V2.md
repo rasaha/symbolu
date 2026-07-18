@@ -1,6 +1,6 @@
 # Autonomous Robotics — VC Brief (v2)
 
-**Cognade Labs | BCVF Autonomy Runtime**
+**Ugence Labs | BCVF Autonomy Runtime**
 *Portable predictor-trust layer between multi-predictor robotics stacks and their planner*
 *Version 0.7 — Prepared May 2026*
 
@@ -329,6 +329,28 @@
 > resolution tests added post-v0.7). v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
+
+---
+
+## What It Does — and What It Does NOT Do (read this first)
+
+For a safety-critical product the scope boundary *is* the credibility. We state it before the pitch, because
+the honesty about where the runtime does **not** apply is exactly what makes the part that does apply
+certifiable.
+
+| ✅ What it DOES | ❌ What it does NOT do |
+|---|---|
+| Arbitrates between **disagreeing predictors** — identifies *which* predictor is failing (per-predictor BCVF cost attribution), not which a heuristic prefers | **Not** a replacement for perception, prediction, fusion, or planning — it arbitrates between predictors, it does not produce them |
+| Fires **only on genuine failure** — Lemma 1 invariance: constant + linear-drift disagreement → exactly **zero** trust signal; only acceleration above the noise floor moves a weight | Does **not** cover failures that don't show up as predictor *disagreement* (e.g. a camera degradation that drops a dimension all predictors share — S4); inapplicable there, documented explicitly |
+| Produces an **auditable trace** — frame-by-frame `TrustShapedEpisodeRecord` showing why a predictor was down-weighted | Does **not** transfer to **LLM** trust / hallucination routing — internal probe returned a clean null (AUC ≈ 0.48–0.53); not positioned as a hallucination detector |
+| **Tunable without retraining** predictors or rewiring the planner (planner-agnostic `TrustWeightComputer`) | Does **not** catch a stealth-bias spoof below the kernel threshold *by itself* (the Lemma-1 trapdoor) — that needs the sensor-attestation defence-in-depth layer |
+| **Composes** with the existing stack — sits between predictors and planner; keep your fusion, perception, planning | Is **not** a full-AV platform, and has **no production deployment yet** — validated on synthetic + realistic-noise-adapter predictors; real-sensor pilot pending |
+| Pure NumPy, CPU, **ms/tick**; evaluable on synthetic predictors **before any procurement** | Does **not** rely on third-party benchmarks — every number is from internal CI; external validation is the next scheduled step |
+
+**The one sentence to take away:** BCVF is the **missing predictor-trust arbitration layer** — narrow by
+design, with a stated mathematical invariance a safety case can point to. It sells **a certifiable
+arbitration property**, not a smarter predictor and not a universal failure detector. Where failure doesn't
+manifest as predictor disagreement, we say so.
 
 ---
 
@@ -864,6 +886,6 @@ reachable.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Ugence Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
 *v0.7 · 1117 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1560 cells across 8 families × 26 configs with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940; Q3 SOTIF / ISO 26262 traceability template pulled forward — 13 clauses across SOTIF 5/6/7/8/9/10/12 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11, **41 indexed BCVF artifacts**, machine-checked snapshot in `safety_case/SOTIF_TRACEABILITY.md`; `StreamingFleetMonitor` with rolling-window summaries + threshold alerts lifts the fleet harness from triage to runtime; the two deferred CSV / Markdown report writers landed; **0.4.0 release ratifies a public-API stability policy** — 38-symbol `STABLE_API` + **77-symbol `PROVISIONAL_API`** (was 14, +6 multi-modal surfaces, +9 safety-state-machine surfaces, +12 ROS 2 / DDS / SBOM surfaces, +10 replay-framework surfaces, +7 real-time-budget surfaces, +9 calibration-management surfaces, +10 sensor-attestation surfaces), deprecation cycle in `API_STABILITY.md`; **hierarchical / group-level BCVF design proposal** lands as a design-only doc gated on three ship-when-ready criteria; **adversarial / spoofing test family** lands as the 8th family and third polarity bucket — UN ECE R155 cybersecurity scope-boundary pinned via the Lemma-1-trapdoor; **multi-modal predictor inputs** thin-shim adapter lifts lane-frame predictors to SE(2) at the kernel boundary — Lemma 1 invariance verified to carry through curved lanes contrary to the pre-implementation hypothesis; **functional-safety state machine** lands as the §9.1-recommended top-of-roadmap pick — `safety_state/` package + load-bearing `SAFETY_STATE_MACHINE_DESIGN.md` + clause-8 / Part-6-§8 traceability wiring, four-state behavioural contract with ASIL-decomposed transitions and machine-enforced direct-jump prohibition; **ROS 2 / DDS / CycloneDX SBOM integration contract** lands as the §9-row-#2 deal-unlock pick — `bcvf_ros2/` framework-agnostic `BCVFNode` + typed `.msg` schemas + documented `RELIABLE / VOLATILE / 10ms / 100ms` DDS QoS profile + `safety_case/SBOM.cdx.json` CycloneDX 1.5 manifest, load-bearing `ROS2_DDS_SBOM_DESIGN.md`, SOTIF clause-5 boundary + clause-12 release-to-market evidence wiring; **replay / record-and-replay framework** lands as the §9-row-#3 recall-investigator's tool — `replay/` package + load-bearing `REPLAY_FRAMEWORK_DESIGN.md`, `ReplayBundle` + bit-identity comparator with field-level + tick-level divergence localisation, SOTIF clause-10 + Part-6-§11 traceability wiring; **real-time / no-allocation hot path + p999 budget framework** lands as the §9-row-#4 AUTOSAR-Adaptive deal-unlock pick — `realtime/` package + load-bearing `REAL_TIME_BUDGET_DESIGN.md`, typed `RealTimeBudget` contract + `LatencyMonitor` per-tick observer with mutually-exclusive tier counters + percentile-availability discipline rejecting statistically-meaningless small-n p999/p9999 claims, ISO 26262 Part 6 §10 integration-verification evidence wiring; **calibration parameter management + drift detection** lands as the §9-row-#6 fleet-deployment pick — `calibration/` package + load-bearing `CALIBRATION_DESIGN.md`, hash-identified `CalibrationSet` bundling 8 typed configs + `CalibrationDriftDetector` over `WindowedFleetSummary`, SOTIF clause-12 release-to-market evidence wiring as a sibling artifact to the CycloneDX SBOM; **sensor attestation interface** lands as the §9-row-#8 cybersecurity-loop-closure pick — `attestation/` package + load-bearing `SENSOR_ATTESTATION_DESIGN.md`, stdlib-only HMAC-SHA256 `SensorAttestation` + `SensorAttestationVerifier` running seven §4 checks (policy lookup, policy-enabled, firmware allowlist, freshness, future-dating, replay, data binding, HMAC signature with constant-time compare), SOTIF clause-8 Insufficiency-#3 in-scope-mitigation evidence wiring closing the UN ECE R155 cybersecurity loop the adversarial family opened; **`INDUSTRY_FEATURES_ROADMAP.md`** documents the eight gap-fill items ranked by deal-unlock value with **six rows shipped** (#1 state machine + #2 ROS 2 / DDS / SBOM + #3 replay framework + #4 real-time budget + #6 calibration management + #8 sensor attestation) struck through with pointers to their design docs — and the LAST entry in `_ROADMAP_TOKENS` removed; the remaining two (HD-map predictor + domain-specific predictors) are hardware-adjacent and not sandbox-implementable, kept on the roadmap for the deployment-partner conversation) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*

@@ -1,0 +1,41 @@
+pride
+A: After losing the championship, she couldn't bear the thought of her teammates looking at her with disappointment.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She felt a quiet pride in her team's efforts, even if they didn't win the championship.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+freedom
+A: Trapped in a toxic relationship, she yearned for the freedom to make her own decisions.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She savored the freedom to travel and explore the world on her own terms.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+patience
+A: He fidgeted restlessly, unable to bear the wait for the test results that would decide his future.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She sat with quiet patience, knowing that the results would come in due time.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+courage
+A: Despite the fear, he mustered the courage to confront the bully who had been tormenting him.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She faced the challenge with courage, determined to overcome her fears.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+control
+A: He felt a surge of anger, the kind of uncontrollable rage that made him lash out.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She maintained a steady control over her emotions, responding calmly to the situation.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+doubt
+A: The constant doubt about his abilities made it hard for him to take on new challenges.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: She felt a growing doubt, but also a determination to prove herself.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+author_identity:      fresh isolated model session — model id + note "clean session"
+date_utc:             2023-10-06T12:34:56Z
+prompt_hash:          0e123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+context_hash:         123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123
+blindness_attestation: I certify I had not seen any of the materials listed in Section 7 before or during this task, and I did not consult any outside material while writing.

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "repeats": 20,
+  "k_shuffle": 40,
+  "n_ref": 300,
+  "base_seed": 1000,
+  "min_delta_r2": 0.01,
+  "shuffle_pctl": 95.0,
+  "n_units": 5,
+  "op_dim": 3,
+  "len_min": 3,
+  "len_max": 6,
+  "effect_grid": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.8
+  ],
+  "sample_grid": [
+    100,
+    200,
+    400,
+    800
+  ],
+  "noise_grid": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "confound_grid": [
+    0.0,
+    1.0,
+    2.0,
+    4.0
+  ]
+}

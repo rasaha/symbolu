@@ -1,0 +1,1450 @@
+{
+  "artifact_type": "b1_6_pilot_randomized_control_manifest_v2_named_vritti",
+  "schema_version": "1.0",
+  "representation_version": "B1.6-v2_named_vritti",
+  "status": "FROZEN_DATA_NOT_AN_EVIDENCE_FREEZE",
+  "generation_run": false,
+  "supersedes": "frozen/b1_6_pilot_randomized_control_manifest.json (B1.6-v1)",
+  "note": "RANDOMIZED_SYMBOLU_CONTROL v2: seeded shuffle of the supported-varna -> named-vrtti profile association; same format/length/entry-count; presented as a scaffold, not revealed as randomized.",
+  "seed": 20260709,
+  "relabel_map_varna_to_donor": {
+    "ba": "va",
+    "ca": "ba",
+    "da": "ga",
+    "ga": "tha",
+    "ka": "ra",
+    "la": "sha",
+    "ma": "ta",
+    "na": "nga",
+    "nga": "ma",
+    "pa": "da",
+    "ra": "pa",
+    "sa": "ka",
+    "sha": "sa",
+    "ta": "na",
+    "tha": "ca",
+    "va": "la"
+  },
+  "relabel_map_sha256": "cbb192ad083d65046a6d34b42605da3b8afee90b8074b6fce44300a9f924195f",
+  "source_v2_table_sha256": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+  "n_items": 24,
+  "randomized_scaffolds": [
+    {
+      "item_id": "b16-01",
+      "TARGET_TEXT": "river",
+      "supported_varna_sequence": [
+        "ra",
+        "va",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "la"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "va": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "profile_from": "la"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "va": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        }
+      }
+    },
+    {
+      "item_id": "b16-02",
+      "TARGET_TEXT": "bridge",
+      "supported_varna_sequence": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ba",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "ga",
+          "profile_from": "tha"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ba": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "profile_from": "va"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        },
+        "ga": {
+          "named_attribute": "vishada / melancholy",
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ba": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "ga": {
+          "worldly_binding_pole": "melancholy / dejection",
+          "spiritual_liberating_pole": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy"
+        }
+      }
+    },
+    {
+      "item_id": "b16-03",
+      "TARGET_TEXT": "lantern",
+      "supported_varna_sequence": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "ta": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "profile_from": "na"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "ta": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-04",
+      "TARGET_TEXT": "mirror",
+      "supported_varna_sequence": [
+        "ma",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "ta"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "profile_from": "ta"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-05",
+      "TARGET_TEXT": "balance",
+      "supported_varna_sequence": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ba",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "ra"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ba": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "profile_from": "va"
+        },
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "ka": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ba": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        },
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "ka": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      }
+    },
+    {
+      "item_id": "b16-06",
+      "TARGET_TEXT": "freedom",
+      "supported_varna_sequence": [
+        "ra",
+        "da",
+        "ma"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "ma",
+          "profile_from": "ta"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        },
+        "ma": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "profile_from": "ta"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "ma": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        }
+      }
+    },
+    {
+      "item_id": "b16-07",
+      "TARGET_TEXT": "patience",
+      "supported_varna_sequence": [
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "pa",
+          "profile_from": "da"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "ra"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "pa": {
+          "named_attribute": "peevishness / irritability",
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "profile_from": "da"
+        },
+        "ta": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "profile_from": "na"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "ka": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "pa": {
+          "worldly_binding_pole": "peevishness / irritability",
+          "spiritual_liberating_pole": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability"
+        },
+        "ta": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "ka": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      }
+    },
+    {
+      "item_id": "b16-08",
+      "TARGET_TEXT": "threshold",
+      "supported_varna_sequence": [
+        "tha",
+        "ra",
+        "sha",
+        "la",
+        "da"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "tha",
+          "profile_from": "ca"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "sha",
+          "profile_from": "sa"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "tha": {
+          "named_attribute": "viveka / conscience",
+          "worldly_binding_distortion": "lack of discrimination / confused discernment",
+          "spiritual_liberating_reading": "conscience as inner dharmic compass",
+          "profile_from": "ca"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "sha": {
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "profile_from": "sa"
+        },
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "tha": {
+          "worldly_binding_pole": "lack of discrimination / confused discernment",
+          "spiritual_liberating_pole": "conscience as inner dharmic compass",
+          "named_attribute": "viveka / conscience"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "sha": {
+          "worldly_binding_pole": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_pole": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+        },
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        }
+      }
+    },
+    {
+      "item_id": "b16-09",
+      "TARGET_TEXT": "Maya",
+      "supported_varna_sequence": [
+        "ma"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "ta"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "profile_from": "ta"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        }
+      }
+    },
+    {
+      "item_id": "b16-10",
+      "TARGET_TEXT": "Rowan",
+      "supported_varna_sequence": [
+        "ra",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        }
+      }
+    },
+    {
+      "item_id": "b16-11",
+      "TARGET_TEXT": "Nova",
+      "supported_varna_sequence": [
+        "na",
+        "va"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "la"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "va": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "profile_from": "la"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "va": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        }
+      }
+    },
+    {
+      "item_id": "b16-12",
+      "TARGET_TEXT": "Ira",
+      "supported_varna_sequence": [
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-13",
+      "TARGET_TEXT": "lotus",
+      "supported_varna_sequence": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "sa",
+          "profile_from": "ka"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "ta": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "profile_from": "na"
+        },
+        "sa": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+          "profile_from": "ka"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "ta": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        },
+        "sa": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        }
+      }
+    },
+    {
+      "item_id": "b16-14",
+      "TARGET_TEXT": "dawn",
+      "supported_varna_sequence": [
+        "da",
+        "va",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "la"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        },
+        "va": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "profile_from": "la"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "va": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        }
+      }
+    },
+    {
+      "item_id": "b16-15",
+      "TARGET_TEXT": "anchor",
+      "supported_varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "ca",
+          "profile_from": "ba"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "ca": {
+          "named_attribute": "avajna / indifference, neglect",
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction",
+          "profile_from": "ba"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "ca": {
+          "worldly_binding_pole": "indifference / neglect",
+          "spiritual_liberating_pole": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-16",
+      "TARGET_TEXT": "mandala",
+      "supported_varna_sequence": [
+        "ma",
+        "na",
+        "da",
+        "la"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "ta"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ma": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "profile_from": "ta"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        },
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ma": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        }
+      }
+    },
+    {
+      "item_id": "b16-17",
+      "TARGET_TEXT": "Lumen",
+      "supported_varna_sequence": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "ma",
+          "profile_from": "ta"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "ma": {
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "profile_from": "ta"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "ma": {
+          "worldly_binding_pole": "inertia / staticity / dullness",
+          "spiritual_liberating_pole": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        }
+      }
+    },
+    {
+      "item_id": "b16-18",
+      "TARGET_TEXT": "Verba",
+      "supported_varna_sequence": [
+        "va",
+        "ra",
+        "ba"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "va",
+          "profile_from": "la"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "ba",
+          "profile_from": "va"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "va": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "profile_from": "la"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "ba": {
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "profile_from": "va"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "va": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "ba": {
+          "worldly_binding_pole": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_pole": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+        }
+      }
+    },
+    {
+      "item_id": "b16-19",
+      "TARGET_TEXT": "Solace",
+      "supported_varna_sequence": [
+        "sa",
+        "la",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "sa",
+          "profile_from": "ka"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "ra"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "sa": {
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+          "profile_from": "ka"
+        },
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "ka": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "sa": {
+          "worldly_binding_pole": "hope / forward-grasping desire",
+          "spiritual_liberating_pole": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound"
+        },
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "ka": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        }
+      }
+    },
+    {
+      "item_id": "b16-20",
+      "TARGET_TEXT": "Kite",
+      "supported_varna_sequence": [
+        "ka",
+        "ta"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ka",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "na"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ka": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "profile_from": "ra"
+        },
+        "ta": {
+          "named_attribute": "moha / blind attachment, infatuation",
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "profile_from": "na"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ka": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "ta": {
+          "worldly_binding_pole": "blind attachment / infatuation",
+          "spiritual_liberating_pole": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation"
+        }
+      }
+    },
+    {
+      "item_id": "b16-21",
+      "TARGET_TEXT": "grief",
+      "supported_varna_sequence": [
+        "ga",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ga",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ga": {
+          "named_attribute": "vishada / melancholy",
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "profile_from": "tha"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ga": {
+          "worldly_binding_pole": "melancholy / dejection",
+          "spiritual_liberating_pole": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-22",
+      "TARGET_TEXT": "wonder",
+      "supported_varna_sequence": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "va",
+          "profile_from": "la"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "va": {
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "profile_from": "la"
+        },
+        "na": {
+          "named_attribute": "dambha / vanity",
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "profile_from": "nga"
+        },
+        "da": {
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "profile_from": "ga"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "va": {
+          "worldly_binding_pole": "cruelty",
+          "spiritual_liberating_pole": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor"
+        },
+        "na": {
+          "worldly_binding_pole": "vanity / pride-display",
+          "spiritual_liberating_pole": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity"
+        },
+        "da": {
+          "worldly_binding_pole": "effort / striving",
+          "spiritual_liberating_pole": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        }
+      }
+    },
+    {
+      "item_id": "b16-23",
+      "TARGET_TEXT": "longing",
+      "supported_varna_sequence": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "nga",
+          "profile_from": "ma"
+        },
+        {
+          "varna_position_key": "nga",
+          "profile_from": "ma"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "la": {
+          "named_attribute": "rajo-guna; artha / psychic longing",
+          "worldly_binding_distortion": "mutative drive / material pursuit",
+          "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+          "profile_from": "sha"
+        },
+        "nga": {
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed",
+          "profile_from": "ma"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "la": {
+          "worldly_binding_pole": "mutative drive / material pursuit",
+          "spiritual_liberating_pole": "rajas; artha as psychic longing and worldly movement",
+          "named_attribute": "rajo-guna; artha / psychic longing"
+        },
+        "nga": {
+          "worldly_binding_pole": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_pole": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude"
+        }
+      }
+    },
+    {
+      "item_id": "b16-24",
+      "TARGET_TEXT": "courage",
+      "supported_varna_sequence": [
+        "ka",
+        "ra",
+        "ga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ka",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "ga",
+          "profile_from": "tha"
+        }
+      ],
+      "NAMED_VRTTI_PROFILE_TABLE": {
+        "ka": {
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "profile_from": "ra"
+        },
+        "ra": {
+          "named_attribute": "ghrina / hatred, revulsion",
+          "worldly_binding_distortion": "hatred / revulsion",
+          "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+          "profile_from": "pa"
+        },
+        "ga": {
+          "named_attribute": "vishada / melancholy",
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_NAMED_DUAL_POLE_FRAME": {
+        "ka": {
+          "worldly_binding_pole": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_pole": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+        },
+        "ra": {
+          "worldly_binding_pole": "hatred / revulsion",
+          "spiritual_liberating_pole": "fetter of hatred; related to moha and fear",
+          "named_attribute": "ghrina / hatred, revulsion"
+        },
+        "ga": {
+          "worldly_binding_pole": "melancholy / dejection",
+          "spiritual_liberating_pole": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy"
+        }
+      }
+    }
+  ]
+}

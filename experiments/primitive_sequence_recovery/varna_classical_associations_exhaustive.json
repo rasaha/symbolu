@@ -1,0 +1,726 @@
+{
+  "schema": "varna_classical_exhaustive_v1",
+  "label": "READ_ONLY_EXHAUSTIVE_EXTRACTION / NO_INFERENCE",
+  "source_tradition": "single tradition (Sarkar varṇa/bīja exposition); no independent second text cited in-repo -> no cross-text variant conflicts (the only internal conflict was the ś/ṣ swap, already RESOLVED)",
+  "ledger_scope": "33 atomic consonants + kṣa conjunct (34 entries). NO vowels in the primary-text ledger.",
+  "vowels": "ABSENT from primary-text verification. varna_lens vowels carry ONLY authored binding/liberating states (source: Sanskrit_letters_full.docx); NO tattva/guṇa/bīja/deity anywhere -> no source-backed vowel classical layer exists to extract.",
+  "normalized_layer_scope": "varna_classical_associations_33.json normalized ONLY guṇa (3), tattva (5), deity (1).",
+  "omitted_but_attested_classes": {
+    "bija_mantra": [
+      "la",
+      "ra"
+    ],
+    "brahma_cosmological": [
+      "ka"
+    ],
+    "buddhist": [
+      "ka"
+    ],
+    "celestial_temporal": [
+      "ha",
+      "ttha"
+    ],
+    "cross_reference": [
+      "ba",
+      "bha",
+      "dda",
+      "dha",
+      "nga",
+      "pa",
+      "pha",
+      "ra"
+    ],
+    "deity": [
+      "ha",
+      "ka"
+    ],
+    "distinction": [
+      "ddha",
+      "dha",
+      "tta"
+    ],
+    "etymology": [
+      "jha",
+      "ka",
+      "kha",
+      "ksha",
+      "nya",
+      "pa",
+      "ra",
+      "ta",
+      "ttha"
+    ],
+    "kosha": [
+      "ttha"
+    ],
+    "loka": [
+      "ha",
+      "ttha"
+    ],
+    "opposite_varna": [
+      "ha",
+      "kha",
+      "ksha",
+      "ttha"
+    ],
+    "phonetic_historical": [
+      "nga"
+    ],
+    "prana_shakti": [
+      "ra"
+    ],
+    "purushartha": [
+      "sa",
+      "sha",
+      "ssa",
+      "va"
+    ],
+    "scope_note": [
+      "ga",
+      "gha",
+      "ma",
+      "na"
+    ],
+    "vidya": [
+      "ha",
+      "ksha"
+    ]
+  },
+  "artifact_hashes": {
+    "b1_2_mapping_fidelity/b1_2_varna_classical_verifications.json": "a1ad271fae62514284123deb879e58973e82843d186f41aa175710dc9217e1b2",
+    "varna_classical_associations_33.json": "354656c201d7ee3efe0183b4bdffea80bf6728c3059e0d8a3d0abe1a6d3a8bd8"
+  },
+  "rows": [
+    {
+      "ledger_key": "ha",
+      "sanskrit_label": "Parā-vidyā (intuitional science)",
+      "source_quote_verbatim": "Sarkar: Ha = acoustic root of the ethereal (ākāśa) factor, of daytime, of the sun, of svarloka, and of parā-vidyā. Opposite to ha is ṭha, the acoustic root of nighttime, of the moon, of bhúvarloka, and of the kāmamaya kośa. Ha + ao = hao = acoustic root of Shiva in His táṇḍava posture.",
+      "classical_associations_verbatim": "ether (ākāśa) factor; daytime; sun; svarloka; parā-vidyā. OPPOSITE varṇa = ṭha (night, moon, bhúvarloka, kāmamaya kośa). COMPOUND ha+ao = hao = Shiva's táṇḍava. (Associations + an opposite varṇa — NOT an intra-ha polarity.)",
+      "attested_associations": [
+        {
+          "class": "tattva",
+          "value": "ākāśa / ether factor",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "celestial_temporal",
+          "value": "daytime; the sun",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "loka",
+          "value": "svarloka",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "vidya",
+          "value": "parā-vidyā (intuitional science)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "opposite_varna",
+          "value": "ṭha (night/moon/bhúvarloka/kāmamaya kośa)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "deity",
+          "value": "Shiva in His táṇḍava (via compound ha+ao=hao)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 6
+    },
+    {
+      "ledger_key": "pa",
+      "sanskrit_label": "Ghṛṇā (hatred / revulsion)",
+      "source_quote_verbatim": "Sarkar: Pa = acoustic root of ghṛṇā vṛtti (hatred/revulsion), the FETTER of hatred (one of the eight pāshas), stemming mainly from moha. 'When one's psychic attraction is toward the crude, the mind has a downward tendency (pat/patati) leading to downfall; when the mind moves upward it is anurakti (attraction for the Great), whose consummation is devotion.'",
+      "classical_associations_verbatim": "ghṛṇā = the fetter of hatred (one of the eight pāshas: hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism); six ripus = kāma, krodha, lobha, mada, moha, mātsarya; downward attraction (pat) -> downfall vs upward anurakti -> devotion. VAIRĀGYA NOTE (preserving the earlier option-A reading): ghṛṇā's energy CAN be redirected — revulsion turned against the crude/vices is a legitimate sublimation (vairāgya) path — but that is a sublimation ROUTE, not an inversion of the pole; hatred remains the binding fetter.",
+      "attested_associations": [
+        {
+          "class": "cross_reference",
+          "value": "ghṛṇā = fetter of hatred, one of the eight pāśas",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "cross_reference",
+          "value": "six ripus: kāma, krodha, lobha, mada, moha, mātsarya",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "pat/patati = downward attraction vs upward anurakti→devotion",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 3
+    },
+    {
+      "ledger_key": "ka",
+      "sanskrit_label": "Āśā (abhiipśātmaka āśā vṛtti — hope)",
+      "source_quote_verbatim": "Sarkar: Ka = acoustic root of the abhiipśātmaka āśā vṛtti (the propensity of hope), which goads creatures — especially humans — to work in various ways. Ka is ALSO the acoustic root of Kārya Brahma (the expressed universe). Etymology: ka (kae + ḍa) = 'that which produces sound'; also 'water' (flowing water; va = water in general); also 'hair grown on the head' (kac = glossy). Ka + iisha = kesha (hair; also Nārāyaṇa). Kārya Brahma (Saguṇarasātmaka Brahma), represented by ka, is the controller of the living world; Buddhist Saṃvṛtti Bodhicitta = the created world = Kārya Brahma (kāpālika: 'Kaṃ saṃvṛtti bodhicittaṃ pālayati').",
+      "classical_associations_verbatim": "ka = Kārya Brahma (the expressed / created universe; Saguṇarasātmaka Brahma; controller of the living world); 'that which produces sound'; 'water' / flowing water (va = water in general); 'hair on the head' (kesha = ka+iisha, also a name of Nārāyaṇa); Buddhist Saṃvṛtti Bodhicitta. These are cosmological / etymological ASSOCIATIONS of ka, NOT poles.",
+      "attested_associations": [
+        {
+          "class": "brahma_cosmological",
+          "value": "Kārya Brahma (Saguṇarasātmaka Brahma; controller of the living world)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "deity",
+          "value": "Nārāyaṇa (kesha = ka+iisha, a name of Nārāyaṇa)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "buddhist",
+          "value": "Saṃvṛtti Bodhicitta (the created world = Kārya Brahma)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "'that which produces sound'; 'water'/flowing water; 'hair on the head'",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 4
+    },
+    {
+      "ledger_key": "kha",
+      "sanskrit_label": "Cintā (worry / reflective-consequential, objective thought)",
+      "source_quote_verbatim": "Sarkar: The acoustic root of āśā vṛtti is ka; that of cintā vṛtti (the propensity of worry) is kha. If your train runs late you think not only of the delay but of the probable inconveniences (the host, arriving late for food, deciding to eat near the station) — such consequential thoughts are symbolized by kha. Travelling elsewhere you might reflect on a collapsing brassware industry and whether it could be revived, though you are 'not personally affected' and 'not a direct player in your own thoughts' — such impersonal thoughts are also kha. Kha MEANS 'sky' but is NOT the acoustic root of the sky (that is ha); kha also means 'heaven', but only its CRUDE aspects — the sphere of heaven that transcends the crude is kṣa. Ka = Kārya Brahma is the first consonant; and since ka + ha = kha, kha immediately follows ka in the Indo-Aryan alphabet.",
+      "classical_associations_verbatim": "Paired with ka: ka = āśā (hope) goads action; kha = cintā (worry / objective thought) reflects. kha MEANS 'sky' and 'heaven' but is NOT their acoustic root — the SKY's root is ha; kha = the CRUDE aspects of heaven, while the transcendent sphere = kṣa (ksha). Structurally ka + ha = kha (hence kha follows ka, the first consonant / Kārya Brahma, in the alphabet). These are meanings/associations, NOT poles.",
+      "attested_associations": [
+        {
+          "class": "etymology",
+          "value": "MEANS 'sky'/'heaven' (crude aspects) but is NOT their acoustic root (ha is)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "opposite_varna",
+          "value": "transcendent heaven = kṣa (ksha)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "structural: ka + ha = kha (follows ka in the alphabet)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 3
+    },
+    {
+      "ledger_key": "ga",
+      "sanskrit_label": "Ceṣṭā (effort / striving to arouse dormant potential)",
+      "source_quote_verbatim": "Sarkar: Every entity has the potentiality of expression; an animate entity can arouse that dormant potentiality through both internal and external means. If poetic genius lies dormant in someone and he arouses it by applying his will-force, he becomes a renowned poet; if lethargy prevents it, the genius stays unexpressed. The effort made to arouse one's dormant potentiality is called ceṣṭā. Ceṣṭā is one of the psychic vṛttis and is the MAIN CAUSE of mundane development AND spiritual elevation — its value in the mundane and supramundane spheres is immense. Ga, the acoustic root of ceṣṭā, plays an important role in the physical, psychic and spiritual spheres.",
+      "classical_associations_verbatim": "ceṣṭā = the effort to arouse dormant potentiality (latent genius -> applied will-force -> expression; else unexpressed). Described as the MAIN CAUSE of BOTH mundane development AND spiritual elevation, operating across the physical, psychic and spiritual spheres. (Scope/significance of the vṛtti — NOT a separate cosmological association.)",
+      "attested_associations": [
+        {
+          "class": "scope_note",
+          "value": "ceṣṭā = main cause of BOTH mundane development AND spiritual elevation (physical/psychic/spiritual)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "gha",
+      "sanskrit_label": "Mamatā (love / possessive attachment — 'mine-ness')",
+      "source_quote_verbatim": "Sarkar: Mamatā, the vṛtti of love and attachment, is related to time, space and individuality. People praise even the poorest goods made in their own country and criticize the best goods made elsewhere — irrational attachment for a place, a psychic disease (SPACE). A mother who sacrifices everything for her child mercilessly slices living kai fish without feeling, deaf to their agony (INDIVIDUALITY). The mother cow who lovingly licks her calf today kicks it away when it grows tomorrow (TIME). Thus mamatā is limited by the relative factors. Only human beings can make mamatā TRANSCEND the boundaries of time, space and individuality, after persistent and intense effort — impossible for other beings. Gha is the acoustic root of mamatā vṛtti.",
+      "classical_associations_verbatim": "mamatā is related to time, space and individuality; its bounded form shows as place-attachment (praising one's own poor goods over better foreign ones — a 'psychic disease'), individuality (the mother who cherishes her child yet slices kai fish unmoved), and time (the cow that licks its calf today, kicks it away grown tomorrow). (Illustrations/scope of the vṛtti — not a separate cosmological association.)",
+      "attested_associations": [
+        {
+          "class": "scope_note",
+          "value": "mamatā bounded by time, space, individuality (illustrations only)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "nga",
+      "sanskrit_label": "Dambha (vanity / self-display)",
+      "source_quote_verbatim": "Sarkar: Uṋa (ṅa) is the acoustic root of dambha vṛtti (vanity). The popular story: the sage Vashiṣṭha travelled to China to learn the Chinese school of Tantra, learned the use of una in Tantric mantras, and introduced it in India; una is used extensively across the Indo-Chinese languages (Tibetan, Ladakhi, Sherpa, Manpa). Its transmission is linked to the Tárā cult, trifurcated as Ugra/Vajra Tárā (India), Nīla Tárā / Nīla Sarasvatī (Tibet), and Bhrāmarī / Kṛṣṇa Tárā (China). The acoustic root of Vajra Tárā and Nīla Tárā is aeṃ; that of the black Bhrāmarī Tárā (= Kālī in Varṇāśrama Dharma) is krīṃ (ka = Kārya Brahma + ra = the luminous factor).",
+      "classical_associations_verbatim": "Phonetic-historical (NOT poles): per the legend, una was learned by Vashiṣṭha in China and introduced to India, and is used across the Indo-Chinese languages (Tibetan/Ladakhi/Sherpa/Manpa). Its transmission is tied to the Tárā cult — but the Tárā deities have their OWN acoustic roots (aeṃ for Vajra/Nīla Tárā; krīṃ = ka[Kārya Brahma] + ra[luminous factor] for Bhrāmarī Tárā / Kālī), NOT una. Record as history/association; do not fold aeṃ/krīṃ/Tárā into nga's poles.",
+      "attested_associations": [
+        {
+          "class": "phonetic_historical",
+          "value": "legend: uṋa learned by Vashiṣṭha in China; used across Indo-Chinese languages (Tibetan/Ladakhi/Sherpa/Manpa)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "cross_reference",
+          "value": "Tárā cult transmission — but Tárā roots are aeṃ / krīṃ, NOT ṅa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "ca",
+      "sanskrit_label": "Viveka (conscience / discernment — real vs unreal, right vs wrong)",
+      "source_quote_verbatim": "Sarkar: 'Ca is the acoustic root of viveka [conscience].' — This is the ENTIRE classical passage: it attests ONLY the vṛtti name. No binding/liberating contrast and no further associations are given.",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "ONLY the vṛtti name (viveka) is attested; no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "cha",
+      "sanskrit_label": "Vikalatā (nervous breakdown / mental incapacitation)",
+      "source_quote_verbatim": "Sarkar: Cha is the acoustic root of vikalatā vṛtti (nervous breakdown). A nervous breakdown occurs when one's mind, which had previously been functioning properly, either starts malfunctioning or stops functioning altogether. [Attests the vṛtti name + a definition of the state — no binding/liberating contrast is given; the poles below are lexicon/framework-supplied.]",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "vṛtti name + state definition (vikalatā); no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "ja",
+      "sanskrit_label": "Ahaṃkāra (ego / I-inflation)",
+      "source_quote_verbatim": "Sarkar: Ja is the acoustic root of ahaṃkāra vṛtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role. 'Since I was there, I was able to control the situation... had I not been there the world would have met its final destruction.' — so spoke Aurangzeb; it is an expression of ahaṃkāra vṛtti. [Attests the vṛtti name + an illustration of the INFLATED (binding) form; no liberating pole is given.]",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "vṛtti name + illustration (ahaṃkāra); no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "jha",
+      "sanskrit_label": "Lolupatā / Lobha / Lolatā (greed / avarice)",
+      "source_quote_verbatim": "Sarkar: Jha is the acoustic root of lolupatā, lobha (greed) and lolatā (avarice) vṛttis. The Bengali word nolā (the greedy fascination of a cat or a dog) is derived from lola / lolatā.",
+      "classical_associations_verbatim": "Etymology: the Bengali nolā (a cat's or dog's greedy fascination) derives from lola / lolatā. (An etymological illustration of the vṛtti — not a separate association or pole.)",
+      "attested_associations": [
+        {
+          "class": "etymology",
+          "value": "Bengali nolā (greedy fascination) derives from lola/lolatā",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "nya",
+      "sanskrit_label": "Kapaṭatā (hypocrisy / duplicity)",
+      "source_quote_verbatim": "Sarkar: Iṋa (ña) is the acoustic root of kapaṭatā vṛtti (hypocrisy). Another Sanskrit word for hypocrite is páśaṇḍa; in Hindi, pākhaṇḍī. Hypocrisy takes many forms; three common ones: (1) getting one's purpose served by exploiting or cheating others; (2) unnecessarily dominating somebody to conceal one's own ignorance or weakness; (3) pretending to be moral by criticizing the sins of others which one secretly commits oneself.",
+      "classical_associations_verbatim": "Sanskrit páśaṇḍa / Hindi pākhaṇḍī = hypocrite. Three illustrated forms of hypocrisy (all of the BINDING pole): exploit/cheat to serve one's purpose; dominate to conceal one's ignorance/weakness; feign morality by condemning others' secretly-shared sins.",
+      "attested_associations": [
+        {
+          "class": "etymology",
+          "value": "Sanskrit páśaṇḍa / Hindi pākhaṇḍī = hypocrite; three forms of hypocrisy",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "tta",
+      "sanskrit_label": "Vitarka (overstatement / garrulous over-argument)",
+      "source_quote_verbatim": "Sarkar: Ṭa is the acoustic root of vitarka vṛtti (overstating one's case). Vitarka is not merely debating; it means overstating one's case to the point of garrulousness — a combination of bad temper and garrulousness. It is NOT synonymous with kaśāya vṛtti (speaking harshly to hurt others). Example (Howrah station): asked whether the Uluberia local has left, one gentleman snaps abusively ('Am I a railway timetable?... People like you make life hell...') — uncontrolled vitarka; a second replies helpfully with just the relevant facts (platform eleven, five minutes) — pramita vāk (balanced statement, only relevant words).",
+      "classical_associations_verbatim": "Vitarka = bad temper + garrulousness; explicitly NOT kaśāya vṛtti (speaking harshly to hurt others). Its liberated contrast term is pramita vāk (balanced statement). (Distinctions/illustration, not a separate cosmological association.)",
+      "attested_associations": [
+        {
+          "class": "distinction",
+          "value": "vitarka NOT kaśāya vṛtti; liberated contrast = pramita vāk",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ttha",
+      "sanskrit_label": "Anutāpa / Paścāttāpa (repentance — 'after-heat')",
+      "source_quote_verbatim": "Sarkar: Ṭha is the acoustic root of anutāpa vṛtti (repentance). One is seized by repentance on realizing (from within, or with a second person's help) the impropriety of one's action. In northern India anutāpa is called paścāttāpa. Anu and paschāt both mean 'later / after'; tāpa means 'heat' (so repentance = 'after-heat').",
+      "classical_associations_verbatim": "COSMOLOGICAL (from the ha passage): ṭha is the acoustic root of nighttime, the moon, bhúvarloka, and the kāmamaya kośa — the contractive OPPOSITE of ha (day/sun/svarloka/parā-vidyā). ETYMOLOGY: anutāpa = anu ('after') + tāpa ('heat'); N. Indian paścāttāpa = paschāt ('after') + tāpa ('heat') = 'after-heat'. This RESOLVES the earlier ttha discrepancy: night/moon are ṭha's ASSOCIATIONS; its VṚTTI is anutāpa (repentance) — associations vs pole, as with ha/ka.",
+      "attested_associations": [
+        {
+          "class": "celestial_temporal",
+          "value": "nighttime; the moon",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "loka",
+          "value": "bhúvarloka",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "kosha",
+          "value": "kāmamaya kośa",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "opposite_varna",
+          "value": "ha (day/sun/svarloka/parā-vidyā)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "anutāpa = anu('after')+tāpa('heat'); N.Indian paścāttāpa = 'after-heat'",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 5
+    },
+    {
+      "ledger_key": "dda",
+      "sanskrit_label": "Lajjā (shyness / bashful inhibition)",
+      "source_quote_verbatim": "Sarkar: 'Ḍa is the acoustic root of lajjā vṛtti [the propensity of shyness].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "classical_associations_verbatim": "Cross-reference: lajjā is one of the eight pāshas (fetters) listed under pa (hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism). (Not a pole.)",
+      "attested_associations": [
+        {
+          "class": "cross_reference",
+          "value": "lajjā = one of the eight pāśas listed under pa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ddha",
+      "sanskrit_label": "Piśunatā (senseless / sadistic cruelty — torturous killing, malice)",
+      "source_quote_verbatim": "Sarkar: Senseless, sadistic killing is called piśunatā vṛtti. Slaughtering in the way that inflicts the LEAST pain is NOT piśunatā; but killing slowly and cruelly — first chopping off legs, then tail, then head — is definitely piśunatā. (A live tortoise part-chopped and left crawling in its own blood; criminals impaled on spikes, half-buried and salted for dogs, or flayed alive — all examples of piśunatā.) The killing of animals, however done, is contrary to the spirit of Neohumanism.",
+      "classical_associations_verbatim": "Distinctions: piśunatā (sadistic torture) is NOT ordinary least-pain killing; it is a sharper/darker sibling of krūratā (la — cruelty / physical harm to the weak) and ENTIRELY DIFFERENT from dha (dental aspirate = tṛṣṇā / craving — operator-flagged 'different from Dha'). Held contrary to the spirit of Neohumanism.",
+      "attested_associations": [
+        {
+          "class": "distinction",
+          "value": "piśunatā vs krūratā (la) vs dha (tṛṣṇā); contrary to Neohumanism",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "nna",
+      "sanskrit_label": "Īrṣyā (envy)",
+      "source_quote_verbatim": "Sarkar: 'Ṇa is the acoustic root of īrṣā vṛtti [the propensity of envy].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "ONLY the vṛtti name (īrṣyā) is attested; no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "ta",
+      "sanskrit_label": "Jāḍya / Nidrā (inertia, staticity, dullness, sleep)",
+      "source_quote_verbatim": "Sarkar: Ta is the acoustic root of staticity, long sleep and deep sleep; also of intellectual dullness and spiritual inertness. That which brings about the cessation of dullness and staticity is Tantra — 'Taṃ jāḍyāt tārayet yastu sa tantraḥ'. The root-verb tan means 'to expand'; if a rope-bound person expands his body the ropes snap of themselves — that which liberates through tan (expansion) is also Tantra — 'Taṃ vistāreṇa tārayet yastu sah tantraḥ'.",
+      "classical_associations_verbatim": "Etymology of Tantra: 'Taṃ jāḍyāt tārayet yastu sa tantraḥ' — that which liberates (tārayet) from jāḍya (staticity/dullness) is Tantra; and tan = 'to expand' — as a rope-bound body expands to snap the ropes, that which liberates through expansion (vistāra) is also Tantra. (Etymological association naming the liberating DIRECTION — not a separate pole.)",
+      "attested_associations": [
+        {
+          "class": "etymology",
+          "value": "Tantra: 'Taṃ jāḍyāt tārayet…'; tan='to expand' (liberating direction)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "tha",
+      "sanskrit_label": "Viṣāda (melancholy / dejection)",
+      "source_quote_verbatim": "Sarkar: Tha is the acoustic root of viśāda vṛtti — melancholy (melancholiness, melancholia). [Phonetic note (operator): थ is the ASPIRATED DENTAL STOP (ant-hill/pot-hole/light-house), NOT the English 'th' of think/this — Sanskrit lacks those fricatives.]",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "vṛtti name (viṣāda) + phonetic note only; no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "da",
+      "sanskrit_label": "Krodha / Karkaśatā (peevishness / irritability)",
+      "source_quote_verbatim": "Sarkar: Da is the acoustic root of peevishness. If one speaks in a nice way to a peevish person, he or she reacts adversely; if one speaks in a harsh way, he or she takes it calmly.",
+      "classical_associations_verbatim": null,
+      "attested_associations": [
+        {
+          "class": "absent",
+          "value": "vṛtti (peevishness) + illustration only; no association",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 0
+    },
+    {
+      "ledger_key": "dha",
+      "sanskrit_label": "Tṛṣṇā (thirst for acquisition / limitless craving)",
+      "source_quote_verbatim": "Sarkar: Dha is the acoustic root of thirst for acquisition — the limitless craving for wealth, name, fame, power and prestige, called tṛṣṇā in Sanskrit. Here tṛṣṇā does NOT mean 'thirst for water'. To divert all the pure and impure thoughts of the mind toward Parama Puruṣa is the only cure for limitless psychic craving.",
+      "classical_associations_verbatim": "Explicitly NOT 'thirst for water' — tṛṣṇā = psychic craving for acquisition. Attested cure / liberating direction: diverting all thoughts of the mind, pure and impure, toward Parama Puruṣa.",
+      "attested_associations": [
+        {
+          "class": "distinction",
+          "value": "tṛṣṇā is NOT 'thirst for water'",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "cross_reference",
+          "value": "cure: divert all thoughts toward Parama Puruṣa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "na",
+      "sanskrit_label": "Moha (blind attachment / infatuation)",
+      "source_quote_verbatim": "Sarkar: Na is the acoustic root of moha vṛtti (blind attachment / infatuation), usually divided into four categories — time, space, idea, individuality. deshagata moha ('geo-sentiment') = losing rationality out of blind attachment for one's country (praising a barren, starving, food-importing land as abundant). kālagata moha = blind attachment to a period of time (old-timers who 'could digest iron pans' disparaging the present age). idea = a strong idea pulls the mind back again and again (the thief who broods on the crime scene and returns into the police's hands). ādhāragata moha = fascination for a long-used object (a rich man's attachment to a battered one-armed chair; a bell-metal pot that broke up a family). The only way to free oneself is to superimpose the ideation of INDIFFERENCE and divert one's thoughts toward Parama Puruṣa; intimidation or laws control it only temporarily — the mind is sublimated by spiritual ideation, not by high-sounding philosophy.",
+      "classical_associations_verbatim": "Moha divides into FOUR categories: space (deshagata moha / geo-sentiment), time (kālagata moha), idea, and individuality/object (ādhāragata moha / object-fascination). Attested cure / liberating direction: superimpose the ideation of indifference and divert thoughts to Parama Puruṣa — sublimation by spiritual ideation, NOT by law or philosophy. Cross-ref: the moha ripu underlies the pa fetter of hatred/fear.",
+      "attested_associations": [
+        {
+          "class": "scope_note",
+          "value": "moha divides into four: space/time/idea/individuality; cure = indifference + Parama Puruṣa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "pha",
+      "sanskrit_label": "Bhaya (fear)",
+      "source_quote_verbatim": "Sarkar: Pha is the acoustic root of bhaya vṛtti (fear). Though fear is generally caused by more than one factor, it is mainly born of the moha ripu (blind attachment).",
+      "classical_associations_verbatim": "Cross-ref: bhaya (fear) is one of the eight pāshas (listed under pa) and, like the fetter of hatred (pa), is mainly born of the moha ripu — moha 'makes others the objects of fear.' (Etiology, not a pole.)",
+      "attested_associations": [
+        {
+          "class": "cross_reference",
+          "value": "bhaya = one of the eight pāśas; born mainly of the moha ripu",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ba",
+      "sanskrit_label": "Avajñā (indifference / neglect of what has value)",
+      "source_quote_verbatim": "Sarkar: Ba is the acoustic root of avajñā vṛtti (indifference). Ignoring something actually UNACCEPTABLE is upekṣā; NEGLECTING something which may actually have VALUE is avajñā (~ avahelā, a negative term; upekṣā is not always bad). The Yoga-sūtra four attitudes (maitrī-karuṇā-muditā-upekṣā): develop maitrī (benign gladness) toward the happy ('may he stay that way'), karuṇā (compassion) toward the miserable, muditā (goodwill) toward the virtuous ('let his intellect inspire him'), and upekṣā (indifference — 'that's his own business') toward the wicked — BUT if the person's sinful actions harm society, one can no longer afford to be indifferent.",
+      "classical_associations_verbatim": "Distinctions: avajñā (neglect of the valuable) vs upekṣā (ignoring the unacceptable — not always bad) vs avahelā (negative disregard). The brahmavihāra four attitudes: maitrī (happy), karuṇā (suffering), muditā (virtuous), upekṣā (wicked) — with the caveat that indifference to SOCIALLY-HARMFUL wickedness is not acceptable.",
+      "attested_associations": [
+        {
+          "class": "cross_reference",
+          "value": "brahmavihāra four attitudes: maitrī/karuṇā/muditā/upekṣā",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "bha",
+      "sanskrit_label": "Mūrcchā (stupefaction / deluded obsession — losing common sense under a ripu's spell)",
+      "source_quote_verbatim": "Sarkar: Bha is the acoustic root of mūrcchā vṛtti. Here mūrcchā does NOT mean senselessness (fainting); it means to lose one's common sense under the hypnotic spell of a particular ripu. To avoid its unsalutary effects one should direct the mind along the path of righteousness through pratyāhāra yoga; those who have not learned pratyāhāra should do kīrtana aloud or sing devotional songs to escape the clutches of mūrcchā.",
+      "classical_associations_verbatim": "Cure / liberating direction: pratyāhāra yoga (directing the mind along righteousness); or, for those without the technique, kīrtana / devotional singing. NOTE: mūrcchā here is NOT fainting/senselessness — it is losing common sense under a ripu's hypnotic spell.",
+      "attested_associations": [
+        {
+          "class": "cross_reference",
+          "value": "cure: pratyāhāra yoga; else kīrtana / devotional singing",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ma",
+      "sanskrit_label": "Praśraya / Praṇāśa (indulgence / annihilating collapse)",
+      "source_quote_verbatim": "Sarkar: Ma is the acoustic root of praṇāśa (the propensity of annihilation). It is also the acoustic root of prashraya vṛtti — giving latitude / treating with indulgence (Hindi: baṛhvā denā).",
+      "classical_associations_verbatim": "Two linked vṛttis on one root: praṇāśa (annihilation) and prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — unchecked latitude running to dissolution.",
+      "attested_associations": [
+        {
+          "class": "scope_note",
+          "value": "two linked vṛttis on one root: praṇāśa (annihilation) + praśraya (indulgence)",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ya",
+      "sanskrit_label": "Aviśvāsa (lack of confidence / faith)",
+      "source_quote_verbatim": "Sarkar: Ya is the acoustic root of aviśvāsa vṛtti (lack of confidence), and also the acoustic root of constant movement (like the movement of air). People with no self-confidence say to the end of their lives 'Shall I be able to do it?' and can never accomplish anything great; as they also lack confidence in others, others have no confidence in them.",
+      "classical_associations_verbatim": "Also the acoustic root of CONSTANT MOVEMENT (like the movement of air / vāyu) — a motion/tattva association, distinct from the aviśvāsa pole.",
+      "attested_associations": [
+        {
+          "class": "tattva",
+          "value": "vāyu / air — acoustic root of CONSTANT MOVEMENT (motion/tattva association)",
+          "captured_in_normalized_layer": true
+        }
+      ],
+      "n_associations": 1
+    },
+    {
+      "ledger_key": "ra",
+      "sanskrit_label": "Sarvanāśa (defeatist annihilation-thought) — with agni / prāṇaśakti (fire, vitality) association; classical side DUAL",
+      "source_quote_verbatim": "Sarkar: Ra is the acoustic root of agnitattva (the fire element) / prāṇaśakti (vitality) — 'Raṃ bījaṃ śikhinaṃ dhyāyet, trikoṇam-aruṇaprabham' (the RAM bīja, triangular, red-glowing). It is ALSO the acoustic root of sarvanāśa (the thought of annihilation): 'I have nothing of my own, everything is gone, I am undone.' Its cure is the constant auto-suggestion 'Parama Puruṣa is mine' (guru mantra); the feeling of defeat is ra-bījātmak, its cure the auto-suggestion 'I have come to win, I am destined to win.' Ra also means 'fire' (the monosyllable ra = fire).",
+      "classical_associations_verbatim": "ra = agnitattva (the fire element) and prāṇaśakti (vitality); the RAM bīja mantra (triangular, red-glowing — 'Raṃ bījaṃ śikhinaṃ dhyāyet'); the monosyllable ra = 'fire'. Cure / liberating direction: the auto-suggestion 'Parama Puruṣa is mine' (guru mantra) and 'I am destined to win.' Classical side is DUAL (vitality AND annihilation).",
+      "attested_associations": [
+        {
+          "class": "tattva",
+          "value": "agnitattva (fire element)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "prana_shakti",
+          "value": "prāṇaśakti (vitality)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "bija_mantra",
+          "value": "RAM bīja — triangular, red-glowing ('Raṃ bījaṃ śikhinaṃ dhyāyet')",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "the monosyllable ra = 'fire'",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "cross_reference",
+          "value": "cure: 'Parama Puruṣa is mine' (guru mantra); 'I am destined to win'",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 5
+    },
+    {
+      "ledger_key": "la",
+      "sanskrit_label": "Krūratā (cruelty) — with kṣititattva (earth / solid factor) association",
+      "source_quote_verbatim": "Sarkar: La is the acoustic root of kruratā vṛtti (cruelty), counteracted by the propensity of compassion (seeing another's misery: 'what great misery he suffers; can I reduce it? how crude he is in thought and behaviour — can I help arouse his latent intellect?'). La is ALSO the acoustic root of kṣititattva, the solid factor — 'Laṃ bījaṃ dharaṇīṃ dhyāyet, caturasrāṃ supītābhām' (the LAM bīja, four-sided/square, deep-yellow).",
+      "classical_associations_verbatim": "la = kṣititattva (the solid / earth factor, dharaṇī / pṛthvī); the LAM bīja mantra (four-sided/square, deep-yellow — 'Laṃ bījaṃ dharaṇīṃ dhyāyet'). ('Earth-bound hardness' echoes this solid factor.) An element/bīja association, distinct from the kruratā pole.",
+      "attested_associations": [
+        {
+          "class": "tattva",
+          "value": "kṣititattva (solid/earth factor, dharaṇī / pṛthvī)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "bija_mantra",
+          "value": "LAM bīja — four-sided/square, deep-yellow ('Laṃ bījaṃ dharaṇīṃ dhyāyet')",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "va",
+      "sanskrit_label": "Dharma (ensconcement in one's original stance / that which sustains) — with jalatattva (water) association; classical side liberating-oriented",
+      "source_quote_verbatim": "Sarkar: Va is the acoustic root of dharma — 'ensconcement in one's original stance'. The innate propensity of human beings is to move toward subtlety in the psychic/spiritual spheres and finally merge into Parama Puruṣa; this unbroken movement is mānava dharma. 'Sukhaṃ vāñchati sarvo hi... ' (all beings long for happiness; dharma originates from that innate propensity, so dharma should be observed by all). 'Dhriyate dharma ityāhuḥ' — dharma is that which SUSTAINS. To diverge from dharma is to rush toward total annihilation. Va is ALSO the acoustic root of jalatattva (the liquid factor — water and any liquid) and of the rain-god Varuṇa Deva.",
+      "classical_associations_verbatim": "va = jalatattva (the liquid factor — water and any liquid) and the rain-god Varuṇa Deva. Dharma = 'that which sustains' (dhriyate dharma); the innate longing for happiness is its origin ('sukhaṃ vāñchati sarvo hi'); diverging from dharma rushes toward annihilation. (Element/deity association, distinct from the dharma pole.)",
+      "attested_associations": [
+        {
+          "class": "tattva",
+          "value": "jalatattva (liquid factor — water and any liquid)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "deity",
+          "value": "Varuṇa Deva (the rain-god)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "purushartha",
+          "value": "dharma ('that which sustains'; dhriyate dharma) — the four-varga longing assigned to va",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 3
+    },
+    {
+      "ledger_key": "sha",
+      "sanskrit_label": "Kāma (physical / worldly desire) — with tamoguṇa (the static principle) association",
+      "source_quote_verbatim": "Sarkar: Śa is the acoustic root of tamoguṇa (the static principle), and also of all kinds of worldly desires — wealth, opulence, name, fame, social position. The collective Sanskrit term is kāma. The four recognized longings of human life are dharma (psycho-spiritual), artha (psychic), kāma (PHYSICAL), and mokṣa (spiritual / liberation). kāma = all types of PHYSICAL longings.",
+      "classical_associations_verbatim": "śa = tamoguṇa (the static principle). The four puruṣārthas (longings): dharma (psycho-spiritual), artha (psychic), kāma (physical), mokṣa (liberation) — kāma = all physical longings. (Guṇa association + longing-hierarchy frame.)",
+      "attested_associations": [
+        {
+          "class": "guna",
+          "value": "tamoguṇa (the static principle)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "purushartha",
+          "value": "kāma (physical longing) — the four-varga puruṣārtha for śa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "sa",
+      "sanskrit_label": "Mokṣa (unqualified liberation / salvation) — with sattvaguṇa (the sentient principle) association; classical side liberating-oriented",
+      "source_quote_verbatim": "Sarkar: Sa is the acoustic root of mokṣa (salvation, unqualified liberation) and of sattvaguṇa (the sentient principle). In the four-varga scheme: va = dharma (+ liquid factor); ṣa ('sha') = artha (removal of worldly wants) + rajoguṇa; śa = kāma (worldly/physical wants) + tamoguṇa; sa = mokṣa + sattvaguṇa.",
+      "classical_associations_verbatim": "sa = sattvaguṇa (the sentient principle) and mokṣa (unqualified liberation) — the highest of the four longings (dharma/artha/kāma/mokṣa). Part of the four-varga sibilant scheme: śa(sha)=tamoguṇa/kāma, ṣa(ssa)=rajoguṇa/artha, sa=sattvaguṇa/mokṣa.",
+      "attested_associations": [
+        {
+          "class": "guna",
+          "value": "sattvaguṇa (the sentient principle)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "purushartha",
+          "value": "mokṣa (liberation) — the four-varga puruṣārtha for sa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "ssa",
+      "sanskrit_label": "Artha (psychic longing / worldly purpose — removal of worldly wants) — with rajoguṇa (the mutative principle) association",
+      "source_quote_verbatim": "Sarkar (four-varga passage): ṣa ('sha') is the acoustic root of artha — 'the removal of worldly wants' — and of rajoguṇa (the mutative principle). artha is the PSYCHIC longing among the four (dharma/artha/kāma/mokṣa).",
+      "classical_associations_verbatim": "ṣa = rajoguṇa (the mutative principle); artha = the psychic longing / the means that removes worldly wants. Part of the four-varga sibilant scheme (śa=tamoguṇa/kāma, ṣa=rajoguṇa/artha, sa=sattva/mokṣa).",
+      "attested_associations": [
+        {
+          "class": "guna",
+          "value": "rajoguṇa (the mutative principle)",
+          "captured_in_normalized_layer": true
+        },
+        {
+          "class": "purushartha",
+          "value": "artha (psychic longing / removal of worldly wants) — four-varga puruṣārtha for ṣa",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 2
+    },
+    {
+      "ledger_key": "ksha",
+      "sanskrit_label": "Aparā-vidyā (mundane knowledge / material science)",
+      "source_quote_verbatim": "Sarkar: Kṣa is the acoustic root of mundane knowledge, and also of material science. [Complement to ha = parā-vidyā (intuitional / higher knowledge). In the kha passage, kṣa also represents the sphere of heaven that TRANSCENDS the crude, while kha = the crude aspects of heaven.]",
+      "classical_associations_verbatim": "kṣa = the complement of ha (parā-vidyā, intuitional knowledge): kṣa is aparā-vidyā (mundane / material knowledge). In the kha passage kṣa also = the sphere of heaven that TRANSCENDS the crude (kha = crude heaven). Structurally kṣa = ka (Kārya Brahma) + ṣa. Classical side liberating-oriented.",
+      "attested_associations": [
+        {
+          "class": "vidya",
+          "value": "aparā-vidyā (mundane knowledge / material science)",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "opposite_varna",
+          "value": "complement of ha (parā-vidyā); transcendent heaven",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "etymology",
+          "value": "structural: kṣa = ka (Kārya Brahma) + ṣa",
+          "captured_in_normalized_layer": false
+        },
+        {
+          "class": "note_out_of_atomic_scope",
+          "value": "kṣa is a CONJUNCT (k+ṣ) — not one of the 33 atomic backbone consonants",
+          "captured_in_normalized_layer": false
+        }
+      ],
+      "n_associations": 4
+    }
+  ]
+}

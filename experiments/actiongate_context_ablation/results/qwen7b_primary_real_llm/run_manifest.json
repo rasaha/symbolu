@@ -1,0 +1,57 @@
+{
+  "actiongate_policy": "0.1.0-ref:b93b95d182bf796c",
+  "checksums": {
+    "REAL_LLM_RESULTS.md": "sha256:bd77bfc4e00d2e974a194f87d47bd0f32729076c14bbd941f423244f6aae4a95",
+    "SHA256SUMS": "sha256:ee13dfd2a9d9432bf21d87eb4914b65c31d8efd67731a142591bae0b636ec780",
+    "environment_probe.json": "sha256:6e2db4003b694d06b9cdbc09b6f36ba2579b78b0b7d3e56c43b42a7bd15eb085",
+    "records.jsonl": "sha256:be4cae21516d2bd83d365a68cf8228ae60509d467a9d87c799e339b372e83f41",
+    "results.csv": "sha256:6bebaae2927cdb058d2f13a31a72cbb005e54e65612f10c0d4dc678eec1543e9",
+    "results.json": "sha256:700a47e490929f7236da422d82cc84b58de036e01419db598fe44959d1d2c265",
+    "run_config.json": "sha256:60cead8db28a67c7f37d01a3f46d77cd169b1f5f809409d8765ede21dee105af",
+    "verify_report.json": "sha256:c5f144ab68dccf3b89f3c94c042d5fa62ef276f60f4a98e21834392430180a33"
+  },
+  "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+  "git": {
+    "branch": "claude/token-compression-enterprise-0koy0r",
+    "commit": "51284a39740a33eaa03903e1951f7991edafa754",
+    "dirty": false
+  },
+  "is_real": true,
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+  "n_records": 3808,
+  "note": "",
+  "records_per_cell": {
+    "original@0.0": 476,
+    "protected@0.2": 476,
+    "protected@0.3": 476,
+    "protected@0.4": 476,
+    "protection_unaware@0.2": 476,
+    "protection_unaware@0.3": 476,
+    "protection_unaware@0.4": 476,
+    "structural_only@0.0": 476
+  },
+  "run_config": {
+    "budgets": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "dtype": "auto",
+    "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+    "max_new_tokens": 64,
+    "methods": [
+      "original",
+      "structural_only",
+      "protected",
+      "protection_unaware"
+    ],
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "run_id": "primary_qwen7b",
+    "run_kind": "PRIMARY",
+    "system_hash": "sha256:0131598f9a531c02e142a8cc2ad178a82f5c0472963059d2a18fa9f72499a564"
+  },
+  "run_id": "primary_qwen7b",
+  "run_kind": "PRIMARY"
+}

@@ -1,0 +1,511 @@
+{
+  "schema_version": "concern_ontology_v1",
+  "ontology_sha256": "39de5d4d2f0252634948b4f15e6486494094479dfe013131aa17807207cfe168",
+  "concerns": [
+    {
+      "id": "C0001",
+      "label": "fear",
+      "description": "An aversive anticipatory reaction to a perceived threat or danger.",
+      "inclusion_criteria": [
+        "speaker anticipates harm/danger",
+        "emotional charge is dread/alarm"
+      ],
+      "exclusion_criteria": [
+        "general low mood without a threat (see grief)",
+        "doubt about a decision (see doubt)"
+      ],
+      "parent": "fear_and_insecurity",
+      "children": [],
+      "synonyms": [
+        "afraid",
+        "scared",
+        "terrified",
+        "frightened"
+      ]
+    },
+    {
+      "id": "C0002",
+      "label": "anxiety",
+      "description": "Sustained worried thought about an uncertain or future situation.",
+      "inclusion_criteria": [
+        "worry is diffuse / about the future",
+        "rumination present"
+      ],
+      "exclusion_criteria": [
+        "acute fear of a present threat (see fear)"
+      ],
+      "parent": "fear_and_insecurity",
+      "children": [],
+      "synonyms": [
+        "worried",
+        "anxious",
+        "nervous",
+        "apprehensive"
+      ]
+    },
+    {
+      "id": "C0003",
+      "label": "anger",
+      "description": "A hostile emotional reaction to a perceived wrong or obstruction.",
+      "inclusion_criteria": [
+        "hostile arousal toward a target",
+        "triggered by a wrong/blockage"
+      ],
+      "exclusion_criteria": [
+        "settled dislike without arousal (see resentment)"
+      ],
+      "parent": "anger_and_conflict",
+      "children": [],
+      "synonyms": [
+        "angry",
+        "furious",
+        "mad",
+        "enraged"
+      ]
+    },
+    {
+      "id": "C0004",
+      "label": "resentment",
+      "description": "A settled aversion or ill-will held toward someone or something.",
+      "inclusion_criteria": [
+        "persistent dislike/ill-will",
+        "cold rather than hot"
+      ],
+      "exclusion_criteria": [
+        "momentary anger (see anger)"
+      ],
+      "parent": "anger_and_conflict",
+      "children": [],
+      "synonyms": [
+        "resentful",
+        "bitter",
+        "aversion",
+        "grudge"
+      ]
+    },
+    {
+      "id": "C0005",
+      "label": "attachment",
+      "description": "Clinging to a person, object, or outcome as needed for one's wellbeing.",
+      "inclusion_criteria": [
+        "felt need to hold on / not lose",
+        "identification with the object"
+      ],
+      "exclusion_criteria": [
+        "simple wanting of something not yet had (see craving)"
+      ],
+      "parent": "attachment_and_loss",
+      "children": [],
+      "synonyms": [
+        "clinging",
+        "attached",
+        "holding on",
+        "can't let go"
+      ]
+    },
+    {
+      "id": "C0006",
+      "label": "grief",
+      "description": "Sorrow at a loss.",
+      "inclusion_criteria": [
+        "sorrow follows a loss/absence",
+        "low, mournful affect"
+      ],
+      "exclusion_criteria": [
+        "fear of a future loss (see fear)"
+      ],
+      "parent": "attachment_and_loss",
+      "children": [],
+      "synonyms": [
+        "grief",
+        "sorrow",
+        "mourning",
+        "heartbroken"
+      ]
+    },
+    {
+      "id": "C0007",
+      "label": "craving",
+      "description": "Wanting to obtain or experience something one does not yet have.",
+      "inclusion_criteria": [
+        "pull toward acquiring/experiencing",
+        "object not yet possessed"
+      ],
+      "exclusion_criteria": [
+        "holding on to what one has (see attachment)",
+        "hoarding more than needed (see greed)"
+      ],
+      "parent": "desire_and_ambition",
+      "children": [],
+      "synonyms": [
+        "craving",
+        "longing",
+        "wanting",
+        "desire"
+      ]
+    },
+    {
+      "id": "C0008",
+      "label": "greed",
+      "description": "Excessive desire to acquire or keep more than one needs.",
+      "inclusion_criteria": [
+        "desire is excessive/insatiable",
+        "emphasis on accumulation"
+      ],
+      "exclusion_criteria": [
+        "ordinary proportionate wanting (see craving)"
+      ],
+      "parent": "desire_and_ambition",
+      "children": [],
+      "synonyms": [
+        "greed",
+        "greedy",
+        "avarice",
+        "grasping"
+      ]
+    },
+    {
+      "id": "C0009",
+      "label": "confusion",
+      "description": "A clouded mental state in which things are not clearly understood.",
+      "inclusion_criteria": [
+        "clarity is lost",
+        "speaker feels muddled/deluded"
+      ],
+      "exclusion_criteria": [
+        "a specific either/or uncertainty (see doubt)"
+      ],
+      "parent": "confusion_and_uncertainty",
+      "children": [],
+      "synonyms": [
+        "confused",
+        "muddled",
+        "lost",
+        "can't think straight"
+      ]
+    },
+    {
+      "id": "C0010",
+      "label": "doubt",
+      "description": "Uncertainty or hesitation between alternatives or about a belief.",
+      "inclusion_criteria": [
+        "hesitation between options/beliefs",
+        "suspended judgment"
+      ],
+      "exclusion_criteria": [
+        "global confusion (see confusion)"
+      ],
+      "parent": "confusion_and_uncertainty",
+      "children": [],
+      "synonyms": [
+        "doubt",
+        "unsure",
+        "uncertain",
+        "hesitant"
+      ]
+    },
+    {
+      "id": "C0011",
+      "label": "pride",
+      "description": "An inflated sense of one's own importance or superiority.",
+      "inclusion_criteria": [
+        "self-elevation/superiority",
+        "need to be above others"
+      ],
+      "exclusion_criteria": [
+        "healthy self-respect",
+        "shame (opposite pole, see shame)"
+      ],
+      "parent": "self_worth_and_identity",
+      "children": [],
+      "synonyms": [
+        "pride",
+        "arrogant",
+        "conceited",
+        "ego"
+      ]
+    },
+    {
+      "id": "C0012",
+      "label": "shame",
+      "description": "A painful self-conscious sense of having fallen short or been exposed.",
+      "inclusion_criteria": [
+        "self-directed painful exposure",
+        "shrinking/hiding impulse"
+      ],
+      "exclusion_criteria": [
+        "pride (opposite, see pride)"
+      ],
+      "parent": "self_worth_and_identity",
+      "children": [],
+      "synonyms": [
+        "shame",
+        "embarrassed",
+        "humiliated",
+        "mortified"
+      ]
+    },
+    {
+      "id": "C0013",
+      "label": "separation-longing",
+      "description": "Painful longing caused by separation from an absent loved one.",
+      "inclusion_criteria": [
+        "a specific loved one is absent",
+        "yearning for reunion"
+      ],
+      "exclusion_criteria": [
+        "grief at permanent loss (see grief)",
+        "general loneliness (excluded from seed)"
+      ],
+      "parent": "loneliness_and_relationship_needs",
+      "children": [],
+      "synonyms": [
+        "missing someone",
+        "pining",
+        "longing for",
+        "apart"
+      ]
+    },
+    {
+      "id": "C0014",
+      "label": "duty",
+      "description": "An obligation to do what one ought in a role or situation.",
+      "inclusion_criteria": [
+        "sense of ought/obligation",
+        "tied to a role/relationship"
+      ],
+      "exclusion_criteria": [
+        "felt heaviness of obligation (see burden)"
+      ],
+      "parent": "responsibility_and_duty",
+      "children": [],
+      "synonyms": [
+        "duty",
+        "obligation",
+        "responsibility",
+        "ought to"
+      ]
+    },
+    {
+      "id": "C0015",
+      "label": "burden",
+      "description": "The felt heaviness of a responsibility or load one carries.",
+      "inclusion_criteria": [
+        "responsibility experienced as weight",
+        "fatigue/pressure from carrying it"
+      ],
+      "exclusion_criteria": [
+        "neutral sense of obligation (see duty)"
+      ],
+      "parent": "responsibility_and_duty",
+      "children": [],
+      "synonyms": [
+        "burden",
+        "weighed down",
+        "load",
+        "too much to carry"
+      ]
+    },
+    {
+      "id": "C0016",
+      "label": "money-concern",
+      "description": "Concern centered on money or wealth.",
+      "inclusion_criteria": [
+        "money/wealth is the focus",
+        "gaining/keeping/lacking money"
+      ],
+      "exclusion_criteria": [
+        "general poverty/deprivation (see poverty)"
+      ],
+      "parent": "money_and_material_concerns",
+      "children": [],
+      "synonyms": [
+        "money",
+        "finances",
+        "wealth",
+        "cash"
+      ]
+    },
+    {
+      "id": "C0017",
+      "label": "poverty",
+      "description": "The condition or fear of material lack and deprivation.",
+      "inclusion_criteria": [
+        "lack/deprivation is the focus",
+        "not-enough to meet needs"
+      ],
+      "exclusion_criteria": [
+        "concern about money in general (see money-concern)"
+      ],
+      "parent": "money_and_material_concerns",
+      "children": [],
+      "synonyms": [
+        "poverty",
+        "broke",
+        "destitute",
+        "can't afford"
+      ]
+    },
+    {
+      "id": "C0018",
+      "label": "diligence",
+      "description": "Sustained effort and industrious application to work.",
+      "inclusion_criteria": [
+        "active effort/exertion",
+        "industriousness"
+      ],
+      "exclusion_criteria": [
+        "a defined aim/target (see purpose)"
+      ],
+      "parent": "work_and_purpose",
+      "children": [],
+      "synonyms": [
+        "effort",
+        "diligence",
+        "hard work",
+        "industrious"
+      ]
+    },
+    {
+      "id": "C0019",
+      "label": "laziness",
+      "description": "Disinclination to effort or activity; inertia.",
+      "inclusion_criteria": [
+        "aversion to effort",
+        "sluggishness/inertia"
+      ],
+      "exclusion_criteria": [
+        "active effort (opposite, see diligence)"
+      ],
+      "parent": "work_and_purpose",
+      "children": [],
+      "synonyms": [
+        "lazy",
+        "sluggish",
+        "procrastinating",
+        "can't get started"
+      ]
+    },
+    {
+      "id": "C0020",
+      "label": "purpose",
+      "description": "A defined aim, goal, or direction one is oriented toward.",
+      "inclusion_criteria": [
+        "a goal/target is named",
+        "orientation/direction"
+      ],
+      "exclusion_criteria": [
+        "the effort toward it (see diligence)"
+      ],
+      "parent": "work_and_purpose",
+      "children": [],
+      "synonyms": [
+        "purpose",
+        "goal",
+        "aim",
+        "direction"
+      ]
+    },
+    {
+      "id": "C0021",
+      "label": "curiosity",
+      "description": "An active desire to know or understand something.",
+      "inclusion_criteria": [
+        "wish to know/inquire",
+        "drawn toward learning"
+      ],
+      "exclusion_criteria": [
+        "settled possession of knowledge (see knowledge)"
+      ],
+      "parent": "learning_and_understanding",
+      "children": [],
+      "synonyms": [
+        "curious",
+        "want to understand",
+        "wondering",
+        "inquisitive"
+      ]
+    },
+    {
+      "id": "C0022",
+      "label": "knowledge",
+      "description": "Understanding or knowing of a subject.",
+      "inclusion_criteria": [
+        "possession/grasp of understanding",
+        "knowing as a state"
+      ],
+      "exclusion_criteria": [
+        "the wish to know (see curiosity)"
+      ],
+      "parent": "learning_and_understanding",
+      "children": [],
+      "synonyms": [
+        "knowledge",
+        "understanding",
+        "knowing",
+        "insight"
+      ]
+    },
+    {
+      "id": "C0023",
+      "label": "patience",
+      "description": "Calm endurance of delay, difficulty, or provocation.",
+      "inclusion_criteria": [
+        "forbearance/endurance",
+        "staying steady under strain"
+      ],
+      "exclusion_criteria": [
+        "settled inner peace (see calm)"
+      ],
+      "parent": "calm_patience_and_regulation",
+      "children": [],
+      "synonyms": [
+        "patience",
+        "forbearance",
+        "tolerance",
+        "enduring"
+      ]
+    },
+    {
+      "id": "C0024",
+      "label": "contentment",
+      "description": "Satisfaction with what one has; absence of craving for more.",
+      "inclusion_criteria": [
+        "satisfaction / enough-ness",
+        "not reaching for more"
+      ],
+      "exclusion_criteria": [
+        "active tranquility (see calm)"
+      ],
+      "parent": "calm_patience_and_regulation",
+      "children": [],
+      "synonyms": [
+        "contentment",
+        "satisfied",
+        "enough",
+        "at ease with what I have"
+      ]
+    },
+    {
+      "id": "C0025",
+      "label": "calm",
+      "description": "A state of inner peace and tranquility.",
+      "inclusion_criteria": [
+        "tranquility/quiet mind",
+        "absence of disturbance"
+      ],
+      "exclusion_criteria": [
+        "satisfaction with possessions (see contentment)",
+        "forbearance under strain (see patience)"
+      ],
+      "parent": "calm_patience_and_regulation",
+      "children": [],
+      "synonyms": [
+        "calm",
+        "peace",
+        "tranquil",
+        "serene"
+      ]
+    }
+  ]
+}

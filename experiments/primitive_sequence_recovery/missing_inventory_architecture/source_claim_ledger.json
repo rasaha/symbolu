@@ -1,0 +1,67 @@
+{
+  "ledger": [
+    {
+      "id": "S1",
+      "claim": "The native varṇa theory (Sarkar) assigns acoustic roots to the vowels (a ā i ī u ū ṛ ṝ ḷ e ai o au) and to aṃ/aḥ; none are present in the current table.",
+      "location": "B1_SANSKRIT_FIRST_STAGING_AUDIT_AND_PLAN.md#A.1",
+      "provenance": "SECONDARY_ATTESTED",
+      "scope": "all vowels + anusvāra + visarga",
+      "implies": "root-bearing / primitive-like content per theory; but per-unit content is MISSING (not in b1_2 lexicon)",
+      "inference_label": "asserts a theory-level claim; the per-vowel root CONTENT is not reproduced in-repo"
+    },
+    {
+      "id": "S2",
+      "claim": "Patent architecture assigns vowels a positional FIELD role (first consonant=seed, final consonant=transformer, interior consonants=unresolved, vowels=field); an opt-in variant lets a word-initial vowel take a seed role.",
+      "location": "H2_PATENT_TECHNICAL_BRIEF.md#L22",
+      "provenance": "AUTHORED_PROVISIONAL",
+      "scope": "vowels (English G2P apparatus)",
+      "implies": "structural/positional role, NOT a per-vowel meaning; this is the DEPRECATED English pipeline, not the native theory",
+      "inference_label": "engineering role of the English apparatus; explicitly not a native-theory claim"
+    },
+    {
+      "id": "S3",
+      "claim": "Vowel-initial positional-polarity variant reads authored per-vowel polar-state fields from a development lexicon; labelled NOT semantic evidence and keyed off English EY→e, not Sanskrit a.",
+      "location": "H2_EXPERIMENTAL_VOWEL_POSITIONAL_POLARITY_MEMO.md",
+      "provenance": "AUTHORED_PROVISIONAL",
+      "scope": "vowels (development lexicon)",
+      "implies": "authored vowel poles EXIST in a dev lexicon but are unattested and English-motivated",
+      "inference_label": "development-only; the memo itself disclaims semantic/ontology/Sanskrit-privilege weight"
+    },
+    {
+      "id": "S4",
+      "claim": "By construction, the a-privative prefix and vowel length carry meaning-flipping contrast: vidyā↔avidyā, himsā↔ahimsā (privative a), nara↔nārī (length/gender) — identical consonant skeletons, opposite/contrastive meanings.",
+      "location": "DROPPED_VOWEL_ANTONYM_PROBE.md",
+      "provenance": "PRIMARY_ATTESTED",
+      "scope": "privative a + vowel length (a natural experiment on the frozen corpus)",
+      "implies": "vowels/prefix/length are semantically LOAD-BEARING (existence proof); refutes consonant-only as a COMPLETE theory",
+      "inference_label": "structural existence proof about WHERE contrast lives — not a per-vowel pole assignment"
+    },
+    {
+      "id": "S5",
+      "claim": "The active native table (v3.1) contains 34 consonant entries and NO vowel / anusvāra / visarga / candrabindu entries.",
+      "location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+      "provenance": "MISSING",
+      "scope": "vowels + anusvāra + visarga + candrabindu",
+      "implies": "the semantic content for every missing category is absent — not droppable, not yet authored",
+      "inference_label": "direct artifact fact"
+    },
+    {
+      "id": "S6",
+      "claim": "Open questions in the staging plan: 'is an aspirated stop a distinct varṇa with its own root, or a modifier? does anusvāra carry a nasal root? does word-position weight a varṇa?'",
+      "location": "B1_SANSKRIT_FIRST_STAGING_AUDIT_AND_PLAN.md#B.3",
+      "provenance": "UNRESOLVED",
+      "scope": "anusvāra (nasal root?), positional weighting",
+      "implies": "the role of anusvāra (primitive-with-root vs modifier) is explicitly OPEN in-repo",
+      "inference_label": "self-declared open question"
+    },
+    {
+      "id": "S7",
+      "claim": "The frozen native parser preserves vowels/anusvāra/visarga/candrabindu as ordered atomic units with NO meaning; 45% of seed-corpus phonological tokens are these missing categories.",
+      "location": "B1_STAGE1_PARSER_FREEZE_RECORD.md; stage1_mapping_integration/coverage_summary.json",
+      "provenance": "PRIMARY_ATTESTED",
+      "scope": "all missing categories",
+      "implies": "structural preservation is done; the missing categories dominate token frequency",
+      "inference_label": "direct artifact fact"
+    }
+  ]
+}

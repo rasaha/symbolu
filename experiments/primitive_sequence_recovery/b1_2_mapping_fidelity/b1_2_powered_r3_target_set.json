@@ -1,0 +1,677 @@
+{
+  "artifact": "b1_2_powered_r3_target_set",
+  "purpose": "Frozen B1.2 target set for a properly powered R3 V<->G style-tell re-adjudication ONLY. Not authorization for mapping-fidelity scoring or B1.2 evidence.",
+  "evidence": false,
+  "frozen": true,
+  "selected_before_any_powered_audit": true,
+  "selection_word_agnostic": true,
+  "n_targets": 70,
+  "targets": [
+    "justice",
+    "silence",
+    "mountain",
+    "river",
+    "music",
+    "friendship",
+    "teacher",
+    "shadow",
+    "freedom",
+    "honesty",
+    "empathy",
+    "ocean",
+    "envy",
+    "order",
+    "integrity",
+    "autumn",
+    "water",
+    "fire",
+    "stone",
+    "tree",
+    "forest",
+    "star",
+    "wind",
+    "storm",
+    "cloud",
+    "rain",
+    "snow",
+    "mother",
+    "father",
+    "child",
+    "friend",
+    "stranger",
+    "doctor",
+    "farmer",
+    "hunter",
+    "bridge",
+    "window",
+    "temple",
+    "village",
+    "road",
+    "boat",
+    "sword",
+    "book",
+    "letter",
+    "song",
+    "dance",
+    "dream",
+    "memory",
+    "fear",
+    "anger",
+    "joy",
+    "sorrow",
+    "wisdom",
+    "truth",
+    "wealth",
+    "wound",
+    "journey",
+    "promise",
+    "law",
+    "war",
+    "peace",
+    "bird",
+    "flower",
+    "island",
+    "desert",
+    "valley",
+    "shield",
+    "crown",
+    "market",
+    "prison"
+  ],
+  "target_details": [
+    {
+      "word": "justice",
+      "part_of_speech": "n",
+      "synset": "justice.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "silence",
+      "part_of_speech": "n",
+      "synset": "silence.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "mountain",
+      "part_of_speech": "n",
+      "synset": "mountain.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "river",
+      "part_of_speech": "n",
+      "synset": "river.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "music",
+      "part_of_speech": "n",
+      "synset": "music.n.01",
+      "n_synonyms": 14,
+      "n_varnas": 4
+    },
+    {
+      "word": "friendship",
+      "part_of_speech": "n",
+      "synset": "friendship.n.01",
+      "n_synonyms": 14,
+      "n_varnas": 6
+    },
+    {
+      "word": "teacher",
+      "part_of_speech": "n",
+      "synset": "teacher.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "shadow",
+      "part_of_speech": "n",
+      "synset": "shadow.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "freedom",
+      "part_of_speech": "n",
+      "synset": "freedom.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "honesty",
+      "part_of_speech": "n",
+      "synset": "honesty.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "empathy",
+      "part_of_speech": "n",
+      "synset": "empathy.n.01",
+      "n_synonyms": 12,
+      "n_varnas": 3
+    },
+    {
+      "word": "ocean",
+      "part_of_speech": "n",
+      "synset": "ocean.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "envy",
+      "part_of_speech": "n",
+      "synset": "envy.n.01",
+      "n_synonyms": 13,
+      "n_varnas": 2
+    },
+    {
+      "word": "order",
+      "part_of_speech": "n",
+      "synset": "order.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "integrity",
+      "part_of_speech": "n",
+      "synset": "integrity.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 5
+    },
+    {
+      "word": "autumn",
+      "part_of_speech": "n",
+      "synset": "fall.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "water",
+      "part_of_speech": "n",
+      "synset": "water.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "fire",
+      "part_of_speech": "n",
+      "synset": "fire.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 1
+    },
+    {
+      "word": "stone",
+      "part_of_speech": "n",
+      "synset": "rock.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "tree",
+      "part_of_speech": "n",
+      "synset": "tree.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "forest",
+      "part_of_speech": "n",
+      "synset": "forest.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "star",
+      "part_of_speech": "n",
+      "synset": "star.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "wind",
+      "part_of_speech": "n",
+      "synset": "wind.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "storm",
+      "part_of_speech": "n",
+      "synset": "storm.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "cloud",
+      "part_of_speech": "n",
+      "synset": "cloud.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "rain",
+      "part_of_speech": "n",
+      "synset": "rain.n.01",
+      "n_synonyms": 11,
+      "n_varnas": 2
+    },
+    {
+      "word": "snow",
+      "part_of_speech": "n",
+      "synset": "snow.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "mother",
+      "part_of_speech": "n",
+      "synset": "mother.n.01",
+      "n_synonyms": 10,
+      "n_varnas": 2
+    },
+    {
+      "word": "father",
+      "part_of_speech": "n",
+      "synset": "father.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "child",
+      "part_of_speech": "n",
+      "synset": "child.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "friend",
+      "part_of_speech": "n",
+      "synset": "friend.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "stranger",
+      "part_of_speech": "n",
+      "synset": "stranger.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 5
+    },
+    {
+      "word": "doctor",
+      "part_of_speech": "n",
+      "synset": "doctor.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "farmer",
+      "part_of_speech": "n",
+      "synset": "farmer.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "hunter",
+      "part_of_speech": "n",
+      "synset": "hunter.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "bridge",
+      "part_of_speech": "n",
+      "synset": "bridge.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "window",
+      "part_of_speech": "n",
+      "synset": "window.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "temple",
+      "part_of_speech": "n",
+      "synset": "temple.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "village",
+      "part_of_speech": "n",
+      "synset": "village.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "road",
+      "part_of_speech": "n",
+      "synset": "road.n.01",
+      "n_synonyms": 11,
+      "n_varnas": 2
+    },
+    {
+      "word": "boat",
+      "part_of_speech": "n",
+      "synset": "boat.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "sword",
+      "part_of_speech": "n",
+      "synset": "sword.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "book",
+      "part_of_speech": "n",
+      "synset": "book.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "letter",
+      "part_of_speech": "n",
+      "synset": "letter.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "song",
+      "part_of_speech": "n",
+      "synset": "song.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "dance",
+      "part_of_speech": "n",
+      "synset": "dance.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "dream",
+      "part_of_speech": "n",
+      "synset": "dream.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "memory",
+      "part_of_speech": "n",
+      "synset": "memory.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "fear",
+      "part_of_speech": "n",
+      "synset": "fear.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "anger",
+      "part_of_speech": "n",
+      "synset": "anger.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "joy",
+      "part_of_speech": "n",
+      "synset": "joy.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 1
+    },
+    {
+      "word": "sorrow",
+      "part_of_speech": "n",
+      "synset": "sorrow.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "wisdom",
+      "part_of_speech": "n",
+      "synset": "wisdom.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "truth",
+      "part_of_speech": "n",
+      "synset": "truth.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "wealth",
+      "part_of_speech": "n",
+      "synset": "wealth.n.01",
+      "n_synonyms": 13,
+      "n_varnas": 3
+    },
+    {
+      "word": "wound",
+      "part_of_speech": "n",
+      "synset": "wound.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "journey",
+      "part_of_speech": "n",
+      "synset": "journey.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "promise",
+      "part_of_speech": "n",
+      "synset": "promise.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "law",
+      "part_of_speech": "n",
+      "synset": "law.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 1
+    },
+    {
+      "word": "war",
+      "part_of_speech": "n",
+      "synset": "war.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "peace",
+      "part_of_speech": "n",
+      "synset": "peace.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "bird",
+      "part_of_speech": "n",
+      "synset": "bird.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "flower",
+      "part_of_speech": "n",
+      "synset": "flower.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "island",
+      "part_of_speech": "n",
+      "synset": "island.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "desert",
+      "part_of_speech": "n",
+      "synset": "desert.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "valley",
+      "part_of_speech": "n",
+      "synset": "valley.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 2
+    },
+    {
+      "word": "shield",
+      "part_of_speech": "n",
+      "synset": "shield.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "crown",
+      "part_of_speech": "n",
+      "synset": "crown.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 3
+    },
+    {
+      "word": "market",
+      "part_of_speech": "n",
+      "synset": "market.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    },
+    {
+      "word": "prison",
+      "part_of_speech": "n",
+      "synset": "prison.n.01",
+      "n_synonyms": 15,
+      "n_varnas": 4
+    }
+  ],
+  "inclusion_criteria": [
+    "present in cmudict (G2P) and yields >=1 varṇa via core_A",
+    "has a WordNet noun synset (POS resolved to first noun synset)",
+    ">=10 usable synonyms/near-neighbors under the frozen G neighbor rule",
+    "not a duplicate/near-duplicate in the candidate pool"
+  ],
+  "exclusion_rules": [
+    "no_cmudict_g2p",
+    "varna_routing_failure",
+    "no_wordnet_noun_synset",
+    "under_10_synonyms",
+    "duplicate_or_near_duplicate"
+  ],
+  "exclusions": [
+    {
+      "word": "grief",
+      "rule": "under_10_synonyms(9)"
+    },
+    {
+      "word": "courage",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "patience",
+      "rule": "under_10_synonyms(9)"
+    },
+    {
+      "word": "echo",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "moon",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "sun",
+      "rule": "under_10_synonyms(5)"
+    },
+    {
+      "word": "soldier",
+      "rule": "under_10_synonyms(5)"
+    },
+    {
+      "word": "mirror",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "door",
+      "rule": "under_10_synonyms(7)"
+    },
+    {
+      "word": "garden",
+      "rule": "under_10_synonyms(5)"
+    },
+    {
+      "word": "city",
+      "rule": "under_10_synonyms(4)"
+    },
+    {
+      "word": "lamp",
+      "rule": "under_10_synonyms(5)"
+    },
+    {
+      "word": "hope",
+      "rule": "under_10_synonyms(7)"
+    },
+    {
+      "word": "mercy",
+      "rule": "under_10_synonyms(4)"
+    },
+    {
+      "word": "hunger",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "gift",
+      "rule": "under_10_synonyms(8)"
+    },
+    {
+      "word": "harvest",
+      "rule": "under_10_synonyms(6)"
+    },
+    {
+      "word": "throne",
+      "rule": "under_10_synonyms(8)"
+    },
+    {
+      "word": "ladder",
+      "rule": "under_10_synonyms(4)"
+    }
+  ],
+  "candidate_pool_source": "B1/B1.1 word pool (b1_dry_run_harness PRIMARY+PRIVATIVE) + a broad neutral common-noun list; ordered+deduped; not chosen by any V/G style-tell outcome",
+  "candidate_pool_size": 89,
+  "wordnet_version": "3.0",
+  "render_schema": "corrected symmetric matched-length keyword schema (already committed in run_b1_2_g_builder.py); NO further renderer tuning before the powered audit",
+  "no_post_hoc_replacement": true,
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED",
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth"
+  ],
+  "target_set_sha256": "fe7aa7ac0081d4dcf6db788ca1fe94449844b40467d78bb7e23d7370f8d82fda"
+}

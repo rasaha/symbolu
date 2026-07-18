@@ -1,0 +1,53 @@
+{
+  "B1_JUDGE_RUN_V2_PROVENANCE": {
+    "gate": "RUN_LLM_JUDGE (final panel, v2)",
+    "recorded_utc": "2026-07-04T16:54:48Z",
+    "harness_parser_commit": "400f7af",
+    "panel_amendment_commit": "6891c73",
+    "judge_view_sha256": "f795707a\u2026(611e5d8)",
+    "b0_freeze_base": "a2ed5cc",
+    "panel": "amended V2 (see B1_JUDGE_PATH_ADDENDUM_V2.md): Llama-3.1-8B + Meta-Llama-3-8B + gemma-2-9b-it",
+    "per_judge": [
+      {
+        "judge": "Llama-3.1-8B-Instruct",
+        "attn_fail": 0,
+        "n_attn": 24,
+        "excluded": false,
+        "parse_fail": 245,
+        "repaired": 0,
+        "flagged": 403,
+        "out_sha256": "d1e2bd9096342b20293d5b70c76c5a61e74c98eefc45b5fd78bef4c9fd0b9839"
+      },
+      {
+        "judge": "Meta-Llama-3-8B-Instruct",
+        "attn_fail": 0,
+        "n_attn": 24,
+        "excluded": false,
+        "parse_fail": 17,
+        "repaired": 1673,
+        "flagged": 18,
+        "out_sha256": "1ddc949bb346e30f5b57695ba1af3086b95f0cae05bc7f6e2c0dfd3493615620"
+      },
+      {
+        "judge": "gemma-2-9b-it",
+        "attn_fail": 0,
+        "n_attn": 24,
+        "excluded": false,
+        "parse_fail": 1,
+        "repaired": 0,
+        "flagged": 416,
+        "out_sha256": "a3c9038f897d2c2ad96f5eb063de5c8a73edd7d02e8a94c85aa9e471ab0bc265"
+      }
+    ],
+    "all_three_kept": true,
+    "caveats": [
+      "Meta-Llama-3-8B: 1673/3024 (55%) verdicts recovered by the missing-final-brace safe repair. Each repair fires only when choice is present+valid; recovers the model's actual complete verdict; flagged (parse_repair) with raw preserved. Does not alter any choice. Report in final write-up.",
+      "Meta-Llama-3-8B is unusually decisive (~1 genuine tie); Llama-3.1 and Gemma tie ~13-14%. Inter-judge style difference; agreement stats will reflect it.",
+      "8B/9B-class judges -> internal LLM-judge evidence; human replication required if positive."
+    ],
+    "scored": false,
+    "verdict": null,
+    "track_b": "BLOCKED",
+    "note": "Final 3-judge panel judged (blind). NOT scored, NOT mapped to A-win, NO verdict. Data lives on pod; bound here by sha256. Structure, not validated meaning."
+  }
+}

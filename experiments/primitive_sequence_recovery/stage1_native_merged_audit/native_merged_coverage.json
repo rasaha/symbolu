@@ -1,0 +1,65 @@
+{
+  "artifact_type": "stage1_native_merged_integration_audit",
+  "supersession": {
+    "supersedes": "b1_stage1_mapping_integration_audit.py (preserved as historically correct vs its v3.1-only source)",
+    "resolves_against": "frozen/varna_native_stage1_merged_v1.json",
+    "corrections_vs_prior": {
+      "common_vowels": "NOW EXISTING (a ā i ī u ū e ai o au) — previously MISSING because the prior audit read v3.1 only",
+      "anusvara_visarga": "NOW EXISTING (am / ah)",
+      "still_missing": [
+        "ṛ",
+        "ṝ",
+        "l̥",
+        "l̥̄",
+        "candrabindu"
+      ],
+      "consonant_identity": "from v3.1 (unchanged); no wholesale authority to the stale lens consonant portion"
+    },
+    "prior_no_signal_linkage": "vowel/marker mappings carry NOT_EMPIRICALLY_VALIDATED; the varṇa-lens semantic content returned NO_SIGNAL (twice) — referenced, not treated as deletion."
+  },
+  "unit_level_coverage": {
+    "total_rows": 51,
+    "consonants_from_v31": 33,
+    "consonant_out_of_scope": 1,
+    "vowels_existing": 10,
+    "vowels_missing": 4,
+    "anusvara_existing": 1,
+    "visarga_existing": 1,
+    "candrabindu": "MISSING",
+    "remaining_missing_units": [
+      "ṛ",
+      "ṝ",
+      "l̥",
+      "l̥̄",
+      "m̐"
+    ],
+    "category_counts": {
+      "consonant": 34,
+      "vowel": 14,
+      "anusvara": 1,
+      "visarga": 1,
+      "candrabindu": 1
+    }
+  },
+  "coverage": {
+    "structurally_resolvable_coverage": {
+      "note": "INCLUDES authored-provisional vowel/marker mappings; NOT a semantic-validation claim.",
+      "token_pct": 98.8,
+      "word_full_pct": 94.5
+    },
+    "confirmatory_eligible_coverage": {
+      "note": "EXCLUDES DEVELOPMENT_ONLY / authored-provisional (vowels, anusvāra, visarga). Consonant backbone only.",
+      "token_pct": 55.0,
+      "word_full_pct": 0.0
+    },
+    "total_phonological_tokens": 518,
+    "token_status_breakdown": {
+      "EXACT_CONFIRMATORY": 285,
+      "EXISTS_DEVELOPMENT_ONLY": 227,
+      "MISSING_TABLE_ENTRY": 6
+    },
+    "n_seed_words": 110
+  },
+  "integration_verdict": "NATIVE_STAGE1_MERGED_LEXICON_CREATED",
+  "readiness_verdict": "READY_FOR_NATIVE_WORD_MAPPING_REVIEW_WITH_PROVENANCE_LIMITS"
+}

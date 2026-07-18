@@ -1,0 +1,37 @@
+{
+  "artifact": "track_g_smoke_outputs",
+  "exploratory_triage_only": true,
+  "primary_label": "RANDOM_POLARITY_EXPLAINS",
+  "deltas": {
+    "A_vs_R": -0.1917,
+    "A_vs_X": -0.075,
+    "A_vs_B": -0.0167,
+    "A_vs_I": -0.1167,
+    "A_vs_D": 0.0667
+  },
+  "per_arm_mrr": {
+    "A": 0.7583,
+    "R": 0.95,
+    "B": 0.775,
+    "I": 0.875,
+    "X": 0.8333,
+    "D": 0.6917
+  },
+  "per_arm_top1": {
+    "A": 0.6,
+    "R": 0.9,
+    "B": 0.6,
+    "I": 0.8,
+    "X": 0.7,
+    "D": 0.5
+  },
+  "A_vs_R_and_A_vs_X_are_co_primary": true,
+  "tasks_judged": 10,
+  "tasks_dropped_by_judge": [],
+  "malformed": 0,
+  "malformed_rate": 0.0,
+  "polarity_derived_from_varna_table": true,
+  "note": "Track G polarity-boundary smoke, exploratory triage only. A derived from a researcher-authored high-DOF varṇa table -> even a positive is architecture-bound utility, never ontology. Not validation; Track B remains blocked. No ONTOLOGICAL_SIGNAL, no Sanskrit privilege.",
+  "scorer_model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "temperature": 0.0
+}
