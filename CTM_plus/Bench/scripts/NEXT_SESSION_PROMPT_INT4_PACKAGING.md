@@ -4,7 +4,7 @@ Copy-paste everything below the line as the session prompt.
 
 ---
 
-You are continuing work on int4_protected (Cognade Labs' quality-preserving 4-bit
+You are continuing work on int4_protected (Ugence Labs' quality-preserving 4-bit
 KV-cache backend for vLLM 0.7.3 V0, on Llama-3.1-8B). Be the honest engineer +
 strategic sounding board — no rosy numbers, disclose costs.
 

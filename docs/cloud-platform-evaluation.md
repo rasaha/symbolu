@@ -1,4 +1,4 @@
-# Cloud Platform Evaluation for Symbol-U / Cognade Labs
+# Cloud Platform Evaluation for Symbol-U / Ugence Labs
 
 **Date:** 2026-03-26
 **Status:** Recommendation Complete

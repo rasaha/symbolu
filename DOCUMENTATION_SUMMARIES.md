@@ -69,7 +69,7 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > This contract establishes immutable governance rules for the frozen ontology substrate used by the Symbolu pipeline. The ontology files contain authoritative ground-truth data that MUST NOT be modified, inferred from, or accessed outside of designated pathways.
 
-### `PITCH_DECK_XOZENCE_LABS.md`
+### `PITCH_DECK_UGENCE_LABS.md`
 **Ugence Labs — Pitch Deck**
 
 > **Ugence Labs** *Making AI Trustworthy — From Chip to Chat*

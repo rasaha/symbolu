@@ -1,6 +1,6 @@
 # Level Discipline Scorer — Design Specification
 
-*Cognade Labs · Conscious Generation LLM · Draft Design · April 2026*
+*Ugence Labs · Conscious Generation LLM · Draft Design · April 2026*
 
 ---
 

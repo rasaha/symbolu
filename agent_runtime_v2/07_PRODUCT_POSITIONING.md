@@ -88,7 +88,7 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 - **Not AI Control Plane.** The prior review established it is probabilistic, threshold-based, and its authorization parts duplicate ActionGate; reclassifying it there re-introduces the exact overlap the Control Plane forbids.
 - **It is a Specialized AI System** — an applied, probabilistic system that produces intelligence and executes workflows, siblings to the model + steering products (Hybrid LLM, LLM Steering Controller). Where those two make *a better model*, the Agent Runtime makes *a better agent from any model*.
 
-**INTERPRETATION.** The three Specialized AI Systems form a natural sub-stack: **Hybrid LLM** (the substrate) → **LLM Steering Controller** (generation control on the substrate) → **Agent Runtime** (agency on top). This mirrors the pitchbook's own vertical-composition claim (FACT: `docs/XOZENCE_PITCHBOOK.md` — "Hybrid LLM → Steering/CG → Agentic Framework consumes state for governance").
+**INTERPRETATION.** The three Specialized AI Systems form a natural sub-stack: **Hybrid LLM** (the substrate) → **LLM Steering Controller** (generation control on the substrate) → **Agent Runtime** (agency on top). This mirrors the pitchbook's own vertical-composition claim (FACT: `docs/UGENCE_PITCHBOOK.md` — "Hybrid LLM → Steering/CG → Agentic Framework consumes state for governance").
 
 ---
 

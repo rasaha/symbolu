@@ -1205,5 +1205,5 @@ The vtable was always there. Training just learned to populate it.
 
 ---
 
-*Architecture document prepared for Cognade Labs / Symbol-U Architecture Team*
+*Architecture document prepared for Ugence Labs / Symbol-U Architecture Team*
 *February 2026*

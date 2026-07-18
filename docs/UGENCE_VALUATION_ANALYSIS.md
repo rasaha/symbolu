@@ -1,6 +1,6 @@
 # Ugence Labs — Valuation Analysis (Indicative)
 
-**Prepared from:** `docs/XOZENCE_PITCHBOOK.md` and the supporting VC briefs
+**Prepared from:** `docs/UGENCE_PITCHBOOK.md` and the supporting VC briefs
 (`INT4_PROTECTED_VC_BRIEF`, `docs/CTM_PLUS_VC_BRIEF`, `KVPro_VC_brief`, `docs/CLOUD_SCALING_CONTROLLER_VC_BRIEF`,
 `docs/cloud_scaling_real_validation/INVESTMENT_THESIS_MEMO` + `COMPETITIVE_DIFFERENTIATION_MEMO`,
 `AGENTIC_FRAMEWORK_VC_BRIEF`, `LLM_STEERING_CONTROLLER_VC_BRIEF`, `CONSCIOUS_GENERATION_LLM_VC_BRIEF`,

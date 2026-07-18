@@ -62,7 +62,7 @@ as the canonical portfolio architecture.
 
 | Document | What was corrected |
 |---|---|
-| `docs/XOZENCE_PITCHBOOK.md` | Taxonomy table: "CG LLM" → "LLM Steering Controller", **Autonomous Runtime** added to Specialized AI Systems; "Autonomous Robotics … standalone vertical" → reframed as the **Autonomous Runtime** (Specialized AI System), PSE kept as the lone standalone; canonical pointer added. AI Infrastructure row was already canonical (KV Pro · Cloud Scaling Controller). |
+| `docs/UGENCE_PITCHBOOK.md` | Taxonomy table: "CG LLM" → "LLM Steering Controller", **Autonomous Runtime** added to Specialized AI Systems; "Autonomous Robotics … standalone vertical" → reframed as the **Autonomous Runtime** (Specialized AI System), PSE kept as the lone standalone; canonical pointer added. AI Infrastructure row was already canonical (KV Pro · Cloud Scaling Controller). |
 
 ### READMEs (1)
 
@@ -96,7 +96,7 @@ is this pass's coverage of both `agentic_framework_review` documents.)*
 - **Technical / design / benchmark docs** that merely *mention* "Hybrid LLM" or "KVPro" as engineering
   subjects (e.g. `docs/PHASE_ATTENTION_*`, `INT4`/`KVPro` runbooks, `token_compression/*`,
   `cloud_scaling_real_validation/*`) were **not** touched — they carry no portfolio taxonomy.
-- **Valuation / market-sizing docs** (`docs/XOZENCE_VALUATION_ANALYSIS.md`,
+- **Valuation / market-sizing docs** (`docs/UGENCE_VALUATION_ANALYSIS.md`,
   `docs/INVESTOR_PITCH_PHASE_QUAD.md`) reference products only as valuation line-items, not as a
   taxonomy hierarchy — left unchanged.
 - **`UGENCE_PLATFORM_OVERVIEW.md`** is the source of truth and was not modified.

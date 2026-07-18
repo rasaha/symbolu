@@ -104,7 +104,7 @@ Ugence Labs
 | "Replayable trace / hard cost caps / token streaming / CI-passing" overstated | FACT | `AGENTIC_FRAMEWORK_READINESS_AUDIT.md` |
 | "JEPA" is deterministic heuristic, not a neural net; stricter-only | FACT | `jepa_governance.py:29–32,1145` |
 | ActionGate/ACP corpus and framework docs never reference each other | FACT | cross-corpus scans |
-| "AI Control Plane" not a pitchbook category; "Specialized AI Systems" absent from repo | FACT | `docs/XOZENCE_PITCHBOOK.md`, repo-wide grep |
+| "AI Control Plane" not a pitchbook category; "Specialized AI Systems" absent from repo | FACT | `docs/UGENCE_PITCHBOOK.md`, repo-wide grep |
 | Cloud Controller is a full control-plane pipeline reused by ACP as cloud safety evaluator | FACT | `cloud_controller/`, `acp/AI_CONTROL_PLANE_ARCHITECTURE.md` |
 | Framework should be an Agent Runtime, not a control plane | INTERPRETATION/RECOMMENDATION | this review, Parts 2–9 |
 | Splitting + folding authz into ActionGate eliminates all duplicated ownership | RECOMMENDATION | `DUPLICATION_ANALYSIS.md` §7 |

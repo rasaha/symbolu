@@ -5,7 +5,7 @@ session WITH pod access (the gates are mandatory before merge).
 
 ---
 
-You are continuing work on int4_protected (Cognade Labs' quality-preserving
+You are continuing work on int4_protected (Ugence Labs' quality-preserving
 4-bit KV-cache backend for vLLM 0.7.3 V0, Llama-3.1-8B). Be the honest
 engineer — no rosy numbers, gate every change.
 
