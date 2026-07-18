@@ -1,0 +1,1858 @@
+{
+  "schema": "symbol_u_intent_profiles_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "status": "INTENT_PROFILES_V1_FROZEN",
+  "universal_usage_rule": "The profile represents possible symbolic framing pressures derived from the frozen Symbol-U mappings. These are auxiliary signals only. They are hypotheses, never facts. They must not override the user's explicit meaning and may be ignored when unsupported by the conversation.",
+  "usage_rule_note": "identical for EVERY profile; the profile is a data contract, not a prompt; carries no assistant behavior",
+  "n_profiles": 25,
+  "intent_profiles_sha256": "96d2512ba54a15660ce6bd028f81663aa937e968009b37bcc166aa95427b2907",
+  "profiles": [
+    {
+      "concern_id": "C0001",
+      "concern_name": "fear",
+      "canonical_sanskrit_concept": {
+        "iast": "bhaya",
+        "devanagari": "भय"
+      },
+      "pronunciation_used_iast": "bhaya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "bh",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "bh",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "bh",
+          "vritti_gloss": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0002",
+      "concern_name": "anxiety",
+      "canonical_sanskrit_concept": {
+        "iast": "cintā",
+        "devanagari": "चिन्ता"
+      },
+      "pronunciation_used_iast": "cintā",
+      "frozen_varna_sequence": [
+        {
+          "unit": "c",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        },
+        {
+          "unit": "n",
+          "type": "consonant"
+        },
+        {
+          "unit": "t",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "c",
+        "n",
+        "t"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "c",
+          "vritti_gloss": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+        },
+        {
+          "varna": "n",
+          "vritti_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "t",
+          "vritti_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0003",
+      "concern_name": "anger",
+      "canonical_sanskrit_concept": {
+        "iast": "krodha",
+        "devanagari": "क्रोध"
+      },
+      "pronunciation_used_iast": "krodha",
+      "frozen_varna_sequence": [
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "dh",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "k",
+        "r",
+        "dh"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "dh",
+          "vritti_gloss": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0004",
+      "concern_name": "resentment",
+      "canonical_sanskrit_concept": {
+        "iast": "dveṣa",
+        "devanagari": "द्वेष"
+      },
+      "pronunciation_used_iast": "dveṣa",
+      "frozen_varna_sequence": [
+        {
+          "unit": "d",
+          "type": "consonant"
+        },
+        {
+          "unit": "v",
+          "type": "consonant"
+        },
+        {
+          "unit": "e",
+          "type": "vowel"
+        },
+        {
+          "unit": "ṣ",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "d",
+        "v",
+        "ṣ"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "d",
+          "vritti_gloss": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+        },
+        {
+          "varna": "v",
+          "vritti_gloss": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "ṣ",
+          "vritti_gloss": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 2,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0005",
+      "concern_name": "attachment",
+      "canonical_sanskrit_concept": {
+        "iast": "āsakti",
+        "devanagari": "आसक्ति"
+      },
+      "pronunciation_used_iast": "āsakti",
+      "frozen_varna_sequence": [
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "s",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "t",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "s",
+        "k",
+        "t"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "s",
+          "vritti_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "t",
+          "vritti_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0006",
+      "concern_name": "grief",
+      "canonical_sanskrit_concept": {
+        "iast": "śoka",
+        "devanagari": "शोक"
+      },
+      "pronunciation_used_iast": "śoka",
+      "frozen_varna_sequence": [
+        {
+          "unit": "ś",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "ś",
+        "k"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "ś",
+          "vritti_gloss": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)"
+        },
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0007",
+      "concern_name": "craving",
+      "canonical_sanskrit_concept": {
+        "iast": "kāma",
+        "devanagari": "काम"
+      },
+      "pronunciation_used_iast": "kāma",
+      "frozen_varna_sequence": [
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "m",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "k",
+        "m"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "m",
+          "vritti_gloss": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0008",
+      "concern_name": "greed",
+      "canonical_sanskrit_concept": {
+        "iast": "lobha",
+        "devanagari": "लोभ"
+      },
+      "pronunciation_used_iast": "lobha",
+      "frozen_varna_sequence": [
+        {
+          "unit": "l",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "bh",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "l",
+        "bh"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "l",
+          "vritti_gloss": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        },
+        {
+          "varna": "bh",
+          "vritti_gloss": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0009",
+      "concern_name": "confusion",
+      "canonical_sanskrit_concept": {
+        "iast": "moha",
+        "devanagari": "मोह"
+      },
+      "pronunciation_used_iast": "moha",
+      "frozen_varna_sequence": [
+        {
+          "unit": "m",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "h",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "m",
+        "h"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "m",
+          "vritti_gloss": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+        },
+        {
+          "varna": "h",
+          "vritti_gloss": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0010",
+      "concern_name": "doubt",
+      "canonical_sanskrit_concept": {
+        "iast": "saṃśaya",
+        "devanagari": "संशय"
+      },
+      "pronunciation_used_iast": "saṃśaya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "s",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "ṃ",
+          "type": "anusvara"
+        },
+        {
+          "unit": "ś",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "s",
+        "ś",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "s",
+          "vritti_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "ś",
+          "vritti_gloss": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 2,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0011",
+      "concern_name": "pride",
+      "canonical_sanskrit_concept": {
+        "iast": "garva",
+        "devanagari": "गर्व"
+      },
+      "pronunciation_used_iast": "garva",
+      "frozen_varna_sequence": [
+        {
+          "unit": "g",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "v",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "g",
+        "r",
+        "v"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "g",
+          "vritti_gloss": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "v",
+          "vritti_gloss": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0012",
+      "concern_name": "shame",
+      "canonical_sanskrit_concept": {
+        "iast": "lajjā",
+        "devanagari": "लज्जा"
+      },
+      "pronunciation_used_iast": "lajjā",
+      "frozen_varna_sequence": [
+        {
+          "unit": "l",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "j",
+          "type": "consonant"
+        },
+        {
+          "unit": "j",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "l",
+        "j",
+        "j"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "l",
+          "vritti_gloss": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        },
+        {
+          "varna": "j",
+          "vritti_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')"
+        },
+        {
+          "varna": "j",
+          "vritti_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {
+        "j": 2
+      },
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0013",
+      "concern_name": "separation-longing",
+      "canonical_sanskrit_concept": {
+        "iast": "viraha",
+        "devanagari": "विरह"
+      },
+      "pronunciation_used_iast": "viraha",
+      "frozen_varna_sequence": [
+        {
+          "unit": "v",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "h",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "v",
+        "r",
+        "h"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "v",
+          "vritti_gloss": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "h",
+          "vritti_gloss": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0014",
+      "concern_name": "duty",
+      "canonical_sanskrit_concept": {
+        "iast": "kartavya",
+        "devanagari": "कर्तव्य"
+      },
+      "pronunciation_used_iast": "kartavya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "t",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "v",
+          "type": "consonant"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "k",
+        "r",
+        "t",
+        "v",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "t",
+          "vritti_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        },
+        {
+          "varna": "v",
+          "vritti_gloss": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 5,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 5,
+        "n_b1_12_tier1_varnas": 2,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0015",
+      "concern_name": "burden",
+      "canonical_sanskrit_concept": {
+        "iast": "bhāra",
+        "devanagari": "भार"
+      },
+      "pronunciation_used_iast": "bhāra",
+      "frozen_varna_sequence": [
+        {
+          "unit": "bh",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "bh",
+        "r"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "bh",
+          "vritti_gloss": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0016",
+      "concern_name": "money-concern",
+      "canonical_sanskrit_concept": {
+        "iast": "dhana",
+        "devanagari": "धन"
+      },
+      "pronunciation_used_iast": "dhana",
+      "frozen_varna_sequence": [
+        {
+          "unit": "dh",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "n",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "dh",
+        "n"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "dh",
+          "vritti_gloss": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)"
+        },
+        {
+          "varna": "n",
+          "vritti_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        }
+      ],
+      "n_drives": 2,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 2,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0017",
+      "concern_name": "poverty",
+      "canonical_sanskrit_concept": {
+        "iast": "dāridrya",
+        "devanagari": "दारिद्र्य"
+      },
+      "pronunciation_used_iast": "dāridrya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "d",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        },
+        {
+          "unit": "d",
+          "type": "consonant"
+        },
+        {
+          "unit": "r",
+          "type": "consonant"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "d",
+        "r",
+        "d",
+        "r",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "d",
+          "vritti_gloss": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "d",
+          "vritti_gloss": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+        },
+        {
+          "varna": "r",
+          "vritti_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 5,
+      "varna_multiplicity": {
+        "d": 2,
+        "r": 2
+      },
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 5,
+        "n_b1_12_tier1_varnas": 3,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0018",
+      "concern_name": "diligence",
+      "canonical_sanskrit_concept": {
+        "iast": "udyoga",
+        "devanagari": "उद्योग"
+      },
+      "pronunciation_used_iast": "udyoga",
+      "frozen_varna_sequence": [
+        {
+          "unit": "u",
+          "type": "vowel"
+        },
+        {
+          "unit": "d",
+          "type": "consonant"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "g",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "d",
+        "y",
+        "g"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "d",
+          "vritti_gloss": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        },
+        {
+          "varna": "g",
+          "vritti_gloss": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 2,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0019",
+      "concern_name": "laziness",
+      "canonical_sanskrit_concept": {
+        "iast": "ālasya",
+        "devanagari": "आलस्य"
+      },
+      "pronunciation_used_iast": "ālasya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "l",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "s",
+          "type": "consonant"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "l",
+        "s",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "l",
+          "vritti_gloss": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        },
+        {
+          "varna": "s",
+          "vritti_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 2,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0020",
+      "concern_name": "purpose",
+      "canonical_sanskrit_concept": {
+        "iast": "lakṣya",
+        "devanagari": "लक्ष्य"
+      },
+      "pronunciation_used_iast": "lakṣya",
+      "frozen_varna_sequence": [
+        {
+          "unit": "l",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "ṣ",
+          "type": "consonant"
+        },
+        {
+          "unit": "y",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "l",
+        "k",
+        "ṣ",
+        "y"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "l",
+          "vritti_gloss": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+        },
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "ṣ",
+          "vritti_gloss": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude"
+        },
+        {
+          "varna": "y",
+          "vritti_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+        }
+      ],
+      "n_drives": 4,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 4,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0021",
+      "concern_name": "curiosity",
+      "canonical_sanskrit_concept": {
+        "iast": "jijñāsā",
+        "devanagari": "जिज्ञासा"
+      },
+      "pronunciation_used_iast": "jijñāsā",
+      "frozen_varna_sequence": [
+        {
+          "unit": "j",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        },
+        {
+          "unit": "j",
+          "type": "consonant"
+        },
+        {
+          "unit": "ñ",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "s",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "j",
+        "j",
+        "ñ",
+        "s"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "j",
+          "vritti_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')"
+        },
+        {
+          "varna": "j",
+          "vritti_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')"
+        },
+        {
+          "varna": "ñ",
+          "vritti_gloss": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits"
+        },
+        {
+          "varna": "s",
+          "vritti_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        }
+      ],
+      "n_drives": 4,
+      "varna_multiplicity": {
+        "j": 2
+      },
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 4,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0022",
+      "concern_name": "knowledge",
+      "canonical_sanskrit_concept": {
+        "iast": "jñāna",
+        "devanagari": "ज्ञान"
+      },
+      "pronunciation_used_iast": "jñāna",
+      "frozen_varna_sequence": [
+        {
+          "unit": "j",
+          "type": "consonant"
+        },
+        {
+          "unit": "ñ",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "n",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "j",
+        "ñ",
+        "n"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "j",
+          "vritti_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')"
+        },
+        {
+          "varna": "ñ",
+          "vritti_gloss": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits"
+        },
+        {
+          "varna": "n",
+          "vritti_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0023",
+      "concern_name": "patience",
+      "canonical_sanskrit_concept": {
+        "iast": "kṣamā",
+        "devanagari": "क्षमा"
+      },
+      "pronunciation_used_iast": "kṣamā",
+      "frozen_varna_sequence": [
+        {
+          "unit": "k",
+          "type": "consonant"
+        },
+        {
+          "unit": "ṣ",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "m",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "k",
+        "ṣ",
+        "m"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "k",
+          "vritti_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+        },
+        {
+          "varna": "ṣ",
+          "vritti_gloss": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude"
+        },
+        {
+          "varna": "m",
+          "vritti_gloss": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0024",
+      "concern_name": "contentment",
+      "canonical_sanskrit_concept": {
+        "iast": "santoṣa",
+        "devanagari": "सन्तोष"
+      },
+      "pronunciation_used_iast": "santoṣa",
+      "frozen_varna_sequence": [
+        {
+          "unit": "s",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        },
+        {
+          "unit": "n",
+          "type": "consonant"
+        },
+        {
+          "unit": "t",
+          "type": "consonant"
+        },
+        {
+          "unit": "o",
+          "type": "vowel"
+        },
+        {
+          "unit": "ṣ",
+          "type": "consonant"
+        },
+        {
+          "unit": "a",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "s",
+        "n",
+        "t",
+        "ṣ"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "s",
+          "vritti_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+        },
+        {
+          "varna": "n",
+          "vritti_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "t",
+          "vritti_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        },
+        {
+          "varna": "ṣ",
+          "vritti_gloss": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude"
+        }
+      ],
+      "n_drives": 4,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "HIGH",
+        "mapping_coverage": 1.0,
+        "n_mapped": 4,
+        "n_b1_12_tier1_varnas": 1,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    },
+    {
+      "concern_id": "C0025",
+      "concern_name": "calm",
+      "canonical_sanskrit_concept": {
+        "iast": "śānti",
+        "devanagari": "शान्ति"
+      },
+      "pronunciation_used_iast": "śānti",
+      "frozen_varna_sequence": [
+        {
+          "unit": "ś",
+          "type": "consonant"
+        },
+        {
+          "unit": "ā",
+          "type": "vowel"
+        },
+        {
+          "unit": "n",
+          "type": "consonant"
+        },
+        {
+          "unit": "t",
+          "type": "consonant"
+        },
+        {
+          "unit": "i",
+          "type": "vowel"
+        }
+      ],
+      "mapped_varnas": [
+        "ś",
+        "n",
+        "t"
+      ],
+      "frozen_drives": [
+        {
+          "varna": "ś",
+          "vritti_gloss": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)"
+        },
+        {
+          "varna": "n",
+          "vritti_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+        },
+        {
+          "varna": "t",
+          "vritti_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+        }
+      ],
+      "n_drives": 3,
+      "varna_multiplicity": {},
+      "mapping_coverage": 1.0,
+      "parser_status": {
+        "ok": true,
+        "warnings": []
+      },
+      "bridge_confidence": {
+        "level": "MEDIUM",
+        "mapping_coverage": 1.0,
+        "n_mapped": 3,
+        "n_b1_12_tier1_varnas": 0,
+        "rule": "HIGH if coverage==1.0 & n_mapped>=2 & n_tier1>=1; MEDIUM if coverage==1.0 & n_mapped>=1; else LOW"
+      },
+      "abstention_status": "NONE",
+      "provenance": {
+        "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+        "varna_mappings_v3_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+        "concern_to_sanskrit_concept_v1_sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4",
+        "concern_ontology_v1_sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840",
+        "bridge_core_sha256": "6ac2c6a27a006211491fd9a5c3e2301af4cb845e131d1012d3da78e5808def11"
+      }
+    }
+  ]
+}

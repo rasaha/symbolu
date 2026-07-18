@@ -1,0 +1,147 @@
+{
+  "schema": "symbol_u_utility_arm_contracts_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "status": "ARM_CONTRACTS_V1_FROZEN",
+  "frozen_inputs": {
+    "controlling_preregistration": {
+      "path": "SYMBOL_U_ASSISTANT_UTILITY_PREREG_V1.md",
+      "sha256": "c44d9eb3014ea6a574943cb51d7eed53784d7cb55c39855a4bcd3b250a685b1e"
+    },
+    "concern_ontology_v1": {
+      "path": "symbol_u_bridge/concern_ontology_v1.json",
+      "sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840"
+    },
+    "concern_to_sanskrit_concept_v1": {
+      "path": "symbol_u_bridge/concern_to_sanskrit_concept_v1.json",
+      "sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4"
+    },
+    "parser": {
+      "path": "sanskrit_stage1_parser.py",
+      "sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947"
+    },
+    "varna_mappings_v3": {
+      "path": "frozen/varna_native_stage1_merged_v3.json",
+      "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f"
+    },
+    "scenario_set_v1": {
+      "path": "symbol_u_utility_study/scenarios_v1/scenario_set_v1.json",
+      "sha256": "0b2429fe3669252739a598fadb92dc926a4f504ad82b0755288ac507f3ae472f"
+    },
+    "abstention_rules": {
+      "path": "symbol_u_bridge/abstention_rules.json",
+      "sha256": "90dca16b00218e262480a0c1856a5afaf826d79eaf43a7975d8c6bccd91fe3c2"
+    }
+  },
+  "contract_sha256": "ae72a3f255359b151062b444c43ad27ca5cd7c368260510728113e23d7b88488",
+  "model_control_invariants": {
+    "identical_across_ALL_arms": [
+      "model id / LLM",
+      "temperature (0, deterministic)",
+      "top_p / top_k",
+      "fixed seed",
+      "context window",
+      "token budget",
+      "stopping criteria",
+      "base system prompt EXCEPT the arm's reflection module"
+    ],
+    "differs_across_arms_ONLY_in": "the injected reflection material (none / generic / concern+concept / varna-mappings)",
+    "arm_labels": "sealed until unblinding; response order randomized per scenario"
+  },
+  "shared_pipeline_contract": {
+    "S1_concern_extraction": "held FIXED via the scenario's frozen_concern_ids during the primary analysis (identical inputs to arms C and D; arms A and B ignore it). Live extraction is a separate secondary study.",
+    "S5_reflection_synthesis": "the synthesis step uses the SAME instruction template for arms B/C/D; ONLY the injected reflection material differs. (Prompt wording is out of scope here; this fixes the CONTRACT, not the text.)",
+    "final_response": "natural language; for arm D no Sanskrit / Symbol-U / varna terminology may surface unless the user explicitly asks."
+  },
+  "arms": [
+    {
+      "arm": "A",
+      "name": "base",
+      "reads": [],
+      "must_not_read": [
+        "concern_ontology_v1",
+        "concern_to_sanskrit_concept_v1",
+        "parser",
+        "varna_mappings_v3"
+      ],
+      "reasoning_passes": 0,
+      "injected_reflection": "none",
+      "purpose": "baseline"
+    },
+    {
+      "arm": "B",
+      "name": "generic_reflection",
+      "reads": [],
+      "must_not_read": [
+        "concern_ontology_v1",
+        "concern_to_sanskrit_concept_v1",
+        "parser",
+        "varna_mappings_v3"
+      ],
+      "reasoning_passes": 1,
+      "injected_reflection": "a generic second-pass reflection with NO ontology and NO Sanskrit, matched to arms C/D in reasoning budget and response length",
+      "purpose": "controls for 'any second-pass reflection helps'"
+    },
+    {
+      "arm": "C",
+      "name": "concern_ontology",
+      "reads": [
+        "concern_ontology_v1",
+        "concern_to_sanskrit_concept_v1"
+      ],
+      "must_not_read": [
+        "parser",
+        "varna_mappings_v3"
+      ],
+      "reasoning_passes": 1,
+      "injected_reflection": "concern-aware reflection grounded in the routed concern + the canonical concept's ORDINARY meaning; NO varna decomposition, NO mappings",
+      "purpose": "controls for 'concern / concept framing helps'"
+    },
+    {
+      "arm": "D",
+      "name": "full_symbol_u",
+      "reads": [
+        "concern_ontology_v1",
+        "concern_to_sanskrit_concept_v1",
+        "parser",
+        "varna_mappings_v3"
+      ],
+      "must_not_read": [],
+      "reasoning_passes": 1,
+      "injected_reflection": "internal symbolic reasoning over the varna-level binding-vritti glosses of the concept's decomposition; final output natural, no Sanskrit unless asked",
+      "purpose": "adds the phonological varna layer; the D-C contrast isolates it"
+    }
+  ],
+  "module_access_matrix": {
+    "concern_ontology_v1": {
+      "A": false,
+      "B": false,
+      "C": true,
+      "D": true
+    },
+    "concern_to_sanskrit_concept_v1": {
+      "A": false,
+      "B": false,
+      "C": true,
+      "D": true
+    },
+    "parser": {
+      "A": false,
+      "B": false,
+      "C": false,
+      "D": true
+    },
+    "varna_mappings_v3": {
+      "A": false,
+      "B": false,
+      "C": false,
+      "D": true
+    }
+  },
+  "attribution_logic": "B/C/D share identical model control + S1 + S5 and differ ONLY in injected reflection material, so each nested contrast attributes to exactly one added component: B-A = reflection; C-B = concern/concept framing; D-C = the varna (phonological) layer.",
+  "out_of_scope": [
+    "LLM prompt wording",
+    "the actual model calls",
+    "judging",
+    "any implementation"
+  ]
+}
