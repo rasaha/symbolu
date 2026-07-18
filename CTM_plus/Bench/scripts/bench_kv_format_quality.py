@@ -317,20 +317,30 @@ def main(argv=None):
     # loads ANY model. If torchaudio's CUDA build mismatches torch (e.g. torchaudio cu124 vs torch cu121)
     # that import raises and cascades to "Could not import module 'Qwen2ForCausalLM'". We never use
     # torchaudio here, so if it can't import cleanly, stub it in sys.modules BEFORE transformers loads. ---
-    import types
+    import types, importlib.machinery
+    from unittest.mock import MagicMock
     try:
         import torchaudio  # noqa: F401  (use the real one when it imports cleanly)
         _ta_ok, _ta_err = True, None
     except Exception as _e:
         _ta_ok, _ta_err = False, _e            # save it: the `as` target is cleared after the except block
     if not _ta_ok:
-        from unittest.mock import MagicMock
         for _name in [m for m in list(sys.modules) if m == "torchaudio" or m.startswith("torchaudio.")]:
             del sys.modules[_name]                                # drop any partial import
-        _ta = MagicMock(name="torchaudio"); _ta.__version__ = "2.5.1"; _ta.__path__ = []
-        sys.modules["torchaudio"] = _ta
+        def _mk_ta_stub(_name):
+            # a REAL module object (not a MagicMock): transformers' is_torchaudio_available() calls
+            # importlib.util.find_spec("torchaudio"), which reads module.__spec__ — a MagicMock does not
+            # auto-provide that dunder, so it must be a genuine ModuleSpec. Arbitrary attribute access
+            # (e.g. torchaudio.functional.rnnt_loss) falls through __getattr__ to a versatile MagicMock;
+            # none of it is ever *called* for a text model, so correctness is irrelevant — only importability.
+            _m = types.ModuleType(_name)
+            _m.__spec__ = importlib.machinery.ModuleSpec(_name, loader=None)
+            _m.__version__ = "2.5.1"; _m.__path__ = []
+            _m.__getattr__ = lambda _a: MagicMock()
+            return _m
+        sys.modules["torchaudio"] = _mk_ta_stub("torchaudio")
         for _sub in ("functional", "_extension", "transforms", "models", "io", "compliance", "datasets"):
-            sys.modules[f"torchaudio.{_sub}"] = MagicMock(name=f"torchaudio.{_sub}")
+            sys.modules[f"torchaudio.{_sub}"] = _mk_ta_stub(f"torchaudio.{_sub}")
         print(f"  [env-fix] torchaudio unusable ({type(_ta_err).__name__}: {_ta_err}); stubbed it "
               f"(unused by this bench) so the model can load.")
 
