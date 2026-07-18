@@ -1,7 +1,7 @@
 # KVPro — VC Brief
 
 **Cognade Labs | Quality-Safe KV-Cache Compression for Long-Context LLM Serving**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro WarmTier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026 · renamed to KVPro + 1-page exec summary added June 2026*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro WarmTier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026 · renamed to KVPro + 1-page exec summary added June 2026 · Blackwell/NVFP4 protection-transfer test (MEASURED July 2026, 6-step qualified protocol): protected-channel quality does NOT transfer to native NVFP4 on outlier models (per-channel int4 is load-bearing) and is unnecessary on clean QK-norm models — added Page 7 "Does Blackwell's native FP4 commoditize the moat?"*
 
 > **Naming key.** **KVPro** = the product / module. **int4_protected** = its first shipped codec
 > implementation (the vLLM backend measured throughout this brief; the registered `kv_cache_dtype`
@@ -600,7 +600,7 @@ recompile, not a methodology change.
 |---|---|
 | Dynamic per-step protect masks | Adaptive quality at the same memory budget. Research-grade. |
 | Pre-RoPE quantization | Better distributional properties; may need fewer protected channels. |
-| FP4 / NVFP4 storage on Hopper / Blackwell | Newer hardware opportunity. |
+| FP4 / NVFP4 storage on Hopper / Blackwell | **MEASURED (quality, July 2026):** native NVFP4 does **not** inherit the protected-channel quality on outlier models — per-channel int4 is load-bearing, and a protected sidecar can't rescue NVFP4's per-block scale (+2,500% PPL @4% where int4-protected holds +0.11%); on clean QK-norm models plain NVFP4 already holds (no protection needed). See Page 7, "Does Blackwell's native FP4 commoditize the moat?". Hardware *speed* opportunity remains for clean models. |
 | ROCm port (AMD) | Open hardware story. Kernel fork is currently CUDA-only. |
 
 ### Realistic v2 timeline
@@ -890,6 +890,40 @@ int4-protected where the hard tail or durable capacity demands it, bf16 where fi
 > similar today (~2×); int4-protected's edge is **quality-robustness + the 4-bit ceiling + byte-faithful
 > offload**, not out-packing fp8 right now. (3) int4 decode is kernel-bound (**0.13–0.67× bf16**) — a
 > capacity / data-movement play, not a raw-speed one; fp8's **1.00×** is the measured speed tier.
+
+### Does Blackwell's native FP4 commoditize the moat? — MEASURED: no on outlier models, moot on clean ones
+
+The sharpest objection a hardware-literate investor raises: **Blackwell runs FP4 (NVFP4) natively at
+~1.0× — won't the silicon just absorb the 4-bit KV tier and delete the moat?** We tested it head-on by
+emulating NVFP4's exact numerics (E2M1 elements + per-16-channel e4m3 block scale + per-tensor FP32
+global scale) and running the **same protection mechanism** on top, under a 6-step qualified protocol
+(the harness first reproduces the production int4-protected result to **+0.11%** before any NVFP4 claim;
+full raw + verdict in `scripts/kvpro_kernel_recovery/NVFP4_STEP4_5_VERDICT_RAW.md`).
+
+- **On outlier-heavy models (Qwen2.5-7B), NVFP4 does NOT inherit the quality — even with protection.**
+  int4-protected holds (**+0.06–0.11%** PPL at 2–4% protected); the **identical mask + budget** on NVFP4
+  collapses (**+2,500% at 4%, +260,000% at 2%**) and plateaus at **+280–330%** through 8% — never near
+  the 1% gate. A decisive one-variable test (swap **only** K's quantizer, hold V identical to int4)
+  reproduces the full collapse, pinning the cause to the **per-channel int4 format**: NVFP4's
+  per-16-channel block scale is flattened by Qwen's boundary-layer per-channel outliers, and a protected
+  bf16 sidecar cannot rescue a per-block format. **The per-channel int4 codec is load-bearing —
+  Blackwell's per-block FP4 cannot replicate it by bolting on protection.** The quality moat *survives*
+  the hardware transition on the models that actually need it.
+- **On clean models (Qwen3-8B, QK-normalized), plain NVFP4 already holds (+0.98%) — no protection
+  needed.** Where native NVFP4 works, KVPro adds nothing; where KVPro is needed, NVFP4 can't follow.
+
+**Honest read of the TAM.** This is the *same* boundary as fp8: the KV-outlier problem KVPro solves is
+increasingly solved **upstream by architecture** — QK-normalization is becoming standard (Qwen3 and
+successors), and it removes the very outliers that break both fp8 and NVFP4. So the moat is **real and
+hardware-durable on outlier-heavy / current-generation models, but the addressable segment narrows as
+new models normalize their KV**. The durable, model-agnostic story is therefore **capacity +
+byte-faithful offload + quality governance** (the WarmTier thesis below), not "the only 4-bit that
+holds" — because on tomorrow's clean models, native NVFP4 will hold too.
+
+> **Caveats.** Quality axis only (PPL); NVFP4's speed is Blackwell-native *by construction*, not
+> benchmarked here. NVFP4 is emulated numerically on A100 — it matches Blackwell's *result*, not its
+> silicon speed. One protection scheme was swept (K-only, exclude-then-quantize, 2–8% budget); the
+> 6→8% plateau makes a higher-budget rescue unlikely, but it was not exhaustively explored.
 
 ### KVPro WarmTier — where compression unlocks cheaper KV reuse (LMCache *and* NAND)
 
