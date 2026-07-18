@@ -305,5 +305,5 @@ The recommended path is to begin with literature-based drug discovery (Phase 1),
 
 ---
 
-*Evaluation prepared for Cognade Labs / Symbol-U Architecture Team*
+*Evaluation prepared for Ugence Labs / Symbol-U Architecture Team*
 *February 2026*

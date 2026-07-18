@@ -26,7 +26,7 @@ Scope explicitly deferred (and stated in docs/FSCS_IMPLEMENTATION_STATUS.md):
     - Trained classifier boundary detector v2
     - Field-integrated softmax (Phase 4 of the broader CG curriculum)
 
-Author: Rakesh Mohan / Cognade Labs
+Author: Rakesh Mohan / Ugence Labs
 Branch: claude/vc-pitch-document-LBYcN
 """
 

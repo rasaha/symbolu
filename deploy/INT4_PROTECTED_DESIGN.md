@@ -1,6 +1,6 @@
 # int4_protected — Design & Deployment Document
 
-**Cognade Labs · quality-preserving 4-bit KV-cache for vLLM**
+**Ugence Labs · quality-preserving 4-bit KV-cache for vLLM**
 *Engineering design + deployment package. Companion to the business-facing `INT4_PROTECTED_VC_BRIEF.md`.*
 
 ---

@@ -76,7 +76,7 @@ PCAM systems:
 
 ### 1.6 Relationship to int4_protected
 
-The Cognade Labs project ships a software KV-cache quantization
+The Ugence Labs project ships a software KV-cache quantization
 backend through vLLM called **int4_protected** (see
 [`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)
 and [`INT4_PROTECTED_VC_BRIEF.md`](../../../INT4_PROTECTED_VC_BRIEF.md)).

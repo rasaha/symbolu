@@ -1,7 +1,7 @@
 # Design Document — NAND Acceleration via LLM-Decoding Optimization Primitives
 
 **Working Title:** NAND-Decode Optimization Layer (NDOL)
-**Author:** Rakesh Mohan, Cognade Labs
+**Author:** Rakesh Mohan, Ugence Labs
 **Status:** Draft v0.3 (engineering design, pre-prototype) — re-anchored on int4_protected / prot-int8
 **Scope:** Apply five LLM decoding-acceleration techniques (PAT, EQSPEC/EXSPEC speculative decoding, KVzip/FastKV, LycheeDecode, EVA) as NAND-flash storage primitives. This is a **design document**, not a patent draft — claims here are engineering hypotheses with explicit assumptions and falsifiable success criteria.
 

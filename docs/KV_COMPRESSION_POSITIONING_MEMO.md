@@ -1,6 +1,6 @@
 # KV-Cache Compression — Competitive Positioning Memo
 
-**Author:** Cognade Labs · **Date:** 2026-06-12 · **Status:** internal positioning (honest, citable)
+**Author:** Ugence Labs · **Date:** 2026-06-12 · **Status:** internal positioning (honest, citable)
 **Scope:** where int4_protected / prot-int8 actually stands vs the KV-compression frontier,
 and the only differentiation that survives scrutiny.
 
