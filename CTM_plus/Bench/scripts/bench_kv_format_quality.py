@@ -82,27 +82,48 @@ def _protect_mask(x, protect_frac):
     per (layer, h_kv). For 2D inputs (no head dim; selftest) it degrades to a global top-k."""
     import torch
     D = x.shape[-1]
-    k = max(1, int(round(protect_frac * D)))
+    k = int(round(protect_frac * D))
     if x.dim() >= 3:                                               # [.., H, S, D]: importance per (head, channel)
         hd = x.dim() - 3
         red = tuple(i for i in range(x.dim()) if i not in (hd, x.dim() - 1))
         imp = x.abs().amax(dim=red, keepdim=True)                  # 1s except the head & channel dims
     else:                                                          # [N, D]: global
         imp = x.abs().amax(dim=0, keepdim=True)
+    if k <= 0:
+        return torch.zeros_like(imp, dtype=torch.bool)            # 0% -> protect nothing (== plain)
+    k = min(k, D)
     thresh = imp.topk(k, dim=-1).values[..., -1:]                  # kth-largest per head
-    return imp >= thresh                                          # broadcastable bool, True = protected
+    return imp >= thresh                                          # broadcastable bool; k>=D -> all True (100%)
 
 
-def _int4_affine_qdq(x, group=32):
-    """Affine (asymmetric) int4 per group along the last dim."""
+def _int4_v_prod(v, group=32):
+    """Production V (writer:2060-2067): affine int4 over 32-CHANNEL groups along head_dim, per token
+    (v_group_size=32 -> 4 groups at D=128; scale=(max-min)/15, 16 levels). No protection on V."""
     import torch
-    D = x.shape[-1]
+    D = v.shape[-1]
     g = group if D % group == 0 else D
-    xg = x.reshape(*x.shape[:-1], D // g, g)
-    xmin = xg.amin(dim=-1, keepdim=True)
-    scale = ((xg.amax(dim=-1, keepdim=True) - xmin) / 15.0).clamp(min=1e-8)
-    xq = torch.round((xg - xmin) / scale).clamp(0, 15)
-    return (xq * scale + xmin).reshape_as(x)
+    vg = v.reshape(*v.shape[:-1], D // g, g)
+    xmin = vg.amin(dim=-1, keepdim=True)
+    scale = ((vg.amax(dim=-1, keepdim=True) - xmin) / 15.0).clamp(min=1e-8)
+    q = torch.round((vg - xmin) / scale).clamp(0, 15)
+    return (q * scale + xmin).reshape_as(v)
+
+
+def _int4_k_prod(k, block=32):
+    """Production K (writer:2482-2487): affine int4 PER CHANNEL over 32-TOKEN blocks along the seq axis
+    (x_max/x_min = amax/amin over the 32-token axis, per channel; scale=(max-min)/15). Per-channel
+    scaling is why production protects only ~4%: an outlier channel gets its OWN scale and never
+    contaminates other channels. Expects [.., S, D] with the token (seq) axis at dim -2."""
+    import torch
+    S = k.shape[-2]
+    out = torch.empty_like(k)
+    for s in range(0, S, block):                                   # independent 32-token blocks
+        blk = k[..., s:s + block, :]                               # [.., g, D]
+        xmin = blk.amin(dim=-2, keepdim=True)                      # over the g tokens, PER CHANNEL
+        scale = ((blk.amax(dim=-2, keepdim=True) - xmin) / 15.0).clamp(min=1e-8)
+        q = torch.round((blk - xmin) / scale).clamp(0, 15)
+        out[..., s:s + block, :] = q * scale + xmin
+    return out
 
 
 def _protected(x, base_qdq, protect_frac):
@@ -116,18 +137,20 @@ def _protected(x, base_qdq, protect_frac):
     return torch.where(mask, x, out)                   # restore protected at full (bf16) precision
 
 
-def quant_dequant(x, fmt, protect_frac=0.04):
-    """Emulate storing `x` (a K or V tensor, [..., head_dim]) in `fmt` and reading it back."""
+def quant_dequant(x, fmt, protect_frac=0.04, is_key=False):
+    """Emulate storing `x` (a K or V tensor, [.., S, D]) in `fmt` and reading it back. Faithful to
+    production: K uses per-channel-over-32-token affine and IS protected; V uses per-32-channel-group
+    affine and is NOT protected (protection is a K-only mechanism)."""
     if fmt == "bf16":
         return x
     if fmt == "fp8":
-        return _fp8_qdq(x)
+        return _fp8_qdq(x)                                        # per-tensor, both K & V, no protect
     if fmt == "int4_protected":
-        return _protected(x, _int4_affine_qdq, protect_frac)
+        return _protected(x, _int4_k_prod, protect_frac) if is_key else _int4_v_prod(x)
     if fmt == "nvfp4":
-        return _nvfp4_qdq(x)
-    if fmt == "nvfp4_protected":
-        return _protected(x, _nvfp4_qdq, protect_frac)
+        return _nvfp4_qdq(x)                                      # both K & V, no protect
+    if fmt == "nvfp4_protected":                                  # swap base quantizer, same K-only protect
+        return _protected(x, _nvfp4_qdq, protect_frac) if is_key else _nvfp4_qdq(x)
     raise ValueError(f"unknown format {fmt!r}")
 
 
@@ -223,36 +246,48 @@ def _selftest():
         s = (t.abs().amax() / _E2M1_MAX).clamp(min=1e-8); return _round_e2m1(t / s) * s
     ck("nvfp4 << per-tensor-FP4 (block scaling wins at equal 4-bit)",
        (_nvfp4_qdq(zc) - zc).abs().mean().item() < (_fp4_pt(zc) - zc).abs().mean().item())
-    # THE KEY INVARIANT (the bug we hit in v1): protection must EXCLUDE outliers from the scale, so an
-    # outlier's block-mates survive. channel 0 is a 100x outlier in block 0; protecting it must rescue
-    # channels 1..15 — their block scale no longer sees the outlier.
+    # --- production quant schemes: K per-channel-over-tokens, V per-channel-group ---
     torch.manual_seed(0)
+    K = torch.randn(1, 2, 64, 128); K[:, :, :, 5] *= 80.0          # [B,H,S,D], outlier in channel 5
+    # PER-CHANNEL non-contamination (why production needs only ~4% protection): channel 10 gets its own
+    # scale, so its reconstruction is BIT-IDENTICAL whether computed in isolation or alongside ch5's 80x
+    # outlier — an outlier channel can never inflate a neighbour's scale (unlike per-tensor/per-block).
+    ck("K per-channel: ch10 recon identical in isolation vs alongside ch5 outlier (no contamination)",
+       torch.equal(_int4_k_prod(K)[..., 10:11], _int4_k_prod(K[..., 10:11])))
+    ck("V per-group affine reduces error", (_int4_v_prod(K) - K).abs().mean().item() < K.abs().mean().item())
+    # NVFP4 protection still rescues an outlier's block-mates (2D, exclusion) — kept from v2
     zz = torch.randn(16, 16); zz[:, 0] *= 100.0
     mates_plain = (_nvfp4_qdq(zz)[:, 1:] - zz[:, 1:]).abs().mean().item()
-    mates_prot = (quant_dequant(zz, "nvfp4_protected", 1 / 16.)[:, 1:] - zz[:, 1:]).abs().mean().item()
-    ck("protection rescues an outlier's block-mates (exclusion works)", mates_prot < 0.5 * mates_plain)
-    # Protection: keeps outlier channels ~exact and never worsens error.
-    z = torch.randn(64, 128); z[:, 7] *= 60.0
-    e_n4 = (quant_dequant(z, "nvfp4") - z).abs().mean().item()
-    ck("nvfp4_protected <= nvfp4 (protection helps)",
-       (quant_dequant(z, "nvfp4_protected") - z).abs().mean().item() <= e_n4 + 1e-9)
-    ck("nvfp4_protected keeps outlier channel ~exact",
-       (quant_dequant(z, "nvfp4_protected")[:, 7] - z[:, 7]).abs().max().item() < 1e-3)
-    ck("int4_protected keeps outlier channel ~exact",
-       (quant_dequant(z, "int4_protected")[:, 7] - z[:, 7]).abs().max().item() < 1e-3)
-    # PER-HEAD selection (the production selector, top-k per (layer, h_kv)): head 0's outlier is in
-    # channel 3, head 1's in channel 11. A per-head mask must protect ch3 for head0 and ch11 for head1 —
-    # a single global mask (v1) could not, which is why v1 needed ~4x the protection budget.
-    xh = torch.randn(2, 2, 8, 16)                                  # [B, H=2, S, D=16]
-    xh[:, 0, :, 3] *= 50.0; xh[:, 1, :, 11] *= 50.0
-    m = _protect_mask(xh, 1 / 16.)                                 # k=1 per head
+    mates_prot = (quant_dequant(zz, "nvfp4_protected", 1 / 16., is_key=True)[:, 1:] - zz[:, 1:]).abs().mean().item()
+    ck("nvfp4 protection rescues block-mates (exclusion)", mates_prot < 0.5 * mates_plain)
+
+    # === THE FOUR REAL-KV INVARIANTS (K path, is_key=True) ===
+    ck("inv1a 0% protect == plain int4-K", torch.equal(quant_dequant(K, "int4_protected", 0.0, is_key=True), _int4_k_prod(K)))
+    ck("inv1b 0% protect == plain nvfp4", torch.equal(quant_dequant(K, "nvfp4_protected", 0.0, is_key=True), _nvfp4_qdq(K)))
+    ck("inv2a 100% protect == bf16 (int4)", torch.equal(quant_dequant(K, "int4_protected", 1.0, is_key=True), K))
+    ck("inv2b 100% protect == bf16 (nvfp4)", torch.equal(quant_dequant(K, "nvfp4_protected", 1.0, is_key=True), K))
+    kp = quant_dequant(K, "int4_protected", 0.04, is_key=True)     # top-5 per head incl. outlier ch5
+    ck("inv3 protected channel == bf16 source exactly", torch.equal(kp[..., 5], K[..., 5]))
+    _mse = lambda fmt, pf: (quant_dequant(K, fmt, pf, is_key=True) - K).pow(2).mean().item()
+    mse_i = [_mse("int4_protected", pf) for pf in (0.0, 0.02, 0.04, 0.08, 0.16)]
+    ck("inv4a int4-K MSE non-increasing in protection", all(mse_i[i + 1] <= mse_i[i] + 1e-9 for i in range(4)))
+    mse_n = [_mse("nvfp4_protected", pf) for pf in (0.0, 0.02, 0.04, 0.08, 0.16)]
+    # NVFP4 has a per-TENSOR global scale, so partial protection CAN perturb other blocks' e4m3 scale
+    # quantization -> monotonicity is NOT guaranteed for NVFP4 (int4-per-channel has no such coupling).
+    # Report it rather than assert it — a violation here is a real finding for the 2% anomaly.
+    n_mono = all(mse_n[i + 1] <= mse_n[i] + 1e-9 for i in range(4))
+    print(f"  [{'MONO' if n_mono else 'NON-MONO'}] nvfp4-K MSE vs protect {[round(x,4) for x in mse_n]}"
+          f"{'' if n_mono else '  <-- per-tensor g_scale coupling; candidate 2% cause'}")
+
+    # PER-HEAD selection (production selector): head0 outlier in ch3, head1 in ch11.
+    xh = torch.randn(2, 2, 8, 16); xh[:, 0, :, 3] *= 50.0; xh[:, 1, :, 11] *= 50.0
+    m = _protect_mask(xh, 1 / 16.)
     ck("per-head mask protects head0 ch3", bool(m[..., 0, :, 3].all()))
     ck("per-head mask protects head1 ch11", bool(m[..., 1, :, 11].all()))
     ck("per-head mask does NOT protect head0 ch11", not bool(m[..., 0, :, 11].any()))
-    qh = quant_dequant(xh, "int4_protected", 1 / 16.)
+    qh = quant_dequant(xh, "int4_protected", 1 / 16., is_key=True)
     ck("per-head protection restores each head's own outlier",
-       (qh[:, 0, :, 3] - xh[:, 0, :, 3]).abs().max().item() < 1e-3
-       and (qh[:, 1, :, 11] - xh[:, 1, :, 11]).abs().max().item() < 1e-3)
+       torch.equal(qh[:, 0, :, 3], xh[:, 0, :, 3]) and torch.equal(qh[:, 1, :, 11], xh[:, 1, :, 11]))
     # verdict wiring
     _, c1 = verdict({"bf16": 8.0, "int4_protected": 8.02, "nvfp4": 8.03, "nvfp4_protected": 8.02})
     ck("verdict: plain NVFP4 holds -> commoditize", "COMMODITIZES" in c1)
@@ -309,8 +344,8 @@ def main(argv=None):
     def _patched(query, key, value, *a, **k):
         active["calls"] += 1
         if active["fmt"] != "bf16":
-            key = quant_dequant(key, active["fmt"], args.protect_frac)
-            value = quant_dequant(value, active["fmt"], args.protect_frac)
+            key = quant_dequant(key, active["fmt"], args.protect_frac, is_key=True)     # K: protected
+            value = quant_dequant(value, active["fmt"], args.protect_frac, is_key=False)  # V: no protect
         return _orig_sdpa(query, key, value, *a, **k)
     F.scaled_dot_product_attention = _patched
 
