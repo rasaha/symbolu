@@ -28,6 +28,14 @@ ablation: FULL_full − FULL_compact is the fp16-pool penalty (what a compact-pr
 kernel would remove). The attention matmuls (tl.dot) are deliberately NOT in scope — they
 run at bf16 speed regardless of the format; the unzip is the format's tax.
 
+6F-A EXTENSION: each config is timed in TWO physical layouts of the SAME values — the current
+native (S,H,*) (one KV head's tokens are H-strided apart) and a per-head-contiguous PAGE-LOCAL
+layout (H, n_blocks, BS, *) where a head's whole block is one coalesced run (the store-as-
+consumed layout). The page-local tensors are a permutation of the current ones, so the reduced
+output must be byte-identical (oracle_max_abs_diff == 0; CPU-proven by validate_kernel_interp).
+The read-latency delta (current vs page-local) is the 6F-A read gate (>=20%); 08_classify feeds
+it into the aggregate projection and 09_append_feasibility_spike measures the write-side cost.
+
 POD-ONLY, HARDWARE-UNTESTED (needs a CUDA GPU + Triton). Writes label=UNAVAILABLE (never
 fabricated) if GPU/Triton is missing. The byte/FLOP model + input geometry are CPU-testable
 (test_unzip_probe_cpu.py) without a GPU.
@@ -109,15 +117,19 @@ if _HAVE_TRITON:
         v_packed_ptr, v_scale_ptr, v_xmin_ptr,
         k_protect_ptr, protect_slot_ptr, k_fp16_ptr,
         out_ptr,
-        S, H, n_protect,
+        S, H, n_protect, n_blocks,
         D: tl.constexpr, DH: tl.constexpr, BS: tl.constexpr,
         VNG: tl.constexpr, GS_v: tl.constexpr,
-        MODE: tl.constexpr, PROTECT: tl.constexpr,
+        MODE: tl.constexpr, PROTECT: tl.constexpr, LAYOUT: tl.constexpr,
     ):
-        # One program per (block, KV head). Native (S, H, *) buffers (no permute) — the
-        # cache's own layout. A single 2D (BS tokens x D channels) tile per program, so the
-        # per-token loads coalesce (faithful HBM behaviour for the roofline). The three MODEs
-        # share this exact tile shape, so fetch/math/full process identical element counts.
+        # One program per (block, KV head). A single 2D (BS tokens x D channels) tile per
+        # program; the three MODEs share this tile shape, so fetch/math/full process identical
+        # element counts. LAYOUT selects the physical addressing of the SAME values:
+        #   LAYOUT 0 = current native (S, H, *) — one head's tokens are H-strided apart;
+        #   LAYOUT 1 = page-local per-head-contiguous (H, n_blocks, BS, *) — a head's whole
+        #              block is one contiguous run (the 6F-A store-as-consumed layout).
+        # Numerics are byte-identical between layouts (the page-local tensors are a permutation
+        # of the current ones); only the per-token flat row index differs.
         blk = tl.program_id(0)
         h = tl.program_id(1)
         d = tl.arange(0, D)                         # (D,)
@@ -127,15 +139,22 @@ if _HAVE_TRITON:
         is_high = d % 2
         gv = d // GS_v
 
-        # per-BLOCK K scale/xmin (production groups K per BS -> ONE load per block) + the
-        # static protect mask/slots for this head (all (D,), broadcast over the BS rows).
-        ks_off = (blk * H + h) * D + d
-        k_sc = tl.load(k_scale_ptr + ks_off).to(tl.float32)         # (D,)
+        # per-token flat row index (before the *DH / *D / *VNG stride) + per-block K scale row.
+        if LAYOUT == 1:                             # page-local (H, n_blocks, BS, *)
+            row = (h * n_blocks + blk) * BS + r     # (BS,) contiguous within (h, blk)
+            ks_off = (h * n_blocks + blk) * D + d   # K scale/xmin: (H, n_blocks, D)
+        else:                                       # current native (S, H, *)
+            row = s * H + h                         # (BS,) H-strided across tokens
+            ks_off = (blk * H + h) * D + d          # K scale/xmin: (n_blocks, H, D)
+        k_sc = tl.load(k_scale_ptr + ks_off).to(tl.float32)         # (D,)  once per block
         k_xm = tl.load(k_xmin_ptr + ks_off).to(tl.float32)          # (D,)
-        slot = tl.load(protect_slot_ptr + h * D + d).to(tl.int32)   # (D,) slot or -1
+        slot = tl.load(protect_slot_ptr + h * D + d).to(tl.int32)   # (D,) slot or -1 (static)
         pm = slot >= 0                                              # (D,)
 
-        if MODE == MODE_MATH:
+        # NOTE: compare the constexpr params against integer LITERALS, not the module-level
+        # MODE_*/PROT_* names — Triton's JIT forbids reading non-constexpr globals from a kernel.
+        # MODE: 0=FETCH 1=MATH 2=FULL ; PROTECT: 0=none 1=compact 2=full.
+        if MODE == 1:  # MODE_MATH
             # ---- MATH-only: load ONE row's operands, broadcast to the (BS,D) tile, run the
             # affine perturbed per-row on a MULTIPLY operand (kt) so the compiler cannot hoist
             # the multiply out — the dequant mul is genuinely re-executed BS*D times. No
@@ -156,26 +175,27 @@ if _HAVE_TRITON:
             v_dq = vt * v_sc[None, :] + v_xm[None, :]
             r_out = k_eff + v_dq                                   # (BS,D)
         else:
-            kp_off = (s[:, None] * H + h) * DH + byte_col[None, :]           # (BS,D)
+            # `row` (BS,) already encodes the layout: current -> s*H+h ; page-local -> contiguous.
+            kp_off = row[:, None] * DH + byte_col[None, :]                   # (BS,D)
             kcode = ((tl.load(k_packed_ptr + kp_off).to(tl.int32)
                       >> (4 * is_high[None, :])) & 0xF).to(tl.float32)
-            if PROTECT == PROT_FULL:                   # route-A: full fp16 K, all D channels
-                kf = tl.load(k_fp16_ptr + (s[:, None] * H + h) * D + d[None, :]).to(tl.float32)
-            elif PROTECT == PROT_COMPACT:              # production: compact n_protect sidecar
+            if PROTECT == 2:                           # PROT_FULL: route-A full fp16 K, all D
+                kf = tl.load(k_fp16_ptr + row[:, None] * D + d[None, :]).to(tl.float32)
+            elif PROTECT == 1:                         # PROT_COMPACT: production n_protect sidecar
                 slot_idx = tl.where(pm, slot, 0)
-                kf = tl.load(k_protect_ptr + (s[:, None] * H + h) * n_protect + slot_idx[None, :],
+                kf = tl.load(k_protect_ptr + row[:, None] * n_protect + slot_idx[None, :],
                              mask=pm[None, :], other=0.0).to(tl.float32)
             else:
                 kf = tl.zeros((BS, D), tl.float32)
-            vp_off = (s[:, None] * H + h) * DH + byte_col[None, :]
+            vp_off = row[:, None] * DH + byte_col[None, :]
             vcode = ((tl.load(v_packed_ptr + vp_off).to(tl.int32)
                       >> (4 * is_high[None, :])) & 0xF).to(tl.float32)
-            vs_off = (s[:, None] * H + h) * VNG + gv[None, :]
+            vs_off = row[:, None] * VNG + gv[None, :]
             v_sc = tl.load(v_scale_ptr + vs_off).to(tl.float32)
             v_xm = tl.load(v_xmin_ptr + vs_off).to(tl.float32)
-            if MODE == MODE_FETCH:                      # loads + unpack + reduce (no affine/select)
+            if MODE == 0:                               # MODE_FETCH: loads+unpack+reduce (no affine)
                 r_out = kcode + k_sc[None, :] + k_xm[None, :] + kf + vcode + v_sc + v_xm
-            else:                                       # MODE_FULL: the real unzip
+            else:                                       # MODE_FULL (2): the real unzip
                 k_dq = kcode * k_sc[None, :] + k_xm[None, :]
                 k_eff = tl.where(pm[None, :], kf, k_dq)
                 v_dq = vcode * v_sc + v_xm
@@ -202,9 +222,35 @@ def _to_native(view, K_fp, device):
                 protect_slot=protect_slot, k_fp16=k_fp16)
 
 
+def _to_pagelocal(ten, geom):
+    """Permute the current native (S,H,*) tensors to the 6F-A page-local per-head-contiguous
+    layout (H, n_blocks, BS, *) — the SAME values, relocated so one (head, block) is one
+    contiguous run. K scale/xmin go (n_blocks,H,D) -> (H,n_blocks,D). Byte-identical numerics;
+    only the physical address of each element changes."""
+    S, H, D, BS, VNG, nb, npr = (geom["S"], geom["H"], geom["D"], geom["BS"],
+                                 geom["VNG"], geom["n_blocks"], geom["n_protect"])
+
+    def tok(t):  # (S,H,W) -> (H,nb,BS,W) contiguous
+        W = t.shape[-1]
+        return t.view(nb, BS, H, W).permute(2, 0, 1, 3).contiguous()
+
+    return dict(
+        k_packed=tok(ten["k_packed"]),                                   # (H,nb,BS,DH)
+        v_packed=tok(ten["v_packed"]),
+        k_scale=ten["k_scale"].permute(1, 0, 2).contiguous(),            # (H,nb,D)
+        k_xmin=ten["k_xmin"].permute(1, 0, 2).contiguous(),
+        v_scale=tok(ten["v_scale"]),                                     # (H,nb,BS,VNG)
+        v_xmin=tok(ten["v_xmin"]),
+        k_protect=tok(ten["k_protect"]),                                 # (H,nb,BS,n_protect)
+        protect_slot=ten["protect_slot"],                               # (H,D) static, unchanged
+        k_fp16=tok(ten["k_fp16"]),                                       # (H,nb,BS,D)
+    )
+
+
 def _build_inputs(context_len, H_kv, D, BS, v_group_size, n_protect, seed, device):
     """Production-faithful packed inputs via the writer contract (route_a_builder). Padded
-    to full BS-blocks (timing needs no partial tails). Returns (tensors, geom)."""
+    to full BS-blocks (timing needs no partial tails). Returns (current_tensors, geom).
+    The page-local layout is derived from these by _to_pagelocal (same values)."""
     import route_a_builder as RB
     torch.manual_seed(seed)
     n_blocks = (context_len + BS - 1) // BS
@@ -222,7 +268,7 @@ def _build_inputs(context_len, H_kv, D, BS, v_group_size, n_protect, seed, devic
     return ten, geom
 
 
-def _launch(ten, geom, mode, protect):
+def _launch(ten, geom, mode, protect, layout=0):
     D, DH, BS, VNG, GS_v = geom["D"], geom["DH"], geom["BS"], geom["VNG"], geom["GS_v"]
     S, H, n_blocks = geom["S"], geom["H"], geom["n_blocks"]
     out = torch.empty(n_blocks * H, dtype=torch.float32, device=ten["k_packed"].device)
@@ -231,8 +277,8 @@ def _launch(ten, geom, mode, protect):
         ten["k_packed"], ten["k_scale"], ten["k_xmin"],
         ten["v_packed"], ten["v_scale"], ten["v_xmin"],
         ten["k_protect"], ten["protect_slot"], ten["k_fp16"],
-        out, S, H, geom["n_protect"],
-        D=D, DH=DH, BS=BS, VNG=VNG, GS_v=GS_v, MODE=mode, PROTECT=protect,
+        out, S, H, geom["n_protect"], n_blocks,
+        D=D, DH=DH, BS=BS, VNG=VNG, GS_v=GS_v, MODE=mode, PROTECT=protect, LAYOUT=layout,
     )
     return out
 
@@ -249,25 +295,58 @@ def _time_ms(fn, iters):
     return s.elapsed_time(e) / iters
 
 
+def _time_dist(fn, iters, warmup=5):
+    """Per-iteration CUDA-event timing -> (median_ms, p95_ms). Records all event pairs first,
+    then syncs once, so per-iter measurement doesn't serialise the stream (minimal perturbation)."""
+    for _ in range(warmup):
+        fn()
+    torch.cuda.synchronize()
+    starts = [torch.cuda.Event(True) for _ in range(iters)]
+    stops = [torch.cuda.Event(True) for _ in range(iters)]
+    for i in range(iters):
+        starts[i].record(); fn(); stops[i].record()
+    torch.cuda.synchronize()
+    ts = sorted(starts[i].elapsed_time(stops[i]) for i in range(iters))
+    med = ts[len(ts) // 2]
+    p95 = ts[min(len(ts) - 1, int(round(0.95 * (len(ts) - 1))))]
+    return round(med, 5), round(p95, 5)
+
+
 def run_probe(contexts, iters, H_kv, D, BS, v_group_size, n_protect, seed=0):
-    """Time FETCH / MATH / FULL(compact) / FULL(full-protect) per context. GPU-only."""
+    """Per context, time the unzip in BOTH physical layouts (current (S,H,*) vs 6F-A page-local
+    per-head-contiguous), same values/numerics. Reports fetch/full for each + MATH (layout-
+    independent) + the route-A full-fp16 ablation + an ORACLE check (page-local FULL output must
+    equal current FULL output exactly). GPU-only."""
     per_ctx = {}
     for ctx in contexts:
         ten, geom = _build_inputs(ctx, H_kv, D, BS, v_group_size, n_protect, seed, "cuda")
+        pl = _to_pagelocal(ten, geom)
         np_ = geom["n_protect"]
-        t_fetch = _time_ms(lambda: _launch(ten, geom, MODE_FETCH, PROT_COMPACT), iters)
-        t_math = _time_ms(lambda: _launch(ten, geom, MODE_MATH, PROT_COMPACT), iters)
-        t_full_c = _time_ms(lambda: _launch(ten, geom, MODE_FULL, PROT_COMPACT), iters)
-        t_full_f = _time_ms(lambda: _launch(ten, geom, MODE_FULL, PROT_FULL), iters)
+        # --- ORACLE: same reduced output from both layouts (byte-identical values) ---
+        o_cur = _launch(ten, geom, MODE_FULL, PROT_COMPACT, layout=0)
+        o_pl = _launch(pl, geom, MODE_FULL, PROT_COMPACT, layout=1)
+        oracle_max_abs = float((o_cur - o_pl).abs().max().item())
+        # --- timings ---
+        f_cur = _time_ms(lambda: _launch(ten, geom, MODE_FETCH, PROT_COMPACT, 0), iters)
+        f_pl = _time_ms(lambda: _launch(pl, geom, MODE_FETCH, PROT_COMPACT, 1), iters)
+        t_math = _time_ms(lambda: _launch(ten, geom, MODE_MATH, PROT_COMPACT, 0), iters)
+        F_cur = _time_ms(lambda: _launch(ten, geom, MODE_FULL, PROT_COMPACT, 0), iters)
+        F_pl = _time_ms(lambda: _launch(pl, geom, MODE_FULL, PROT_COMPACT, 1), iters)
+        t_full_f = _time_ms(lambda: _launch(ten, geom, MODE_FULL, PROT_FULL, 0), iters)
         per_ctx[str(ctx)] = {
-            "fetch_only_ms": round(t_fetch, 5), "math_only_ms": round(t_math, 5),
-            "full_compact_ms": round(t_full_c, 5), "full_fullprotect_ms": round(t_full_f, 5),
+            # current-layout names kept for back-compat with the Part-H classifier
+            "fetch_only_ms": round(f_cur, 5), "math_only_ms": round(t_math, 5),
+            "full_compact_ms": round(F_cur, 5), "full_fullprotect_ms": round(t_full_f, 5),
+            # 6F-A page-local layout
+            "fetch_pagelocal_ms": round(f_pl, 5), "full_pagelocal_ms": round(F_pl, 5),
+            "oracle_max_abs_diff": oracle_max_abs,
             "S_padded": geom["S"], "n_blocks": geom["n_blocks"], "iters": iters,
             "model_compact": byte_flop_model(geom["S"], H_kv, D, BS, np_, v_group_size, "compact"),
             "model_fullprotect": byte_flop_model(geom["S"], H_kv, D, BS, np_, v_group_size, "full"),
         }
-        print(f"  ctx={ctx:6} fetch={t_fetch:.4f} math={t_math:.4f} "
-              f"full_compact={t_full_c:.4f} full_full={t_full_f:.4f} ms  (n_protect={np_})")
+        gain = (f_cur - f_pl) / f_cur if f_cur > 0 else float("nan")
+        print(f"  ctx={ctx:6} fetch: cur={f_cur:.4f} pagelocal={f_pl:.4f} (-{gain*100:.1f}%) | "
+              f"full: cur={F_cur:.4f} pl={F_pl:.4f} | math={t_math:.4f} ms | oracle_dz={oracle_max_abs:.1e}")
     return per_ctx
 
 
@@ -312,13 +391,14 @@ def main(argv=None):
         "geom": {"H_kv": a.h_kv, "D": a.head_dim, "BS": a.bs,
                  "v_group_size": a.v_group_size, "n_protect_requested": a.n_protect},
         "per_ctx": per_ctx,
-        "note": ("Three specialisations of ONE unzip inner loop. FETCH=loads+unpack+reduce; "
-                 "MATH=affine+select on register-resident operands (no per-token HBM); "
-                 "FULL=fetch+unpack+affine+select. compact=production compact-protect sidecar; "
-                 "fullprotect=route-A full-fp16-K load (int4_fused_attention_kernel.py:140). "
-                 "Attention matmuls out of scope (bf16-speed regardless). MATH is an UPPER "
-                 "bound on the true dequant compute (it re-fabricates the +token perturbation "
-                 "the real kernel gets from loads)."),
+        "note": ("Three specialisations of ONE unzip inner loop, timed in TWO physical layouts. "
+                 "FETCH=loads+unpack+reduce; MATH=affine+select on register-resident operands "
+                 "(no per-token HBM, layout-independent); FULL=fetch+unpack+affine+select. "
+                 "current=native (S,H,*) (one head's tokens H-strided); pagelocal=6F-A per-head-"
+                 "contiguous (H,n_blocks,BS,*), SAME values (a permutation) so oracle_max_abs_diff "
+                 "must be 0. compact=production compact-protect sidecar; fullprotect=route-A full-"
+                 "fp16-K load (int4_fused_attention_kernel.py:140). Attention matmuls out of scope "
+                 "(bf16-speed regardless). MATH UPPER-bounds the true dequant compute."),
     }
     json.dump(blob, open(a.out, "w"), indent=2)
     print(f"[GPU-measured] unzip-bound probe -> {a.out}")

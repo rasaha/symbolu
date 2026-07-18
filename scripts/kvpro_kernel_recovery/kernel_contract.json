@@ -1,0 +1,48 @@
+{
+  "kernel": "flash_attn_with_int4_kvcache",
+  "torch_op": "torch.ops._vllm_fa2_C.fwd_kvcache_int4",
+  "contract_source": "shipped call sites (phase5b_backend_install.py:659-681, 818-841) + wrapper signature (apply_phase2_4_1a_patches.py:335-358, apply_phase2_2_patches.py:233-262) + writer shapes (phase5b_4c_paged_writer.py)",
+  "status": "code-traced; NOT executed this session (CPU-only). Geometry example = Qwen2.5-7B.",
+  "geometry_example_qwen2_5_7b": {"H_q": 28, "H_kv": 4, "G": 7, "D": 128, "BS": 32, "n_protect": 5, "v_group_size": 32, "v_n_groups": 4},
+  "invariants": {
+    "S_padded_eq_nblocks_times_BS": "S = n_blocks * BS (paged, padded)",
+    "packed_last_dim_is_half_D": "packed int4 K/V last dim == D // 2 (2 channels per uint8)",
+    "H_q_div_H_kv": "H_q % H_kv == 0 (GQA group G = H_q // H_kv)",
+    "protect_is_compact": "k_packed_protect_bf16 last dim == n_protect << D (compact sidecar, NOT full D)",
+    "k_group_is_block": "packed_group_size == BS (K scale/xmin are per-block per-channel)",
+    "v_group_divides_D": "D % v_group_size == 0 (v_n_groups = D // v_group_size)",
+    "bf16_k_is_dummy": "the positional k_cache is a bf16 dummy; content UNUSED on the packed path (only shape/seqlen matter)"
+  },
+  "arguments": [
+    {"name": "q", "position": 0, "shape": "(B, S_q=1, H_q, D)", "dtype": "bfloat16", "contiguous": true, "role": "decode query (1 token/seq)", "ownership": "caller", "lifetime": "per-step"},
+    {"name": "k_cache (bf16 dummy)", "position": 1, "shape": "(1, S, H_kv, D)", "dtype": "bfloat16", "contiguous": true, "role": "DUMMY — zeros, content UNUSED on packed path; shape/seqlen contract only", "ownership": "caller (persistent scratch)", "lifetime": "reused"},
+    {"name": "v_cache (v_for_kernel)", "position": 2, "shape": "(1, S, H_kv, D)", "dtype": "bfloat16", "contiguous": true, "role": "V values as bf16 backing (when _bf16_v_mode) OR ignored in favor of v_packed_* kwargs", "ownership": "caller", "lifetime": "per-step gather"},
+    {"name": "cache_seqlens", "shape": "(B,)", "dtype": "int32", "role": "per-seq real token count; masks S - seqlen padded tail", "ownership": "caller"},
+    {"name": "block_table", "shape": "(B, max_blocks)", "dtype": "int32", "role": "paged block ids (BS-token blocks); may be pre-gathered host-side into the packed view", "ownership": "caller/scheduler"},
+    {"name": "protect_mask", "shape": "(B, H_kv, D)", "dtype": "int8", "role": "1 where a K channel is protected (bf16 overlay), else 0; per-model frozen", "ownership": "writer (frozen)"},
+    {"name": "n_protect / packed_n_protect", "shape": "scalar", "dtype": "int", "role": "protected channels per (h,kv) = 5 (Qwen)"},
+    {"name": "softmax_scale", "shape": "scalar", "dtype": "float", "role": "1/sqrt(D)"},
+    {"name": "causal", "shape": "scalar", "dtype": "bool", "role": "False for decode (query attends all cached)"},
+    {"name": "window_size", "shape": "(2,)", "dtype": "int", "role": "sliding window (-1,-1 = none)"},
+    {"name": "k_packed_int4", "shape": "(B, S, H_kv, D/2)", "dtype": "uint8", "contiguous": true, "role": "packed INT4 K nibbles (low=even d, high=odd d)", "ownership": "paged cache view"},
+    {"name": "k_packed_scale", "shape": "(B, S, H_kv, D)", "dtype": "float16", "role": "K affine scale, per-block group (packed_group_size=BS)"},
+    {"name": "k_packed_xmin", "shape": "(B, S, H_kv, D)", "dtype": "float16", "role": "K affine xmin (asymmetric)"},
+    {"name": "k_packed_protect_bf16", "shape": "(B, S, H_kv, n_protect)", "dtype": "bfloat16", "contiguous": true, "role": "COMPACT protected-K sidecar (n_protect of D channels)"},
+    {"name": "k_packed_protect_slot", "shape": "(H_kv, D)", "dtype": "int (int8/int16)", "role": "protected channel -> sidecar index, or -1"},
+    {"name": "packed_group_size", "shape": "scalar", "dtype": "int", "role": "K scale/xmin group = BS = 32"},
+    {"name": "v_packed_int4", "shape": "(B, S, H_kv, D/2)", "dtype": "uint8", "role": "packed INT4 V (when not bf16-V)", "optional": true},
+    {"name": "v_packed_scale", "shape": "(B, S, H_kv, v_n_groups)", "dtype": "float16", "role": "V affine scale, per-token per-group", "optional": true},
+    {"name": "v_packed_xmin", "shape": "(B, S, H_kv, v_n_groups)", "dtype": "float16", "role": "V affine xmin", "optional": true},
+    {"name": "v_packed_group_size", "shape": "scalar", "dtype": "int", "role": "V group = 32", "optional": true}
+  ],
+  "output": {"shape": "(B, S_q=1, H_q, D)", "dtype": "bfloat16", "role": "attention output",
+             "optional_second": {"name": "softmax_lse", "shape": "(B, H_q, S_q)", "dtype": "float32", "when": "return_softmax_lse=True"}},
+  "semantics": {
+    "batching": "B sequences x 1 decode token; padded positions masked by cache_seqlens",
+    "block_table": "paged BS=32-token blocks; padded block_id=0 positions contribute 0",
+    "partial_tail": "last block partially filled (seqlen % BS); writer splices the K tail; kernel masks by cache_seqlens",
+    "gqa": "H_q query heads share H_kv KV heads in groups of G=H_q/H_kv",
+    "protected_overlay": "for channel d with protect_slot[h,d]>=0: K = k_packed_protect_bf16[..,slot]; else dequant(int4*scale+xmin)",
+    "scale_granularity": "K per-block per-channel (group=BS); V per-token per-group (v_group_size)"
+  }
+}

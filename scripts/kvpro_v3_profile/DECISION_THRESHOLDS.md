@@ -86,3 +86,72 @@ route-A full-fp16-K ablation (`FULL_full − FULL_compact`) quantifies the fp16-
 read kernel would remove. Correctness of the kernel's addressing + arithmetic is anchored on CPU by
 `validate_kernel_interp.py` (Triton interpreter mode, exact match vs a numpy reference) — no GPU needed for
 the correctness half; the pod supplies only timing.
+
+---
+
+# Part 6F-A — FROZEN gates for the page-local (store-as-consumed) layout probe
+
+6F-A extends the probe with a per-head-contiguous **page-local** layout `(H, n_blocks, BS, *)` timed
+against the current native `(S,H,*)` layout on **identical values** (the page-local tensors are a
+permutation; the oracle diff MUST be 0). It asks: does coalescing the reads deliver, and is the write side
+affordable? These gates are **frozen before the GPU run**. `08_classify_unzip_bound.py` computes read/full
+improvement + the aggregate projection; `09_append_feasibility_spike.py` measures the write-side delta.
+
+| Gate | Constant | Value | Meaning |
+|---|---|---|---|
+| Read | `READ_GAIN_MIN` | **20%** | page-local must cut **fetch** latency by ≥ 20% at the decision context vs current layout |
+| Aggregate | `AGG_PROJ_MIN` | **15%** | projected aggregate-TPS improvement must be ≥ 15% to authorise 6F-C |
+| Write | `WRITE_COST_MAX` | **25%** | added per-token write cost must be **< 25%** of the per-step read gain (append spike) |
+| Oracle | — | **exact** | page-local output must equal current output bit-for-bit (same values, re-addressed) |
+
+**Aggregate projection (MODELED, not measured).** The decode-kernel-time breakdown is UNAVAILABLE without
+`ncu`/production `nsys`, so aggregate is projected:
+```
+projected_aggregate ≈ unzip_full_improvement × α × β × realizable
+  α = unzip-read share of the decode-attention kernel time
+  β = decode-attention kernel share of the whole decode step
+```
+Three labelled share scenarios are reported (conservative / **default** / optimistic = products
+0.09 / 0.245 / 0.567). Verdict: **FAIL** if even optimistic misses 15%; **PASS** if the *central* (default)
+estimate clears 15%; **PROVISIONAL** otherwise (only optimistic clears → measure the real shares with
+`--unzip-share α` / `--decode-attn-share β` or a `stage_summary.json` before deciding). α and β are
+**assumptions, never fabricated measurements** — the projection is explicitly `label: "MODELED"`.
+
+**Append spike (MEASURED write delta).** Only the store *pattern* differs by layout (the quantise math is
+common-mode), so the spike stores pre-quantised payloads and times: `append_no_repack` (a plain slot-write —
+the page-local layout needs **no** re-transpose per token), `block_rollover` (crossing a BS boundary +
+once-per-block K-scale write), `mixed_tail` (per-seq random block/offset — cost must be fill-independent),
+across a batch/concurrency sweep. Because a token is **written once but read every later step**, the gate is
+`ΔW_per_step / (B · ΔR_per_seq) < 25%` — the write penalty amortised over the context, evaluated at the
+decision context using the 6F-A read gain.
+
+**Authorise 6F-C only if ALL hold:** read ≥ 20% **and** projected aggregate ≥ 15% (not FAIL) **and** added
+write < 25% of read gain **and** oracle exact. Any miss → stop at 6F-A and report. (This is the reviewer's
+frozen decision rule; the fp16-pool compact-sidecar swap is a ~7% side-lever, **not** the primary Route-C
+optimisation, and is not on this path.)
+
+## Measurement #1 — α (decode-path share the layout improves) — FROZEN
+
+The A100 6F-A result left exactly one gate PROVISIONAL: the aggregate projection depends on how much of
+the real decode step the improved read path represents. `10_alpha_decode_share.py` measures it **without
+6F-C code**, grounded in the actual production decode path (`int4_protected_k_cache.py:520-548`): the
+standard `kernel_inputs` **permute-copies the whole KV** native `(S,H,*)` → head-major every decode step
+(O(context)); page-local (store-as-consumed) **eliminates that per-step copy**. So:
+
+```
+α = permute_copy_ms / (permute_copy_ms + decode_kernel_ms)      # the (copy+kernel) share page-local removes
+aggregate ≈ α × β × realizability     β = decode-attn-block share of the whole step (needs an nsys trace)
+```
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `ALPHA_STOP` | **0.50** | α < 0.50 → improved path too small a share → **LIKELY_STOP** |
+| `ALPHA_STRONG` | **0.70** | α > 0.70 → **STRONG_RUN_BETA** (run the nsys β trace — the final gate) |
+| — | 0.50–0.70 | **AMBIGUOUS_NEED_BETA** (β measurement mandatory) |
+| `REALIZABILITY` | **0.70–0.80** | conservative factor (never 1.0) |
+
+The decode kernel is oracle-checked (cosine ≥ 0.99 vs the fp reference) before its timing is trusted.
+Median **and** p95 are reported per context. The tool prints `β_needed = 0.15/(α·r)` at r∈{0.7,0.8}: a
+value ≤ ~0.7 is plausible for long-context decode, > 1 is impossible → stop. **Measurement #1 is necessary
+but not sufficient**: a STRONG α authorises the β trace, not 6F-C directly. 6F-C is authorised only once
+measured α and β imply ≥ 15% aggregate under conservative realizability.

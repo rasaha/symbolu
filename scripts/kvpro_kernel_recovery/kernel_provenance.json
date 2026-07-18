@@ -1,0 +1,107 @@
+{
+  "artifact": "flash_attn_with_int4_kvcache",
+  "torch_op": "torch.ops._vllm_fa2_C.fwd_kvcache_int4",
+  "cpp_entry": "mha_fwd_kvcache_int4 (forwards into mha_fwd_kvcache with the int4 split path)",
+  "summary": "The shipped int4_protected decode kernel is the public vLLM flash-attention fork at a pinned SHA, plus an ADDITIVE in-repo INT4-KV patch set. Base source is a public pinned commit; the INT4 additions live in this repo's apply_phase*_patches.py. Build is documented and was GREEN on 2026-05-20. Source is therefore recoverable exactly (pod re-verification pending).",
+  "provenance_status": "source-confirmed (in-repo patches) + binary-confirmed (documented GREEN build) + hardware-untested (this session is CPU-only; pod re-verify via scripts/kvpro_kernel_recovery/)",
+
+  "base_fork": {
+    "repo_url": "https://github.com/vllm-project/flash-attention",
+    "commit_sha": "720c94869cf2e0ff5a706e9c7f1dce0939686ade",
+    "commit_sha_short": "720c948",
+    "commit_date": "2025-02-06",
+    "commit_subject": "fix illegal memory access #42",
+    "why_this_sha": "The SHA vLLM 0.7.3 ships/pins at vllm/CMakeLists.txt:602 (v0.7.3 tag).",
+    "evidence": [
+      "CTM_plus/Bench/scripts/KERNEL_6C3C_RUNBOOK.md:23",
+      "INT4_PROTECTED_VC_BRIEF.md:191,222,692,1253",
+      "deploy/INT4_PROTECTED_DESIGN.md:83",
+      "CTM_plus/KVPolicy/INT4_PROTECTED_README.md:116"
+    ],
+    "status": "provenance-confirmed (documented, multiply-corroborated); public remote fetch NOT re-verified this session"
+  },
+
+  "int4_patch_set": {
+    "nature": "ADDITIVE INT4-KV path on top of the base fork (not a rewrite of base kernels)",
+    "location_in_repo": "CTM_plus/Bench/scripts/apply_phase*_patches.py (apply_phase2_2_patches.py, apply_phase2_3_patches.py, apply_phase2_4_1a_patches.py, and phase-1 scaffolding)",
+    "applies_to_dev_tree": "/workspace/dev/vllm-flash-attn-dev (a clone of the base fork at 720c948)",
+    "files_added": [
+      "csrc/flash_attn/src/int4_inline.h",
+      "csrc/flash_attn/src/int4_packed_load.h",
+      "csrc/flash_attn/src/flash_fwd_split_hdim128_bf16_int4kv_sm80.cu",
+      "csrc/flash_attn/src/flash_fwd_split_hdim128_bf16_int4kv_packed_sm80.cu"
+    ],
+    "files_modified": [
+      "csrc/flash_attn/src/flash_fwd_kernel.h",
+      "csrc/flash_attn/src/flash_fwd_launch_template.h",
+      "csrc/flash_attn/src/flash.h",
+      "csrc/flash_attn/flash_api.cpp",
+      "csrc/flash_attn/flash_api_torch_lib.cpp"
+    ],
+    "python_wrapper_added_to": "vllm_flash_attn (flash_attn_with_int4_kvcache -> torch.ops._vllm_fa2_C.fwd_kvcache_int4)",
+    "evidence": [
+      "CTM_plus/Bench/scripts/apply_phase2_3_patches.py:1-40 (int4_inline.h body)",
+      "CTM_plus/Bench/scripts/KERNEL_6C3C_PHASE12_CODEREAD.md:156-256 (patch map, mha_fwd_kvcache_int4)",
+      "CTM_plus/Bench/scripts/apply_phase2_4_1a_patches.py:335-358 (packed-K wrapper kwargs)",
+      "CTM_plus/Bench/scripts/KERNEL_6C3C_PHASE2_3_INSERTION_POINT.md:4 (flash_fwd_kernel.h insertion)"
+    ],
+    "status": "source-confirmed IN-REPO (patch bodies read directly)"
+  },
+
+  "build": {
+    "command": "TORCH_CUDA_ARCH_LIST=8.0 MAX_JOBS=16 NVCC_THREADS=2 python setup.py bdist_wheel",
+    "cuda_arch": ["8.0 (A100/sm80, the shipped target)", "9.0 optional (H100) — NOT built for production; sm80-only per runbook"],
+    "wheel_name": "vllm_flash_attn-2.7.2.post1+cu128-cp312-cp312-linux_x86_64.whl",
+    "wheel_size_mb_approx": 200,
+    "so_files": ["_vllm_fa2_C.abi3.so (~137 MB dev build)", "_vllm_fa3_C.abi3.so (FA3; NOT used on sm80)"],
+    "install": "install_dev_vllm_flash_attn.sh — pip force-reinstall into venv-vllm, overwriting the vendored vllm_flash_attn; vendored backup at /workspace/dev/build-logs/vllm_flash_attn_vendored_backup",
+    "green_run": {
+      "date": "2026-05-20",
+      "gpu": "A100-80GB",
+      "cuda": "12.8",
+      "torch": "2.5.1+cu124",
+      "python": "3.12 (cp312)",
+      "vllm": "0.7.3 (V0)",
+      "wall_clock_min": 48,
+      "build_steps": 198,
+      "smoke": "FA p50@16k 67.3->69.6us (+3.4%, PASS <=10%); Cell A@32k 28.40->28.59 tok/s (+0.7%, PASS <=5%)"
+    },
+    "evidence": ["CTM_plus/Bench/scripts/KERNEL_6C3C_RUNBOOK.md:23-67"],
+    "status": "binary-confirmed (documented GREEN build + smoke); NOT rebuilt this session"
+  },
+
+  "requirements": {
+    "vllm": "0.7.3 (V0 engine; upstream has since moved to V1 — forward-port is ~1-2 weeks maintenance)",
+    "torch": "2.5.1+cu124",
+    "cuda_toolkit": "12.8 (dev build); risk: ABI vs whatever vLLM 0.7.3 shipped — pin toolkit",
+    "python": "3.12",
+    "build_deps": ["ninja", "pybind11", "cmake"]
+  },
+
+  "k0_build_confirmation": {
+    "status": "GREEN — recovery reproduced on A100 (2026-07-16 pod run)",
+    "path": "Path A (untarred vllm-flash-attn-dev-src.tar.gz) -> rebuild_all_kernels.sh --clean --verify-source",
+    "wheel_built": "vllm_flash_attn-2.7.2.post1+cu128-cp312-cp312-linux_x86_64.whl",
+    "wheel_size_bytes": 214150426,
+    "wheel_sha256": "4f2d5c20fcc3fe09e9808fbfda5b00446305003ce0180671e82447fb03aa904d",
+    "smoke": "PASS — FA p50@16k drift -0.1% (<=10%); Cell A@32k drift -0.2% (<=5%) vs the 2026-05-20 baselines",
+    "gates": {"build": "ok", "gate_import": "ok", "gate_hash": "recorded",
+              "gate_contract": "ok_16_16", "gate_smoke": "ok", "recovery_verdict": "recorded"},
+    "note": "Wheel NAME + SIZE match the documented build and smoke is byte-behaviorally identical; the original build's sha256 was not recorded, so this sha256 establishes the reproducible-build hash going forward. stack pins: torch 2.5.1 + vLLM 0.7.3 + transformers 4.48.3 + tokenizers 0.21.1."
+  },
+  "recoverability": {
+    "from_git_history": "PARTIAL — the INT4 additions are in-repo as apply_phase*_patches.py (the source-of-truth for the patch); the BASE is not vendored in this repo.",
+    "from_remote_repo": "YES (expected) — base is a public pinned SHA on github.com/vllm-project/flash-attention (fetch NOT re-verified this session).",
+    "from_installed_wheel": "BINARY only on the pod (venv-vllm) + the /workspace/dev checkout if still present; wheel is a compiled .so, not source.",
+    "from_patch_files": "YES — apply_phase*_patches.py encode the exact INT4 source additions + insertion points.",
+    "from_build_cache": "MAYBE — /workspace/dev/vllm-flash-attn-dev and build-logs may persist on the ORIGINAL pod; this session's pod is a fresh container (verify with Phase B).",
+    "net_verdict": "SOURCE_RECOVERED_EXACT — reconstructible as (public base @ 720c948) + (in-repo apply_phase*_patches.py) with the documented build; pending pod re-verification that the SHA still fetches, patches apply, and the wheel builds byte-comparably."
+  },
+
+  "hard_constraints_honored": {
+    "no_routeA_timings_for_production": true,
+    "no_full_bf16_K_claim": true,
+    "provenance_not_inferred_from_filenames_alone": true,
+    "confidential_mechanism_names_kept_generic_in_public_docs": true
+  }
+}

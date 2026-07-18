@@ -28,6 +28,8 @@ evaluate P8 independently before combining with S2.
 | 11 | Honest status | this file (below) |
 | H | **Unzip memory-vs-compute probe** (no `ncu`) | `07_unzip_bound_probe.sh` → `unzip_bound_probe.py` (fetch/math/full half-kernels) + `08_classify_unzip_bound.py` → `runs/unzip_bound_verdict.json` |
 | H | Kernel correctness anchor (CPU, optional) | `validate_kernel_interp.py` (Triton interpreter, exact vs numpy) |
+| 6F-A | **Page-local (store-as-consumed) layout probe + gates** | `unzip_bound_probe.py` LAYOUT variant + `08_classify_unzip_bound.py` `sixfa_pagelocal` (read≥20% / agg≥15% gates + projection) |
+| 6F-A | **Append feasibility spike** (write-side delta) | `09_append_feasibility_spike.py` → `runs/append_spike.json` (write<25%-of-read-gain gate) |
 
 ## Part H — is the INT4 unzipper memory-bound or compute-bound?
 `ncu` is blocked on the pod (`ERR_NVGPUCTRPERM`), so the fetch-vs-dequant split is measured **without
@@ -40,6 +42,32 @@ GPU number is viewed**. The verdict maps straight to the lever: HBM-saturated �
 under-utilised → a compact-protect/coalesced read kernel (6F-style) first. The unzip is measured
 production-faithfully (compact bf16 protected sidecar); one ablation times the route-A full-fp16-K load
 (`int4_fused_attention_kernel.py:140`) so `FULL_full − FULL_compact` = the fp16-pool penalty.
+
+**MEASURED RESULT (A100-80GB): `MEMORY-BOUND`, scatter-limited (~3% HBM used) — see
+`UNZIP_BOUND_RESULT.md`.** The dequant math is ~7.5× under the fetch and fully hidden; the lever is a
+6F-style coalesced/store-as-consumed read layout, NOT faster hardware and NOT cheaper math.
+
+### 6F-A — page-local layout probe (the authorised next milestone)
+The probe now also builds a per-head-contiguous **page-local** layout `(H, n_blocks, BS, *)` and times it
+against the current `(S,H,*)` layout on **identical values** (oracle diff must be 0 — CPU-verified via the
+interpreter). It reports, per context: read-only and full-unzip latency for both layouts, effective
+bandwidth, the **≥20% read gate**, and a **MODELED aggregate-TPS projection** (labelled α/β share
+scenarios) vs the **≥15%** gate. If the read gate passes, `07_unzip_bound_probe.sh` immediately runs the
+**append feasibility spike** (`09_…`) which measures the write-side delta the layout imposes (per-token
+appends become scattered-across-heads) against the **<25%-of-read-gain** gate — the four cases the reviewer
+required: one-token append (no repack), block rollover, mixed tail lengths, saturation batch sweep.
+**6F-C integration is authorised only if read ≥ 20% AND aggregate ≥ 15% (not FAIL) AND write < 25% AND
+oracle exact** (frozen in `DECISION_THRESHOLDS.md` Part 6F-A). The route-A full-fp16 compact-sidecar swap is
+a ~7% side-lever, deliberately **not** the primary Route-C optimisation.
+
+**MEASURED RESULT (A100-80GB) — see `SIXFA_RESULT.md`: STOP 6F-C.** 6F-A components pass (read **+44.8%**,
+write **0.02%** of gain, oracle **exact**) but measurement #1 (`10_alpha_decode_share.py`) resolved the
+aggregate gate against the layout: the improved read/copy is only **α = 15.7%** of the (copy+decode-kernel)
+block — the decode **kernel is ~5.4× the permute-copy** — so **β_needed > 1 (impossible)** to reach 15%
+aggregate. The read wins are real but the KV read/copy is a minority of decode-kernel time; the tall pole is
+the decode kernel (matmuls / split-K+combine / GQA padding / route-A fp16-K load), **not** the storage
+layout. The 6F layout line is **CLOSED on measured evidence** (the β nsys trace is moot). If the decode
+kernel is later optimised on its own, re-evaluate 6F then.
 
 ## RunPod command sequence
 ```bash
@@ -58,12 +86,15 @@ bash run_profile_all.sh                   # env -> CORRECTNESS GATE -> nsys -> n
 #    route-A Triton (03) needs NO fork; set KVV3_GPU_GATE=1 to also attempt the pod kernel-vs-oracle check)
 cat runs/decision.json                    # ranked table + one recommendation (uses DECISION_THRESHOLDS.md)
 
-# --- H) unzip memory-vs-compute probe (needs GPU + Triton; NO ncu, NO fork) ---
-python3 validate_kernel_interp.py         # optional CPU anchor: kernel addressing+dequant exact vs numpy
+# --- H + 6F-A) unzip probe + page-local layout gate + append spike (GPU + Triton; NO ncu, NO fork) ---
+python3 validate_kernel_interp.py         # optional CPU anchor: addressing+dequant exact; page-local==current
 CONTEXTS="4096 16384 32768" ITERS=100 bash 07_unzip_bound_probe.sh
-cat runs/unzip_bound_verdict.json         # MEMORY-BOUND / COMPUTE-BOUND / BOTH-TIGHTENABLE + lever
-#   (writes UNAVAILABLE if GPU/Triton absent; peaks auto-detected, override with PEAK_HBM_GBPS/PEAK_FP32_TFLOPS)
-git add -f runs/unzip_bound*.json         # commit the artifacts (pod push)
+#   -> prints the Part-H bound (MEMORY/COMPUTE) AND the 6F-A page-local read gate (>=20%) + aggregate
+#      projection (>=15%); if the read gate passes it auto-runs the append spike (write<25%-of-gain).
+#   optional measured shares for the projection: DECODE_ATTN_SHARE=<beta> UNZIP_SHARE=<alpha> bash 07_...
+cat runs/unzip_bound_verdict.json         # verdict + sixfa_pagelocal gates + lever
+cat runs/append_spike.json                # write-side delta + <25% gate (if the read gate passed)
+git add -f runs/unzip_bound*.json runs/append_spike.json    # commit artifacts (pod push)
 
 # --- F) protected-INT8 quality (fake-quant; needs GPU+model+mask, NOT the fork) ---
 cd ../../experiments/kvpro_v3_symmetric_residual
@@ -88,7 +119,8 @@ python3 05_decision_matrix.py --env runs/env_gate.json --stages runs/stage_summa
 | Implementation-removal ceiling (time) | **UNAVAILABLE until a GPU profile exists** (never modeled/fabricated) |
 | `01/02` nsys/ncu profiling, `run_profile_all.sh` | **HARDWARE-UNTESTED** — RunPod-ready, need GPU + Nsight (+ forked vLLM for the production kernel) |
 | `03` route-A Triton timing | **HARDWARE-UNTESTED** — needs GPU; needs a route-A synthetic-input builder (emits `UNAVAILABLE` if absent) |
-| **Part H unzip probe** (`07`/`08`) | **decision logic + byte/FLOP model CPU-tested** (`test_unzip_probe_cpu.py` 43); **kernel addressing+dequant CPU-verified exact** via Triton interpreter (`validate_kernel_interp.py`); **GPU timing HARDWARE-UNTESTED** — needs GPU + Triton, emits `UNAVAILABLE` otherwise |
+| **Part H unzip probe** (`07`/`08`) | **decision logic + byte/FLOP model CPU-tested** (`test_unzip_probe_cpu.py` 62); **kernel addressing+dequant CPU-verified exact** via Triton interpreter (`validate_kernel_interp.py`); **GPU-MEASURED on A100-80GB** — `MEMORY-BOUND`, scatter-limited (see `UNZIP_BOUND_RESULT.md`) |
+| **6F-A page-local probe + append spike** (`07`/`08`/`09`) | **gates + projection + write-delta logic CPU-tested** (62 checks); **page-local == current byte-exact CPU-verified** (interpreter); **GPU timing HARDWARE-UNTESTED** — read/agg/write gates frozen in `DECISION_THRESHOLDS.md` Part 6F-A; emits `UNAVAILABLE` w/o GPU |
 | P8 generation (`run_p8_quality.sh`, drivers) | **HARDWARE-UNTESTED** — GPU + model + mask (fake-quant; no fork) |
 | **BLOCKED prerequisite** | production `flash_attn_with_int4_kvcache` = external forked vLLM wheel, **absent** — restore via `CTM_plus/Bench/scripts/apply_phase*_patches.py` on the pod, or profile the in-repo Triton route-A kernel instead |
 

@@ -41,13 +41,17 @@ def main():
         return _skip(f"input build failed: {e}")
     S, nb, DH, VNG = geom["S"], geom["n_blocks"], geom["DH"], geom["VNG"]
 
-    def run(mode, protect):
+    pl = P._to_pagelocal(ten, geom)
+
+    def run(mode, protect, layout=0, tt=None):
+        tt = tt if tt is not None else ten
         out = torch.zeros(nb * H, dtype=torch.float32)
         P._unzip_probe_kernel[(nb, H)](
-            ten["k_packed"], ten["k_scale"], ten["k_xmin"],
-            ten["v_packed"], ten["v_scale"], ten["v_xmin"],
-            ten["k_protect"], ten["protect_slot"], ten["k_fp16"], out,
-            S, H, npr, D=D, DH=DH, BS=BS, VNG=VNG, GS_v=VG, MODE=mode, PROTECT=protect)
+            tt["k_packed"], tt["k_scale"], tt["k_xmin"],
+            tt["v_packed"], tt["v_scale"], tt["v_xmin"],
+            tt["k_protect"], tt["protect_slot"], tt["k_fp16"], out,
+            S, H, npr, nb, D=D, DH=DH, BS=BS, VNG=VNG, GS_v=VG,
+            MODE=mode, PROTECT=protect, LAYOUT=layout)
         return out.numpy().astype(np.float64)
 
     # Independent numpy reference for FULL/compact (the production unzip).
@@ -79,20 +83,30 @@ def main():
         ref = npref()
         err = float(np.abs(got - ref).max())
         print(f"  FULL/compact kernel-vs-numpy max abs err: {err:.3e}")
+        # 6F-A ORACLE: page-local layout must reproduce the current-layout output EXACTLY
+        # (same values, only re-addressed). Checked for FULL and FETCH.
+        oracle = 0.0
+        for mode in (P.MODE_FULL, P.MODE_FETCH):
+            cur = run(mode, P.PROT_COMPACT, layout=0)
+            plo = run(mode, P.PROT_COMPACT, layout=1, tt=pl)
+            oracle = max(oracle, float(np.abs(cur - plo).max()))
+        print(f"  6F-A page-local vs current max abs diff: {oracle:.3e}")
         finite = True
         for name, mode, prot in [("FETCH", P.MODE_FETCH, P.PROT_COMPACT),
                                  ("MATH", P.MODE_MATH, P.PROT_COMPACT),
-                                 ("FULL_fullprotect", P.MODE_FULL, P.PROT_FULL)]:
-            o = run(mode, prot)
+                                 ("FULL_fullprotect", P.MODE_FULL, P.PROT_FULL),
+                                 ("FETCH_pagelocal", P.MODE_FETCH, P.PROT_COMPACT)]:
+            lay, tt = (1, pl) if name.endswith("pagelocal") else (0, ten)
+            o = run(mode, prot, layout=lay, tt=tt)
             f = bool(np.isfinite(o).all()); finite &= f
             print(f"  {name:18} ran OK, finite={f}")
     except Exception as e:  # noqa: BLE001
         return _skip(f"interpreter launch failed (version/env): {e}")
 
-    if err < 1e-2 and finite:
-        print("interpreter validation: PASS (addressing + dequant correct)")
+    if err < 1e-2 and oracle < 1e-6 and finite:
+        print("interpreter validation: PASS (addressing + dequant correct; page-local == current)")
         return 0
-    print("interpreter validation: FAIL")
+    print(f"interpreter validation: FAIL (err={err:.2e} oracle={oracle:.2e} finite={finite})")
     return 1
 
 
