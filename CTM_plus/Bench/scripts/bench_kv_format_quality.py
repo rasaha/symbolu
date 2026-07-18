@@ -96,19 +96,30 @@ def _int4_affine_qdq(x, group=32):
     return (xq * scale + xmin).reshape_as(x)
 
 
+def _protected(x, base_qdq, protect_frac):
+    """Protect the top-`protect_frac` outlier channels at bf16, EXCLUDING them from the base quantizer's
+    scale computation. This is the whole point of protection: an outlier must NOT inflate its group/block
+    scale and wreck its neighbors. (Leaving it in — the naive version — makes protection near-useless.)"""
+    mask = _protect_mask(x, protect_frac)              # [D]
+    x_clean = x.clone()
+    x_clean[..., mask] = 0.0                            # remove outliers before computing scales
+    out = base_qdq(x_clean)
+    out[..., mask] = x[..., mask]                       # restore outliers at full (bf16) precision
+    return out
+
+
 def quant_dequant(x, fmt, protect_frac=0.04):
     """Emulate storing `x` (a K or V tensor, [..., head_dim]) in `fmt` and reading it back."""
-    import torch
     if fmt == "bf16":
         return x
     if fmt == "fp8":
         return _fp8_qdq(x)
     if fmt == "int4_protected":
-        return torch.where(_protect_mask(x, protect_frac), x, _int4_affine_qdq(x))
+        return _protected(x, _int4_affine_qdq, protect_frac)
     if fmt == "nvfp4":
         return _nvfp4_qdq(x)
     if fmt == "nvfp4_protected":
-        return torch.where(_protect_mask(x, protect_frac), x, _nvfp4_qdq(x))
+        return _protected(x, _nvfp4_qdq, protect_frac)
     raise ValueError(f"unknown format {fmt!r}")
 
 
@@ -204,8 +215,15 @@ def _selftest():
         s = (t.abs().amax() / _E2M1_MAX).clamp(min=1e-8); return _round_e2m1(t / s) * s
     ck("nvfp4 << per-tensor-FP4 (block scaling wins at equal 4-bit)",
        (_nvfp4_qdq(zc) - zc).abs().mean().item() < (_fp4_pt(zc) - zc).abs().mean().item())
-    # Protection: keeps outlier channels ~exact and never worsens error.
+    # THE KEY INVARIANT (the bug we hit in v1): protection must EXCLUDE outliers from the scale, so an
+    # outlier's block-mates survive. channel 0 is a 100x outlier in block 0; protecting it must rescue
+    # channels 1..15 — their block scale no longer sees the outlier.
     torch.manual_seed(0)
+    zz = torch.randn(16, 16); zz[:, 0] *= 100.0
+    mates_plain = (_nvfp4_qdq(zz)[:, 1:] - zz[:, 1:]).abs().mean().item()
+    mates_prot = (quant_dequant(zz, "nvfp4_protected", 1 / 16.)[:, 1:] - zz[:, 1:]).abs().mean().item()
+    ck("protection rescues an outlier's block-mates (exclusion works)", mates_prot < 0.5 * mates_plain)
+    # Protection: keeps outlier channels ~exact and never worsens error.
     z = torch.randn(64, 128); z[:, 7] *= 60.0
     e_n4 = (quant_dequant(z, "nvfp4") - z).abs().mean().item()
     ck("nvfp4_protected <= nvfp4 (protection helps)",
@@ -227,7 +245,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="KV-format quality: NVFP4 (+protected) vs int4-protected via emulation")
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--formats", default="bf16,fp8,int4_protected,nvfp4,nvfp4_protected")
-    ap.add_argument("--context", type=int, default=2048)
+    ap.add_argument("--context", type=int, default=4096)
     ap.add_argument("--ppl-start-frac", type=float, default=0.5)
     ap.add_argument("--protect-frac", type=float, default=0.04)
     ap.add_argument("--text-file", default=None)
@@ -241,11 +259,20 @@ def main(argv=None):
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(args.model)
-    text = open(args.text_file).read() if args.text_file else _PROSE
+    if args.text_file:
+        text = open(args.text_file).read()
+    else:
+        try:
+            from datasets import load_dataset
+            ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+            text = "\n\n".join(t for t in ds["text"] if t.strip())
+        except Exception as e:
+            print(f"  WARNING: wikitext load failed ({type(e).__name__}: {e}); using built-in prose "
+                  "(SHORT, ~384 tok). `pip install datasets hf_transfer` or pass --text-file for real context.")
+            text = _PROSE
     ids = tok(text)["input_ids"]
     if len(ids) < args.context:
-        print(f"  NOTE: only {len(ids)} real tokens (< {args.context}); measuring at ctx={len(ids)} "
-              "(no tiling). Pass --text-file for a deeper test.")
+        print(f"  NOTE: only {len(ids)} real tokens (< {args.context}); measuring at ctx={len(ids)} (no tiling).")
     ids = ids[:args.context]
     input_ids = torch.tensor([ids], device="cuda")
     start = max(1, int(args.ppl_start_frac * input_ids.shape[1]))
