@@ -20,10 +20,12 @@
 #   python CTM_plus/Bench/scripts/bench_kv_format_quality.py --model Qwen/Qwen3-8B          # needs newer venv
 #   python CTM_plus/Bench/scripts/bench_kv_format_quality.py --selftest                     # CPU, quant math
 #
-# HONEST caveats: (1) emulation matches Blackwell's *result*, not its speed. (2) protection here selects
-# outlier channels by max-abs (a proxy); the real product calibrates importance, so real int4-protected
-# may do slightly better. (3) scale/xmin stored at fp32 here (the sim isolates the 4-bit+protection
-# quality effect, not the sidecar-precision tax). (4) both K and V are protected uniformly.
+# HONEST caveats: (1) emulation matches Blackwell's *result*, not its speed. (2) protection uses the
+# PRODUCTION selector — top-`protect-frac` max-abs channels PER HEAD (matches calibrate_phase5b_protect_
+# mask.py's per-(layer,h_kv) top-4%); computed per-forward on the eval text, not corpus-calibrated, but
+# channel importance is a static model property so this is a faithful proxy. (3) scale/xmin stored at
+# fp32 here (isolates the 4-bit+protection quality effect, not the sidecar-precision tax). (4) both K
+# and V are protected uniformly (production protects K; V protection is a superset — never worse).
 from __future__ import annotations
 import argparse, math, os, sys
 
@@ -74,14 +76,21 @@ def _nvfp4_qdq(x, block=16):
 
 
 def _protect_mask(x, protect_frac):
-    """Boolean [D] mask of the top-`protect_frac` channels (by max-abs) — the outlier channels."""
+    """PRODUCTION selector: boolean mask (broadcastable to x) of the top-`protect_frac` K channels by
+    max-abs, PER HEAD — matching `calibrate_phase5b_protect_mask.py` (top-4% highest-magnitude channels
+    per (layer, h_kv), static). The sdpa hook fires per layer and x is [.., H, S, D], so per-head here =
+    per (layer, h_kv). For 2D inputs (no head dim; selftest) it degrades to a global top-k."""
     import torch
     D = x.shape[-1]
-    imp = x.reshape(-1, D).abs().amax(dim=0)                       # per-channel importance
     k = max(1, int(round(protect_frac * D)))
-    m = torch.zeros(D, dtype=torch.bool, device=x.device)
-    m[torch.topk(imp, k).indices] = True
-    return m
+    if x.dim() >= 3:                                               # [.., H, S, D]: importance per (head, channel)
+        hd = x.dim() - 3
+        red = tuple(i for i in range(x.dim()) if i not in (hd, x.dim() - 1))
+        imp = x.abs().amax(dim=red, keepdim=True)                  # 1s except the head & channel dims
+    else:                                                          # [N, D]: global
+        imp = x.abs().amax(dim=0, keepdim=True)
+    thresh = imp.topk(k, dim=-1).values[..., -1:]                  # kth-largest per head
+    return imp >= thresh                                          # broadcastable bool, True = protected
 
 
 def _int4_affine_qdq(x, group=32):
@@ -97,15 +106,14 @@ def _int4_affine_qdq(x, group=32):
 
 
 def _protected(x, base_qdq, protect_frac):
-    """Protect the top-`protect_frac` outlier channels at bf16, EXCLUDING them from the base quantizer's
+    """Protect the top-`protect_frac` channels PER HEAD at bf16, EXCLUDING them from the base quantizer's
     scale computation. This is the whole point of protection: an outlier must NOT inflate its group/block
     scale and wreck its neighbors. (Leaving it in — the naive version — makes protection near-useless.)"""
-    mask = _protect_mask(x, protect_frac)              # [D]
-    x_clean = x.clone()
-    x_clean[..., mask] = 0.0                            # remove outliers before computing scales
+    import torch
+    mask = _protect_mask(x, protect_frac)              # broadcastable bool, True = protected
+    x_clean = torch.where(mask, torch.zeros_like(x), x)  # remove outliers before computing scales
     out = base_qdq(x_clean)
-    out[..., mask] = x[..., mask]                       # restore outliers at full (bf16) precision
-    return out
+    return torch.where(mask, x, out)                   # restore protected at full (bf16) precision
 
 
 def quant_dequant(x, fmt, protect_frac=0.04):
@@ -232,6 +240,19 @@ def _selftest():
        (quant_dequant(z, "nvfp4_protected")[:, 7] - z[:, 7]).abs().max().item() < 1e-3)
     ck("int4_protected keeps outlier channel ~exact",
        (quant_dequant(z, "int4_protected")[:, 7] - z[:, 7]).abs().max().item() < 1e-3)
+    # PER-HEAD selection (the production selector, top-k per (layer, h_kv)): head 0's outlier is in
+    # channel 3, head 1's in channel 11. A per-head mask must protect ch3 for head0 and ch11 for head1 —
+    # a single global mask (v1) could not, which is why v1 needed ~4x the protection budget.
+    xh = torch.randn(2, 2, 8, 16)                                  # [B, H=2, S, D=16]
+    xh[:, 0, :, 3] *= 50.0; xh[:, 1, :, 11] *= 50.0
+    m = _protect_mask(xh, 1 / 16.)                                 # k=1 per head
+    ck("per-head mask protects head0 ch3", bool(m[..., 0, :, 3].all()))
+    ck("per-head mask protects head1 ch11", bool(m[..., 1, :, 11].all()))
+    ck("per-head mask does NOT protect head0 ch11", not bool(m[..., 0, :, 11].any()))
+    qh = quant_dequant(xh, "int4_protected", 1 / 16.)
+    ck("per-head protection restores each head's own outlier",
+       (qh[:, 0, :, 3] - xh[:, 0, :, 3]).abs().max().item() < 1e-3
+       and (qh[:, 1, :, 11] - xh[:, 1, :, 11]).abs().max().item() < 1e-3)
     # verdict wiring
     _, c1 = verdict({"bf16": 8.0, "int4_protected": 8.02, "nvfp4": 8.03, "nvfp4_protected": 8.02})
     ck("verdict: plain NVFP4 holds -> commoditize", "COMMODITIZES" in c1)
