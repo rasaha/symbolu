@@ -320,9 +320,9 @@ def main(argv=None):
     import types
     try:
         import torchaudio  # noqa: F401  (use the real one when it imports cleanly)
-        _ta_ok = True
-    except Exception as _ta_err:
-        _ta_ok = False
+        _ta_ok, _ta_err = True, None
+    except Exception as _e:
+        _ta_ok, _ta_err = False, _e            # save it: the `as` target is cleared after the except block
     if not _ta_ok:
         from unittest.mock import MagicMock
         for _name in [m for m in list(sys.modules) if m == "torchaudio" or m.startswith("torchaudio.")]:
