@@ -312,6 +312,28 @@ def main(argv=None):
 
     import torch
     import torch.nn.functional as F
+
+    # --- pod env-fix: newer transformers EAGERLY imports torchaudio (via its RNNT-loss module) when it
+    # loads ANY model. If torchaudio's CUDA build mismatches torch (e.g. torchaudio cu124 vs torch cu121)
+    # that import raises and cascades to "Could not import module 'Qwen2ForCausalLM'". We never use
+    # torchaudio here, so if it can't import cleanly, stub it in sys.modules BEFORE transformers loads. ---
+    import types
+    try:
+        import torchaudio  # noqa: F401  (use the real one when it imports cleanly)
+        _ta_ok = True
+    except Exception as _ta_err:
+        _ta_ok = False
+    if not _ta_ok:
+        from unittest.mock import MagicMock
+        for _name in [m for m in list(sys.modules) if m == "torchaudio" or m.startswith("torchaudio.")]:
+            del sys.modules[_name]                                # drop any partial import
+        _ta = MagicMock(name="torchaudio"); _ta.__version__ = "2.5.1"; _ta.__path__ = []
+        sys.modules["torchaudio"] = _ta
+        for _sub in ("functional", "_extension", "transforms", "models", "io", "compliance", "datasets"):
+            sys.modules[f"torchaudio.{_sub}"] = MagicMock(name=f"torchaudio.{_sub}")
+        print(f"  [env-fix] torchaudio unusable ({type(_ta_err).__name__}: {_ta_err}); stubbed it "
+              f"(unused by this bench) so the model can load.")
+
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(args.model)
