@@ -174,6 +174,14 @@ from agentic.agentic_framework.shadow_ai import (
 from agentic.agentic_framework.policy_bundle import (
     PolicyResolution,
 )
+from agentic.agentic_framework.human_policy import (
+    HumanPolicyEngine,
+    HumanPolicyMode,
+    HumanPolicyResolution,
+    HumanPolicyVerdict,
+    resolve_human_policy,
+    stricter_decision,
+)
 from agentic.agentic_framework.approval_workflow import (
     ApprovalContext,
     ApprovalLevel,
@@ -1226,6 +1234,7 @@ class GovernanceService:
         approval_store: Optional[ApprovalStore] = None,
         agent_policy_engine: Optional[PolicyEngine] = None,
         rollback_monitor: Optional[RollbackMonitor] = None,
+        human_policy_engine: Optional[HumanPolicyEngine] = None,
     ):
         """
         Initialize governance service.
@@ -1261,6 +1270,14 @@ class GovernanceService:
                 signal snapshot is captured at authorize-time and a watch is
                 started. Post-action check() must be called by external caller.
                 Fail-safe: if not provided, no snapshot is captured.
+            human_policy_engine: Optional HumanPolicyEngine for human-curated
+                policy governance. When provided, a matching curated rule sets
+                the BASELINE governance decision ("human sets baseline, LLM can
+                only tighten"): an explicit human DENY is dispositive, a human
+                REQUIRE_APPROVAL forces at least DEFER, and a human ALLOW is a
+                permissiveness ceiling that the LLM/JEPA/domain overlays may
+                still tighten. When no rule matches (or no engine is provided),
+                the existing LLM-derived baseline is used unchanged.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -1295,6 +1312,9 @@ class GovernanceService:
 
         # Rollback Monitor (Phase S5-safety)
         self._rollback_monitor: Optional[RollbackMonitor] = rollback_monitor
+
+        # Human-Curated Policy Layer (authoritative baseline; LLM tightens)
+        self._human_policy_engine: Optional[HumanPolicyEngine] = human_policy_engine
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -1365,10 +1385,65 @@ class GovernanceService:
             policy_resolution=self._policy_resolution,
         )
 
-        # Step 5: Compute governance decision
+        # Step 5: Compute governance decision (LLM-derived baseline)
         governance_decision = _compute_governance_decision(
             eligible, gate_decision, forbidden_cap,
         )
+
+        # Capture the pure LLM baseline before any human authority is applied
+        # (audit: the model's opinion independent of the human policy).
+        llm_baseline_decision = governance_decision.value
+
+        # Step 5a: Human-curated policy layer with PER-DECISION authority mode.
+        #   The authority mode is resolved for THIS request (not fixed at engine
+        #   construction) by precedence, inside the engine:
+        #     1. explicit authority_mode on the matched rule;
+        #     2. human-authored criticality registry default
+        #        (critical → SOURCE_OF_TRUTH, non-critical → BASELINE,
+        #         uncertain → conservative: SOURCE_OF_TRUTH and/or REQUIRE_APPROVAL);
+        #     3. engine/service default (backward-compatible).
+        #   A single service therefore handles critical and non-critical requests
+        #   concurrently, each under its own mode. The LLM never participates in
+        #   mode resolution, so it can never downgrade a SOURCE_OF_TRUTH decision.
+        #
+        #   BASELINE effective mode: composed = stricter_of(model, human).
+        #   SOURCE_OF_TRUTH effective mode: the human verdict is dispositive —
+        #     model layers still run (for audit) but Step 5f restores it, subject
+        #     only to the independent fail-closed hard blocks.
+        #   No match / no engine → LLM baseline stands. Fail-closed → DENY.
+        human_default_mode = (
+            self._human_policy_engine.mode
+            if self._human_policy_engine is not None
+            else HumanPolicyMode.BASELINE
+        )
+        human_resolution = resolve_human_policy(
+            self._human_policy_engine, request, risk_level.value,
+        )
+        human_matched = (
+            human_resolution.matched and human_resolution.verdict is not None
+        )
+        human_effective_mode = human_resolution.effective_mode
+        human_conservative_floor = human_resolution.conservative_floor
+        human_requires_human = False
+        if human_matched:
+            human_decision = human_resolution.governance_decision()  # ALLOW/DEFER/DENY
+            # Conservative floor (uncertain criticality → force at least DEFER).
+            if human_conservative_floor:
+                human_decision = stricter_decision(
+                    human_decision, human_conservative_floor
+                )
+            if human_effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH.value:
+                # Human verdict is the baseline; model layers still run (for
+                # audit) but Step 5f restores this decision afterwards.
+                governance_decision = APIGovernanceDecision(human_decision)
+            else:
+                governance_decision = APIGovernanceDecision(
+                    stricter_decision(governance_decision.value, human_decision)
+                )
+            if governance_decision != APIGovernanceDecision.ALLOW:
+                eligible = False
+            if human_resolution.requires_human or human_conservative_floor == "DEFER":
+                human_requires_human = True
 
         # Step 5b: JEPA residual governance check
         #   Compares the JEPA composite latent state (ontology + vritti)
@@ -1661,6 +1736,7 @@ class GovernanceService:
         effective_requires_human = (
             gate_decision.escalation.requires_human
             or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
+            or human_requires_human
         )
 
         # Step 5e: Domain Semantic Policy Layer
@@ -1767,12 +1843,77 @@ class GovernanceService:
                 if governance_decision != APIGovernanceDecision.DENY:
                     effective_requires_human = True
 
+        # Independent, human-configured fail-closed hard blocks. These are NOT
+        # LLM judgements — they are deterministic safety invariants — so they
+        # remain authoritative even under SOURCE_OF_TRUTH.
+        hard_block_provenance: List[str] = []
+        if forbidden_cap is not None:
+            hard_block_provenance.append(f"forbidden_capability:{forbidden_cap}")
+        if agent_policy_resolution.hard_deny:
+            hard_block_provenance.append("agent_policy_hard_deny")
+        if generation_gate_result["gate_blocks"]:
+            hard_block_provenance.append(
+                f"generation_gate:{generation_gate_result['block_reason']}"
+            )
+        hard_block = bool(hard_block_provenance)
+
+        # The model layers' advisory verdict — what the confidence gate + JEPA +
+        # domain + shadow concluded, captured BEFORE any source-of-truth restore.
+        model_advisory_decision = governance_decision.value
+
+        # Step 5f: SOURCE_OF_TRUTH reconciliation.
+        #   When THIS request's effective mode is SOURCE_OF_TRUTH and a human
+        #   rule matched, the human verdict is DISPOSITIVE: the model-derived
+        #   layers above (confidence gate, JEPA, domain, shadow, sovereign
+        #   biases) were still evaluated and recorded for audit, but they cannot
+        #   change the decision. The human verdict is restored here. It remains
+        #   subject ONLY to the independent fail-closed hard blocks above.
+        human_source_of_truth_override = False
+        if (
+            human_matched
+            and human_effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH.value
+        ):
+            if hard_block:
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            else:
+                human_decision = human_resolution.governance_decision()
+                if human_conservative_floor:
+                    human_decision = stricter_decision(
+                        human_decision, human_conservative_floor
+                    )
+                governance_decision = APIGovernanceDecision(human_decision)
+                eligible = governance_decision == APIGovernanceDecision.ALLOW
+                effective_requires_human = (
+                    human_resolution.requires_human
+                    or human_conservative_floor == "DEFER"
+                )
+            human_source_of_truth_override = True
+
+        # Final authority attribution (audit): which authority set the decision.
+        if hard_block and governance_decision == APIGovernanceDecision.DENY:
+            final_authority_used = "HARD_BLOCK"
+        elif human_source_of_truth_override:
+            final_authority_used = "HUMAN_SOURCE_OF_TRUTH"
+        elif human_matched:
+            final_authority_used = "HUMAN_BASELINE_COMPOSED"
+        else:
+            final_authority_used = "MODEL"
+
         # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
             governance_decision, jepa_assessment, jepa_overrode,
             domain_result, session_enrichment,
         )
+        # Add human-curated policy reason codes (per-decision authority)
+        if human_resolution.available:
+            for rc in human_resolution.reason_codes:
+                rationale_codes.append(rc)
+        if human_source_of_truth_override:
+            rationale_codes.append("HUMAN_POLICY_AUTHORITATIVE")
+        if human_matched or human_source_of_truth_override:
+            rationale_codes.append(f"HUMAN_POLICY_FINAL_AUTHORITY:{final_authority_used}")
         # Add shadow reason codes
         if shadow_assessment is not None:
             for rc in shadow_assessment.reason_codes:
@@ -1782,6 +1923,16 @@ class GovernanceService:
             forbidden_cap, jepa_assessment, jepa_overrode,
             domain_result,
         )
+        if human_resolution.matched and human_resolution.verdict is not None:
+            _hp_detail = (
+                f" Human-curated policy [{human_resolution.matched_rule_id}]: "
+                f"{human_resolution.verdict.value}."
+            )
+            if human_resolution.description:
+                _hp_detail += f" {human_resolution.description}"
+            if human_resolution.constraints:
+                _hp_detail += f" Constraints: {dict(human_resolution.constraints)}."
+            rationale += _hp_detail
         if shadow_assessment is not None and shadow_assessment.shadow_overrode_baseline:
             rationale += (
                 f" Shadow AI policy: {shadow_assessment.containment_mode.value}. "
@@ -1920,6 +2071,24 @@ class GovernanceService:
             if rollback_resolution.available else None
         )
 
+        # Step 7o: Human-curated policy audit dict (per-decision authority)
+        human_policy_dict = None
+        if human_resolution.available:
+            human_policy_dict = {
+                **human_resolution.to_audit_dict(),
+                # Service-computed attribution (not known to the engine alone)
+                "human_verdict_decision": (
+                    human_resolution.governance_decision() if human_matched else None
+                ),
+                "llm_baseline_decision": llm_baseline_decision,
+                "model_advisory_decision": model_advisory_decision,
+                "hard_block": hard_block,
+                "hard_block_provenance": list(hard_block_provenance),
+                "hard_block_decision": "DENY" if hard_block else None,
+                "final_authority_used": final_authority_used,
+                "source_of_truth_override": human_source_of_truth_override,
+            }
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -2056,6 +2225,41 @@ class GovernanceService:
                 "rollback_available": rollback_resolution.available,
                 "rollback_watch_started": rollback_resolution.watch_started,
                 "rollback_watch_id": rollback_resolution.watch_id,
+                # Human-curated policy provenance (baseline authority)
+                "human_policy_available": human_resolution.available,
+                "human_policy_matched": human_resolution.matched,
+                "human_policy_verdict": (
+                    human_resolution.verdict.value
+                    if human_resolution.verdict is not None else None
+                ),
+                "human_policy_rule_id": human_resolution.matched_rule_id,
+                "human_policy_governance_decision": human_resolution.governance_decision(),
+                "human_policy_requires_human": human_resolution.requires_human,
+                "human_policy_constraints": dict(human_resolution.constraints),
+                "human_policy_version": human_resolution.policy_version,
+                "human_policy_fail_closed_error": human_resolution.fail_closed_error,
+                # Per-decision authority-mode resolution provenance
+                "human_policy_default_mode": human_default_mode.value,
+                "human_policy_rule_mode": human_resolution.rule_authority_mode,
+                "human_policy_criticality": human_resolution.criticality,
+                "human_policy_criticality_basis": list(human_resolution.criticality_basis),
+                "human_policy_criticality_mode": human_resolution.criticality_mode,
+                "human_policy_effective_mode": human_resolution.effective_mode,
+                "human_policy_mode_resolution_source": human_resolution.mode_resolution_source,
+                "human_policy_conservative_floor": human_resolution.conservative_floor,
+                "human_policy_source_of_truth_override": human_source_of_truth_override,
+                # Verdict / advisory / hard-block / final-authority attribution
+                "human_policy_verdict_decision": (
+                    human_resolution.governance_decision()
+                    if human_matched else None
+                ),
+                "llm_baseline_decision": llm_baseline_decision,
+                "model_advisory_decision": model_advisory_decision,
+                "hard_block": hard_block,
+                "hard_block_provenance": hard_block_provenance,
+                "final_authority_used": final_authority_used,
+                # Back-compat: previously emitted key (== effective mode audit)
+                "human_policy_mode": human_resolution.effective_mode,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -2074,6 +2278,7 @@ class GovernanceService:
             readiness_check=readiness_check_dict,
             agent_policy=agent_policy_dict,
             rollback_watch=rollback_watch_dict,
+            human_policy=human_policy_dict,
         )
         self._persist_audit_event(audit_event)
 
@@ -2181,6 +2386,7 @@ class GovernanceService:
             confidence_gate=confidence_summary,
             audit_event=audit_event,
             shadow_assessment=shadow_audit,
+            human_policy=human_policy_dict,
             approval_required=approval_required,
             approval_id=approval_id,
             approval_summary=approval_summary,
