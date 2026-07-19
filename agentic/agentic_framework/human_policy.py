@@ -195,6 +195,13 @@ class ActionCriticalityRegistry:
     critical_promoting_facts: Tuple[str, ...] = (
         "last_replica", "irreversible", "bulk", "public_sensitive",
     )
+    # Deterministic facts that classify an action as NON-critical. Symmetric to
+    # ``critical_promoting_facts`` so a domain adapter that derives criticality
+    # externally (e.g. a healthcare classifier) can signal BOTH directions with
+    # a single fact each. Promotion still wins: any critical signal above
+    # short-circuits to CRITICAL before these are consulted, so a non-critical
+    # fact can never downgrade a critically-classified action.
+    non_critical_facts: Tuple[str, ...] = ()
     uncertain_disposition: UncertainDisposition = UncertainDisposition.REQUIRE_APPROVAL
 
     def classify(self, ctx: "RequestContext") -> Tuple[CriticalityClass, Tuple[str, ...]]:
@@ -223,6 +230,10 @@ class ActionCriticalityRegistry:
 
         # 3. Non-critical class membership.
         noncrit = False
+        for fact in self.non_critical_facts:
+            if _fact_truthy(ctx.facts, fact):
+                noncrit = True
+                basis.append(f"non_critical:fact:{fact}")
         if ctx.risk_level in self.non_critical_risk_levels:
             noncrit = True
             basis.append(f"non_critical:risk_level:{ctx.risk_level}")
