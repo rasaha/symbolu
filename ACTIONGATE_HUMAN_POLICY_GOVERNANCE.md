@@ -1,7 +1,8 @@
 # ActionGate — Human-Curated Policy Governance
 
-**Status:** Implemented (Phase HP-1). Backward-compatible; off unless a policy
-book is configured.
+**Status:** Implemented (Phase HP-2 — per-decision authority mode).
+Backward-compatible; off unless a policy book is configured, and identical to
+the pre-feature service when no registry / per-rule mode is set.
 
 **Scope:** Adds a deterministic, human-authored policy layer to the ActionGate
 decision core (`agentic/agentic_framework/governance_service.py`) so that
@@ -67,7 +68,14 @@ AuthorizationRequest
   `constraints`, `approver_policy`, and a `priority`.
 - **`HumanPolicyBook`** — a versioned, content-hashed collection of rules with a
   stable `policy_version()` (mirrors `action_gate_ref.policy.policy_version`).
-- **`HumanPolicyEngine`** — deterministic, fail-closed evaluator.
+- **`HumanPolicyEngine`** — deterministic, fail-closed evaluator; accepts an
+  optional `mode` (default) and `criticality_registry`, and resolves the
+  per-decision effective mode.
+- **`ActionCriticalityRegistry` / `CriticalityClass` / `UncertainDisposition`**
+  — human-authored, deterministic action-class → criticality classification and
+  its conservative uncertain-handling policy.
+- **`resolve_authority_mode` / `AuthorityModeResolution`** — the per-decision
+  mode precedence (rule → registry → engine default).
 - **`RequestContext` / `build_request_context`** — a dependency-light,
   duck-typed view of an `AuthorizationRequest` (no Pydantic import → no cycle).
 - **`resolve_human_policy` / `stricter_decision`** — the adapter + composition
@@ -75,14 +83,18 @@ AuthorizationRequest
 - **`build_default_book()`** — a small illustrative book mirroring a few frozen
   reference invariants; meant to be replaced by a real book.
 
-## 3. Authority modes — the switch
+## 3. Authority modes — the switch (now resolved per decision)
 
 The relationship between a matched human verdict and the LLM/model-derived
-decision is a **switch** on the engine: `HumanPolicyMode`.
+decision is `HumanPolicyMode`. It is **resolved per authorization request**, so a
+single `GovernanceService` handles critical and non-critical actions
+concurrently — each under its own mode. See §3a for the resolution precedence;
+the engine-level `mode` is only the lowest-precedence default.
 
 ```python
 HumanPolicyEngine(book, mode=HumanPolicyMode.BASELINE)          # default
 HumanPolicyEngine(book, mode=HumanPolicyMode.SOURCE_OF_TRUTH)
+HumanPolicyEngine(book, criticality_registry=registry)          # per-decision
 ```
 
 ### Mode A — `BASELINE` (default): "human sets the baseline, the LLM can only tighten"
@@ -129,10 +141,64 @@ verdict after the model layers run.
 | **no** | — | DENY | **DENY** | **DENY** |
 | n/a (no engine) | — | any | LLM baseline | LLM baseline |
 
-The switch is recorded on every decision: `human_policy.mode`,
-`request_snapshot.human_policy_mode`, and a `HUMAN_POLICY_MODE:*` rationale code;
-a source-of-truth override also emits `HUMAN_POLICY_AUTHORITATIVE` and
-`request_snapshot.human_policy_source_of_truth_override`.
+The effective mode is recorded on every decision (see §3a and §4).
+
+## 3a. Per-decision authority-mode resolution
+
+The mode is **not fixed at engine construction**. It is resolved for each request
+by precedence, so one service runs both semantics at once — critical decisions
+under `SOURCE_OF_TRUTH`, non-critical under `BASELINE`.
+
+**Precedence** (highest first), implemented in `resolve_authority_mode()`:
+
+1. **Explicit `authority_mode` on the matched rule** — a human's deliberate
+   per-rule override (e.g. promoting an otherwise non-critical action to
+   `SOURCE_OF_TRUTH`).
+2. **Human-authored criticality registry** (`ActionCriticalityRegistry`):
+   - `CRITICAL` action class → `SOURCE_OF_TRUTH`;
+   - `NON_CRITICAL` → `BASELINE`;
+   - `UNKNOWN` → conservative (see below).
+3. **Engine/service default mode** — backward-compatible; used when neither a
+   per-rule mode nor a registry classification applies.
+
+**Criticality is deterministic and human-authored.** `ActionCriticalityRegistry`
+classifies by human-configured class membership (risk level / action type / tool)
+plus caller-declared deterministic impact facts (`last_replica`, `irreversible`,
+`bulk`, `public_sensitive`, …). Those impact facts may only **promote** an action
+to `CRITICAL`; the LLM producing the governance verdict has **no input** to
+classification, so it can never downgrade an action to non-critical. It may of
+course still *tighten* the decision under `BASELINE`, and it may escalate.
+
+**Conservative handling of uncertain criticality** (`UncertainDisposition`):
+
+- `REQUIRE_APPROVAL` (default): resolve to `SOURCE_OF_TRUTH` **and** apply a
+  `DEFER` floor — an unclassified action with a broad human `ALLOW` becomes
+  `DEFER` (+ human confirmation), never a silent pass.
+- `TREAT_AS_CRITICAL`: resolve to `SOURCE_OF_TRUTH` and let the matched verdict
+  stand.
+
+**The LLM can never downgrade a `SOURCE_OF_TRUTH` decision to `BASELINE`** —
+mode resolution consults only human-authored inputs (rule mode, registry,
+engine default); the model is never a source. It can recommend escalation
+(tighten) but not relax the authority mode.
+
+**Fail-closed hard blocks remain the final layer** in both modes: a forbidden
+capability, an agent `PolicyEngine` hard-deny, or a closed generation gate force
+`DENY` even over a human `SOURCE_OF_TRUTH` `ALLOW` (these are independent
+human-configured invariants, not LLM judgements).
+
+```python
+from agentic.agentic_framework.human_policy import (
+    ActionCriticalityRegistry, UncertainDisposition, HumanPolicyEngine,
+)
+registry = ActionCriticalityRegistry(
+    critical_risk_levels=("destructive", "privileged"),
+    non_critical_risk_levels=("read_only",),
+    critical_tools=("prod_db",),
+    uncertain_disposition=UncertainDisposition.REQUIRE_APPROVAL,
+)
+engine = HumanPolicyEngine(book, criticality_registry=registry)  # per-decision
+```
 
 ### Rule selection within a book
 
@@ -152,22 +218,32 @@ All changes are additive and guarded by `self._human_policy_engine is not None`:
 2. **`__init__`** — new optional `human_policy_engine` parameter, stored as
    `self._human_policy_engine`.
 3. **Step 5a** (between the LLM baseline `_compute_governance_decision` and the
-   JEPA override): read the mode from the engine, `resolve_human_policy(...)`,
-   then set the baseline — `stricter_of(llm, human)` in `BASELINE`, or the human
-   verdict directly in `SOURCE_OF_TRUTH`; set `eligible=False` when non-ALLOW;
-   capture `human_requires_human`.
-3b. **Step 5f** (after the model layers / shadow): in `SOURCE_OF_TRUTH` mode with
-   a matched rule, restore the human verdict (undoing model tightening) unless an
-   independent hard block (forbidden capability / agent-policy hard-deny /
-   generation gate) forces `DENY`.
-4. **`effective_requires_human`** — OR in `human_requires_human`; in a
-   source-of-truth override it is set from the human verdict.
-5. **Rationale codes / string** — `HUMAN_POLICY:*`, `HUMAN_POLICY_RULE:*`, and a
-   human-readable clause.
+   JEPA override): capture `llm_baseline_decision`, `resolve_human_policy(...)`
+   (which resolves the **per-decision** `effective_mode`), then set the baseline
+   — `stricter_of(llm, human)` when the effective mode is `BASELINE`, or the human
+   verdict directly when `SOURCE_OF_TRUTH`; apply the conservative floor; set
+   `eligible=False` when non-ALLOW; capture `human_requires_human`.
+3b. **Step 5f** (after the model layers / shadow): compute `hard_block` +
+   provenance and the `model_advisory_decision`; when the effective mode is
+   `SOURCE_OF_TRUTH` and a rule matched, restore the human verdict (undoing model
+   tightening) unless a hard block forces `DENY`; then attribute
+   `final_authority_used` ∈ {`HARD_BLOCK`, `HUMAN_SOURCE_OF_TRUTH`,
+   `HUMAN_BASELINE_COMPOSED`, `MODEL`}.
+4. **`effective_requires_human`** — OR in `human_requires_human` (incl. the
+   uncertain `DEFER` floor); in a source-of-truth override it is set from the
+   human verdict.
+5. **Rationale codes** — `HUMAN_POLICY:*`, `HUMAN_POLICY_RULE:*`,
+   `HUMAN_POLICY_MODE:*`, `HUMAN_POLICY_MODE_SOURCE:*`,
+   `HUMAN_POLICY_CRITICALITY:*`, `HUMAN_POLICY_CONSERVATIVE_FLOOR:*`,
+   `HUMAN_POLICY_AUTHORITATIVE`, `HUMAN_POLICY_FINAL_AUTHORITY:*`.
 6. **Audit** — full `human_policy` block on the `AuditEvent` and provenance keys
    in `request_snapshot`; a `human_policy` field on `AuthorizationResponse`.
    (Both models gained an optional `human_policy` field with a default, so
-   existing callers are unaffected.)
+   existing callers are unaffected.) The block distinguishes: configured
+   **default mode**, matched **rule mode**, **criticality** + basis + implied
+   mode, **effective mode** + **resolution source**, **human verdict**,
+   **model advisory verdict**, **hard-block** decision + provenance, and the
+   **final authority used**.
 
 ## 5. Guarantees
 
@@ -175,9 +251,9 @@ All changes are additive and guarded by `self._human_policy_engine is not None`:
   resolves to `DENY` with a `HUMAN_POLICY_ERROR` code — never a silent fallback
   to the LLM. The whole `authorize()` remains wrapped in the existing
   fail-closed try/except.
-- **Backward-compatible.** No engine → `human_policy` is `None`, decisions are
-  byte-identical to before. Verified: the full pre-existing governance suite
-  (380 tests) passes unchanged.
+- **Backward-compatible.** No engine → `human_policy` is `None`; no registry and
+  no per-rule mode → the engine default governs exactly as before. Decisions are
+  byte-identical to the pre-feature service in those cases.
 - **Deterministic + auditable.** Evaluation is a pure function of (request,
   risk, facts, book). The book has a stable `policy_version()` recorded in the
   audit event.
@@ -228,11 +304,15 @@ Callers declare facts via `AuthorizationRequest.metadata["facts"]`, e.g.
 
 ## 8. Testing
 
-`agentic/agentic_framework/tests/test_human_policy.py` (29 tests):
-engine/book unit tests (matching, facts, priority overrides, fail-closed,
-content hash), `GovernanceService` integration tests proving each row of the
-truth table, and mode-switch tests covering `BASELINE` vs `SOURCE_OF_TRUTH`
-(including the forbidden-capability hard-block carve-out).
+`agentic/agentic_framework/tests/test_human_policy.py` (41 tests): engine/book
+unit tests (matching, facts, priority overrides, fail-closed, content hash),
+`GovernanceService` integration tests proving each row of the truth table,
+mode-switch tests (`BASELINE` vs `SOURCE_OF_TRUTH`, incl. the hard-block
+carve-out), criticality-registry + `resolve_authority_mode` precedence tests,
+and **concurrent per-decision** tests proving one service instance handles
+critical (`SOURCE_OF_TRUTH`), non-critical (`BASELINE`), uncertain
+(conservative `DEFER`), explicit-rule-override, and hard-block requests
+back-to-back.
 
 ## 9. Future work
 

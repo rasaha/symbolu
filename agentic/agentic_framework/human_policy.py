@@ -132,6 +132,203 @@ def verdict_severity(verdict: HumanPolicyVerdict) -> int:
 
 
 # =============================================================================
+# Action-criticality classification (human-authored)
+# =============================================================================
+
+
+class CriticalityClass(str, Enum):
+    """Human-authored criticality of an action class.
+
+    CRITICAL      → decisions default to SOURCE_OF_TRUTH (human dispositive).
+    NON_CRITICAL  → decisions default to BASELINE (model may tighten).
+    UNKNOWN       → not classified; handled conservatively per the registry's
+                    ``uncertain_disposition``.
+    """
+
+    CRITICAL = "critical"
+    NON_CRITICAL = "non_critical"
+    UNKNOWN = "unknown"
+
+
+class UncertainDisposition(str, Enum):
+    """How to handle an action whose criticality the registry cannot classify.
+
+    REQUIRE_APPROVAL
+        Conservative default — force at least DEFER (human confirmation) and
+        resolve the authority mode to SOURCE_OF_TRUTH so the model cannot loosen
+        that floor.  Safe regardless of what the matched verdict says (a broad
+        ALLOW does not silently pass on an unclassified action).
+
+    TREAT_AS_CRITICAL
+        Treat the action as CRITICAL — resolve to SOURCE_OF_TRUTH and let the
+        matched human verdict stand (no forced approval floor).
+    """
+
+    REQUIRE_APPROVAL = "require_approval"
+    TREAT_AS_CRITICAL = "treat_as_critical"
+
+
+@dataclass(frozen=True)
+class ActionCriticalityRegistry:
+    """Human-authored classification of action classes into criticality.
+
+    Classification is **deterministic** and derived only from human-configured
+    class membership plus caller-declared deterministic impact facts.  The LLM
+    that produces the governance verdict has NO input here, so it can never
+    downgrade an action's criticality; deterministic impact facts may only
+    PROMOTE an action to CRITICAL.
+
+    Membership is checked in this order (promotion wins):
+      1. any ``critical_promoting_facts`` truthy in the request facts → CRITICAL;
+      2. ``critical_*`` class membership (risk level / action type / tool) → CRITICAL;
+      3. otherwise ``non_critical_*`` membership → NON_CRITICAL;
+      4. otherwise → UNKNOWN (handled per ``uncertain_disposition``).
+    """
+
+    critical_risk_levels: Tuple[str, ...] = ("destructive", "privileged")
+    non_critical_risk_levels: Tuple[str, ...] = ("read_only",)
+    critical_action_types: Tuple[str, ...] = ()
+    non_critical_action_types: Tuple[str, ...] = ()
+    critical_tools: Tuple[str, ...] = ()
+    non_critical_tools: Tuple[str, ...] = ()
+    # Deterministic impact facts that PROMOTE an action to critical (never demote).
+    critical_promoting_facts: Tuple[str, ...] = (
+        "last_replica", "irreversible", "bulk", "public_sensitive",
+    )
+    uncertain_disposition: UncertainDisposition = UncertainDisposition.REQUIRE_APPROVAL
+
+    def classify(self, ctx: "RequestContext") -> Tuple[CriticalityClass, Tuple[str, ...]]:
+        """Return ``(criticality, basis)`` for *ctx* (deterministic)."""
+        basis: List[str] = []
+
+        # 1. Deterministic impact promotion (facts) — always wins.
+        promoted = False
+        for fact in self.critical_promoting_facts:
+            if _fact_truthy(ctx.facts, fact):
+                promoted = True
+                basis.append(f"promoted:fact:{fact}")
+
+        # 2. Critical class membership.
+        if ctx.risk_level in self.critical_risk_levels:
+            promoted = True
+            basis.append(f"critical:risk_level:{ctx.risk_level}")
+        if ctx.action_type in self.critical_action_types:
+            promoted = True
+            basis.append(f"critical:action_type:{ctx.action_type}")
+        if ctx.tool_name and ctx.tool_name in self.critical_tools:
+            promoted = True
+            basis.append(f"critical:tool:{ctx.tool_name}")
+        if promoted:
+            return CriticalityClass.CRITICAL, tuple(basis)
+
+        # 3. Non-critical class membership.
+        noncrit = False
+        if ctx.risk_level in self.non_critical_risk_levels:
+            noncrit = True
+            basis.append(f"non_critical:risk_level:{ctx.risk_level}")
+        if ctx.action_type in self.non_critical_action_types:
+            noncrit = True
+            basis.append(f"non_critical:action_type:{ctx.action_type}")
+        if ctx.tool_name and ctx.tool_name in self.non_critical_tools:
+            noncrit = True
+            basis.append(f"non_critical:tool:{ctx.tool_name}")
+        if noncrit:
+            return CriticalityClass.NON_CRITICAL, tuple(basis)
+
+        # 4. Unclassified.
+        return CriticalityClass.UNKNOWN, ("unclassified",)
+
+    def default_mode(self, criticality: CriticalityClass) -> HumanPolicyMode:
+        """Authority mode a criticality class maps to (audit/transparency)."""
+        if criticality == CriticalityClass.NON_CRITICAL:
+            return HumanPolicyMode.BASELINE
+        # CRITICAL and UNKNOWN both resolve to SOURCE_OF_TRUTH (conservative).
+        return HumanPolicyMode.SOURCE_OF_TRUTH
+
+
+@dataclass(frozen=True)
+class AuthorityModeResolution:
+    """Result of resolving the per-decision authority mode."""
+
+    effective_mode: HumanPolicyMode
+    source: str  # rule_explicit | criticality_registry | uncertain_conservative | engine_default
+    criticality: CriticalityClass
+    criticality_basis: Tuple[str, ...]
+    criticality_mode: Optional[HumanPolicyMode]  # mode implied by criticality (pre-override)
+    rule_authority_mode: Optional[HumanPolicyMode]
+    conservative_floor: Optional[str]  # e.g. "DEFER" when uncertain forces approval
+
+
+def resolve_authority_mode(
+    *,
+    rule: "HumanPolicyRule",
+    registry: Optional[ActionCriticalityRegistry],
+    engine_default: HumanPolicyMode,
+    ctx: "RequestContext",
+) -> AuthorityModeResolution:
+    """Resolve the authority mode for a matched rule, by precedence:
+
+    1. explicit ``authority_mode`` on the matched rule;
+    2. human-authored criticality registry default;
+    3. engine/service default (backward compatibility).
+
+    Unknown/uncertain criticality is handled conservatively per the registry's
+    ``uncertain_disposition``.
+    """
+    criticality = CriticalityClass.UNKNOWN
+    basis: Tuple[str, ...] = ()
+    criticality_mode: Optional[HumanPolicyMode] = None
+    if registry is not None:
+        criticality, basis = registry.classify(ctx)
+        criticality_mode = registry.default_mode(criticality)
+
+    # Precedence 1: explicit per-rule mode.
+    if rule.authority_mode is not None:
+        return AuthorityModeResolution(
+            effective_mode=rule.authority_mode,
+            source="rule_explicit",
+            criticality=criticality,
+            criticality_basis=basis,
+            criticality_mode=criticality_mode,
+            rule_authority_mode=rule.authority_mode,
+            conservative_floor=None,
+        )
+
+    # Precedence 2: criticality registry.
+    if registry is not None:
+        if criticality == CriticalityClass.CRITICAL:
+            return AuthorityModeResolution(
+                effective_mode=HumanPolicyMode.SOURCE_OF_TRUTH,
+                source="criticality_registry", criticality=criticality,
+                criticality_basis=basis, criticality_mode=criticality_mode,
+                rule_authority_mode=None, conservative_floor=None)
+        if criticality == CriticalityClass.NON_CRITICAL:
+            return AuthorityModeResolution(
+                effective_mode=HumanPolicyMode.BASELINE,
+                source="criticality_registry", criticality=criticality,
+                criticality_basis=basis, criticality_mode=criticality_mode,
+                rule_authority_mode=None, conservative_floor=None)
+        # UNKNOWN → conservative.
+        floor = (
+            "DEFER"
+            if registry.uncertain_disposition == UncertainDisposition.REQUIRE_APPROVAL
+            else None
+        )
+        return AuthorityModeResolution(
+            effective_mode=HumanPolicyMode.SOURCE_OF_TRUTH,
+            source="uncertain_conservative", criticality=criticality,
+            criticality_basis=basis, criticality_mode=criticality_mode,
+            rule_authority_mode=None, conservative_floor=floor)
+
+    # Precedence 3: engine/service default.
+    return AuthorityModeResolution(
+        effective_mode=engine_default, source="engine_default",
+        criticality=criticality, criticality_basis=basis,
+        criticality_mode=criticality_mode, rule_authority_mode=None,
+        conservative_floor=None)
+
+
+# =============================================================================
 # Rule
 # =============================================================================
 
@@ -189,6 +386,10 @@ class HumanPolicyRule:
     approver_policy: str = ""
     priority: int = 0
     description: str = ""
+    # Optional explicit authority mode for this rule — precedence #1 in
+    # per-decision mode resolution (a human's deliberate per-rule override,
+    # e.g. promoting an otherwise non-critical action to SOURCE_OF_TRUTH).
+    authority_mode: Optional[HumanPolicyMode] = None
 
     def matches(self, ctx: "RequestContext") -> bool:
         """Return True if this rule applies to *ctx* (conjunctive match)."""
@@ -238,6 +439,9 @@ class HumanPolicyRule:
             "approver_policy": self.approver_policy,
             "priority": self.priority,
             "description": self.description,
+            "authority_mode": (
+                self.authority_mode.value if self.authority_mode is not None else None
+            ),
         }
 
 
@@ -356,7 +560,16 @@ class HumanPolicyResolution:
     policy_version: str = ""
     description: str = ""
     fail_closed_error: bool = False
+    # ``mode`` is the engine/service DEFAULT mode (configured at construction).
     mode: str = HumanPolicyMode.BASELINE.value
+    # Per-decision authority-mode resolution (populated by the engine).
+    effective_mode: str = HumanPolicyMode.BASELINE.value
+    mode_resolution_source: str = "engine_default"
+    criticality: str = ""  # "", "critical", "non_critical", "unknown"
+    criticality_basis: Tuple[str, ...] = ()
+    criticality_mode: Optional[str] = None
+    rule_authority_mode: Optional[str] = None
+    conservative_floor: Optional[str] = None  # e.g. "DEFER"
 
     def governance_decision(self) -> Optional[str]:
         """Map the verdict to a top-level decision string, or None if silent."""
@@ -389,6 +602,15 @@ class HumanPolicyResolution:
             "policy_version": self.policy_version,
             "description": self.description,
             "fail_closed_error": self.fail_closed_error,
+            "default_mode": self.mode,
+            "effective_mode": self.effective_mode,
+            "mode_resolution_source": self.mode_resolution_source,
+            "criticality": self.criticality,
+            "criticality_basis": list(self.criticality_basis),
+            "criticality_mode": self.criticality_mode,
+            "rule_authority_mode": self.rule_authority_mode,
+            "conservative_floor": self.conservative_floor,
+            # Back-compat alias: previously ``mode`` meant the engine default.
             "mode": self.mode,
         }
 
@@ -414,29 +636,59 @@ class HumanPolicyEngine:
         self,
         book: HumanPolicyBook,
         mode: HumanPolicyMode = HumanPolicyMode.BASELINE,
+        criticality_registry: Optional[ActionCriticalityRegistry] = None,
     ) -> None:
         self.book = book
+        # ``mode`` is the DEFAULT authority mode — the lowest-precedence source
+        # in per-decision resolution (backward-compatible when no per-rule or
+        # per-action-class configuration exists).
         self.mode = mode
+        self.criticality_registry = criticality_registry
         self._policy_version = book.policy_version()
 
     def evaluate(self, ctx: RequestContext) -> HumanPolicyResolution:
-        mode_value = self.mode.value
+        default_mode_value = self.mode.value
         try:
             rule = self.book.select(ctx)
             if rule is None:
                 # Configured but nothing matched — silent, LLM baseline stands.
+                # Criticality is still classified for audit transparency, but no
+                # authority mode is applied (there is no human verdict to make
+                # dispositive).
+                crit = CriticalityClass.UNKNOWN
+                crit_basis: Tuple[str, ...] = ()
+                if self.criticality_registry is not None:
+                    crit, crit_basis = self.criticality_registry.classify(ctx)
                 return HumanPolicyResolution(
                     available=True,
                     matched=False,
                     reason_codes=("HUMAN_POLICY:NO_MATCH",),
                     policy_version=self._policy_version,
-                    mode=mode_value,
+                    mode=default_mode_value,
+                    effective_mode=default_mode_value,
+                    mode_resolution_source="no_match",
+                    criticality=crit.value,
+                    criticality_basis=crit_basis,
                 )
-            reason_codes = (
+
+            amr = resolve_authority_mode(
+                rule=rule,
+                registry=self.criticality_registry,
+                engine_default=self.mode,
+                ctx=ctx,
+            )
+            reason_codes = [
                 f"HUMAN_POLICY:{rule.verdict.value}",
                 f"HUMAN_POLICY_RULE:{rule.rule_id}",
-                f"HUMAN_POLICY_MODE:{mode_value}",
-            )
+                f"HUMAN_POLICY_MODE:{amr.effective_mode.value}",
+                f"HUMAN_POLICY_MODE_SOURCE:{amr.source}",
+            ]
+            if amr.criticality != CriticalityClass.UNKNOWN or self.criticality_registry is not None:
+                reason_codes.append(f"HUMAN_POLICY_CRITICALITY:{amr.criticality.value}")
+            if amr.conservative_floor:
+                reason_codes.append(
+                    f"HUMAN_POLICY_CONSERVATIVE_FLOOR:{amr.conservative_floor}"
+                )
             return HumanPolicyResolution(
                 available=True,
                 matched=True,
@@ -445,12 +697,26 @@ class HumanPolicyEngine:
                 matched_rule_priority=rule.priority,
                 constraints=dict(rule.constraints),
                 approver_policy=rule.approver_policy,
-                reason_codes=reason_codes,
+                reason_codes=tuple(reason_codes),
                 policy_version=self._policy_version,
                 description=rule.description,
-                mode=mode_value,
+                mode=default_mode_value,
+                effective_mode=amr.effective_mode.value,
+                mode_resolution_source=amr.source,
+                criticality=amr.criticality.value,
+                criticality_basis=amr.criticality_basis,
+                criticality_mode=(
+                    amr.criticality_mode.value
+                    if amr.criticality_mode is not None else None
+                ),
+                rule_authority_mode=(
+                    amr.rule_authority_mode.value
+                    if amr.rule_authority_mode is not None else None
+                ),
+                conservative_floor=amr.conservative_floor,
             )
         except Exception as exc:  # fail-closed: a broken book must not open the gate
+            # Fail closed to a dispositive DENY.
             return HumanPolicyResolution(
                 available=True,
                 matched=True,
@@ -459,7 +725,9 @@ class HumanPolicyEngine:
                 reason_codes=(f"HUMAN_POLICY_ERROR:{type(exc).__name__}",),
                 policy_version=self._policy_version,
                 fail_closed_error=True,
-                mode=mode_value,
+                mode=default_mode_value,
+                effective_mode=HumanPolicyMode.SOURCE_OF_TRUTH.value,
+                mode_resolution_source="fail_closed",
             )
 
 
@@ -542,6 +810,8 @@ def resolve_human_policy(
             reason_codes=(f"HUMAN_POLICY_ERROR:{type(exc).__name__}",),
             fail_closed_error=True,
             mode=engine.mode.value,
+            effective_mode=HumanPolicyMode.SOURCE_OF_TRUTH.value,
+            mode_resolution_source="fail_closed",
         )
     return engine.evaluate(ctx)
 
@@ -562,6 +832,24 @@ def stricter_decision(a: str, b: str) -> str:
 # =============================================================================
 # Example / default book
 # =============================================================================
+
+
+def build_default_criticality_registry() -> ActionCriticalityRegistry:
+    """A small, illustrative human-authored criticality registry.
+
+    Destructive/privileged actions (and known impact facts) are CRITICAL →
+    SOURCE_OF_TRUTH; read-only actions are NON_CRITICAL → BASELINE; anything
+    else is UNKNOWN and handled conservatively (force REQUIRE_APPROVAL).
+    Security owners replace this with their own class map.
+    """
+    return ActionCriticalityRegistry(
+        critical_risk_levels=("destructive", "privileged"),
+        non_critical_risk_levels=("read_only",),
+        critical_promoting_facts=(
+            "last_replica", "irreversible", "bulk", "public_sensitive",
+        ),
+        uncertain_disposition=UncertainDisposition.REQUIRE_APPROVAL,
+    )
 
 
 def build_default_book() -> HumanPolicyBook:

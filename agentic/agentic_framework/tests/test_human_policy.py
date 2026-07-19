@@ -21,14 +21,20 @@ from agentic.agentic_framework.governance_models import (
 )
 from agentic.agentic_framework.governance_service import GovernanceService
 from agentic.agentic_framework.human_policy import (
+    ActionCriticalityRegistry,
+    AuthorityModeResolution,
+    CriticalityClass,
     HumanPolicyBook,
     HumanPolicyEngine,
     HumanPolicyMode,
     HumanPolicyRule,
     HumanPolicyVerdict,
     RequestContext,
+    UncertainDisposition,
     build_default_book,
+    build_default_criticality_registry,
     build_request_context,
+    resolve_authority_mode,
     resolve_human_policy,
     stricter_decision,
     verdict_severity,
@@ -402,6 +408,219 @@ def test_source_of_truth_no_match_falls_back_to_llm():
     assert sot.human_policy["matched"] is False
     assert sot.governance_decision == APIGovernanceDecision.ALLOW
     assert "HUMAN_POLICY_AUTHORITATIVE" not in sot.rationale_codes
+
+
+# =============================================================================
+# Per-decision authority-mode resolution (criticality registry + precedence)
+# =============================================================================
+
+
+def test_criticality_registry_classifies_critical_noncritical_unknown():
+    reg = build_default_criticality_registry()
+    crit, _ = reg.classify(_ctx(risk_level="destructive"))
+    assert crit == CriticalityClass.CRITICAL
+    noncrit, _ = reg.classify(_ctx(risk_level="read_only"))
+    assert noncrit == CriticalityClass.NON_CRITICAL
+    unknown, basis = reg.classify(_ctx(risk_level="write"))
+    assert unknown == CriticalityClass.UNKNOWN
+    assert basis == ("unclassified",)
+
+
+def test_criticality_promoting_fact_overrides_noncritical():
+    # A deterministic impact fact promotes an otherwise non-critical action.
+    reg = build_default_criticality_registry()
+    crit, basis = reg.classify(_ctx(risk_level="read_only", facts={"last_replica": True}))
+    assert crit == CriticalityClass.CRITICAL
+    assert any("promoted:fact:last_replica" in b for b in basis)
+
+
+def test_resolve_authority_mode_precedence():
+    reg = build_default_criticality_registry()
+    # 1. explicit rule mode wins over registry.
+    rule_sot = HumanPolicyRule(rule_id="r", verdict=HumanPolicyVerdict.ALLOW,
+                               authority_mode=HumanPolicyMode.SOURCE_OF_TRUTH)
+    amr = resolve_authority_mode(rule=rule_sot, registry=reg,
+                                 engine_default=HumanPolicyMode.BASELINE,
+                                 ctx=_ctx(risk_level="read_only"))
+    assert amr.effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH
+    assert amr.source == "rule_explicit"
+    # 2. registry: critical -> SOURCE_OF_TRUTH, non-critical -> BASELINE.
+    rule = HumanPolicyRule(rule_id="r", verdict=HumanPolicyVerdict.ALLOW)
+    amr_c = resolve_authority_mode(rule=rule, registry=reg,
+                                   engine_default=HumanPolicyMode.BASELINE,
+                                   ctx=_ctx(risk_level="destructive"))
+    assert amr_c.effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH
+    assert amr_c.source == "criticality_registry"
+    amr_n = resolve_authority_mode(rule=rule, registry=reg,
+                                   engine_default=HumanPolicyMode.SOURCE_OF_TRUTH,
+                                   ctx=_ctx(risk_level="read_only"))
+    assert amr_n.effective_mode == HumanPolicyMode.BASELINE
+    # 3. no registry -> engine default.
+    amr_d = resolve_authority_mode(rule=rule, registry=None,
+                                   engine_default=HumanPolicyMode.SOURCE_OF_TRUTH,
+                                   ctx=_ctx(risk_level="write"))
+    assert amr_d.effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH
+    assert amr_d.source == "engine_default"
+
+
+def test_resolve_authority_mode_uncertain_conservative():
+    # REQUIRE_APPROVAL disposition → SOURCE_OF_TRUTH + DEFER floor.
+    reg = ActionCriticalityRegistry(
+        critical_risk_levels=(), non_critical_risk_levels=(),
+        uncertain_disposition=UncertainDisposition.REQUIRE_APPROVAL)
+    amr = resolve_authority_mode(
+        rule=HumanPolicyRule(rule_id="r", verdict=HumanPolicyVerdict.ALLOW),
+        registry=reg, engine_default=HumanPolicyMode.BASELINE,
+        ctx=_ctx(risk_level="write"))
+    assert amr.effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH
+    assert amr.source == "uncertain_conservative"
+    assert amr.conservative_floor == "DEFER"
+    # TREAT_AS_CRITICAL disposition → SOURCE_OF_TRUTH, no floor.
+    reg2 = ActionCriticalityRegistry(
+        critical_risk_levels=(), non_critical_risk_levels=(),
+        uncertain_disposition=UncertainDisposition.TREAT_AS_CRITICAL)
+    amr2 = resolve_authority_mode(
+        rule=HumanPolicyRule(rule_id="r", verdict=HumanPolicyVerdict.ALLOW),
+        registry=reg2, engine_default=HumanPolicyMode.BASELINE,
+        ctx=_ctx(risk_level="write"))
+    assert amr2.effective_mode == HumanPolicyMode.SOURCE_OF_TRUTH
+    assert amr2.conservative_floor is None
+
+
+def test_engine_populates_per_decision_resolution():
+    reg = build_default_criticality_registry()
+    eng = HumanPolicyEngine(build_default_book(), criticality_registry=reg)
+    res = eng.evaluate(_ctx(action_type="read", risk_level="read_only",
+                            target_haystack="read fs"))
+    assert res.effective_mode == "baseline"
+    assert res.mode_resolution_source == "criticality_registry"
+    assert res.criticality == "non_critical"
+    assert res.criticality_mode == "baseline"
+
+
+# --- Concurrent per-decision modes on ONE service instance ------------------
+
+
+def _concurrent_service():
+    """A single service whose engine resolves mode per decision."""
+    book = HumanPolicyBook(rules=(
+        HumanPolicyRule(rule_id="crit-proddb", verdict=HumanPolicyVerdict.ALLOW,
+                        tool_names=("prod_db",)),
+        HumanPolicyRule(rule_id="noncrit-report", verdict=HumanPolicyVerdict.ALLOW,
+                        tool_names=("report_view",)),
+        HumanPolicyRule(rule_id="uncertain-batch", verdict=HumanPolicyVerdict.ALLOW,
+                        tool_names=("batch_job",)),
+        HumanPolicyRule(rule_id="special-sot", verdict=HumanPolicyVerdict.ALLOW,
+                        tool_names=("special",),
+                        authority_mode=HumanPolicyMode.SOURCE_OF_TRUTH),
+    ))
+    registry = ActionCriticalityRegistry(
+        critical_tools=("prod_db",),
+        non_critical_tools=("report_view", "special"),
+        critical_risk_levels=(), non_critical_risk_levels=(),
+        uncertain_disposition=UncertainDisposition.REQUIRE_APPROVAL,
+    )
+    return GovernanceService(
+        human_policy_engine=HumanPolicyEngine(book, criticality_registry=registry)
+    )
+
+
+_WEAK = dict(quality_score=0.0, coherence_score=0.0, internal_consistency=0.0,
+             goal_alignment=0.0, trajectory_confidence=0.0, agency_level="FULL")
+
+
+def test_concurrent_critical_source_of_truth_allow():
+    # critical + human ALLOW + model DENY → ALLOW (no hard block).
+    svc = _concurrent_service()
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="act", tool_name="prod_db", **_WEAK))
+    assert resp.governance_decision == APIGovernanceDecision.ALLOW
+    hp = resp.human_policy
+    assert hp["effective_mode"] == "source_of_truth"
+    assert hp["mode_resolution_source"] == "criticality_registry"
+    assert hp["criticality"] == "critical"
+    assert hp["model_advisory_decision"] == "DENY"
+    assert hp["final_authority_used"] == "HUMAN_SOURCE_OF_TRUTH"
+
+
+def test_concurrent_noncritical_baseline_deny():
+    # non-critical + human ALLOW + model DENY → DENY (baseline tightening).
+    svc = _concurrent_service()
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="act", tool_name="report_view", **_WEAK))
+    assert resp.governance_decision == APIGovernanceDecision.DENY
+    hp = resp.human_policy
+    assert hp["effective_mode"] == "baseline"
+    assert hp["criticality"] == "non_critical"
+    assert hp["final_authority_used"] == "HUMAN_BASELINE_COMPOSED"
+
+
+def test_concurrent_critical_forbidden_capability_hard_block():
+    # critical + human ALLOW + forbidden capability → DENY (hard block wins).
+    svc = _concurrent_service()
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="act", tool_name="prod_db",
+        capabilities=["malware_execution"], **_WEAK))
+    assert resp.governance_decision == APIGovernanceDecision.DENY
+    hp = resp.human_policy
+    assert hp["final_authority_used"] == "HARD_BLOCK"
+    assert any("malware_execution" in p for p in hp["hard_block_provenance"])
+
+
+def test_concurrent_uncertain_criticality_conservative():
+    # uncertain criticality + human ALLOW → conservative DEFER + requires_human.
+    svc = _concurrent_service()
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="act", tool_name="batch_job",
+        quality_score=1.0, coherence_score=1.0, internal_consistency=1.0,
+        goal_alignment=1.0, trajectory_confidence=1.0, agency_level="FULL"))
+    assert resp.governance_decision == APIGovernanceDecision.DEFER
+    assert resp.requires_human_approval
+    hp = resp.human_policy
+    assert hp["criticality"] == "unknown"
+    assert hp["mode_resolution_source"] == "uncertain_conservative"
+    assert hp["conservative_floor"] == "DEFER"
+
+
+def test_concurrent_explicit_rule_mode_overrides_action_class_default():
+    # 'special' is non-critical in the registry (→ baseline) but the matched
+    # rule explicitly forces SOURCE_OF_TRUTH, so a model DENY cannot override.
+    svc = _concurrent_service()
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="act", tool_name="special", **_WEAK))
+    assert resp.governance_decision == APIGovernanceDecision.ALLOW
+    hp = resp.human_policy
+    assert hp["effective_mode"] == "source_of_truth"
+    assert hp["mode_resolution_source"] == "rule_explicit"
+    assert hp["criticality"] == "non_critical"
+    assert hp["criticality_mode"] == "baseline"
+
+
+def test_one_service_handles_all_classes_in_sequence():
+    # The same service instance processes critical, non-critical, and uncertain
+    # requests back-to-back, each under its own resolved authority mode.
+    svc = _concurrent_service()
+    crit = svc.authorize(AuthorizationRequest(actor_id="a", action_type="act",
+                                              tool_name="prod_db", **_WEAK))
+    noncrit = svc.authorize(AuthorizationRequest(actor_id="a", action_type="act",
+                                                 tool_name="report_view", **_WEAK))
+    assert crit.human_policy["effective_mode"] == "source_of_truth"
+    assert noncrit.human_policy["effective_mode"] == "baseline"
+    assert crit.governance_decision == APIGovernanceDecision.ALLOW
+    assert noncrit.governance_decision == APIGovernanceDecision.DENY
+
+
+def test_no_registry_preserves_engine_default_mode():
+    # No criticality registry and no per-rule mode → engine default governs,
+    # exactly as before this feature existed.
+    baseline_eng = HumanPolicyEngine(build_default_book())  # default BASELINE
+    svc = GovernanceService(human_policy_engine=baseline_eng)
+    resp = svc.authorize(AuthorizationRequest(
+        actor_id="a", action_type="file_read", tool_name="read_file", **_WEAK))
+    hp = resp.human_policy
+    assert hp["effective_mode"] == "baseline"
+    assert hp["mode_resolution_source"] == "engine_default"
+    assert resp.governance_decision == APIGovernanceDecision.DENY  # LLM tightened
 
 
 def test_service_custom_book_actor_scoped_allow_exception():
