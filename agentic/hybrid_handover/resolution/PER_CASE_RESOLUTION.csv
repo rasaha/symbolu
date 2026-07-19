@@ -1,5 +1,5 @@
 resolver,mode,case_id,correct,failure_stage,abstained,edges
-frozen,A_oracle,later_amendment_override,1,none,0,0
+frozen,A_oracle,later_amendment_override,1,none,0,1
 frozen,A_oracle,buried_exception,1,none,0,0
 frozen,A_oracle,conflicting_definitions,1,none,0,0
 frozen,A_oracle,order_of_precedence,0,relationship,0,0
@@ -15,7 +15,7 @@ frozen,A_oracle,missing_appendix,0,relationship,0,0
 frozen,A_oracle,irrelevant_distractors,1,none,0,0
 frozen,A_oracle,inconsistent_numbering,0,relationship,0,0
 frozen,A_oracle,policy_override,0,relationship,0,0
-frozen,B_bm25,later_amendment_override,1,none,0,0
+frozen,B_bm25,later_amendment_override,1,none,0,1
 frozen,B_bm25,buried_exception,1,none,0,0
 frozen,B_bm25,conflicting_definitions,1,none,0,0
 frozen,B_bm25,order_of_precedence,0,relationship,0,0

@@ -59,8 +59,8 @@ def test_component_metric_signatures():
     out = run_all()
     fr = out["resolvers"]["frozen"]["A_oracle"]["metrics"]
     gt = out["resolvers"]["graph_traversal"]["A_oracle"]["metrics"]
-    # frozen recovers no typed edges; rule/graph recover most
-    assert fr["relationship_edge_recall"] == 0.0
+    # frozen recovers almost no typed edges; rule/graph recover most
+    assert fr["relationship_edge_recall"] < 0.1
     assert gt["relationship_edge_recall"] > 0.9
     # capabilities only graph_traversal has
     assert gt["cycle_detection_accuracy"] == 1.0

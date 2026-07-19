@@ -53,9 +53,9 @@ def has_negation(text: str) -> bool:
 
 
 def allows_terminate(text: str) -> bool:
-    low = text.lower()
-    return "either party may terminate for convenience" in low or \
-           "any party may terminate for convenience" in low
+    # word-boundary guard: "neither party may terminate" must NOT match
+    # "either party may terminate" (substring bug).
+    return bool(re.search(r"\b(either|any) party may terminate for convenience", text.lower()))
 
 
 def references(text: str) -> list[str]:

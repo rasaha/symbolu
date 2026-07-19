@@ -6,8 +6,8 @@
     "frozen": {
       "A_oracle": {
         "metrics": {
-          "relationship_edge_precision": 0.0,
-          "relationship_edge_recall": 0.0,
+          "relationship_edge_precision": 0.5,
+          "relationship_edge_recall": 0.0588,
           "relationship_type_accuracy": 1.0,
           "cross_document_link_accuracy": 0.25,
           "abstention_accuracy": 0.0,
@@ -41,13 +41,20 @@
               "Amendment 6 \u00a72 p.331",
               "Amendment 6 \u00a72 p.331"
             ],
-            "relationship_graph": [],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
             "governing_evidence": [
-              "MSA \u00a77.1 p.12",
               "Amendment 4 \u00a73 p.204",
               "Amendment 6 \u00a72 p.331"
             ],
-            "discarded_evidence": {},
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "superseded"
+            },
             "abstained": false,
             "abstain_reason": "",
             "final_packet": {
@@ -494,8 +501,8 @@
       },
       "B_bm25": {
         "metrics": {
-          "relationship_edge_precision": 0.0,
-          "relationship_edge_recall": 0.0,
+          "relationship_edge_precision": 0.5,
+          "relationship_edge_recall": 0.0588,
           "relationship_type_accuracy": 1.0,
           "cross_document_link_accuracy": 0.25,
           "abstention_accuracy": 0.0,
@@ -526,13 +533,20 @@
               "Amendment 4 \u00a73 p.204",
               "Amendment 6 \u00a72 p.331"
             ],
-            "relationship_graph": [],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
             "governing_evidence": [
-              "MSA \u00a77.1 p.12",
               "Amendment 4 \u00a73 p.204",
               "Amendment 6 \u00a72 p.331"
             ],
-            "discarded_evidence": {},
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "superseded"
+            },
             "abstained": false,
             "abstain_reason": "",
             "final_packet": {
@@ -978,12 +992,12 @@
         ]
       },
       "pipeline_metrics_seeb_B_bm25": {
-        "unsafe_handover_rate": 32.0,
-        "fail_closed_rate": 73.9,
+        "unsafe_handover_rate": 20.0,
+        "fail_closed_rate": 84.2,
         "packet_sufficiency": 61.9,
-        "routing_accuracy": 83.3,
-        "unsupported_claim_rate": 9.6,
-        "precedence_recall": 0.0
+        "routing_accuracy": 88.1,
+        "unsupported_claim_rate": 10.3,
+        "precedence_recall": 52.9
       }
     },
     "rule": {

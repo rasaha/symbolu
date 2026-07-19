@@ -1,0 +1,529 @@
+{
+  "benchmark": "SEEB relationship-resolution layer",
+  "synthetic": true,
+  "adversarial": {
+    "per_resolver": {
+      "always_abstain": {
+        "n_correct": 5,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.75,
+          "abstention_accuracy": 1.0,
+          "conflict_resolution_accuracy": 0.5,
+          "coverage_abstention_accuracy": 1.0,
+          "cycle_detection_accuracy": 1.0,
+          "definition_resolution_accuracy": 0.0,
+          "exception_resolution_accuracy": 0.0,
+          "negation_interpretation_accuracy": 0.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.5
+        },
+        "false_abstention": "11/11"
+      },
+      "always_first_document": {
+        "n_correct": 5,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.0,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.5
+        },
+        "false_abstention": "0/11"
+      },
+      "always_latest": {
+        "n_correct": 6,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.0,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.5
+        },
+        "false_abstention": "0/11"
+      },
+      "always_override": {
+        "n_correct": 6,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.0,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.5
+        },
+        "false_abstention": "0/11"
+      },
+      "always_allowed": {
+        "n_correct": 5,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.0,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.5,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 0.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.5
+        },
+        "false_abstention": "0/11"
+      },
+      "null": {
+        "n_correct": 0,
+        "metrics": {
+          "relationship_edge_precision": null,
+          "relationship_edge_recall": 0.0,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.0,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 0.0,
+          "exception_resolution_accuracy": 0.0,
+          "negation_interpretation_accuracy": 0.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.0,
+          "version_selection_accuracy": 0.0
+        },
+        "false_abstention": "0/11"
+      }
+    },
+    "gameable_metrics": {
+      "abstention_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_abstain"
+        ]
+      },
+      "coverage_abstention_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_abstain"
+        ]
+      },
+      "cycle_detection_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_abstain"
+        ]
+      },
+      "definition_resolution_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_first_document",
+          "always_latest",
+          "always_override",
+          "always_allowed"
+        ]
+      },
+      "exception_resolution_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_first_document",
+          "always_latest",
+          "always_override",
+          "always_allowed"
+        ]
+      },
+      "negation_interpretation_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_first_document",
+          "always_latest",
+          "always_override"
+        ]
+      },
+      "relationship_type_accuracy": {
+        "max_by_cheat": 1.0,
+        "cheats": [
+          "always_abstain",
+          "always_first_document",
+          "always_latest",
+          "always_override",
+          "always_allowed",
+          "null"
+        ]
+      }
+    }
+  },
+  "mirrors": {
+    "frozen": {
+      "entity_detected": "1/4",
+      "wording_detected": "1/4",
+      "rows": [
+        {
+          "mirror": "supersede_entity",
+          "capability": "supersede",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "supersede_wording",
+          "capability": "supersede",
+          "family": "wording",
+          "edge_detected": true
+        },
+        {
+          "mirror": "governs_entity",
+          "capability": "governs_over",
+          "family": "entity",
+          "edge_detected": false
+        },
+        {
+          "mirror": "governs_wording",
+          "capability": "governs_over",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "override_entity",
+          "capability": "override",
+          "family": "entity",
+          "edge_detected": false
+        },
+        {
+          "mirror": "override_wording",
+          "capability": "override",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "exception_entity",
+          "capability": "exception",
+          "family": "entity",
+          "edge_detected": false
+        },
+        {
+          "mirror": "exception_wording",
+          "capability": "exception",
+          "family": "wording",
+          "edge_detected": false
+        }
+      ]
+    },
+    "rule": {
+      "entity_detected": "4/4",
+      "wording_detected": "1/4",
+      "rows": [
+        {
+          "mirror": "supersede_entity",
+          "capability": "supersede",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "supersede_wording",
+          "capability": "supersede",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "governs_entity",
+          "capability": "governs_over",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "governs_wording",
+          "capability": "governs_over",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "override_entity",
+          "capability": "override",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "override_wording",
+          "capability": "override",
+          "family": "wording",
+          "edge_detected": true
+        },
+        {
+          "mirror": "exception_entity",
+          "capability": "exception",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "exception_wording",
+          "capability": "exception",
+          "family": "wording",
+          "edge_detected": false
+        }
+      ]
+    },
+    "graph_traversal": {
+      "entity_detected": "4/4",
+      "wording_detected": "1/4",
+      "rows": [
+        {
+          "mirror": "supersede_entity",
+          "capability": "supersede",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "supersede_wording",
+          "capability": "supersede",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "governs_entity",
+          "capability": "governs_over",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "governs_wording",
+          "capability": "governs_over",
+          "family": "wording",
+          "edge_detected": false
+        },
+        {
+          "mirror": "override_entity",
+          "capability": "override",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "override_wording",
+          "capability": "override",
+          "family": "wording",
+          "edge_detected": true
+        },
+        {
+          "mirror": "exception_entity",
+          "capability": "exception",
+          "family": "entity",
+          "edge_detected": true
+        },
+        {
+          "mirror": "exception_wording",
+          "capability": "exception",
+          "family": "wording",
+          "edge_detected": false
+        }
+      ]
+    }
+  },
+  "ground_truth": {
+    "structural_issues": [],
+    "necessity": [
+      {
+        "case_id": "later_amendment_override",
+        "edge": "Amendment 4 \u00a73 p.204 -supersedes-> MSA \u00a77.1 p.12",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "later_amendment_override",
+        "edge": "Amendment 6 \u00a72 p.331 -amends-> MSA \u00a77.1 p.12",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "buried_exception",
+        "edge": "Schedule D \u00a74 p.88 -exception_to-> MSA \u00a77.1 p.12",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "conflicting_definitions",
+        "edge": "DPA \u00a71 p.51 -conflicts_with-> MSA \u00a71 p.3",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "order_of_precedence",
+        "edge": "Order Form \u00a72 p.1 -governs_over-> MSA \u00a77.1 p.12",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "conflicting_versions",
+        "edge": "Amendment 3 (v1) p.150 -same_as-> Amendment 3 (v2) p.150",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "conflicting_versions",
+        "edge": "Amendment 3 (v1) p.150 -conflicts_with-> Amendment 3 (v2) p.150",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "duplicate_amendment",
+        "edge": "Amendment 4 p.204 -same_as-> Amendment 4 (dup) p.204",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "scanned_annex",
+        "edge": "MSA \u00a77 p.12 -references-> Annex A p.400",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "conflicting_tables",
+        "edge": "MSA \u00a77.3 p.12 -conflicts_with-> Fee Table Exhibit B p.60",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "cross_document_reference",
+        "edge": "MSA \u00a77.3 p.12 -references-> Schedule C p.70",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "circular_reference",
+        "edge": "MSA \u00a77 p.12 -references-> Schedule C p.70",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "circular_reference",
+        "edge": "Schedule C p.70 -references-> MSA \u00a77 p.12",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "missing_appendix",
+        "edge": "MSA \u00a77.3 p.12 -references-> Appendix 1",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "inconsistent_numbering",
+        "edge": "Amendment 5 \u00a77.01 p.250 -same_as-> MSA \u00a77.1 p.12",
+        "governance_necessary": false
+      },
+      {
+        "case_id": "inconsistent_numbering",
+        "edge": "Amendment 5 \u00a77.01 p.250 -supersedes-> MSA \u00a77.1 p.12",
+        "governance_necessary": true
+      },
+      {
+        "case_id": "policy_override",
+        "edge": "Corporate Policy GOV-12 p.2 -overrides-> MSA \u00a77.1 p.12",
+        "governance_necessary": true
+      }
+    ]
+  },
+  "leakage": {
+    "leak_findings": [],
+    "signature_clean": true
+  },
+  "robustness": {
+    "redundant_edges": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A"
+        ],
+        "discarded": [
+          "B"
+        ]
+      },
+      "expectation": "duplicate edge should be idempotent (B discarded once, A governs)"
+    },
+    "irrelevant_node": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A",
+          "D"
+        ],
+        "discarded": [
+          "B"
+        ]
+      },
+      "expectation": "D is unrelated; governance has NO relevance filter -> D pollutes the governing set"
+    },
+    "multiple_paths": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A",
+          "B"
+        ],
+        "discarded": [
+          "C"
+        ]
+      },
+      "expectation": "C discarded via either path; A,B both govern"
+    },
+    "parallel_overrides": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "P1",
+          "P2"
+        ],
+        "discarded": [
+          "A"
+        ]
+      },
+      "expectation": "A discarded by both; P1,P2 both govern -> ambiguous, no tie-break"
+    },
+    "nested_exceptions": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A"
+        ],
+        "discarded": []
+      },
+      "expectation": "nesting (E2->E1) is not modelled; only top-level exception recognised"
+    },
+    "multi_hop_chain": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A"
+        ],
+        "discarded": [
+          "B",
+          "C"
+        ]
+      },
+      "expectation": "B and C both discarded (each is a supersede dst); A governs (works WITHOUT transitive reasoning)"
+    },
+    "dangling_reference": {
+      "result": {
+        "abstain": false,
+        "governing": [
+          "A"
+        ],
+        "discarded": []
+      },
+      "expectation": "abstains on the dangling reference"
+    }
+  }
+}
