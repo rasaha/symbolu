@@ -1,0 +1,880 @@
+{
+  "benchmark": "SEEB",
+  "benchmark_version": "1.0.0",
+  "synthetic": true,
+  "cases": [
+    {
+      "case_id": "later_amendment_override",
+      "taxonomy_level": 3,
+      "category": "precedence reasoning",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": true,
+      "why": "Needs supersession edge MSA \u00a77.1 \u2192superseded_by\u2192 Amendment 4. Solved ONLY because the shared resolver hard-codes exactly this prohibition\u2192grant pattern; not a general capability.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          3,
+          3
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          1,
+          1
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          3,
+          3
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          1,
+          1
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "buried_exception",
+      "taxonomy_level": 2,
+      "category": "semantic retrieval / missing retrieval",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "A low-salience exception carrying no fixed keyword. Query-conditioned retrieval surfaces the span; no relationship reasoning required to make it present.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "conflicting_definitions",
+      "taxonomy_level": 2,
+      "category": "definition ambiguity / semantic retrieval",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "Two governing definitions named in the query. Retrieval surfaces both; the benchmark scores their presence, which retrieval satisfies.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          2,
+          2
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          2,
+          2
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "order_of_precedence",
+      "taxonomy_level": 3,
+      "category": "precedence reasoning",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "Requires following an explicit 'Order Form governs over the MSA' edge. The clause can be retrieved, but the governing relationship must be recorded \u2014 not a span, an edge.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "conflicting_versions",
+      "taxonomy_level": 4,
+      "category": "version reasoning",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "Two documents both labelled 'Amendment 3' with opposite content. Requires version/authority selection (or abstention); retrieving both spans does not resolve which governs.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "REFUSE",
+        "decisive": [
+          2,
+          2
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          2,
+          2
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "duplicate_amendment",
+      "taxonomy_level": 1,
+      "category": "pure retrieval / duplicate handling",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "The decisive clause exists intact; retrieval finds it. Duplicate/truncated copy is ignorable.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "ocr_corruption",
+      "taxonomy_level": 1,
+      "category": "coverage / parse failure",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "Source is garbled; correct behaviour is abstain. Coverage validation detects it \u2014 an ingestion property, not relationship reasoning.",
+      "baseline": {
+        "decision": "REFUSE",
+        "expected": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "scanned_annex",
+      "taxonomy_level": 1,
+      "category": "missing document / coverage",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "Decisive content exists only as an un-OCR'd image; correct behaviour is abstain. Coverage validation detects it.",
+      "baseline": {
+        "decision": "REFUSE",
+        "expected": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "hidden_negation",
+      "taxonomy_level": 5,
+      "category": "logical contradiction / negation",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": false,
+      "why": "Evidence is COMPLETE; the verdict inverts on a negation operator ('In no event'). No amount of retrieval fixes a polarity error \u2014 a logical, not retrieval, task.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "conflicting_tables",
+      "taxonomy_level": 5,
+      "category": "logical contradiction (prose vs table)",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "Prose (3 months) contradicts a table (6 months). Both spans retrievable; resolution needs a contradiction/precedence operator between representations.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "cross_document_reference",
+      "taxonomy_level": 2,
+      "category": "cross-document reference following",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "The decisive figure sits behind a resolvable reference (Schedule C is present). Retrieval that follows the reference surfaces the span; the value exists.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          2,
+          2
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          2,
+          2
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "circular_reference",
+      "taxonomy_level": 4,
+      "category": "cross-document reconciliation (circular)",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "A\u2192defined_in\u2192B\u2192defined_in\u2192A cycle with no ground term. Requires cycle detection \u2192 abstain; retrieving the pointer spans yields no value.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "missing_appendix",
+      "taxonomy_level": 1,
+      "category": "missing document / coverage",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "The decisive appendix is absent from the corpus; no retrieval can produce a span that does not exist. Coverage validation detects the dangling reference \u2192 abstain.",
+      "baseline": {
+        "decision": "REFUSE",
+        "expected": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "REFUSE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "irrelevant_distractors",
+      "taxonomy_level": 1,
+      "category": "pure retrieval",
+      "baseline_solved": true,
+      "oracle_solved": true,
+      "classification": "ALREADY SOLVED",
+      "requires_graph_reasoning": false,
+      "why": "One decisive clause among unrelated documents; retrieval isolates it.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          0
+        ],
+        "unsafe": false,
+        "sufficient": true
+      }
+    },
+    {
+      "case_id": "inconsistent_numbering",
+      "taxonomy_level": 3,
+      "category": "precedence reasoning + numbering normalisation",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "Amendment renumbers 7.1 as 7.01 and supersedes it. Requires a normalisation edge (7.1\u22617.01) plus a supersession edge; retrieving both clauses does not record the relationship.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          0,
+          0
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      }
+    },
+    {
+      "case_id": "policy_override",
+      "taxonomy_level": 5,
+      "category": "policy reasoning / cross-document governance",
+      "baseline_solved": false,
+      "oracle_solved": false,
+      "classification": "RETRIEVAL INSUFFICIENT",
+      "requires_graph_reasoning": true,
+      "why": "A corporate policy overrides the contract ('notwithstanding any contract term'). Requires an overridden_by edge from clause to policy; the policy span is retrievable but the governing relationship is not a span.",
+      "baseline": {
+        "decision": "ESCALATE",
+        "expected": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      },
+      "oracle": {
+        "decision": "ESCALATE",
+        "decisive": [
+          1,
+          1
+        ],
+        "defeater": [
+          1,
+          1
+        ],
+        "definition": [
+          0,
+          0
+        ],
+        "precedence": [
+          0,
+          1
+        ],
+        "unsafe": true,
+        "sufficient": false
+      }
+    }
+  ],
+  "summary": {
+    "n_cases": 16,
+    "already_solved": 9,
+    "retrieval_limited": 0,
+    "retrieval_insufficient": 7,
+    "unresolved_case_ids": [
+      "order_of_precedence",
+      "conflicting_versions",
+      "hidden_negation",
+      "conflicting_tables",
+      "circular_reference",
+      "inconsistent_numbering",
+      "policy_override"
+    ],
+    "retrieval_insufficient_ids": [
+      "order_of_precedence",
+      "conflicting_versions",
+      "hidden_negation",
+      "conflicting_tables",
+      "circular_reference",
+      "inconsistent_numbering",
+      "policy_override"
+    ],
+    "retrieval_saturated": true
+  }
+}
