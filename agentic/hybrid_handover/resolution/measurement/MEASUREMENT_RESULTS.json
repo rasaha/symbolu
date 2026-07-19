@@ -1,0 +1,391 @@
+{
+  "benchmark": "SEEB relationship-resolution measurement (repaired)",
+  "synthetic": true,
+  "metric_owner": {
+    "discovery_recall": "Discovery",
+    "discovery_precision": "Discovery",
+    "classification_accuracy": "Classification",
+    "governance_accuracy_modeG": "Governance",
+    "abstention_precision": "Governance",
+    "abstention_recall": "Governance",
+    "answer_coverage": "Governance",
+    "selective_accuracy": "Governance",
+    "packet_realization_accuracy_modeP": "PacketConstruction",
+    "parser_negation_accuracy": "SemanticParser",
+    "parser_type_accuracy": "SemanticParser",
+    "coverage_abstention_accuracy": "SafetyGate"
+  },
+  "resolvers": {
+    "frozen": {
+      "discovery_recall": 0.1333,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.5,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.6,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "answer_coverage": 0.9375,
+      "selective_accuracy": 0.4,
+      "_abstention_counts": {
+        "TA": 0,
+        "FA": 0,
+        "MA": 4,
+        "TN": 11
+      }
+    },
+    "rule": {
+      "discovery_recall": 0.9333,
+      "discovery_precision": 0.875,
+      "classification_accuracy": 0.9286,
+      "governance_accuracy_modeG": 0.7333,
+      "packet_realization_accuracy_modeP": 0.8667,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "answer_coverage": 0.9375,
+      "selective_accuracy": 0.6,
+      "_abstention_counts": {
+        "TA": 0,
+        "FA": 0,
+        "MA": 4,
+        "TN": 11
+      }
+    },
+    "graph_traversal": {
+      "discovery_recall": 0.9333,
+      "discovery_precision": 0.875,
+      "classification_accuracy": 0.9286,
+      "governance_accuracy_modeG": 1.0,
+      "packet_realization_accuracy_modeP": 0.8667,
+      "abstention_precision": 1.0,
+      "abstention_recall": 1.0,
+      "answer_coverage": 0.6875,
+      "selective_accuracy": 0.8182,
+      "_abstention_counts": {
+        "TA": 4,
+        "FA": 0,
+        "MA": 0,
+        "TN": 11
+      }
+    }
+  },
+  "parser": {
+    "parser_negation_accuracy": 1.0,
+    "parser_type_accuracy": 1.0,
+    "_neg_probes": 6,
+    "_type_probes": 7
+  },
+  "hidden": {
+    "frozen": [
+      {
+        "id": "supersede_entity",
+        "capability": "supersede",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "supersede_wording",
+        "capability": "supersede",
+        "family": "wording",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "governs_entity",
+        "capability": "governs_over",
+        "family": "entity",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "governs_wording",
+        "capability": "governs_over",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "override_entity",
+        "capability": "override",
+        "family": "entity",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "override_wording",
+        "capability": "override",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "exception_entity",
+        "capability": "exception",
+        "family": "entity",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "exception_wording",
+        "capability": "exception",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "date_supersede",
+        "capability": "supersede",
+        "family": "date",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "numbering_supersede",
+        "capability": "supersede",
+        "family": "numbering",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "nested_exception",
+        "capability": "exception",
+        "family": "nested",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "parallel_authority",
+        "capability": "override",
+        "family": "parallel",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "multi_hop_reference",
+        "capability": "reference",
+        "family": "multihop",
+        "endpoint_discovered": false
+      }
+    ],
+    "rule": [
+      {
+        "id": "supersede_entity",
+        "capability": "supersede",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "supersede_wording",
+        "capability": "supersede",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "governs_entity",
+        "capability": "governs_over",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "governs_wording",
+        "capability": "governs_over",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "override_entity",
+        "capability": "override",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "override_wording",
+        "capability": "override",
+        "family": "wording",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "exception_entity",
+        "capability": "exception",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "exception_wording",
+        "capability": "exception",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "date_supersede",
+        "capability": "supersede",
+        "family": "date",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "numbering_supersede",
+        "capability": "supersede",
+        "family": "numbering",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "nested_exception",
+        "capability": "exception",
+        "family": "nested",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "parallel_authority",
+        "capability": "override",
+        "family": "parallel",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "multi_hop_reference",
+        "capability": "reference",
+        "family": "multihop",
+        "endpoint_discovered": true
+      }
+    ],
+    "graph_traversal": [
+      {
+        "id": "supersede_entity",
+        "capability": "supersede",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "supersede_wording",
+        "capability": "supersede",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "governs_entity",
+        "capability": "governs_over",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "governs_wording",
+        "capability": "governs_over",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "override_entity",
+        "capability": "override",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "override_wording",
+        "capability": "override",
+        "family": "wording",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "exception_entity",
+        "capability": "exception",
+        "family": "entity",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "exception_wording",
+        "capability": "exception",
+        "family": "wording",
+        "endpoint_discovered": false
+      },
+      {
+        "id": "date_supersede",
+        "capability": "supersede",
+        "family": "date",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "numbering_supersede",
+        "capability": "supersede",
+        "family": "numbering",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "nested_exception",
+        "capability": "exception",
+        "family": "nested",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "parallel_authority",
+        "capability": "override",
+        "family": "parallel",
+        "endpoint_discovered": true
+      },
+      {
+        "id": "multi_hop_reference",
+        "capability": "reference",
+        "family": "multihop",
+        "endpoint_discovered": true
+      }
+    ]
+  },
+  "adversarial_revalidation": {
+    "per_resolver": {
+      "always_abstain": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.2667,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.2667,
+        "abstention_recall": 1.0,
+        "answer_coverage": 0.0,
+        "selective_accuracy": 0.0
+      },
+      "always_first_document": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.4,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.0,
+        "abstention_recall": 0.0,
+        "answer_coverage": 0.9375,
+        "selective_accuracy": 0.3333
+      },
+      "always_latest": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.6,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.0,
+        "abstention_recall": 0.0,
+        "answer_coverage": 0.9375,
+        "selective_accuracy": 0.4
+      },
+      "always_override": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.6,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.0,
+        "abstention_recall": 0.0,
+        "answer_coverage": 0.9375,
+        "selective_accuracy": 0.4
+      },
+      "always_allowed": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.0,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.0,
+        "abstention_recall": 0.0,
+        "answer_coverage": 0.9375,
+        "selective_accuracy": 0.3333
+      },
+      "null": {
+        "discovery_recall": 0.0,
+        "discovery_precision": null,
+        "classification_accuracy": null,
+        "governance_accuracy_modeG": 0.0,
+        "packet_realization_accuracy_modeP": 0.6,
+        "abstention_precision": 0.0,
+        "abstention_recall": 0.0,
+        "answer_coverage": 0.9375,
+        "selective_accuracy": 0.0
+      }
+    },
+    "gamed_capability_metrics": {},
+    "always_abstain_scores_poorly": true
+  }
+}
