@@ -23,6 +23,7 @@ from agentic.agentic_framework.governance_service import GovernanceService
 from agentic.agentic_framework.human_policy import (
     HumanPolicyBook,
     HumanPolicyEngine,
+    HumanPolicyMode,
     HumanPolicyRule,
     HumanPolicyVerdict,
     RequestContext,
@@ -332,6 +333,75 @@ def test_service_records_human_policy_in_audit_event():
     assert snap["human_policy_verdict"] == "DENY"
     assert snap["human_policy_rule_id"] == "HP-DB-LAST-REPLICA"
     assert resp.audit_event.human_policy["governance_decision"] == "DENY"
+
+
+# --- Authority mode switch: BASELINE vs SOURCE_OF_TRUTH ---------------------
+
+
+def _sot_svc():
+    return GovernanceService(
+        human_policy_engine=HumanPolicyEngine(
+            build_default_book(), mode=HumanPolicyMode.SOURCE_OF_TRUTH,
+        )
+    )
+
+
+def test_engine_mode_defaults_to_baseline():
+    eng = HumanPolicyEngine(build_default_book())
+    assert eng.mode == HumanPolicyMode.BASELINE
+    res = eng.evaluate(_ctx(action_type="read", risk_level="read_only",
+                            target_haystack="read fs"))
+    assert res.mode == "baseline"
+
+
+def test_source_of_truth_allow_overrides_weak_llm():
+    # Read-only human ALLOW with terrible LLM signals:
+    #   BASELINE  -> LLM tightens to DENY
+    #   SOURCE_OF_TRUTH -> human ALLOW is dispositive
+    weak = dict(action_type="file_read", tool_name="read_file", agency_level="FULL",
+                quality_score=0.0, coherence_score=0.0, internal_consistency=0.0,
+                goal_alignment=0.0, trajectory_confidence=0.0)
+    baseline = _svc().authorize(AuthorizationRequest(actor_id="a", **weak))
+    sot = _sot_svc().authorize(AuthorizationRequest(actor_id="a", **weak))
+    assert baseline.governance_decision == APIGovernanceDecision.DENY
+    assert sot.governance_decision == APIGovernanceDecision.ALLOW
+    assert sot.human_policy["mode"] == "source_of_truth"
+    assert sot.audit_event.request_snapshot["human_policy_source_of_truth_override"] is True
+    assert "HUMAN_POLICY_AUTHORITATIVE" in sot.rationale_codes
+
+
+def test_source_of_truth_still_honors_forbidden_capability_hard_block():
+    # A human ALLOW cannot open a forbidden-capability action even in
+    # source-of-truth mode — that hard block is an independent fail-closed
+    # invariant.
+    resp = _sot_svc().authorize(AuthorizationRequest(
+        actor_id="a", action_type="file_read", tool_name="read_file",
+        capabilities=["malware_execution"], agency_level="FULL",
+        quality_score=1.0, coherence_score=1.0, internal_consistency=1.0,
+        goal_alignment=1.0, trajectory_confidence=1.0))
+    assert resp.governance_decision == APIGovernanceDecision.DENY
+
+
+def test_source_of_truth_deny_and_require_approval_unchanged():
+    sot = _sot_svc()
+    deny = sot.authorize(AuthorizationRequest(
+        actor_id="a", action_type="db_delete", tool_name="database_delete",
+        metadata={"facts": {"last_replica": True}}, **_strong_signals()))
+    assert deny.governance_decision == APIGovernanceDecision.DENY
+    approval = sot.authorize(AuthorizationRequest(
+        actor_id="a", action_type="db_delete", tool_name="database_delete",
+        metadata={"facts": {}}, **_strong_signals()))
+    assert approval.governance_decision == APIGovernanceDecision.DEFER
+    assert approval.requires_human_approval
+
+
+def test_source_of_truth_no_match_falls_back_to_llm():
+    # No human rule matches a write => identical LLM pipeline in both modes.
+    req = dict(action_type="file_write", tool_name="write_file", **_strong_signals())
+    sot = _sot_svc().authorize(AuthorizationRequest(actor_id="a", **req))
+    assert sot.human_policy["matched"] is False
+    assert sot.governance_decision == APIGovernanceDecision.ALLOW
+    assert "HUMAN_POLICY_AUTHORITATIVE" not in sot.rationale_codes
 
 
 def test_service_custom_book_actor_scoped_allow_exception():

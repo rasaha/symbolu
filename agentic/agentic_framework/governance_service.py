@@ -176,6 +176,7 @@ from agentic.agentic_framework.policy_bundle import (
 )
 from agentic.agentic_framework.human_policy import (
     HumanPolicyEngine,
+    HumanPolicyMode,
     HumanPolicyResolution,
     HumanPolicyVerdict,
     resolve_human_policy,
@@ -1389,26 +1390,46 @@ class GovernanceService:
             eligible, gate_decision, forbidden_cap,
         )
 
-        # Step 5a: Human-curated policy layer — authoritative BASELINE.
-        #   "Human sets the baseline, the LLM can only tighten."  A matching
-        #   curated rule establishes the baseline governance decision; the LLM
-        #   baseline (above) and every downstream overlay (JEPA/domain/shadow/
-        #   generation gate/agent policy) are stricter-only, so the composed
-        #   decision is the MORE RESTRICTIVE of the two.  Concretely:
-        #     - human DENY               → dispositive DENY
-        #     - human REQUIRE_APPROVAL   → at least DEFER (requires human)
-        #     - human ALLOW/ALLOW+cons   → permissiveness ceiling; LLM may still
-        #                                  tighten to DEFER/DENY
-        #     - no matching rule / no engine → LLM baseline stands (unchanged).
+        # Step 5a: Human-curated policy layer. Behaviour depends on the
+        #   configured authority mode (the switch, set on the engine):
+        #
+        #   BASELINE ("human sets the baseline, the LLM can only tighten"):
+        #     a matching rule establishes the baseline; the LLM baseline (above)
+        #     and every downstream overlay (JEPA/domain/shadow/generation gate/
+        #     agent policy) are stricter-only, so the composed decision is the
+        #     MORE RESTRICTIVE of the two.  A human ALLOW is a permissiveness
+        #     ceiling the model may still tighten to DEFER/DENY.
+        #
+        #   SOURCE_OF_TRUTH ("humans are the source of truth"):
+        #     a matching rule is DISPOSITIVE — the LLM/model layers are advisory
+        #     and cannot change it.  The final reconciliation (Step 5f, after the
+        #     model layers run and are recorded for audit) restores the human
+        #     verdict, subject only to the independent fail-closed hard blocks.
+        #
+        #   In BOTH modes: no matching rule / no engine → LLM baseline stands.
         #   Fail-closed: a configured-but-erroring book resolves to DENY.
+        human_mode = (
+            self._human_policy_engine.mode
+            if self._human_policy_engine is not None
+            else HumanPolicyMode.BASELINE
+        )
         human_resolution = resolve_human_policy(
             self._human_policy_engine, request, risk_level.value,
         )
+        human_matched = (
+            human_resolution.matched and human_resolution.verdict is not None
+        )
         human_requires_human = False
-        if human_resolution.matched and human_resolution.verdict is not None:
+        if human_matched:
             human_decision = human_resolution.governance_decision()  # ALLOW/DEFER/DENY
-            reconciled = stricter_decision(governance_decision.value, human_decision)
-            governance_decision = APIGovernanceDecision(reconciled)
+            if human_mode == HumanPolicyMode.SOURCE_OF_TRUTH:
+                # Human verdict is the baseline; model layers still run (for
+                # audit) but Step 5f restores this decision afterwards.
+                governance_decision = APIGovernanceDecision(human_decision)
+            else:
+                governance_decision = APIGovernanceDecision(
+                    stricter_decision(governance_decision.value, human_decision)
+                )
             if governance_decision != APIGovernanceDecision.ALLOW:
                 eligible = False
             if human_resolution.requires_human:
@@ -1812,6 +1833,34 @@ class GovernanceService:
                 if governance_decision != APIGovernanceDecision.DENY:
                     effective_requires_human = True
 
+        # Step 5f: SOURCE_OF_TRUTH reconciliation.
+        #   In source-of-truth mode a matched human verdict is DISPOSITIVE:
+        #   the model-derived layers above (confidence gate, JEPA, domain,
+        #   shadow, sovereign biases) are advisory — they were still evaluated
+        #   and are recorded for audit, but they cannot change the decision.
+        #   The human verdict is restored here, undoing any model tightening.
+        #   It remains subject ONLY to the independent, fail-closed hard blocks
+        #   that are themselves human-configured (not LLM judgements): a
+        #   forbidden capability, an agent PolicyEngine hard-deny, or a closed
+        #   generation gate still force DENY.
+        human_source_of_truth_override = False
+        if human_matched and human_mode == HumanPolicyMode.SOURCE_OF_TRUTH:
+            hard_block = (
+                forbidden_cap is not None
+                or agent_policy_resolution.hard_deny
+                or generation_gate_result["gate_blocks"]
+            )
+            if hard_block:
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            else:
+                governance_decision = APIGovernanceDecision(
+                    human_resolution.governance_decision()
+                )
+                eligible = governance_decision == APIGovernanceDecision.ALLOW
+                effective_requires_human = human_resolution.requires_human
+            human_source_of_truth_override = True
+
         # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
@@ -1822,6 +1871,8 @@ class GovernanceService:
         if human_resolution.available:
             for rc in human_resolution.reason_codes:
                 rationale_codes.append(rc)
+        if human_source_of_truth_override:
+            rationale_codes.append("HUMAN_POLICY_AUTHORITATIVE")
         # Add shadow reason codes
         if shadow_assessment is not None:
             for rc in shadow_assessment.reason_codes:
@@ -2134,6 +2185,8 @@ class GovernanceService:
                 "human_policy_constraints": dict(human_resolution.constraints),
                 "human_policy_version": human_resolution.policy_version,
                 "human_policy_fail_closed_error": human_resolution.fail_closed_error,
+                "human_policy_mode": human_resolution.mode,
+                "human_policy_source_of_truth_override": human_source_of_truth_override,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,

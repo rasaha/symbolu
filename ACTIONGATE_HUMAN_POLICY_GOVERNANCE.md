@@ -75,32 +75,64 @@ AuthorizationRequest
 - **`build_default_book()`** — a small illustrative book mirroring a few frozen
   reference invariants; meant to be replaced by a real book.
 
-## 3. Authority model — "human sets the baseline, the LLM can only tighten"
+## 3. Authority modes — the switch
 
-When a curated rule matches, its verdict becomes the **baseline** governance
-decision. Because every downstream layer is already stricter-only, the composed
-result is the **more restrictive** of the human baseline and the LLM baseline:
+The relationship between a matched human verdict and the LLM/model-derived
+decision is a **switch** on the engine: `HumanPolicyMode`.
+
+```python
+HumanPolicyEngine(book, mode=HumanPolicyMode.BASELINE)          # default
+HumanPolicyEngine(book, mode=HumanPolicyMode.SOURCE_OF_TRUTH)
+```
+
+### Mode A — `BASELINE` (default): "human sets the baseline, the LLM can only tighten"
+
+When a curated rule matches, its verdict becomes the **baseline**. Because every
+downstream layer is already stricter-only, the composed result is the **more
+restrictive** of the human baseline and the LLM baseline:
 
 ```
 final = stricter_of( human_baseline , llm_baseline_and_downstream_tightening )
 ```
 
-### Truth table
-
-| Human rule match | Human verdict | Strong LLM says | Final decision | Why |
-|---|---|---|---|---|
-| yes | `DENY` | ALLOW | **DENY** | human DENY is dispositive |
-| yes | `REQUIRE_APPROVAL` | ALLOW | **DEFER** (+requires_human) | human forces confirmation |
-| yes | `ALLOW` | ALLOW | **ALLOW** | both agree |
-| yes | `ALLOW` | DENY (low confidence) | **DENY** | LLM tightened the ceiling |
-| yes | `ALLOW_WITH_CONSTRAINTS` | ALLOW | **ALLOW** (+constraints recorded) | constraints attached |
-| **no** | — | ALLOW | **ALLOW** | silent → LLM baseline unchanged |
-| **no** | — | DENY | **DENY** | silent → LLM baseline unchanged |
-| n/a (no engine) | — | any | LLM baseline | fully backward-compatible |
-
-Key property: a human `ALLOW` is a **ceiling of permissiveness**, not a
-guarantee — a low-confidence or drifting model can still deny. A human `DENY` /
+A human `ALLOW` is a **ceiling of permissiveness**, not a guarantee — a
+low-confidence or drifting model can still deny. A human `DENY` /
 `REQUIRE_APPROVAL` can never be loosened by the model.
+
+### Mode B — `SOURCE_OF_TRUTH`: "humans are the source of truth"
+
+When a curated rule matches, its verdict is **dispositive**. The model layers
+(confidence gate, JEPA, domain, shadow, sovereign biases) are still evaluated —
+and fully recorded in the audit event — but they are **advisory**: they cannot
+change the decision. A human `ALLOW` stays `ALLOW` even if the model would have
+deferred or denied.
+
+The one carve-out: a human `ALLOW` is still subject to the **independent,
+fail-closed hard blocks that are themselves human-configured** (not LLM
+judgements) — a forbidden capability, an agent `PolicyEngine` hard-deny, or a
+closed generation gate. These still force `DENY`, because a permissive policy
+book must not be able to open, say, `malware_execution`.
+
+Mechanically this is a final reconciliation (Step 5f) that restores the human
+verdict after the model layers run.
+
+### Truth table (both modes)
+
+| Human match | Human verdict | Strong LLM says | `BASELINE` | `SOURCE_OF_TRUTH` |
+|---|---|---|---|---|
+| yes | `DENY` | ALLOW | **DENY** | **DENY** |
+| yes | `REQUIRE_APPROVAL` | ALLOW | **DEFER** (+human) | **DEFER** (+human) |
+| yes | `ALLOW` | ALLOW | **ALLOW** | **ALLOW** |
+| yes | `ALLOW` | DENY (low confidence) | **DENY** (LLM tightened) | **ALLOW** (human wins) |
+| yes | `ALLOW` | ALLOW, but forbidden capability | **DENY** | **DENY** (hard block) |
+| **no** | — | ALLOW | **ALLOW** | **ALLOW** |
+| **no** | — | DENY | **DENY** | **DENY** |
+| n/a (no engine) | — | any | LLM baseline | LLM baseline |
+
+The switch is recorded on every decision: `human_policy.mode`,
+`request_snapshot.human_policy_mode`, and a `HUMAN_POLICY_MODE:*` rationale code;
+a source-of-truth override also emits `HUMAN_POLICY_AUTHORITATIVE` and
+`request_snapshot.human_policy_source_of_truth_override`.
 
 ### Rule selection within a book
 
@@ -120,10 +152,16 @@ All changes are additive and guarded by `self._human_policy_engine is not None`:
 2. **`__init__`** — new optional `human_policy_engine` parameter, stored as
    `self._human_policy_engine`.
 3. **Step 5a** (between the LLM baseline `_compute_governance_decision` and the
-   JEPA override): `resolve_human_policy(...)`, then
-   `governance_decision = stricter_of(llm, human)`; set `eligible=False` when it
-   becomes non-ALLOW; capture `human_requires_human`.
-4. **`effective_requires_human`** — OR in `human_requires_human`.
+   JEPA override): read the mode from the engine, `resolve_human_policy(...)`,
+   then set the baseline — `stricter_of(llm, human)` in `BASELINE`, or the human
+   verdict directly in `SOURCE_OF_TRUTH`; set `eligible=False` when non-ALLOW;
+   capture `human_requires_human`.
+3b. **Step 5f** (after the model layers / shadow): in `SOURCE_OF_TRUTH` mode with
+   a matched rule, restore the human verdict (undoing model tightening) unless an
+   independent hard block (forbidden capability / agent-policy hard-deny /
+   generation gate) forces `DENY`.
+4. **`effective_requires_human`** — OR in `human_requires_human`; in a
+   source-of-truth override it is set from the human verdict.
 5. **Rationale codes / string** — `HUMAN_POLICY:*`, `HUMAN_POLICY_RULE:*`, and a
    human-readable clause.
 6. **Audit** — full `human_policy` block on the `AuditEvent` and provenance keys
@@ -160,6 +198,7 @@ later (see Future work).
 from agentic.agentic_framework.governance_service import GovernanceService
 from agentic.agentic_framework.human_policy import (
     HumanPolicyEngine, HumanPolicyBook, HumanPolicyRule, HumanPolicyVerdict,
+    HumanPolicyMode,
 )
 
 book = HumanPolicyBook(
@@ -175,7 +214,13 @@ book = HumanPolicyBook(
                         priority=100),
     ),
 )
-svc = GovernanceService(human_policy_engine=HumanPolicyEngine(book))
+
+# The switch: how the human verdict relates to the LLM.
+#   BASELINE        → human sets the baseline, the LLM can only tighten (default)
+#   SOURCE_OF_TRUTH → the human verdict is dispositive; the LLM is advisory
+svc = GovernanceService(
+    human_policy_engine=HumanPolicyEngine(book, mode=HumanPolicyMode.SOURCE_OF_TRUTH),
+)
 ```
 
 Callers declare facts via `AuthorizationRequest.metadata["facts"]`, e.g.
@@ -183,10 +228,11 @@ Callers declare facts via `AuthorizationRequest.metadata["facts"]`, e.g.
 
 ## 8. Testing
 
-`agentic/agentic_framework/tests/test_human_policy.py` (24 tests):
+`agentic/agentic_framework/tests/test_human_policy.py` (29 tests):
 engine/book unit tests (matching, facts, priority overrides, fail-closed,
-content hash) and `GovernanceService` integration tests proving each row of the
-truth table above.
+content hash), `GovernanceService` integration tests proving each row of the
+truth table, and mode-switch tests covering `BASELINE` vs `SOURCE_OF_TRUTH`
+(including the forbidden-capability hard-block carve-out).
 
 ## 9. Future work
 

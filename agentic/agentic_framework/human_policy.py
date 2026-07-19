@@ -84,6 +84,31 @@ class HumanPolicyVerdict(str, Enum):
     DENY = "DENY"
 
 
+class HumanPolicyMode(str, Enum):
+    """How a matched human verdict relates to the LLM/model-derived decision.
+
+    BASELINE
+        "Human sets the baseline, the LLM can only tighten."  A matched human
+        verdict is the baseline; the LLM/JEPA/domain/shadow overlays are
+        stricter-only, so the composed decision is the MORE RESTRICTIVE of the
+        human baseline and the model decision.  A human ALLOW is therefore a
+        permissiveness ceiling the model may still tighten to DEFER/DENY.
+
+    SOURCE_OF_TRUTH
+        "Humans are the source of truth."  A matched human verdict is
+        DISPOSITIVE: the LLM/model-derived governance layers are advisory and
+        cannot change it — a human ALLOW stays ALLOW even if the model would
+        have deferred/denied.  It remains subject only to the independent
+        fail-closed hard blocks that are themselves human-configured, not LLM
+        judgements (forbidden capability, agent PolicyEngine hard-deny, and the
+        generation gate).  When no human rule matches, the normal model
+        pipeline decides (identical to BASELINE on a no-match).
+    """
+
+    BASELINE = "baseline"
+    SOURCE_OF_TRUTH = "source_of_truth"
+
+
 # Higher number == more restrictive.  Used for "most-restrictive-rule-wins".
 _VERDICT_SEVERITY: Dict[HumanPolicyVerdict, int] = {
     HumanPolicyVerdict.ALLOW: 0,
@@ -331,6 +356,7 @@ class HumanPolicyResolution:
     policy_version: str = ""
     description: str = ""
     fail_closed_error: bool = False
+    mode: str = HumanPolicyMode.BASELINE.value
 
     def governance_decision(self) -> Optional[str]:
         """Map the verdict to a top-level decision string, or None if silent."""
@@ -363,6 +389,7 @@ class HumanPolicyResolution:
             "policy_version": self.policy_version,
             "description": self.description,
             "fail_closed_error": self.fail_closed_error,
+            "mode": self.mode,
         }
 
 
@@ -383,11 +410,17 @@ class HumanPolicyEngine:
     silently degrading to the LLM baseline.
     """
 
-    def __init__(self, book: HumanPolicyBook) -> None:
+    def __init__(
+        self,
+        book: HumanPolicyBook,
+        mode: HumanPolicyMode = HumanPolicyMode.BASELINE,
+    ) -> None:
         self.book = book
+        self.mode = mode
         self._policy_version = book.policy_version()
 
     def evaluate(self, ctx: RequestContext) -> HumanPolicyResolution:
+        mode_value = self.mode.value
         try:
             rule = self.book.select(ctx)
             if rule is None:
@@ -397,10 +430,12 @@ class HumanPolicyEngine:
                     matched=False,
                     reason_codes=("HUMAN_POLICY:NO_MATCH",),
                     policy_version=self._policy_version,
+                    mode=mode_value,
                 )
             reason_codes = (
                 f"HUMAN_POLICY:{rule.verdict.value}",
                 f"HUMAN_POLICY_RULE:{rule.rule_id}",
+                f"HUMAN_POLICY_MODE:{mode_value}",
             )
             return HumanPolicyResolution(
                 available=True,
@@ -413,6 +448,7 @@ class HumanPolicyEngine:
                 reason_codes=reason_codes,
                 policy_version=self._policy_version,
                 description=rule.description,
+                mode=mode_value,
             )
         except Exception as exc:  # fail-closed: a broken book must not open the gate
             return HumanPolicyResolution(
@@ -423,6 +459,7 @@ class HumanPolicyEngine:
                 reason_codes=(f"HUMAN_POLICY_ERROR:{type(exc).__name__}",),
                 policy_version=self._policy_version,
                 fail_closed_error=True,
+                mode=mode_value,
             )
 
 
@@ -504,6 +541,7 @@ def resolve_human_policy(
             verdict=HumanPolicyVerdict.DENY,
             reason_codes=(f"HUMAN_POLICY_ERROR:{type(exc).__name__}",),
             fail_closed_error=True,
+            mode=engine.mode.value,
         )
     return engine.evaluate(ctx)
 
