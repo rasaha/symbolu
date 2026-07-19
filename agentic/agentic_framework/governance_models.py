@@ -437,6 +437,19 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Human-Curated Policy Layer: authoritative baseline decision
+    human_policy: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Human-curated policy evaluation at decision time: matched rule id, "
+            "verdict (ALLOW/ALLOW_WITH_CONSTRAINTS/REQUIRE_APPROVAL/DENY), "
+            "mapped governance decision, constraints, approver policy, and the "
+            "book's policy_version. Present when a human policy engine is "
+            "configured. The verdict sets the BASELINE decision; downstream "
+            "LLM/JEPA/domain overlays can only tighten it."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,
@@ -534,6 +547,15 @@ class AuthorizationResponse(BaseModel):
         None,
         description="Shadow AI assessment (serialized ShadowAssessment). "
                     "Present when shadow policy evaluation ran.",
+    )
+
+    # Human-Curated Policy Layer
+    human_policy: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Human-curated policy evaluation (matched rule, verdict, "
+                    "mapped decision, constraints, policy_version). Present when "
+                    "a human policy engine is configured. Sets the baseline "
+                    "decision; downstream layers can only tighten it.",
     )
 
     # Approval Workflow Layer
