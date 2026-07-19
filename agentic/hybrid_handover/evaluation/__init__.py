@@ -15,6 +15,8 @@ Entry point: ``python -m agentic.hybrid_handover.evaluation.run_eval``.
 
 from .cases import EvalCase, PrecedenceReq, RequiredSpan
 from .corpus import ALL_CASE_BUILDERS, CONTROL_CASE_IDS, all_cases
+from .integrity import IntegrityReport, Issue, check_all, check_case
+from .version import BENCHMARK_NAME, BENCHMARK_VERSION
 from .harness import CaseResult, evaluate_case
 from .injectors import ALL_INJECTORS, CORPUS_INJECTORS, PACKET_INJECTORS, Injector
 from .metrics import Aggregate, Frac, precedence_recall, recall, unsupported_claims
@@ -42,4 +44,6 @@ __all__ = [
     "ValidationOutcome", "DEFAULT_VALIDATORS",
     "aggregate", "classify", "build_report", "render_markdown", "render_json",
     "run",
+    "check_all", "check_case", "IntegrityReport", "Issue",
+    "BENCHMARK_NAME", "BENCHMARK_VERSION",
 ]

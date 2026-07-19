@@ -155,3 +155,41 @@ def test_baseline_is_not_validated():
     # With the deterministic extractor, the design must NOT come back VALIDATED.
     assert report["verdict"] != "VALIDATED"
     assert report["verdict_reasons"]
+
+
+# --- benchmark freeze: integrity, determinism, versioning ------------------ #
+def test_benchmark_integrity_is_clean():
+    from agentic.hybrid_handover.evaluation import check_all
+    rep = check_all()
+    assert rep.n_cases == 16
+    assert rep.ok, [i.model_dump() for i in rep.errors]
+    assert not rep.errors
+
+
+def test_every_required_span_needle_exists_in_source():
+    # explicit, span-level ground-truth check (defence against silent corpus edits)
+    import re
+    from agentic.hybrid_handover.evaluation import all_cases
+    norm = lambda s: re.sub(r"\s+", " ", s).strip().lower()
+    for case in all_cases():
+        for grp in (case.required_decisive, case.required_defeaters, case.required_definitions):
+            for rs in grp:
+                doc = case.corpus.by_id(rs.doc_id)
+                assert doc is not None, f"{case.case_id}: {rs.doc_id} missing"
+                if rs.needle:
+                    assert norm(rs.needle) in norm(doc.text), f"{case.case_id}: {rs.needle!r} not in {rs.doc_id}"
+
+
+def test_benchmark_is_deterministic():
+    from agentic.hybrid_handover.evaluation import run
+    from agentic.hybrid_handover.evaluation.report import render_json
+    a = run(); b = run()
+    a.pop("_paths", None); b.pop("_paths", None)
+    assert render_json(a) == render_json(b)
+
+
+def test_report_is_version_stamped():
+    from agentic.hybrid_handover.evaluation import run, BENCHMARK_VERSION
+    report = run()
+    assert report["meta"]["benchmark_version"] == BENCHMARK_VERSION
+    assert BENCHMARK_VERSION == "1.0.0"

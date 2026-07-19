@@ -20,6 +20,7 @@ import json
 
 from .harness import CaseResult
 from .metrics import Aggregate, Frac
+from .version import BENCHMARK_NAME, BENCHMARK_VERSION
 
 
 def aggregate(results: list[CaseResult]) -> Aggregate:
@@ -92,7 +93,13 @@ def build_report(
     missed_defs = sorted({r.case_id for r in augmented if r.definition[1] and r.definition[0] < r.definition[1]})
 
     return {
-        "meta": {"synthetic": True, "n_gates_runs": len(gates), "n_augmented_runs": len(augmented)},
+        "meta": {
+            "benchmark": BENCHMARK_NAME,
+            "benchmark_version": BENCHMARK_VERSION,
+            "synthetic": True,
+            "n_gates_runs": len(gates),
+            "n_augmented_runs": len(augmented),
+        },
         "verdict": label,
         "verdict_reasons": reasons,
         "metrics": {
@@ -163,6 +170,7 @@ def render_markdown(report: dict) -> str:
     m = report["metrics"]
     L = []
     L.append("# Hybrid Handover — Enterprise Readiness Evaluation\n")
+    L.append(f"**{report['meta']['benchmark']} v{report['meta']['benchmark_version']}**\n")
     L.append("> **SYNTHETIC EVALUATION.** All corpora are synthetic. This measures whether the "
              "sovereign hybrid layer can reliably produce *complete* evidence packets. It prioritises "
              "evidence completeness over generated-answer quality, and attempts to *falsify* the design.\n")

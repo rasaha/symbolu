@@ -1,5 +1,7 @@
 # Hybrid Handover — Enterprise Readiness Evaluation
 
+**Sovereign Evidence Extraction Benchmark (SEEB) v1.0.0**
+
 > **SYNTHETIC EVALUATION.** All corpora are synthetic. This measures whether the sovereign hybrid layer can reliably produce *complete* evidence packets. It prioritises evidence completeness over generated-answer quality, and attempts to *falsify* the design.
 
 ## Verdict: **PARTIALLY VALIDATED**

@@ -67,6 +67,7 @@ def main() -> None:
     report = run()
     print("=" * 72)
     print("HYBRID HANDOVER — ENTERPRISE READINESS EVALUATION (SYNTHETIC)")
+    print(f"{report['meta']['benchmark']} v{report['meta']['benchmark_version']}")
     print("=" * 72)
     print(f"Verdict: {report['verdict']}")
     for r in report["verdict_reasons"]:

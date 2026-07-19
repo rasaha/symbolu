@@ -1,5 +1,15 @@
 # Hybrid Handover — Enterprise Readiness Evaluation
 
+> **Frozen as the Sovereign Evidence Extraction Benchmark (SEEB) v1.0.0.** This is
+> a stable research artifact: it measures *any* future extractor without
+> modification. Do not change the benchmark to make an extractor look better.
+> Governing docs: [`BENCHMARK_SPEC.md`](BENCHMARK_SPEC.md) ·
+> [`BASELINE_RESULTS.md`](BASELINE_RESULTS.md) ·
+> [`BENCHMARK_COVERAGE.md`](BENCHMARK_COVERAGE.md) ·
+> [`BENCHMARK_VERSIONING.md`](BENCHMARK_VERSIONING.md) ·
+> [`ROADMAP.md`](ROADMAP.md) · [`BENCHMARK_LIMITATIONS.md`](BENCHMARK_LIMITATIONS.md).
+> Integrity: `python -m agentic.hybrid_handover.evaluation.integrity` (must print OK).
+
 A modular, **extractor-agnostic falsification framework** for the sovereign
 hybrid handover layer. It exists to answer one question and to try to answer it
 *negatively*:

@@ -1,5 +1,7 @@
 {
   "meta": {
+    "benchmark": "Sovereign Evidence Extraction Benchmark (SEEB)",
+    "benchmark_version": "1.0.0",
     "synthetic": true,
     "n_gates_runs": 42,
     "n_augmented_runs": 42
