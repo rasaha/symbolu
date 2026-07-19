@@ -1,0 +1,114 @@
+{
+  "corpus": "SEEB hidden relationship corpus (audit-only)",
+  "synthetic": true,
+  "integrity_issues": [],
+  "leakage_findings": [],
+  "statistics": {
+    "n_cases": 22,
+    "coverage_by_capability": {
+      "version_supersession": 2,
+      "scoped_exceptions": 2,
+      "definition_inheritance": 3,
+      "effective_date_precedence": 2,
+      "cross_document_reference": 2,
+      "implicit_references": 2,
+      "transitive_authority": 4,
+      "hierarchical_governance": 2,
+      "multiple_authorities": 3,
+      "partial_overrides": 1,
+      "table_vs_text": 1,
+      "conflicting_amendments": 3,
+      "appendix_precedence": 1,
+      "policy_migration": 2,
+      "entity_renaming": 1,
+      "parallel_overrides": 1,
+      "conditional_applicability": 1,
+      "multi_hop": 1,
+      "nested_exceptions": 1,
+      "no_relationship": 1,
+      "unresolvable_conflict": 1,
+      "insufficient_evidence": 1,
+      "circular_reference": 1,
+      "multiple_valid_interpretations": 1
+    },
+    "coverage_by_difficulty": {
+      "1": 3,
+      "2": 4,
+      "3": 7,
+      "4": 6,
+      "5": 2
+    },
+    "coverage_by_variation": {
+      "voice": 2,
+      "wording": 15,
+      "entity_names": 1,
+      "explicit_implicit": 7,
+      "section_reference": 3,
+      "date_format": 4,
+      "doc_order": 2,
+      "number_format": 2,
+      "doc_granularity": 6,
+      "table_prose": 1,
+      "policy_naming": 3
+    },
+    "coverage_by_relationship_type": {
+      "supersedes": 4,
+      "exception_to": 4,
+      "effective_after": 1,
+      "references": 6,
+      "same_as": 1,
+      "governs_over": 3,
+      "amends": 1,
+      "conflicts_with": 2,
+      "overrides": 4
+    },
+    "coverage_by_governance_type": {
+      "supersession": 3,
+      "exception": 3,
+      "single_or_none": 1,
+      "reference_resolution": 2,
+      "other": 3,
+      "precedence_override": 5,
+      "abstain": 5
+    },
+    "coverage_by_ambiguity": {
+      "ambiguous": 16,
+      "unambiguous": 6
+    },
+    "coverage_by_abstention": {
+      "abstain": 5,
+      "answer": 17
+    },
+    "negative_controls": {
+      "no_relationship": 1,
+      "unresolvable_conflict": 1,
+      "insufficient_evidence": 1,
+      "circular_reference": 1,
+      "multiple_valid_interpretations": 1
+    },
+    "blind_spots": {
+      "capabilities_zero": [],
+      "capabilities_single": [
+        "parallel_overrides",
+        "nested_exceptions",
+        "partial_overrides",
+        "table_vs_text",
+        "appendix_precedence",
+        "circular_reference",
+        "multi_hop",
+        "conditional_applicability",
+        "entity_renaming",
+        "no_relationship",
+        "multiple_valid_interpretations",
+        "insufficient_evidence",
+        "unresolvable_conflict"
+      ],
+      "variations_zero": [
+        "sentence_structure",
+        "clause_numbering"
+      ],
+      "edge_types_zero": [],
+      "difficulty_levels_thin": []
+    }
+  }
+}
