@@ -1,0 +1,97 @@
+{
+  "per_competition": [
+    {
+      "cid": "HX59d7a3eb1c",
+      "winner": "Policy P-8 (effective 2024) p.1",
+      "competing_edge": "Order Form \u00a72 (effective 2020) p.1",
+      "retained": "Policy P-8 (effective 2024) p.1",
+      "rejected_primary": "Order Form \u00a72 (effective 2020) p.1",
+      "decisive_component": "authority",
+      "winner_vector": {
+        "authority": 1.0,
+        "temporal": 1.0,
+        "specificity": 0.5,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.5
+      },
+      "loser_vector": {
+        "authority": 0.3333,
+        "temporal": 0.0,
+        "specificity": 0.75,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.25
+      },
+      "reason": "'Policy P-8 (effective 2024) p.1' outranks 'Order Form \u00a72 (effective 2020) p.1' on authority"
+    },
+    {
+      "cid": "HXb3def36e76",
+      "winner": "Regulatory Directive R-9 p.1",
+      "competing_edge": "Corporate Policy G-2 p.2",
+      "retained": "Regulatory Directive R-9 p.1",
+      "rejected_primary": "Corporate Policy G-2 p.2",
+      "decisive_component": "authority",
+      "winner_vector": {
+        "authority": 1.0,
+        "temporal": 0.0,
+        "specificity": 0.5,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.25
+      },
+      "loser_vector": {
+        "authority": 0.5,
+        "temporal": 0.0,
+        "specificity": 0.5,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.25
+      },
+      "reason": "'Regulatory Directive R-9 p.1' outranks 'Corporate Policy G-2 p.2' on authority"
+    },
+    {
+      "cid": "HPb167985bd5",
+      "winner": "MSA \u00a72 p.2",
+      "competing_edge": "Order Form \u00a71 p.1",
+      "retained": "MSA \u00a72 p.2",
+      "rejected_primary": "Order Form \u00a71 p.1",
+      "decisive_component": "authority",
+      "winner_vector": {
+        "authority": 0.5,
+        "temporal": 0.0,
+        "specificity": 0.75,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.25
+      },
+      "loser_vector": {
+        "authority": 0.0,
+        "temporal": 0.0,
+        "specificity": 0.75,
+        "reference": 1.0,
+        "structural": 0.3333,
+        "confidence": 0.85,
+        "support": 0.25
+      },
+      "reason": "'MSA \u00a72 p.2' outranks 'Order Form \u00a71 p.1' on authority"
+    }
+  ],
+  "changed_cases": [
+    {
+      "cid": "HX59d7a3eb1c",
+      "p0": "(False, ('Order Form \u00a72 (effective 2020) p.1', 'Policy P-7 p.2', 'Policy P-8 (effective 2024) p.1'), 'unknown', None, None)",
+      "p4": "(False, ('Order Form \u00a72 (effective 2020) p.1', 'Policy P-7 p.2', 'Policy P-8 (effective 2024) p.1'), 'prohibited', None, None)"
+    },
+    {
+      "cid": "HXb3def36e76",
+      "p0": "(False, ('Corporate Policy G-2 p.2', 'Regulatory Directive R-9 p.1'), 'prohibited', None, None)",
+      "p4": "(False, ('Corporate Policy G-2 p.2', 'Regulatory Directive R-9 p.1'), 'unknown', None, None)"
+    }
+  ]
+}

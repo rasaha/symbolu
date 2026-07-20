@@ -1,0 +1,444 @@
+{
+  "study": "Governance Semantics Experiment v0.1",
+  "resolver_under_test": "HybridRelationshipResolver Experimental v0.4",
+  "deterministic": true,
+  "repetitions": 2,
+  "byte_identical_reps": true,
+  "calibration_gates": {
+    "G0_control_reproduces_v2": true,
+    "G1_discovery_identical": true,
+    "G2_classification_identical": true,
+    "G3_validation_records_identical": true
+  },
+  "visible": {
+    "G0_frozen": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "G1_supersession_amendment": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "G2_parallel": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "G3_operative": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "G4_full": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    }
+  },
+  "hidden": {
+    "G0_frozen": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "G1_supersession_amendment": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "G2_parallel": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "G3_operative": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.386,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5972
+    },
+    "G4_full": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.4333,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 0.3023,
+      "abstention_recall": 0.8125,
+      "false_abstention_rate": 0.5,
+      "missed_abstention_rate": 0.05,
+      "answer_coverage": 0.2833,
+      "selective_accuracy": 0.5294,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5926
+    }
+  },
+  "primary_endpoint": {
+    "metric": "selective_accuracy",
+    "g0": 0.2982,
+    "g4": 0.5294,
+    "selective_gain": 0.2312,
+    "practical_threshold": 0.03,
+    "practically_significant": true
+  },
+  "non_inferiority": {
+    "identical": {
+      "discovery_precision": {
+        "g0": 0.8974,
+        "g4": 0.8974,
+        "identical": true
+      },
+      "discovery_recall": {
+        "g0": 0.4167,
+        "g4": 0.4167,
+        "identical": true
+      },
+      "discovery_f1": {
+        "g0": 0.5691,
+        "g4": 0.5691,
+        "identical": true
+      },
+      "classification_accuracy": {
+        "g0": 0.9143,
+        "g4": 0.9143,
+        "identical": true
+      },
+      "packet_realization_accuracy_modeP": {
+        "g0": 0.5167,
+        "g4": 0.5167,
+        "identical": true
+      }
+    },
+    "bounded": {
+      "governance_accuracy_modeG": {
+        "g0": 0.6,
+        "g4": 0.4333,
+        "margin": 0.03,
+        "direction": "decrease",
+        "violated": true
+      },
+      "answer_coverage": {
+        "g0": 0.95,
+        "g4": 0.2833,
+        "margin": 0.05,
+        "direction": "decrease",
+        "violated": true
+      },
+      "false_abstention_rate": {
+        "g0": 0.0,
+        "g4": 0.5,
+        "margin": 0.05,
+        "direction": "increase",
+        "violated": true
+      },
+      "missed_abstention_rate": {
+        "g0": 0.2167,
+        "g4": 0.05,
+        "margin": 0.05,
+        "direction": "increase",
+        "violated": false
+      }
+    },
+    "passes": false,
+    "unsafe_not_increased": true
+  },
+  "fix_break": {
+    "fixes": 5,
+    "breaks": 0,
+    "unchanged_correct": 4,
+    "unchanged_incorrect": 8,
+    "detail": {
+      "fix": [
+        "HX59d7a3eb1c",
+        "HP059f01c294",
+        "HP7d8d12efac",
+        "HPb3463204c9",
+        "HPebe6e8abf0"
+      ],
+      "break": []
+    }
+  },
+  "statistics": {
+    "mcnemar_answer_correct_g4_vs_g0": {
+      "b10_candidate_fixes": 5,
+      "b01_candidate_breaks": 0,
+      "n_discordant": 5,
+      "p_value": 0.0625,
+      "net": 5
+    },
+    "bootstrap_selective_g4_minus_g0": {
+      "observed_diff": 0.2312,
+      "ci95": [
+        -0.0119,
+        0.4702
+      ],
+      "excludes_zero": false,
+      "n": 60,
+      "iters": 10000,
+      "seed": 20240601
+    }
+  },
+  "competing_authority": {
+    "cases_with_competition": 3,
+    "rows": [
+      {
+        "cid": "HX59d7a3eb1c",
+        "governance_sources": [
+          "Order Form \u00a72 (effective 2020) p.1",
+          "Policy P-8 (effective 2024) p.1"
+        ],
+        "operative_nodes": [
+          "Policy P-8 (effective 2024) p.1"
+        ],
+        "governance_abstention": false,
+        "abstention_reason": "",
+        "g0_decision": "(False, 'unknown', None, None)",
+        "g4_decision": "(False, 'prohibited', None, None)",
+        "changed": true,
+        "gold_abstain": false,
+        "gold_packet": {
+          "tfc": "prohibited",
+          "notice_days": null,
+          "penalty": null
+        },
+        "capability": [
+          "multiple_authorities",
+          "hierarchical_governance",
+          "policy_migration",
+          "effective_date_precedence",
+          "transitive_authority"
+        ]
+      },
+      {
+        "cid": "HXb3def36e76",
+        "governance_sources": [
+          "Corporate Policy G-2 p.2",
+          "Regulatory Directive R-9 p.1"
+        ],
+        "operative_nodes": [
+          "Corporate Policy G-2 p.2"
+        ],
+        "governance_abstention": false,
+        "abstention_reason": "",
+        "g0_decision": "(False, 'prohibited', None, None)",
+        "g4_decision": "(False, 'prohibited', None, None)",
+        "changed": false,
+        "gold_abstain": false,
+        "gold_packet": {
+          "tfc": "prohibited",
+          "notice_days": null,
+          "penalty": null
+        },
+        "capability": [
+          "parallel_overrides",
+          "multiple_authorities"
+        ]
+      },
+      {
+        "cid": "HPb167985bd5",
+        "governance_sources": [
+          "MSA \u00a72 p.2",
+          "Order Form \u00a71 p.1"
+        ],
+        "operative_nodes": [],
+        "governance_abstention": true,
+        "abstention_reason": "authority established but operative term not locatable",
+        "g0_decision": "(False, 'unknown', None, None)",
+        "g4_decision": "(True, 'unknown', None, None)",
+        "changed": true,
+        "gold_abstain": true,
+        "gold_packet": {
+          "abstain": true
+        },
+        "capability": [
+          "unresolvable_conflict",
+          "hierarchical_governance"
+        ]
+      }
+    ]
+  },
+  "subgroups": {
+    "by_capability": {
+      "appendix_precedence": {
+        "g0": 0.0,
+        "g4": null
+      },
+      "circular_reference": {
+        "g0": 0.6667,
+        "g4": null
+      },
+      "conditional_applicability": {
+        "g0": 0.0,
+        "g4": 1.0
+      },
+      "conflicting_amendments": {
+        "g0": 0.4,
+        "g4": 0.0
+      },
+      "cross_document_reference": {
+        "g0": 0.0,
+        "g4": null
+      },
+      "definition_inheritance": {
+        "g0": 1.0,
+        "g4": null
+      },
+      "effective_date_precedence": {
+        "g0": 0.0,
+        "g4": 1.0
+      },
+      "entity_renaming": {
+        "g0": 0.75,
+        "g4": 1.0
+      },
+      "hierarchical_governance": {
+        "g0": 0.1667,
+        "g4": 1.0
+      },
+      "implicit_references": {
+        "g0": 0.0,
+        "g4": null
+      },
+      "insufficient_evidence": {
+        "g0": 1.0,
+        "g4": null
+      },
+      "multi_hop": {
+        "g0": 0.0,
+        "g4": null
+      },
+      "multiple_authorities": {
+        "g0": 0.1667,
+        "g4": 1.0
+      },
+      "multiple_valid_interpretations": {
+        "g0": 0.6667,
+        "g4": 0.0
+      },
+      "nested_exceptions": {
+        "g0": 0.0,
+        "g4": 0.0
+      },
+      "no_relationship": {
+        "g0": 1.0,
+        "g4": 1.0
+      },
+      "parallel_overrides": {
+        "g0": 0.25,
+        "g4": 0.75
+      },
+      "partial_overrides": {
+        "g0": 0.0,
+        "g4": 0.0
+      },
+      "policy_migration": {
+        "g0": 0.4,
+        "g4": 1.0
+      },
+      "scoped_exceptions": {
+        "g0": 0.0,
+        "g4": 0.5
+      },
+      "table_vs_text": {
+        "g0": 0.0,
+        "g4": 0.0
+      },
+      "transitive_authority": {
+        "g0": 0.5,
+        "g4": 1.0
+      },
+      "unresolvable_conflict": {
+        "g0": 0.75,
+        "g4": 0.0
+      },
+      "version_supersession": {
+        "g0": 0.0,
+        "g4": null
+      }
+    },
+    "by_difficulty": {
+      "1": {
+        "g0": 0.1429,
+        "g4": 0.0
+      },
+      "2": {
+        "g0": 0.4167,
+        "g4": 1.0
+      },
+      "3": {
+        "g0": 0.3158,
+        "g4": 0.375
+      },
+      "4": {
+        "g0": 0.4167,
+        "g4": 0.5
+      },
+      "5": {
+        "g0": 0.0,
+        "g4": 1.0
+      }
+    },
+    "by_source": {
+      "seed": {
+        "g0": 0.381,
+        "g4": 0.5
+      },
+      "pilot": {
+        "g0": 0.25,
+        "g4": 0.5556
+      }
+    }
+  },
+  "failure_attribution": {
+    "proposal_generation": 23,
+    "governance_applicability": 13,
+    "operative_source_or_frozen_packet": 3
+  },
+  "verdict": "NO CLEAR SIGNAL"
+}

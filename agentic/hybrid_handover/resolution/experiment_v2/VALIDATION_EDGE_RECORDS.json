@@ -1,0 +1,905 @@
+[
+  {
+    "cid": "HX09294aee30",
+    "src": "Governance Charter \u00a74 p.3",
+    "dst": "MSA \u00a77 p.10",
+    "type": "governs_over",
+    "proposal_evidence": "precedence",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HX0e533313cd",
+    "src": "Variation III (effective 15 March 2023) p.9",
+    "dst": "Variation VII (effective 01/01/2021) p.5",
+    "type": "effective_after",
+    "proposal_evidence": "effective",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HX3b2fc94160",
+    "src": "MSA \u00a77.3 p.10",
+    "dst": "Schedule C p.30",
+    "type": "references",
+    "proposal_evidence": "Schedule C",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HX3b2fc94160",
+    "src": "Schedule C p.30",
+    "dst": "Exhibit 4 p.44",
+    "type": "references",
+    "proposal_evidence": "Exhibit 4",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HX59d7a3eb1c",
+    "src": "Order Form \u00a72 (effective 2020) p.1",
+    "dst": "MSA \u00a77 p.10",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HX59d7a3eb1c",
+    "src": "Policy P-7 p.2",
+    "dst": "Policy P-8 (effective 2024) p.1",
+    "type": "same_as",
+    "proposal_evidence": "migrated to",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "reject",
+    "rejection_reason": "relationship_ambiguity",
+    "confidence_vector": {
+      "lexical": 0.7,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HX59d7a3eb1c",
+    "src": "Policy P-8 (effective 2024) p.1",
+    "dst": "MSA \u00a77 p.10",
+    "type": "overrides",
+    "proposal_evidence": "notwithstanding",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HX59d7a3eb1c",
+    "src": "Policy P-8 (effective 2024) p.1",
+    "dst": "Order Form \u00a72 (effective 2020) p.1",
+    "type": "effective_after",
+    "proposal_evidence": "effective",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXa608d40882",
+    "src": "Schedule D \u00a74 p.18",
+    "dst": "MSA \u00a77 p.10",
+    "type": "exception_to",
+    "proposal_evidence": "may not",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXa608d40882",
+    "src": "Schedule D \u00a75 p.19",
+    "dst": "Schedule D \u00a74 p.18",
+    "type": "exception_to",
+    "proposal_evidence": "does not apply",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXb3def36e76",
+    "src": "Corporate Policy G-2 p.2",
+    "dst": "MSA \u00a77 p.10",
+    "type": "overrides",
+    "proposal_evidence": "notwithstanding",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXb3def36e76",
+    "src": "Regulatory Directive R-9 p.1",
+    "dst": "MSA \u00a77 p.10",
+    "type": "overrides",
+    "proposal_evidence": "notwithstanding",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXb5e7d29486",
+    "src": "Frame Agreement \u00a79.1 p.7",
+    "dst": "Frame Agreement \u00a79 p.7",
+    "type": "exception_to",
+    "proposal_evidence": "does not apply",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXd6fd8a1aef",
+    "src": "Appendix H \u00a72 p.40",
+    "dst": "MSA \u00a77 p.10",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXe3c2131a1a",
+    "src": "Rider 4 \u00a71 p.15",
+    "dst": "MSA \u00a77 p.10",
+    "type": "exception_to",
+    "proposal_evidence": "unavailable",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXf978239808",
+    "src": "Policy Q-1 p.1",
+    "dst": "MSA \u00a77 p.10",
+    "type": "overrides",
+    "proposal_evidence": "notwithstanding",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HXfb04f41f33",
+    "src": "Order Form \u00a73 p.1",
+    "dst": "Master Pricing Terms",
+    "type": "references",
+    "proposal_evidence": "Master Pricing Terms",
+    "validation_evidence": {
+      "destination_exists": false,
+      "authority_consistent": true,
+      "reference_resolves": false
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.6,
+      "structural": 0.5,
+      "authority": 1.0,
+      "reference": 0.5
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP0095f9f0b6",
+    "src": "Schedule E \u00a72 p.15",
+    "dst": "MSA \u00a77 p.8",
+    "type": "exception_to",
+    "proposal_evidence": "may not",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP0095f9f0b6",
+    "src": "Schedule E \u00a73 p.16",
+    "dst": "Schedule E \u00a72 p.15",
+    "type": "exception_to",
+    "proposal_evidence": "does not apply",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP0311e86e69",
+    "src": "MSA \u00a72 p.3",
+    "dst": "Appendix M \u00a71 p.52",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HP05f6792b24",
+    "src": "Order \u00a72 p.1",
+    "dst": "Glossary p.9",
+    "type": "references",
+    "proposal_evidence": "Glossary",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP05f6792b24",
+    "src": "Glossary p.9",
+    "dst": "Order \u00a72 p.1",
+    "type": "references",
+    "proposal_evidence": "Order",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP1cce0a19e3",
+    "src": "Amendment 9 \u00a72 p.22",
+    "dst": "MSA \u00a78 p.9",
+    "type": "supersedes",
+    "proposal_evidence": "delet",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.9,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP3866288a46",
+    "src": "Appendix K \u00a71 p.50",
+    "dst": "MSA \u00a77 p.8",
+    "type": "governs_over",
+    "proposal_evidence": "controls over",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP4098cabef9",
+    "src": "Amendment 12 \u00a71 p.24",
+    "dst": "MSA \u00a77 p.8",
+    "type": "supersedes",
+    "proposal_evidence": "is removed",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.9,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP4855aada04",
+    "src": "Service Tiers \u00a73 p.11",
+    "dst": "MSA \u00a77 p.8",
+    "type": "exception_to",
+    "proposal_evidence": "only to",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP6f0fac771c",
+    "src": "Policy N-1 p.2",
+    "dst": "Standard S-9 p.1",
+    "type": "same_as",
+    "proposal_evidence": "published as",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "reject",
+    "rejection_reason": "relationship_ambiguity",
+    "confidence_vector": {
+      "lexical": 0.7,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HP6f0fac771c",
+    "src": "Standard S-9 p.1",
+    "dst": "MSA \u00a77 p.8",
+    "type": "overrides",
+    "proposal_evidence": "notwithstanding",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP7d8d12efac",
+    "src": "Order Form \u00a72 (effective 2019) p.1",
+    "dst": "MSA \u00a77 p.8",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP7d8d12efac",
+    "src": "Policy T-1 p.2",
+    "dst": "Policy T-2 (effective 2025) p.1",
+    "type": "same_as",
+    "proposal_evidence": "migrated to",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "reject",
+    "rejection_reason": "relationship_ambiguity",
+    "confidence_vector": {
+      "lexical": 0.7,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HP94ce61a720",
+    "src": "Rider 6 \u00a71 p.16",
+    "dst": "MSA \u00a77 p.8",
+    "type": "exception_to",
+    "proposal_evidence": "unavailable",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP98c234d8ef",
+    "src": "Order \u00a74 p.1",
+    "dst": "Schedule B p.12",
+    "type": "references",
+    "proposal_evidence": "Schedule B",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP98c234d8ef",
+    "src": "Schedule B p.12",
+    "dst": "Annex 3 p.19",
+    "type": "references",
+    "proposal_evidence": "Annex 3",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP98c234d8ef",
+    "src": "Annex 3 p.19",
+    "dst": "Exhibit Z p.30",
+    "type": "references",
+    "proposal_evidence": "Exhibit Z",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HP98c234d8ef",
+    "src": "Exhibit Z p.30",
+    "dst": "Rider Q p.44",
+    "type": "references",
+    "proposal_evidence": "Rider Q",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPb167985bd5",
+    "src": "Order Form \u00a71 p.1",
+    "dst": "MSA \u00a72 p.2",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPb167985bd5",
+    "src": "MSA \u00a72 p.2",
+    "dst": "Order Form \u00a71 p.1",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HPb3463204c9",
+    "src": "Order Form \u00a72 (effective 2020) p.1",
+    "dst": "MSA \u00a77 p.8",
+    "type": "governs_over",
+    "proposal_evidence": "prevail",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.85,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPb3463204c9",
+    "src": "Policy V-1 p.2",
+    "dst": "Policy V-2 (effective 2025) p.1",
+    "type": "same_as",
+    "proposal_evidence": "migrated to",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "reject",
+    "rejection_reason": "relationship_ambiguity",
+    "confidence_vector": {
+      "lexical": 0.7,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": false
+  },
+  {
+    "cid": "HPd559d42bc8",
+    "src": "Order \u00a74 p.1",
+    "dst": "Schedule B p.12",
+    "type": "references",
+    "proposal_evidence": "Schedule B",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPd559d42bc8",
+    "src": "Schedule B p.12",
+    "dst": "Annex 3 p.19",
+    "type": "references",
+    "proposal_evidence": "Annex 3",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPd559d42bc8",
+    "src": "Annex 3 p.19",
+    "dst": "Exhibit Z p.30",
+    "type": "references",
+    "proposal_evidence": "Exhibit Z",
+    "validation_evidence": {
+      "destination_exists": true,
+      "authority_consistent": true,
+      "reference_resolves": true
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.8,
+      "structural": 1.0,
+      "authority": 1.0,
+      "reference": 1.0
+    },
+    "pair_in_gold": true
+  },
+  {
+    "cid": "HPddb3ae6b0e",
+    "src": "Order \u00a75 p.1",
+    "dst": "Master Fee Schedule",
+    "type": "references",
+    "proposal_evidence": "Master Fee Schedule",
+    "validation_evidence": {
+      "destination_exists": false,
+      "authority_consistent": true,
+      "reference_resolves": false
+    },
+    "decision": "accept",
+    "rejection_reason": null,
+    "confidence_vector": {
+      "lexical": 0.6,
+      "structural": 0.5,
+      "authority": 1.0,
+      "reference": 0.5
+    },
+    "pair_in_gold": true
+  }
+]

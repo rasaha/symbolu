@@ -1,0 +1,94 @@
+# GOVERNANCE_SEMANTICS_HIDDEN_LOCK — Governance Semantics Experiment v0.1
+
+**Lock version:** `v0.4`  
+**Combined lock hash:** `a14c3ba00b819278ee5b295a80662e4c998b6ebe73e1f22d487770607a582273`  
+**Manifest hash:** `44a1c554c711a83117772ce4b9c41036f55672ae95fbab6f00773c84652b43e2`
+
+Computed BEFORE the first hidden evaluation of v0.4. The v0.3/v0.2/v0.1 experiments
+and all frozen platform artifacts are hashed here to prove they are unchanged.
+
+## Prior experiment locks (must verify zero drift)
+| experiment | drift |
+|---|---|
+| v0.1 | none |
+| v0.2 | none |
+| v0.3 | none |
+
+## Manifest
+```json
+{
+  "study": "Governance Semantics Experiment v0.1",
+  "resolver_under_test": "HybridRelationshipResolver Experimental v0.4",
+  "control": "G0 = HybridRelationshipResolver v0.2 (frozen governance)",
+  "ablation_order": [
+    "G0_frozen",
+    "G1_supersession_amendment",
+    "G2_parallel",
+    "G3_operative",
+    "G4_full"
+  ],
+  "primary_endpoint": "full-pipeline selective_accuracy, G4 vs G0, threshold +0.03",
+  "identical_metrics": [
+    "discovery_precision",
+    "discovery_recall",
+    "discovery_f1",
+    "classification_accuracy",
+    "packet_realization_accuracy_modeP"
+  ],
+  "bounded_noninferiority": {
+    "governance_modeG_decrease": 0.03,
+    "coverage_decrease": 0.05,
+    "false_abstention_increase": 0.05,
+    "missed_abstention_increase": 0.05,
+    "unsafe_increase": "any"
+  },
+  "governing_set": "pinned to the frozen governing set (Mode G preserved by construction)",
+  "bootstrap_seed": 20240601,
+  "bootstrap_iters": 10000,
+  "repetitions": 2,
+  "byte_identical_required": true,
+  "note": "v0.1/v0.2/v0.3 experiments and all frozen platform artifacts are unchanged."
+}
+```
+
+## v0.4 source + spec hashes (SHA-256)
+| file | sha256 |
+|---|---|
+| `governance_semantics.py` | `228a90a02327f816615548fcbcd3755593057a2cf963c7ef053298154568d2a7` |
+| `hybrid_resolver_v4.py` | `b68dd97c05561786b0098bcf7bdda15984a1fd93c407f13b31ae35efccc4adeb` |
+| `run_governance_experiment.py` | `207b7b042021a62263661b585f60de63b1c95738ee0ca34e653dbab910fee2d3` |
+| `lock_v4.py` | `aef4572ffda9d0721ce66ae3bf9e19de3b6ebc02b5a64b6e08e0bd2092160ce4` |
+| `GOVERNANCE_SEMANTICS_PREREGISTRATION.md` | `e5869756cb527dd454e5e63d245ddb725086a0d5818a67f8c1325533f1cd0a0d` |
+| `GOVERNANCE_SEMANTICS_ARCHITECTURE.md` | `ea33f99d6ab496bbe74fec02552e8f2594061260a970057b9a60e78e87ca1b94` |
+| `GOVERNANCE_STATUS_MODEL.md` | `10432f50620f87039d4c43eb1944c35eccef2e8d6df2fa16013b42d76cbbb3cd` |
+| `GOVERNANCE_RULEBOOK.md` | `dd3eff4f3d7eb9a58c5d5dfc2eaf6fd8e29e7a234f2f427718eb5ebec064fddb` |
+| `OPERATIVE_SOURCE_SPEC.md` | `f38b34e16d996099b9c4791fc5b3dc54e630fc1e59dd19c00bed0afb8e0b9666` |
+| `GOVERNANCE_ABSTENTION_SPEC.md` | `1012b50e29e16f068f78abfa084e9d8f42257cee0b413a10320d4d734ba2688f` |
+
+## Frozen-dependency hashes (must be unchanged)
+| file | sha256 |
+|---|---|
+| `experiment_v3/prioritizer.py` | `9a18377bbf18e657a25f347c897114bec6126002f6a9ff5be0a2c2fa9c836310` |
+| `experiment_v3/hybrid_resolver_v3.py` | `45a2656cc945bbfba1819cb96fba798a63f893546be1f39498190548a4cacb41` |
+| `experiment_v2/hybrid_resolver_v2.py` | `620e82c76d7f35932fc9c40af2241d4749d6dac1400b35faf2708529cbaa5a8e` |
+| `experiment_v2/validator.py` | `257ed63c0a35b6140b957188a479f32e1ca6ebef0db8bae45099fd5e83da89dc` |
+| `experiment/hybrid_resolver.py` | `a2bb9803f0d180dd80a0f3c7806247dde284b9830240a44095fdd4632b887add` |
+| `experiment/hidden_data.py` | `a32119d1b4bf84f8f871d88f2b52b704da2ff25ef9840191710b7bfe10973813` |
+| `experiment/hidden_metrics.py` | `b878994f23a312de2d09d008661c52f3b19cbb6b913cd8b98b683388f3e90228` |
+| `experiment/stats.py` | `03ca5b37b5da45dce5c43f80e2a82299895665f219d847ba6f6751976fc82cd3` |
+| `resolution/resolvers.py` | `a5eba70cf0b2f4a564ed848a93cb5e4d1006bf87e5e7e6afff619d8d99c0ef53` |
+| `resolution/parse.py` | `f84657b904255b1071d8705eb5be629d1e70671355177c52e22bb8dafebf8f47` |
+| `resolution/graph.py` | `db7309356ddb1ab1599d3526e85618a8c734310ce3dd3ed3640b816776e3c645` |
+| `measurement/stage_metrics.py` | `e105714cfa3d5785303c0219e035b194a2cc219391deb574b9455aea920c1419` |
+| `measurement/abstention.py` | `874becf768ea33c0156df97e4a522b76722d264ac39a4920de2a6f500cd235f2` |
+| `hidden_corpus/corpus.py` | `e9bc51cf8f0ed1ea8f9ac3379f88121a3ed43cddf99ce1cc91acd083f38482b1` |
+| `hidden_corpus/annotations.py` | `8aee8fe56782121a66602412effdf4f566c21a743377071b52eb2a9f87191524` |
+| `curation/pilot_corpus.py` | `e48884305d758891852794b5255de11aefd2052901a8bee0400a10f2c149f639` |
+| `curation/pilot_annotations.py` | `c999dcb1c5b2aec780553915db7414997a3fd4fa7e6367e0ac1dd5f071735dca` |
+
+## Calibration gates (must pass before hidden eval)
+- G0 control reproduces v0.2 bit-for-bit.
+- Discovery + classification identical across G0–G4.
+- Proposal-validation records identical across G0–G4.
+- Packet Mode P identical (delegated to the frozen packet).
+- No correct visible full-pipeline decision degraded (G0–G4 identical on visible).

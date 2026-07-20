@@ -1,0 +1,176 @@
+{
+  "study": "Proposal Validation Experiment v0.1",
+  "resolver_under_test": "HybridRelationshipResolver Experimental v0.2",
+  "deterministic": true,
+  "repetitions": 2,
+  "byte_identical_reps": true,
+  "visible": {
+    "V0_none": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "V1_dedupe_only": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "V2_evidence_only": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "V3_authority_temporal": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "V4_full": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    }
+  },
+  "hidden": {
+    "V0_none": {
+      "discovery_precision": 0.814,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5512,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5761
+    },
+    "V1_dedupe_only": {
+      "discovery_precision": 0.814,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5512,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5761
+    },
+    "V2_evidence_only": {
+      "discovery_precision": 0.814,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5512,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5761
+    },
+    "V3_authority_temporal": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "V4_full": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    }
+  },
+  "primary_endpoint": {
+    "definition": "recover discovery precision with recall loss <= 0.03 vs V0 (Hybrid v0.1)",
+    "v0_precision": 0.814,
+    "v4_precision": 0.8974,
+    "precision_gain": 0.0834,
+    "v0_recall": 0.4167,
+    "v4_recall": 0.4167,
+    "recall_loss": 0.0,
+    "recall_loss_margin": 0.03,
+    "recall_loss_within_margin": true,
+    "endpoint_met": true
+  },
+  "success_criteria": {
+    "discovery_precision_improves": true,
+    "recall_loss_within_margin": true,
+    "selective_accuracy_improves": false,
+    "unsafe_not_increased": true,
+    "governance_unchanged": true,
+    "packet_unchanged": true
+  },
+  "all_success": false,
+  "statistics": {
+    "mcnemar_discovery_complete_v4_vs_v0": {
+      "b10_candidate_fixes": 0,
+      "b01_candidate_breaks": 0,
+      "n_discordant": 0,
+      "p_value": 1.0,
+      "net": 0
+    },
+    "bootstrap_precision_v4_minus_v0": {
+      "observed_diff": 0.0835,
+      "ci95": [
+        0.0204,
+        0.1557
+      ],
+      "excludes_zero": true,
+      "n": 60,
+      "iters": 10000,
+      "seed": 20240601
+    }
+  },
+  "rejection_taxonomy": {
+    "counts": {
+      "unsupported_wording": 0,
+      "authority_mismatch": 0,
+      "temporal_mismatch": 0,
+      "missing_destination_evidence": 0,
+      "missing_source_evidence": 0,
+      "graph_contradiction": 0,
+      "duplicate_edge": 0,
+      "relationship_ambiguity": 4,
+      "low_evidence": 0,
+      "type_conflict": 0
+    },
+    "incorrect_removed": 4,
+    "correct_rejected": 0,
+    "accepted_correct": 35,
+    "accepted_incorrect": 4
+  },
+  "verdict": "PROMISING VALIDATION LAYER (with caveats)"
+}

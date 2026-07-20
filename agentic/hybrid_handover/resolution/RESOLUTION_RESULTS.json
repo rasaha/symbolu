@@ -1,0 +1,3352 @@
+{
+  "benchmark": "SEEB",
+  "benchmark_version": "1.0.0",
+  "synthetic": true,
+  "resolvers": {
+    "frozen": {
+      "A_oracle": {
+        "metrics": {
+          "relationship_edge_precision": 0.5,
+          "relationship_edge_recall": 0.0588,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.25,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 0.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 0.5
+        },
+        "n_correct": 6,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 6,
+          "relationship": 8,
+          "extraction": 1,
+          "packet_construction": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "superseded"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "supersedes",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {
+              "Amendment 3 (v2) p.150": "superseded"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "6 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": "fee applies"
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          }
+        ]
+      },
+      "B_bm25": {
+        "metrics": {
+          "relationship_edge_precision": 0.5,
+          "relationship_edge_recall": 0.0588,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.25,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.0,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 0.0,
+          "override_resolution_accuracy": 0.0,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 0.5
+        },
+        "n_correct": 6,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 6,
+          "relationship": 8,
+          "extraction": 1,
+          "packet_construction": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "superseded"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "supersedes",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {
+              "Amendment 3 (v2) p.150": "superseded"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "6 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": "fee applies"
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          }
+        ]
+      },
+      "pipeline_metrics_seeb_B_bm25": {
+        "unsafe_handover_rate": 20.0,
+        "fail_closed_rate": 84.2,
+        "packet_sufficiency": 61.9,
+        "routing_accuracy": 88.1,
+        "unsupported_claim_rate": 10.3,
+        "precedence_recall": 52.9
+      }
+    },
+    "rule": {
+      "A_oracle": {
+        "metrics": {
+          "relationship_edge_precision": 0.8889,
+          "relationship_edge_recall": 0.9412,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.25,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.5,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 0.5
+        },
+        "n_correct": 9,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 9,
+          "packet_construction": 2,
+          "governance": 3,
+          "extraction": 1,
+          "relationship": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 6 \u00a72 p.331",
+                "amends",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [
+              [
+                "Schedule D \u00a74 p.88",
+                "exception_to",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "DPA \u00a71 p.51",
+                "conflicts_with",
+                "MSA \u00a71 p.3"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [
+              [
+                "Order Form \u00a72 p.1",
+                "governs_over",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "governs_over"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "same_as",
+                "Amendment 3 (v2) p.150"
+              ],
+              [
+                "Amendment 3 (v1) p.150",
+                "conflicts_with",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 p.204",
+                "same_as",
+                "Amendment 4 (dup) p.204"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Annex A p.400"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "conflicts_with",
+                "Fee Table Exhibit B p.60"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "amends",
+                "MSA \u00a77.3 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "references",
+                "MSA \u00a77."
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Appendix 1"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "same_as",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 45,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [
+              [
+                "Corporate Policy GOV-12 p.2",
+                "overrides",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "overrides"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          }
+        ]
+      },
+      "B_bm25": {
+        "metrics": {
+          "relationship_edge_precision": 0.8889,
+          "relationship_edge_recall": 0.9412,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 0.25,
+          "abstention_accuracy": 0.0,
+          "conflict_resolution_accuracy": 0.5,
+          "coverage_abstention_accuracy": 0.0,
+          "cycle_detection_accuracy": 0.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 0.5
+        },
+        "n_correct": 9,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 9,
+          "packet_construction": 2,
+          "governance": 3,
+          "extraction": 1,
+          "relationship": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 6 \u00a72 p.331",
+                "amends",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [
+              [
+                "Schedule D \u00a74 p.88",
+                "exception_to",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "DPA \u00a71 p.51",
+                "conflicts_with",
+                "MSA \u00a71 p.3"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [
+              [
+                "Order Form \u00a72 p.1",
+                "governs_over",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "governs_over"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "same_as",
+                "Amendment 3 (v2) p.150"
+              ],
+              [
+                "Amendment 3 (v1) p.150",
+                "conflicts_with",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 p.204",
+                "same_as",
+                "Amendment 4 (dup) p.204"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Annex A p.400"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "conflicts_with",
+                "Fee Table Exhibit B p.60"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "amends",
+                "MSA \u00a77.3 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "references",
+                "MSA \u00a77."
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "relationship"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Appendix 1"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "governance"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "same_as",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 45,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [
+              [
+                "Corporate Policy GOV-12 p.2",
+                "overrides",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "overrides"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          }
+        ]
+      },
+      "pipeline_metrics_seeb_B_bm25": {
+        "unsafe_handover_rate": 5.9,
+        "fail_closed_rate": 84.2,
+        "packet_sufficiency": 73.8,
+        "routing_accuracy": 88.1,
+        "unsupported_claim_rate": 11.0,
+        "precedence_recall": 82.4
+      }
+    },
+    "graph_traversal": {
+      "A_oracle": {
+        "metrics": {
+          "relationship_edge_precision": 0.8889,
+          "relationship_edge_recall": 0.9412,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 1.0,
+          "abstention_accuracy": 1.0,
+          "conflict_resolution_accuracy": 1.0,
+          "coverage_abstention_accuracy": 0.6667,
+          "cycle_detection_accuracy": 1.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 1.0
+        },
+        "n_correct": 13,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 13,
+          "packet_construction": 2,
+          "extraction": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 6 \u00a72 p.331",
+                "amends",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [
+              [
+                "Schedule D \u00a74 p.88",
+                "exception_to",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "DPA \u00a71 p.51",
+                "conflicts_with",
+                "MSA \u00a71 p.3"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [
+              [
+                "Order Form \u00a72 p.1",
+                "governs_over",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "governs_over"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "same_as",
+                "Amendment 3 (v2) p.150"
+              ],
+              [
+                "Amendment 3 (v1) p.150",
+                "conflicts_with",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "unresolvable version conflict",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 p.204",
+                "same_as",
+                "Amendment 4 (dup) p.204"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Annex A p.400"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document not machine-readable",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "conflicts_with",
+                "Fee Table Exhibit B p.60"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "amends",
+                "MSA \u00a77.3 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "references",
+                "MSA \u00a77."
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document absent",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Appendix 1"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document absent",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "same_as",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 45,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [
+              [
+                "Corporate Policy GOV-12 p.2",
+                "overrides",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "overrides"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          }
+        ]
+      },
+      "B_bm25": {
+        "metrics": {
+          "relationship_edge_precision": 0.8889,
+          "relationship_edge_recall": 0.9412,
+          "relationship_type_accuracy": 1.0,
+          "cross_document_link_accuracy": 1.0,
+          "abstention_accuracy": 1.0,
+          "conflict_resolution_accuracy": 1.0,
+          "coverage_abstention_accuracy": 0.6667,
+          "cycle_detection_accuracy": 1.0,
+          "definition_resolution_accuracy": 1.0,
+          "exception_resolution_accuracy": 1.0,
+          "negation_interpretation_accuracy": 1.0,
+          "override_resolution_accuracy": 0.5,
+          "precedence_resolution_accuracy": 0.3333,
+          "version_selection_accuracy": 1.0
+        },
+        "n_correct": 13,
+        "n_cases": 16,
+        "failure_attribution": {
+          "none": 13,
+          "packet_construction": 2,
+          "extraction": 1
+        },
+        "per_case": [
+          {
+            "case_id": "later_amendment_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 \u00a73 p.204",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 6 \u00a72 p.331",
+                "amends",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 \u00a73 p.204",
+              "Amendment 6 \u00a72 p.331"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": "3 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "buried_exception",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Schedule D \u00a74 p.88",
+              "Schedule D \u00a74 p.88"
+            ],
+            "relationship_graph": [
+              [
+                "Schedule D \u00a74 p.88",
+                "exception_to",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 60,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_definitions",
+            "retrieved_evidence": [
+              "MSA \u00a71 p.3",
+              "MSA \u00a71 p.3",
+              "DPA \u00a71 p.51",
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "DPA \u00a71 p.51",
+                "conflicts_with",
+                "MSA \u00a71 p.3"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "order_of_precedence",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Order Form \u00a72 p.1",
+              "Order Form \u00a72 p.1"
+            ],
+            "relationship_graph": [
+              [
+                "Order Form \u00a72 p.1",
+                "governs_over",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Order Form \u00a72 p.1"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "governs_over"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 30,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 30,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "conflicting_versions",
+            "retrieved_evidence": [
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v1) p.150",
+              "Amendment 3 (v2) p.150",
+              "Amendment 3 (v2) p.150"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 3 (v1) p.150",
+                "same_as",
+                "Amendment 3 (v2) p.150"
+              ],
+              [
+                "Amendment 3 (v1) p.150",
+                "conflicts_with",
+                "Amendment 3 (v2) p.150"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "unresolvable version conflict",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "duplicate_amendment",
+            "retrieved_evidence": [
+              "Amendment 4 p.204",
+              "Amendment 4 p.204",
+              "Amendment 4 (dup) p.204",
+              "Amendment 4 (dup) p.204"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 4 p.204",
+                "same_as",
+                "Amendment 4 (dup) p.204"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 4 p.204"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "ocr_corruption",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12 (scanned)"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": false,
+            "failure_stage": "extraction"
+          },
+          {
+            "case_id": "scanned_annex",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Annex A p.400"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Annex A p.400"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document not machine-readable",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "hidden_negation",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "conflicting_tables",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Fee Table Exhibit B p.60",
+              "Fee Table Exhibit B p.60"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "conflicts_with",
+                "Fee Table Exhibit B p.60"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "cross_document_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "amends",
+                "MSA \u00a77.3 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "MSA \u00a77.3 p.12",
+              "Schedule C p.70"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees"
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": "4 months' fees",
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "circular_reference",
+            "retrieved_evidence": [
+              "MSA \u00a77 p.12",
+              "Schedule C p.70"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77 p.12",
+                "references",
+                "Schedule C p.70"
+              ],
+              [
+                "Schedule C p.70",
+                "references",
+                "MSA \u00a77."
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document absent",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "missing_appendix",
+            "retrieved_evidence": [
+              "MSA \u00a77.3 p.12",
+              "MSA \u00a77.3 p.12"
+            ],
+            "relationship_graph": [
+              [
+                "MSA \u00a77.3 p.12",
+                "references",
+                "Appendix 1"
+              ]
+            ],
+            "governing_evidence": [],
+            "discarded_evidence": {},
+            "abstained": true,
+            "abstain_reason": "referenced document absent",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": true
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "irrelevant_distractors",
+            "retrieved_evidence": [
+              "NDA p.1",
+              "MSA \u00a77.1 p.12",
+              "Invoice 2043 p.1"
+            ],
+            "relationship_graph": [],
+            "governing_evidence": [
+              "MSA \u00a77.1 p.12"
+            ],
+            "discarded_evidence": {},
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 90,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          },
+          {
+            "case_id": "inconsistent_numbering",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "MSA \u00a77.1 p.12",
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "relationship_graph": [
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "supersedes",
+                "MSA \u00a77.1 p.12"
+              ],
+              [
+                "Amendment 5 \u00a77.01 p.250",
+                "same_as",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Amendment 5 \u00a77.01 p.250"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "supersedes"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "unknown",
+              "notice_days": 45,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "allowed",
+              "notice_days": 45,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": false,
+            "failure_stage": "packet_construction"
+          },
+          {
+            "case_id": "policy_override",
+            "retrieved_evidence": [
+              "MSA \u00a77.1 p.12",
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "relationship_graph": [
+              [
+                "Corporate Policy GOV-12 p.2",
+                "overrides",
+                "MSA \u00a77.1 p.12"
+              ]
+            ],
+            "governing_evidence": [
+              "Corporate Policy GOV-12 p.2"
+            ],
+            "discarded_evidence": {
+              "MSA \u00a77.1 p.12": "overrides"
+            },
+            "abstained": false,
+            "abstain_reason": "",
+            "final_packet": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null
+            },
+            "expected": {
+              "tfc": "prohibited",
+              "notice_days": null,
+              "penalty": null,
+              "abstain": false
+            },
+            "correct": true,
+            "failure_stage": "none"
+          }
+        ]
+      },
+      "pipeline_metrics_seeb_B_bm25": {
+        "unsafe_handover_rate": 5.9,
+        "fail_closed_rate": 84.2,
+        "packet_sufficiency": 69.0,
+        "routing_accuracy": 88.1,
+        "unsupported_claim_rate": 11.9,
+        "precedence_recall": 82.4
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "lock_version": "v0.3",
+  "v3_hashes": {
+    "agentic/hybrid_handover/resolution/experiment_v3/prioritizer.py": "9a18377bbf18e657a25f347c897114bec6126002f6a9ff5be0a2c2fa9c836310",
+    "agentic/hybrid_handover/resolution/experiment_v3/hybrid_resolver_v3.py": "45a2656cc945bbfba1819cb96fba798a63f893546be1f39498190548a4cacb41",
+    "agentic/hybrid_handover/resolution/experiment_v3/run_prioritization_experiment.py": "acac2384be55612e1dcb921ef17f93b6b7cba847d327b3188b149691e389d451",
+    "agentic/hybrid_handover/resolution/experiment_v3/lock_v3.py": "91e7a0832b950e68dfb061116f6f0e74eef17282a8f5cb94bfd713418d312c74",
+    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITIZATION_PREREGISTRATION.md": "010bd9f7253e68b84c2901f60656157e84c206959a5ed1bb82eada98ba531ff8",
+    "agentic/hybrid_handover/resolution/experiment_v3/PRIORITY_VECTOR_SPEC.md": "643332620bbfc30a463b62223d746770853e605943a3f60fa7e37652ac07b6ba",
+    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITY_RULEBOOK.md": "7ea6ba0fa4119cd849565c0612647711111258ab201d7f1e8e8bc976a637d9d9"
+  },
+  "frozen_hashes": {
+    "agentic/hybrid_handover/resolution/experiment_v2/hybrid_resolver_v2.py": "620e82c76d7f35932fc9c40af2241d4749d6dac1400b35faf2708529cbaa5a8e",
+    "agentic/hybrid_handover/resolution/experiment_v2/validator.py": "257ed63c0a35b6140b957188a479f32e1ca6ebef0db8bae45099fd5e83da89dc",
+    "agentic/hybrid_handover/resolution/experiment/hybrid_resolver.py": "a2bb9803f0d180dd80a0f3c7806247dde284b9830240a44095fdd4632b887add",
+    "agentic/hybrid_handover/resolution/experiment/hidden_data.py": "a32119d1b4bf84f8f871d88f2b52b704da2ff25ef9840191710b7bfe10973813",
+    "agentic/hybrid_handover/resolution/experiment/hidden_metrics.py": "b878994f23a312de2d09d008661c52f3b19cbb6b913cd8b98b683388f3e90228",
+    "agentic/hybrid_handover/resolution/experiment/stats.py": "03ca5b37b5da45dce5c43f80e2a82299895665f219d847ba6f6751976fc82cd3",
+    "agentic/hybrid_handover/resolution/resolvers.py": "a5eba70cf0b2f4a564ed848a93cb5e4d1006bf87e5e7e6afff619d8d99c0ef53",
+    "agentic/hybrid_handover/resolution/parse.py": "f84657b904255b1071d8705eb5be629d1e70671355177c52e22bb8dafebf8f47",
+    "agentic/hybrid_handover/resolution/graph.py": "db7309356ddb1ab1599d3526e85618a8c734310ce3dd3ed3640b816776e3c645",
+    "agentic/hybrid_handover/resolution/measurement/stage_metrics.py": "e105714cfa3d5785303c0219e035b194a2cc219391deb574b9455aea920c1419",
+    "agentic/hybrid_handover/resolution/measurement/abstention.py": "874becf768ea33c0156df97e4a522b76722d264ac39a4920de2a6f500cd235f2",
+    "agentic/hybrid_handover/resolution/hidden_corpus/corpus.py": "e9bc51cf8f0ed1ea8f9ac3379f88121a3ed43cddf99ce1cc91acd083f38482b1",
+    "agentic/hybrid_handover/resolution/hidden_corpus/annotations.py": "8aee8fe56782121a66602412effdf4f566c21a743377071b52eb2a9f87191524",
+    "agentic/hybrid_handover/resolution/hidden_corpus/curation/pilot_corpus.py": "e48884305d758891852794b5255de11aefd2052901a8bee0400a10f2c149f639",
+    "agentic/hybrid_handover/resolution/hidden_corpus/curation/pilot_annotations.py": "c999dcb1c5b2aec780553915db7414997a3fd4fa7e6367e0ac1dd5f071735dca"
+  },
+  "manifest": {
+    "study": "Edge Prioritization Experiment v0.1",
+    "resolver_under_test": "HybridRelationshipResolver Experimental v0.3",
+    "ablation_order": [
+      "P0_none",
+      "P1_authority",
+      "P2_authority_temporal",
+      "P3_auth_temporal_specificity",
+      "P4_full"
+    ],
+    "priority_component_order": [
+      "authority",
+      "temporal",
+      "specificity",
+      "reference",
+      "structural",
+      "confidence",
+      "support"
+    ],
+    "governance_source_types": [
+      "supersedes",
+      "overrides",
+      "governs_over"
+    ],
+    "primary_endpoint": "selective_accuracy, no degradation of discovery precision/recall, classification, governance ModeG, packet ModeP, unsafe",
+    "bootstrap_seed": 20240601,
+    "bootstrap_iters": 10000,
+    "repetitions": 2,
+    "byte_identical_required": true,
+    "note": "v0.2, the Proposal Validation Layer, v0.1, and all frozen platform artifacts are unchanged; proposal + validation are bit-identical to v0.2."
+  },
+  "manifest_hash": "ccc12b9fdbeaccd8312eaa56107bcf4cdc9c233e0ff87accec5dea4e2b0642c3",
+  "combined_lock_hash": "a36cadd8070d6880b6fe2b30a8a76370fb143f1d7eafbcb80049f3f713fc8db8"
+}

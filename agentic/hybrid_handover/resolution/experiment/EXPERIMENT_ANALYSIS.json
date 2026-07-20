@@ -1,0 +1,1265 @@
+{
+  "study": "Exploratory Resolver Study v0.1",
+  "generalization": {
+    "graph_traversal": {
+      "by_source": {
+        "seed": {
+          "n": 22,
+          "macro": 0.5427,
+          "disc_f1": 0.3226
+        },
+        "pilot": {
+          "n": 38,
+          "macro": 0.4725,
+          "disc_f1": 0.2941
+        }
+      },
+      "by_capability": {
+        "appendix_precedence": {
+          "n": 6,
+          "macro": 0.2394,
+          "disc_f1": 0.3636
+        },
+        "circular_reference": {
+          "n": 4,
+          "macro": 0.45,
+          "disc_f1": 0.0
+        },
+        "conditional_applicability": {
+          "n": 6,
+          "macro": 0.3,
+          "disc_f1": 0.3333
+        },
+        "conflicting_amendments": {
+          "n": 5,
+          "macro": 0.28,
+          "disc_f1": 0.0
+        },
+        "cross_document_reference": {
+          "n": 5,
+          "macro": 0.4776,
+          "disc_f1": 0.5882
+        },
+        "definition_inheritance": {
+          "n": 5,
+          "macro": 0.4,
+          "disc_f1": 0.0
+        },
+        "effective_date_precedence": {
+          "n": 6,
+          "macro": 0.4533,
+          "disc_f1": 0.5
+        },
+        "entity_renaming": {
+          "n": 4,
+          "macro": 0.6389,
+          "disc_f1": 0.4444
+        },
+        "hierarchical_governance": {
+          "n": 6,
+          "macro": 0.5167,
+          "disc_f1": 0.5
+        },
+        "implicit_references": {
+          "n": 4,
+          "macro": 0.4,
+          "disc_f1": 0.0
+        },
+        "insufficient_evidence": {
+          "n": 3,
+          "macro": 0.5333,
+          "disc_f1": 0.0
+        },
+        "multi_hop": {
+          "n": 4,
+          "macro": 0.525,
+          "disc_f1": 0.625
+        },
+        "multiple_authorities": {
+          "n": 6,
+          "macro": 0.6556,
+          "disc_f1": 0.4444
+        },
+        "multiple_valid_interpretations": {
+          "n": 3,
+          "macro": 0.3333,
+          "disc_f1": 0.0
+        },
+        "nested_exceptions": {
+          "n": 4,
+          "macro": 0.2,
+          "disc_f1": 0.0
+        },
+        "no_relationship": {
+          "n": 3,
+          "macro": 0.4,
+          "disc_f1": 0.0
+        },
+        "parallel_overrides": {
+          "n": 4,
+          "macro": 0.65,
+          "disc_f1": 0.25
+        },
+        "partial_overrides": {
+          "n": 3,
+          "macro": 0.3,
+          "disc_f1": 0.5
+        },
+        "policy_migration": {
+          "n": 5,
+          "macro": 0.7511,
+          "disc_f1": 0.5556
+        },
+        "scoped_exceptions": {
+          "n": 6,
+          "macro": 0.2333,
+          "disc_f1": 0.0
+        },
+        "table_vs_text": {
+          "n": 5,
+          "macro": 0.32,
+          "disc_f1": 0.4
+        },
+        "transitive_authority": {
+          "n": 6,
+          "macro": 0.6719,
+          "disc_f1": 0.5263
+        },
+        "unresolvable_conflict": {
+          "n": 4,
+          "macro": 0.43,
+          "disc_f1": 0.4
+        },
+        "version_supersession": {
+          "n": 5,
+          "macro": 0.16,
+          "disc_f1": 0.0
+        }
+      },
+      "by_difficulty": {
+        "1": {
+          "n": 7,
+          "macro": 0.2286,
+          "disc_f1": 0.0
+        },
+        "2": {
+          "n": 13,
+          "macro": 0.4949,
+          "disc_f1": 0.1667
+        },
+        "3": {
+          "n": 20,
+          "macro": 0.4311,
+          "disc_f1": 0.2222
+        },
+        "4": {
+          "n": 13,
+          "macro": 0.567,
+          "disc_f1": 0.2963
+        },
+        "5": {
+          "n": 7,
+          "macro": 0.5323,
+          "disc_f1": 0.5185
+        }
+      },
+      "by_gold_edge_type": {
+        "amends": {
+          "n": 3,
+          "disc_f1": 0.5
+        },
+        "conflicts_with": {
+          "n": 6,
+          "disc_f1": 0.2857
+        },
+        "effective_after": {
+          "n": 2,
+          "disc_f1": 0.0
+        },
+        "exception_to": {
+          "n": 11,
+          "disc_f1": 0.1818
+        },
+        "governs_over": {
+          "n": 10,
+          "disc_f1": 0.4167
+        },
+        "overrides": {
+          "n": 8,
+          "disc_f1": 0.48
+        },
+        "references": {
+          "n": 12,
+          "disc_f1": 0.3448
+        },
+        "same_as": {
+          "n": 5,
+          "disc_f1": 0.25
+        },
+        "supersedes": {
+          "n": 9,
+          "disc_f1": 0.381
+        }
+      },
+      "by_variation": {
+        "clause_numbering": {
+          "n": 1,
+          "macro": 0.2
+        },
+        "date_format": {
+          "n": 9,
+          "macro": 0.4736
+        },
+        "doc_granularity": {
+          "n": 11,
+          "macro": 0.4771
+        },
+        "doc_order": {
+          "n": 3,
+          "macro": 0.5556
+        },
+        "entity_names": {
+          "n": 4,
+          "macro": 0.5071
+        },
+        "explicit_implicit": {
+          "n": 13,
+          "macro": 0.3145
+        },
+        "number_format": {
+          "n": 5,
+          "macro": 0.2
+        },
+        "policy_naming": {
+          "n": 9,
+          "macro": 0.7145
+        },
+        "section_reference": {
+          "n": 3,
+          "macro": 0.5467
+        },
+        "sentence_structure": {
+          "n": 1,
+          "macro": 0.2
+        },
+        "table_prose": {
+          "n": 5,
+          "macro": 0.32
+        },
+        "voice": {
+          "n": 4,
+          "macro": 0.6071
+        },
+        "wording": {
+          "n": 31,
+          "macro": 0.4697
+        }
+      },
+      "negative_control": {
+        "n": 16,
+        "macro": 0.4683
+      }
+    },
+    "hybrid_relationship": {
+      "by_source": {
+        "seed": {
+          "n": 22,
+          "macro": 0.6285,
+          "disc_f1": 0.6512
+        },
+        "pilot": {
+          "n": 38,
+          "macro": 0.5467,
+          "disc_f1": 0.5
+        }
+      },
+      "by_capability": {
+        "appendix_precedence": {
+          "n": 6,
+          "macro": 0.4333,
+          "disc_f1": 0.3333
+        },
+        "circular_reference": {
+          "n": 4,
+          "macro": 0.7133,
+          "disc_f1": 0.4
+        },
+        "conditional_applicability": {
+          "n": 6,
+          "macro": 0.5256,
+          "disc_f1": 0.4615
+        },
+        "conflicting_amendments": {
+          "n": 5,
+          "macro": 0.28,
+          "disc_f1": 0.0
+        },
+        "cross_document_reference": {
+          "n": 5,
+          "macro": 0.5314,
+          "disc_f1": 0.8571
+        },
+        "definition_inheritance": {
+          "n": 5,
+          "macro": 0.4,
+          "disc_f1": 0.0
+        },
+        "effective_date_precedence": {
+          "n": 6,
+          "macro": 0.4767,
+          "disc_f1": 0.4167
+        },
+        "entity_renaming": {
+          "n": 4,
+          "macro": 0.63,
+          "disc_f1": 0.4
+        },
+        "hierarchical_governance": {
+          "n": 6,
+          "macro": 0.47,
+          "disc_f1": 0.4167
+        },
+        "implicit_references": {
+          "n": 4,
+          "macro": 0.6143,
+          "disc_f1": 0.5714
+        },
+        "insufficient_evidence": {
+          "n": 3,
+          "macro": 0.9333,
+          "disc_f1": 1.0
+        },
+        "multi_hop": {
+          "n": 4,
+          "macro": 0.58,
+          "disc_f1": 0.9
+        },
+        "multiple_authorities": {
+          "n": 6,
+          "macro": 0.6293,
+          "disc_f1": 0.48
+        },
+        "multiple_valid_interpretations": {
+          "n": 3,
+          "macro": 0.3333,
+          "disc_f1": 0.0
+        },
+        "nested_exceptions": {
+          "n": 4,
+          "macro": 0.5231,
+          "disc_f1": 0.6154
+        },
+        "no_relationship": {
+          "n": 3,
+          "macro": 0.4,
+          "disc_f1": 0.0
+        },
+        "parallel_overrides": {
+          "n": 4,
+          "macro": 0.6889,
+          "disc_f1": 0.4444
+        },
+        "partial_overrides": {
+          "n": 3,
+          "macro": 0.3,
+          "disc_f1": 0.5
+        },
+        "policy_migration": {
+          "n": 5,
+          "macro": 0.7067,
+          "disc_f1": 0.5
+        },
+        "scoped_exceptions": {
+          "n": 6,
+          "macro": 0.5256,
+          "disc_f1": 0.4615
+        },
+        "table_vs_text": {
+          "n": 5,
+          "macro": 0.24,
+          "disc_f1": 0.0
+        },
+        "transitive_authority": {
+          "n": 6,
+          "macro": 0.6884,
+          "disc_f1": 0.72
+        },
+        "unresolvable_conflict": {
+          "n": 4,
+          "macro": 0.4167,
+          "disc_f1": 0.3333
+        },
+        "version_supersession": {
+          "n": 5,
+          "macro": 0.4171,
+          "disc_f1": 0.2857
+        }
+      },
+      "by_difficulty": {
+        "1": {
+          "n": 7,
+          "macro": 0.5386,
+          "disc_f1": 0.8
+        },
+        "2": {
+          "n": 13,
+          "macro": 0.5467,
+          "disc_f1": 0.4706
+        },
+        "3": {
+          "n": 20,
+          "macro": 0.5694,
+          "disc_f1": 0.4242
+        },
+        "4": {
+          "n": 13,
+          "macro": 0.6359,
+          "disc_f1": 0.6857
+        },
+        "5": {
+          "n": 7,
+          "macro": 0.5607,
+          "disc_f1": 0.5
+        }
+      },
+      "by_gold_edge_type": {
+        "amends": {
+          "n": 3,
+          "disc_f1": 0.5
+        },
+        "conflicts_with": {
+          "n": 6,
+          "disc_f1": 0.25
+        },
+        "effective_after": {
+          "n": 2,
+          "disc_f1": 0.5
+        },
+        "exception_to": {
+          "n": 11,
+          "disc_f1": 0.5714
+        },
+        "governs_over": {
+          "n": 10,
+          "disc_f1": 0.3871
+        },
+        "overrides": {
+          "n": 8,
+          "disc_f1": 0.5
+        },
+        "references": {
+          "n": 12,
+          "disc_f1": 0.7027
+        },
+        "same_as": {
+          "n": 5,
+          "disc_f1": 0.2222
+        },
+        "supersedes": {
+          "n": 9,
+          "disc_f1": 0.4444
+        }
+      },
+      "by_variation": {
+        "clause_numbering": {
+          "n": 1,
+          "macro": 0.2
+        },
+        "date_format": {
+          "n": 9,
+          "macro": 0.5007
+        },
+        "doc_granularity": {
+          "n": 11,
+          "macro": 0.5247
+        },
+        "doc_order": {
+          "n": 3,
+          "macro": 0.531
+        },
+        "entity_names": {
+          "n": 4,
+          "macro": 0.5
+        },
+        "explicit_implicit": {
+          "n": 13,
+          "macro": 0.6028
+        },
+        "number_format": {
+          "n": 5,
+          "macro": 0.4143
+        },
+        "policy_naming": {
+          "n": 9,
+          "macro": 0.6942
+        },
+        "section_reference": {
+          "n": 3,
+          "macro": 0.6381
+        },
+        "sentence_structure": {
+          "n": 1,
+          "macro": 0.6
+        },
+        "table_prose": {
+          "n": 5,
+          "macro": 0.24
+        },
+        "voice": {
+          "n": 4,
+          "macro": 0.6833
+        },
+        "wording": {
+          "n": 31,
+          "macro": 0.5774
+        }
+      },
+      "negative_control": {
+        "n": 16,
+        "macro": 0.7028
+      }
+    }
+  },
+  "failure_attribution": {
+    "graph_traversal": {
+      "counts": {
+        "relationship_discovery": 50,
+        "governance_application": 8,
+        "relationship_classification": 2
+      },
+      "rows": [
+        {
+          "cid": "HX09294aee30",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX0e533313cd",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HX13a2747e4e",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HX2db0f830f6",
+          "primary_stage": "relationship_classification",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX3b2fc94160",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HX415bb3de5c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HX44832ac0da",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX59d7a3eb1c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 5
+        },
+        {
+          "cid": "HX70588d36ad",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HXa608d40882",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXa7a77c44ac",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HXaf71d36b6c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 5
+        },
+        {
+          "cid": "HXb3def36e76",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXb5e7d29486",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HXc074bf7990",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HXd6fd8a1aef",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXdd16b0a331",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXe3c2131a1a",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXe882fecc23",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXf978239808",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXfb04f41f33",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXfda7798ba9",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP0095f9f0b6",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP0311e86e69",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP059f01c294",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP05f6792b24",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP06e37e1883",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP13f782d554",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP1cce0a19e3",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP3163e54332",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP3866288a46",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP3889d79e64",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP4098cabef9",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP4508edbf5a",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP454bc70c03",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP4788afb721",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP4855aada04",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP49b7649e84",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP5c17651a47",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP622160e875",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP64914beb42",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP6f0fac771c",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP6f1aa9efd1",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP75826c8e9e",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP7690d32f92",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP793bf2ab24",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP7d8d12efac",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP7e6c2b42d6",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP94ce61a720",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP98c234d8ef",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP9a31291ced",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP9a51f07e1f",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HPa5a527cfdb",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPb167985bd5",
+          "primary_stage": "relationship_classification",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPb3463204c9",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HPca9f1489d1",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPd559d42bc8",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HPddb3ae6b0e",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HPebe6e8abf0",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPfec0994f72",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        }
+      ]
+    },
+    "hybrid_relationship": {
+      "counts": {
+        "relationship_discovery": 33,
+        "governance_application": 9,
+        "packet_realization": 12,
+        "relationship_classification": 1,
+        "relationship_discovery_overproposal": 1
+      },
+      "rows": [
+        {
+          "cid": "HX09294aee30",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX0e533313cd",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HX13a2747e4e",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HX2db0f830f6",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX3b2fc94160",
+          "primary_stage": "packet_realization",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HX415bb3de5c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HX44832ac0da",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HX59d7a3eb1c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 5
+        },
+        {
+          "cid": "HX70588d36ad",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HXa608d40882",
+          "primary_stage": "packet_realization",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXa7a77c44ac",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HXaf71d36b6c",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 5
+        },
+        {
+          "cid": "HXb3def36e76",
+          "primary_stage": "none",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXb5e7d29486",
+          "primary_stage": "packet_realization",
+          "source": "seed",
+          "difficulty": 1
+        },
+        {
+          "cid": "HXc074bf7990",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 2
+        },
+        {
+          "cid": "HXd6fd8a1aef",
+          "primary_stage": "packet_realization",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXdd16b0a331",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXe3c2131a1a",
+          "primary_stage": "packet_realization",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXe882fecc23",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HXf978239808",
+          "primary_stage": "relationship_discovery",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXfb04f41f33",
+          "primary_stage": "none",
+          "source": "seed",
+          "difficulty": 3
+        },
+        {
+          "cid": "HXfda7798ba9",
+          "primary_stage": "governance_application",
+          "source": "seed",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP0095f9f0b6",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP0311e86e69",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP059f01c294",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP05f6792b24",
+          "primary_stage": "none",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP06e37e1883",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP13f782d554",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP1cce0a19e3",
+          "primary_stage": "relationship_classification",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP3163e54332",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP3866288a46",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP3889d79e64",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP4098cabef9",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 1
+        },
+        {
+          "cid": "HP4508edbf5a",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP454bc70c03",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP4788afb721",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP4855aada04",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP49b7649e84",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP5c17651a47",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP622160e875",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP64914beb42",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP6f0fac771c",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP6f1aa9efd1",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP75826c8e9e",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP7690d32f92",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HP793bf2ab24",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP7d8d12efac",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP7e6c2b42d6",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP94ce61a720",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HP98c234d8ef",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HP9a31291ced",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HP9a51f07e1f",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HPa5a527cfdb",
+          "primary_stage": "governance_application",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPb167985bd5",
+          "primary_stage": "relationship_discovery_overproposal",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPb3463204c9",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 5
+        },
+        {
+          "cid": "HPca9f1489d1",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPd559d42bc8",
+          "primary_stage": "packet_realization",
+          "source": "pilot",
+          "difficulty": 4
+        },
+        {
+          "cid": "HPddb3ae6b0e",
+          "primary_stage": "none",
+          "source": "pilot",
+          "difficulty": 2
+        },
+        {
+          "cid": "HPebe6e8abf0",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        },
+        {
+          "cid": "HPfec0994f72",
+          "primary_stage": "relationship_discovery",
+          "source": "pilot",
+          "difficulty": 3
+        }
+      ]
+    }
+  }
+}
