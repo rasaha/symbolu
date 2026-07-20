@@ -1,0 +1,184 @@
+{
+  "study": "Edge Prioritization Experiment v0.1",
+  "resolver_under_test": "HybridRelationshipResolver Experimental v0.3",
+  "deterministic": true,
+  "repetitions": 2,
+  "byte_identical_reps": true,
+  "visible": {
+    "P0_none": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "P1_authority": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "P2_authority_temporal": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "P3_auth_temporal_specificity": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    },
+    "P4_full": {
+      "discovery_recall": 1.0,
+      "discovery_precision": 1.0,
+      "classification_accuracy": 0.9333
+    }
+  },
+  "hidden": {
+    "P0_none": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "P1_authority": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "P2_authority_temporal": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "P3_auth_temporal_specificity": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    },
+    "P4_full": {
+      "discovery_precision": 0.8974,
+      "discovery_recall": 0.4167,
+      "discovery_f1": 0.5691,
+      "classification_accuracy": 0.9143,
+      "governance_accuracy_modeG": 0.6,
+      "packet_realization_accuracy_modeP": 0.5167,
+      "abstention_precision": 1.0,
+      "abstention_recall": 0.1875,
+      "false_abstention_rate": 0.0,
+      "missed_abstention_rate": 0.2167,
+      "answer_coverage": 0.95,
+      "selective_accuracy": 0.2982,
+      "unsafe_answers": 2,
+      "primary_macro": 0.5797
+    }
+  },
+  "primary_endpoint": {
+    "metric": "selective_accuracy",
+    "p0": 0.2982,
+    "p4": 0.2982,
+    "selective_gain": 0.0,
+    "no_protected_degradation": true
+  },
+  "protected_metrics": {
+    "discovery_precision": {
+      "p0": 0.8974,
+      "p4": 0.8974,
+      "unchanged": true,
+      "degraded": false
+    },
+    "discovery_recall": {
+      "p0": 0.4167,
+      "p4": 0.4167,
+      "unchanged": true,
+      "degraded": false
+    },
+    "classification_accuracy": {
+      "p0": 0.9143,
+      "p4": 0.9143,
+      "unchanged": true,
+      "degraded": false
+    },
+    "governance_accuracy_modeG": {
+      "p0": 0.6,
+      "p4": 0.6,
+      "unchanged": true,
+      "degraded": false
+    },
+    "packet_realization_accuracy_modeP": {
+      "p0": 0.5167,
+      "p4": 0.5167,
+      "unchanged": true,
+      "degraded": false
+    },
+    "unsafe_answers": {
+      "p0": 2,
+      "p4": 2,
+      "unchanged": true,
+      "degraded": false
+    }
+  },
+  "success_criteria": {
+    "selective_accuracy_improves": false,
+    "discovery_unchanged": true,
+    "precision_unchanged": true,
+    "recall_unchanged": true,
+    "unsafe_unchanged": true
+  },
+  "all_success": false,
+  "competition": {
+    "cases_with_competition": 3,
+    "competing_edges_reprioritized": 3,
+    "governance_decisions_changed": 2
+  },
+  "statistics": {
+    "mcnemar_answer_correct_p4_vs_p0": {
+      "b10_candidate_fixes": 1,
+      "b01_candidate_breaks": 1,
+      "n_discordant": 2,
+      "p_value": 1.0,
+      "net": 0
+    }
+  },
+  "verdict": "NO CLEAR SIGNAL (reshuffled edges without improving decisions)"
+}
