@@ -1,0 +1,295 @@
+{
+  "gold_distribution": {
+    "CONTRADICTED": 8,
+    "INSUFFICIENT_EVIDENCE": 8,
+    "PARTIALLY_SUPPORTED": 8,
+    "SUPPORTED": 12,
+    "UNKNOWN": 4,
+    "UNSUPPORTED": 8
+  },
+  "hidden_lock": {
+    "corpus_public_hash": "727b27aff8039472462bebed7dba1902671f28e86539d1fa678167834e21dc16",
+    "documents_hash": "63dff7dd13a21d6ed16312a0d3fc818770a833000aefaf6dcce32ed01909e4e2",
+    "frozen_components_hash": "e4a966f9f518899607927666abca5c7b886fcd0c059c686529232f770dc1d2f7"
+  },
+  "n_claims": 48,
+  "n_documents": 59,
+  "paired_vs_V0": {
+    "V1": {
+      "breaks": [
+        "P0",
+        "P1",
+        "P2",
+        "PA0",
+        "PA1",
+        "PA2",
+        "PT0",
+        "PT1",
+        "S0",
+        "S1",
+        "S10",
+        "S11",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8",
+        "S9"
+      ],
+      "fixes": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "I0",
+        "I1",
+        "I2",
+        "I3",
+        "I4",
+        "I5",
+        "I6",
+        "I7",
+        "K0",
+        "K1",
+        "K2",
+        "K3",
+        "U0",
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7"
+      ],
+      "n_breaks": 20,
+      "n_fixes": 28,
+      "net": 8,
+      "net_fix_rate": 0.1667,
+      "net_fix_rate_ci95": [
+        -0.125,
+        0.4167
+      ]
+    },
+    "V2": {
+      "breaks": [],
+      "fixes": [
+        "I0",
+        "I1",
+        "I2",
+        "I3",
+        "I4",
+        "I5",
+        "I6",
+        "I7",
+        "U0",
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7"
+      ],
+      "n_breaks": 0,
+      "n_fixes": 16,
+      "net": 16,
+      "net_fix_rate": 0.3333,
+      "net_fix_rate_ci95": [
+        0.2083,
+        0.4583
+      ]
+    },
+    "V3": {
+      "breaks": [],
+      "fixes": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "I0",
+        "I1",
+        "I2",
+        "I3",
+        "I4",
+        "I5",
+        "I6",
+        "I7",
+        "U0",
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7"
+      ],
+      "n_breaks": 0,
+      "n_fixes": 24,
+      "net": 24,
+      "net_fix_rate": 0.5,
+      "net_fix_rate_ci95": [
+        0.3542,
+        0.6458
+      ]
+    },
+    "V4": {
+      "breaks": [],
+      "fixes": [
+        "C0",
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "I0",
+        "I1",
+        "I2",
+        "I3",
+        "I4",
+        "I5",
+        "I6",
+        "I7",
+        "K0",
+        "K1",
+        "K2",
+        "K3",
+        "U0",
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7"
+      ],
+      "n_breaks": 0,
+      "n_fixes": 28,
+      "net": 28,
+      "net_fix_rate": 0.5833,
+      "net_fix_rate_ci95": [
+        0.4375,
+        0.7083
+      ]
+    }
+  },
+  "per_ablation": {
+    "V0": {
+      "confusion": {
+        "fn": 0,
+        "fp": 28,
+        "tn": 0,
+        "tp": 20
+      },
+      "description": "no claim validation (identity pass-through; baseline)",
+      "n_adjudicated": 0,
+      "n_deterministic_removed": 0,
+      "n_retained": 48,
+      "precision": 0.4167,
+      "recall": 1.0,
+      "status_accuracy": 0.25
+    },
+    "V1": {
+      "confusion": {
+        "fn": 20,
+        "fp": 0,
+        "tn": 28,
+        "tp": 0
+      },
+      "description": "deterministic validation only",
+      "n_adjudicated": 0,
+      "n_deterministic_removed": 5,
+      "n_retained": 0,
+      "precision": 1.0,
+      "recall": 0.0,
+      "status_accuracy": 0.2083
+    },
+    "V2": {
+      "confusion": {
+        "fn": 0,
+        "fp": 12,
+        "tn": 16,
+        "tp": 20
+      },
+      "description": "deterministic + Judge A (advocate) only",
+      "n_adjudicated": 0,
+      "n_deterministic_removed": 6,
+      "n_retained": 32,
+      "precision": 0.625,
+      "recall": 1.0,
+      "status_accuracy": 0.75
+    },
+    "V3": {
+      "confusion": {
+        "fn": 0,
+        "fp": 4,
+        "tn": 24,
+        "tp": 20
+      },
+      "description": "deterministic + Judge A + Judge B (no adjudicator)",
+      "n_adjudicated": 0,
+      "n_deterministic_removed": 6,
+      "n_retained": 24,
+      "precision": 0.8333,
+      "recall": 1.0,
+      "status_accuracy": 0.9167
+    },
+    "V4": {
+      "confusion": {
+        "fn": 0,
+        "fp": 0,
+        "tn": 28,
+        "tp": 20
+      },
+      "description": "full system: deterministic + A + B + C",
+      "n_adjudicated": 4,
+      "n_deterministic_removed": 6,
+      "n_retained": 20,
+      "precision": 1.0,
+      "recall": 1.0,
+      "status_accuracy": 1.0
+    }
+  },
+  "status_distribution": {
+    "V0": {
+      "SUPPORTED": 48
+    },
+    "V1": {
+      "INSUFFICIENT_EVIDENCE": 46,
+      "UNSUPPORTED": 2
+    },
+    "V2": {
+      "INSUFFICIENT_EVIDENCE": 8,
+      "PARTIALLY_SUPPORTED": 8,
+      "SUPPORTED": 24,
+      "UNSUPPORTED": 8
+    },
+    "V3": {
+      "CONTRADICTED": 8,
+      "INSUFFICIENT_EVIDENCE": 8,
+      "PARTIALLY_SUPPORTED": 8,
+      "SUPPORTED": 16,
+      "UNSUPPORTED": 8
+    },
+    "V4": {
+      "CONTRADICTED": 8,
+      "INSUFFICIENT_EVIDENCE": 8,
+      "PARTIALLY_SUPPORTED": 8,
+      "SUPPORTED": 12,
+      "UNKNOWN": 4,
+      "UNSUPPORTED": 8
+    }
+  }
+}
