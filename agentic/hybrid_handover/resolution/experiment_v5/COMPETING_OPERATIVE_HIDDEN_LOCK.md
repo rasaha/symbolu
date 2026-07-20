@@ -1,0 +1,98 @@
+# COMPETING_OPERATIVE_HIDDEN_LOCK — Competing Operative Resolution Experiment v0.1
+
+**Lock version:** `v0.5`  
+**Combined lock hash:** `6b5eec75e2be1054946abe8039616751ece69f3f2ef4d46bf8389ac2dd9be763`  
+**Manifest hash:** `2f7696daae66382f68fffddfe806011885865e28414f885149ac23c8e01711b3`
+
+Computed BEFORE the first hidden evaluation of v0.5. The v0.4/v0.3/v0.2/v0.1
+experiments and all frozen platform artifacts are hashed here to prove they are
+unchanged.
+
+## Prior experiment locks (must verify zero drift)
+| experiment | drift |
+|---|---|
+| v0.1 | none |
+| v0.2 | none |
+| v0.3 | none |
+| v0.4 | none |
+
+## Manifest
+```json
+{
+  "study": "Competing Operative Resolution Experiment v0.1",
+  "resolver_under_test": "HybridRelationshipResolver Experimental v0.5",
+  "control": "C0 = Governance Semantics G3 (operative-source selection, no coarse abstention)",
+  "ablation_order": [
+    "C0_g3_control",
+    "C1_extract",
+    "C2_scope",
+    "C3_classify",
+    "C4_full"
+  ],
+  "primary_endpoint": "selective_accuracy C4 vs C0 (+0.03), OR correct-abstention-recall +0.10 with no false-abstention increase and no safety regression",
+  "abstention_reasons": [
+    "GENUINE_UNRESOLVED_CONFLICT",
+    "INSUFFICIENT_SCOPE_EVIDENCE",
+    "OPERATIVE_TERM_NOT_LOCATED",
+    "MULTIPLE_INCOMPATIBLE_OPERATIVE_TERMS",
+    "FROZEN_PACKET_CARDINALITY_LIMIT",
+    "MISSING_DECISIVE_PROVENANCE"
+  ],
+  "g3_fixes_that_must_be_retained": [
+    "HX59d7a3eb1c",
+    "HP059f01c294",
+    "HP7d8d12efac",
+    "HPb3463204c9",
+    "HPebe6e8abf0"
+  ],
+  "bootstrap_seed": 20240601,
+  "bootstrap_iters": 10000,
+  "repetitions": 2,
+  "byte_identical_required": true,
+  "note": "v0.1..v0.4 experiments and all frozen platform artifacts are unchanged; proposal, validation, governing set, and G3 operative selection are bit-identical."
+}
+```
+
+## v0.5 source + spec hashes (SHA-256)
+| file | sha256 |
+|---|---|
+| `competing_operative.py` | `8a575121ca949d52a4cc838c5a9ddd440293acba8969f29cd90cb7a5ccf1033f` |
+| `hybrid_resolver_v5.py` | `40e2f776cf9c20bc1f2993783f33f0e3e736f18109e2878769922bd6dd8c8827` |
+| `synthetic_fixtures.py` | `509014ea9cc2c241d92b78d13d327446d10ead269848a6b774cbbd9bcfc0af28` |
+| `run_competing_operative_experiment.py` | `f118a37d305afee440a86109a12a6c13ee9a0b38f78678adebfb9ac76fff5916` |
+| `lock_v5.py` | `e75c860fffbe8bd885262058e0deaa5b09fa9aa70d2c80039b86f6ab6b60728e` |
+| `COMPETING_OPERATIVE_PREREGISTRATION.md` | `e61480955d6d7ce4a88ac7027e6d2fe0bf31b5c87cbf9f70028cd573801d0fa8` |
+| `COMPETING_OPERATIVE_ARCHITECTURE.md` | `70898bdf10d8757446acc970825615389211bc52f171b489d0fc867a7061bda0` |
+| `OPERATIVE_CANDIDATE_SCHEMA.md` | `a045b4012ed151408ce95c5496e549391d99272209ec560b3723b31bfc1ebcd0` |
+| `OPERATIVE_SCOPE_SPEC.md` | `ddfd8d17ee9c3007c9cfb52d6b4618085d49e1250f2a150085e2e65f5c3a108e` |
+| `CONFLICT_PREDICATE_SPEC.md` | `26ad6f344b5979c71aef098198b808c7a7bb089191f2f930c7f39b2d6445dff6` |
+| `CONFLICT_CLASSIFICATION_RULEBOOK.md` | `b76f22675a16ae4a2e7a3b220d2ffac8d5443a3a41d5b8d010650a6099c31483` |
+| `PRECISE_ABSTENTION_SPEC.md` | `881e00e56bb8d33175c40c4f07b661b523f817b9a6517d269c7f5e0b009d9ef3` |
+| `PACKET_CARDINALITY_BOUNDARY.md` | `bdc71e34ec66c50860535577d6efa99e64843191c74da1289ed2a11c4ae3bb6e` |
+
+## Frozen-dependency hashes (must be unchanged)
+| file | sha256 |
+|---|---|
+| `experiment_v4/governance_semantics.py` | `228a90a02327f816615548fcbcd3755593057a2cf963c7ef053298154568d2a7` |
+| `experiment_v4/hybrid_resolver_v4.py` | `b68dd97c05561786b0098bcf7bdda15984a1fd93c407f13b31ae35efccc4adeb` |
+| `experiment_v3/prioritizer.py` | `9a18377bbf18e657a25f347c897114bec6126002f6a9ff5be0a2c2fa9c836310` |
+| `experiment_v2/hybrid_resolver_v2.py` | `620e82c76d7f35932fc9c40af2241d4749d6dac1400b35faf2708529cbaa5a8e` |
+| `experiment_v2/validator.py` | `257ed63c0a35b6140b957188a479f32e1ca6ebef0db8bae45099fd5e83da89dc` |
+| `experiment/hybrid_resolver.py` | `a2bb9803f0d180dd80a0f3c7806247dde284b9830240a44095fdd4632b887add` |
+| `experiment/hidden_data.py` | `a32119d1b4bf84f8f871d88f2b52b704da2ff25ef9840191710b7bfe10973813` |
+| `experiment/hidden_metrics.py` | `b878994f23a312de2d09d008661c52f3b19cbb6b913cd8b98b683388f3e90228` |
+| `experiment/stats.py` | `03ca5b37b5da45dce5c43f80e2a82299895665f219d847ba6f6751976fc82cd3` |
+| `resolution/resolvers.py` | `a5eba70cf0b2f4a564ed848a93cb5e4d1006bf87e5e7e6afff619d8d99c0ef53` |
+| `resolution/parse.py` | `f84657b904255b1071d8705eb5be629d1e70671355177c52e22bb8dafebf8f47` |
+| `resolution/graph.py` | `db7309356ddb1ab1599d3526e85618a8c734310ce3dd3ed3640b816776e3c645` |
+| `measurement/stage_metrics.py` | `e105714cfa3d5785303c0219e035b194a2cc219391deb574b9455aea920c1419` |
+| `measurement/abstention.py` | `874becf768ea33c0156df97e4a522b76722d264ac39a4920de2a6f500cd235f2` |
+| `hidden_corpus/corpus.py` | `e9bc51cf8f0ed1ea8f9ac3379f88121a3ed43cddf99ce1cc91acd083f38482b1` |
+| `hidden_corpus/annotations.py` | `8aee8fe56782121a66602412effdf4f566c21a743377071b52eb2a9f87191524` |
+| `curation/pilot_corpus.py` | `e48884305d758891852794b5255de11aefd2052901a8bee0400a10f2c149f639` |
+| `curation/pilot_annotations.py` | `c999dcb1c5b2aec780553915db7414997a3fd4fa7e6367e0ac1dd5f071735dca` |
+
+## Calibration gates (all must pass before hidden eval)
+C0 control identity · C1 discovery · C2 classification · C3 validation ·
+C4 governing set · C5 G3 operative · C6 Mode P · C7 visible non-degradation ·
+C8 co-occurrence safety · C9 genuine-conflict activation.
