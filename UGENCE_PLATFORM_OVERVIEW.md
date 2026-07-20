@@ -1,13 +1,21 @@
 # Ugence Platform — Architecture Overview
 
 **Ugence Labs | The Governed AI Platform**
-*How three architectural layers containing nine platform components form one architecture — not nine unrelated tools.*
-*Version 1.1 — July 2026*
+*How three architectural layers containing ten platform components form one architecture — not ten unrelated tools.*
+*Version 1.2 — July 2026*
 
 > **How to read this document.** This is an architecture overview, in the spirit of an AWS or
 > NVIDIA platform document — not a marketing flyer and not a research paper. Every section answers
 > three questions: **Why does this layer exist? What one responsibility does it own? Why doesn't
 > another product own it?** If the architecture is right, the platform should look inevitable.
+>
+> **v1.2 — documentation sync (no architectural change).** This revision incorporates the completed
+> Hybrid LLM v2 and Truth Assurance Platform (TAP) work. The only substantive change is that the AI
+> Control Plane now explicitly governs **two** externally visible surfaces — the **assertions** the
+> system delivers *and* the **actions** it commits — by adding **TAP** as an **emerging** governance
+> capability. TAP's maturity is stated honestly throughout (specified architecture; one layer
+> prototyped on synthetic data; no production or enterprise validation). No component ownership
+> changed except this documented addition; the platform architecture is otherwise unchanged.
 
 ---
 
@@ -41,10 +49,11 @@ belong together as one platform.
 
 ## Page 2 — Platform Architecture
 
-Ugence is one platform: **three architectural layers containing nine platform components.**
+Ugence is one platform: **three architectural layers containing ten platform components.**
 **Specialized AI Systems** (four components) reason, steer, and execute; the **AI Control Plane**
-(three components) governs every action they propose; **AI Infrastructure** (two components) runs the
-result efficiently — and never governs.
+(four components) governs the externally visible outputs they produce — both the **assertions** they
+deliver and the **actions** they commit; **AI Infrastructure** (two components) runs the result
+efficiently — and never governs.
 
 ```
                                  APPLICATIONS
@@ -63,12 +72,13 @@ result efficiently — and never governs.
                                       │  proposes actions
                                       ▼
    ───────────────────────────────────────────────────────────────────
-     AI CONTROL PLANE               — govern every action (external)
+     AI CONTROL PLANE               — govern externally visible assertions & actions (external)
    ───────────────────────────────────────────────────────────────────
      • Context Minimization         — decide what context is admissible
+     • Truth Assurance Platform     — validate delivered assertions   (emerging)
      • ActionGate                   — authorize the exact action
      • Autonomous Control Plane     — clear it against live safety
-                                      │  authorized + cleared
+                                      │  validated · authorized · cleared
                                       ▼
    ───────────────────────────────────────────────────────────────────
      AI INFRASTRUCTURE              — run it efficiently (never governs)
@@ -85,7 +95,7 @@ result efficiently — and never governs.
 | Layer | Owns exactly | Does **not** own |
 |---|---|---|
 | **Specialized AI Systems** | Reasoning, steering, and *execution* — turning intent into proposed actions. | It does not authorize its own actions, and it does not manage its own compute substrate. |
-| **AI Control Plane** | *Governance* — authorizing the exact action and clearing it against live operational safety. | It does not reason, plan, or execute; it never generates the action it judges. |
+| **AI Control Plane** | *Governance* — validating the assertions the system delivers, authorizing the exact action it commits, and clearing that action against live operational safety. | It does not reason, plan, or execute; it never generates the assertion or action it judges. |
 | **AI Infrastructure** | *Efficiency* — memory and scaling substrates that make AI affordable and fast. | It never governs and never decides what an agent may do; it executes what is already authorized. |
 
 The boundaries are deliberate. Reasoning is separated from governance so that governance can be
@@ -131,10 +141,13 @@ deployment requires it. *Its one responsibility: reasoning quality over long con
 route requests, execute actions, or govern them.
 
 **LLM Steering Controller** — a deterministic, model-agnostic layer that steers and audits *the act
-of generation itself* — evaluating tokens across multiple fields and exposing an interpretable
-internal state. *Its one responsibility: control and auditability of generation.* Note the sharp
-boundary with ActionGate: the Steering Controller governs **tokens as they are produced**; ActionGate
-governs **actions before they are committed**. Different objects, no overlap.
+of generation itself*: it fixes the meaning-frame a model generates within and produces a logged,
+auditable reason for each steering decision. *Its one responsibility: deterministic generation
+steering, framing, and generation auditability.* It does not interpret or decode the model's internal
+state. Note the boundaries with the governance layer, which concern three different objects with no
+overlap: the Steering Controller governs **how generation happens** (the frame); the Truth Assurance
+Platform governs **whether a completed response is sufficiently supported before delivery** (the
+assertion); ActionGate governs **whether an action may execute** (the deed).
 
 ### Execution runtimes
 
@@ -174,34 +187,75 @@ specialized in surface.
 ## Page 4 — AI Control Plane
 
 **Why this layer exists.** A runtime that grades its own homework is not governed. For autonomous AI
-to touch anything consequential, authorization must be **external, deterministic, and identical
-across every runtime**. That is the AI Control Plane's job — and only its job.
+to touch anything consequential, governance of what it *says* and what it *does* must be **external,
+deterministic, and identical across every runtime**. That is the AI Control Plane's job — and only its
+job.
 
-**What it owns.** Governance, in three stages:
+**What it owns.** Governance of the system's externally visible outputs, across four responsibilities
+spanning two surfaces — the **assertions** it delivers and the **actions** it commits. Context
+Minimization bounds what enters a decision; the other three govern what leaves it:
 
 ```
-   Proposed action (CER)
+   Information entering a decision
           │
           ▼
-   Context Minimization   — "What is the minimal, admissible context for this decision?"
+   Context Minimization   — "What information may the reasoning process receive?"
           │
           ▼
-   ActionGate             — "Is THIS exact action authorized? allow / deny / approve / escalate"
+   (reasoning & generation happen in Specialized AI Systems)
           │
-          ▼
-   Autonomous Control Plane (ACP)  — "Is it operationally safe against live state right now? clear / hold"
+          ├─────────────►  completed response (assertion)
+          │                     │
+          │                     ▼
+          │              Truth Assurance Platform  (emerging)
+          │                — "Is the response sufficiently supported before delivery?"
+          │                     │
+          │                     ▼
+          │                deliver · qualify · abstain
           │
-          ▼
-   Authorized + cleared → execution
+          └─────────────►  proposed action (CER)
+                                │
+                                ▼
+                         ActionGate  — "May THIS exact action execute? allow / deny / approve / escalate"
+                                │
+                                ▼
+                         Autonomous Control Plane (ACP)  — "Operationally safe right now? clear / hold"
+                                │
+                                ▼
+                         authorized + cleared → execution
 ```
 
-Each control-plane component owns exactly one stage of governance:
+Each control-plane component owns exactly one governance responsibility — and reasoning/generation
+(the Hybrid LLM proposes reasoning; the Steering Controller governs *how* generation happens) lives
+upstream in Specialized AI Systems, never in this layer:
+
+| Governance responsibility | Owner | The one question it answers |
+|---|---|---|
+| Information entering a decision | **Context Minimization** | "What information may the reasoning process receive?" |
+| Assertions leaving the system | **Truth Assurance Platform** *(emerging)* | "Is the completed response sufficiently supported before delivery?" |
+| Actions leaving the system | **ActionGate** | "May this exact action be executed?" |
+| Operational execution safety | **Autonomous Control Plane** | "Is execution operationally safe right now?" |
 
 **Context Minimization**
 - *Purpose:* the context layer for autonomous enterprise agents.
-- *Responsibility:* decide what context is admissible before a decision is made — it bounds *what the
-  decision is allowed to see*.
-- *Not responsible for:* authorizing the action, or judging operational safety.
+- *Responsibility:* decide what information may enter a decision — it bounds *what the reasoning
+  process is allowed to receive*.
+- *Not responsible for:* validating the response, authorizing the action, or judging operational safety.
+
+**Truth Assurance Platform (TAP)** — *emerging capability.*
+- *Purpose:* assertion governance — validate that a completed response is sufficiently grounded in
+  evidence *before it is delivered to a user*. It is the assertion-side analogue of ActionGate's
+  action-side authorization.
+- *Responsibility:* decide whether the delivered assertion is sufficiently supported — deliver,
+  qualify, or abstain.
+- *Not responsible for:* producing the response, bounding its input context (Context Minimization), or
+  authorizing any action (ActionGate).
+- *Maturity (stated plainly).* TAP is an **emerging** platform capability — **not** at the maturity of
+  Context Minimization, ActionGate, ACP, KVPro, or the runtimes. Its architecture is **specified**;
+  only its **Claim Truth Layer** currently has a self-contained **synthetic** prototype. **Production
+  efficacy has not been established, and real enterprise validation has not yet occurred.** TAP is a
+  platform governance capability used *alongside* the Hybrid LLM — **not** part of the Hybrid LLM — and
+  it governs assertions regardless of which model produced them.
 
 **ActionGate**
 - *Purpose:* deterministic, pre-commit authorization of the exact action.
@@ -215,16 +269,17 @@ Each control-plane component owns exactly one stage of governance:
   current load, blast radius — and hold an action that is authorized in principle but unsafe right now.
 - *Not responsible for:* deciding whether the action is *allowed* (that is ActionGate), or producing it.
 
-**Why governance is external.** If the same loop that *chose* an action also *approved* it, there is
-no independent check — the failure mode of every "governance baked into the framework" design. By
-placing governance outside the runtime, one control plane can sit in front of **many** runtimes
-(Agent Runtime, Autonomous Runtime, and even third-party runtimes via adapters) and give the
-enterprise **one consistent answer** to "who authorized this, and was it safe?"
+**Why governance is external.** If the same loop that *produced* an assertion or *chose* an action also
+*approved* it, there is no independent check — the failure mode of every "governance baked into the
+framework" design. By placing governance outside the runtime, one control plane can sit in front of
+**many** runtimes (Agent Runtime, Autonomous Runtime, and even third-party runtimes via adapters) and
+give the enterprise **one consistent answer** to "what did the AI deliver and was it supported, who
+authorized this action, and was it safe?"
 
-**Why the runtime can't own this.** A runtime is optimized to *produce* good actions; governance
-must be willing to *reject* them, deterministically, under rules the runtime cannot edit at runtime.
-Those are opposing objectives. Separating them is what makes the authorization trustworthy — and it
-is why the AI Control Plane is a distinct layer, not a runtime feature.
+**Why the runtime can't own this.** A runtime is optimized to *produce* good assertions and actions;
+governance must be willing to *reject* them, deterministically, under rules the runtime cannot edit at
+runtime. Those are opposing objectives. Separating them is what makes the authorization trustworthy —
+and it is why the AI Control Plane is a distinct layer, not a runtime feature.
 
 ---
 
@@ -292,6 +347,13 @@ Here is a single request travelling through the whole platform, and back:
 novel; the closed, governed loop is. The **Autonomous Runtime** path is the same shape: a physical
 action is proposed, governed, cleared, actuated, observed by sensors, and fed back — the difference
 is APIs versus actuators, not architecture.
+
+The flow above governs an **action** leaving the system. When the system instead **delivers an
+assertion** to a user, the completed response passes through the assertion-governance path — the Truth
+Assurance Platform (emerging) validates whether it is sufficiently supported before delivery, and
+otherwise qualifies or abstains. It is the same discipline (external, deterministic governance of a
+system output) applied to words rather than deeds; as an emerging capability it is specified with one
+layer prototyped, not yet production- or enterprise-validated.
 
 Every hand-off in this loop is a clean boundary owned by exactly one product. That is what makes the
 platform auditable end-to-end: at any point you can name which product is responsible.
@@ -380,8 +442,10 @@ The architecture is designed to expand along one axis — more domains, same gov
                             Autonomous Vehicles      ──►    Platform
 ```
 
-- **Today** — two execution runtimes (digital and physical), a deterministic control plane, and an
-  efficiency substrate, proven inside the repository.
+- **Today** — two execution runtimes (digital and physical), a deterministic control plane governing
+  actions, and an efficiency substrate, proven inside the repository. Assertion governance (the Truth
+  Assurance Platform) is an **emerging** addition to the control plane: specified, with one layer
+  prototyped on synthetic data, and not yet production- or enterprise-validated.
 - **Tomorrow** — the same platform carries Enterprise AI, industrial robotics, humanoids, and
   autonomous vehicles. Each new domain is a new *surface* on the runtime layer, not a new
   architecture: it proposes, the control plane governs, the infrastructure runs.
@@ -398,4 +462,4 @@ that stays scarce — and that every serious autonomous deployment will eventual
 
 *Ugence Labs — the governed AI platform.*
 *Specialized AI Systems · AI Control Plane · AI Infrastructure*
-*Nine platform components across three architectural layers, one architecture — Specialized AI Systems: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime; AI Control Plane: Context Minimization · ActionGate · Autonomous Control Plane; AI Infrastructure: KVPro · Cloud Scaling Controller.*
+*Ten platform components across three architectural layers, one architecture — Specialized AI Systems: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime; AI Control Plane: Context Minimization · Truth Assurance Platform (emerging) · ActionGate · Autonomous Control Plane; AI Infrastructure: KVPro · Cloud Scaling Controller.*
