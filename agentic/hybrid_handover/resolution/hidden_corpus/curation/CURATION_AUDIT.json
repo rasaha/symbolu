@@ -1,0 +1,391 @@
+{
+  "corpus": "hidden pilot curation",
+  "synthetic": true,
+  "counts": {
+    "authored": 43,
+    "ACCEPTED": 38,
+    "REJECTED": 4,
+    "QUARANTINED": 1
+  },
+  "rejection_reasons": [
+    {
+      "id": "HP68bc295eb9",
+      "decision": "REJECTED",
+      "reason": "evidence does not uniquely support the supersedes edge; no ordering given -> more than one governance outcome valid but labelled determinate. REJECT."
+    },
+    {
+      "id": "HP31d3b357e1",
+      "decision": "REJECTED",
+      "reason": "abstention labelled but the case is resolvable (clear supersession) -> REJECT (must not mislabel abstention)."
+    },
+    {
+      "id": "HPe50feaa2d9",
+      "decision": "QUARANTINED",
+      "reason": "near-identical text + identical graph signature vs an accepted case -> shared reasoning template -> QUARANTINE."
+    },
+    {
+      "id": "HPcbf8317f8a",
+      "decision": "REJECTED",
+      "reason": "the graph requires unstated external (statutory) knowledge to resolve -> REJECT."
+    },
+    {
+      "id": "HP433af3817f",
+      "decision": "REJECTED",
+      "reason": "difficulty depends primarily on obscure vocabulary rather than reasoning depth -> REJECT."
+    }
+  ],
+  "lifecycle_issues": [],
+  "blinding_issues": [],
+  "agreement": {
+    "node": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "exact_match_rate": 1.0
+    },
+    "edge_presence": {
+      "precision": 0.9839,
+      "recall": 0.9839,
+      "f1": 0.9839,
+      "exact_match_rate": 0.9767
+    },
+    "governing": {
+      "precision": 0.9778,
+      "recall": 0.9778,
+      "f1": 0.9778,
+      "exact_match_rate": 0.9535
+    },
+    "packet_membership": {
+      "precision": 0.9778,
+      "recall": 0.9778,
+      "f1": 0.9778,
+      "exact_match_rate": 0.9535
+    },
+    "abstention_kappa": 0.8844,
+    "abstention_exact_match": 0.9535
+  },
+  "duplicates": {
+    "accepted_quarantine_hits": [],
+    "documented_overrides": [
+      {
+        "id": "HP793bf2ab24",
+        "ref": "cr_harmful",
+        "override_reason": "Contrastive pair with cr_benign: identical reference-cycle structure, OPPOSITE outcome (abstain vs resolvable). Retained to test harmful-vs-benign cycle discrimination; not a template copy."
+      },
+      {
+        "id": "HP3889d79e64",
+        "ref": "cr_benign",
+        "override_reason": "Contrastive pair with cr_harmful (identical structure, opposite outcome). Retained deliberately; not a template copy."
+      }
+    ],
+    "quarantine_detector_confirms_design_case": true
+  },
+  "difficulty_recalibration": {
+    "seed_recommendations": [
+      {
+        "id": "HXb5e7d29486",
+        "seed_label": 1,
+        "rubric": 2
+      },
+      {
+        "id": "HX13a2747e4e",
+        "seed_label": 1,
+        "rubric": 2
+      },
+      {
+        "id": "HX0e533313cd",
+        "seed_label": 2,
+        "rubric": 3
+      },
+      {
+        "id": "HX415bb3de5c",
+        "seed_label": 2,
+        "rubric": 3
+      },
+      {
+        "id": "HX09294aee30",
+        "seed_label": 3,
+        "rubric": 2
+      },
+      {
+        "id": "HX2db0f830f6",
+        "seed_label": 3,
+        "rubric": 2
+      },
+      {
+        "id": "HXd6fd8a1aef",
+        "seed_label": 3,
+        "rubric": 1
+      },
+      {
+        "id": "HXb3def36e76",
+        "seed_label": 4,
+        "rubric": 3
+      },
+      {
+        "id": "HXe3c2131a1a",
+        "seed_label": 4,
+        "rubric": 2
+      },
+      {
+        "id": "HX3b2fc94160",
+        "seed_label": 4,
+        "rubric": 3
+      },
+      {
+        "id": "HXa608d40882",
+        "seed_label": 4,
+        "rubric": 3
+      },
+      {
+        "id": "HX59d7a3eb1c",
+        "seed_label": 5,
+        "rubric": 4
+      },
+      {
+        "id": "HXaf71d36b6c",
+        "seed_label": 5,
+        "rubric": 2
+      },
+      {
+        "id": "HXe882fecc23",
+        "seed_label": 4,
+        "rubric": 3
+      },
+      {
+        "id": "HX44832ac0da",
+        "seed_label": 3,
+        "rubric": 4
+      },
+      {
+        "id": "HXfda7798ba9",
+        "seed_label": 4,
+        "rubric": 3
+      }
+    ],
+    "pilot_deltas": [
+      {
+        "id": "HP06e37e1883",
+        "proposed": 3,
+        "adjudicated": 1
+      },
+      {
+        "id": "HP1cce0a19e3",
+        "proposed": 3,
+        "adjudicated": 1
+      },
+      {
+        "id": "HP059f01c294",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP13f782d554",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP0095f9f0b6",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HPfec0994f72",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP3163e54332",
+        "proposed": 3,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP3866288a46",
+        "proposed": 3,
+        "adjudicated": 1
+      },
+      {
+        "id": "HP0311e86e69",
+        "proposed": 4,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP454bc70c03",
+        "proposed": 3,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP6f0fac771c",
+        "proposed": 4,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP94ce61a720",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP4855aada04",
+        "proposed": 3,
+        "adjudicated": 2
+      },
+      {
+        "id": "HPa5a527cfdb",
+        "proposed": 2,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP49b7649e84",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HPb167985bd5",
+        "proposed": 5,
+        "adjudicated": 3
+      },
+      {
+        "id": "HPddb3ae6b0e",
+        "proposed": 3,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP4508edbf5a",
+        "proposed": 3,
+        "adjudicated": 2
+      },
+      {
+        "id": "HP793bf2ab24",
+        "proposed": 3,
+        "adjudicated": 4
+      },
+      {
+        "id": "HP05f6792b24",
+        "proposed": 3,
+        "adjudicated": 4
+      },
+      {
+        "id": "HP64914beb42",
+        "proposed": 4,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP7e6c2b42d6",
+        "proposed": 5,
+        "adjudicated": 4
+      },
+      {
+        "id": "HP6f1aa9efd1",
+        "proposed": 5,
+        "adjudicated": 4
+      },
+      {
+        "id": "HP9a31291ced",
+        "proposed": 5,
+        "adjudicated": 4
+      },
+      {
+        "id": "HPebe6e8abf0",
+        "proposed": 5,
+        "adjudicated": 3
+      },
+      {
+        "id": "HP4098cabef9",
+        "proposed": 2,
+        "adjudicated": 1
+      },
+      {
+        "id": "HP7690d32f92",
+        "proposed": 3,
+        "adjudicated": 2
+      }
+    ]
+  },
+  "gold_sufficiency_issues": [],
+  "answer_position": {
+    "correlations": {
+      "governing_is_last_doc": 0.593,
+      "governing_is_first_doc": 0.444,
+      "table_governs_when_present": 0.111,
+      "appendix_governs_when_present": 0.074,
+      "longest_doc_governs": 0.704,
+      "abstention_by_difficulty": {
+        "3": 6,
+        "2": 3,
+        "4": 2
+      },
+      "n_answered": 27
+    },
+    "excessive_flags": []
+  },
+  "leakage_findings": [],
+  "accepted_coverage": {
+    "by_capability": {
+      "partial_overrides": 2,
+      "parallel_overrides": 3,
+      "multiple_authorities": 3,
+      "unresolvable_conflict": 3,
+      "nested_exceptions": 3,
+      "scoped_exceptions": 4,
+      "multi_hop": 3,
+      "cross_document_reference": 3,
+      "implicit_references": 2,
+      "table_vs_text": 4,
+      "appendix_precedence": 5,
+      "hierarchical_governance": 4,
+      "entity_renaming": 3,
+      "policy_migration": 3,
+      "conditional_applicability": 5,
+      "no_relationship": 2,
+      "conflicting_amendments": 2,
+      "insufficient_evidence": 2,
+      "circular_reference": 3,
+      "multiple_valid_interpretations": 2,
+      "definition_inheritance": 2,
+      "effective_date_precedence": 4,
+      "transitive_authority": 2,
+      "version_supersession": 3
+    },
+    "by_difficulty": {
+      "1": 4,
+      "3": 13,
+      "4": 7,
+      "2": 9,
+      "5": 5
+    },
+    "by_relationship_type": {
+      "amends": 2,
+      "overrides": 6,
+      "conflicts_with": 4,
+      "exception_to": 13,
+      "references": 17,
+      "governs_over": 7,
+      "same_as": 4,
+      "supersedes": 5,
+      "effective_after": 1
+    },
+    "negative_controls": {
+      "unresolvable_conflict": 3,
+      "no_relationship": 2,
+      "insufficient_evidence": 2,
+      "circular_reference": 2,
+      "multiple_valid_interpretations": 2
+    }
+  },
+  "combined_corpus_size": {
+    "seed": 22,
+    "pilot": 38,
+    "total": 60
+  },
+  "gates": {
+    "lifecycle_clean": true,
+    "blinding_clean": true,
+    "gold_sufficiency_clean": true,
+    "leakage_clean": true,
+    "no_accepted_quarantine": true,
+    "quarantine_detector_works": true,
+    "no_answer_position_excess": true,
+    "every_case_adjudicated": true
+  },
+  "verdict": "CURATION PIPELINE VALIDATED"
+}
