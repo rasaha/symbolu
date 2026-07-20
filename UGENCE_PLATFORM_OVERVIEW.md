@@ -11,11 +11,13 @@
 >
 > **v1.2 — documentation sync (no architectural change).** This revision incorporates the completed
 > Hybrid LLM v2 and Truth Assurance Platform (TAP) work. The only substantive change is that the AI
-> Control Plane now explicitly governs **two** externally visible surfaces — the **assertions** the
-> system delivers *and* the **actions** it commits — by adding **TAP** as an **emerging** governance
-> capability. TAP's maturity is stated honestly throughout (specified architecture; one layer
-> prototyped on synthetic data; no production or enterprise validation). No component ownership
-> changed except this documented addition; the platform architecture is otherwise unchanged.
+> Control Plane is now described as governing the **complete AI interaction boundary** across four
+> distinct responsibilities — what may **enter** reasoning, what **assertions** may leave, what
+> **actions** may be committed, and whether **execution** is operationally safe — by adding **TAP** as
+> an **emerging** governance capability for delivered assertions. TAP's maturity is stated honestly
+> throughout (specified architecture; one layer prototyped on synthetic data; no production or
+> enterprise validation). No component ownership changed except this documented addition; the platform
+> architecture is otherwise unchanged.
 
 ---
 
@@ -51,9 +53,9 @@ belong together as one platform.
 
 Ugence is one platform: **three architectural layers containing ten platform components.**
 **Specialized AI Systems** (four components) reason, steer, and execute; the **AI Control Plane**
-(four components) governs the externally visible outputs they produce — both the **assertions** they
-deliver and the **actions** they commit; **AI Infrastructure** (two components) runs the result
-efficiently — and never governs.
+(four components) governs the **complete AI interaction boundary** — what may enter reasoning, what
+assertions may leave, what actions may be committed, and whether execution is safe; **AI
+Infrastructure** (two components) runs the result efficiently — and never governs.
 
 ```
                                  APPLICATIONS
@@ -72,7 +74,7 @@ efficiently — and never governs.
                                       │  proposes actions
                                       ▼
    ───────────────────────────────────────────────────────────────────
-     AI CONTROL PLANE               — govern externally visible assertions & actions (external)
+     AI CONTROL PLANE               — govern the AI interaction boundary (enter · assert · act · clear)
    ───────────────────────────────────────────────────────────────────
      • Context Minimization         — decide what context is admissible
      • Truth Assurance Platform     — validate delivered assertions   (emerging)
@@ -191,9 +193,11 @@ to touch anything consequential, governance of what it *says* and what it *does*
 deterministic, and identical across every runtime**. That is the AI Control Plane's job — and only its
 job.
 
-**What it owns.** Governance of the system's externally visible outputs, across four responsibilities
-spanning two surfaces — the **assertions** it delivers and the **actions** it commits. Context
-Minimization bounds what enters a decision; the other three govern what leaves it:
+**What it owns.** Governance of the complete AI interaction boundary — the information crossing between
+the AI system and the external world. It determines what may **enter** reasoning, what **assertions**
+may leave the system, what **actions** may be committed, and whether **execution** is operationally
+safe. Four distinct responsibilities: Context Minimization bounds what enters a decision; the other
+three govern what leaves it:
 
 ```
    Information entering a decision
@@ -314,33 +318,44 @@ Here is a single request travelling through the whole platform, and back:
    User request
         │
         ▼
-   Agent Runtime            — plan, decompose, remember, orchestrate tools
+   Context Minimization     — bound what information may enter reasoning
         │
         ▼
-   CER                      — a Canonical Execution Request: the exact proposed action, hashable
+   Agent Runtime            — plan, decompose, remember, orchestrate tools (reason & generate)
         │
-        ▼
-   Context Minimization     — bound the admissible context
+        ├────────────►  Completed response (assertion)
+        │                    │
+        │                    ▼
+        │             Truth Assurance Platform (emerging)  — validate support before delivery
+        │                    │
+        │                    ▼
+        │               deliver · qualify · abstain  ───────────────►  to user
         │
-        ▼
-   ActionGate               — authorize THIS exact action (allow / deny / approve / escalate)
-        │
-        ▼
-   ACP                      — clear it against live operational safety (clear / hold)
-        │
-        ▼
-   AI Infrastructure        — KVPro + Cloud Scaling Controller run it efficiently
-        │
-        ▼
-   Execution                — the authorized, cleared action actually happens
-        │
-        ▼
-   Observation              — the real-world outcome is captured
-        │
-        ▼
-   Agent Runtime            — folds the result into memory and reflection → next step
-        └──────────────────────────────────────────────────────────────────► (loop)
+        └────────────►  CER — a Canonical Execution Request: the exact proposed action, hashable
+                             │
+                             ▼
+                       ActionGate           — authorize THIS exact action (allow / deny / approve / escalate)
+                             │
+                             ▼
+                       ACP                  — clear it against live operational safety (clear / hold)
+                             │
+                             ▼
+                       AI Infrastructure    — KVPro + Cloud Scaling Controller run it efficiently
+                             │
+                             ▼
+                       Execution            — the authorized, cleared action actually happens
+                             │
+                             ▼
+                       Observation          — the real-world outcome is captured
+                             │
+                             ▼
+                       Agent Runtime        — folds the result into memory & reflection → next step
+                             └──────────────────────────────────────────────► (loop)
 ```
+
+Two governance paths fork from reasoning, with the same external, deterministic discipline: **TAP
+governs assertions** (validate → deliver / qualify / abstain), and **ActionGate + ACP govern actions**
+(authorize → clear → execute). Context Minimization bounds what may enter reasoning in the first place.
 
 **The loop is the product.** The runtime *proposes*, the control plane *governs*, the infrastructure
 *runs*, the world *responds*, and the runtime *learns* — then proposes again. No single arrow is
@@ -348,12 +363,9 @@ novel; the closed, governed loop is. The **Autonomous Runtime** path is the same
 action is proposed, governed, cleared, actuated, observed by sensors, and fed back — the difference
 is APIs versus actuators, not architecture.
 
-The flow above governs an **action** leaving the system. When the system instead **delivers an
-assertion** to a user, the completed response passes through the assertion-governance path — the Truth
-Assurance Platform (emerging) validates whether it is sufficiently supported before delivery, and
-otherwise qualifies or abstains. It is the same discipline (external, deterministic governance of a
-system output) applied to words rather than deeds; as an emerging capability it is specified with one
-layer prototyped, not yet production- or enterprise-validated.
+The assertion path shown above is an **emerging** capability: TAP's architecture is specified, only its
+Claim Truth Layer is prototyped (on synthetic data), and it is not yet production- or
+enterprise-validated.
 
 Every hand-off in this loop is a clean boundary owned by exactly one product. That is what makes the
 platform auditable end-to-end: at any point you can name which product is responsible.
