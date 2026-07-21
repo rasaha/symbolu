@@ -1,0 +1,128 @@
+{
+  "corpus": {
+    "eval_lock": {
+      "eval_inputs_hash": "5a084a6c431e66de36795e60c751cba31d32a88d17b8d296e1eaae7b4d134c18",
+      "n_eval": 12
+    },
+    "family_distribution": {
+      "attribution": 1,
+      "conditional": 1,
+      "conflict_ontology": 1,
+      "conflict_value": 1,
+      "cooccurrence": 2,
+      "coordinated": 1,
+      "direct": 3,
+      "distributes_not_owns": 2,
+      "duplicate": 1,
+      "exception": 1,
+      "future": 1,
+      "governance": 1,
+      "historical": 1,
+      "hosted": 1,
+      "modality_may": 1,
+      "modality_must": 1,
+      "modality_should": 1,
+      "negation": 2,
+      "passive": 2,
+      "scope": 1,
+      "structural": 1,
+      "supersession": 1,
+      "upstream_gap": 1
+    },
+    "n_cases": 29,
+    "n_evidence_units": 32,
+    "split_distribution": {
+      "dev": 17,
+      "eval": 12
+    },
+    "units_hash": "65867d987a69abd85785313201aa9f3c516f1d33d4bfaf7d8998bce29e90084f"
+  },
+  "eval_lock": {
+    "eval_inputs_hash": "5a084a6c431e66de36795e60c751cba31d32a88d17b8d296e1eaae7b4d134c18",
+    "n_eval": 12
+  },
+  "frozen_components_hash": "082e3e94e93139a8c88ba17f14b391dc9d7a8c4e7390c3488131f14385880e58",
+  "gates": [
+    {
+      "gate": "relationship_f1",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.8,
+      "value": 0.9524
+    },
+    {
+      "gate": "predicate_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.85,
+      "value": 1.0
+    },
+    {
+      "gate": "direction_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "polarity_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.95,
+      "value": 1.0
+    },
+    {
+      "gate": "modality_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.85,
+      "value": 1.0
+    },
+    {
+      "gate": "provenance_completeness",
+      "op": "==",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "conflict_detection_f1",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.75,
+      "value": 1.0
+    },
+    {
+      "gate": "gap_detection_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.75,
+      "value": 1.0
+    },
+    {
+      "gate": "cooccurrence_false_positive_rate",
+      "op": "<=",
+      "pass": true,
+      "threshold": 0.1,
+      "value": 0.0
+    },
+    {
+      "gate": "unsupported_relationship_rate",
+      "op": "<=",
+      "pass": true,
+      "threshold": 0.1,
+      "value": 0.0
+    },
+    {
+      "gate": "severe_critical_failure_count",
+      "op": "==",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    }
+  ],
+  "ontology_version": "tap-e3-ontology/1.0.0",
+  "schema_version": "tap-e3-relationship/1.0.0",
+  "selected_config": "F",
+  "verdict": "PASS_WITH_LIMITED_CLAIM"
+}
