@@ -504,5 +504,6 @@ of unrelated optimization technologies.**
 
 *Ugence Labs — the governed AI platform.*
 *Sources: each module's VC brief, readiness/implementation audit, and machine-readable results under the
-repository; see `UGENCE_PLATFORM_VALUE_PROPOSITIONS.md` for maturity detail and
+repository; see `UGENCE_PLATFORM_VALUE_PROPOSITIONS.md` for maturity detail,
+`HYBRID_LLM_COMPARATIVE_MODELS_ANALYSIS.md` for the Hybrid LLM competitive analysis, and
 `UGENCE_PLATFORM_OVERVIEW.md` for the canonical taxonomy.*
