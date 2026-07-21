@@ -1,0 +1,53 @@
+{
+  "experiment": "TAP-E5 Evidence Assembly",
+  "phase": "fifth TAP research layer — evidence assembly / packet minimization only",
+  "status": "preregistered before locked-set scoring",
+  "inputs": ["IntentRecord (TAP-E1, frozen public interface)",
+             "RetrievalRecord (TAP-E2, frozen public interface)",
+             "RelationshipRecord (TAP-E3, frozen public interface)",
+             "GovernanceRecord (TAP-E4, frozen public interface)"],
+  "responsibility": "assemble the smallest complete, dependency-preserving, provenance-preserving EvidencePacket required by downstream claim validation; NOT truth determination, claim validation, response generation, retrieval, governance reasoning, conflict resolution, or gap filling",
+  "honesty_notes": [
+    "New, independently authored synthetic corpus; not reused from any prior layer.",
+    "Upstream records are authored fixtures (this phase evaluates assembly/minimization, not upstream extraction). The packet gold (minimal complete set) is computed independently of the assembler.",
+    "Results are mechanism/construction validation on the synthetic corpus used in this study only.",
+    "The eval split is content-hash locked and preregistered, but was inspected during iterative engineering — a LOCKED DEVELOPMENT evaluation, not an untouched or interpreter-blind holdout."
+  ],
+  "schema_version": "tap-e5-evidence-packet/1.0.0",
+  "baselines": {
+    "A": "naive union (all objects, with duplicate references)",
+    "B": "deduplicate object ids and edges",
+    "C": "dependency-aware pruning from the winning decision only",
+    "D": "dependency + full closure (rejected authorities, minority evidence, conflict members)",
+    "E": "D + provenance preservation (provenance index, no orphans)",
+    "F": "full: dependency + provenance + minimization + validation + freeze"
+  },
+  "config_selection_rule": "the SIMPLEST baseline (A..F order) that satisfies ALL preregistered gates on the DEV split; the locked eval split is never used for selection.",
+  "gates": [
+    {"key": "packet_completeness", "op": ">=", "threshold": 1.00},
+    {"key": "packet_minimality", "op": ">=", "threshold": 1.00},
+    {"key": "dependency_preservation", "op": ">=", "threshold": 1.00},
+    {"key": "provenance_preservation", "op": ">=", "threshold": 1.00},
+    {"key": "reference_integrity", "op": ">=", "threshold": 1.00},
+    {"key": "conflict_preservation", "op": ">=", "threshold": 1.00},
+    {"key": "gap_preservation", "op": ">=", "threshold": 1.00},
+    {"key": "duplicate_elimination", "op": ">=", "threshold": 1.00},
+    {"key": "unsupported_reference_rate", "op": "<=", "threshold": 0.00},
+    {"key": "orphan_rate", "op": "<=", "threshold": 0.00},
+    {"key": "validation_success", "op": ">=", "threshold": 1.00},
+    {"key": "packet_size_reduction", "op": ">=", "threshold": 0.05},
+    {"key": "determinism", "op": ">=", "threshold": 1.00},
+    {"key": "severe_critical_failure_count", "op": "==", "threshold": 0.0}
+  ],
+  "critical_failure_classes": [
+    "ORPHAN_EVIDENCE", "ORPHAN_RELATIONSHIP", "ORPHAN_GOVERNANCE_DECISION", "LOST_CONFLICT",
+    "LOST_GAP", "LOST_PROVENANCE", "BROKEN_DEPENDENCY", "DUPLICATE_IDENTIFIERS",
+    "PACKET_SMALLER_BUT_INCOMPLETE", "PACKET_LARGER_WITHOUT_JUSTIFICATION",
+    "SCHEMA_CORRUPTION", "NON_DETERMINISTIC_PACKET"
+  ],
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "all gates pass on the locked eval for the selected baseline (capped by synthetic corpus + authored upstream fixtures)",
+    "INCONCLUSIVE": "no baseline passes all gates on dev, or 1-2 non-severe gates fail on eval",
+    "FAIL": "a severe gate fails or 3+ gates fail on eval"
+  }
+}

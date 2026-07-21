@@ -1,0 +1,565 @@
+{
+  "baselines": [
+    {
+      "description": "naive union",
+      "name": "A"
+    },
+    {
+      "description": "deduplicate",
+      "name": "B"
+    },
+    {
+      "description": "dependency-aware (winner closure only)",
+      "name": "C"
+    },
+    {
+      "description": "dependency + full closure",
+      "name": "D"
+    },
+    {
+      "description": "dependency + provenance",
+      "name": "E"
+    },
+    {
+      "description": "full: dependency + provenance + minimization + validation",
+      "name": "F"
+    }
+  ],
+  "corpus_manifest": {
+    "eval_lock": {
+      "eval_inputs_hash": "04b87570c5d927de5a0576ed42c999c3171575c2ef31f348be2929e1343e757f",
+      "n_eval": 16
+    },
+    "family_distribution": {
+      "deep_provenance": 2,
+      "e3_conflict": 4,
+      "e4_conflict": 2,
+      "independent_trees": 2,
+      "minimal_edge": 2,
+      "multi_gap": 2,
+      "multi_governing": 2,
+      "multiple": 2,
+      "nested": 2,
+      "rejected_authority": 4,
+      "shared_evidence": 2,
+      "single": 2,
+      "unused_evidence": 4
+    },
+    "n_cases": 32,
+    "n_families": 13,
+    "split_distribution": {
+      "dev": 16,
+      "eval": 16
+    }
+  },
+  "frozen_components_hash": "7a91bcf9f4d6c3a4f0d0a2f219473cb96c95b0f315f4fecb4392a3742356498c",
+  "gates": {
+    "all_pass": true,
+    "gates": [
+      {
+        "gate": "packet_completeness",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "packet_minimality",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "dependency_preservation",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "provenance_preservation",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "reference_integrity",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "conflict_preservation",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "gap_preservation",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "duplicate_elimination",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "unsupported_reference_rate",
+        "op": "<=",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      },
+      {
+        "gate": "orphan_rate",
+        "op": "<=",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      },
+      {
+        "gate": "validation_success",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "packet_size_reduction",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.05,
+        "value": 0.3153
+      },
+      {
+        "gate": "determinism",
+        "op": ">=",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "severe_critical_failure_count",
+        "op": "==",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      }
+    ]
+  },
+  "metrics": {
+    "dev": {
+      "A": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 16,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 4,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 0.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 6.9375,
+        "n_cases": 16,
+        "orphan_rate": 0.04895833333333333,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.0,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 52.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "B": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 4,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 5.0625,
+        "n_cases": 16,
+        "orphan_rate": 0.06145833333333333,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.27027,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 36.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "C": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 3,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 8,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 3.5,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 0.7933035714285713,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.495495,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 0.8125,
+        "severe_critical_failure_count": 43.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "D": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 32.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "E": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 0,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 1.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 16.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "F": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 0,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 0,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 1.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 1.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 0.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 1.0
+      }
+    },
+    "eval_locked": {
+      "A": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 16,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 4,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 0.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 6.9375,
+        "n_cases": 16,
+        "orphan_rate": 0.04895833333333333,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.0,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 52.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "B": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 4,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 5.0625,
+        "n_cases": 16,
+        "orphan_rate": 0.06145833333333333,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.27027,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 36.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "C": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 3,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 8,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 3.5,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 0.7933035714285713,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.495495,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 0.8125,
+        "severe_critical_failure_count": 43.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "D": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 16,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 0.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 32.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "E": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 0,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 16,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 0.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 1.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 16.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 0.0
+      },
+      "F": {
+        "conflict_preservation": 1.0,
+        "critical_failures": {
+          "BROKEN_DEPENDENCY": 0,
+          "DUPLICATE_IDENTIFIERS": 0,
+          "LOST_CONFLICT": 0,
+          "LOST_GAP": 0,
+          "LOST_PROVENANCE": 0,
+          "NON_DETERMINISTIC_PACKET": 0,
+          "ORPHAN_EVIDENCE": 0,
+          "ORPHAN_GOVERNANCE_DECISION": 0,
+          "ORPHAN_RELATIONSHIP": 0,
+          "PACKET_LARGER_WITHOUT_JUSTIFICATION": 0,
+          "PACKET_SMALLER_BUT_INCOMPLETE": 0,
+          "SCHEMA_CORRUPTION": 0
+        },
+        "dependency_preservation": 1.0,
+        "determinism": 1.0,
+        "duplicate_elimination": 1.0,
+        "gap_preservation": 1.0,
+        "mean_object_count": 4.75,
+        "n_cases": 16,
+        "orphan_rate": 0.0,
+        "packet_completeness": 1.0,
+        "packet_minimality": 1.0,
+        "packet_size_reduction": 0.315315,
+        "provenance_preservation": 1.0,
+        "reference_integrity": 1.0,
+        "severe_critical_failure_count": 0.0,
+        "unsupported_reference_rate": 0.0,
+        "validation_success": 1.0
+      }
+    }
+  },
+  "schema_version": "tap-e5-evidence-packet/1.0.0",
+  "selection": {
+    "dev_gate_pass": {
+      "A": false,
+      "B": false,
+      "C": false,
+      "D": false,
+      "E": false,
+      "F": true
+    },
+    "rule": "simplest baseline (A..F) satisfying ALL preregistered gates on DEV; locked eval never used for selection",
+    "selected_config": "F",
+    "selected_passes_dev": true
+  },
+  "verdict": "PASS_WITH_LIMITED_CLAIM",
+  "verdict_reason": "All preregistered gates pass on the locked eval split for the selected baseline. The claim is limited to mechanism/construction validation: TAP-E5 deterministically assembles a minimal, complete, provenance- and dependency-preserving EvidencePacket from frozen upstream TAP records on this study's synthetic corpus. It introduces no new reasoning, evidence, governance decision, or factual assertion; it validates no claim and resolves nothing."
+}
