@@ -1,5 +1,41 @@
 # TAP-E4 — Changelog
 
+## v4.1 (Governance Resolution — interface-boundary completion; additive, no re-run)
+
+**Additive interface-boundary work only. No frozen algorithm, schema, corpus, metric, gate,
+or result was changed; every `frozen_components_hash` and stored artifact is byte-identical
+and no experiment was rerun.**
+
+- **Canonical import package** `truth_assurance_pipeline/tap_e4_governance_resolution/` — a
+  thin re-export/alias layer (no engine copy) over the historical
+  `tap_e4_governance_truth` package. Canonical-name aliases are `is`-identical objects, not
+  new types: `GovernanceResolver = GovernanceTruthLayer`, `GovernanceSituation = Situation`,
+  `GovernanceDecision = GoverningDecision`. No `resolve_governance` function was invented
+  (none exists); resolution is `GovernanceResolver(config(name)).resolve(...)`.
+- **Historical package retained** unchanged for reproducibility (directory name, experiment
+  IDs, stored manifests, `frozen_components_hash`), with a documentation note that the
+  canonical engineering name is Governance Resolution. Its non-hashed `__init__.py` was
+  extended additively to expose the full public surface; no runtime deprecation warning.
+- **Documented the `GovernanceSituation` contract**: ownership (E1 owns intent; the
+  caller/runtime owns operational metadata; E4 only normalizes explicit inputs and never
+  discovers/retrieves/invents facts), the actual implemented fields (`jurisdiction`,
+  `user_role`, `environment`, `date_year`, `contract`, `product`, `business_unit`), and the
+  upstream-record and ActionGate boundaries.
+- **Honest provenance disclosure**: field-level situation provenance is **not implemented**;
+  provenance preservation applies to upstream evidence and governance decisions only. Future
+  `SituationFact` model documented as a version-gated schema extension.
+- **Evaluation Input Realism**: disclosed that synthetic situation facts are hand-authored,
+  pre-normalized, and construction-coupled to the gold winner; situation extraction is not
+  evaluated.
+- **Missing/contradictory situation facts**: documented current behavior (missing → reduced
+  confidence, never invented; contradictions not representable and must be detected before
+  construction) and recorded the permissive-resolution + no-per-missing-field-gap behavior
+  as a limitation deferred to a future version-incremented engine revision (the fix would
+  touch frozen `scope.py`/`applicability.py`).
+- **Tests**: added `tap_e4_governance_resolution/tests/test_canonical_import.py` (10 tests)
+  verifying both import paths, re-export identity, cross-path byte-identical resolution, and
+  a regression pinning current missing-fact behavior. Full suite **134 passing**.
+
 ## v4 (Governance Resolution — initial research & falsification phase)
 
 **Added** a self-contained TAP-E4 track under

@@ -49,6 +49,16 @@ Full repository regression after the change: **124 tests pass** (all upstream su
   design decision, not legal ground truth.
 - **Perfect upstream inputs.** Confidence-1.0 relationship inputs isolate the governance
   layer but understate real-world difficulty; upstream extraction error is out of scope here.
+- **Situation construction coupling.** The `GovernanceSituation` facts are hand-authored per
+  case by the same routine that defines the policy scenario and the expected governing
+  outcome, and are pre-normalized to the resolver's internal categories to match the intended
+  winner's scope. Situation **extraction** is therefore not evaluated, and the situation
+  inputs are construction-coupled to the gold (see [CORPUS](CORPUS.md) "Evaluation Input
+  Realism"). The study exercises the resolution engine on clean, authored facts — not
+  extraction of those facts from user language or enterprise systems.
+- **No field-level situation provenance.** The `Situation` input carries bare values with no
+  per-field source/confidence; provenance preservation applies to upstream evidence and
+  decisions, not to the situation (a documented limitation, not a validated property).
 - **Development-inspected eval.** As in §1, the locked set informed engineering; a future
   blind holdout is required to claim generalization.
 
@@ -61,3 +71,7 @@ Full repository regression after the change: **124 tests pass** (all upstream su
    propagation.
 4. Adversarial expansion: nested exceptions, multi-jurisdiction overlap, partial
    supersession, conflicting emergency overrides.
+5. **Decouple situation from gold:** evaluate governance-fact *extraction/normalization*
+   independently (author situations blind to the gold winner; add field-level
+   `SituationFact` provenance behind a schema-version increment); and evaluate missing- and
+   contradictory-fact handling as first-class outcomes rather than confidence attenuation.

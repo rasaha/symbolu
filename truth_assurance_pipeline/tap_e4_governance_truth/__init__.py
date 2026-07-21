@@ -17,8 +17,20 @@ from truth_assurance_pipeline.tap_e4_governance_truth.applicability import (
     BASELINES, GovernanceConfig, GovernanceTruthLayer, Situation, config,
 )
 from truth_assurance_pipeline.tap_e4_governance_truth.schema import (
-    GovernanceRecord, GoverningDecision, SCHEMA_VERSION,
+    AUTHORITY_MODEL_VERSION, AuthorityTier, GovConflictType, GovGapCode, GovProvenance,
+    GovStatus, GovernanceConfidence, GovernanceConflict, GovernanceGap, GovernanceRecord,
+    GoverningDecision, RejectedAuthority, SCHEMA_VERSION, validate_record,
 )
 
-__all__ = ["GovernanceTruthLayer", "GovernanceConfig", "Situation", "BASELINES", "config",
-           "GovernanceRecord", "GoverningDecision", "SCHEMA_VERSION"]
+# NOTE: the canonical engineering name for this layer is **Governance Resolution**; see
+# ``truth_assurance_pipeline.tap_e4_governance_resolution`` for the canonical import path.
+# This ``tap_e4_governance_truth`` package name is retained for experiment reproducibility
+# (it is embedded in stored manifests, experiment IDs, and the frozen_components_hash).
+
+__all__ = [
+    "GovernanceTruthLayer", "GovernanceConfig", "Situation", "BASELINES", "config",
+    "GovernanceRecord", "GoverningDecision", "GovernanceConflict", "GovernanceGap",
+    "GovProvenance", "GovernanceConfidence", "RejectedAuthority", "GovStatus",
+    "GovConflictType", "GovGapCode", "AuthorityTier", "validate_record",
+    "SCHEMA_VERSION", "AUTHORITY_MODEL_VERSION",
+]

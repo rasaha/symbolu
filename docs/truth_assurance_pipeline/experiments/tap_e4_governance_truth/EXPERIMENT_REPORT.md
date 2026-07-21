@@ -145,16 +145,26 @@ All ten independent critical-failure classes are **0** for F on both splits. See
 
 **`PASS_WITH_LIMITED_CLAIM`.**
 
-**Supported claim (narrow):** a deterministic, provenance-preserving architecture for
-resolving *which documented authority governs a situation* — across authority precedence,
-jurisdiction, scope, temporal/version, supersession, exception, customer/emergency
-override, immutable-tier protection, conflict surfacing, gap preservation, and per-authority
-provenance — on this study's synthetic corpus, with the full pipeline (F) demonstrably the
-simplest configuration that avoids every preregistered safety-critical governance failure.
+**Supported claim (narrow):** TAP-E4 demonstrates a deterministic, provenance-preserving
+Governance Resolution architecture for applying encoded authority, applicability,
+jurisdiction, scope, temporal, version, exception, precedence, conflict, and gap mechanisms
+**when supplied with normalized synthetic governance-situation facts** — on this study's
+synthetic corpus, with the full pipeline (F) demonstrably the simplest configuration that
+avoids every preregistered safety-critical governance failure.
 
-**Explicitly NOT claimed:** production legal/regulatory reasoning; correctness of any
-obligation; real-world authority hierarchies; external generalization; claim truth; user
+**The study does not validate** operational extraction of governance facts, production legal
+reasoning, arbitrary enterprise-policy understanding, real-world authority correctness, or
+external generalization. Also not claimed: correctness of any obligation; claim truth; user
 answers; enforcement.
+
+**Provenance scope (honesty).** "Provenance-preserving" here refers to **upstream evidence
+and governance decisions** — `GovProvenance` traces each selected authority → relationship
+assertion → evidence unit → source. **Field-level situation provenance is not implemented**
+(the `Situation` input holds bare normalized values with no per-field source/confidence);
+this is a documented limitation and future schema extension (see
+[SCHEMA](SCHEMA.md) and the canonical package README). The situation input is a caller-
+supplied contract, authored (and construction-coupled to the gold) in this synthetic
+evaluation — see [CORPUS](CORPUS.md) "Evaluation Input Realism".
 
 ## 8. Integrity
 

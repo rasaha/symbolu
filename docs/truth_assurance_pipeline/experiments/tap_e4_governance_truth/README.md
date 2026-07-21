@@ -9,6 +9,12 @@ The fourth TAP research layer. Given `IntentRecord` (E1), `RetrievalRecord` (E2)
 - Scope: *which documented authority controls here* — **not** claim truth, factual
   correctness, a user answer, retrieval, relationship discovery, or enforcement.
 
+> **Canonical import:** new downstream work imports through
+> `truth_assurance_pipeline.tap_e4_governance_resolution` (see its
+> [README](../../../../truth_assurance_pipeline/tap_e4_governance_resolution/README.md) for
+> the `GovernanceSituation` ownership/provenance contract). The historical
+> `tap_e4_governance_truth` path is retained unchanged for reproducibility.
+
 ## Documents
 
 | Doc | Contents |

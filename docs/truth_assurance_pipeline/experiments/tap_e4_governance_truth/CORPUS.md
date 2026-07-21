@@ -63,3 +63,40 @@ evaluation** (`eval_inputs_hash = c28e23f3…`, `n_eval = 15`). The eval inputs 
 during iterative engineering — a locked development set, **not an untouched or blind
 holdout** (see [LEAKAGE_AUDIT](LEAKAGE_AUDIT.md)). The public `loader.py` exposes only the
 situation + candidate names, never the gold.
+
+## Evaluation Input Realism
+
+How each synthetic evaluation situation was constructed (from `corpus/cases.py`), stated
+precisely:
+
+- **Manually authored per case.** Every case's situation is written inline via
+  `_sit(jurisdiction=…, user_role=…, …)` inside `_build_split`, alongside that case's policy
+  candidates and its expected governing authority.
+- **Produced by a corpus helper?** Only the trivial `_sit(**kw)` constructor; there is no
+  extraction or inference step.
+- **Derived from `IntentRecord`?** **No.** The `IntentRecord` is built separately by the
+  frozen TAP-E1 layer from the case's `request_text`, and only its `request_id` is used
+  downstream; situation fields are not read from intent.
+- **Derived from application-metadata fixtures?** No separate fixture layer exists — the
+  situation *is* the hand-authored stand-in for application/runtime metadata.
+- **Copied from gold governance annotations?** The situation values are **authored to match
+  the intended governing authority's scope** (e.g. a case whose gold winner is the
+  engineer-scoped policy is given `user_role="engineers"`). They are chosen *alongside* the
+  gold outcome by the same author, i.e. **construction-coupled** to the gold, not
+  independently observed.
+- **Same author for policy facts and situation metadata?** **Yes** — one `_build_split`
+  routine defines the policy scenario, the normalized situation inputs, and the expected
+  governance outcome together.
+- **Already normalized to the resolver's internal categories?** **Yes** — situation values
+  are lower-case tokens matching the candidate `scope` values (`us`, `engineers`,
+  `emergency`, year ints), so no normalization or matching ambiguity is exercised.
+- **Was situation extraction evaluated?** **No.**
+
+> The synthetic evaluation supplies deliberately authored and normalized governance-situation
+> facts to exercise the resolution engine. It does not evaluate extraction of those facts
+> from arbitrary user language or live enterprise systems.
+
+> The same corpus construction process defined the policy scenario, normalized situation
+> inputs, and expected governance outcome, creating construction coupling. Situation values
+> were authored to match the intended governing authority's scope; they were not extracted
+> and situation extraction was not evaluated.

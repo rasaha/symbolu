@@ -26,13 +26,66 @@ them and adds no field to them.
 Governance Resolution answers *"which documented authority controls, and why"* — never *"is it
 right"* or *"do it"*.
 
-## 3. The Situation
+## 3. The Situation (`GovernanceSituation`)
 
-Governance is situation-relative, so the layer takes an explicit `Situation`
-(`jurisdiction`, `user_role`, `environment`, `date_year`, `contract`, `product`,
-`business_unit`) supplied as application metadata. The Situation is data, not a document:
-it is never treated as an authority and never grounds a decision by itself. A missing
-Situation field lowers the relevant confidence axis rather than inventing a match.
+Governance is situation-relative, so the layer takes an explicit `Situation` — canonical
+engineering name **`GovernanceSituation`** (an `is`-identical alias exported from
+`tap_e4_governance_resolution`) — supplied as application/runtime metadata. It is *a
+normalized representation of the operational facts needed to determine whether a documented
+authority, policy, version, scope, exception, or temporal rule applies to the present case.*
+The Situation is data, not a document: it is never treated as an authority and never grounds
+a decision by itself. A missing Situation field lowers the relevant confidence axis rather
+than inventing a match.
+
+The implemented fields are exactly: `jurisdiction`, `user_role`, `environment`, `date_year`
+(a year `int`), `contract`, `product`, `business_unit` — all optional (`product` and
+`business_unit` are not consumed by the current resolver). Note the role field is
+`user_role` (not `actor_role`), effective time is `date_year` (not a timestamp), and there
+is no dedicated `customer` / `system` / `emergency_state` field — emergency is carried by
+`environment` and by the evidence-side `is_emergency_override` flag.
+
+### Governance Situation Ownership
+
+```
+IntentRecord  +  Explicit application/runtime metadata
+        ↓
+GovernanceSituation
+        ↓
+Governance Resolution
+```
+
+- **TAP-E1** owns analysis of the user's intent.
+- **The calling application or runtime** owns authoritative operational metadata.
+- **TAP-E4** may normalize those inputs into a `GovernanceSituation`.
+- **TAP-E4 does not** discover operational facts from the real world.
+- **TAP-E4 does not** retrieve missing situation metadata.
+- **TAP-E4 does not** invent a role, jurisdiction, customer, contract, environment,
+  effective time, or emergency state.
+- **TAP-E4 may only** apply bounded deterministic normalization to explicitly supplied
+  inputs.
+- **Missing or contradictory situation facts must remain unresolved and must not be silently
+  repaired.**
+
+`GovernanceSituation` is an explicit caller-visible input contract — **not hidden ground
+truth supplied magically to the resolver**, and not a fact source owned by E4.
+
+### Upstream records vs. the situation
+
+TAP-E4 consumes four inputs with distinct roles: `IntentRecord` (what the user is asking and
+intent-level entities/constraints), `RetrievalRecord` (the available evidence units),
+`RelationshipRecord` (the relationships that evidence expresses), and `GovernanceSituation`
+(the operational facts applicability is resolved against). The situation **does not replace**
+the upstream records; E4 must not derive new evidence relationships or repair upstream gaps.
+
+### Governance Resolution vs. ActionGate
+
+```
+Governance Resolution:  Which documented authority governs this information case?
+ActionGate:             May this exact proposed action execute?
+```
+
+Governance Resolution may determine that a policy *states* an action is permitted or
+prohibited; it does **not** issue execution authorization. The two are not merged.
 
 ## 4. Thirteen-stage deterministic pipeline
 

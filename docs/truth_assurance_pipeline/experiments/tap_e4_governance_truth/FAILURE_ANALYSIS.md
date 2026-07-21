@@ -58,3 +58,32 @@ Severe critical counts on DEV: **A=9, B=7, C=5, D=3, E=1, F=0**.
   controls, never that the controlled obligation is right. Correctness is Claim Validation's job.
 - **Conflicts are surfaced, not adjudicated.** `CONFLICTED` is an honest terminal state, not
   a deferred resolution; the layer intentionally does not break genuine ties.
+
+## Situation-fact handling (missing / contradictory) — current behavior & limitations
+
+These concern the **`GovernanceSituation` input**, not the evidence side, and are recorded
+honestly as limitations of the current prototype (fixing them would require changing frozen
+resolver source and thus the E4 `frozen_components_hash`, which is out of scope for the
+interface-boundary task that added this section — deferred to a future versioned revision).
+
+- **Missing facts are never invented.** A missing situation field lowers the relevant
+  confidence axis (`jurisdiction_confidence` / `scope_confidence` → 0.4; `temporal_confidence`
+  → 0.4–0.5) rather than fabricating a value. No role, jurisdiction, date, etc. is invented.
+- **Limitation — permissive resolution on absent mandatory scope.** Because scope/jurisdiction
+  matching is permissive (an unknown situation fact keeps candidates at reduced confidence
+  rather than rejecting them), a *fully* unspecified situation can still resolve to a
+  scope-specific authority reported as `GOVERNING` at a lowered confidence band, and the
+  engine emits **no dedicated per-missing-field gap** (no `ACTOR_ROLE_UNRESOLVED`, etc.). The
+  implemented gap vocabulary is `NO_GOVERNING_POLICY`, `CONFLICTING_AUTHORITIES`,
+  `INSUFFICIENT_UPSTREAM_RELATIONSHIPS`; the schema also defines `UNRESOLVED_SCOPE` /
+  `AMBIGUOUS_JURISDICTION` / `MISSING_TEMPORAL_BASIS` / `MISSING_VERSION` /
+  `UNRESOLVED_EXCEPTION` / `EXPIRED_AUTHORITY` which are **not currently emitted**. A future
+  revision should force an unresolved state (or emit a missing-mandatory-fact gap) when a
+  material scope fact required by the surviving candidates is absent.
+- **Contradictory facts are not representable.** Each `Situation` field holds one normalized
+  value, so contradictory inputs (`user_role = employee` **and** `contractor`; two
+  jurisdictions; emergency active **and** inactive) cannot be expressed. **Contradiction
+  detection must occur before `GovernanceSituation` construction** in the current prototype;
+  TAP-E4 claims no contradictory-situation-fact detection it cannot represent. Contradictions
+  among *documented authorities* (not situation facts) are separately surfaced as
+  `CONFLICTED` / `GovernanceConflict`.

@@ -1,5 +1,14 @@
 # TAP-E4 — Governance Resolution
 
+> **Historical package path retained for experiment reproducibility. The canonical
+> engineering name is Governance Resolution.** New downstream code should import through
+> the canonical package
+> [`truth_assurance_pipeline.tap_e4_governance_resolution`](../tap_e4_governance_resolution/README.md);
+> this `tap_e4_governance_truth` path continues to work unchanged and is retained for frozen
+> experiments, stored manifests, backward compatibility, and reproducibility (its directory
+> name, experiment IDs, and `frozen_components_hash` embed the original name). This is a
+> path/name note only — no runtime deprecation warning is emitted, per repository policy.
+
 The fourth TAP research layer. Given an `IntentRecord` (TAP-E1), a `RetrievalRecord`
 (TAP-E2), and a `RelationshipRecord` (TAP-E3) — all consumed through their **frozen public
 interfaces** — plus an explicit governance `Situation`, it resolves **which documented

@@ -103,6 +103,15 @@ package directories (e.g. `tap_e3_relationship_truth/`), schema-version strings 
 source of any module folded into a `frozen_components_hash`. Those retain the original
 terminology by design.
 
+**Canonical import paths.** Where a canonical engineering import package exists, new
+downstream code should import through it while the historical package path is retained for
+reproducibility. For Governance Resolution (TAP-E4) the canonical path is
+`truth_assurance_pipeline.tap_e4_governance_resolution` (a thin re-export/alias layer over
+the historical `tap_e4_governance_truth` implementation). That package also documents the
+**`GovernanceSituation`** input contract: the caller/runtime owns operational metadata and
+supplies it explicitly; TAP-E4 only normalizes explicit inputs and never discovers,
+retrieves, or invents situation facts, and leaves missing or contradictory facts unresolved.
+
 ## 3. Design invariants
 
 1. **Single responsibility.** Each layer owns exactly one responsibility; the

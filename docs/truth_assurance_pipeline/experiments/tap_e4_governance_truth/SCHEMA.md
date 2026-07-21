@@ -87,3 +87,36 @@ upstream authority metadata.
 
 Checks schema/authority versions, non-empty id, that any selected authority has complete
 provenance, and JSON round-trip. Returns `(ok, problems)`.
+
+## GovernanceSituation (input contract — not a serialized output type)
+
+The resolver's situation input is the `Situation` dataclass, canonical name
+**`GovernanceSituation`** (an `is`-identical alias re-exported from
+`tap_e4_governance_resolution`; **not a new serialized type** and not part of the
+`GovernanceRecord` schema). Implemented fields, all optional:
+
+| Field | Type | Consumed by |
+|---|---|---|
+| `jurisdiction` | `str` | jurisdiction resolution |
+| `user_role` | `str` | scope matching (role) |
+| `environment` | `str` | scope matching (environment) |
+| `date_year` | `Optional[int]` | temporal / version / supersession |
+| `contract` | `str` | informational (contract tier derives from the evidence unit) |
+| `product` | `str` | not consumed by the current resolver |
+| `business_unit` | `str` | not consumed by the current resolver |
+
+### Field-level situation provenance — limitation
+
+**The current prototype accepts normalized situation values but does not yet preserve
+field-level provenance inside the `Situation` object.** Its fields are bare values with no
+per-field source, confidence, timestamp, or normalization method. `GovProvenance` traces
+**evidence and decisions** (authority → assertion → evidence unit → source), **not** the
+situation input — so "provenance-preserving" in TAP-E4 refers to upstream evidence and
+governance decisions, not to the situation facts.
+
+A future `SituationFact` structure (`field_name`, `value`, `source_type`,
+`source_reference`, `confidence`, `observed_at`, `normalization_method`; source types such
+as `INTENT_RECORD` / `APPLICATION_METADATA` / `RUNTIME_METADATA` / `CALLER_ASSERTION` /
+`EVALUATION_FIXTURE`) is a **documented future schema extension** — not implemented. Adding
+it would require a **schema-version increment**, a migration note, downstream compatibility
+analysis, and architectural justification.
