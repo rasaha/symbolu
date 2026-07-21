@@ -1,0 +1,10 @@
+{
+  "agent_cache_hash": "0ebe8c036b523e23a3c6e42b8491f7e044cdbd7e7c0ad63c7fd242907896c8fa",
+  "eval_lock": {
+    "eval_inputs_hash": "f94a664daa8a21883da955f8cdd191cbb0782f6c5372a2175a999f27d3df1c20",
+    "n_eval": 24,
+    "per_case_hash": "2e3c69e7f2b02ed331d987d8549e8f43dc8e9494d041198d39404e40d1a55d41"
+  },
+  "frozen": true,
+  "note": "Frozen before hidden-set scoring. eval_inputs_hash locks the 24 hidden prompts (inputs only, no gold)."
+}
