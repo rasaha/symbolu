@@ -1,4 +1,7 @@
-# TAP-E2 — Trusted Retrieval — Experiment Report
+# TAP-E2 — Evidence Retrieval — Experiment Report
+
+> **Naming note.** This layer's canonical engineering name is used throughout. **Previously referred to as Trusted Retrieval.** For reproducibility, the package directory `tap_e2_trusted_retrieval/`, the schema-version prefix `tap-e2-retrieval/…`, experiment IDs, and stored artifacts retain the original name — see `01_TRUTH_ASSURANCE_ARCHITECTURE.md` §2a.
+
 
 > **Research & falsification phase.** Second TAP layer. Retrieval only. TAP-E1 is a
 > frozen baseline, imported through its public interface and never modified.
@@ -19,7 +22,7 @@ Code: [`truth_assurance_pipeline/tap_e2_trusted_retrieval/`](../../../../truth_a
 
 ## 1. Objective & boundary
 
-The Trusted Retrieval Layer answers exactly one question: **which evidence should be
+The Evidence Retrieval Layer answers exactly one question: **which evidence should be
 supplied to downstream truth reasoning?** It does **not** decide factual correctness,
 policy applicability, relationship validity, authorization, claim truth, or response
 quality, and it never answers the user. Input: an `IntentRecord` from TAP-E1 (+ optional
@@ -28,7 +31,7 @@ conversation / app metadata). Output: a versioned `RetrievalRecord`.
 If retrieval ever began making truth/policy/claim judgments, that logic would belong in
 a later TAP layer — it is deliberately excluded here.
 
-## 1a. Meaning of "Trusted Retrieval"
+## 1a. Meaning of "Evidence Retrieval"
 
 "Trusted" here is a precise, **narrow** claim about the *properties of the retrieval
 process and its output*, not about the evidence being correct. In TAP-E2 "trusted" means
@@ -50,8 +53,8 @@ the retrieval is:
 - **sufficient for claim support**;
 - **free of contradiction** (conflicts are *surfaced*, not *resolved*).
 
-Those responsibilities belong to later TAP layers (Relationship Truth, Governance Truth,
-Claim Truth). TAP-E2 makes evidence *trustworthy to reason about*, not *established as
+Those responsibilities belong to later TAP layers (Relationship Analysis, Governance Resolution,
+Claim Validation). TAP-E2 makes evidence *trustworthy to reason about*, not *established as
 true*.
 
 ## 2. Architecture — the retrieval pipeline (typed stages)
@@ -237,7 +240,7 @@ exposes a genuine architectural deficiency** (a field it structurally needs and 
 derive), not for incidental convenience. Downstream layers should consume
 `RetrievalRecord` and `EvidenceProvenance` as a stable contract.
 
-## 15. Roadmap — next layer is TAP-E3 Relationship Truth
+## 15. Roadmap — next layer is TAP-E3 Relationship Analysis
 
 Retrieval now supplies **evidence units with provenance, confidence, and explicit
 gaps** — but deliberately makes no judgment about what those units mean *in relation to
@@ -245,15 +248,15 @@ each other or to the entities in the request*. Determining whether a proposed **
 is supported cannot come next, because claim support presupposes knowing **what
 relationship the evidence actually establishes**. That is the job of the next layer.
 
-**TAP-E3 — Relationship Truth** determines *what relationship the retrieved evidence
+**TAP-E3 — Relationship Analysis** determines *what relationship the retrieved evidence
 actually establishes* among the entities involved, for example:
 
 `owns` · `licenses` · `depends on` · `supersedes` · `recommends` · `applies to` ·
 `prohibits` · `replaces` · `references`
 
 Only **after** relationships are established should later layers determine whether a
-proposed claim is actually supported (Claim Truth), whether policy permits an action
-(Governance Truth), and how to respond (Response Truth). TAP-E3 should consume the frozen
+proposed claim is actually supported (Claim Validation), whether policy permits an action
+(Governance Resolution), and how to respond (Response Validation). TAP-E3 should consume the frozen
 `RetrievalRecord` / `EvidenceProvenance` (§14) as its input contract, carry E2 provenance
 and gaps forward, keep relationship judgments strictly separated from retrieval, and be
 evaluated under the same locked-split + preregistered-gate discipline.
@@ -261,19 +264,19 @@ evaluated under the same locked-split + preregistered-gate discipline.
 ### Updated TAP roadmap
 
 ```
-TAP-E1  Intent Understanding
+TAP-E1  Intent Analysis
         ↓
-TAP-E2  Trusted Retrieval          ← this experiment (frozen interface: RetrievalRecord)
+TAP-E2  Evidence Retrieval          ← this experiment (frozen interface: RetrievalRecord)
         ↓
-TAP-E3  Relationship Truth         ← next layer
+TAP-E3  Relationship Analysis         ← next layer
         ↓
-TAP-E4  Governance Truth
+TAP-E4  Governance Resolution
         ↓
-Evidence Packet
+Evidence Assembly
         ↓
-Claim Truth
+Claim Validation
         ↓
-Response Truth
+Response Validation
 ```
 
 ## 15a. Future validation (goals, not achievements)

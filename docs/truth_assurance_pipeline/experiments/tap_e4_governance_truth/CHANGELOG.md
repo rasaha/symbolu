@@ -1,6 +1,6 @@
 # TAP-E4 — Changelog
 
-## v4 (Governance Truth — initial research & falsification phase)
+## v4 (Governance Resolution — initial research & falsification phase)
 
 **Added** a self-contained TAP-E4 track under
 `truth_assurance_pipeline/tap_e4_governance_truth/`. It imports TAP-E1 (`IntentRecord`),
@@ -54,4 +54,4 @@ enforcement.
 relationship inputs; the authority hierarchy/precedence rules are a frozen model, not law;
 locked **development** evaluation inspected during iteration (see LEAKAGE_AUDIT). Mechanism/
 construction validation only. TAP-E1/E1.1/E2/E3 are unchanged (byte-identical; 124 tests
-pass). Next layer: **TAP-E5 — Evidence Packet.**
+pass). Next layer: **TAP-E5 — Evidence Assembly.**

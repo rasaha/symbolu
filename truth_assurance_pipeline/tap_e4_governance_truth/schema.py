@@ -1,7 +1,7 @@
 """
 Versioned, serializable GovernanceRecord schema for TAP-E4.
 
-The GovernanceRecord is the sole output of the Governance Truth layer: a deterministic,
+The GovernanceRecord is the sole output of the Governance Resolution layer: a deterministic,
 provenance-preserving selection and justification of which documented authority governs a
 situation. It does NOT determine factual truth, claim truth, response correctness, or
 execution authorization, and never answers the user (see ARCHITECTURE).

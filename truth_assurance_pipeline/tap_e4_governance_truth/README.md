@@ -1,4 +1,4 @@
-# TAP-E4 — Governance Truth
+# TAP-E4 — Governance Resolution
 
 The fourth TAP research layer. Given an `IntentRecord` (TAP-E1), a `RetrievalRecord`
 (TAP-E2), and a `RelationshipRecord` (TAP-E3) — all consumed through their **frozen public
@@ -65,5 +65,5 @@ gap/severe gates require it). All fourteen gates pass on the locked eval split; 
 **`PASS_WITH_LIMITED_CLAIM`**.
 
 The `GovernanceRecord` schema is the provisional frozen downstream interface; the **next
-layer is TAP-E5 — Evidence Packet**. See
+layer is TAP-E5 — Evidence Assembly**. See
 [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e4_governance_truth/EXPERIMENT_REPORT.md).

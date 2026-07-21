@@ -1,6 +1,6 @@
 # Claim Validation — Preregistration (v0.1)
 
-**Experiment:** Relationship Claim Validation Experiment v0.1 ("Claim Truth Layer").
+**Experiment:** Relationship Claim Validation Experiment v0.1 ("Claim Validation Layer").
 **Track:** new, independent, additive. Package: `relationship_claim_validation/`.
 
 > ## Scope boundary — read first

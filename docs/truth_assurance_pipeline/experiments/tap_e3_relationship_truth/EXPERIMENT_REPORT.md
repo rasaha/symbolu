@@ -1,4 +1,7 @@
-# TAP-E3 — Relationship Truth — Experiment Report
+# TAP-E3 — Relationship Analysis — Experiment Report
+
+> **Naming note.** This layer's canonical engineering name is used throughout. **Previously referred to as Relationship Truth.** For reproducibility, the package directory `tap_e3_relationship_truth/`, the schema-version prefix `tap-e3-relationship/…`, experiment IDs, and stored artifacts retain the original name — see `01_TRUTH_ASSURANCE_ARCHITECTURE.md` §2a.
+
 
 > **Research & falsification phase.** Third TAP layer. Relationship extraction /
 > normalization / conflict-detection / uncertainty-representation only. TAP-E1 and
@@ -33,7 +36,7 @@ explicit from inferred, positive from negated, current from superseded, direct f
 conditional, supported from ambiguous, and source assertion from platform judgment.
 
 TAP-E3 does **not** decide final claim truth, governance applicability, authorization, or
-answer the user (see ARCHITECTURE §"Relationship Truth boundary"). "Truth" here means a
+answer the user (see ARCHITECTURE §"Relationship Analysis boundary"). "Truth" here means a
 **faithful representation of the relationship asserted, qualified, negated, alleged,
 conditioned, or contradicted by the evidence** — not metaphysical truth, and not
 verification of the source's real-world correctness.
@@ -187,7 +190,7 @@ which rule governs the current case.
 - **Governance.** Evidence "Policy A applies to contractors." → E3 may represent
   `Policy A --APPLIES_TO--> contractors`. It must **not** yet decide "Policy A is the
   controlling policy for this contractor in the current case" — that is **TAP-E4 Governance
-  Truth**.
+  Resolution**.
 - **Historical.** Evidence "System A previously depended on Library B." → E3 preserves
   `DEPENDS_ON` with **temporality: HISTORICAL**; it must **not** present the dependency as
   current. The `SUPERSEDED_RELATION_TREATED_AS_CURRENT` critical guards this.
@@ -220,7 +223,7 @@ architectural deficiency**, and any such change must carry: an explicit schema-v
 increment, a migration note, a downstream compatibility analysis, and an explanation of
 why the existing interface was insufficient (see SCHEMA).
 
-**Next layer: TAP-E4 — Governance Truth.** It consumes `IntentRecord`, `RetrievalRecord`,
+**Next layer: TAP-E4 — Governance Resolution.** It consumes `IntentRecord`, `RetrievalRecord`,
 and `RelationshipRecord`, and determines **which documented rule, authority, policy,
 version, jurisdiction, scope, exception, and temporal condition governs the current
 situation** — e.g. taking a represented `APPLIES_TO` relationship (with its scope /
@@ -228,19 +231,19 @@ temporality / supersession) and deciding whether that policy is the *controlling
 here. TAP-E4 is **not** implemented in this task.
 
 ```
-TAP-E1  Intent Understanding
+TAP-E1  Intent Analysis
         ↓
-TAP-E2  Trusted Retrieval
+TAP-E2  Evidence Retrieval
         ↓
-TAP-E3  Relationship Truth          ← this experiment (frozen interface: RelationshipRecord)
+TAP-E3  Relationship Analysis          ← this experiment (frozen interface: RelationshipRecord)
         ↓
-TAP-E4  Governance Truth            ← next layer
+TAP-E4  Governance Resolution            ← next layer
         ↓
-Evidence Packet
+Evidence Assembly
         ↓
-Claim Truth
+Claim Validation
         ↓
-Response Truth
+Response Validation
 ```
 
 ## 12. Future validation (goals, not achievements)

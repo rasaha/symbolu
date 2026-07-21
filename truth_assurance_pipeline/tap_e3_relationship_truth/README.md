@@ -1,4 +1,4 @@
-# TAP-E3 — Relationship Truth
+# TAP-E3 — Relationship Analysis
 
 The third TAP research layer. Given an `IntentRecord` (TAP-E1) and a `RetrievalRecord`
 (TAP-E2) — both consumed through their **frozen public interfaces** — it determines **what
@@ -10,7 +10,7 @@ provenance.
 > qualified, negated, alleged, conditioned, or contradicted by the evidence* — **not**
 > metaphysical truth, governance applicability, claim support, or a user answer. TAP-E3
 > may represent "Policy A applies to contractors"; it must not decide that Policy A is the
-> controlling policy here (Governance Truth), nor whether a final claim is justified (Claim
+> controlling policy here (Governance Resolution), nor whether a final claim is justified (Claim
 > Truth).
 
 ## Honesty (read first)
@@ -68,5 +68,5 @@ pairs**, so a perfect matched-structure score does not mean full recovery (see
 [METRICS](../../docs/truth_assurance_pipeline/experiments/tap_e3_relationship_truth/METRICS.md)).
 
 The `RelationshipRecord` schema is the provisional frozen downstream interface; the **next
-layer is TAP-E4 — Governance Truth**. See
+layer is TAP-E4 — Governance Resolution**. See
 [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e3_relationship_truth/EXPERIMENT_REPORT.md).

@@ -2,7 +2,7 @@
 
 ## v1 (initial research & falsification phase)
 
-**Added** a new, self-contained TAP-E1 Intent Understanding research track under
+**Added** a new, self-contained TAP-E1 Intent Analysis research track under
 `truth_assurance_pipeline/tap_e1_intent/`. Nothing outside that directory (and this
 docs folder) was modified.
 

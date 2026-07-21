@@ -1,7 +1,7 @@
 """
 Versioned, serializable RetrievalRecord schema for TAP-E2.
 
-The RetrievalRecord is the sole output of the Trusted Retrieval Layer. It selects
+The RetrievalRecord is the sole output of the Evidence Retrieval Layer. It selects
 candidate evidence; it does NOT judge factual correctness, policy applicability,
 relationship validity, authorization, claim truth, or response quality, and it does
 NOT answer the user.

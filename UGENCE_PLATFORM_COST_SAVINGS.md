@@ -170,7 +170,7 @@ is a function of an incident rate the customer must supply; we can prove detecti
 hallucination (bad decision, compliance exposure, lost trust). This targets the #1 stated
 blocker slowing enterprise gen-AI adoption.
 
-**Grounded figure.** **[NOT-QUANTIFIED].** TAP is **emerging** — only the Claim Truth layer has a
+**Grounded figure.** **[NOT-QUANTIFIED].** TAP is **emerging** — only the Claim Validation layer has a
 synthetic prototype whose own verdict is "production: NO." No avoided-error rate is measured.
 
 **Counter-cost.** Validation adds latency and compute per response (retrieval + checks), and

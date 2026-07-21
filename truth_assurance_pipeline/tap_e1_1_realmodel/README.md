@@ -1,6 +1,6 @@
 # TAP-E1.1 — LLM Integration Validation
 
-A validation track (not a new layer) for the frozen **TAP-E1 Intent Understanding
+A validation track (not a new layer) for the frozen **TAP-E1 Intent Analysis
 Layer**. The only variable under study is the interpretation engine: the deterministic
 placeholder is replaced with an **LLM**. Everything else (schema, deterministic
 extraction, provenance, ambiguity, conflict, clarification, metrics) is imported

@@ -2,7 +2,7 @@
 TAP-E1 research corpus (NEW and explicitly labeled for this study).
 
 HONESTY (Section 21): this corpus is SYNTHETIC and human-authored for the TAP-E1
-Intent Understanding study. There is no pre-existing "frozen intent corpus" in this
+Intent Analysis study. There is no pre-existing "frozen intent corpus" in this
 repository; none is claimed as a prerequisite. Gold annotations are author-assigned.
 Because both the corpus and the deterministic interpreter are authored here, a
 positive result is *mechanism / construction* validation on synthetic inputs — it is

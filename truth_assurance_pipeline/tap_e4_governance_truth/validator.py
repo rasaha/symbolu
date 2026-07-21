@@ -1,5 +1,5 @@
 """
-Input validation for the Governance Truth layer.
+Input validation for the Governance Resolution layer.
 
 TAP-E4 consumes three upstream records through their frozen public interfaces. Before
 resolving governance we assert the inputs are internally coherent (correct schema

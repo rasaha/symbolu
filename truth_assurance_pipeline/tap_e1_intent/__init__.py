@@ -1,5 +1,5 @@
 """
-TAP-E1 — Intent Understanding Layer (research & falsification phase).
+TAP-E1 — Intent Analysis Layer (research & falsification phase).
 
 A NEW, self-contained research track. It imports nothing from, and modifies nothing
 in, any other track in this repository (no resolver, retriever, governance engine,

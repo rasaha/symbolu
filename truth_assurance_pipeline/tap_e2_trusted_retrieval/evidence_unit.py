@@ -1,5 +1,5 @@
 """
-Evidence-unit and document types for TAP-E2 Trusted Retrieval.
+Evidence-unit and document types for TAP-E2 Evidence Retrieval.
 
 Core philosophy: retrieve EVIDENCE UNITS, not documents. An evidence unit is the
 smallest independently citable factual fragment practical for the corpus (here, a

@@ -1,9 +1,12 @@
-# TAP-E4 — Governance Truth — Experiment Report
+# TAP-E4 — Governance Resolution — Experiment Report
+
+> **Naming note.** This layer's canonical engineering name is used throughout. **Previously referred to as Governance Truth.** For reproducibility, the package directory `tap_e4_governance_truth/`, the schema-version prefix `tap-e4-governance/…`, experiment IDs, and stored artifacts retain the original name — see `01_TRUTH_ASSURANCE_ARCHITECTURE.md` §2a.
+
 
 ## 1. Objective
 
 Implement and evaluate a **standalone, deterministic, provenance-preserving Governance
-Truth layer**. Given the frozen upstream records — `IntentRecord` (TAP-E1),
+Resolution layer**. Given the frozen upstream records — `IntentRecord` (TAP-E1),
 `RetrievalRecord` (TAP-E2), `RelationshipRecord` (TAP-E3) — and an explicit governance
 `Situation`, resolve **which documented authority governs the situation, and why**:
 the controlling rule / policy / regulation / contract / version, together with its
@@ -14,9 +17,9 @@ Nothing beyond that. This layer does **not** determine factual truth, claim trut
 response correctness; does **not** answer the user; does **not** retrieve; does **not**
 discover relationships; and does **not** authorize or execute anything.
 
-## 2. What "Governance Truth" means (and does not)
+## 2. What "Governance Resolution" means (and does not)
 
-Governance Truth is the answer to *"among the documented authorities the evidence puts on
+Governance Resolution is the answer to *"among the documented authorities the evidence puts on
 the table, which one controls this specific situation, and by what documented rule?"* It is
 a **selection-and-justification** result, not a correctness result:
 
@@ -163,9 +166,9 @@ answers; enforcement.
 
 ## 9. Next layer
 
-**TAP-E5 — Evidence Packet.** With intent (E1), trusted retrieval (E2), relationships (E3),
+**TAP-E5 — Evidence Assembly.** With intent (E1), trusted retrieval (E2), relationships (E3),
 and now governing authority (E4) resolved, the next layer should **assemble the minimal,
 fully-provenanced evidence packet** — the governing authority, the relationships it rests
 on, the retrieved units behind them, and the intent it answers — that a downstream Claim
-Truth layer will need. It should carry every unresolved conflict and gap forward intact and
+Validation layer will need. It should carry every unresolved conflict and gap forward intact and
 add no new inference. See [CHANGELOG](CHANGELOG.md) and [LEAKAGE_AUDIT](LEAKAGE_AUDIT.md).

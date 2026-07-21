@@ -3,7 +3,7 @@
 ## 1. Position in the pipeline
 
 ```
-TAP-E1 Intent  ─▶  TAP-E2 Retrieval  ─▶  TAP-E3 Relationship  ─▶  TAP-E4 Governance  ─▶  (TAP-E5 Evidence Packet ─▶ Claim Truth ─▶ Response Truth)
+TAP-E1 Intent  ─▶  TAP-E2 Retrieval  ─▶  TAP-E3 Relationship  ─▶  TAP-E4 Governance  ─▶  (TAP-E5 Evidence Assembly ─▶ Claim Validation ─▶ Response Validation)
 IntentRecord       RetrievalRecord        RelationshipRecord        GovernanceRecord
 ```
 
@@ -19,11 +19,11 @@ them and adds no field to them.
 | Which evidence is trustworthy/retrieved? | TAP-E2 | consumes tiers/provenance; never retrieves |
 | What relationship does the evidence assert? | TAP-E3 | consumes assertions; never re-extracts |
 | **Which documented authority governs here?** | **TAP-E4** | **this layer** |
-| Is the obligation factually correct? | Claim Truth | out of scope |
+| Is the obligation factually correct? | Claim Validation | out of scope |
 | Should the action be executed? | Enforcement | out of scope |
-| What do we tell the user? | Response Truth | out of scope |
+| What do we tell the user? | Response Validation | out of scope |
 
-Governance Truth answers *"which documented authority controls, and why"* — never *"is it
+Governance Resolution answers *"which documented authority controls, and why"* — never *"is it
 right"* or *"do it"*.
 
 ## 3. The Situation

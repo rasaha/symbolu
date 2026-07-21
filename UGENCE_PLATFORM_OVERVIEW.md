@@ -256,7 +256,7 @@ upstream in Specialized AI Systems, never in this layer:
   authorizing any action (ActionGate).
 - *Maturity (stated plainly).* TAP is an **emerging** platform capability — **not** at the maturity of
   Context Minimization, ActionGate, ACP, KVPro, or the runtimes. Its architecture is **specified**;
-  only its **Claim Truth Layer** currently has a self-contained **synthetic** prototype. **Production
+  only its **Claim Validation Layer** currently has a self-contained **synthetic** prototype. **Production
   efficacy has not been established, and real enterprise validation has not yet occurred.** TAP is a
   platform governance capability used *alongside* the Hybrid LLM — **not** part of the Hybrid LLM — and
   it governs assertions regardless of which model produced them.
@@ -364,7 +364,7 @@ action is proposed, governed, cleared, actuated, observed by sensors, and fed ba
 is APIs versus actuators, not architecture.
 
 The assertion path shown above is an **emerging** capability: TAP's architecture is specified, only its
-Claim Truth Layer is prototyped (on synthetic data), and it is not yet production- or
+Claim Validation Layer is prototyped (on synthetic data), and it is not yet production- or
 enterprise-validated.
 
 Every hand-off in this loop is a clean boundary owned by exactly one product. That is what makes the

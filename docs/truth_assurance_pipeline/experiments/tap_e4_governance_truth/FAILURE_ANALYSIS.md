@@ -55,6 +55,6 @@ Severe critical counts on DEV: **A=9, B=7, C=5, D=3, E=1, F=0**.
   resolves governance over what it is given and preserves upstream gaps, but does not detect
   upstream extraction errors — that is TAP-E3's boundary.
 - **No correctness judgment.** A zero-failure `GOVERNING` decision asserts *which* authority
-  controls, never that the controlled obligation is right. Correctness is Claim Truth's job.
+  controls, never that the controlled obligation is right. Correctness is Claim Validation's job.
 - **Conflicts are surfaced, not adjudicated.** `CONFLICTED` is an honest terminal state, not
   a deferred resolution; the layer intentionally does not break genuine ties.

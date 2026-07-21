@@ -19,11 +19,11 @@ replaceability.
 
 | # | Experiment | Layer | Question | Prerequisite corpus | Status |
 |---|---|---|---|---|---|
-| E1 | Relationship Truth Experiment | L1 | are proposed relationships supported by evidence? | relationship-truth corpus (gold labels + spans) | corpus does not exist |
-| E2 | Governance Truth Experiment | L2 | is applicability / operative source decided correctly? | governance-truth corpus (genuine + resolved conflicts) | corpus does not exist |
-| E3 | Evidence Packet Experiment | L3 | is the packet minimal **and** complete? | packet corpus (gold minimal sets) | corpus does not exist |
-| E4 | Claim Truth Experiment | L4 | is each claim correctly statused? | claim-truth corpus | **synthetic prototype exists** (`relationship_claim_validation/`); a *real* corpus does not |
-| E5 | Response Truth Experiment | L5 | is the whole answer faithful? | response-truth corpus | corpus does not exist |
+| E1 | Relationship Analysis Experiment | L1 | are proposed relationships supported by evidence? | relationship-truth corpus (gold labels + spans) | corpus does not exist |
+| E2 | Governance Resolution Experiment | L2 | is applicability / operative source decided correctly? | governance-truth corpus (genuine + resolved conflicts) | corpus does not exist |
+| E3 | Evidence Assembly Experiment | L3 | is the packet minimal **and** complete? | packet corpus (gold minimal sets) | corpus does not exist |
+| E4 | Claim Validation Experiment | L4 | is each claim correctly statused? | claim-truth corpus | **synthetic prototype exists** (`relationship_claim_validation/`); a *real* corpus does not |
+| E5 | Response Validation Experiment | L5 | is the whole answer faithful? | response-truth corpus | corpus does not exist |
 | E6 | Cross-Layer Provenance Experiment | cross | is every assertion end-to-end traceable? | an end-to-end pipeline + labeled traces | pipeline does not exist |
 | E7 | Cross-Layer Confidence Experiment | cross | are confidence dimensions calibrated? | labeled outcomes per dimension | data does not exist |
 

@@ -1,6 +1,6 @@
 # TAP-E2 — Changelog
 
-## v2 (Trusted Retrieval — initial research & falsification phase)
+## v2 (Evidence Retrieval — initial research & falsification phase)
 
 **Added** a self-contained TAP-E2 track under
 `truth_assurance_pipeline/tap_e2_trusted_retrieval/`. It imports TAP-E1 through its
@@ -48,5 +48,5 @@ holdout** (not double-blind).
 **Honesty:** synthetic corpus; "dense semantic retrieval" is a deterministic
 concept-vector stand-in (not embeddings); results are mechanism validation only. The
 `RetrievalRecord` schema is the provisional frozen downstream interface. **Next layer:
-TAP-E3 — Relationship Truth** (not claim grounding): relationships among evidence/entities
+TAP-E3 — Relationship Analysis** (not claim grounding): relationships among evidence/entities
 must be established before any claim-support judgment. TAP-E1 and TAP-E1.1 are unchanged.

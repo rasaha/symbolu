@@ -1,7 +1,7 @@
 """
 TAP-E1.1 — Real Model Validation.
 
-A validation track (NOT a new TAP layer) for the frozen TAP-E1 Intent Understanding
+A validation track (NOT a new TAP layer) for the frozen TAP-E1 Intent Analysis
 Layer. It imports TAP-E1 UNCHANGED and replaces only the interpretation engine with a
 real LLM, then measures — under preregistered gates, leakage controls, and a metric
 audit — whether real-model reasoning improves intent understanding without increasing

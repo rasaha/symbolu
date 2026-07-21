@@ -1,5 +1,5 @@
 """
-TAP-E3 — Relationship Truth.
+TAP-E3 — Relationship Analysis.
 
 Third TAP research layer. Given an IntentRecord (TAP-E1) and a RetrievalRecord (TAP-E2)
 — both consumed through their frozen public interfaces — it determines WHAT RELATIONSHIP

@@ -1,4 +1,4 @@
-# TAP-E4 — Governance Truth (docs index)
+# TAP-E4 — Governance Resolution (docs index)
 
 The fourth TAP research layer. Given `IntentRecord` (E1), `RetrievalRecord` (E2), and
 `RelationshipRecord` (E3) — all via frozen public interfaces — plus an explicit governance
@@ -35,4 +35,4 @@ TAP-E1/E1.1/E2/E3 unchanged (byte-identical; consumed through frozen public inte
 Full regression: 124 tests pass. Deterministic across `PYTHONHASHSEED ∈ {0,1,7,42,123}`.
 `frozen_components_hash = 9e44afd7…`, `eval_inputs_hash = c28e23f3…`.
 
-**Next layer: TAP-E5 — Evidence Packet.**
+**Next layer: TAP-E5 — Evidence Assembly.**

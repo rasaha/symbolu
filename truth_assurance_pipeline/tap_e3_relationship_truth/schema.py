@@ -1,7 +1,7 @@
 """
 Versioned, serializable RelationshipRecord schema for TAP-E3.
 
-The RelationshipRecord is the sole output of the Relationship Truth layer: a structured,
+The RelationshipRecord is the sole output of the Relationship Analysis layer: a structured,
 provenance-preserving representation of the relationships the retrieved evidence
 *asserts, qualifies, negates, alleges, conditions, or contradicts*. It does NOT decide
 final claim truth, governance applicability, or authorization, and never answers the

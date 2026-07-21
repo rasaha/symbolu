@@ -1,5 +1,5 @@
 """
-TAP-E2 — Trusted Retrieval.
+TAP-E2 — Evidence Retrieval.
 
 The second TAP research layer. It selects candidate EVIDENCE UNITS for downstream truth
 reasoning, given an IntentRecord from the FROZEN TAP-E1 layer. It determines *which

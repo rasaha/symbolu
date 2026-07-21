@@ -210,7 +210,7 @@ the improvement is demonstrated only under self-generated conditions.
 
 ## 14. Architecture freeze
 
-**TAP-E1 (the Intent Understanding Layer, `tap_e1_intent/`) is hereby treated as the
+**TAP-E1 (the Intent Analysis Layer, `tap_e1_intent/`) is hereby treated as the
 frozen baseline.** It should not be modified indefinitely. Future work should **evaluate
 improvements by comparison against this frozen TAP-E1 implementation** — as TAP-E1.1
 does — rather than by continuing to edit the baseline. TAP-E1.1 itself (corpus, harness,

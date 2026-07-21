@@ -55,7 +55,7 @@ relationship representation**, NOT to universal or real-world truth.
 > **Downstream warning.** Layers consuming this record must **not** interpret `SUPPORTED`
 > as equivalent to *factually verified*, *legally controlling*, *currently applicable*, or
 > *safe to include in a final answer without further validation*. Those determinations
-> belong to Governance Truth (TAP-E4), Claim Truth, and Response Truth.
+> belong to Governance Resolution (TAP-E4), Claim Validation, and Response Validation.
 
 ## Conflict semantics
 
@@ -65,7 +65,7 @@ incompatible polarity/modality/value). It does **not adjudicate which source win
 "passwords must be ≥12 characters" vs "≥14 characters" TAP-E3 may emit a `VALUE_CONFLICT`;
 it must **not** decide which requirement governs the current user, system, jurisdiction, or
 effective period. Authority hierarchy, applicability, supersession control, jurisdiction,
-and governing-rule selection belong to **TAP-E4 Governance Truth**.
+and governing-rule selection belong to **TAP-E4 Governance Resolution**.
 
 ## SourceProvenance (mandatory per assertion)
 

@@ -1,5 +1,5 @@
 """
-TAP-E4 — Governance Truth.
+TAP-E4 — Governance Resolution.
 
 The fourth TAP research layer. Given an ``IntentRecord`` (TAP-E1), a ``RetrievalRecord``
 (TAP-E2), and a ``RelationshipRecord`` (TAP-E3) — all consumed through their frozen public
@@ -9,7 +9,7 @@ jurisdiction, scope, temporal/version, supersession, exception, precedence, conf
 and per-authority provenance.
 
 It does NOT determine factual/claim truth, answer the user, retrieve, discover
-relationships, or authorize execution. Governance Truth = "which documented authority
+relationships, or authorize execution. Governance Resolution = "which documented authority
 controls here, and why," never "is this obligation correct / should it be enforced."
 """
 

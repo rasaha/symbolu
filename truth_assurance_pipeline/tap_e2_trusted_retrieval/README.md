@@ -1,4 +1,4 @@
-# TAP-E2 — Trusted Retrieval
+# TAP-E2 — Evidence Retrieval
 
 The second TAP research layer. Given an `IntentRecord` from the **frozen TAP-E1** layer,
 it selects candidate **evidence units** for downstream truth reasoning. It determines
@@ -76,5 +76,5 @@ with interpretable ranking, explicit gap detection, and typed `RetrievalRecord` 
 on this study's synthetic corpus — it does **not** independently establish production
 retrieval performance or external generalization. The `RetrievalRecord` schema is the
 provisional frozen downstream interface; the **next layer is TAP-E3 — Relationship
-Truth**. See
+Analysis**. See
 [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e2_trusted_retrieval/EXPERIMENT_REPORT.md).

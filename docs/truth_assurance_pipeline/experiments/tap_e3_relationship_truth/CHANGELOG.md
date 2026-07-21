@@ -1,6 +1,6 @@
 # TAP-E3 — Changelog
 
-## v3 (Relationship Truth — initial research & falsification phase)
+## v3 (Relationship Analysis — initial research & falsification phase)
 
 **Added** a self-contained TAP-E3 track under
 `truth_assurance_pipeline/tap_e3_relationship_truth/`. It imports TAP-E1 (`IntentRecord`)
@@ -50,4 +50,4 @@ display labels `matched_*` while artifact keys are unchanged.
 sentences (not general NLU); locked **development** evaluation inspected during iteration
 (implementation changes followed some observed eval failures — see LEAKAGE_AUDIT).
 Mechanism/construction validation only. TAP-E1 and TAP-E2 are unchanged. Next layer:
-**TAP-E4 — Governance Truth**.
+**TAP-E4 — Governance Resolution**.
