@@ -7,6 +7,14 @@ Code: [`truth_assurance_pipeline/tap_e2_trusted_retrieval/`](../../../../truth_a
 · Results: [`experiments/results_v2.json`](../../../../truth_assurance_pipeline/tap_e2_trusted_retrieval/experiments/results_v2.json)
 · Prereg: [`experiments/preregistration.json`](../../../../truth_assurance_pipeline/tap_e2_trusted_retrieval/experiments/preregistration.json)
 
+> **Evaluation protocol (read first).** The eval split was **content-hash locked** and
+> the evaluation configuration was **preregistered** before scoring. However, evaluation
+> **outputs were inspected during iterative engineering and debugging** (ranking weights,
+> score floors, concept idf-weighting, and gap-detection rules were tuned while observing
+> eval metrics). This is therefore a **locked *development* evaluation, not an untouched
+> independent holdout**, and it was **not** a double-blind or interpreter-blind study. Read
+> every result accordingly (see §11 and §12).
+
 ---
 
 ## 1. Objective & boundary
@@ -19,6 +27,32 @@ conversation / app metadata). Output: a versioned `RetrievalRecord`.
 
 If retrieval ever began making truth/policy/claim judgments, that logic would belong in
 a later TAP layer — it is deliberately excluded here.
+
+## 1a. Meaning of "Trusted Retrieval"
+
+"Trusted" here is a precise, **narrow** claim about the *properties of the retrieval
+process and its output*, not about the evidence being correct. In TAP-E2 "trusted" means
+the retrieval is:
+
+- **provenance-bearing** — every evidence unit carries a source, location, retrieval
+  path/method/score, and extraction method;
+- **reproducible** — deterministic; the same inputs yield byte-identical records;
+- **attributable** — every returned unit maps back to a specific corpus source;
+- **traceable** — the pipeline stages that surfaced each unit are recorded;
+- **confidence-scored** — a multidimensional confidence vector accompanies each record;
+- **gap-aware** — retrieval incompleteness is represented explicitly.
+
+"Trusted" does **not** yet mean the retrieved evidence is:
+
+- **factually correct**;
+- **authoritative** (the layer records authority level but does not adjudicate it);
+- **applicable** to the user's situation;
+- **sufficient for claim support**;
+- **free of contradiction** (conflicts are *surfaced*, not *resolved*).
+
+Those responsibilities belong to later TAP layers (Relationship Truth, Governance Truth,
+Claim Truth). TAP-E2 makes evidence *trustworthy to reason about*, not *established as
+true*.
 
 ## 2. Architecture — the retrieval pipeline (typed stages)
 
@@ -140,12 +174,22 @@ selected config F on the locked set. Ladder:
   imperfection. `hallucinated_evidence_identifiers` is 0 and structurally impossible
   (deterministic retrieval only returns real corpus ids) — a test enforces this.
 
-## 11. Leakage controls
+## 11. Leakage controls — and what they do and do not guarantee
 
-Locked eval split with a content-hash lock (`eval_inputs_hash`); a gold-free public
-loader (query gold — relevant/partial/distractor/expected-gaps — is never exposed);
-dev/eval separation with no id or text overlap; duplicate detection; a corpus hash
-(documents + units); a frozen-components hash; and dev-only configuration selection.
+Enforced: a locked eval split with a content-hash lock (`eval_inputs_hash`); a gold-free
+public loader (query gold — relevant/partial/distractor/expected-gaps — is never
+exposed); dev/eval separation with no id or text overlap; duplicate detection; a corpus
+hash (documents + units); a frozen-components hash; and **dev-only configuration
+selection** (the weighted selection criterion never reads eval).
+
+**What this does NOT guarantee (honest disclosure):** the eval split was **not** an
+untouched independent holdout. During iterative engineering and debugging, eval outputs
+were inspected and the retrieval implementation was tuned (ranking weights, the score
+floor, concept idf-weighting, and gap-detection rules) while those eval metrics were
+visible. The gold labels remained withheld from the code and the *final* configuration
+selection used dev only, but the engineering loop saw eval behavior. This is therefore a
+**locked development evaluation, not a double-blind or interpreter-blind holdout**. A
+genuinely independent confirmation is listed under Future validation (§15a).
 
 ## 12. Limitations
 
@@ -162,25 +206,92 @@ dev/eval separation with no id or text overlap; duplicate detection; a corpus ha
 ## 13. Verdict
 
 **`PASS_WITH_LIMITED_CLAIM`.** All six preregistered gates pass for the selected
-configuration (F) on the locked eval split: full recall of authoritative evidence,
-complete provenance, authority coverage, correct gap detection (conflict + missing +
-no-authoritative), low false-evidence, and zero severe critical failures. **The claim is
-limited** to mechanism/construction validation on a small synthetic corpus with a
-deterministic semantic stand-in — not real-world retrieval quality or production
-readiness. The ladder is honest: hybrid > single-signal on ranking, provenance filtering
+configuration (F) on the locked development-evaluation split.
+
+**Supported claim (narrow).** The experiment demonstrates **a deterministic,
+provenance-preserving retrieval architecture with interpretable ranking, explicit gap
+detection, and typed `RetrievalRecord` generation on the synthetic evaluation corpus used
+in this study.** Concretely: full recall of authoritative evidence, complete provenance,
+authority coverage, correct gap detection (conflict + missing + no-authoritative), low
+false-evidence inclusion, and zero severe critical failures — on that corpus.
+
+**This experiment does not independently establish production retrieval performance or
+external generalization.** It is not evidence of real-world retrieval quality, does not
+use real embedding-based retrieval, and (per §11) was tuned against a locked *development*
+evaluation rather than an untouched holdout.
+
+The internal ladder is honest: hybrid > single-signal on ranking, provenance filtering
 removes unsourced evidence, gap detection is what eliminates hidden conflicts, and the
 full pipeline (F) only marginally edges the simpler gap-detecting hybrid (E).
 
-## 14. Next recommended layer (TAP-E3)
+## 14. Frozen interface — the `RetrievalRecord`
+
+The current `RetrievalRecord` schema (`schema.py`, `tap-e2-retrieval/1.0.0`) — with its
+evidence units, per-unit `EvidenceProvenance`, interpretable `RankingSignals`,
+multidimensional `RetrievalConfidence`, and typed `RetrievalGap`s — is hereby the
+**provisional frozen interface** for downstream TAP research.
+
+Future retrieval improvements should be **compared against this interface** rather than
+continuously redesigning it. Interface changes should occur **only if a later TAP layer
+exposes a genuine architectural deficiency** (a field it structurally needs and cannot
+derive), not for incidental convenience. Downstream layers should consume
+`RetrievalRecord` and `EvidenceProvenance` as a stable contract.
+
+## 15. Roadmap — next layer is TAP-E3 Relationship Truth
 
 Retrieval now supplies **evidence units with provenance, confidence, and explicit
-gaps** — but deliberately makes no judgment about whether that evidence *supports a
-claim*. The natural next layer is **TAP-E3 — Evidence / Claim Grounding**: given a
-`RetrievalRecord` (evidence units + gaps) and an `IntentRecord`, decide, per candidate
-claim, whether the retrieved evidence **supports, partially supports, contradicts, or is
-insufficient** — carrying the E2 provenance and gaps forward, and abstaining when E2
-reports `INSUFFICIENT_EVIDENCE` / `CONFLICTING_SOURCES`. It should reuse the E2
-`RetrievalRecord` and `EvidenceProvenance` as its frozen input interface, keep truth
-judgments strictly separated from retrieval, and be evaluated against a grounding corpus
-with support/contradiction/insufficient gold under the same locked-split + preregistered-
-gate discipline.
+gaps** — but deliberately makes no judgment about what those units mean *in relation to
+each other or to the entities in the request*. Determining whether a proposed **claim**
+is supported cannot come next, because claim support presupposes knowing **what
+relationship the evidence actually establishes**. That is the job of the next layer.
+
+**TAP-E3 — Relationship Truth** determines *what relationship the retrieved evidence
+actually establishes* among the entities involved, for example:
+
+`owns` · `licenses` · `depends on` · `supersedes` · `recommends` · `applies to` ·
+`prohibits` · `replaces` · `references`
+
+Only **after** relationships are established should later layers determine whether a
+proposed claim is actually supported (Claim Truth), whether policy permits an action
+(Governance Truth), and how to respond (Response Truth). TAP-E3 should consume the frozen
+`RetrievalRecord` / `EvidenceProvenance` (§14) as its input contract, carry E2 provenance
+and gaps forward, keep relationship judgments strictly separated from retrieval, and be
+evaluated under the same locked-split + preregistered-gate discipline.
+
+### Updated TAP roadmap
+
+```
+TAP-E1  Intent Understanding
+        ↓
+TAP-E2  Trusted Retrieval          ← this experiment (frozen interface: RetrievalRecord)
+        ↓
+TAP-E3  Relationship Truth         ← next layer
+        ↓
+TAP-E4  Governance Truth
+        ↓
+Evidence Packet
+        ↓
+Claim Truth
+        ↓
+Response Truth
+```
+
+## 15a. Future validation (goals, not achievements)
+
+None of the following is claimed here; each would constitute a stronger confirmation than
+this study provides:
+
+- **larger enterprise corpora** (thousands of documents, realistic length and noise);
+- **real embedding-based retrieval** (a neural dense retriever in place of the
+  deterministic concept-vector stand-in);
+- **independently authored evaluation sets** (queries and gold written by someone other
+  than the author of the retrieval implementation);
+- **untouched, interpreter-blind holdouts** (an eval split whose outputs are never
+  inspected during engineering — unlike the locked *development* evaluation used here);
+- **replication by another evaluator**;
+- **comparison against established retrieval systems** (e.g. BM25 libraries and
+  production dense-retrieval baselines) on shared benchmarks.
+
+These are future work. Only after independent, blind, and externally-benchmarked
+replication should the magnitude of these results be trusted or generalized beyond this
+synthetic corpus.

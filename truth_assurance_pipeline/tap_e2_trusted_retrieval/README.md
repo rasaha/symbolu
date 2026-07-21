@@ -8,12 +8,22 @@ relationship, authorization, claim, or response judgment and never answers the u
 > If retrieval starts making truth/claim/policy judgments, that logic belongs in a later
 > TAP layer (see TAP-E3 recommendation in the report).
 
+## "Trusted" means (narrow)
+
+Provenance-bearing, reproducible, attributable, traceable, confidence-scored, and
+gap-aware. It does **not** yet mean the evidence is factually correct, authoritative,
+applicable, sufficient for claim support, or free of contradiction — those belong to
+later TAP layers (see the report, §1a).
+
 ## Honesty (read first)
 
 - New synthetic enterprise corpus; no TAP-E1 prompt reused.
 - **"Dense semantic retrieval" is a deterministic idf-weighted concept-vector stand-in,
   NOT neural embeddings.** Results are mechanism/construction validation on synthetic
   text only — not real-world retrieval quality or production readiness.
+- The eval split was content-hash locked and the configuration preregistered, but eval
+  outputs were inspected during iterative engineering — a **locked development
+  evaluation, not an untouched/interpreter-blind holdout** (not double-blind).
 
 ## Layout
 
@@ -60,5 +70,11 @@ for g in rec.gaps:
 ## Result
 
 Selected baseline **F** (full pipeline; E effectively tied). All six preregistered gates
-pass on the locked eval split; verdict **`PASS_WITH_LIMITED_CLAIM`**. See
+pass on the locked development-evaluation split; verdict **`PASS_WITH_LIMITED_CLAIM`**.
+Supported claim (narrow): a deterministic, provenance-preserving retrieval architecture
+with interpretable ranking, explicit gap detection, and typed `RetrievalRecord` generation
+on this study's synthetic corpus — it does **not** independently establish production
+retrieval performance or external generalization. The `RetrievalRecord` schema is the
+provisional frozen downstream interface; the **next layer is TAP-E3 — Relationship
+Truth**. See
 [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e2_trusted_retrieval/EXPERIMENT_REPORT.md).
