@@ -1,0 +1,79 @@
+{
+  "corpus": {
+    "all_inputs_hash": "698ee7f8683bbd0d17f9efaca9d7454d779965469554988ce718f0e657bccec1",
+    "eval_lock": {
+      "eval_inputs_hash": "25264cef53ba2f7d64922d6938ef0de4841c32e6cd5621dd9ec993df5ca6eebc",
+      "n_eval": 19,
+      "per_case_hash": "32f4f634299116e24c18769b2f3350ec1f74016556c99b7f21fbd714efae99e1"
+    },
+    "family_distribution": {
+      "adversarial": 6,
+      "conflicting": 6,
+      "context_dependent": 6,
+      "dates_numbers": 7,
+      "doc_create": 5,
+      "doc_edit": 7,
+      "factual_simple": 8,
+      "implied_assumptions": 4,
+      "minor_ambiguity_no_clarify": 5,
+      "multipart": 6,
+      "negative_controls": 5,
+      "prohibitions": 9,
+      "repo_mod": 7,
+      "underspecified": 5
+    },
+    "n_cases": 86,
+    "split_distribution": {
+      "adversarial": 6,
+      "dev": 56,
+      "eval": 19,
+      "negative": 5
+    }
+  },
+  "frozen_components_hash": "8d21744690a4109df87a49a8a459b5e4728847dff0b0efe174d31567de0a25e3",
+  "gates": [
+    {
+      "gate": "explicit_constraint_preservation",
+      "op": ">=",
+      "pass": true,
+      "rationale": "explicit user constraints must be preserved, not dropped",
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "unsupported_assumption_rate",
+      "op": "<=",
+      "pass": true,
+      "rationale": "the layer must rarely introduce content the user did not provide",
+      "threshold": 0.15,
+      "value": 0.0
+    },
+    {
+      "gate": "material_ambiguity_recall",
+      "op": ">=",
+      "pass": true,
+      "rationale": "materially different interpretations must be detected",
+      "threshold": 0.8,
+      "value": 1.0
+    },
+    {
+      "gate": "unnecessary_clarification_rate",
+      "op": "<=",
+      "pass": true,
+      "rationale": "the layer must not over-ask on harmless ambiguity",
+      "threshold": 0.15,
+      "value": 0.0
+    },
+    {
+      "gate": "severe_failure_count",
+      "op": "==",
+      "pass": true,
+      "rationale": "no critical (Section 17) failures on the hidden set for the chosen config",
+      "threshold": 0.0,
+      "value": 0.0
+    }
+  ],
+  "schema_version": "tap-e1-intent/1.0.0",
+  "selected_config": "V4",
+  "verdict": "PASS_WITH_LIMITED_CLAIM"
+}
