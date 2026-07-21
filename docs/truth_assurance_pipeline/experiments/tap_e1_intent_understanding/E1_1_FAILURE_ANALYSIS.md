@@ -5,6 +5,11 @@ TAP-E1): invented actions, invented constraints/entities, dropped prohibitions,
 unsupported assumptions, incorrect conflict resolution, silent ambiguity resolution,
 provenance errors, clarification errors.
 
+> All LLM counts below reflect the **author==interpreter confound**: the same
+> in-session model authored the corpus and produced the interpretations, and the locked
+> eval was seen by the interpreter (not double-blind). These are integration findings,
+> not independent model-capability measurements. See the [experiment report](./E1_1_EXPERIMENT_REPORT.md) §2/§5.
+
 ## Severe-failure counts (v1.1 corpus)
 
 | split | A raw | B | C | D (selected) | E | F | DET V4 | DET V0 |
@@ -26,7 +31,8 @@ is not a safe interface, regardless of model quality.*
 "off the table" are missed → constraint preservation 0.60) and, on adversarial prompts,
 `resolved_material_ambiguity_without_evidence` (7 severe): the lexical ambiguity detector
 does not fire on "as approved…", "the usual files", "make it say we're certified", so it
-commits. This is the concrete gap the real model closes.
+commits. This is the concrete gap the LLM-backed configuration closes under the
+conditions tested.
 
 **Selected D (LLM + extraction + provenance).** Zero severe failures on eval,
 adversarial, and negative. The model paraphrases the objective and the corrected
@@ -57,7 +63,7 @@ result seen in TAP-E1.
 - `primary_objective_accuracy` 0.75 for the LLM (vs 1.00 deterministic) is a **scoring
   artifact** of keyword-based objective matching penalizing paraphrase; a semantic
   scorer would likely erase this gap.
-- Coverage is bounded (68 real-model interpretations; dev sample 20/53) and the corpus
+- Coverage is bounded (68 LLM interpretations; dev sample 20/53) and the corpus
   is smaller than target — statistical power is limited.
 - The **author==interpreter confound** may inflate every LLM number; an independent
   interpreter/author is required to trust the magnitude of the improvement.

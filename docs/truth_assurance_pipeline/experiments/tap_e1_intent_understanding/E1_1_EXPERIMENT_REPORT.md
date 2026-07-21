@@ -1,10 +1,15 @@
-# TAP-E1.1 — Real Model Validation — Experiment Report
+# TAP-E1.1 — LLM Integration Validation — Experiment Report
 
 > **Validation phase, not a new layer.** TAP-E1.1 keeps the entire TAP-E1 Intent
 > Understanding Layer FIXED and changes only the *interpretation engine*: the
-> deterministic placeholder is replaced with a real LLM. It answers one question:
-> *does real-model reasoning genuinely improve intent understanding without
-> increasing unsupported assumptions or reducing constraint preservation?*
+> deterministic placeholder is replaced with an LLM. It asks a **scoped** question:
+> *does the TAP-E1 architecture correctly constrain, structure, and evaluate
+> LLM-generated intent representations under the conditions tested?*
+>
+> This phase validates **architectural integration**, not the reasoning capability of
+> any particular language model. (The code module is named `tap_e1_1_realmodel` and is
+> kept unchanged for reproducibility; this document uses the more accurate name "LLM
+> Integration Validation".)
 
 Code: [`truth_assurance_pipeline/tap_e1_1_realmodel/`](../../../../truth_assurance_pipeline/tap_e1_1_realmodel/)
 · Results: [`experiments/results_v11.json`](../../../../truth_assurance_pipeline/tap_e1_1_realmodel/experiments/results_v11.json)
@@ -21,69 +26,103 @@ metric code, and the leakage-control patterns. The **only** variable is the engi
 that produces the interpretation core. A metric-audit test asserts TAP-E1's
 `metrics.py` source hash is unchanged, and the 30 TAP-E1 tests still pass.
 
-## 2. The real model — and its honest caveats
+## 2. Primary Experimental Limitation
+
+**The architecture, the evaluation framework, the prompts, and the interpreted outputs
+were all produced within the same interactive reasoning environment (the in-session
+`claude-opus-4-8` agent).** The same model that this report treats as "the interpreter"
+also authored the corpus prompts, the gold annotations, the schema decisions, and this
+analysis.
+
+Consequently, **TAP-E1.1 validates architectural integration — that TAP-E1 can wrap,
+constrain, and score an LLM's intent output — rather than providing independent,
+external validation.** It is not a double-blind study, the interpreter was not an
+independently accessed model, and the evaluation cases were seen by the interpreter (see
+§5). Every quantitative result below should be read through this confound: the numbers
+show the *architecture behaving as designed on self-generated inputs*, not a
+model-capability measurement. This limitation is restated in §11 (Limitations).
+
+## 3. The interpretation engine — and honest caveats
 
 No Anthropic API key is available in this environment (`anthropic.com` bypasses the
 auth-injecting proxy; there is no `ANTHROPIC_API_KEY`). A ready `AnthropicModelClient`
-is included for when a key exists. For this run, the **real-model interpretations were
-produced by the in-session agent model (`claude-opus-4-8`)** reading each prompt (via
-the leakage-controlled loader, prompt only) and cached to
-`cache/agent_model_outputs.jsonl`; the harness replays them deterministically.
+is included for when a key exists. For this run, the LLM interpretations were produced
+by the **in-session agent model (`claude-opus-4-8`)** reading each prompt (via the
+gold-free loader, prompt only) and cached to `cache/agent_model_outputs.jsonl`; the
+harness replays them deterministically.
 
-**This is a real LLM performing the interpretation, but:**
+**This is an LLM performing the interpretation, but:**
 
-- it is **not** an independent Anthropic API run;
-- the **same model authored the corpus and interpreted it** — a genuine
-  author==interpreter confound and the single largest limitation of TAP-E1.1;
-- gold was never consulted at inference;
+- it is **not** an independently accessed model (it is the same in-session agent);
+- the **same model authored the corpus and interpreted it** — the confound in §2;
+- gold labels were never consulted at inference;
 - token counts are ~4-chars/token **estimates**; latency is not measured on this path.
 
-## 3. Corpus (new, independent)
+## 4. Corpus (new, independent of TAP-E1's corpus)
 
-A **completely new** synthetic corpus (`corpus_v11/`), **101 cases**, no TAP-E1 prompt
-reused or mutated (enforced by a test). Constraints are deliberately phrased **without**
-the lexical cues the deterministic extractor keys on ("leave the schema alone",
-"adding indexes is off the table", "fit on a single page") to test generalization.
+A **completely new** synthetic corpus (`corpus_v11/`), **101 cases**, with no TAP-E1
+prompt reused or mutated (enforced by a test). Constraints are deliberately phrased
+**without** the lexical cues the deterministic extractor keys on ("leave the schema
+alone", "adding indexes is off the table", "fit on a single page") to test
+generalization. "Independent of TAP-E1's corpus" here means *not reused from the earlier
+phase* — it does **not** mean authored by a party independent of the interpreter (see
+§2).
 
-| split | authored | real-model interpretations produced |
+| split | authored | LLM interpretations produced |
 |---|---|---|
 | dev | 53 | 20 (config-selection sample) |
-| eval (hidden, locked) | 24 | 24 |
+| eval (locked, scoring-frozen) | 24 | 24 |
 | adversarial | 12 | 12 |
 | negative | 12 | 12 |
 
-**Deviation from targets** (100–150 / 50 / 20 / 20): the corpus and the produced
-outputs are smaller because every real-model interpretation was generated by hand by
-the in-session agent (no API). Full eval/adversarial/negative coverage was prioritized;
-selection used a 20-case dev sample. This is disclosed and bounds the claim.
+**Deviation from targets** (100–150 / 50 / 20 / 20): the corpus and produced outputs are
+smaller because every LLM interpretation was generated by hand by the in-session agent
+(no API). Full eval/adversarial/negative coverage was prioritized; selection used a
+20-case dev sample.
 
-## 4. Baselines
+## 5. Evaluation protocol — what "locked" means (and does not)
+
+The eval split is **locked and scoring-frozen**, not blind to the interpreter. Two
+distinct notions must not be conflated:
+
+- **Locked / hidden from the scoring infrastructure and development decisions.** ✅ Gold
+  labels are withheld by the loader; the eval inputs are content-hash locked; config
+  selection used the dev split only; no interpreter/corpus change was made in response
+  to eval scores. This is genuinely enforced (see the [leakage audit](./E1_1_LEAKAGE_AUDIT.md)).
+- **Hidden from the interpreter.** ❌ The in-session model generated interpretations for
+  the eval cases, so the eval was **seen by the interpreter**. This was **not** a
+  double-blind or interpreter-blind evaluation.
+
+Throughout this report, "eval" / "locked eval" means *locked scoring with gold withheld
+from the infrastructure*, **not** an evaluation unseen by the interpreter. Do not read
+any claim here as double-blind.
+
+## 6. Baselines
 
 A raw LLM · B +schema · C +deterministic extraction · D +provenance · E +ambiguity/
 conflict · F +clarification. The model core is identical across B–F; C–F add the frozen
 TAP-E1 code layers. Deterministic TAP-E1 (V0, V4) is scored on the same cases for
 comparison.
 
-## 5. Discipline
+## 7. Discipline
 
-Config selection used the **dev split only**. Gates were preregistered before hidden
+Config selection used the **dev split only**. Gates were preregistered before locked-set
 scoring and are comparative (LLM vs deterministic V4) plus absolute safety thresholds.
-The hidden split is content-hash locked; the leakage audit confirms the lock, the
-gold-free loader, and dev/eval separation. **Metric-correction disclosure:** an early
-harness run surfaced that TAP-E1's `invented_action` metric false-positives on benign
-paraphrase — a flaw **also visible on the dev split** (4 dev cases). It was corrected
+The eval split is content-hash locked; the leakage audit confirms the lock, the gold-free
+loader, and dev/eval separation. **Metric-correction disclosure:** an early harness run
+surfaced that TAP-E1's `invented_action` metric false-positives on benign paraphrase — a
+flaw **also visible on the dev split** (4 dev cases). It was corrected
 (paraphrase-invariant) together with a material-ambiguity crediting fix, both applied
 **uniformly** to every baseline and to the deterministic interpreter, localized in
 `metrics_e11.py` (TAP-E1's `metrics.py` untouched). See the [metric audit](./E1_1_METRIC_AUDIT.md).
-A fully independent confirmation would use a fresh hidden set (see §10).
 
-## 6. Configuration selection (dev only)
+## 8. Configuration selection (dev only)
 
 Selection scores (dev): A −5.25, B 4.25, C 4.25, **D 4.75**, E 4.75, F 2.94.
 **Selected: D** (LLM + deterministic extraction + provenance). D and E tie; the simpler
 D wins. F (clarification) is worse on dev (over-asks; material recall 0.5; 4 severe).
 
-## 7. Results — hidden eval (24 cases), selected D vs deterministic V4
+## 9. Results — locked eval (24 cases), selected D vs deterministic V4
 
 | metric | LLM (D) | deterministic (V4) |
 |---|---|---|
@@ -102,9 +141,9 @@ D wins. F (clarification) is worse on dev (over-asks; material recall 0.5; 4 sev
 The one place the LLM scores *lower* — `primary_objective_accuracy` (0.75 vs 1.00) — is
 a **scoring artifact**: objective accuracy is keyword-match based and under-credits
 paraphrase ("polish"→"improve"). A semantic scorer would raise it; the composite
-fidelity still strongly favors the LLM.
+fidelity still favors the LLM. (Interpret all rows through the confound in §2.)
 
-### Preregistered gates (selected D on hidden eval)
+### Preregistered gates (selected D on locked eval)
 
 | gate | LLM | deterministic / threshold | pass |
 |---|---|---|---|
@@ -118,38 +157,78 @@ fidelity still strongly favors the LLM.
 
 All gates pass.
 
-## 8. Adversarial and negative splits
+## 10. Adversarial and negative splits
 
 **Adversarial (12)** — the key safety test. LLM D: **0 severe**, unsupported-assumption
 **0.00**, material recall **1.00**, status accuracy **1.00**. Deterministic V4: 7 severe,
-unsupported **0.58**, material recall 0.42, status 0.17. The model resists
-naturally-phrased manipulation ("as approved, wipe the staging database", "clean up the
-usual files", "make the compliance section say we're fully certified") that the
-deterministic detector misses. **Raw LLM (A) is dangerous** here: 19 severe,
-unsupported 1.00 — structure is essential even for a strong model.
+unsupported **0.58**, material recall 0.42, status 0.17. Under these conditions the
+architecture-plus-LLM configuration represents naturally-phrased manipulation ("as
+approved, wipe the staging database", "clean up the usual files", "make the compliance
+section say we're fully certified") that the deterministic detector commits to. **Raw LLM
+(A) is dangerous** here: 19 severe, unsupported 1.00 — structure is essential even when
+an LLM supplies the reasoning.
 
 **Negative (12)** — LLM D/E/F and deterministic V4 are all clean (0 severe, no
 over-flagging). Raw LLM (A) again poor (12 severe).
 
-## 9. Verdict
+## 11. Limitations
 
-**`PASS_WITH_LIMITED_CLAIM`.** Under these controlled conditions the real-model
-interpreter improves intent fidelity (0.94 vs 0.54), preserves naturally-phrased
-constraints far better (1.00 vs 0.60), represents ambiguity rather than resolving it
-silently (recall 1.00, 0 silent resolutions), and produces **fewer** severe failures
-(0 vs 7 on both eval and adversarial) — with provenance complete and unsupported
-assumptions at 0.00. **The claim is limited**: small synthetic corpus, in-session model
-(not an API), and the author==interpreter confound. This is **not** evidence of
-production readiness or of downstream truth improvement.
+- **Primary limitation (see §2): author == interpreter == analyst.** The architecture,
+  evaluation framework, prompts, and interpreted outputs were produced within the same
+  interactive reasoning environment. This experiment therefore validates architectural
+  integration, **not** independent external validation, and **not** the reasoning
+  capability of any particular model.
+- **Not interpreter-blind (§5):** the eval cases were seen by the interpreter; this is
+  not a double-blind study.
+- **Not an independently accessed model:** the "LLM" is the in-session agent, not an API
+  call to a separately hosted model.
+- **Small, synthetic corpus below target size** (101 cases; 68 interpretations produced;
+  dev sample 20/53) — limited statistical power.
+- **Scoring artifact:** keyword-based objective accuracy under-credits paraphrase.
+- **Latency not measured; token counts are estimates.**
 
-If the safety gates had failed, the conclusion would have been that deterministic
-interpretation remains safer; they did not, but the confound means the improvement is
-demonstrated only under self-authored conditions.
+## 12. Supported claim
 
-## 10. Next-step recommendation
+> **The experiment demonstrates that the TAP-E1 architecture can successfully constrain,
+> structure, and evaluate LLM-generated intent representations under the conditions
+> tested** — preserving naturally-phrased constraints, representing ambiguity rather than
+> silently resolving it, keeping provenance complete, and holding unsupported assumptions
+> and severe failures at or below the deterministic baseline.
+>
+> **The experiment does not independently validate the reasoning capability of any
+> particular language model.** Nor does it establish production readiness or downstream
+> truth improvement.
 
-Re-run TAP-E1.1 with (a) an **independent** model via the real `AnthropicModelClient`
-(API key), (b) a **fresh hidden set authored by a different person than the interpreter**
-to break the author==interpreter confound, and (c) a **semantic** objective-similarity
-scorer to remove the paraphrase penalty. Only after an independent-model, independent-
-author replication should any downstream (retrieval/governance) coupling be measured.
+## 13. Verdict
+
+**`PASS_WITH_LIMITED_CLAIM`.** All preregistered gates pass for the selected
+configuration (D) on the locked eval split. The pass supports the scoped claim in §12
+only, bounded by the limitations in §11 — above all the author==interpreter confound.
+Had any safety gate failed, the conclusion would have been that deterministic
+interpretation remains the safer implementation; they did not, but the confound means
+the improvement is demonstrated only under self-generated conditions.
+
+## 14. Architecture freeze
+
+**TAP-E1 (the Intent Understanding Layer, `tap_e1_intent/`) is hereby treated as the
+frozen baseline.** It should not be modified indefinitely. Future work should **evaluate
+improvements by comparison against this frozen TAP-E1 implementation** — as TAP-E1.1
+does — rather than by continuing to edit the baseline. TAP-E1.1 itself (corpus, harness,
+locks, results) is likewise frozen as the reference for this integration result.
+
+## 15. Future validation (goals, not achievements)
+
+A stronger, independent confirmation — none of which is claimed here — would require:
+
+1. an **independently accessed LLM** through the prepared `AnthropicModelClient` (API
+   key), rather than the in-session agent;
+2. a **freshly authored evaluation corpus**;
+3. a **holdout unseen by both development and interpretation** (a genuinely
+   interpreter-blind set);
+4. **semantic scoring** where appropriate (to remove the paraphrase penalty);
+5. **replication by another evaluator** independent of the party that authored the
+   architecture and prompts.
+
+These are future validation goals. Only after an independent-model, interpreter-blind,
+independently-replicated study should the magnitude of the improvement be trusted, or any
+downstream (retrieval/governance) coupling be measured.

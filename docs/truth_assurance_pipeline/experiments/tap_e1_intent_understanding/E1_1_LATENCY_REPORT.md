@@ -13,14 +13,14 @@ overhead.
 - Deterministic-layer overhead is real Python execution time on the cached cores and is
   negligible relative to any model call.
 
-## Model cost (estimated, hidden eval, per case)
+## Model cost (estimated, locked eval, per case)
 
 | item | value |
 |---|---|
 | prompt tokens / case | ~454 |
 | completion tokens / case | ~121 |
 | total tokens / case | ~575 |
-| total tokens, 24 hidden cases | ~13,790 |
+| total tokens, 24 locked-eval cases | ~13,790 |
 | model calls / case | **1** (all of B–F reuse one core) |
 
 Baselines B, C, D, E, F cost the **same** model tokens — the interpretation core is

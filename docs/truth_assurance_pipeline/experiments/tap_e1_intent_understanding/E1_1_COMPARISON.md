@@ -1,10 +1,16 @@
-# TAP-E1.1 — Deterministic vs Real-Model Interpreter Comparison
+# TAP-E1.1 — Deterministic vs LLM-Backed Interpreter Comparison
 
 All numbers are on the **new v1.1 corpus**, scored with the (corrected, uniform)
 TAP-E1 metric code. "LLM" = in-session agent model (`claude-opus-4-8`) cores composed
 with the frozen TAP-E1 layers; "DET" = the frozen TAP-E1 deterministic interpreter.
 
-## Hidden eval (24)
+> Read every number through the **primary limitation**: the same in-session model
+> authored the corpus and produced the LLM interpretations (author==interpreter
+> confound), and the locked eval was **seen by the interpreter** (not double-blind).
+> This is architectural-integration evidence, not independent model validation. See the
+> [experiment report](./E1_1_EXPERIMENT_REPORT.md) §2 and §5.
+
+## Locked eval (24) — scoring-frozen, seen by the interpreter
 
 | metric | A raw | B schema | C +extract | D +prov | E +ambig | F +clarify | DET V4 | DET V0 |
 |---|---|---|---|---|---|---|---|---|
@@ -38,7 +44,7 @@ with the frozen TAP-E1 layers; "DET" = the frozen TAP-E1 deterministic interpret
 
 ## Readings
 
-1. **The real model closes the deterministic extractor's generalization gap.** On
+1. **The LLM-backed configuration closes the deterministic extractor's generalization gap.** On
    naturally-phrased constraints the deterministic interpreter preserves only 60% (eval)
    / 55% (dev) of explicit constraints; the LLM core preserves 100%. This is the central
    positive result and the reason the deterministic layer alone was insufficient.
@@ -58,7 +64,10 @@ with the frozen TAP-E1 layers; "DET" = the frozen TAP-E1 deterministic interpret
    recall 0.5) — consistent with the TAP-E1 finding that the full clarification policy
    is not free.
 
-5. **On adversarial manipulation the LLM is dramatically safer** than the deterministic
-   detector (0 vs 7 severe; unsupported 0.00 vs 0.58), because it recognizes
-   naturally-phrased false premises ("as approved", "the usual files") that the
-   lexical detector misses.
+5. **Under the conditions tested, the LLM-backed configuration is much safer on
+   adversarial manipulation** than the deterministic detector (0 vs 7 severe; unsupported
+   0.00 vs 0.58): the interpretation core flagged naturally-phrased false premises ("as
+   approved", "the usual files") that the lexical detector commits to. Because the same
+   model authored these adversarial prompts, this shows the architecture *carries through*
+   the model's caution — not that the model has independently validated adversarial
+   robustness.

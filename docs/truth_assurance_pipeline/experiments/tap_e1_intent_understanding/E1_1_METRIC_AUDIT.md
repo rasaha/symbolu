@@ -44,8 +44,8 @@ every baseline and to the deterministic interpreter.
 
 ## What was NOT changed
 
-- No threshold was altered after seeing hidden results (thresholds are in
-  `preregistration_v11.json`, fixed before hidden scoring).
+- No threshold was altered after seeing locked-set results (thresholds are in
+  `preregistration_v11.json`, fixed before locked-set scoring).
 - Severe failures remain reported independently from aggregate scores.
 - Ambiguity and conflict remain separate metric channels (a fix carried over from
   TAP-E1: `material_ambiguity_recall` excludes `CONFLICTING`).
