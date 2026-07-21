@@ -52,6 +52,21 @@ python -m pytest truth_assurance_pipeline/tap_e3_relationship_truth/tests/ -q
 
 Selected baseline **F** (the simplest satisfying all preregistered gates — the conflict/
 gap/severe gates require it). All eleven gates pass on the locked eval split; verdict
-**`PASS_WITH_LIMITED_CLAIM`**. The `RelationshipRecord` schema is the provisional frozen
-downstream interface; the **next layer is TAP-E4 — Governance Truth**. See
+**`PASS_WITH_LIMITED_CLAIM`**.
+
+**Supported claim (narrow):** a deterministic, provenance-preserving architecture for
+extracting and normalizing relationships expressed by retrieved evidence — including
+direction, polarity, modality, temporality, scope, conditions, exceptions, conflicts,
+attribution, and unresolved gaps — on this study's synthetic corpus. It does **not**
+independently establish production-grade semantic understanding, real-world factual
+correctness, or external generalization, and does **not** verify whether the source itself
+is true.
+
+Note on metrics: `relationship_f1`/`recall` are **end-to-end** (missing gold relationships
+lower them); triple/full-structure/predicate accuracies are computed **only over matched
+pairs**, so a perfect matched-structure score does not mean full recovery (see
+[METRICS](../../docs/truth_assurance_pipeline/experiments/tap_e3_relationship_truth/METRICS.md)).
+
+The `RelationshipRecord` schema is the provisional frozen downstream interface; the **next
+layer is TAP-E4 — Governance Truth**. See
 [`EXPERIMENT_REPORT.md`](../../docs/truth_assurance_pipeline/experiments/tap_e3_relationship_truth/EXPERIMENT_REPORT.md).

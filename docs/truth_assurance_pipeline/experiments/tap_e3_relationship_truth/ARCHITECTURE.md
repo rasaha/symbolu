@@ -16,6 +16,19 @@ evidence). It **must not** decide "Policy A is the controlling policy for this c
 in this situation" (Governance Truth), nor whether a final claim is justified (Claim
 Truth), nor answer the user.
 
+### What "Relationship Truth" includes and does not mean
+
+*Relationship Truth* = **faithful, provenance-preserving representation of the relationship
+expressed by retrieved evidence.** It **includes** preserving: who/what is the subject;
+what predicate is asserted; who/what is the object; direction; negation; modality;
+attribution; temporality; scope; conditions; exceptions; conflicts; and uncertainty.
+
+It does **not** mean any of: independent factual verification · source-reliability
+adjudication · governance applicability · legal interpretation · final claim truth ·
+response validation. Those responsibilities belong to later TAP layers (Governance Truth,
+Claim Truth, Response Truth) — see the "Relationship Representation Is Not Source
+Verification" section of the EXPERIMENT_REPORT.
+
 ## Position in the stack
 
 ```

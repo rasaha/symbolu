@@ -33,7 +33,21 @@ fixes direction; polarity/modality (D) preserve negation and `must`≠`may`; tem
 scope/conditions (E) complete per-assertion structure and preserve upstream gaps; only the
 full pipeline (F) detects cross-evidence conflicts and reaches zero severe failures.
 
+**Supported claim (narrow):** a deterministic, provenance-preserving architecture for
+extracting and normalizing relationships expressed by retrieved evidence — including
+direction, polarity, modality, temporality, scope, conditions, exceptions, conflicts,
+**attribution**, and unresolved gaps — on this study's synthetic corpus. It does **not**
+establish production-grade semantic understanding, real-world factual correctness, or
+external generalization, and does **not** verify whether the source is true (see the
+"Relationship Representation Is Not Source Verification" section of the report).
+
+**Metric note:** `relationship_f1`/`recall` are **end-to-end** (missing gold relationships
+lower them); triple/full-structure/predicate accuracies are **matched-only** (denominator =
+matched pairs), so a perfect matched score is not full recovery — documentation uses
+display labels `matched_*` while artifact keys are unchanged.
+
 **Honesty:** synthetic corpus; deterministic pattern-based extraction over parseable
-sentences (not general NLU); locked **development** evaluation inspected during iteration.
+sentences (not general NLU); locked **development** evaluation inspected during iteration
+(implementation changes followed some observed eval failures — see LEAKAGE_AUDIT).
 Mechanism/construction validation only. TAP-E1 and TAP-E2 are unchanged. Next layer:
 **TAP-E4 — Governance Truth**.

@@ -10,10 +10,18 @@ Code: [`truth_assurance_pipeline/tap_e3_relationship_truth/`](../../../../truth_
 · Prereg: [`experiments/preregistration.json`](../../../../truth_assurance_pipeline/tap_e3_relationship_truth/experiments/preregistration.json)
 · Companions: [ARCHITECTURE](./ARCHITECTURE.md) · [ONTOLOGY](./ONTOLOGY.md) · [SCHEMA](./SCHEMA.md) · [CORPUS](./CORPUS.md) · [METRICS](./METRICS.md) · [FAILURE_ANALYSIS](./FAILURE_ANALYSIS.md) · [LEAKAGE_AUDIT](./LEAKAGE_AUDIT.md)
 
-> **Evaluation protocol (read first).** The eval split was content-hash locked and the
-> configuration preregistered, but eval outputs were inspected during iterative
-> engineering. This is a **locked development evaluation, not an untouched or
-> interpreter-blind holdout** (not double-blind). See LEAKAGE_AUDIT.
+> **Evaluation protocol (read first).** For the recorded run the eval split was
+> **content-hash locked** and the **ontology, normalization rules, metric definitions, and
+> baseline configuration were frozen**. However, **evaluation outputs were inspected during
+> iterative engineering and debugging, and implementation changes followed some observed
+> evaluation failures** (e.g. unit-level co-occurrence gap handling, predicate-lexicon
+> additions such as `depended on`, historical-dependency handling, cross-segment subject
+> inheritance, consolidation-key behavior, numeric value extraction for conflict detection,
+> deterministic tie-breaking, and test-data corrections). These are ordinary iterative
+> mechanism development, not misconduct — but they mean the reported evaluation is a
+> **locked *development* evaluation, not an untouched independent holdout**, and it was
+> **not interpreter-blind or double-blind**. The verdict (`PASS_WITH_LIMITED_CLAIM`) and
+> all numeric results are unchanged by this disclosure. See LEAKAGE_AUDIT.
 
 ---
 
@@ -71,16 +79,23 @@ direction) · D +polarity/modality · E +temporality/scope/conditions/exceptions
 
 ## 7. Results — locked eval (12 cases)
 
-| metric | A | B | C | D | E | **F** |
+Display labels below make the metric denominators explicit. The stored result keys in
+`results_v3.json` are unchanged for reproducibility (`exact_triple_accuracy`,
+`full_structure_accuracy`, `predicate_accuracy`, …); this table uses clearer *display*
+names for the conditional (matched-only) metrics — see the denominator note under the
+table and [METRICS](./METRICS.md).
+
+| metric (display label) | A | B | C | D | E | **F** |
 |---|---|---|---|---|---|---|
-| relationship_f1 | 0.00 | 0.95 | 0.95 | 0.95 | 0.95 | **0.95** |
-| predicate_accuracy | 0.00 | 1.00 | 1.00 | 1.00 | 1.00 | **1.00** |
-| direction_accuracy | 0.91 | 0.90 | 1.00 | 1.00 | 1.00 | **1.00** |
-| polarity_accuracy | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | **1.00** |
-| modality_accuracy | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | **1.00** |
-| temporality_accuracy | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | **1.00** |
-| exact_triple_accuracy | 0.00 | 0.90 | 1.00 | 1.00 | 1.00 | **1.00** |
-| full_structure_accuracy | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | **1.00** |
+| relationship_f1 *(end-to-end)* | 0.00 | 0.95 | 0.95 | 0.95 | 0.95 | **0.95** |
+| relationship_recall *(end-to-end)* | 0.00 | 0.91 | 0.91 | 0.91 | 0.91 | **0.91** |
+| matched_predicate_accuracy | 0.00 | 1.00 | 1.00 | 1.00 | 1.00 | **1.00** |
+| direction_accuracy *(matched)* | 0.91 | 0.90 | 1.00 | 1.00 | 1.00 | **1.00** |
+| polarity_accuracy *(matched)* | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | **1.00** |
+| modality_accuracy *(matched)* | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | **1.00** |
+| temporality_accuracy *(matched)* | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | **1.00** |
+| matched_triple_accuracy | 0.00 | 0.90 | 1.00 | 1.00 | 1.00 | **1.00** |
+| matched_full_structure_accuracy | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | **1.00** |
 | provenance_completeness | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | **1.00** |
 | conflict_detection_f1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **1.00** |
 | gap_detection_accuracy | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | **1.00** |
@@ -88,9 +103,24 @@ direction) · D +polarity/modality · E +temporality/scope/conditions/exceptions
 | unsupported_relationship_rate | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.00** |
 | **severe_critical_failure_count** | 8 | 3 | 2 | 2 | 1 | **0** |
 
-(relationship_f1 caps at 0.95 because one eval sentence — "Engineers should review the
-design document" — uses a verb outside the bounded lexicon and yields no assertion; an
-honest recall miss, above the 0.80 gate.)
+**Metric denominators — do not read the matched-only metrics as end-to-end accuracy.**
+`relationship_precision/recall/f1` are **end-to-end detection** metrics: recall penalizes
+every missing gold relationship. The triple / full-structure / predicate accuracies are
+computed **only over successfully matched predicted↔gold pairs**:
+
+```
+relationship_recall        = correctly recovered gold relationships ÷ all gold relationships
+matched_triple_accuracy    = correct subject–predicate–object triples ÷ number of matched pairs
+matched_full_structure_acc = fully-correct assertions (all dimensions) ÷ number of matched pairs
+```
+
+So a **perfect matched-structure score does not mean every gold relationship was
+recovered.** In this run `relationship_recall = 0.91` and `f1 = 0.95` because one eval
+sentence — "Engineers should review the design document" — uses a verb outside the bounded
+lexicon and yields **no** assertion (an honest recall miss, above the 0.80 gate); yet
+every *matched* assertion is structurally correct, so `matched_triple_accuracy` and
+`matched_full_structure_accuracy` are 1.00. The two families measure different things and
+must not be conflated.
 
 ### Preregistered gates — selected config F (locked eval)
 
@@ -142,25 +172,92 @@ upstream-gap-ignoring persists until the gap stage (E). See FAILURE_ANALYSIS.
 - No model-based interpreter in this phase (kept behind the baseline abstraction for
   future comparison).
 
+## 9a. Relationship Representation Is Not Source Verification
+
+TAP-E3 determines **what relationship the retrieved evidence asserts, qualifies, negates,
+alleges, conditions, supersedes, or contradicts.** It does **not** determine whether the
+source's assertion is factually true in the real world, which source is authoritative, or
+which rule governs the current case.
+
+- **Attribution.** Evidence "The audit alleges that Vendor A caused the outage." → E3
+  preserves attribution and modality (`Vendor A --CAUSES--> outage`, **modality: ALLEGED**,
+  attributed to the audit). E3 must **not** silently convert this into an unqualified
+  real-world fact (`Vendor A --CAUSES--> outage`, asserted). The `ALLEGATION_TREATED_AS_FACT`
+  critical guards this.
+- **Governance.** Evidence "Policy A applies to contractors." → E3 may represent
+  `Policy A --APPLIES_TO--> contractors`. It must **not** yet decide "Policy A is the
+  controlling policy for this contractor in the current case" — that is **TAP-E4 Governance
+  Truth**.
+- **Historical.** Evidence "System A previously depended on Library B." → E3 preserves
+  `DEPENDS_ON` with **temporality: HISTORICAL**; it must **not** present the dependency as
+  current. The `SUPERSEDED_RELATION_TREATED_AS_CURRENT` critical guards this.
+
+Conflict detection identifies **incompatible evidence-stated relationships**; it does **not
+adjudicate which source wins.** For "passwords must be ≥12 characters" vs "≥14 characters"
+E3 emits a `VALUE_CONFLICT` and stops there — authority hierarchy, applicability,
+supersession control, jurisdiction, and governing-rule selection belong to TAP-E4.
+
 ## 10. Verdict
 
 **`PASS_WITH_LIMITED_CLAIM`.** All eleven preregistered gates pass for the selected
-baseline (F) on the locked eval split. **Supported claim:** *TAP-E3 demonstrates a
-deterministic, provenance-preserving architecture for extracting and normalizing
-evidence-stated relationships — including direction, polarity, modality, temporality,
-scope, conditions, exceptions, conflicts, and unresolved gaps — on the synthetic corpus
-used in this study.* It does **not** claim production semantic understanding or external
-generalization.
+baseline (F) on the locked eval split.
+
+**Supported claim.** *TAP-E3 demonstrates a deterministic, provenance-preserving
+architecture for extracting and normalizing relationships expressed by retrieved evidence,
+including direction, polarity, modality, temporality, scope, conditions, exceptions,
+conflicts, attribution, and unresolved gaps, on the synthetic corpus used in this study.*
+
+*This experiment does not independently establish production-grade semantic understanding,
+real-world factual correctness, or external generalization.* In particular, TAP-E3 does
+**not** verify whether the source itself is true (see §9a).
 
 ## 11. Frozen interface & recommendation for TAP-E4
 
 The `RelationshipRecord` schema (`tap-e3-relationship/1.0.0`) is the **provisional frozen
-interface** for downstream TAP research; future work compares against it and changes it
-only if TAP-E4 exposes a genuine interface deficiency (via explicit schema versioning).
+interface** for downstream TAP research. Future work should **consume** it rather than
+modify TAP-E3. A schema change should occur **only if TAP-E4 exposes a genuine
+architectural deficiency**, and any such change must carry: an explicit schema-version
+increment, a migration note, a downstream compatibility analysis, and an explanation of
+why the existing interface was insufficient (see SCHEMA).
 
-**Next layer: TAP-E4 — Governance Truth.** It should consume `IntentRecord`,
-`RetrievalRecord`, and `RelationshipRecord`, and determine **which documented rules,
-authorities, policies, versions, jurisdictions, exceptions, and temporal conditions
-govern the current situation** — e.g. taking a represented `APPLIES_TO` relationship (and
-its scope/temporality/supersession) and deciding whether that policy is the *controlling*
-one here. TAP-E4 must not be implemented as part of this task.
+**Next layer: TAP-E4 — Governance Truth.** It consumes `IntentRecord`, `RetrievalRecord`,
+and `RelationshipRecord`, and determines **which documented rule, authority, policy,
+version, jurisdiction, scope, exception, and temporal condition governs the current
+situation** — e.g. taking a represented `APPLIES_TO` relationship (with its scope /
+temporality / supersession) and deciding whether that policy is the *controlling* one
+here. TAP-E4 is **not** implemented in this task.
+
+```
+TAP-E1  Intent Understanding
+        ↓
+TAP-E2  Trusted Retrieval
+        ↓
+TAP-E3  Relationship Truth          ← this experiment (frozen interface: RelationshipRecord)
+        ↓
+TAP-E4  Governance Truth            ← next layer
+        ↓
+Evidence Packet
+        ↓
+Claim Truth
+        ↓
+Response Truth
+```
+
+## 12. Future validation (goals, not achievements)
+
+None of the following is claimed here; each would be a stronger confirmation than this
+study provides:
+
+- larger and more linguistically diverse enterprise corpora;
+- independently authored evaluation cases (author ≠ implementer);
+- untouched, evaluator-blind holdouts (outputs never inspected during engineering);
+- real parser- or model-based relationship extraction (behind the baseline abstraction);
+- comparison against established relation-extraction systems on shared benchmarks;
+- external replication by another evaluator;
+- cross-document coreference resolution;
+- longer, less templated evidence passages;
+- adversarial attribution, negation, temporal, and exception cases;
+- calibration of uncertainty and abstention.
+
+These are future work. Only after independent, blind, and externally-benchmarked
+replication should these results be trusted or generalized beyond this synthetic corpus.

@@ -18,8 +18,6 @@ never collapsed into a binary true/false.
 `source_provenance[]`, `extraction_method`, `confidence_vector`, `ambiguities[]`,
 `conflicts[]`, `status`, `valid_from`, `valid_until`.
 
-- **status:** SUPPORTED, PARTIALLY_SUPPORTED, AMBIGUOUS, CONTRADICTED,
-  INSUFFICIENT_EVIDENCE, UNRESOLVED.
 - **direction:** SUBJECT_TO_OBJECT, OBJECT_TO_SUBJECT, UNDIRECTED, UNCLEAR.
 - **polarity:** POSITIVE, NEGATED, UNKNOWN (negation never discarded).
 - **modality:** ASSERTED, REQUIRED, PERMITTED, RECOMMENDED, POSSIBLE, CONDITIONAL,
@@ -28,6 +26,46 @@ never collapsed into a binary true/false.
   plus explicit `valid_from`/`valid_until`.
 - **explicitness:** EXPLICIT, STRUCTURALLY_INFERRED, LINGUISTICALLY_INFERRED,
   UNSUPPORTED_INFERENCE (surfaced, never silently accepted).
+
+## Assertion status — precise semantics
+
+Every `status` value refers to the **quality and completeness of the evidence-grounded
+relationship representation**, NOT to universal or real-world truth.
+
+- **SUPPORTED** — the cited evidence explicitly states, or validly supports through bounded
+  structural normalization, the represented relationship and its recorded dimensions. This
+  means *the representation is supported by the cited evidence*. It does **not** mean the
+  proposition has been independently proven true in the real world.
+- **PARTIALLY_SUPPORTED** — the cited evidence establishes part of the relationship but one
+  or more dimensions remain unresolved (e.g. subject+predicate clear but object scope
+  incomplete; relationship stated but temporal scope missing; obligation exists but the
+  exact condition is unresolved; base relationship explicit but direction or exception scope
+  ambiguous).
+- **AMBIGUOUS** — the evidence permits more than one materially different relationship
+  interpretation and TAP-E3 cannot deterministically resolve them.
+- **CONTRADICTED** — one or more cited evidence units assert an incompatible relationship
+  under sufficiently comparable subject, object, scope, and temporal conditions. This means
+  *conflicting evidence exists*; it does **not** mean TAP-E3 has determined which source is
+  correct.
+- **INSUFFICIENT_EVIDENCE** — the retrieved evidence does not establish the requested or
+  candidate relationship with adequate provenance and relational specificity.
+- **UNRESOLVED** — processing cannot assign a more specific status because of unresolved
+  references, unsupported inference, missing upstream evidence, or incompatible ambiguity.
+
+> **Downstream warning.** Layers consuming this record must **not** interpret `SUPPORTED`
+> as equivalent to *factually verified*, *legally controlling*, *currently applicable*, or
+> *safe to include in a final answer without further validation*. Those determinations
+> belong to Governance Truth (TAP-E4), Claim Truth, and Response Truth.
+
+## Conflict semantics
+
+`RelationshipConflict` identifies **incompatible evidence-stated relationships** (comparable
+subject/object, compatible/overlapping scope, overlapping temporal range, and a logically
+incompatible polarity/modality/value). It does **not adjudicate which source wins.** For
+"passwords must be ≥12 characters" vs "≥14 characters" TAP-E3 may emit a `VALUE_CONFLICT`;
+it must **not** decide which requirement governs the current user, system, jurisdiction, or
+effective period. Authority hierarchy, applicability, supersession control, jurisdiction,
+and governing-rule selection belong to **TAP-E4 Governance Truth**.
 
 ## SourceProvenance (mandatory per assertion)
 
@@ -52,5 +90,16 @@ TEMPORAL/DIRECTION/ONTOLOGY/SCOPE), `scope_overlap`, `temporal_overlap`, `severi
 DIRECTION, UNRESOLVED_SUBJECT/OBJECT, NEGATION/TEMPORAL/CONDITION_SCOPE_UNCLEAR,
 CONFLICTING_RELATIONSHIPS, INSUFFICIENT_RETRIEVAL_EVIDENCE, UNSUPPORTED_INFERENCE.
 
-The schema is the **provisional frozen downstream interface**; changes require explicit
-version bumps and a demonstrated TAP-E4 deficiency.
+## Provisional interface freeze
+
+The `RelationshipRecord` schema (`tap-e3-relationship/1.0.0`) is the **provisional frozen
+interface** for TAP-E4. Future work should **consume** it rather than modify TAP-E3. A
+schema change should occur **only if TAP-E4 exposes a genuine architectural deficiency**,
+and any such change must carry:
+
+1. an explicit schema-version increment;
+2. a migration note;
+3. a downstream compatibility analysis;
+4. an explanation of why the existing interface was insufficient.
+
+The schema is **not** changed in this task.

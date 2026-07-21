@@ -16,13 +16,27 @@
 
 ## What these controls do NOT guarantee (honest disclosure)
 
-The eval split was **not** an untouched independent holdout. During iterative engineering
-and debugging, eval outputs were inspected and the deterministic extractor and gap rules
-were adjusted (e.g. unit-level co-occurrence detection, the `depended on` lexicon entry,
-the consolidation key) while eval metrics were visible. Gold labels stayed withheld from
-the code and the final selection used dev only, but the engineering loop saw eval
-behavior. This is therefore a **locked development evaluation, not a double-blind or
-interpreter-blind holdout.**
+For the recorded run the ontology, normalization rules, metric definitions, and baseline
+configuration were frozen, and the eval inputs were content-hash locked. **However, eval
+outputs were inspected during iterative engineering and debugging, and implementation
+changes followed some observed evaluation failures.** Disclosed development changes
+include:
+
+- unit-level **co-occurrence gap handling** (detecting ≥2 entities with no predicate at the
+  unit level rather than per-clause);
+- **predicate-lexicon additions** (e.g. `depended on`, `authorizes`);
+- **historical-dependency handling** for "previously … but now …" segments;
+- cross-segment **subject inheritance** in coordinated clauses;
+- **consolidation behavior** (the consolidation key that keeps different-value assertions
+  apart so conflicts are not merged away);
+- numeric **value extraction** used by `VALUE_CONFLICT` detection;
+- **deterministic tie-breaking** and small **test-data corrections**.
+
+These are ordinary iterative mechanism development, **not misconduct**. But because the
+engineering loop saw eval behavior (gold labels stayed withheld from the code and the final
+selection used dev only), the reported evaluation is a **locked *development* evaluation,
+not a double-blind or interpreter-blind holdout.** No numeric result or the verdict changed
+as a result of this disclosure.
 
 ## Placeholder for a future independent holdout
 
