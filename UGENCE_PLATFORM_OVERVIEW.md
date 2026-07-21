@@ -18,54 +18,55 @@
 # Page 1 — Executive Summary
 
 > ### UGENCE IS THE MISSING GOVERNANCE LAYER FOR ENTERPRISE AI
-> Foundation models reason and clouds host — but nothing in today's stack **governs what an
-> autonomous AI system asserts and does**. Ugence is an Enterprise AI Infrastructure Platform that
-> authorizes the exact action an agent takes, validates assertions before delivery, and runs the
-> result efficiently — deterministically, across every runtime. **The architecture is complete and
-> internally proven; external validation is pending and the platform is pre-commercial.**
+> Enterprises can build an AI application in an afternoon — but cannot let it act on a payment system,
+> a production database, a vehicle, or a factory with confidence. Ugence is the **Governed Execution
+> Platform** that makes autonomous AI deployable: it governs what the AI **asserts**, authorizes what
+> it **does**, and runs the result efficiently — deterministically, across every runtime.
+> **Architecture complete and internally proven; external validation pending; pre-commercial.**
 
-### What is Ugence?
+Ugence is an **Enterprise AI Infrastructure Platform** — a new category we call a **Governed Execution
+Platform**. It is the **missing layer** between foundation models and applications: the runtime,
+governance, and infrastructure substrate that turns a model's reasoning into supervised, externally
+governed execution. Enterprises need it because, without that layer, autonomous AI cannot be trusted to
+act on consequential systems and stays stuck in pilots.
 
-Ugence is an **Enterprise AI Infrastructure Platform**. It is **not** another foundation model, **not**
-another AI agent, and **not** another orchestration framework. It is the layer beneath them: the
-runtime, governance, and infrastructure substrate that turns a model's reasoning into **supervised,
-externally governed, operationally reliable execution**. Where models reason, orchestrators wire, and
-clouds host, Ugence supplies the missing capability — deterministic control over what an autonomous AI
-system asserts and does — as one architecture spanning digital and physical AI.
+- **Govern assertions** — validate what the AI *says* is grounded, before it is delivered.
+- **Govern actions** — authorize the *exact* action, before it executes.
+- **Run efficiently** — long-context reasoning and scaling that stay affordable and stable.
+
+**The missing middle:**
+
+```
+                          Applications
+              ══════════════════════════════════════
+                   GOVERNED EXECUTION LAYER
+                          ·  UGENCE  ·
+              ══════════════════════════════════════
+            Foundation Models  ·  Orchestration  ·  Cloud
+```
+
+**Where Ugence sits in the stack** — one responsibility per layer:
+
+| Layer | Primary responsibility |
+|---|---|
+| Foundation models | Reasoning |
+| Orchestration frameworks | Workflow |
+| Cloud infrastructure | Compute |
+| **Ugence** | **Governed execution** |
 
 ### Platform classification
 
 | Field | Detail |
 |---|---|
 | **Platform type** | Enterprise AI Infrastructure Platform (runtime + control + governance layer) |
+| **Category** | **Governed Execution Platform** — the "missing middle" between foundation models and applications |
 | **Technology domain** | Governed autonomous AI — digital agents and physical / embodied AI |
-| **Category** | The "missing middle": a governed execution layer between foundation models and applications |
 | **Primary offering** | External, deterministic governance of AI assertions and actions, atop a long-context reasoning substrate and an efficiency layer |
 | **Primary customers** | Enterprises deploying autonomous AI in regulated / high-consequence settings (Enterprise AI + Physical AI) |
 | **Deployment scope** | Cloud · Enterprise · Robotics; the control plane can sit in front of many runtimes, including third-party runtimes via adapters |
 | **Current development stage** | Architecture complete; core components implemented and internally validated; TAP emerging; **pre-commercial** |
 | **Current objective** | Independent technical evaluation, architecture review, and incubation assessment |
 | **Business model** | Not specified. |
-
-### The enterprise problem (in brief)
-
-The industry has successfully built three of the four layers enterprises need — **foundation models**,
-**orchestration frameworks**, and **cloud infrastructure**. One architectural layer remains fragmented:
-the **governed execution layer**. Models reason, orchestrators wire, clouds host — but none *govern*
-what the AI asserts or does, and none *supervise* execution. Today that layer is re-implemented,
-partially and inconsistently, inside every application, producing duplication, operational risk, and
-governance gaps that keep enterprise AI stuck in pilots rather than production. (Expanded below.)
-
-### Why the architecture is different
-
-- **An infrastructure platform, not an application** — Ugence provides the layer *between* models and
-  apps; it neither trains a model nor builds the end application.
-- **Governance is external and deterministic** — reasoning (which produces actions) is separated from
-  governance (which must be able to reject them under rules the runtime cannot edit at runtime).
-- **One control plane across many runtimes** — a hashable **Canonical Execution Request (CER)** lets a
-  single control plane authorize the *exact* action across heterogeneous digital and physical runtimes.
-- **A complete governed loop, not a single check** — what may **enter** reasoning, what **assertions**
-  may leave, what **actions** may execute, and whether execution is **operationally safe**.
 
 ### Current platform status
 

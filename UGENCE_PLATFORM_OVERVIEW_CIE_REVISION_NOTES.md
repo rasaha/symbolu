@@ -57,6 +57,23 @@ business-model, no inflated maturity, no removed limitation. TAP remains emergin
 distinctions *implemented / internally validated / synthetically validated / externally validated / production
 / commercial* are preserved and never blurred.
 
+### v1.4 — compression pass (post-review refinements)
+
+Applying external reviewer feedback; **compression, not addition** — no new claims.
+
+15. **Shortened the Executive Summary** to a 30–45s read: a reworded callout, a three-sentence intro
+    (*what it is · the missing layer · why enterprises care*) and three bullets (**govern assertions ·
+    govern actions · run efficiently**). Removed the redundant "enterprise problem in brief" paragraph and
+    the "why the architecture is different" bullets from Page 1 — both are expanded later.
+16. **Added the "missing middle" graphic** immediately after the opening (Applications ▸ Governed Execution
+    Layer / Ugence ▸ Foundation Models · Orchestration · Cloud).
+17. **Named the category explicitly** — "**Governed Execution Platform**" — in the callout, the intro, and
+    the classification table's Category row, so the category is memorable and used consistently.
+18. **Added the ecosystem-placement table** (Foundation Models → Reasoning · Orchestration → Workflow ·
+    Cloud → Compute · **Ugence → Governed execution**) on Page 1.
+19. **Reduced repetition of the signature phrase** ("Models reason. Orchestrators wire. Clouds host.") from
+    four occurrences to **one**, kept as the signature line in the Enterprise Problem section.
+
 ---
 
 ## 2. Reviewer notes — why each structural change raises the probability of a technical meeting
