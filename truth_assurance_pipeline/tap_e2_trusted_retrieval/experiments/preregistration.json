@@ -1,0 +1,38 @@
+{
+  "experiment": "TAP-E2 Trusted Retrieval",
+  "phase": "second TAP research layer — retrieval only",
+  "status": "preregistered before locked-set scoring",
+  "input": "IntentRecord from the FROZEN TAP-E1 layer (imported through its public interface)",
+  "responsibility": "select candidate evidence units only; no factual, policy, relationship, authorization, claim, or response judgment; never answer the user",
+  "honesty_notes": [
+    "New synthetic enterprise corpus; no TAP-E1 prompt reused.",
+    "'Dense semantic retrieval' is a DETERMINISTIC idf-weighted concept-vector stand-in, NOT neural embeddings.",
+    "Results are mechanism/construction validation on synthetic text only — not real-world retrieval quality or production readiness."
+  ],
+  "baselines": {
+    "A": "keyword (lexical) retrieval",
+    "B": "dense semantic retrieval (concept stand-in)",
+    "C": "hybrid retrieval",
+    "D": "hybrid + provenance filtering",
+    "E": "hybrid + provenance + gap detection",
+    "F": "full TAP-E2 pipeline (expansion + dedup + multi-signal ranking + gaps)"
+  },
+  "k": 5,
+  "config_selection_rule": "argmax on the DEV split of a documented weighted criterion (recall + ndcg + provenance + authority coverage + gap accuracy + (1-false_evidence) + (1-redundancy) - severe); simplest wins ties; the locked eval split is NEVER used for selection.",
+  "gates": [
+    {"key": "recall_at_k", "op": ">=", "threshold": 0.80},
+    {"key": "provenance_completeness", "op": "==", "threshold": 1.0},
+    {"key": "authority_coverage", "op": ">=", "threshold": 0.80},
+    {"key": "gap_detection_accuracy", "op": ">=", "threshold": 0.70},
+    {"key": "false_evidence_inclusion", "op": "<=", "threshold": 0.20},
+    {"key": "severe_critical_count", "op": "==", "threshold": 0.0}
+  ],
+  "severe_criticals": ["authoritative_evidence_omitted", "provenance_missing",
+                       "conflicting_evidence_hidden", "hallucinated_evidence_identifiers"],
+  "gate_application": "applied to the DEV-selected config on the locked eval split; fixed before locked scoring.",
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "all gates pass (capped below PASS by the synthetic corpus + deterministic concept stand-in)",
+    "INCONCLUSIVE": "1-2 non-severe gates fail with recall >= 0.6",
+    "FAIL": "a severe gate fails, recall < 0.6, or 3+ gates fail"
+  }
+}
