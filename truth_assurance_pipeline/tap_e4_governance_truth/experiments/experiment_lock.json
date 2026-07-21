@@ -1,0 +1,142 @@
+{
+  "authority_model_version": "tap-e4-authority/1.0.0",
+  "corpus": {
+    "eval_lock": {
+      "eval_inputs_hash": "c28e23f30d1ce808ff7e14776b592a39351e927b32d771b48d5ddbbb1d3412bf",
+      "n_eval": 15
+    },
+    "family_distribution": {
+      "basic": 2,
+      "conflict": 2,
+      "customer_override": 2,
+      "draft": 2,
+      "emergency_override": 2,
+      "exception": 2,
+      "expired": 2,
+      "future": 2,
+      "jurisdiction": 2,
+      "law_supremacy": 2,
+      "no_governing": 2,
+      "scope": 2,
+      "superseded": 2,
+      "upstream_gap": 2,
+      "version": 2
+    },
+    "n_cases": 30,
+    "n_evidence_units": 26,
+    "n_families": 15,
+    "split_distribution": {
+      "dev": 15,
+      "eval": 15
+    }
+  },
+  "eval_lock": {
+    "eval_inputs_hash": "c28e23f30d1ce808ff7e14776b592a39351e927b32d771b48d5ddbbb1d3412bf",
+    "n_eval": 15
+  },
+  "frozen_components_hash": "9e44afd74d85359781479a45847e582f368b1b528d8f975415d19cdb77051488",
+  "gates": [
+    {
+      "gate": "governing_authority_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "jurisdiction_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "scope_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "temporal_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.95,
+      "value": 1.0
+    },
+    {
+      "gate": "version_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "exception_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "precedence_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.9,
+      "value": 1.0
+    },
+    {
+      "gate": "governance_conflict_f1",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.75,
+      "value": 1.0
+    },
+    {
+      "gate": "governance_gap_accuracy",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.75,
+      "value": 1.0
+    },
+    {
+      "gate": "provenance_completeness",
+      "op": "==",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "unsupported_governance_rate",
+      "op": "<=",
+      "pass": true,
+      "threshold": 0.05,
+      "value": 0.0
+    },
+    {
+      "gate": "incorrect_override_rate",
+      "op": "==",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    },
+    {
+      "gate": "expired_policy_selection_rate",
+      "op": "==",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    },
+    {
+      "gate": "severe_critical_failure_count",
+      "op": "==",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    }
+  ],
+  "precedence_rules_version": "tap-e4-precedence/1.0.0",
+  "schema_version": "tap-e4-governance/1.0.0",
+  "selected_config": "F",
+  "verdict": "PASS_WITH_LIMITED_CLAIM"
+}

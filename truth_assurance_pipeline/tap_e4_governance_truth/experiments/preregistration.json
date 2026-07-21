@@ -1,0 +1,56 @@
+{
+  "experiment": "TAP-E4 Governance Truth",
+  "phase": "fourth TAP research layer — governance resolution only (which documented authority governs)",
+  "status": "preregistered before locked-set scoring",
+  "inputs": ["IntentRecord (TAP-E1, frozen public interface)",
+             "RetrievalRecord (TAP-E2, frozen public interface)",
+             "RelationshipRecord (TAP-E3, frozen public interface)",
+             "Situation (explicit governance context passed as application metadata)"],
+  "responsibility": "resolve WHICH documented authority (rule/policy/regulation/contract/version) governs a situation, and why; NOT factual/claim truth, a user answer, retrieval, relationship discovery, or execution authorization",
+  "honesty_notes": [
+    "New, independently authored synthetic corpus; no upstream gold is reused as governance gold.",
+    "Deterministic, documented-rule resolution over already-perfect synthetic relationship inputs (upstream confidence 1.0); this phase evaluates the governance layer, not upstream extraction.",
+    "Results are mechanism/construction validation on the synthetic corpus used in this study only.",
+    "The eval split is content-hash locked and preregistered, but was inspected during iterative engineering — a LOCKED DEVELOPMENT evaluation, not an untouched or interpreter-blind holdout.",
+    "No claim of production legal/regulatory reasoning; the authority hierarchy and precedence rules are a documented, frozen model, not law."
+  ],
+  "authority_model_version": "tap-e4-authority/1.0.0",
+  "precedence_rules_version": "tap-e4-precedence/1.0.0",
+  "schema_version": "tap-e4-governance/1.0.0",
+  "baselines": {
+    "A": "first matching policy (no applicability filtering, no selectability guard)",
+    "B": "highest authority only (ignores jurisdiction/scope/temporal)",
+    "C": "authority + jurisdiction + scope",
+    "D": "C + temporal + version/supersession",
+    "E": "D + exceptions + precedence (customer/emergency override)",
+    "F": "full Governance Truth (+ conflict detection, confidence, gaps, provenance, trace)"
+  },
+  "config_selection_rule": "the SIMPLEST baseline (A..F order) that satisfies ALL preregistered gates on the DEV split; the locked eval split is never used for selection.",
+  "gates": [
+    {"key": "governing_authority_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "jurisdiction_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "scope_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "temporal_accuracy", "op": ">=", "threshold": 0.95},
+    {"key": "version_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "exception_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "precedence_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "governance_conflict_f1", "op": ">=", "threshold": 0.75},
+    {"key": "governance_gap_accuracy", "op": ">=", "threshold": 0.75},
+    {"key": "provenance_completeness", "op": "==", "threshold": 1.00},
+    {"key": "unsupported_governance_rate", "op": "<=", "threshold": 0.05},
+    {"key": "incorrect_override_rate", "op": "==", "threshold": 0.0},
+    {"key": "expired_policy_selection_rate", "op": "==", "threshold": 0.0},
+    {"key": "severe_critical_failure_count", "op": "==", "threshold": 0.0}
+  ],
+  "critical_failure_classes": [
+    "EXPIRED_POLICY_SELECTED", "SUPERSEDED_POLICY_SELECTED", "DRAFT_SELECTED",
+    "WRONG_JURISDICTION", "EXCEPTION_IGNORED", "CUSTOMER_OVERRIDE_IGNORED",
+    "LAW_OVERRIDDEN_BY_POLICY", "MISSING_PROVENANCE", "UPSTREAM_GAP_IGNORED",
+    "UNSUPPORTED_GOVERNANCE_DECISION"
+  ],
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "all gates pass on the locked eval for the selected baseline (capped by synthetic corpus + documented rule model)",
+    "INCONCLUSIVE": "no baseline passes all gates on dev, or 1-2 non-severe gates fail on eval",
+    "FAIL": "a severe gate fails or 3+ gates fail on eval"
+  }
+}
