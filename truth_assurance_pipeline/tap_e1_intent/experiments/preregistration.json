@@ -1,0 +1,44 @@
+{
+  "experiment": "TAP-E1 Intent Understanding Layer",
+  "phase": "research / falsification (v1)",
+  "status": "preregistered before hidden-eval scoring",
+  "honesty_notes": [
+    "The corpus is SYNTHETIC and human-authored for this study; no prior/frozen intent corpus exists in this repository and none is claimed as a prerequisite.",
+    "The V0/V1 'model interpretation' is a DETERMINISTIC heuristic stand-in, not an LLM, so the study is reproducible. Results validate a mechanism on synthetic inputs only.",
+    "This experiment validates ONLY the Intent Understanding Layer. No claim is made about retrieval, governance, claim truth, response truth, ActionGate, downstream truth improvement, or production readiness."
+  ],
+  "ablation_conditions": {
+    "V0": "raw model interpretation (single reading; may answer)",
+    "V1": "structured schema only (naive heuristics; over-claims provenance)",
+    "V2": "deterministic extraction + structured schema",
+    "V3": "V2 + provenance enforcement",
+    "V4": "V3 + ambiguity/conflict detection",
+    "V5": "V4 + clarification/abstention policy"
+  },
+  "config_selection_rule": "argmax on the DEV split of a documented weighted criterion (1.5*constraint_preservation + material_ambiguity_recall + (1-unsupported_assumption_rate) + 0.5*(1-unnecessary_clarification_rate) + 0.5*negation_preservation - 0.25*severe_failure_count); the simplest config wins ties; the hidden eval set is NEVER used for selection.",
+  "gates": [
+    {"key": "explicit_constraint_preservation", "op": ">=", "threshold": 0.90},
+    {"key": "unsupported_assumption_rate", "op": "<=", "threshold": 0.15},
+    {"key": "material_ambiguity_recall", "op": ">=", "threshold": 0.80},
+    {"key": "unnecessary_clarification_rate", "op": "<=", "threshold": 0.15},
+    {"key": "severe_failure_count", "op": "==", "threshold": 0.0}
+  ],
+  "gate_application": "Gates are applied to the SELECTED config on the HIDDEN eval split only. Gates are fixed before hidden-set results are seen and are not changed afterward.",
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "all gates pass (capped below PASS because of the synthetic corpus + deterministic stand-in)",
+    "INCONCLUSIVE": "exactly one gate fails, or the severe-failure gate fails while constraint preservation stays >= 0.70",
+    "FAIL": "constraint preservation < 0.70 or two or more gates fail",
+    "BLOCKED": "reserved for infrastructure failure (e.g. no eval cases loadable)"
+  },
+  "critical_failures_tracked": [
+    "reversed_prohibition",
+    "dropped_constraint",
+    "invented_entity",
+    "invented_action",
+    "resolved_material_ambiguity_without_evidence",
+    "missed_conflict",
+    "false_explicit_provenance",
+    "redundant_clarification",
+    "answered_instead_of_interpreted"
+  ]
+}
