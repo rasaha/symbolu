@@ -1,0 +1,4330 @@
+{
+  "frozen_config": {
+    "vocab_size": 32,
+    "hidden_size": 96,
+    "num_layers": 2,
+    "num_heads": 4,
+    "ff_size": 384,
+    "context_length": 64,
+    "dropout": 0.0,
+    "aux_layer": -1,
+    "num_kv": 4,
+    "num_queries": 2,
+    "num_distractors": 0,
+    "n_relation_systems": 1,
+    "steps": 2500,
+    "batch_size": 32,
+    "lr": 0.004,
+    "weight_decay": 0.0,
+    "warmup": 50,
+    "grad_clip": 1.0,
+    "eval_every": 250,
+    "eval_batches": 8,
+    "grad_diag_every": 250,
+    "lambda_aux": 1.0,
+    "tau": 1.0,
+    "objective": "classification",
+    "screen_seeds": [
+      0,
+      1,
+      2
+    ],
+    "confirm_seeds": [
+      3,
+      4
+    ],
+    "acc_threshold": 0.8
+  },
+  "snap_every": 250,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "final": {
+    "A": {
+      "final_acc": {
+        "mean": 0.2522786458333333,
+        "std": 0.008183466855453472
+      },
+      "dyn_margin_mean": {
+        "mean": 0.40174229939778644,
+        "std": 0.588768562469353
+      },
+      "dyn_entropy_mean": {
+        "mean": 0.06292654822270076,
+        "std": 0.0310039375428477
+      },
+      "dyn_pos_score_mean": {
+        "mean": -57.83724848429362,
+        "std": 15.815267813528164
+      },
+      "dyn_neg_score_mean": {
+        "mean": -58.238990783691406,
+        "std": 15.804242554913863
+      },
+      "dyn_top1_prob_mean": {
+        "mean": 0.9726425409317017,
+        "std": 0.01573172989233533
+      },
+      "dyn_logit_variance_mean": {
+        "mean": 3454.3213796019554,
+        "std": 1297.8772438231658
+      },
+      "grad_grad_wrt_score": {
+        "mean": 0.0020112086785957217,
+        "std": 0.0014379275374812382
+      },
+      "grad_grad_wrt_hidden": {
+        "mean": 0.005296279831478993,
+        "std": 0.0015645486990569144
+      },
+      "grad_grad_wrt_Wq": {
+        "mean": 0.028865663800388575,
+        "std": 0.03257792266150678
+      },
+      "grad_grad_wrt_Wk": {
+        "mean": 0.0710878459115823,
+        "std": 0.06782235304286013
+      },
+      "geom_hidden_cos_gap": {
+        "mean": 0.016494448055810722,
+        "std": 0.040323354178248234
+      },
+      "geom_proj_qk_cos_gap": {
+        "mean": -0.015756628657173793,
+        "std": 0.004691532837736757
+      },
+      "geom_hidden_cos_pos": {
+        "mean": 0.38782645091123413,
+        "std": 0.0639870635482089
+      },
+      "geom_hidden_cos_neg": {
+        "mean": 0.3713320028554234,
+        "std": 0.0237578610714174
+      },
+      "geom_proj_qk_cos_pos": {
+        "mean": -0.3592943654997119,
+        "std": 0.07330828854285683
+      },
+      "geom_proj_qk_cos_neg": {
+        "mean": -0.34353773684253813,
+        "std": 0.06956384992308598
+      },
+      "temp": {
+        "max_entropy_uniform": 1.3862943649291992,
+        "by_temp": {
+          "1.0": {
+            "entropy_mean": 0.06292654822270076,
+            "entropy_frac_of_uniform": 0.0453919094058458,
+            "ranking_preserved": true
+          },
+          "2.0": {
+            "entropy_mean": 0.11536970734596252,
+            "entropy_frac_of_uniform": 0.08322165209973617,
+            "ranking_preserved": true
+          },
+          "5.0": {
+            "entropy_mean": 0.25439531604448956,
+            "entropy_frac_of_uniform": 0.18350742993713462,
+            "ranking_preserved": true
+          },
+          "10.0": {
+            "entropy_mean": 0.42125436663627625,
+            "entropy_frac_of_uniform": 0.30387079201450157,
+            "ranking_preserved": true
+          },
+          "20.0": {
+            "entropy_mean": 0.6526604692141215,
+            "entropy_frac_of_uniform": 0.47079500986607137,
+            "ranking_preserved": true
+          },
+          "50.0": {
+            "entropy_mean": 1.0376079082489014,
+            "entropy_frac_of_uniform": 0.7484758897522418,
+            "ranking_preserved": true
+          }
+        }
+      }
+    },
+    "C": {
+      "final_acc": {
+        "mean": 0.7490234375,
+        "std": 0.3528648836291773
+      },
+      "dyn_margin_mean": {
+        "mean": 22.640565236409504,
+        "std": 17.711299965004375
+      },
+      "dyn_entropy_mean": {
+        "mean": 0.07109941666324933,
+        "std": 0.03851756471942439
+      },
+      "dyn_pos_score_mean": {
+        "mean": -9.311449686686197,
+        "std": 57.839844530314956
+      },
+      "dyn_neg_score_mean": {
+        "mean": -31.952014247576397,
+        "std": 42.15737280185362
+      },
+      "dyn_top1_prob_mean": {
+        "mean": 0.9702284336090088,
+        "std": 0.01561107057504982
+      },
+      "dyn_logit_variance_mean": {
+        "mean": 393.0178044723968,
+        "std": 233.964898465175
+      },
+      "grad_grad_wrt_score": {
+        "mean": 0.0007901499869310177,
+        "std": 0.0011156025894322648
+      },
+      "grad_grad_wrt_hidden": {
+        "mean": 0.0030693438566231634,
+        "std": 0.004195798901072144
+      },
+      "grad_grad_wrt_Wq": {
+        "mean": 0.0029904502400010338,
+        "std": 0.004164521247962607
+      },
+      "grad_grad_wrt_Wk": {
+        "mean": 0.007451729363841271,
+        "std": 0.010430859590853755
+      },
+      "geom_hidden_cos_gap": {
+        "mean": 0.6229589019931154,
+        "std": 0.3767102146614825
+      },
+      "geom_proj_qk_cos_gap": {
+        "mean": 0.30806001193802024,
+        "std": 0.23362683042348353
+      },
+      "geom_hidden_cos_pos": {
+        "mean": 0.6510106349014677,
+        "std": 0.28393240903524414
+      },
+      "geom_hidden_cos_neg": {
+        "mean": 0.028051732908352275,
+        "std": 0.09277964369833062
+      },
+      "geom_proj_qk_cos_pos": {
+        "mean": 0.010946153100424757,
+        "std": 0.6017229248916759
+      },
+      "geom_proj_qk_cos_neg": {
+        "mean": -0.2971138588375955,
+        "std": 0.37766424051939185
+      },
+      "temp": {
+        "max_entropy_uniform": 1.3862943649291992,
+        "by_temp": {
+          "1.0": {
+            "entropy_mean": 0.07109941666324933,
+            "entropy_frac_of_uniform": 0.051287387774154675,
+            "ranking_preserved": true
+          },
+          "2.0": {
+            "entropy_mean": 0.14443622653683028,
+            "entropy_frac_of_uniform": 0.10418871358840653,
+            "ranking_preserved": true
+          },
+          "5.0": {
+            "entropy_mean": 0.369181493918101,
+            "entropy_frac_of_uniform": 0.2663081545000407,
+            "ranking_preserved": true
+          },
+          "10.0": {
+            "entropy_mean": 0.6730083227157593,
+            "entropy_frac_of_uniform": 0.485472883495513,
+            "ranking_preserved": true
+          },
+          "20.0": {
+            "entropy_mean": 1.025499741236369,
+            "entropy_frac_of_uniform": 0.7397416935246239,
+            "ranking_preserved": true
+          },
+          "50.0": {
+            "entropy_mean": 1.306207815806071,
+            "entropy_frac_of_uniform": 0.9422297665278193,
+            "ranking_preserved": true
+          }
+        }
+      }
+    },
+    "D": {
+      "final_acc": {
+        "mean": 0.990234375,
+        "std": 0.0034756114101664425
+      },
+      "dyn_margin_mean": {
+        "mean": 45.044516245524086,
+        "std": 2.748394838358281
+      },
+      "dyn_entropy_mean": {
+        "mean": 4.052567828694009e-05,
+        "std": 2.4223151896084532e-05
+      },
+      "dyn_pos_score_mean": {
+        "mean": 45.58683776855469,
+        "std": 2.699481500562713
+      },
+      "dyn_neg_score_mean": {
+        "mean": 0.5423212647438049,
+        "std": 0.4645486547568641
+      },
+      "dyn_top1_prob_mean": {
+        "mean": 0.9999955892562866,
+        "std": 2.7821176948887976e-06
+      },
+      "dyn_logit_variance_mean": {
+        "mean": 595.2030076980591,
+        "std": 75.60746376051823
+      },
+      "grad_grad_wrt_score": {
+        "mean": 0.0024688157573109493,
+        "std": 0.0027596633201574733
+      },
+      "grad_grad_wrt_hidden": {
+        "mean": 0.01976740484436353,
+        "std": 0.009280277403560192
+      },
+      "grad_grad_wrt_Wq": {
+        "mean": 0.03982377106634279,
+        "std": 0.049437991245179794
+      },
+      "grad_grad_wrt_Wk": {
+        "mean": 0.06633646910389264,
+        "std": 0.08309813667876405
+      },
+      "geom_hidden_cos_gap": {
+        "mean": 0.2781628780519693,
+        "std": 0.02702719266042511
+      },
+      "geom_proj_qk_cos_gap": {
+        "mean": 0.7225800883518079,
+        "std": 0.01711696643726207
+      },
+      "geom_hidden_cos_pos": {
+        "mean": 0.7375384355740001,
+        "std": 0.021922773864773835
+      },
+      "geom_hidden_cos_neg": {
+        "mean": 0.45937555752203074,
+        "std": 0.0368349942398395
+      },
+      "geom_proj_qk_cos_pos": {
+        "mean": 0.7447725312473873,
+        "std": 0.00995347479980071
+      },
+      "geom_proj_qk_cos_neg": {
+        "mean": 0.022192442895579412,
+        "std": 0.008206913871743746
+      },
+      "temp": {
+        "max_entropy_uniform": 1.3862943649291992,
+        "by_temp": {
+          "1.0": {
+            "entropy_mean": 4.052567828694009e-05,
+            "entropy_frac_of_uniform": 2.9233097466287268e-05,
+            "ranking_preserved": true
+          },
+          "2.0": {
+            "entropy_mean": 0.0019627349295963845,
+            "entropy_frac_of_uniform": 0.0014158139708637025,
+            "ranking_preserved": true
+          },
+          "5.0": {
+            "entropy_mean": 0.05935713897148768,
+            "entropy_frac_of_uniform": 0.042817124900106744,
+            "ranking_preserved": true
+          },
+          "10.0": {
+            "entropy_mean": 0.34750468532244366,
+            "entropy_frac_of_uniform": 0.2506716424113802,
+            "ranking_preserved": true
+          },
+          "20.0": {
+            "entropy_mean": 0.8641184568405151,
+            "entropy_frac_of_uniform": 0.62332970449941,
+            "ranking_preserved": true
+          },
+          "50.0": {
+            "entropy_mean": 1.2718219757080078,
+            "entropy_frac_of_uniform": 0.9174256261028387,
+            "ranking_preserved": true
+          }
+        }
+      }
+    }
+  },
+  "trajectory_seed0": {
+    "A": [
+      {
+        "dyn_pos_score_mean": -0.059165194630622864,
+        "dyn_neg_score_mean": -0.03583505377173424,
+        "dyn_margin_mean": -0.023330140858888626,
+        "dyn_entropy_mean": 1.3775548934936523,
+        "dyn_top1_prob_mean": 0.2906554043292999,
+        "dyn_logit_variance_mean": 0.017199668850025773,
+        "dyn_pos_score_std": 0.16456425189971924,
+        "dyn_neg_score_std": 0.14392244815826416,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          165.0,
+          91.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005074218846857548,
+        "grad_grad_wrt_hidden": 0.05100414529442787,
+        "grad_grad_wrt_Wq": 0.03328881412744522,
+        "grad_grad_wrt_Wk": 0.03392777219414711,
+        "grad_task_loss": 3.726430654525757,
+        "geom_hidden_cos_pos": 0.5402379767037928,
+        "geom_hidden_cos_neg": 0.0022440194685865813,
+        "geom_hidden_cos_gap": 0.5379939572352063,
+        "geom_proj_qk_cos_pos": -0.04160015087109059,
+        "geom_proj_qk_cos_neg": -0.02353143916358628,
+        "geom_proj_qk_cos_gap": -0.01806871170750431,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 1.3775548934936523,
+              "entropy_frac_of_uniform": 0.9936958039672957,
+              "top1_prob_mean": 0.2906554043292999,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 1.3841216564178467,
+              "entropy_frac_of_uniform": 0.9984327221069939,
+              "top1_prob_mean": 0.26993513107299805,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 1.385948657989502,
+              "entropy_frac_of_uniform": 0.9997506251569341,
+              "top1_prob_mean": 0.2578688859939575,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.386208176612854,
+              "entropy_frac_of_uniform": 0.9999378282718839,
+              "top1_prob_mean": 0.2539161145687103,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.38627290725708,
+              "entropy_frac_of_uniform": 0.9999845215614649,
+              "top1_prob_mean": 0.2519534230232239,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3862907886505127,
+              "entropy_frac_of_uniform": 0.9999974202602442,
+              "top1_prob_mean": 0.25078028440475464,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 0,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -12.674478530883789,
+        "dyn_neg_score_mean": -13.455357551574707,
+        "dyn_margin_mean": 0.780879020690918,
+        "dyn_entropy_mean": 0.4080420136451721,
+        "dyn_top1_prob_mean": 0.8341872692108154,
+        "dyn_logit_variance_mean": 20.84844365902245,
+        "dyn_pos_score_std": 4.991973876953125,
+        "dyn_neg_score_std": 5.666014671325684,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          2.0,
+          4.0,
+          21.0,
+          34.0,
+          34.0,
+          47.0,
+          39.0,
+          31.0,
+          24.0,
+          8.0,
+          8.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0077551063150167465,
+        "grad_grad_wrt_hidden": 0.019927218556404114,
+        "grad_grad_wrt_Wq": 0.07689814269542694,
+        "grad_grad_wrt_Wk": 0.14372900128364563,
+        "grad_task_loss": 1.7463874816894531,
+        "geom_hidden_cos_pos": 0.5451967254048213,
+        "geom_hidden_cos_neg": 0.4217565741952664,
+        "geom_hidden_cos_gap": 0.12344015120955493,
+        "geom_proj_qk_cos_pos": -0.6084760050289333,
+        "geom_proj_qk_cos_neg": -0.6097447406403566,
+        "geom_proj_qk_cos_gap": 0.0012687356114232662,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.4080420136451721,
+              "entropy_frac_of_uniform": 0.29434009397132016,
+              "top1_prob_mean": 0.8341872692108154,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.7195375561714172,
+              "entropy_frac_of_uniform": 0.5190366305847066,
+              "top1_prob_mean": 0.6990329027175903,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 1.1424692869186401,
+              "entropy_frac_of_uniform": 0.8241173850381973,
+              "top1_prob_mean": 0.48911553621292114,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.3056769371032715,
+              "entropy_frac_of_uniform": 0.9418468184929504,
+              "top1_prob_mean": 0.3746478855609894,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.3631845712661743,
+              "entropy_frac_of_uniform": 0.9833298076890004,
+              "top1_prob_mean": 0.3121352791786194,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3823025226593018,
+              "entropy_frac_of_uniform": 0.9971204944845165,
+              "top1_prob_mean": 0.27457380294799805,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 250,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -15.063461303710938,
+        "dyn_neg_score_mean": -15.509453773498535,
+        "dyn_margin_mean": 0.44599246978759766,
+        "dyn_entropy_mean": 0.3167424201965332,
+        "dyn_top1_prob_mean": 0.8628352880477905,
+        "dyn_logit_variance_mean": 60.995753141120076,
+        "dyn_pos_score_std": 10.475229263305664,
+        "dyn_neg_score_std": 10.552882194519043,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          5.0,
+          16.0,
+          11.0,
+          21.0,
+          26.0,
+          18.0,
+          30.0,
+          16.0,
+          11.0,
+          11.0,
+          6.0,
+          24.0,
+          16.0,
+          30.0,
+          9.0,
+          3.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.006286569405347109,
+        "grad_grad_wrt_hidden": 0.014577186666429043,
+        "grad_grad_wrt_Wq": 0.08846992254257202,
+        "grad_grad_wrt_Wk": 0.16893672943115234,
+        "grad_task_loss": 1.7421680688858032,
+        "geom_hidden_cos_pos": 0.5189916001691017,
+        "geom_hidden_cos_neg": 0.42725985693202045,
+        "geom_hidden_cos_gap": 0.09173174323708128,
+        "geom_proj_qk_cos_pos": -0.5184406368352938,
+        "geom_proj_qk_cos_neg": -0.5252157999008583,
+        "geom_proj_qk_cos_gap": 0.006775163065564471,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.3167424201965332,
+              "entropy_frac_of_uniform": 0.2284813588005242,
+              "top1_prob_mean": 0.8628352880477905,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.5366088151931763,
+              "entropy_frac_of_uniform": 0.3870814372246128,
+              "top1_prob_mean": 0.7659559845924377,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.9402555823326111,
+              "entropy_frac_of_uniform": 0.678251031035989,
+              "top1_prob_mean": 0.5808859467506409,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.1980394124984741,
+              "entropy_frac_of_uniform": 0.864202757225851,
+              "top1_prob_mean": 0.44206923246383667,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.324958086013794,
+              "entropy_frac_of_uniform": 0.9557552274126586,
+              "top1_prob_mean": 0.3500160276889801,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.374983787536621,
+              "entropy_frac_of_uniform": 0.9918411430654875,
+              "top1_prob_mean": 0.29016420245170593,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 500,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -25.251148223876953,
+        "dyn_neg_score_mean": -24.24700355529785,
+        "dyn_margin_mean": -1.0041446685791016,
+        "dyn_entropy_mean": 0.1456761658191681,
+        "dyn_top1_prob_mean": 0.9330503344535828,
+        "dyn_logit_variance_mean": 128.66083457693458,
+        "dyn_pos_score_std": 15.609564781188965,
+        "dyn_neg_score_std": 14.86851692199707,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          7.0,
+          10.0,
+          13.0,
+          22.0,
+          18.0,
+          25.0,
+          22.0,
+          11.0,
+          20.0,
+          6.0,
+          17.0,
+          8.0,
+          9.0,
+          10.0,
+          7.0,
+          10.0,
+          5.0,
+          4.0,
+          3.0,
+          10.0,
+          5.0,
+          3.0,
+          6.0,
+          1.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.003406140487641096,
+        "grad_grad_wrt_hidden": 0.010402092710137367,
+        "grad_grad_wrt_Wq": 0.04443495348095894,
+        "grad_grad_wrt_Wk": 0.08506804704666138,
+        "grad_task_loss": 1.6418514251708984,
+        "geom_hidden_cos_pos": 0.570957406249363,
+        "geom_hidden_cos_neg": 0.46492911817040294,
+        "geom_hidden_cos_gap": 0.10602828807896003,
+        "geom_proj_qk_cos_pos": -0.5557221749186283,
+        "geom_proj_qk_cos_neg": -0.5374482664531873,
+        "geom_proj_qk_cos_gap": -0.01827390846544097,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.1456761658191681,
+              "entropy_frac_of_uniform": 0.1050831407127649,
+              "top1_prob_mean": 0.9330503344535828,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.280070036649704,
+              "entropy_frac_of_uniform": 0.20202782593291987,
+              "top1_prob_mean": 0.8863143920898438,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.5990377068519592,
+              "entropy_frac_of_uniform": 0.43211436330303,
+              "top1_prob_mean": 0.755842387676239,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.9324432611465454,
+              "entropy_frac_of_uniform": 0.6726156325349899,
+              "top1_prob_mean": 0.6117526888847351,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.224760890007019,
+              "entropy_frac_of_uniform": 0.8834782287162871,
+              "top1_prob_mean": 0.45402297377586365,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3591420650482178,
+              "entropy_frac_of_uniform": 0.9804137558603088,
+              "top1_prob_mean": 0.32854437828063965,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 750,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -37.14364242553711,
+        "dyn_neg_score_mean": -36.99150466918945,
+        "dyn_margin_mean": -0.15213775634765625,
+        "dyn_entropy_mean": 0.04722331091761589,
+        "dyn_top1_prob_mean": 0.9798122644424438,
+        "dyn_logit_variance_mean": 543.7926269844174,
+        "dyn_pos_score_std": 27.74260139465332,
+        "dyn_neg_score_std": 28.178712844848633,
+        "dyn_hist_counts": [
+          65.0,
+          10.0,
+          10.0,
+          11.0,
+          15.0,
+          12.0,
+          13.0,
+          14.0,
+          6.0,
+          8.0,
+          6.0,
+          6.0,
+          9.0,
+          7.0,
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          8.0,
+          2.0,
+          4.0,
+          4.0,
+          4.0,
+          5.0,
+          7.0,
+          0.0,
+          0.0,
+          0.0,
+          3.0,
+          2.0,
+          6.0,
+          3.0,
+          2.0,
+          2.0,
+          0.0,
+          2.0,
+          2.0,
+          1.0,
+          3.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005095765460282564,
+        "grad_grad_wrt_hidden": 0.011865520849823952,
+        "grad_grad_wrt_Wq": 0.06377576291561127,
+        "grad_grad_wrt_Wk": 0.1659790575504303,
+        "grad_task_loss": 1.500138759613037,
+        "geom_hidden_cos_pos": 0.5385889736644458,
+        "geom_hidden_cos_neg": 0.45482906720523414,
+        "geom_hidden_cos_gap": 0.08375990645921166,
+        "geom_proj_qk_cos_pos": -0.5310826354107121,
+        "geom_proj_qk_cos_neg": -0.5153064878977602,
+        "geom_proj_qk_cos_gap": -0.015776147512951866,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.04722331091761589,
+              "entropy_frac_of_uniform": 0.03406441814399763,
+              "top1_prob_mean": 0.9798122644424438,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.13065944612026215,
+              "entropy_frac_of_uniform": 0.09425086722251459,
+              "top1_prob_mean": 0.9531576037406921,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.34970471262931824,
+              "entropy_frac_of_uniform": 0.2522586266497436,
+              "top1_prob_mean": 0.8624768257141113,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.5972097516059875,
+              "entropy_frac_of_uniform": 0.4307957723224881,
+              "top1_prob_mean": 0.7559953331947327,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.9475176930427551,
+              "entropy_frac_of_uniform": 0.6834895365755502,
+              "top1_prob_mean": 0.6044003963470459,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2812304496765137,
+              "entropy_frac_of_uniform": 0.9242124054525379,
+              "top1_prob_mean": 0.40817171335220337,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1000,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -35.234981536865234,
+        "dyn_neg_score_mean": -31.258514404296875,
+        "dyn_margin_mean": -3.9764671325683594,
+        "dyn_entropy_mean": 0.17493873834609985,
+        "dyn_top1_prob_mean": 0.929254949092865,
+        "dyn_logit_variance_mean": 220.96576673164964,
+        "dyn_pos_score_std": 16.819181442260742,
+        "dyn_neg_score_std": 18.785255432128906,
+        "dyn_hist_counts": [
+          12.0,
+          2.0,
+          12.0,
+          21.0,
+          17.0,
+          15.0,
+          8.0,
+          13.0,
+          13.0,
+          10.0,
+          13.0,
+          11.0,
+          16.0,
+          11.0,
+          10.0,
+          3.0,
+          3.0,
+          9.0,
+          13.0,
+          10.0,
+          9.0,
+          9.0,
+          4.0,
+          6.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0034058329183608294,
+        "grad_grad_wrt_hidden": 0.008120357058942318,
+        "grad_grad_wrt_Wq": 0.035553451627492905,
+        "grad_grad_wrt_Wk": 0.08006464689970016,
+        "grad_task_loss": 1.567707896232605,
+        "geom_hidden_cos_pos": 0.5342035845824284,
+        "geom_hidden_cos_neg": 0.42961411767464597,
+        "geom_hidden_cos_gap": 0.10458946690778248,
+        "geom_proj_qk_cos_pos": -0.44616448995657265,
+        "geom_proj_qk_cos_neg": -0.38559465832076967,
+        "geom_proj_qk_cos_gap": -0.060569831635802984,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.17493873834609985,
+              "entropy_frac_of_uniform": 0.1261916247888913,
+              "top1_prob_mean": 0.929254949092865,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.309980571269989,
+              "entropy_frac_of_uniform": 0.22360371585714434,
+              "top1_prob_mean": 0.8681725263595581,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.5612147450447083,
+              "entropy_frac_of_uniform": 0.40483086366247373,
+              "top1_prob_mean": 0.7544160485267639,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.8690215945243835,
+              "entropy_frac_of_uniform": 0.6268665707003478,
+              "top1_prob_mean": 0.6267082691192627,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.170773983001709,
+              "entropy_frac_of_uniform": 0.8445349073185497,
+              "top1_prob_mean": 0.47674447298049927,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3431240320205688,
+              "entropy_frac_of_uniform": 0.9688591874851665,
+              "top1_prob_mean": 0.34231266379356384,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1250,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -47.34445571899414,
+        "dyn_neg_score_mean": -40.705955505371094,
+        "dyn_margin_mean": -6.638500213623047,
+        "dyn_entropy_mean": 0.1452692449092865,
+        "dyn_top1_prob_mean": 0.9224857091903687,
+        "dyn_logit_variance_mean": 686.9739110656083,
+        "dyn_pos_score_std": 27.75255584716797,
+        "dyn_neg_score_std": 34.79576110839844,
+        "dyn_hist_counts": [
+          108.0,
+          5.0,
+          13.0,
+          8.0,
+          5.0,
+          10.0,
+          4.0,
+          3.0,
+          2.0,
+          0.0,
+          7.0,
+          6.0,
+          5.0,
+          8.0,
+          4.0,
+          10.0,
+          6.0,
+          7.0,
+          3.0,
+          3.0,
+          3.0,
+          0.0,
+          0.0,
+          2.0,
+          4.0,
+          3.0,
+          1.0,
+          3.0,
+          3.0,
+          0.0,
+          0.0,
+          1.0,
+          4.0,
+          1.0,
+          0.0,
+          4.0,
+          0.0,
+          3.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          3.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0011186259798705578,
+        "grad_grad_wrt_hidden": 0.005929436068981886,
+        "grad_grad_wrt_Wq": 0.026975329965353012,
+        "grad_grad_wrt_Wk": 0.050105489790439606,
+        "grad_task_loss": 1.6215636730194092,
+        "geom_hidden_cos_pos": 0.556757820857456,
+        "geom_hidden_cos_neg": 0.4345006417667416,
+        "geom_hidden_cos_gap": 0.12225717909071437,
+        "geom_proj_qk_cos_pos": -0.4615394813590683,
+        "geom_proj_qk_cos_neg": -0.39166848704432294,
+        "geom_proj_qk_cos_gap": -0.06987099431474536,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.1452692449092865,
+              "entropy_frac_of_uniform": 0.10478960932421137,
+              "top1_prob_mean": 0.9224857091903687,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.1913762092590332,
+              "entropy_frac_of_uniform": 0.13804875364173264,
+              "top1_prob_mean": 0.8994954228401184,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.32093751430511475,
+              "entropy_frac_of_uniform": 0.23150747952546546,
+              "top1_prob_mean": 0.8459792137145996,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.49534475803375244,
+              "entropy_frac_of_uniform": 0.35731571199097434,
+              "top1_prob_mean": 0.7800069451332092,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.8345022201538086,
+              "entropy_frac_of_uniform": 0.6019661056592611,
+              "top1_prob_mean": 0.657140851020813,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2439197301864624,
+              "entropy_frac_of_uniform": 0.8972984105363451,
+              "top1_prob_mean": 0.4435439705848694,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1500,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -70.2424545288086,
+        "dyn_neg_score_mean": -65.04669952392578,
+        "dyn_margin_mean": -5.1957550048828125,
+        "dyn_entropy_mean": 0.00606766901910305,
+        "dyn_top1_prob_mean": 0.9986252188682556,
+        "dyn_logit_variance_mean": 2578.221133708954,
+        "dyn_pos_score_std": 54.97547149658203,
+        "dyn_neg_score_std": 56.17783737182617,
+        "dyn_hist_counts": [
+          148.0,
+          1.0,
+          1.0,
+          2.0,
+          4.0,
+          3.0,
+          1.0,
+          1.0,
+          2.0,
+          1.0,
+          0.0,
+          2.0,
+          4.0,
+          12.0,
+          4.0,
+          5.0,
+          4.0,
+          5.0,
+          4.0,
+          0.0,
+          4.0,
+          3.0,
+          2.0,
+          9.0,
+          0.0,
+          2.0,
+          3.0,
+          5.0,
+          2.0,
+          2.0,
+          0.0,
+          0.0,
+          8.0,
+          3.0,
+          2.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          2.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0017077611992135644,
+        "grad_grad_wrt_hidden": 0.0068315016105771065,
+        "grad_grad_wrt_Wq": 0.02503366209566593,
+        "grad_grad_wrt_Wk": 0.08103412389755249,
+        "grad_task_loss": 1.5695008039474487,
+        "geom_hidden_cos_pos": 0.5125397870433517,
+        "geom_hidden_cos_neg": 0.43089901343531284,
+        "geom_hidden_cos_gap": 0.08164077360803884,
+        "geom_proj_qk_cos_pos": -0.5062588379660156,
+        "geom_proj_qk_cos_neg": -0.45629813290724996,
+        "geom_proj_qk_cos_gap": -0.0499607050587656,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.00606766901910305,
+              "entropy_frac_of_uniform": 0.004376897989780791,
+              "top1_prob_mean": 0.9986252188682556,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.03199886530637741,
+              "entropy_frac_of_uniform": 0.023082302082365933,
+              "top1_prob_mean": 0.9910298585891724,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.12181136757135391,
+              "entropy_frac_of_uniform": 0.0878683277180998,
+              "top1_prob_mean": 0.955082893371582,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.26696455478668213,
+              "entropy_frac_of_uniform": 0.1925742191127759,
+              "top1_prob_mean": 0.8974707126617432,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.5394814014434814,
+              "entropy_frac_of_uniform": 0.38915357018783947,
+              "top1_prob_mean": 0.7865239977836609,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.028532862663269,
+              "entropy_frac_of_uniform": 0.7419296281391133,
+              "top1_prob_mean": 0.5664613246917725,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1750,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -52.469383239746094,
+        "dyn_neg_score_mean": -52.76597213745117,
+        "dyn_margin_mean": 0.2965888977050781,
+        "dyn_entropy_mean": 0.023779327049851418,
+        "dyn_top1_prob_mean": 0.9932200312614441,
+        "dyn_logit_variance_mean": 3403.040729522705,
+        "dyn_pos_score_std": 64.14554595947266,
+        "dyn_neg_score_std": 61.34699630737305,
+        "dyn_hist_counts": [
+          125.0,
+          6.0,
+          1.0,
+          1.0,
+          9.0,
+          3.0,
+          2.0,
+          4.0,
+          4.0,
+          0.0,
+          7.0,
+          4.0,
+          7.0,
+          4.0,
+          5.0,
+          3.0,
+          3.0,
+          6.0,
+          0.0,
+          4.0,
+          6.0,
+          1.0,
+          0.0,
+          2.0,
+          3.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          7.0,
+          3.0,
+          1.0,
+          1.0,
+          6.0,
+          0.0,
+          1.0,
+          3.0,
+          3.0,
+          2.0,
+          2.0,
+          2.0,
+          9.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0024410493206232786,
+        "grad_grad_wrt_hidden": 0.010815599001944065,
+        "grad_grad_wrt_Wq": 0.023110901936888695,
+        "grad_grad_wrt_Wk": 0.10749837756156921,
+        "grad_task_loss": 1.6556880474090576,
+        "geom_hidden_cos_pos": 0.3248002023319714,
+        "geom_hidden_cos_neg": 0.28230889581269974,
+        "geom_hidden_cos_gap": 0.04249130651927163,
+        "geom_proj_qk_cos_pos": -0.32148721427074634,
+        "geom_proj_qk_cos_neg": -0.32735213587390416,
+        "geom_proj_qk_cos_gap": 0.005864921603157824,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.023779327049851418,
+              "entropy_frac_of_uniform": 0.017153158558114657,
+              "top1_prob_mean": 0.9932200312614441,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.06708734482526779,
+              "entropy_frac_of_uniform": 0.04839328970993406,
+              "top1_prob_mean": 0.976243257522583,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.17363697290420532,
+              "entropy_frac_of_uniform": 0.12525259951776066,
+              "top1_prob_mean": 0.9274563193321228,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.27825936675071716,
+              "entropy_frac_of_uniform": 0.2007217036945313,
+              "top1_prob_mean": 0.8729395866394043,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.4812542200088501,
+              "entropy_frac_of_uniform": 0.3471515373529118,
+              "top1_prob_mean": 0.791459321975708,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 0.9645373821258545,
+              "entropy_frac_of_uniform": 0.6957666470606445,
+              "top1_prob_mean": 0.5919386744499207,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2000,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -78.03790283203125,
+        "dyn_neg_score_mean": -81.26860046386719,
+        "dyn_margin_mean": 3.2306976318359375,
+        "dyn_entropy_mean": 0.030793670564889908,
+        "dyn_top1_prob_mean": 0.9877699613571167,
+        "dyn_logit_variance_mean": 4237.451100349426,
+        "dyn_pos_score_std": 76.40833282470703,
+        "dyn_neg_score_std": 69.68965911865234,
+        "dyn_hist_counts": [
+          155.0,
+          3.0,
+          6.0,
+          5.0,
+          7.0,
+          2.0,
+          1.0,
+          1.0,
+          4.0,
+          5.0,
+          1.0,
+          0.0,
+          0.0,
+          5.0,
+          3.0,
+          2.0,
+          4.0,
+          2.0,
+          4.0,
+          1.0,
+          1.0,
+          2.0,
+          2.0,
+          4.0,
+          2.0,
+          0.0,
+          3.0,
+          1.0,
+          5.0,
+          0.0,
+          3.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          2.0,
+          2.0,
+          0.0,
+          3.0,
+          1.0,
+          0.0,
+          0.0,
+          8.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0005098095862194896,
+        "grad_grad_wrt_hidden": 0.0038768332451581955,
+        "grad_grad_wrt_Wq": 0.0014525348087772727,
+        "grad_grad_wrt_Wk": 0.00472048157826066,
+        "grad_task_loss": 1.6676124334335327,
+        "geom_hidden_cos_pos": 0.4122205498861149,
+        "geom_hidden_cos_neg": 0.390388936677482,
+        "geom_hidden_cos_gap": 0.021831613208632916,
+        "geom_proj_qk_cos_pos": -0.4315796422160929,
+        "geom_proj_qk_cos_neg": -0.4499287960352376,
+        "geom_proj_qk_cos_gap": 0.018349153819144703,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.030793670564889908,
+              "entropy_frac_of_uniform": 0.022212937846330064,
+              "top1_prob_mean": 0.9877699613571167,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.043993331491947174,
+              "entropy_frac_of_uniform": 0.0317344805006071,
+              "top1_prob_mean": 0.9785617589950562,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.09477750957012177,
+              "entropy_frac_of_uniform": 0.06836752133444778,
+              "top1_prob_mean": 0.9589398503303528,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.22043447196483612,
+              "entropy_frac_of_uniform": 0.15900985933539025,
+              "top1_prob_mean": 0.9132474660873413,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.44670936465263367,
+              "entropy_frac_of_uniform": 0.3222326916660647,
+              "top1_prob_mean": 0.8208400011062622,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 0.9103009700775146,
+              "entropy_frac_of_uniform": 0.6566433458192737,
+              "top1_prob_mean": 0.6213942766189575,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2250,
+        "aux_active": false
+      },
+      {
+        "dyn_pos_score_mean": -79.66803741455078,
+        "dyn_neg_score_mean": -79.85847473144531,
+        "dyn_margin_mean": 0.19043731689453125,
+        "dyn_entropy_mean": 0.06000678241252899,
+        "dyn_top1_prob_mean": 0.9757969379425049,
+        "dyn_logit_variance_mean": 4800.920607089996,
+        "dyn_pos_score_std": 79.27021026611328,
+        "dyn_neg_score_std": 81.7955093383789,
+        "dyn_hist_counts": [
+          174.0,
+          1.0,
+          4.0,
+          1.0,
+          0.0,
+          2.0,
+          2.0,
+          3.0,
+          2.0,
+          3.0,
+          2.0,
+          0.0,
+          0.0,
+          5.0,
+          1.0,
+          2.0,
+          0.0,
+          1.0,
+          2.0,
+          1.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          2.0,
+          0.0,
+          0.0,
+          1.0,
+          3.0,
+          1.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0,
+          3.0,
+          1.0,
+          2.0,
+          3.0,
+          2.0,
+          1.0,
+          3.0,
+          20.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0008277412271127105,
+        "grad_grad_wrt_hidden": 0.004061183892190456,
+        "grad_grad_wrt_Wq": 0.005983288399875164,
+        "grad_grad_wrt_Wk": 0.02094518020749092,
+        "grad_task_loss": 1.6923835277557373,
+        "geom_hidden_cos_pos": 0.4401538400561549,
+        "geom_hidden_cos_neg": 0.38877731951652095,
+        "geom_hidden_cos_gap": 0.05137652053963393,
+        "geom_proj_qk_cos_pos": -0.461697937338613,
+        "geom_proj_qk_cos_neg": -0.44002710313846666,
+        "geom_proj_qk_cos_gap": -0.021670834200146316,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.06000678241252899,
+              "entropy_frac_of_uniform": 0.04328574358418723,
+              "top1_prob_mean": 0.9757969379425049,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.10754156112670898,
+              "entropy_frac_of_uniform": 0.0775748382503173,
+              "top1_prob_mean": 0.952955961227417,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.23161087930202484,
+              "entropy_frac_of_uniform": 0.1670719330333956,
+              "top1_prob_mean": 0.8959389925003052,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.3743723928928375,
+              "entropy_frac_of_uniform": 0.2700525965940556,
+              "top1_prob_mean": 0.8258852958679199,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.5760054588317871,
+              "entropy_frac_of_uniform": 0.41550010834906975,
+              "top1_prob_mean": 0.7334404587745667,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 0.9489209651947021,
+              "entropy_frac_of_uniform": 0.6845017834600845,
+              "top1_prob_mean": 0.57056725025177,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2499,
+        "aux_active": false
+      }
+    ],
+    "C": [
+      {
+        "dyn_pos_score_mean": -0.059160999953746796,
+        "dyn_neg_score_mean": -0.03584528714418411,
+        "dyn_margin_mean": -0.023315712809562683,
+        "dyn_entropy_mean": 1.3775675296783447,
+        "dyn_top1_prob_mean": 0.2906239330768585,
+        "dyn_logit_variance_mean": 0.017176167487036764,
+        "dyn_pos_score_std": 0.16451624035835266,
+        "dyn_neg_score_std": 0.1438334435224533,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          164.0,
+          92.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005074237007647753,
+        "grad_grad_wrt_hidden": 0.051004402339458466,
+        "grad_grad_wrt_Wq": 0.03328622505068779,
+        "grad_grad_wrt_Wk": 0.03392371907830238,
+        "grad_task_loss": 3.7264838218688965,
+        "geom_hidden_cos_pos": 0.5402437290176749,
+        "geom_hidden_cos_neg": 0.0022883690495897704,
+        "geom_hidden_cos_gap": 0.5379553599680852,
+        "geom_proj_qk_cos_pos": -0.04160166003566701,
+        "geom_proj_qk_cos_neg": -0.02354061589479291,
+        "geom_proj_qk_cos_gap": -0.0180610441408741,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 1.3775675296783447,
+              "entropy_frac_of_uniform": 0.9937049190477665,
+              "top1_prob_mean": 0.2906239330768585,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 1.384124517440796,
+              "entropy_frac_of_uniform": 0.9984347858987985,
+              "top1_prob_mean": 0.26992008090019226,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 1.3859490156173706,
+              "entropy_frac_of_uniform": 0.9997508831309098,
+              "top1_prob_mean": 0.25786304473876953,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.386208176612854,
+              "entropy_frac_of_uniform": 0.9999378282718839,
+              "top1_prob_mean": 0.2539132833480835,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.38627290725708,
+              "entropy_frac_of_uniform": 0.9999845215614649,
+              "top1_prob_mean": 0.25195199251174927,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3862907886505127,
+              "entropy_frac_of_uniform": 0.9999974202602442,
+              "top1_prob_mean": 0.2507796585559845,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 0,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 8.771930694580078,
+        "dyn_neg_score_mean": -0.5116276741027832,
+        "dyn_margin_mean": 9.283557891845703,
+        "dyn_entropy_mean": 0.09188905358314514,
+        "dyn_top1_prob_mean": 0.9644694328308105,
+        "dyn_logit_variance_mean": 74.09448298811913,
+        "dyn_pos_score_std": 10.729166030883789,
+        "dyn_neg_score_std": 9.215686798095703,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          2.0,
+          4.0,
+          6.0,
+          5.0,
+          11.0,
+          15.0,
+          20.0,
+          29.0,
+          24.0,
+          19.0,
+          26.0,
+          19.0,
+          14.0,
+          15.0,
+          10.0,
+          16.0,
+          8.0,
+          7.0,
+          3.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.01409902423620224,
+        "grad_grad_wrt_hidden": 0.03143678978085518,
+        "grad_grad_wrt_Wq": 0.3268773853778839,
+        "grad_grad_wrt_Wk": 0.29592272639274597,
+        "grad_task_loss": 0.014708828181028366,
+        "geom_hidden_cos_pos": 0.6847934955731034,
+        "geom_hidden_cos_neg": -0.0023058125467893356,
+        "geom_hidden_cos_gap": 0.6870993081198927,
+        "geom_proj_qk_cos_pos": 0.3242891040863469,
+        "geom_proj_qk_cos_neg": -0.02137715749753018,
+        "geom_proj_qk_cos_gap": 0.3456662615838771,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.09188905358314514,
+              "entropy_frac_of_uniform": 0.06628394077605451,
+              "top1_prob_mean": 0.9644694328308105,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.23544058203697205,
+              "entropy_frac_of_uniform": 0.16983447959769818,
+              "top1_prob_mean": 0.9143968820571899,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.6727482080459595,
+              "entropy_frac_of_uniform": 0.4852852504239372,
+              "top1_prob_mean": 0.7507135272026062,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.074605941772461,
+              "entropy_frac_of_uniform": 0.7751643294224478,
+              "top1_prob_mean": 0.5617114305496216,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.2927274703979492,
+              "entropy_frac_of_uniform": 0.9325057528196555,
+              "top1_prob_mean": 0.4094781279563904,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3710156679153442,
+              "entropy_frac_of_uniform": 0.9889787498237178,
+              "top1_prob_mean": 0.31060928106307983,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 8.133136749267578,
+        "dyn_neg_score_mean": 0.07279304414987564,
+        "dyn_margin_mean": 8.060343742370605,
+        "dyn_entropy_mean": 0.13232561945915222,
+        "dyn_top1_prob_mean": 0.9444085955619812,
+        "dyn_logit_variance_mean": 88.57837224006653,
+        "dyn_pos_score_std": 15.087459564208984,
+        "dyn_neg_score_std": 9.418749809265137,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          2.0,
+          4.0,
+          2.0,
+          7.0,
+          14.0,
+          14.0,
+          30.0,
+          20.0,
+          27.0,
+          25.0,
+          23.0,
+          21.0,
+          12.0,
+          6.0,
+          11.0,
+          7.0,
+          8.0,
+          4.0,
+          3.0,
+          6.0,
+          4.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 8.105794222501572e-06,
+        "grad_grad_wrt_hidden": 9.436871914658695e-05,
+        "grad_grad_wrt_Wq": 0.00016867289377842098,
+        "grad_grad_wrt_Wk": 0.00019368351786397398,
+        "grad_task_loss": 0.0004919512430205941,
+        "geom_hidden_cos_pos": 0.7382081015966833,
+        "geom_hidden_cos_neg": -0.009115654029301368,
+        "geom_hidden_cos_gap": 0.7473237556259846,
+        "geom_proj_qk_cos_pos": 0.22546655792393722,
+        "geom_proj_qk_cos_neg": 0.0028549968264997005,
+        "geom_proj_qk_cos_gap": 0.22261156109743752,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.13232561945915222,
+              "entropy_frac_of_uniform": 0.09545275722585106,
+              "top1_prob_mean": 0.9444085955619812,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.2512710690498352,
+              "entropy_frac_of_uniform": 0.18125376212047728,
+              "top1_prob_mean": 0.8974102735519409,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.6314358711242676,
+              "entropy_frac_of_uniform": 0.45548469870359476,
+              "top1_prob_mean": 0.7587942481040955,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.033595085144043,
+              "entropy_frac_of_uniform": 0.7455812497635238,
+              "top1_prob_mean": 0.5791752934455872,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.2757236957550049,
+              "entropy_frac_of_uniform": 0.9202401221764749,
+              "top1_prob_mean": 0.421740859746933,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3679866790771484,
+              "entropy_frac_of_uniform": 0.9867937962418352,
+              "top1_prob_mean": 0.31549543142318726,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 500,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 7.626856803894043,
+        "dyn_neg_score_mean": 0.40408432483673096,
+        "dyn_margin_mean": 7.222772598266602,
+        "dyn_entropy_mean": 0.17453603446483612,
+        "dyn_top1_prob_mean": 0.9174313545227051,
+        "dyn_logit_variance_mean": 79.13339965324849,
+        "dyn_pos_score_std": 14.501595497131348,
+        "dyn_neg_score_std": 8.816956520080566,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          2.0,
+          2.0,
+          4.0,
+          13.0,
+          22.0,
+          21.0,
+          27.0,
+          27.0,
+          27.0,
+          23.0,
+          17.0,
+          13.0,
+          10.0,
+          11.0,
+          8.0,
+          6.0,
+          4.0,
+          5.0,
+          7.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 2.064743540586278e-07,
+        "grad_grad_wrt_hidden": 1.3466556993080303e-05,
+        "grad_grad_wrt_Wq": 3.9857186493463814e-06,
+        "grad_grad_wrt_Wk": 4.334324330557138e-06,
+        "grad_task_loss": 0.00016441498883068562,
+        "geom_hidden_cos_pos": 0.7413926422595978,
+        "geom_hidden_cos_neg": -0.004929819008490692,
+        "geom_hidden_cos_gap": 0.7463224612680884,
+        "geom_proj_qk_cos_pos": 0.20539366771117784,
+        "geom_proj_qk_cos_neg": 0.01596426491353971,
+        "geom_proj_qk_cos_gap": 0.18942940279763812,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.17453603446483612,
+              "entropy_frac_of_uniform": 0.12590113534346656,
+              "top1_prob_mean": 0.9174313545227051,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.28962767124176025,
+              "entropy_frac_of_uniform": 0.20892220192826946,
+              "top1_prob_mean": 0.8725976347923279,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.6688235998153687,
+              "entropy_frac_of_uniform": 0.4824542440158637,
+              "top1_prob_mean": 0.7354662418365479,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.0615859031677246,
+              "entropy_frac_of_uniform": 0.7657723568846375,
+              "top1_prob_mean": 0.5588245987892151,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.286532998085022,
+              "entropy_frac_of_uniform": 0.9280373855885419,
+              "top1_prob_mean": 0.4099571704864502,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3699164390563965,
+              "entropy_frac_of_uniform": 0.9881858238140936,
+              "top1_prob_mean": 0.3110789656639099,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 750,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 10.579490661621094,
+        "dyn_neg_score_mean": -0.8507335782051086,
+        "dyn_margin_mean": 11.430224418640137,
+        "dyn_entropy_mean": 0.10910487174987793,
+        "dyn_top1_prob_mean": 0.9558578133583069,
+        "dyn_logit_variance_mean": 157.59540245309472,
+        "dyn_pos_score_std": 19.482805252075195,
+        "dyn_neg_score_std": 11.708571434020996,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          4.0,
+          6.0,
+          6.0,
+          6.0,
+          14.0,
+          15.0,
+          22.0,
+          18.0,
+          16.0,
+          17.0,
+          19.0,
+          13.0,
+          17.0,
+          9.0,
+          15.0,
+          12.0,
+          7.0,
+          6.0,
+          3.0,
+          4.0,
+          6.0,
+          4.0,
+          4.0,
+          2.0,
+          1.0,
+          4.0,
+          2.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.02092677354812622,
+        "grad_grad_wrt_hidden": 0.08243086189031601,
+        "grad_grad_wrt_Wq": 0.4917601943016052,
+        "grad_grad_wrt_Wk": 0.5664186477661133,
+        "grad_task_loss": 0.14662668108940125,
+        "geom_hidden_cos_pos": 0.7354095135815442,
+        "geom_hidden_cos_neg": 0.015267093709553592,
+        "geom_hidden_cos_gap": 0.7201424198719906,
+        "geom_proj_qk_cos_pos": 0.21317119215382263,
+        "geom_proj_qk_cos_neg": -0.031586577562848106,
+        "geom_proj_qk_cos_gap": 0.24475776971667074,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.10910487174987793,
+              "entropy_frac_of_uniform": 0.07870252848892603,
+              "top1_prob_mean": 0.9558578133583069,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.22772561013698578,
+              "entropy_frac_of_uniform": 0.16426930376263643,
+              "top1_prob_mean": 0.9081552624702454,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.5123527646064758,
+              "entropy_frac_of_uniform": 0.36958439532619947,
+              "top1_prob_mean": 0.7913994789123535,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.8741464614868164,
+              "entropy_frac_of_uniform": 0.6305633807661483,
+              "top1_prob_mean": 0.6438468098640442,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.194790005683899,
+              "entropy_frac_of_uniform": 0.8618588056836827,
+              "top1_prob_mean": 0.47667908668518066,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.352875828742981,
+              "entropy_frac_of_uniform": 0.9758936218514276,
+              "top1_prob_mean": 0.33864626288414,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1000,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 19.835987091064453,
+        "dyn_neg_score_mean": -2.1407155990600586,
+        "dyn_margin_mean": 21.976703643798828,
+        "dyn_entropy_mean": 0.07551249116659164,
+        "dyn_top1_prob_mean": 0.975056529045105,
+        "dyn_logit_variance_mean": 271.429877910763,
+        "dyn_pos_score_std": 20.584089279174805,
+        "dyn_neg_score_std": 14.485810279846191,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          1.0,
+          0.0,
+          0.0,
+          3.0,
+          1.0,
+          2.0,
+          0.0,
+          1.0,
+          1.0,
+          4.0,
+          3.0,
+          5.0,
+          6.0,
+          8.0,
+          13.0,
+          19.0,
+          16.0,
+          15.0,
+          19.0,
+          20.0,
+          15.0,
+          15.0,
+          8.0,
+          15.0,
+          9.0,
+          6.0,
+          6.0,
+          4.0,
+          5.0,
+          2.0,
+          6.0,
+          4.0,
+          4.0,
+          4.0,
+          1.0,
+          2.0,
+          1.0,
+          4.0,
+          4.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.008662005886435509,
+        "grad_grad_wrt_hidden": 0.04703838378190994,
+        "grad_grad_wrt_Wq": 0.2901220917701721,
+        "grad_grad_wrt_Wk": 0.3326694071292877,
+        "grad_task_loss": 0.007278779521584511,
+        "geom_hidden_cos_pos": 0.8475105240941048,
+        "geom_hidden_cos_neg": -0.0401481751857015,
+        "geom_hidden_cos_gap": 0.8876586992798062,
+        "geom_proj_qk_cos_pos": 0.36096986671327613,
+        "geom_proj_qk_cos_neg": -0.03212930786927851,
+        "geom_proj_qk_cos_gap": 0.39309917458255467,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.07551249116659164,
+              "entropy_frac_of_uniform": 0.054470748115930064,
+              "top1_prob_mean": 0.975056529045105,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.187471404671669,
+              "entropy_frac_of_uniform": 0.1352320325425571,
+              "top1_prob_mean": 0.9316327571868896,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.45414185523986816,
+              "entropy_frac_of_uniform": 0.327594100307161,
+              "top1_prob_mean": 0.8202640414237976,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.7771293520927429,
+              "entropy_frac_of_uniform": 0.5605803296563443,
+              "top1_prob_mean": 0.6853899359703064,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.1141058206558228,
+              "entropy_frac_of_uniform": 0.8036574690345238,
+              "top1_prob_mean": 0.5210133790969849,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3320307731628418,
+              "entropy_frac_of_uniform": 0.9608570927364848,
+              "top1_prob_mean": 0.3608132600784302,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 24.73054313659668,
+        "dyn_neg_score_mean": -0.6009957790374756,
+        "dyn_margin_mean": 25.331539154052734,
+        "dyn_entropy_mean": 0.02752004750072956,
+        "dyn_top1_prob_mean": 0.9907403588294983,
+        "dyn_logit_variance_mean": 358.58476227521896,
+        "dyn_pos_score_std": 21.033843994140625,
+        "dyn_neg_score_std": 16.31165313720703,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0,
+          6.0,
+          6.0,
+          6.0,
+          10.0,
+          17.0,
+          6.0,
+          12.0,
+          6.0,
+          16.0,
+          12.0,
+          13.0,
+          14.0,
+          16.0,
+          11.0,
+          7.0,
+          11.0,
+          10.0,
+          11.0,
+          3.0,
+          1.0,
+          6.0,
+          4.0,
+          8.0,
+          5.0,
+          5.0,
+          7.0,
+          5.0,
+          2.0,
+          3.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0,
+          3.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.00010697308607632294,
+        "grad_grad_wrt_hidden": 0.0032813292928040028,
+        "grad_grad_wrt_Wq": 0.0037050144746899605,
+        "grad_grad_wrt_Wk": 0.004121814854443073,
+        "grad_task_loss": 0.0024370772298425436,
+        "geom_hidden_cos_pos": 0.8183029186911881,
+        "geom_hidden_cos_neg": -0.03147684698099814,
+        "geom_hidden_cos_gap": 0.8497797656721863,
+        "geom_proj_qk_cos_pos": 0.4387081817840226,
+        "geom_proj_qk_cos_neg": -0.014574589741338665,
+        "geom_proj_qk_cos_gap": 0.4532827715253613,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.02752004750072956,
+              "entropy_frac_of_uniform": 0.019851517972616924,
+              "top1_prob_mean": 0.9907403588294983,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.0944296345114708,
+              "entropy_frac_of_uniform": 0.06811658252415496,
+              "top1_prob_mean": 0.968845546245575,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.3279527723789215,
+              "entropy_frac_of_uniform": 0.23656791852837886,
+              "top1_prob_mean": 0.8816758990287781,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.6555802822113037,
+              "entropy_frac_of_uniform": 0.47290120972596283,
+              "top1_prob_mean": 0.7515182495117188,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.0410404205322266,
+              "entropy_frac_of_uniform": 0.75095192396991,
+              "top1_prob_mean": 0.5737470388412476,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.314676284790039,
+              "entropy_frac_of_uniform": 0.94833847561458,
+              "top1_prob_mean": 0.38431766629219055,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1500,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 27.779422760009766,
+        "dyn_neg_score_mean": -1.0038896799087524,
+        "dyn_margin_mean": 28.78331184387207,
+        "dyn_entropy_mean": 0.04027629643678665,
+        "dyn_top1_prob_mean": 0.9861008524894714,
+        "dyn_logit_variance_mean": 299.44905948638916,
+        "dyn_pos_score_std": 14.340726852416992,
+        "dyn_neg_score_std": 14.13881778717041,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3.0,
+          3.0,
+          5.0,
+          4.0,
+          3.0,
+          5.0,
+          8.0,
+          9.0,
+          14.0,
+          11.0,
+          9.0,
+          15.0,
+          17.0,
+          13.0,
+          11.0,
+          10.0,
+          19.0,
+          13.0,
+          10.0,
+          5.0,
+          6.0,
+          6.0,
+          9.0,
+          7.0,
+          7.0,
+          6.0,
+          8.0,
+          2.0,
+          4.0,
+          4.0,
+          6.0,
+          0.0,
+          3.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 4.0218060348706786e-06,
+        "grad_grad_wrt_hidden": 3.681008456624113e-05,
+        "grad_grad_wrt_Wq": 0.00013963988749310374,
+        "grad_grad_wrt_Wk": 0.00015233831072691828,
+        "grad_task_loss": 0.00011430268932599574,
+        "geom_hidden_cos_pos": 0.8716231472790241,
+        "geom_hidden_cos_neg": -0.03846923938544933,
+        "geom_hidden_cos_gap": 0.9100923866644735,
+        "geom_proj_qk_cos_pos": 0.5359764465829358,
+        "geom_proj_qk_cos_neg": -0.022522241174253093,
+        "geom_proj_qk_cos_gap": 0.5584986877571888,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.04027629643678665,
+              "entropy_frac_of_uniform": 0.02905320648752954,
+              "top1_prob_mean": 0.9861008524894714,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.10609520226716995,
+              "entropy_frac_of_uniform": 0.0765315108761828,
+              "top1_prob_mean": 0.9612167477607727,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.3076001703739166,
+              "entropy_frac_of_uniform": 0.221886619577817,
+              "top1_prob_mean": 0.8822163343429565,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.6477802395820618,
+              "entropy_frac_of_uniform": 0.4672746683314587,
+              "top1_prob_mean": 0.7541623115539551,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.0601606369018555,
+              "entropy_frac_of_uniform": 0.7647442446006046,
+              "top1_prob_mean": 0.5675786733627319,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.324136734008789,
+              "entropy_frac_of_uniform": 0.9551627471820643,
+              "top1_prob_mean": 0.37842094898223877,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1750,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 30.042808532714844,
+        "dyn_neg_score_mean": -0.6620166301727295,
+        "dyn_margin_mean": 30.704824447631836,
+        "dyn_entropy_mean": 0.07740272581577301,
+        "dyn_top1_prob_mean": 0.9699224233627319,
+        "dyn_logit_variance_mean": 415.9309269785881,
+        "dyn_pos_score_std": 19.92229652404785,
+        "dyn_neg_score_std": 17.718198776245117,
+        "dyn_hist_counts": [
+          0.0,
+          1.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          2.0,
+          0.0,
+          2.0,
+          2.0,
+          2.0,
+          1.0,
+          2.0,
+          5.0,
+          8.0,
+          10.0,
+          11.0,
+          8.0,
+          10.0,
+          8.0,
+          18.0,
+          13.0,
+          15.0,
+          12.0,
+          13.0,
+          12.0,
+          9.0,
+          8.0,
+          10.0,
+          4.0,
+          6.0,
+          2.0,
+          3.0,
+          10.0,
+          4.0,
+          6.0,
+          6.0,
+          6.0,
+          4.0,
+          8.0,
+          0.0,
+          2.0,
+          3.0,
+          0.0,
+          2.0,
+          5.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.004573616664856672,
+        "grad_grad_wrt_hidden": 0.031758107244968414,
+        "grad_grad_wrt_Wq": 0.13194069266319275,
+        "grad_grad_wrt_Wk": 0.21125584840774536,
+        "grad_task_loss": 0.03933655098080635,
+        "geom_hidden_cos_pos": 0.871185258962214,
+        "geom_hidden_cos_neg": -0.026314900043265272,
+        "geom_hidden_cos_gap": 0.8975001590054793,
+        "geom_proj_qk_cos_pos": 0.49642216321080923,
+        "geom_proj_qk_cos_neg": -0.012970758298858224,
+        "geom_proj_qk_cos_gap": 0.5093929215096674,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.07740272581577301,
+              "entropy_frac_of_uniform": 0.05583426418942857,
+              "top1_prob_mean": 0.9699224233627319,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.14794936776161194,
+              "entropy_frac_of_uniform": 0.10672290929291053,
+              "top1_prob_mean": 0.9399839639663696,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.3463883101940155,
+              "entropy_frac_of_uniform": 0.24986634798281548,
+              "top1_prob_mean": 0.8613664507865906,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.6309584379196167,
+              "entropy_frac_of_uniform": 0.45514030344618833,
+              "top1_prob_mean": 0.7475116848945618,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.008156657218933,
+              "entropy_frac_of_uniform": 0.7272313029061628,
+              "top1_prob_mean": 0.58119797706604,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3044246435165405,
+              "entropy_frac_of_uniform": 0.9409434796217757,
+              "top1_prob_mean": 0.3907589316368103,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2000,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 40.97205352783203,
+        "dyn_neg_score_mean": -0.20400166511535645,
+        "dyn_margin_mean": 41.176055908203125,
+        "dyn_entropy_mean": 0.024186810478568077,
+        "dyn_top1_prob_mean": 0.9895957112312317,
+        "dyn_logit_variance_mean": 591.1947292685509,
+        "dyn_pos_score_std": 21.73231315612793,
+        "dyn_neg_score_std": 20.03248405456543,
+        "dyn_hist_counts": [
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          0.0,
+          2.0,
+          4.0,
+          2.0,
+          8.0,
+          3.0,
+          2.0,
+          1.0,
+          3.0,
+          7.0,
+          6.0,
+          16.0,
+          10.0,
+          9.0,
+          12.0,
+          9.0,
+          12.0,
+          8.0,
+          5.0,
+          13.0,
+          8.0,
+          8.0,
+          11.0,
+          4.0,
+          9.0,
+          4.0,
+          12.0,
+          5.0,
+          6.0,
+          4.0,
+          4.0,
+          5.0,
+          3.0,
+          3.0,
+          5.0,
+          1.0,
+          5.0,
+          3.0,
+          6.0,
+          12.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.0007882988429628313,
+        "grad_grad_wrt_hidden": 0.02501635067164898,
+        "grad_grad_wrt_Wq": 0.03190833702683449,
+        "grad_grad_wrt_Wk": 0.03680400177836418,
+        "grad_task_loss": 0.1355142742395401,
+        "geom_hidden_cos_pos": 0.8760900823399425,
+        "geom_hidden_cos_neg": -0.03700993241121372,
+        "geom_hidden_cos_gap": 0.9131000147511562,
+        "geom_proj_qk_cos_pos": 0.5741837925743312,
+        "geom_proj_qk_cos_neg": -0.004495168643188663,
+        "geom_proj_qk_cos_gap": 0.5786789612175198,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.024186810478568077,
+              "entropy_frac_of_uniform": 0.017447095718233944,
+              "top1_prob_mean": 0.9895957112312317,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.062446631491184235,
+              "entropy_frac_of_uniform": 0.04504572266249781,
+              "top1_prob_mean": 0.976635754108429,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.1924900859594345,
+              "entropy_frac_of_uniform": 0.13885224583544012,
+              "top1_prob_mean": 0.9283871650695801,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.4423643946647644,
+              "entropy_frac_of_uniform": 0.31909845834752193,
+              "top1_prob_mean": 0.8391721248626709,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.8607823848724365,
+              "entropy_frac_of_uniform": 0.6209232372638248,
+              "top1_prob_mean": 0.6725672483444214,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2652723789215088,
+              "entropy_frac_of_uniform": 0.9127010907139688,
+              "top1_prob_mean": 0.437174916267395,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 43.0186767578125,
+        "dyn_neg_score_mean": -1.95187246799469,
+        "dyn_margin_mean": 44.970550537109375,
+        "dyn_entropy_mean": 0.02727336809039116,
+        "dyn_top1_prob_mean": 0.9868729114532471,
+        "dyn_logit_variance_mean": 714.95748052001,
+        "dyn_pos_score_std": 21.930091857910156,
+        "dyn_neg_score_std": 20.92987060546875,
+        "dyn_hist_counts": [
+          1.0,
+          2.0,
+          2.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          1.0,
+          1.0,
+          7.0,
+          2.0,
+          3.0,
+          3.0,
+          9.0,
+          8.0,
+          10.0,
+          11.0,
+          10.0,
+          7.0,
+          16.0,
+          6.0,
+          6.0,
+          11.0,
+          8.0,
+          7.0,
+          7.0,
+          11.0,
+          6.0,
+          9.0,
+          5.0,
+          13.0,
+          7.0,
+          3.0,
+          3.0,
+          3.0,
+          4.0,
+          5.0,
+          4.0,
+          7.0,
+          4.0,
+          2.0,
+          0.0,
+          1.0,
+          1.0,
+          22.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 2.4962605493783485e-06,
+        "grad_grad_wrt_hidden": 0.00019081890059169382,
+        "grad_grad_wrt_Wq": 8.98681246326305e-05,
+        "grad_grad_wrt_Wk": 0.00014880301023367792,
+        "grad_task_loss": 0.0002856411738321185,
+        "geom_hidden_cos_pos": 0.8742523789405823,
+        "geom_hidden_cos_neg": -0.04410355461974783,
+        "geom_hidden_cos_gap": 0.9183559335603301,
+        "geom_proj_qk_cos_pos": 0.5394748132675886,
+        "geom_proj_qk_cos_neg": -0.026553404454413492,
+        "geom_proj_qk_cos_gap": 0.5660282177220021,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.02727336809039116,
+              "entropy_frac_of_uniform": 0.019673576392113562,
+              "top1_prob_mean": 0.9868729114532471,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.0577298142015934,
+              "entropy_frac_of_uniform": 0.04164325821561121,
+              "top1_prob_mean": 0.9757955074310303,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.16836458444595337,
+              "entropy_frac_of_uniform": 0.12144937518703114,
+              "top1_prob_mean": 0.9344440698623657,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.3955376148223877,
+              "entropy_frac_of_uniform": 0.28532007691064126,
+              "top1_prob_mean": 0.8547407984733582,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.8069334030151367,
+              "entropy_frac_of_uniform": 0.5820794078293382,
+              "top1_prob_mean": 0.695601224899292,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.243343710899353,
+              "entropy_frac_of_uniform": 0.8968829004530023,
+              "top1_prob_mean": 0.4539024829864502,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2499,
+        "aux_active": true
+      }
+    ],
+    "D": [
+      {
+        "dyn_pos_score_mean": -0.05501189082860947,
+        "dyn_neg_score_mean": -0.035475775599479675,
+        "dyn_margin_mean": -0.01953611522912979,
+        "dyn_entropy_mean": 1.3776377439498901,
+        "dyn_top1_prob_mean": 0.2904056906700134,
+        "dyn_logit_variance_mean": 0.017039429615351764,
+        "dyn_pos_score_std": 0.1634843498468399,
+        "dyn_neg_score_std": 0.1436542421579361,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          165.0,
+          91.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005072515923529863,
+        "grad_grad_wrt_hidden": 0.05100560560822487,
+        "grad_grad_wrt_Wq": 0.033260978758335114,
+        "grad_grad_wrt_Wk": 0.03390974923968315,
+        "grad_task_loss": 3.7267019748687744,
+        "geom_hidden_cos_pos": 0.540208323393017,
+        "geom_hidden_cos_neg": 0.0023089812166290358,
+        "geom_hidden_cos_gap": 0.537899342176388,
+        "geom_proj_qk_cos_pos": -0.03889471458387561,
+        "geom_proj_qk_cos_neg": -0.02330024287463554,
+        "geom_proj_qk_cos_gap": -0.015594471709240072,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 1.3776377439498901,
+              "entropy_frac_of_uniform": 0.9937555679383064,
+              "top1_prob_mean": 0.2904056906700134,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 1.3841419219970703,
+              "entropy_frac_of_uniform": 0.998447340632277,
+              "top1_prob_mean": 0.2698144316673279,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 1.3859519958496094,
+              "entropy_frac_of_uniform": 0.9997530329140396,
+              "top1_prob_mean": 0.2578217685222626,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.3862090110778809,
+              "entropy_frac_of_uniform": 0.9999384302111602,
+              "top1_prob_mean": 0.2538927495479584,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.3862730264663696,
+              "entropy_frac_of_uniform": 0.9999846075527901,
+              "top1_prob_mean": 0.2519417703151703,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3862910270690918,
+              "entropy_frac_of_uniform": 0.9999975922428945,
+              "top1_prob_mean": 0.2507755756378174,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 0,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 16.93122673034668,
+        "dyn_neg_score_mean": -0.22544337809085846,
+        "dyn_margin_mean": 17.15666961669922,
+        "dyn_entropy_mean": 0.005660010501742363,
+        "dyn_top1_prob_mean": 0.9990874528884888,
+        "dyn_logit_variance_mean": 85.85529328882694,
+        "dyn_pos_score_std": 5.505692481994629,
+        "dyn_neg_score_std": 7.053633213043213,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          2.0,
+          0.0,
+          2.0,
+          4.0,
+          10.0,
+          13.0,
+          14.0,
+          13.0,
+          31.0,
+          31.0,
+          26.0,
+          20.0,
+          21.0,
+          14.0,
+          14.0,
+          14.0,
+          7.0,
+          9.0,
+          3.0,
+          4.0,
+          2.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.004365299828350544,
+        "grad_grad_wrt_hidden": 0.03737318515777588,
+        "grad_grad_wrt_Wq": 0.09078235179185867,
+        "grad_grad_wrt_Wk": 0.0638030469417572,
+        "grad_task_loss": 1.1750946044921875,
+        "geom_hidden_cos_pos": 0.6232376717962325,
+        "geom_hidden_cos_neg": 0.337065586039292,
+        "geom_hidden_cos_gap": 0.2861720857569405,
+        "geom_proj_qk_cos_pos": 0.7317783841863275,
+        "geom_proj_qk_cos_neg": -0.011806397669715807,
+        "geom_proj_qk_cos_gap": 0.7435847818560433,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.005660010501742363,
+              "entropy_frac_of_uniform": 0.004082834529902623,
+              "top1_prob_mean": 0.9990874528884888,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.07336638122797012,
+              "entropy_frac_of_uniform": 0.05292265703735807,
+              "top1_prob_mean": 0.984108567237854,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.551069438457489,
+              "entropy_frac_of_uniform": 0.39751257193174355,
+              "top1_prob_mean": 0.8339942693710327,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 1.034362554550171,
+              "entropy_frac_of_uniform": 0.74613486191513,
+              "top1_prob_mean": 0.6079443097114563,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.2804341316223145,
+              "entropy_frac_of_uniform": 0.9236379834002346,
+              "top1_prob_mean": 0.43122777342796326,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3687450885772705,
+              "entropy_frac_of_uniform": 0.9873408730527264,
+              "top1_prob_mean": 0.31872230768203735,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 25.00721549987793,
+        "dyn_neg_score_mean": -1.3933706283569336,
+        "dyn_margin_mean": 26.400585174560547,
+        "dyn_entropy_mean": 0.0019257263047620654,
+        "dyn_top1_prob_mean": 0.9996436834335327,
+        "dyn_logit_variance_mean": 186.64051365852356,
+        "dyn_pos_score_std": 8.753612518310547,
+        "dyn_neg_score_std": 9.792835235595703,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0,
+          0.0,
+          6.0,
+          4.0,
+          3.0,
+          9.0,
+          12.0,
+          13.0,
+          10.0,
+          21.0,
+          20.0,
+          23.0,
+          21.0,
+          10.0,
+          20.0,
+          9.0,
+          7.0,
+          10.0,
+          9.0,
+          8.0,
+          13.0,
+          3.0,
+          5.0,
+          2.0,
+          6.0,
+          3.0,
+          3.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005896663758903742,
+        "grad_grad_wrt_hidden": 0.05208346247673035,
+        "grad_grad_wrt_Wq": 0.06528983265161514,
+        "grad_grad_wrt_Wk": 0.06512214988470078,
+        "grad_task_loss": 0.8584139943122864,
+        "geom_hidden_cos_pos": 0.6904771325644106,
+        "geom_hidden_cos_neg": 0.381748567779141,
+        "geom_hidden_cos_gap": 0.30872856478526955,
+        "geom_proj_qk_cos_pos": 0.7163327941671014,
+        "geom_proj_qk_cos_neg": -0.04216105379843308,
+        "geom_proj_qk_cos_gap": 0.7584938479655344,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.0019257263047620654,
+              "entropy_frac_of_uniform": 0.001389117891177763,
+              "top1_prob_mean": 0.9996436834335327,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.019093506038188934,
+              "entropy_frac_of_uniform": 0.013773053199393245,
+              "top1_prob_mean": 0.9956744909286499,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.2392367124557495,
+              "entropy_frac_of_uniform": 0.1725728088550427,
+              "top1_prob_mean": 0.9377031922340393,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.7288007736206055,
+              "entropy_frac_of_uniform": 0.5257186295046555,
+              "top1_prob_mean": 0.7635058164596558,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.1567976474761963,
+              "entropy_frac_of_uniform": 0.8344531123700241,
+              "top1_prob_mean": 0.5364291667938232,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3472394943237305,
+              "entropy_frac_of_uniform": 0.9718278660048775,
+              "top1_prob_mean": 0.3591165244579315,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 500,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 25.53406524658203,
+        "dyn_neg_score_mean": -2.346698522567749,
+        "dyn_margin_mean": 27.88076400756836,
+        "dyn_entropy_mean": 0.008697583340108395,
+        "dyn_top1_prob_mean": 0.9974524974822998,
+        "dyn_logit_variance_mean": 213.13660669326782,
+        "dyn_pos_score_std": 7.1058783531188965,
+        "dyn_neg_score_std": 10.109395027160645,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          1.0,
+          2.0,
+          3.0,
+          7.0,
+          5.0,
+          5.0,
+          8.0,
+          6.0,
+          15.0,
+          11.0,
+          16.0,
+          22.0,
+          21.0,
+          19.0,
+          24.0,
+          11.0,
+          7.0,
+          7.0,
+          8.0,
+          6.0,
+          7.0,
+          11.0,
+          7.0,
+          10.0,
+          2.0,
+          8.0,
+          2.0,
+          1.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.006385316606611013,
+        "grad_grad_wrt_hidden": 0.05051782727241516,
+        "grad_grad_wrt_Wq": 0.07321532070636749,
+        "grad_grad_wrt_Wk": 0.10338018089532852,
+        "grad_task_loss": 0.4025989770889282,
+        "geom_hidden_cos_pos": 0.7170418299501762,
+        "geom_hidden_cos_neg": 0.44031487026586547,
+        "geom_hidden_cos_gap": 0.2767269596843107,
+        "geom_proj_qk_cos_pos": 0.698564087972045,
+        "geom_proj_qk_cos_neg": -0.04420944116524576,
+        "geom_proj_qk_cos_gap": 0.7427735291372907,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.008697583340108395,
+              "entropy_frac_of_uniform": 0.00627398015900656,
+              "top1_prob_mean": 0.9974524974822998,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.026393761858344078,
+              "entropy_frac_of_uniform": 0.019039074619402394,
+              "top1_prob_mean": 0.9912818074226379,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.2126035988330841,
+              "entropy_frac_of_uniform": 0.15336107843440755,
+              "top1_prob_mean": 0.9429998993873596,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.6913074254989624,
+              "entropy_frac_of_uniform": 0.4986728958782638,
+              "top1_prob_mean": 0.7782586216926575,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.133557915687561,
+              "entropy_frac_of_uniform": 0.8176891895145618,
+              "top1_prob_mean": 0.5503741502761841,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3420543670654297,
+              "entropy_frac_of_uniform": 0.9680875873241908,
+              "top1_prob_mean": 0.3654715120792389,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 750,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 32.88804626464844,
+        "dyn_neg_score_mean": -2.2018017768859863,
+        "dyn_margin_mean": 35.089847564697266,
+        "dyn_entropy_mean": 0.008089778944849968,
+        "dyn_top1_prob_mean": 0.9974378943443298,
+        "dyn_logit_variance_mean": 372.5072373151779,
+        "dyn_pos_score_std": 11.269261360168457,
+        "dyn_neg_score_std": 13.981780052185059,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          2.0,
+          0.0,
+          1.0,
+          4.0,
+          4.0,
+          2.0,
+          4.0,
+          4.0,
+          6.0,
+          5.0,
+          5.0,
+          7.0,
+          6.0,
+          14.0,
+          16.0,
+          12.0,
+          18.0,
+          19.0,
+          16.0,
+          11.0,
+          13.0,
+          8.0,
+          10.0,
+          8.0,
+          4.0,
+          6.0,
+          5.0,
+          7.0,
+          7.0,
+          6.0,
+          1.0,
+          1.0,
+          8.0,
+          6.0,
+          2.0,
+          2.0,
+          2.0,
+          1.0,
+          0.0,
+          1.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.007538274396210909,
+        "grad_grad_wrt_hidden": 0.04012766480445862,
+        "grad_grad_wrt_Wq": 0.17579112946987152,
+        "grad_grad_wrt_Wk": 0.11584257334470749,
+        "grad_task_loss": 0.20347435772418976,
+        "geom_hidden_cos_pos": 0.7401287818793207,
+        "geom_hidden_cos_neg": 0.45558217545233975,
+        "geom_hidden_cos_gap": 0.284546606426981,
+        "geom_proj_qk_cos_pos": 0.7009119759313762,
+        "geom_proj_qk_cos_neg": -0.027751487214118242,
+        "geom_proj_qk_cos_gap": 0.7286634631454945,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.008089778944849968,
+              "entropy_frac_of_uniform": 0.005835541966776391,
+              "top1_prob_mean": 0.9974378943443298,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.022404002025723457,
+              "entropy_frac_of_uniform": 0.0161610712648808,
+              "top1_prob_mean": 0.9923696517944336,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.17276647686958313,
+              "entropy_frac_of_uniform": 0.12462466936335463,
+              "top1_prob_mean": 0.9522252082824707,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.5580164194107056,
+              "entropy_frac_of_uniform": 0.40252375940315144,
+              "top1_prob_mean": 0.8222468495368958,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.014266014099121,
+              "entropy_frac_of_uniform": 0.7316382723310872,
+              "top1_prob_mean": 0.6117730140686035,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3110594749450684,
+              "entropy_frac_of_uniform": 0.9457294988081603,
+              "top1_prob_mean": 0.3973378539085388,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1000,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 36.640377044677734,
+        "dyn_neg_score_mean": -2.3845303058624268,
+        "dyn_margin_mean": 39.024906158447266,
+        "dyn_entropy_mean": 0.0013406593352556229,
+        "dyn_top1_prob_mean": 0.9997463226318359,
+        "dyn_logit_variance_mean": 421.2620874643326,
+        "dyn_pos_score_std": 11.977089881896973,
+        "dyn_neg_score_std": 14.405027389526367,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          2.0,
+          5.0,
+          1.0,
+          5.0,
+          7.0,
+          8.0,
+          2.0,
+          8.0,
+          3.0,
+          7.0,
+          9.0,
+          10.0,
+          11.0,
+          11.0,
+          16.0,
+          16.0,
+          21.0,
+          9.0,
+          14.0,
+          15.0,
+          3.0,
+          3.0,
+          2.0,
+          8.0,
+          5.0,
+          6.0,
+          7.0,
+          6.0,
+          8.0,
+          3.0,
+          3.0,
+          3.0,
+          4.0,
+          5.0,
+          3.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.02597803808748722,
+        "grad_grad_wrt_hidden": 0.059475384652614594,
+        "grad_grad_wrt_Wq": 0.6748889684677124,
+        "grad_grad_wrt_Wk": 0.6025061011314392,
+        "grad_task_loss": 0.10550269484519958,
+        "geom_hidden_cos_pos": 0.7534001488238573,
+        "geom_hidden_cos_neg": 0.45901374602302286,
+        "geom_hidden_cos_gap": 0.29438640280083445,
+        "geom_proj_qk_cos_pos": 0.7076744046062231,
+        "geom_proj_qk_cos_neg": -0.03402995870662077,
+        "geom_proj_qk_cos_gap": 0.7417043633128438,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.0013406593352556229,
+              "entropy_frac_of_uniform": 0.0009670812845900106,
+              "top1_prob_mean": 0.9997463226318359,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.009197890758514404,
+              "entropy_frac_of_uniform": 0.006634875673742033,
+              "top1_prob_mean": 0.9976100325584412,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.09894083440303802,
+              "entropy_frac_of_uniform": 0.07137072537122455,
+              "top1_prob_mean": 0.9751314520835876,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.43971315026283264,
+              "entropy_frac_of_uniform": 0.31718598977735124,
+              "top1_prob_mean": 0.8730685114860535,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.950133204460144,
+              "entropy_frac_of_uniform": 0.6853762292459936,
+              "top1_prob_mean": 0.6572372317314148,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2998617887496948,
+              "entropy_frac_of_uniform": 0.9376520756586075,
+              "top1_prob_mean": 0.41561001539230347,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 30.090797424316406,
+        "dyn_neg_score_mean": -0.014717618934810162,
+        "dyn_margin_mean": 30.105514526367188,
+        "dyn_entropy_mean": 0.00367431971244514,
+        "dyn_top1_prob_mean": 0.9993257522583008,
+        "dyn_logit_variance_mean": 279.94508372992277,
+        "dyn_pos_score_std": 9.965399742126465,
+        "dyn_neg_score_std": 12.947308540344238,
+        "dyn_hist_counts": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          1.0,
+          3.0,
+          1.0,
+          6.0,
+          6.0,
+          4.0,
+          4.0,
+          12.0,
+          7.0,
+          19.0,
+          8.0,
+          13.0,
+          15.0,
+          18.0,
+          12.0,
+          14.0,
+          15.0,
+          10.0,
+          13.0,
+          8.0,
+          15.0,
+          7.0,
+          3.0,
+          5.0,
+          5.0,
+          8.0,
+          5.0,
+          3.0,
+          5.0,
+          2.0,
+          2.0,
+          1.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.005140853580087423,
+        "grad_grad_wrt_hidden": 0.01827305369079113,
+        "grad_grad_wrt_Wq": 0.08949527144432068,
+        "grad_grad_wrt_Wk": 0.12647922337055206,
+        "grad_task_loss": 0.03085118718445301,
+        "geom_hidden_cos_pos": 0.7142756542889401,
+        "geom_hidden_cos_neg": 0.5022386951556351,
+        "geom_hidden_cos_gap": 0.212036959133305,
+        "geom_proj_qk_cos_pos": 0.7018404800910503,
+        "geom_proj_qk_cos_neg": 0.016039368167791206,
+        "geom_proj_qk_cos_gap": 0.6858011119232591,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.00367431971244514,
+              "entropy_frac_of_uniform": 0.0026504614066095514,
+              "top1_prob_mean": 0.9993257522583008,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.027483917772769928,
+              "entropy_frac_of_uniform": 0.01982545588301052,
+              "top1_prob_mean": 0.9933815598487854,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.2389875054359436,
+              "entropy_frac_of_uniform": 0.17239304398972233,
+              "top1_prob_mean": 0.9334895610809326,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.6627302169799805,
+              "entropy_frac_of_uniform": 0.4780587974285154,
+              "top1_prob_mean": 0.7780116200447083,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.0933103561401367,
+              "entropy_frac_of_uniform": 0.7886567123108621,
+              "top1_prob_mean": 0.5640032291412354,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.330657720565796,
+              "entropy_frac_of_uniform": 0.9598666446528874,
+              "top1_prob_mean": 0.3741450011730194,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1500,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 33.082096099853516,
+        "dyn_neg_score_mean": -1.5553172826766968,
+        "dyn_margin_mean": 34.637413024902344,
+        "dyn_entropy_mean": 0.01344156265258789,
+        "dyn_top1_prob_mean": 0.9917815923690796,
+        "dyn_logit_variance_mean": 368.69157153367996,
+        "dyn_pos_score_std": 9.194313049316406,
+        "dyn_neg_score_std": 14.841838836669922,
+        "dyn_hist_counts": [
+          2.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          2.0,
+          0.0,
+          1.0,
+          0.0,
+          5.0,
+          1.0,
+          5.0,
+          7.0,
+          8.0,
+          6.0,
+          7.0,
+          10.0,
+          15.0,
+          6.0,
+          16.0,
+          12.0,
+          13.0,
+          21.0,
+          14.0,
+          15.0,
+          11.0,
+          8.0,
+          3.0,
+          6.0,
+          4.0,
+          5.0,
+          8.0,
+          9.0,
+          8.0,
+          9.0,
+          5.0,
+          3.0,
+          3.0,
+          0.0,
+          5.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.013509197160601616,
+        "grad_grad_wrt_hidden": 0.03841514140367508,
+        "grad_grad_wrt_Wq": 0.2169906347990036,
+        "grad_grad_wrt_Wk": 0.1500619798898697,
+        "grad_task_loss": 0.10740916430950165,
+        "geom_hidden_cos_pos": 0.7467078047338873,
+        "geom_hidden_cos_neg": 0.5135174104555821,
+        "geom_hidden_cos_gap": 0.23319039427830524,
+        "geom_proj_qk_cos_pos": 0.6873892829753458,
+        "geom_proj_qk_cos_neg": -0.005881692782471267,
+        "geom_proj_qk_cos_gap": 0.6932709757578172,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 0.01344156265258789,
+              "entropy_frac_of_uniform": 0.00969603786370031,
+              "top1_prob_mean": 0.9917815923690796,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.025509227067232132,
+              "entropy_frac_of_uniform": 0.01840101764284019,
+              "top1_prob_mean": 0.9886329770088196,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.14979299902915955,
+              "entropy_frac_of_uniform": 0.10805280813271557,
+              "top1_prob_mean": 0.9564093351364136,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.5412673950195312,
+              "entropy_frac_of_uniform": 0.39044189222191267,
+              "top1_prob_mean": 0.8314964175224304,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 1.029363751411438,
+              "entropy_frac_of_uniform": 0.7425289876757233,
+              "top1_prob_mean": 0.6088541150093079,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.3154879808425903,
+              "entropy_frac_of_uniform": 0.9489239905478335,
+              "top1_prob_mean": 0.3936687111854553,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 1750,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 45.676849365234375,
+        "dyn_neg_score_mean": 1.2186884880065918,
+        "dyn_margin_mean": 44.458160400390625,
+        "dyn_entropy_mean": 6.376406417984981e-06,
+        "dyn_top1_prob_mean": 0.999999463558197,
+        "dyn_logit_variance_mean": 596.2458212375641,
+        "dyn_pos_score_std": 14.066620826721191,
+        "dyn_neg_score_std": 19.355161666870117,
+        "dyn_hist_counts": [
+          2.0,
+          1.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          2.0,
+          0.0,
+          1.0,
+          1.0,
+          2.0,
+          2.0,
+          2.0,
+          1.0,
+          5.0,
+          5.0,
+          8.0,
+          7.0,
+          5.0,
+          4.0,
+          10.0,
+          11.0,
+          6.0,
+          8.0,
+          9.0,
+          14.0,
+          15.0,
+          11.0,
+          8.0,
+          12.0,
+          8.0,
+          8.0,
+          6.0,
+          7.0,
+          9.0,
+          4.0,
+          7.0,
+          6.0,
+          3.0,
+          5.0,
+          8.0,
+          4.0,
+          4.0,
+          3.0,
+          3.0,
+          5.0,
+          10.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.020162103697657585,
+        "grad_grad_wrt_hidden": 0.049003951251506805,
+        "grad_grad_wrt_Wq": 0.18598978221416473,
+        "grad_grad_wrt_Wk": 0.2602840065956116,
+        "grad_task_loss": 0.06110670417547226,
+        "geom_hidden_cos_pos": 0.7684605757240206,
+        "geom_hidden_cos_neg": 0.49744707578550634,
+        "geom_hidden_cos_gap": 0.27101349993851426,
+        "geom_proj_qk_cos_pos": 0.7744791712611914,
+        "geom_proj_qk_cos_neg": 0.03112780218361877,
+        "geom_proj_qk_cos_gap": 0.7433513690775726,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 6.376406417984981e-06,
+              "entropy_frac_of_uniform": 4.599604946320788e-06,
+              "top1_prob_mean": 0.999999463558197,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.0014565803576260805,
+              "entropy_frac_of_uniform": 0.0010507006264145573,
+              "top1_prob_mean": 0.9998058080673218,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.07477613538503647,
+              "entropy_frac_of_uniform": 0.053939579700199844,
+              "top1_prob_mean": 0.9839683175086975,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.3767736554145813,
+              "entropy_frac_of_uniform": 0.27178474135529207,
+              "top1_prob_mean": 0.8940039873123169,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.8744726181030273,
+              "entropy_frac_of_uniform": 0.6307986530318821,
+              "top1_prob_mean": 0.6904606819152832,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2724051475524902,
+              "entropy_frac_of_uniform": 0.9178462956656932,
+              "top1_prob_mean": 0.4372147023677826,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2000,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 49.12821578979492,
+        "dyn_neg_score_mean": -1.3573646545410156,
+        "dyn_margin_mean": 50.48558044433594,
+        "dyn_entropy_mean": 8.682459156261757e-05,
+        "dyn_top1_prob_mean": 0.9999895691871643,
+        "dyn_logit_variance_mean": 740.9164950847626,
+        "dyn_pos_score_std": 13.737351417541504,
+        "dyn_neg_score_std": 20.603008270263672,
+        "dyn_hist_counts": [
+          2.0,
+          0.0,
+          1.0,
+          2.0,
+          0.0,
+          3.0,
+          1.0,
+          1.0,
+          3.0,
+          2.0,
+          3.0,
+          3.0,
+          2.0,
+          3.0,
+          6.0,
+          5.0,
+          2.0,
+          2.0,
+          7.0,
+          8.0,
+          4.0,
+          8.0,
+          8.0,
+          11.0,
+          10.0,
+          10.0,
+          8.0,
+          11.0,
+          13.0,
+          16.0,
+          11.0,
+          4.0,
+          8.0,
+          4.0,
+          2.0,
+          5.0,
+          6.0,
+          8.0,
+          2.0,
+          1.0,
+          5.0,
+          5.0,
+          6.0,
+          3.0,
+          5.0,
+          8.0,
+          6.0,
+          12.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 8.372267620870844e-05,
+        "grad_grad_wrt_hidden": 0.0043049887754023075,
+        "grad_grad_wrt_Wq": 0.001680841320194304,
+        "grad_grad_wrt_Wk": 0.0012185380328446627,
+        "grad_task_loss": 0.009139235131442547,
+        "geom_hidden_cos_pos": 0.7664432995952666,
+        "geom_hidden_cos_neg": 0.46778808525414206,
+        "geom_hidden_cos_gap": 0.2986552143411245,
+        "geom_proj_qk_cos_pos": 0.7368052764795721,
+        "geom_proj_qk_cos_neg": -0.004377384131657891,
+        "geom_proj_qk_cos_gap": 0.74118266061123,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 8.682459156261757e-05,
+              "entropy_frac_of_uniform": 6.263070366520019e-05,
+              "top1_prob_mean": 0.9999895691871643,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.0021034760866314173,
+              "entropy_frac_of_uniform": 0.0015173372552364417,
+              "top1_prob_mean": 0.9995783567428589,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.04385616257786751,
+              "entropy_frac_of_uniform": 0.03163553404482556,
+              "top1_prob_mean": 0.9902327060699463,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.27815133333206177,
+              "entropy_frac_of_uniform": 0.20064377405607323,
+              "top1_prob_mean": 0.9270222783088684,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.7810069918632507,
+              "entropy_frac_of_uniform": 0.5633774554822909,
+              "top1_prob_mean": 0.7390478849411011,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2441989183425903,
+              "entropy_frac_of_uniform": 0.8974998022199521,
+              "top1_prob_mean": 0.46500176191329956,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2250,
+        "aux_active": true
+      },
+      {
+        "dyn_pos_score_mean": 46.522544860839844,
+        "dyn_neg_score_mean": -0.09773367643356323,
+        "dyn_margin_mean": 46.620277404785156,
+        "dyn_entropy_mean": 6.28187217444065e-06,
+        "dyn_top1_prob_mean": 0.9999995231628418,
+        "dyn_logit_variance_mean": 666.424076795578,
+        "dyn_pos_score_std": 14.902654647827148,
+        "dyn_neg_score_std": 20.504972457885742,
+        "dyn_hist_counts": [
+          2.0,
+          0.0,
+          1.0,
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          4.0,
+          1.0,
+          0.0,
+          3.0,
+          4.0,
+          4.0,
+          2.0,
+          1.0,
+          5.0,
+          5.0,
+          3.0,
+          4.0,
+          7.0,
+          5.0,
+          3.0,
+          14.0,
+          11.0,
+          15.0,
+          14.0,
+          9.0,
+          10.0,
+          14.0,
+          10.0,
+          6.0,
+          5.0,
+          6.0,
+          8.0,
+          4.0,
+          8.0,
+          3.0,
+          4.0,
+          8.0,
+          13.0,
+          5.0,
+          7.0,
+          2.0,
+          0.0,
+          3.0,
+          2.0,
+          2.0,
+          16.0
+        ],
+        "dyn_hist_range": [
+          -60.0,
+          60.0
+        ],
+        "dyn_hist_bins": 48,
+        "dyn_n_queries": 64,
+        "grad_grad_wrt_score": 0.006355054676532745,
+        "grad_grad_wrt_hidden": 0.019572874531149864,
+        "grad_grad_wrt_Wq": 0.10969943553209305,
+        "grad_grad_wrt_Wk": 0.18382787704467773,
+        "grad_task_loss": 0.04679127037525177,
+        "geom_hidden_cos_pos": 0.7682583443820477,
+        "geom_hidden_cos_neg": 0.48963457573457464,
+        "geom_hidden_cos_gap": 0.278623768647473,
+        "geom_proj_qk_cos_pos": 0.758665585424751,
+        "geom_proj_qk_cos_neg": 0.012137679431665068,
+        "geom_proj_qk_cos_gap": 0.7465279059930859,
+        "temp": {
+          "max_entropy_uniform": 1.3862943649291992,
+          "by_temp": {
+            "1.0": {
+              "entropy_mean": 6.28187217444065e-06,
+              "entropy_frac_of_uniform": 4.531412904330371e-06,
+              "top1_prob_mean": 0.9999995231628418,
+              "ranking_preserved": true
+            },
+            "2.0": {
+              "entropy_mean": 0.0012256482150405645,
+              "entropy_frac_of_uniform": 0.0008841182984273046,
+              "top1_prob_mean": 0.9998278617858887,
+              "ranking_preserved": true
+            },
+            "5.0": {
+              "entropy_mean": 0.055175233632326126,
+              "entropy_frac_of_uniform": 0.039800517861258156,
+              "top1_prob_mean": 0.9885188341140747,
+              "ranking_preserved": true
+            },
+            "10.0": {
+              "entropy_mean": 0.3395043909549713,
+              "entropy_frac_of_uniform": 0.24490064992243582,
+              "top1_prob_mean": 0.9095114469528198,
+              "ranking_preserved": true
+            },
+            "20.0": {
+              "entropy_mean": 0.8491477966308594,
+              "entropy_frac_of_uniform": 0.612530655907432,
+              "top1_prob_mean": 0.7065011262893677,
+              "ranking_preserved": true
+            },
+            "50.0": {
+              "entropy_mean": 1.2622365951538086,
+              "entropy_frac_of_uniform": 0.91051123562655,
+              "top1_prob_mean": 0.4465034604072571,
+              "ranking_preserved": true
+            }
+          }
+        },
+        "step": 2499,
+        "aux_active": true
+      }
+    ]
+  },
+  "wall_clock_s": 377.96416664123535
+}
