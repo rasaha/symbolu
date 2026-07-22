@@ -1,0 +1,1 @@
+{"derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"MD01","modality":"image","outcome_derivation":"§8.1(UNSUPPORTED_MODALITY) -> INDETERMINATE","phenomenon":"unsupported_modality","rule":"modality image not in BASE supported {text,json} -> UNSUPPORTED_MODALITY"}

@@ -1,0 +1,1 @@
+{"artifact_attributed_source":"S9","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SV03","outcome_derivation":"§8.1(PROVENANCE_MISMATCH) -> NOT_ASSURED","phenomenon":"provenance_mismatch","rule":"artifact attributes to source not in entry.provenance_ids -> PROVENANCE_MISMATCH","vr_provenance_ids":["S1"]}

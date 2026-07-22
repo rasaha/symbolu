@@ -1,0 +1,1 @@
+{"adjudication":"A: artifact decomposed 'e + U+0301' NFC-normalizes to the precomposed record alias 'systém' -> exact match. No diacritic folding.","code_points":["e","U+0301"],"correspondence_stage":"exact","defect":"FIXTURE_INPUT_CORRECTION","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"UC09","nfc_equal_to_alias":true,"outcome":"ASSURED","phenomenon":"unicode"}

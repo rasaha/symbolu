@@ -1,0 +1,9 @@
+# BASE-SCOPE-CMP/1.0 relation	subset_ok
+equal	YES
+narrower	YES
+wider	NO
+overlap	LIMIT
+incomparable	LIMIT
+artifact_absent_validated_restricted	NO
+artifact_absent_validated_unrestricted	YES
+validated_absent	YES

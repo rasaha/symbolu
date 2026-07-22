@@ -1,0 +1,36 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "tap-e7-base/projection-pi/1.0",
+ "title": "TAP-E7-BASE normalized projection Pi",
+ "description": "Implementation-independent semantic core of an AssuranceRecord. Hashed via TAP-CANON/1 to yield projection_pi_sha256. Located under spec/ (not schemas/) so it is not a runtime resource and does not affect schema_root or config_fingerprint.",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["outcome", "findings", "evaluation_summary"],
+ "properties": {
+  "outcome": { "enum": ["ASSURED", "NOT_ASSURED", "INDETERMINATE"] },
+  "findings": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["category", "polarity"],
+    "properties": {
+     "category": { "type": "string" },
+     "polarity": { "enum": ["POSITIVE_VIOLATION", "EVALUATION_LIMITATION"] }
+    }
+   }
+  },
+  "evaluation_summary": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["total_assertive", "evaluated_assertive", "unevaluated_assertive", "positive_violations", "evaluation_limitations"],
+   "properties": {
+    "total_assertive": { "type": "integer", "minimum": 0 },
+    "evaluated_assertive": { "type": "integer", "minimum": 0 },
+    "unevaluated_assertive": { "type": "integer", "minimum": 0 },
+    "positive_violations": { "type": "integer", "minimum": 0 },
+    "evaluation_limitations": { "type": "integer", "minimum": 0 }
+   }
+  }
+ }
+}

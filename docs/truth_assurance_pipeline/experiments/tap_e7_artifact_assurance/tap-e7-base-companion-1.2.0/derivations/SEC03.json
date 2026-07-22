@@ -1,0 +1,1 @@
+{"attack":"hidden_html","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC03","outcome_derivation":"§8.1(PROCESSING_FAILURE) -> INDETERMINATE","payload_present":true,"phenomenon":"security","rule":"raw HTML block unsupported by BASE-MD grammar -> PROCESSING_FAILURE"}

@@ -1,0 +1,1 @@
+{"attack":"prompt_injection","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC01","outcome_derivation":"§8.1(<none>) -> ASSURED","payload_present":true,"phenomenon":"security","rule":"verify-only; injection text carries no authority; proposition still exact-matches V1 -> ASSURED"}
