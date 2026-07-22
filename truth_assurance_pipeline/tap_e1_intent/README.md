@@ -1,4 +1,4 @@
-# TAP-E1 — Intent Understanding Layer
+# TAP-E1 — Intent Analysis Layer
 
 A **new, self-contained** research track for the first phase of the Truth Assurance
 Platform (TAP). It converts a raw user request into an explicit, structured
@@ -8,8 +8,8 @@ Platform (TAP). It converts a raw user request into an explicit, structured
 > **Boundary:** this layer interprets the request. It does **not** validate the
 > world. It never decides factual correctness, retrieval, policy, claim support,
 > authorization, or the final response, and it **never answers the request it is
-> analyzing**. Trusted Retrieval, Relationship/Governance/Claim/Response Truth,
-> Evidence Packets, ActionGate, and production TAP orchestration are out of scope and
+> analyzing**. Evidence Retrieval, Relationship/Governance/Claim/Response Validation,
+> Evidence Assemblys, ActionGate, and production TAP orchestration are out of scope and
 > are not implemented or modified here.
 
 > **Honesty:** the corpus is synthetic and human-authored for this study (no prior

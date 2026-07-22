@@ -1,0 +1,43 @@
+{
+  "experiment": "TAP-E3 Relationship Truth",
+  "phase": "third TAP research layer — relationship extraction/normalization/conflict/gap only",
+  "status": "preregistered before locked-set scoring",
+  "inputs": ["IntentRecord (TAP-E1, frozen public interface)",
+             "RetrievalRecord (TAP-E2, frozen public interface)"],
+  "responsibility": "represent what relationship the evidence establishes; NOT claim truth, governance applicability, authorization, or a user answer",
+  "honesty_notes": [
+    "New, independently authored synthetic corpus; TAP-E2 query annotations are NOT reused as relationship gold.",
+    "Deterministic pattern-based extraction over sentences authored to be parseable; no model-based interpretation in this phase; no claim of general NLU.",
+    "Results are mechanism/construction validation on the synthetic corpus used in this study only.",
+    "The eval split is content-hash locked and preregistered, but was inspected during iterative engineering — a LOCKED DEVELOPMENT evaluation, not an untouched or interpreter-blind holdout."
+  ],
+  "ontology_version": "tap-e3-ontology/1.0.0",
+  "schema_version": "tap-e3-relationship/1.0.0",
+  "baselines": {
+    "A": "entity co-occurrence",
+    "B": "predicate keyword matching",
+    "C": "normalized deterministic extraction (active/passive, ontology, direction)",
+    "D": "C + polarity and modality",
+    "E": "D + temporality, scope, conditions, exceptions",
+    "F": "full TAP-E3 (consolidation, conflict, confidence, gaps, provenance, trace)"
+  },
+  "config_selection_rule": "the SIMPLEST baseline (A..F order) that satisfies ALL preregistered gates on the DEV split; the locked eval split is never used for selection.",
+  "gates": [
+    {"key": "relationship_f1", "op": ">=", "threshold": 0.80},
+    {"key": "predicate_accuracy", "op": ">=", "threshold": 0.85},
+    {"key": "direction_accuracy", "op": ">=", "threshold": 0.90},
+    {"key": "polarity_accuracy", "op": ">=", "threshold": 0.95},
+    {"key": "modality_accuracy", "op": ">=", "threshold": 0.85},
+    {"key": "provenance_completeness", "op": "==", "threshold": 1.00},
+    {"key": "conflict_detection_f1", "op": ">=", "threshold": 0.75},
+    {"key": "gap_detection_accuracy", "op": ">=", "threshold": 0.75},
+    {"key": "cooccurrence_false_positive_rate", "op": "<=", "threshold": 0.10},
+    {"key": "unsupported_relationship_rate", "op": "<=", "threshold": 0.10},
+    {"key": "severe_critical_failure_count", "op": "==", "threshold": 0.0}
+  ],
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "all gates pass on the locked eval for the selected baseline (capped by synthetic corpus + deterministic extractor)",
+    "INCONCLUSIVE": "no baseline passes all gates on dev, or 1-2 non-severe gates fail on eval",
+    "FAIL": "a severe gate fails or 3+ gates fail on eval"
+  }
+}

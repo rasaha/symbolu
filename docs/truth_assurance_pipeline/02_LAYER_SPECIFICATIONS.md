@@ -12,8 +12,8 @@ modes · abstention · confidence · evaluation metrics. Architecture-only; no c
 
 | Responsibility | Owning layer |
 |---|---|
-| scope / user intent | Intent Understanding |
-| candidate evidence retrieval | Trusted Retrieval |
+| scope / user intent | Intent Analysis |
+| candidate evidence retrieval | Evidence Retrieval |
 | relationship supported-by-evidence? | Layer 1 |
 | relationship applicability / who governs? | Layer 2 |
 | assemble minimum complete evidence | Layer 3 |
@@ -25,7 +25,7 @@ No responsibility appears twice.
 
 ---
 
-## Pre-truth stage — Intent Understanding
+## Pre-truth stage — Intent Analysis
 
 - **Responsibility:** turn the user request into a scoped, typed query (entities,
   intent type, constraints). Not a truth layer.
@@ -35,7 +35,7 @@ No responsibility appears twice.
 - **Abstention:** ambiguous intent → request clarification.
 - **Metrics:** intent classification accuracy; constraint-capture recall.
 
-## Pre-truth stage — Trusted Retrieval
+## Pre-truth stage — Evidence Retrieval
 
 - **Responsibility:** produce candidate evidence (documents + spans) for the scoped
   query. Not a truth layer; it does not decide truth.
@@ -47,7 +47,7 @@ No responsibility appears twice.
 
 ---
 
-## Layer 1 — Relationship Truth Layer
+## Layer 1 — Relationship Analysis Layer
 
 - **Single responsibility:** determine whether proposed semantic relationships are
   actually supported by evidence. **Never makes governance decisions.**
@@ -65,7 +65,7 @@ No responsibility appears twice.
   validates relationship *claims* and is the closest reference; a dedicated Layer-1
   experiment is future work (`11_…`).
 
-## Layer 2 — Governance Truth Layer
+## Layer 2 — Governance Resolution Layer
 
 - **Single responsibility:** determine **applicability** — which supported
   relationships actually govern. **Never invents relationships** (consumes Layer 1's
@@ -81,7 +81,7 @@ No responsibility appears twice.
 - **Metrics:** operative-source accuracy; conflict-resolution correctness;
   abstention correctness on genuine-conflict cases.
 
-## Layer 3 — Evidence Packet
+## Layer 3 — Evidence Assembly
 
 - **Single responsibility:** produce the **minimum complete** evidence downstream
   reasoning needs. **No natural-language generation.**
@@ -95,7 +95,7 @@ No responsibility appears twice.
 - **Metrics:** completeness (all material evidence present); minimality; provenance
   coverage.
 
-## Layer 4 — Claim Truth Layer
+## Layer 4 — Claim Validation Layer
 
 - **Single responsibility:** validate every factual claim produced from the packet;
   each claim is an atomic hypothesis.
@@ -114,7 +114,7 @@ No responsibility appears twice.
   `relationship_claim_validation/` v0.1 — with deterministic judges and the six
   statuses. It is construction-validated only (see its `FINAL_VERDICT.md`).
 
-## Layer 5 — Response Truth Layer
+## Layer 5 — Response Validation Layer
 
 - **Single responsibility:** validate the **complete answer** for faithfulness to the
   validated claims. Owns only response correctness.

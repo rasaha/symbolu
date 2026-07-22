@@ -1,6 +1,11 @@
 # Final Verdict (v0.1)
 
-Relationship Claim Validation Experiment v0.1 — "Claim Truth Layer".
+Relationship Claim Validation Experiment v0.1 — "Claim Validation Layer".
+
+> **Naming note.** *Claim Validation* is the canonical engineering name for TAP layer L4
+> (TAP-E6). **Previously referred to as Claim Truth.** The experiment ID and the package
+> `relationship_claim_validation/` are unchanged. See
+> `docs/truth_assurance_pipeline/01_TRUTH_ASSURANCE_ARCHITECTURE.md` §2a.
 
 ---
 

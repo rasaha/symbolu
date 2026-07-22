@@ -230,7 +230,7 @@ validate / qualify / abstain with provenance, above the model.
 **Economic lever (Mechanism B — risk / incident avoidance).** Validate before delivery → avoid the cost
 of an acted-upon hallucination (bad decision, compliance exposure, lost trust).
 
-**Evidence.** **[NOT-QUANTIFIED].** TAP is **emerging** — only the Claim Truth layer has a synthetic
+**Evidence.** **[NOT-QUANTIFIED].** TAP is **emerging** — only the Claim Validation layer has a synthetic
 prototype whose own verdict is "production: NO." No avoided-error rate is measured.
 
 **Counter-cost.** Validation adds latency and compute per response; abstention has a coverage cost (some

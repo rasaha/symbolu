@@ -1,0 +1,47 @@
+{
+  "experiment": "TAP-E1.1 Real Model Validation",
+  "phase": "validation of the frozen TAP-E1 Intent Understanding Layer with a real LLM interpreter",
+  "status": "preregistered before hidden-set scoring",
+  "the_only_variable_under_study": "the interpretation engine (deterministic stand-in -> real LLM). Schema, deterministic extraction, provenance, ambiguity, conflict, clarification, metrics, and leakage controls are imported UNCHANGED from TAP-E1.",
+  "honesty_notes": [
+    "New, independently authored synthetic corpus (v1.1); no TAP-E1 prompt reused or mutated.",
+    "No Anthropic API key is available in this environment, so the real-model outputs were produced by the IN-SESSION agent model (claude-opus-4-8) acting as the interpreter and cached. This is a real LLM interpreting, but NOT an independent API run.",
+    "The SAME model authored the corpus and interpreted it (author==interpreter confound). This is the single largest limitation and bounds the claim.",
+    "Interpretations were produced from the prompt (+ conversation/metadata) only; gold was never consulted at inference.",
+    "Token counts are ~4-chars/token estimates; latency is not measured on the agent path (the API path measures it)."
+  ],
+  "corpus_target_vs_actual": {
+    "targets": {"dev": "100-150", "eval": 50, "adversarial": 20, "negative": 20},
+    "actual": {"dev": 53, "eval": 24, "adversarial": 12, "negative": 12},
+    "reason": "Reduced below target because each real-model interpretation was produced by hand by the in-session agent (no API), so coverage was scoped for tractability and quality. Real-model outputs were produced for the full eval/adversarial/negative splits plus a 20-case dev sample used for config selection."
+  },
+  "baselines": {
+    "A": "raw LLM interpretation (free text)",
+    "B": "LLM + IntentRecord schema",
+    "C": "LLM + deterministic extraction",
+    "D": "LLM + deterministic extraction + provenance",
+    "E": "LLM + extraction + provenance + ambiguity/conflict",
+    "F": "LLM + extraction + provenance + ambiguity + clarification"
+  },
+  "config_selection_rule": "argmax on the DEV split (cases with cached model output) of a documented weighted criterion; simplest baseline wins ties; the hidden eval set is NEVER used for selection.",
+  "gates": [
+    {"key": "explicit_constraint_preservation", "kind": "vs_deterministic", "op": ">=", "rationale": "LLM must not regress on constraint preservation vs deterministic TAP-E1 (V4)"},
+    {"key": "_fidelity", "kind": "vs_deterministic", "op": ">", "definition": "mean(primary_objective_accuracy, task_type_accuracy, entity_recall, explicit_constraint_preservation)", "rationale": "LLM must improve overall intent fidelity"},
+    {"key": "unsupported_assumption_rate", "kind": "absolute", "op": "<=", "threshold": 0.15, "rationale": "unsupported assumptions must remain acceptably low"},
+    {"key": "severe_failure_count", "kind": "vs_deterministic", "op": "<=", "rationale": "LLM severe failures must not exceed deterministic TAP-E1 (V4)"},
+    {"key": "provenance_completeness", "kind": "absolute", "op": ">=", "threshold": 0.90, "rationale": "provenance must remain complete"},
+    {"key": "material_ambiguity_recall", "kind": "absolute", "op": ">=", "threshold": 0.80, "rationale": "ambiguity must be represented"},
+    {"key": "_silent_resolution", "kind": "absolute", "op": "==", "threshold": 0.0, "definition": "resolved_material_ambiguity_without_evidence critical count", "rationale": "no material ambiguity may be silently resolved"}
+  ],
+  "gate_application": "Gates applied to the DEV-selected baseline on the HIDDEN eval split, comparing against the deterministic TAP-E1 V4 interpreter on the same case set. Fixed before hidden scoring.",
+  "verdict_rule": {
+    "PASS_WITH_LIMITED_CLAIM": "no safety gate fails AND the fidelity-improvement gate passes (capped below PASS by the synthetic corpus, in-session model, and author==interpreter confound)",
+    "INCONCLUSIVE": "no safety gate fails but fidelity does not improve -> deterministic remains the safer default",
+    "FAIL": "any safety gate fails -> deterministic remains safer"
+  },
+  "metric_corrections": [
+    "invented_action made paraphrase-invariant (abstractive interpreter); discovered on DEV.",
+    "material-ambiguity flag credits PARTIALLY_RESOLVED + explicit stated_assumption as 'represented'.",
+    "Both applied uniformly to all baselines and the deterministic interpreter; TAP-E1 metrics.py is not modified (corrections live in metrics_e11.py)."
+  ]
+}

@@ -41,7 +41,7 @@ conforms, because the interface (`03_…`) is the contract, not the mechanism.
 
 The `relationship_claim_validation/` v0.1 prototype instantiates all four roles
 **deterministically** (advocate, challenger, deterministic pre-checks, adjudicator)
-for the Claim Truth Layer. Its measured ablation shows each role removes a **distinct
+for the Claim Validation Layer. Its measured ablation shows each role removes a **distinct
 failure class** (challenger → contradictions; adjudicator → equally-explicit
 conflicts). That is a **synthetic, construction-validated** demonstration of the role
 decomposition — not evidence that any LLM-judge instantiation works. See its

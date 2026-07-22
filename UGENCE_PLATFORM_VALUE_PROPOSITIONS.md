@@ -191,7 +191,7 @@ provenance-backed answers, not model self-report.
 
 **Maturity — Emerging / specified.**
 - The architecture (Intent → Retrieval → Relationship/Governance/Claim/Response truth →
-  Safety) is **documented specification**; **only the Claim Truth layer** has a
+  Safety) is **documented specification**; **only the Claim Validation layer** has a
   self-contained prototype, **on synthetic data**.
 
 **The honest catch.** TAP is the **least mature** component and is labeled so throughout

@@ -1,4 +1,7 @@
-# TAP-E1 — Intent Understanding Layer — Experiment Report (v1)
+# TAP-E1 — Intent Analysis Layer — Experiment Report (v1)
+
+> **Naming note.** This layer's canonical engineering name is used throughout. **Previously referred to as Intent Understanding.** For reproducibility, the package directory `tap_e1_intent/`, the schema-version prefix `tap-e1-intent/…`, experiment IDs, and stored artifacts retain the original name — see `01_TRUTH_ASSURANCE_ARCHITECTURE.md` §2a.
+
 
 > **Research & falsification phase.** This is not a product-completion phase and
 > makes no production claim. See §3 (Non-goals) and §21 (Evidence discipline).
@@ -20,7 +23,7 @@ user intent**. The layer answers one question only:
 
 ## 2. Scope
 
-Implement and evaluate **only** the Intent Understanding Layer: extraction of the
+Implement and evaluate **only** the Intent Analysis Layer: extraction of the
 primary objective, task type, entities, explicit/temporal/scope constraints,
 evidence requirements, assumptions, dependencies, references, ambiguity, missing
 information, conflicts, candidate interpretations, interpretation status, and
@@ -31,9 +34,9 @@ per-field provenance.
 
 The layer does **not** decide factual correctness, which documents to retrieve,
 policy applicability, claim support, authorization, or whether a final response is
-safe — and it **never answers the request it is analyzing**. Trusted Retrieval,
-Relationship Truth, Governance Truth, Evidence-Packet construction, Claim Truth,
-Response Truth, ActionGate integration, and production TAP orchestration are **out
+safe — and it **never answers the request it is analyzing**. Evidence Retrieval,
+Relationship Analysis, Governance Resolution, Evidence-Packet construction, Claim Validation,
+Response Validation, ActionGate integration, and production TAP orchestration are **out
 of scope** and were **not** implemented or modified.
 
 ## 4. Layer boundary

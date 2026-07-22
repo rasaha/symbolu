@@ -1,0 +1,100 @@
+{
+  "corpus": {
+    "document_types": {
+      "api_doc": 1,
+      "contract": 1,
+      "design_doc": 2,
+      "manual": 1,
+      "policy": 4,
+      "regulatory": 2,
+      "sop": 2,
+      "tech_spec": 1
+    },
+    "documents_hash": "ddfd16a882022f32a0954aa79ecf2be782c5121233a1327855c662a037f4b6f1",
+    "n_documents": 14,
+    "n_evidence_units": 32,
+    "queries": {
+      "eval_lock": {
+        "eval_inputs_hash": "0493e79d7388fe8cf01090007bfb0f09688c8a5272b6769cbedb06fb38a309f8",
+        "n_eval": 12
+      },
+      "family_distribution": {
+        "access": 6,
+        "api": 5,
+        "audit": 1,
+        "backup": 2,
+        "conflict": 2,
+        "contract": 3,
+        "encryption": 2,
+        "incident": 2,
+        "missing": 2,
+        "no_authority": 1,
+        "retention": 4
+      },
+      "n_queries": 30,
+      "split_distribution": {
+        "dev": 18,
+        "eval": 12
+      }
+    },
+    "units_hash": "49b167b14c4ed9d4804b74f0f977823d7e59fe95853acae1d073cb870e1f2683"
+  },
+  "eval_lock": {
+    "eval_inputs_hash": "0493e79d7388fe8cf01090007bfb0f09688c8a5272b6769cbedb06fb38a309f8",
+    "n_eval": 12
+  },
+  "frozen_components_hash": "ea42f1929b4aeb747f919087510f56103fb3dc0f0acd1c1c9f13aba4f7e68d6c",
+  "gates": [
+    {
+      "gate": "recall_at_k",
+      "op": ">=",
+      "pass": true,
+      "rationale": "must retrieve the authoritative evidence when it exists",
+      "threshold": 0.8,
+      "value": 1.0
+    },
+    {
+      "gate": "provenance_completeness",
+      "op": "==",
+      "pass": true,
+      "rationale": "no evidence may appear without provenance",
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "authority_coverage",
+      "op": ">=",
+      "pass": true,
+      "rationale": "authoritative sources must be surfaced",
+      "threshold": 0.8,
+      "value": 1.0
+    },
+    {
+      "gate": "gap_detection_accuracy",
+      "op": ">=",
+      "pass": true,
+      "rationale": "retrieval incompleteness must be detected",
+      "threshold": 0.7,
+      "value": 1.0
+    },
+    {
+      "gate": "false_evidence_inclusion",
+      "op": "<=",
+      "pass": true,
+      "rationale": "distractors must be largely excluded",
+      "threshold": 0.2,
+      "value": 0.0278
+    },
+    {
+      "gate": "severe_critical_count",
+      "op": "==",
+      "pass": true,
+      "rationale": "no severe critical failures on the locked set",
+      "threshold": 0.0,
+      "value": 0.0
+    }
+  ],
+  "schema_version": "tap-e2-retrieval/1.0.0",
+  "selected_config": "F",
+  "verdict": "PASS_WITH_LIMITED_CLAIM"
+}

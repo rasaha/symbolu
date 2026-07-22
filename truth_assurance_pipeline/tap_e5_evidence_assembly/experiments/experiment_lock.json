@@ -1,0 +1,137 @@
+{
+  "corpus": {
+    "eval_lock": {
+      "eval_inputs_hash": "04b87570c5d927de5a0576ed42c999c3171575c2ef31f348be2929e1343e757f",
+      "n_eval": 16
+    },
+    "family_distribution": {
+      "deep_provenance": 2,
+      "e3_conflict": 4,
+      "e4_conflict": 2,
+      "independent_trees": 2,
+      "minimal_edge": 2,
+      "multi_gap": 2,
+      "multi_governing": 2,
+      "multiple": 2,
+      "nested": 2,
+      "rejected_authority": 4,
+      "shared_evidence": 2,
+      "single": 2,
+      "unused_evidence": 4
+    },
+    "n_cases": 32,
+    "n_families": 13,
+    "split_distribution": {
+      "dev": 16,
+      "eval": 16
+    }
+  },
+  "eval_lock": {
+    "eval_inputs_hash": "04b87570c5d927de5a0576ed42c999c3171575c2ef31f348be2929e1343e757f",
+    "n_eval": 16
+  },
+  "frozen_components_hash": "7a91bcf9f4d6c3a4f0d0a2f219473cb96c95b0f315f4fecb4392a3742356498c",
+  "gates": [
+    {
+      "gate": "packet_completeness",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "packet_minimality",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "dependency_preservation",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "provenance_preservation",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "reference_integrity",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "conflict_preservation",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "gap_preservation",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "duplicate_elimination",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "unsupported_reference_rate",
+      "op": "<=",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    },
+    {
+      "gate": "orphan_rate",
+      "op": "<=",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    },
+    {
+      "gate": "validation_success",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "packet_size_reduction",
+      "op": ">=",
+      "pass": true,
+      "threshold": 0.05,
+      "value": 0.3153
+    },
+    {
+      "gate": "determinism",
+      "op": ">=",
+      "pass": true,
+      "threshold": 1.0,
+      "value": 1.0
+    },
+    {
+      "gate": "severe_critical_failure_count",
+      "op": "==",
+      "pass": true,
+      "threshold": 0.0,
+      "value": 0.0
+    }
+  ],
+  "schema_version": "tap-e5-evidence-packet/1.0.0",
+  "selected_config": "F",
+  "verdict": "PASS_WITH_LIMITED_CLAIM"
+}

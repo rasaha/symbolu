@@ -1,0 +1,497 @@
+{
+  "baselines": [
+    {
+      "description": "keyword (lexical) retrieval",
+      "name": "A"
+    },
+    {
+      "description": "dense semantic retrieval (concept stand-in)",
+      "name": "B"
+    },
+    {
+      "description": "hybrid retrieval",
+      "name": "C"
+    },
+    {
+      "description": "hybrid + provenance filtering",
+      "name": "D"
+    },
+    {
+      "description": "hybrid + provenance + gap detection",
+      "name": "E"
+    },
+    {
+      "description": "full TAP-E2 pipeline",
+      "name": "F"
+    }
+  ],
+  "corpus_manifest": {
+    "document_types": {
+      "api_doc": 1,
+      "contract": 1,
+      "design_doc": 2,
+      "manual": 1,
+      "policy": 4,
+      "regulatory": 2,
+      "sop": 2,
+      "tech_spec": 1
+    },
+    "documents_hash": "ddfd16a882022f32a0954aa79ecf2be782c5121233a1327855c662a037f4b6f1",
+    "n_documents": 14,
+    "n_evidence_units": 32,
+    "queries": {
+      "eval_lock": {
+        "eval_inputs_hash": "0493e79d7388fe8cf01090007bfb0f09688c8a5272b6769cbedb06fb38a309f8",
+        "n_eval": 12
+      },
+      "family_distribution": {
+        "access": 6,
+        "api": 5,
+        "audit": 1,
+        "backup": 2,
+        "conflict": 2,
+        "contract": 3,
+        "encryption": 2,
+        "incident": 2,
+        "missing": 2,
+        "no_authority": 1,
+        "retention": 4
+      },
+      "n_queries": 30,
+      "split_distribution": {
+        "dev": 18,
+        "eval": 12
+      }
+    },
+    "units_hash": "49b167b14c4ed9d4804b74f0f977823d7e59fe95853acae1d073cb870e1f2683"
+  },
+  "frozen_components_hash": "ea42f1929b4aeb747f919087510f56103fb3dc0f0acd1c1c9f13aba4f7e68d6c",
+  "gates": {
+    "all_pass": true,
+    "gates": [
+      {
+        "gate": "recall_at_k",
+        "op": ">=",
+        "pass": true,
+        "rationale": "must retrieve the authoritative evidence when it exists",
+        "threshold": 0.8,
+        "value": 1.0
+      },
+      {
+        "gate": "provenance_completeness",
+        "op": "==",
+        "pass": true,
+        "rationale": "no evidence may appear without provenance",
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "authority_coverage",
+        "op": ">=",
+        "pass": true,
+        "rationale": "authoritative sources must be surfaced",
+        "threshold": 0.8,
+        "value": 1.0
+      },
+      {
+        "gate": "gap_detection_accuracy",
+        "op": ">=",
+        "pass": true,
+        "rationale": "retrieval incompleteness must be detected",
+        "threshold": 0.7,
+        "value": 1.0
+      },
+      {
+        "gate": "false_evidence_inclusion",
+        "op": "<=",
+        "pass": true,
+        "rationale": "distractors must be largely excluded",
+        "threshold": 0.2,
+        "value": 0.0278
+      },
+      {
+        "gate": "severe_critical_count",
+        "op": "==",
+        "pass": true,
+        "rationale": "no severe critical failures on the locked set",
+        "threshold": 0.0,
+        "value": 0.0
+      }
+    ]
+  },
+  "latency_ms_mean": {
+    "dev": {
+      "A": 0.1149,
+      "B": 0.1575,
+      "C": 0.1758,
+      "D": 0.1636,
+      "E": 0.1765,
+      "F": 0.2365
+    },
+    "eval_locked": {
+      "A": 0.1008,
+      "B": 0.1546,
+      "C": 0.1698,
+      "D": 0.1722,
+      "E": 0.197,
+      "F": 0.2394
+    }
+  },
+  "metrics": {
+    "dev": {
+      "A": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 6,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.8981,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0593,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.8611,
+        "n": 18,
+        "ndcg_at_k": 0.9066,
+        "precision_at_k": 0.4556,
+        "provenance_completeness": 0.9111,
+        "recall_at_k": 0.9722,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.7343,
+        "severe_failure_count": 8
+      },
+      "B": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 4,
+          "unsupported_evidence_retrieved": 5
+        },
+        "evidence_coverage": 0.8704,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0546,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.6222,
+        "n": 18,
+        "ndcg_at_k": 0.7567,
+        "precision_at_k": 0.3704,
+        "provenance_completeness": 0.95,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.6528,
+        "severe_failure_count": 10
+      },
+      "C": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 4,
+          "unsupported_evidence_retrieved": 2
+        },
+        "evidence_coverage": 0.9537,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0657,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.7917,
+        "n": 18,
+        "ndcg_at_k": 0.896,
+        "precision_at_k": 0.3852,
+        "provenance_completeness": 0.95,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.6537,
+        "severe_failure_count": 7
+      },
+      "D": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 2
+        },
+        "evidence_coverage": 0.9537,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0407,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.7963,
+        "n": 18,
+        "ndcg_at_k": 0.9032,
+        "precision_at_k": 0.4037,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.6352,
+        "severe_failure_count": 3
+      },
+      "E": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 0.5,
+        "conflict_detection_recall": 1.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 0,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 2
+        },
+        "evidence_coverage": 0.9537,
+        "false_conflict_rate": 0.0667,
+        "false_evidence_inclusion": 0.0407,
+        "gap_detection_accuracy": 1.0,
+        "missing_evidence_detection": 1.0,
+        "mrr": 0.7963,
+        "n": 18,
+        "ndcg_at_k": 0.9032,
+        "precision_at_k": 0.4037,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.6352,
+        "severe_failure_count": 2
+      },
+      "F": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 0.5,
+        "conflict_detection_recall": 1.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 0,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 2
+        },
+        "evidence_coverage": 0.9537,
+        "false_conflict_rate": 0.0667,
+        "false_evidence_inclusion": 0.0296,
+        "gap_detection_accuracy": 1.0,
+        "missing_evidence_detection": 1.0,
+        "mrr": 0.8241,
+        "n": 18,
+        "ndcg_at_k": 0.9128,
+        "precision_at_k": 0.4037,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.6352,
+        "severe_failure_count": 2
+      }
+    },
+    "eval_locked": {
+      "A": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 3,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.6528,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0861,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.75,
+        "n": 12,
+        "ndcg_at_k": 0.7516,
+        "precision_at_k": 0.3931,
+        "provenance_completeness": 0.8722,
+        "recall_at_k": 0.8333,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.8347,
+        "severe_failure_count": 5
+      },
+      "B": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 3,
+          "unsupported_evidence_retrieved": 2
+        },
+        "evidence_coverage": 0.8056,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0819,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.8333,
+        "n": 12,
+        "ndcg_at_k": 0.8773,
+        "precision_at_k": 0.3805,
+        "provenance_completeness": 0.9458,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.782,
+        "severe_failure_count": 6
+      },
+      "C": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 3,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.8333,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0653,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.875,
+        "n": 12,
+        "ndcg_at_k": 0.9135,
+        "precision_at_k": 0.3889,
+        "provenance_completeness": 0.9458,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.7861,
+        "severe_failure_count": 5
+      },
+      "D": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 0.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 1,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.8333,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0444,
+        "gap_detection_accuracy": 0.0,
+        "missing_evidence_detection": 0.0,
+        "mrr": 0.875,
+        "n": 12,
+        "ndcg_at_k": 0.9165,
+        "precision_at_k": 0.4111,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.7681,
+        "severe_failure_count": 2
+      },
+      "E": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 1.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 0,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.8333,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0444,
+        "gap_detection_accuracy": 1.0,
+        "missing_evidence_detection": 1.0,
+        "mrr": 0.875,
+        "n": 12,
+        "ndcg_at_k": 0.9165,
+        "precision_at_k": 0.4111,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.7681,
+        "severe_failure_count": 1
+      },
+      "F": {
+        "authority_coverage": 1.0,
+        "conflict_detection_precision": 1.0,
+        "conflict_detection_recall": 1.0,
+        "critical_failures": {
+          "authoritative_evidence_omitted": 0,
+          "conflicting_evidence_hidden": 0,
+          "duplicate_evidence_overload": 0,
+          "hallucinated_evidence_identifiers": 0,
+          "outdated_evidence_preferred": 0,
+          "provenance_missing": 0,
+          "unsupported_evidence_retrieved": 1
+        },
+        "evidence_coverage": 0.8333,
+        "false_conflict_rate": 0.0,
+        "false_evidence_inclusion": 0.0278,
+        "gap_detection_accuracy": 1.0,
+        "missing_evidence_detection": 1.0,
+        "mrr": 0.8611,
+        "n": 12,
+        "ndcg_at_k": 0.914,
+        "precision_at_k": 0.4111,
+        "provenance_completeness": 1.0,
+        "recall_at_k": 1.0,
+        "redundancy": 0.0,
+        "retrieval_diversity": 0.7181,
+        "severe_failure_count": 1
+      }
+    }
+  },
+  "schema_version": "tap-e2-retrieval/1.0.0",
+  "selection": {
+    "rule": "argmax on DEV of a documented weighted criterion; simplest wins ties; locked eval never used for selection",
+    "selected_config": "F",
+    "selection_scores_dev": {
+      "A": 2.2721,
+      "B": 2.78394,
+      "C": 2.91658,
+      "D": 4.17878,
+      "E": 5.27878,
+      "F": 5.29504
+    }
+  },
+  "verdict": "PASS_WITH_LIMITED_CLAIM",
+  "verdict_reason": "All preregistered gates pass on the locked eval set. The claim is limited to mechanism/construction validation on a small synthetic corpus with a DETERMINISTIC concept-vector stand-in for dense retrieval (not neural embeddings). No claim of real-world retrieval quality or production readiness is made."
+}

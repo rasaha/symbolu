@@ -381,10 +381,11 @@ supplies capability; TAP governs deliverability.
              │
   ┌─────────────────────────────────────────────────┐
   │  Truth Assurance Platform (TAP)                  │
-  │   Intent → Trusted Retrieval → Relationship      │
-  │   Truth → Governance Truth → Evidence Packet →   │
-  │   Claim Truth → Response Truth → Safety →        │
-  │   Final Response                                 │
+  │   Intent Analysis → Evidence Retrieval →         │
+  │   Relationship Analysis → Governance             │
+  │   Resolution → Evidence Assembly →               │
+  │   Claim Validation → Response Validation →       │
+  │   Safety → Final Response                        │
   └─────────────────┬───────────────────────────────┘
                     │
        HybridPhaseTransformer (Pillar 1)
@@ -397,12 +398,12 @@ TAP is defined as a sequence of independently-owned layers, each responsible for
 | Layer | Responsibility (high level) |
 |---|---|
 | **Intent** | scope the user request into a typed query |
-| **Trusted Retrieval** | assemble candidate evidence for that query |
-| **Relationship Truth** | decide which proposed relationships are actually supported by evidence |
-| **Governance Truth** | decide which supported relationships actually apply (authority, scope, precedence) |
-| **Evidence Packet** | assemble the minimum complete evidence for downstream reasoning |
-| **Claim Truth** | validate each factual claim against the evidence packet |
-| **Response Truth** | validate the complete answer for faithfulness to the validated claims |
+| **Evidence Retrieval** | assemble candidate evidence for that query |
+| **Relationship Analysis** | decide which proposed relationships are actually supported by evidence |
+| **Governance Resolution** | decide which supported relationships actually apply (authority, scope, precedence) |
+| **Evidence Assembly** | assemble the minimum complete evidence for downstream reasoning |
+| **Claim Validation** | validate each factual claim against the evidence packet |
+| **Response Validation** | validate the complete answer for faithfulness to the validated claims |
 | **Safety** | apply final policy/safety admissibility before delivery |
 | **Final Response** | deliver the validated, evidence-grounded output |
 
@@ -436,8 +437,8 @@ explicit about the boundary between the three pillars' maturity:
 |---|---|---|
 | `HybridPhaseTransformer` (Pillar 1) | working training + inference infrastructure; mechanism-level retrieval signal | **implemented** (see Pages 2–4) |
 | TAP overall architecture | layer definitions, typed interfaces, provenance/confidence/repair/abstention/evaluation models | **documented architectural specification** (`docs/truth_assurance_pipeline/`) |
-| TAP **Claim Truth** layer | self-contained research prototype on a **self-authored synthetic** corpus; construction-validated only | **implemented prototype** (`relationship_claim_validation/`), *not* an efficacy claim |
-| TAP remaining layers (Intent, Retrieval, Relationship, Governance, Evidence Packet, Response, Safety) | specifications and future work | **architectural specification / roadmap** |
+| TAP **Claim Validation** layer | self-contained research prototype on a **self-authored synthetic** corpus; construction-validated only | **implemented prototype** (`relationship_claim_validation/`), *not* an efficacy claim |
+| TAP remaining layers (Intent, Retrieval, Relationship, Governance, Evidence Assembly, Response, Safety) | specifications and future work | **architectural specification / roadmap** |
 
 We do **not** claim that the full TAP architecture has been experimentally validated, that it
 eliminates hallucination, or that it is production-ready. The one prototype we have built is on
@@ -541,7 +542,7 @@ strengthened, or removed. Changes:
    Pillar-1 ask intact.
 7. **Evidence discipline preserved throughout:** every technical statement is either implemented in the
    repository, a documented architectural specification, or an explicit roadmap item — and TAP's status
-   is stated conservatively (only the Claim Truth layer has a self-contained, synthetic,
+   is stated conservatively (only the Claim Validation layer has a self-contained, synthetic,
    construction-validated prototype; the rest are specification/future work). No claim of full-TAP
    experimental validation, hallucination elimination, or production readiness was introduced.
 
@@ -550,4 +551,4 @@ strengthened, or removed. Changes:
 *Contact: Rakesh Mohan — Ugence Labs*
 *Repo: `rasaha/symbolu` · Pillar 1 modules: `symbolu/phase_transformer.py`, `train_hybrid_7b.py`, `symbolu_training/training/unified/mistral_hybrid_wrapper.py`, `symbolu/inference/`*
 *Pillar 1 refs: `docs/HYBRID_PHASE_QUAD_ARCHITECTURE.md` · `docs/TRAIN_HYBRID_7B.md` · `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` · `docs/PHASE_ATTENTION_PAPER.md`*
-*Pillar 2 refs: `docs/truth_assurance_pipeline/` (architecture specification) · `relationship_claim_validation/` (Claim Truth Layer research prototype)*
+*Pillar 2 refs: `docs/truth_assurance_pipeline/` (architecture specification) · `relationship_claim_validation/` (Claim Validation Layer research prototype)*

@@ -35,19 +35,19 @@ failure modes**. The architecture forbids conflating them.
 ```
 User Request
    ↓
-Intent Understanding      (scoping; not a truth layer)
+Intent Analysis      (scoping; not a truth layer)
    ↓
-Trusted Retrieval         (candidate evidence; not a truth layer)
+Evidence Retrieval         (candidate evidence; not a truth layer)
    ↓
-Layer 1  Relationship Truth Layer   — are proposed relationships supported?
+Layer 1  Relationship Analysis Layer   — are proposed relationships supported?
    ↓
-Layer 2  Governance Truth Layer     — which supported relationships govern?
+Layer 2  Governance Resolution Layer     — which supported relationships govern?
    ↓
-Layer 3  Evidence Packet            — minimum complete evidence (no NL generation)
+Layer 3  Evidence Assembly            — minimum complete evidence (no NL generation)
    ↓
-Layer 4  Claim Truth Layer          — is each claim from the packet supported?
+Layer 4  Claim Validation Layer          — is each claim from the packet supported?
    ↓
-Layer 5  Response Truth Layer       — is the whole answer faithful?
+Layer 5  Response Validation Layer       — is the whole answer faithful?
    ↓
 Safety / Policy Layer               — final admissibility (not a truth layer)
    ↓
@@ -59,6 +59,58 @@ appends to a shared **provenance object** (`04_PROVENANCE_MODEL.md`), emits
 **multidimensional confidence** (`05_CONFIDENCE_MODEL.md`), and has its own
 **abstention** (`09_ABSTENTION_MODEL.md`), **repair** (`08_REPAIR_MODEL.md`), and
 **evaluation** (`10_EVALUATION_FRAMEWORK.md`) definitions.
+
+## 2a. Naming philosophy (engineering names vs. truth concepts)
+
+The canonical **internal engineering names** for the pipeline layers are:
+
+```
+Intent Analysis
+      ↓
+Evidence Retrieval
+      ↓
+Relationship Analysis
+      ↓
+Governance Resolution
+      ↓
+Evidence Assembly
+      ↓
+Claim Validation
+      ↓
+Response Validation
+```
+
+**These internal names describe engineering functions rather than philosophical concepts.
+The platform continues to provide Truth Assurance as the combined outcome of the complete
+deterministic pipeline.** The external product name remains **Truth Assurance Platform
+(TAP)**, and the lowercase *truth concepts* the platform assures — relationship truth,
+governance truth, claim truth, response truth (§1) — are unchanged; they name the
+philosophical outcomes, not the engineering layers.
+
+| Layer | Engineering name (canonical) | Previously referred to as |
+|---|---|---|
+| TAP-E1 | Intent Analysis | Intent Understanding |
+| TAP-E2 | Evidence Retrieval | Trusted Retrieval |
+| TAP-E3 | Relationship Analysis | Relationship Truth |
+| TAP-E4 | Governance Resolution | Governance Truth |
+| TAP-E5 | Evidence Assembly | Evidence Packet |
+| TAP-E6 | Claim Validation | Claim Truth |
+| TAP-E7 | Response Validation | Response Truth |
+
+For **reproducibility**, artifacts that would be invalidated by a rename are left unchanged:
+package directories (e.g. `tap_e3_relationship_truth/`), schema-version strings (e.g.
+`tap-e3-relationship/1.0.0`), experiment IDs, JSON result keys, stored manifests, and the
+source of any module folded into a `frozen_components_hash`. Those retain the original
+terminology by design.
+
+**Canonical import paths.** Where a canonical engineering import package exists, new
+downstream code should import through it while the historical package path is retained for
+reproducibility. For Governance Resolution (TAP-E4) the canonical path is
+`truth_assurance_pipeline.tap_e4_governance_resolution` (a thin re-export/alias layer over
+the historical `tap_e4_governance_truth` implementation). That package also documents the
+**`GovernanceSituation`** input contract: the caller/runtime owns operational metadata and
+supplies it explicitly; TAP-E4 only normalizes explicit inputs and never discovers,
+retrieves, or invents situation facts, and leaves missing or contradictory facts unresolved.
 
 ## 3. Design invariants
 
@@ -83,13 +135,13 @@ has a self-contained prototype**, and it is on **synthetic** data:
 
 | Layer / stage | Status in this repo |
 |---|---|
-| Intent Understanding | **proposed only** |
-| Trusted Retrieval | **proposed only** |
-| Layer 1 Relationship Truth | **proposed only** (no code) |
-| Layer 2 Governance Truth | **proposed only** (no code) |
-| Layer 3 Evidence Packet | **proposed only** (no code) |
-| Layer 4 Claim Truth | **synthetic prototype exists** → `relationship_claim_validation/` (v0.1), deterministic judges, self-authored synthetic corpus; construction-validated only. See its `docs/relationship_claim_validation/FINAL_VERDICT.md`. |
-| Layer 5 Response Truth | **proposed only** (no code) |
+| Intent Analysis | **proposed only** |
+| Evidence Retrieval | **proposed only** |
+| Layer 1 Relationship Analysis | **proposed only** (no code) |
+| Layer 2 Governance Resolution | **proposed only** (no code) |
+| Layer 3 Evidence Assembly | **proposed only** (no code) |
+| Layer 4 Claim Validation | **synthetic prototype exists** → `relationship_claim_validation/` (v0.1), deterministic judges, self-authored synthetic corpus; construction-validated only. See its `docs/relationship_claim_validation/FINAL_VERDICT.md`. |
+| Layer 5 Response Validation | **proposed only** (no code) |
 | Safety / Policy | **proposed only** here (a separate ActionGate/enforcement line exists elsewhere in the monorepo and is out of TAP scope) |
 
 The resolver series, hidden corpus, and frozen proposal/governance/packet pipeline

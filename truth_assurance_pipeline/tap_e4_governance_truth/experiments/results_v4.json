@@ -1,0 +1,534 @@
+{
+  "authority_model_version": "tap-e4-authority/1.0.0",
+  "baselines": [
+    {
+      "description": "first matching policy",
+      "name": "A"
+    },
+    {
+      "description": "highest authority only",
+      "name": "B"
+    },
+    {
+      "description": "authority + jurisdiction (+ scope)",
+      "name": "C"
+    },
+    {
+      "description": "C + temporal + version/supersession",
+      "name": "D"
+    },
+    {
+      "description": "D + exceptions + precedence (customer/emergency override)",
+      "name": "E"
+    },
+    {
+      "description": "full Governance Truth (+ conflict, confidence, gaps, provenance, trace)",
+      "name": "F"
+    }
+  ],
+  "corpus_manifest": {
+    "eval_lock": {
+      "eval_inputs_hash": "c28e23f30d1ce808ff7e14776b592a39351e927b32d771b48d5ddbbb1d3412bf",
+      "n_eval": 15
+    },
+    "family_distribution": {
+      "basic": 2,
+      "conflict": 2,
+      "customer_override": 2,
+      "draft": 2,
+      "emergency_override": 2,
+      "exception": 2,
+      "expired": 2,
+      "future": 2,
+      "jurisdiction": 2,
+      "law_supremacy": 2,
+      "no_governing": 2,
+      "scope": 2,
+      "superseded": 2,
+      "upstream_gap": 2,
+      "version": 2
+    },
+    "n_cases": 30,
+    "n_evidence_units": 26,
+    "n_families": 15,
+    "split_distribution": {
+      "dev": 15,
+      "eval": 15
+    }
+  },
+  "frozen_components_hash": "9e44afd74d85359781479a45847e582f368b1b528d8f975415d19cdb77051488",
+  "gates": {
+    "all_pass": true,
+    "gates": [
+      {
+        "gate": "governing_authority_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "jurisdiction_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "scope_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "temporal_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.95,
+        "value": 1.0
+      },
+      {
+        "gate": "version_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "exception_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "precedence_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "gate": "governance_conflict_f1",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.75,
+        "value": 1.0
+      },
+      {
+        "gate": "governance_gap_accuracy",
+        "op": ">=",
+        "pass": true,
+        "threshold": 0.75,
+        "value": 1.0
+      },
+      {
+        "gate": "provenance_completeness",
+        "op": "==",
+        "pass": true,
+        "threshold": 1.0,
+        "value": 1.0
+      },
+      {
+        "gate": "unsupported_governance_rate",
+        "op": "<=",
+        "pass": true,
+        "threshold": 0.05,
+        "value": 0.0
+      },
+      {
+        "gate": "incorrect_override_rate",
+        "op": "==",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      },
+      {
+        "gate": "expired_policy_selection_rate",
+        "op": "==",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      },
+      {
+        "gate": "severe_critical_failure_count",
+        "op": "==",
+        "pass": true,
+        "threshold": 0.0,
+        "value": 0.0
+      }
+    ]
+  },
+  "metrics": {
+    "dev": {
+      "A": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 1,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 1,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 2
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.13333333333333333,
+        "incorrect_override_rate": 0.13333333333333333,
+        "jurisdiction_accuracy": 0.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 0.0,
+        "severe_critical_failure_count": 9.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "B": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 2
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.26666666666666666,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 0.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 0.0,
+        "severe_critical_failure_count": 7.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "C": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.4666666666666667,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 5.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "D": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.7333333333333333,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 3.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      },
+      "E": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 0,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 0,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 1.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.9333333333333333,
+        "incorrect_override_rate": 0.0,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 1.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 1.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      },
+      "F": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 0,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 0,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 0,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 1.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 1.0,
+        "governance_gap_accuracy": 1.0,
+        "governing_authority_accuracy": 1.0,
+        "incorrect_override_rate": 0.0,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 1.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 0.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      }
+    },
+    "eval_locked": {
+      "A": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 1,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 1,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 2
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.13333333333333333,
+        "incorrect_override_rate": 0.13333333333333333,
+        "jurisdiction_accuracy": 0.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 0.0,
+        "severe_critical_failure_count": 9.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "B": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 2
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.26666666666666666,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 0.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 0.0,
+        "severe_critical_failure_count": 7.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "C": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 1,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 1,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.06666666666666667,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.4666666666666667,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 5.0,
+        "temporal_accuracy": 0.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 0.0
+      },
+      "D": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 1,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 1,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 0.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.7333333333333333,
+        "incorrect_override_rate": 0.06666666666666667,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 0.5,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 3.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      },
+      "E": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 0,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 0,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 1,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 1.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 0.0,
+        "governance_gap_accuracy": 0.8,
+        "governing_authority_accuracy": 0.9333333333333333,
+        "incorrect_override_rate": 0.0,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 1.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 1.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      },
+      "F": {
+        "critical_failures": {
+          "CUSTOMER_OVERRIDE_IGNORED": 0,
+          "DRAFT_SELECTED": 0,
+          "EXCEPTION_IGNORED": 0,
+          "EXPIRED_POLICY_SELECTED": 0,
+          "LAW_OVERRIDDEN_BY_POLICY": 0,
+          "MISSING_PROVENANCE": 0,
+          "SUPERSEDED_POLICY_SELECTED": 0,
+          "UNSUPPORTED_GOVERNANCE_DECISION": 0,
+          "UPSTREAM_GAP_IGNORED": 0,
+          "WRONG_JURISDICTION": 0
+        },
+        "exception_accuracy": 1.0,
+        "expired_policy_selection_rate": 0.0,
+        "governance_conflict_f1": 1.0,
+        "governance_gap_accuracy": 1.0,
+        "governing_authority_accuracy": 1.0,
+        "incorrect_override_rate": 0.0,
+        "jurisdiction_accuracy": 1.0,
+        "n_cases": 15,
+        "precedence_accuracy": 1.0,
+        "provenance_completeness": 1.0,
+        "scope_accuracy": 1.0,
+        "severe_critical_failure_count": 0.0,
+        "temporal_accuracy": 1.0,
+        "unsupported_governance_rate": 0.0,
+        "version_accuracy": 1.0
+      }
+    }
+  },
+  "precedence_rules_version": "tap-e4-precedence/1.0.0",
+  "schema_version": "tap-e4-governance/1.0.0",
+  "selection": {
+    "dev_gate_pass": {
+      "A": false,
+      "B": false,
+      "C": false,
+      "D": false,
+      "E": false,
+      "F": true
+    },
+    "rule": "simplest baseline (A..F) satisfying ALL preregistered gates on DEV; locked eval never used for selection",
+    "selected_config": "F",
+    "selected_passes_dev": true
+  },
+  "verdict": "PASS_WITH_LIMITED_CLAIM",
+  "verdict_reason": "All preregistered gates pass on the locked eval split for the selected baseline. The claim is limited to mechanism/construction validation: a deterministic, provenance-preserving governance-resolution architecture (authority precedence, jurisdiction, scope, temporal/version, supersession, exception, conflict, gap) on the synthetic corpus used in this study. No claim of production legal/regulatory reasoning or external generalization."
+}

@@ -27,7 +27,7 @@ Read this before quoting anything from the other eleven deliverables.
 - The frozen substrate referenced by prior briefs — a resolver series, a hidden
   relationship corpus, and a running proposal→governance→packet pipeline — **does not
   exist here** (verified by exhaustive search).
-- The **only** concrete artifact aligned with TAP is the **synthetic** Claim Truth
+- The **only** concrete artifact aligned with TAP is the **synthetic** Claim Validation
   Layer prototype `relationship_claim_validation/` (v0.1): deterministic judges,
   self-authored synthetic corpus, construction-validated only. Its own
   `FINAL_VERDICT.md` records that its perfect scores are by construction and that
