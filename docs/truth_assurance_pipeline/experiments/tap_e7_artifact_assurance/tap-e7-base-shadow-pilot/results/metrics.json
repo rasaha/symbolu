@@ -1,0 +1,96 @@
+{
+ "pilot_size": 162,
+ "domains": 9,
+ "issue_types": 9,
+ "replicates": 2,
+ "fingerprint_bound": "sha-256:d01e466e5bb57d6a1a00d42b01fb9943d9208e6e39b6a90413a0b247b0416734",
+ "engine": "Implementation B (read-only reference)",
+ "package": "tap-e7-base-companion/1.2.0",
+ "outcome_distribution": {
+  "ASSURED": 54,
+  "NOT_ASSURED": 72,
+  "INDETERMINATE": 36
+ },
+ "confusion_overall": {
+  "TP": 108,
+  "FP": 0,
+  "TN": 18,
+  "FN": 36
+ },
+ "precision_overall": 1,
+ "recall_overall": 0.75,
+ "recall_on_base_detectable_classes": 1,
+ "indeterminate_rate": 0.222,
+ "false_negatives_total": 36,
+ "false_positives_total": 0,
+ "engine_gap_missed": 36,
+ "engine_gap_total": 54,
+ "by_issue": {
+  "faithful": {
+   "n": 18,
+   "flagged": 0,
+   "flag_rate": 0,
+   "detectable": true,
+   "typical_outcome": "ASSURED"
+  },
+  "unsupported_assertion": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": true,
+   "typical_outcome": "NOT_ASSURED"
+  },
+  "status_upgrade": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": true,
+   "typical_outcome": "NOT_ASSURED"
+  },
+  "citation_mismatch": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": true,
+   "typical_outcome": "NOT_ASSURED"
+  },
+  "provenance_mismatch": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": true,
+   "typical_outcome": "NOT_ASSURED"
+  },
+  "integrity_homoglyph": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": true,
+   "typical_outcome": "INDETERMINATE"
+  },
+  "certainty_inflation": {
+   "n": 18,
+   "flagged": 18,
+   "flag_rate": 1,
+   "detectable": false,
+   "typical_outcome": "INDETERMINATE"
+  },
+  "scope_expansion": {
+   "n": 18,
+   "flagged": 0,
+   "flag_rate": 0,
+   "detectable": false,
+   "typical_outcome": "ASSURED"
+  },
+  "omitted_qualifier": {
+   "n": 18,
+   "flagged": 0,
+   "flag_rate": 0,
+   "detectable": false,
+   "typical_outcome": "ASSURED"
+  }
+ },
+ "note": "reviewer_agreement and average_review_time are DESIGN metrics requiring human reviewers; they are not produced by this synthetic demonstration and are marked N/A here.",
+ "reviewer_agreement": "N/A (requires human reviewers)",
+ "average_review_time": "N/A (requires human reviewers)"
+}
