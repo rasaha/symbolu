@@ -1,0 +1,37 @@
+{
+  "vocab_size": 32,
+  "hidden_size": 96,
+  "num_layers": 2,
+  "num_heads": 4,
+  "ff_size": 384,
+  "context_length": 64,
+  "dropout": 0.0,
+  "aux_layer": -1,
+  "num_kv": 4,
+  "num_queries": 2,
+  "num_distractors": 0,
+  "n_relation_systems": 1,
+  "steps": 2500,
+  "batch_size": 32,
+  "lr": 0.004,
+  "weight_decay": 0.0,
+  "warmup": 50,
+  "grad_clip": 1.0,
+  "eval_every": 250,
+  "eval_batches": 8,
+  "grad_diag_every": 250,
+  "lambda_aux": 1.0,
+  "tau": 1.0,
+  "objective": "classification",
+  "screen_seeds": [
+    0,
+    1,
+    2
+  ],
+  "confirm_seeds": [
+    3,
+    4
+  ],
+  "acc_threshold": 0.8,
+  "_note": "Frozen, pre-registered protocol for the Quad Generative Regularization CPU screen. Set once during the bounded pilot; never re-tuned after observing results. lambda_aux and tau chosen conservatively in the pilot (both 0.5 and 1.0 worked; 1.0 frozen). Base MQAR num_kv=4 is the baseline capability boundary (baseline solves kv<=3 and overfits kv=4, but cannot learn kv=4 from streaming data in-budget)."
+}
