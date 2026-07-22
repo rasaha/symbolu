@@ -1,0 +1,138 @@
+{
+ "rows": [
+  {
+   "fixture": "DT01",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT02",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT03",
+   "relation": "accented(precomposed)",
+   "outcome": "ASSURED",
+   "code_points": [
+    "U+00E9"
+   ]
+  },
+  {
+   "fixture": "DT04",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT05",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT06",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT07",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT08",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT09",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "DT10",
+   "relation": "ascii",
+   "outcome": "ASSURED",
+   "code_points": []
+  },
+  {
+   "fixture": "UC01",
+   "relation": "confusable-only",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+03BF"
+   ]
+  },
+  {
+   "fixture": "UC02",
+   "relation": "confusable-only",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+0441"
+   ]
+  },
+  {
+   "fixture": "UC03",
+   "relation": "invisible-strip-and-flag",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+200B"
+   ]
+  },
+  {
+   "fixture": "UC04",
+   "relation": "invisible-strip-and-flag",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+200C"
+   ]
+  },
+  {
+   "fixture": "UC05",
+   "relation": "reject(invisible)",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+202E"
+   ]
+  },
+  {
+   "fixture": "UC06",
+   "relation": "invisible-strip-and-flag",
+   "outcome": "INDETERMINATE",
+   "code_points": [
+    "U+202B"
+   ]
+  },
+  {
+   "fixture": "UC07",
+   "relation": "space-normalize",
+   "outcome": "ASSURED",
+   "code_points": [
+    "U+00A0"
+   ]
+  },
+  {
+   "fixture": "UC08",
+   "relation": "accented(precomposed)",
+   "outcome": "ASSURED",
+   "code_points": [
+    "U+00E9"
+   ]
+  },
+  {
+   "fixture": "UC09",
+   "relation": "decomposed(NFC-equivalent)",
+   "outcome": "ASSURED",
+   "code_points": [
+    "U+0301"
+   ]
+  }
+ ]
+}

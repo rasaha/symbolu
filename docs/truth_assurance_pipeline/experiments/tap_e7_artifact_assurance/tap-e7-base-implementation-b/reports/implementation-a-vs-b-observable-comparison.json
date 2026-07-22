@@ -1,0 +1,11 @@
+{
+ "basis": "Both A and B independently EXACT_PASS every mandatory fixture against the SAME v1.1.1 expected oracle; therefore A.output==expected==B.output on outcome/findings/stage/summary/projection for each.",
+ "mandatory_total": 86,
+ "A_exact_pass": 86,
+ "B_exact_pass": 86,
+ "observable_agreement": 86,
+ "disagreements": [],
+ "A_language": "Python (class-based)",
+ "B_language": "JavaScript/Node (functional-pipeline)",
+ "author_independence": "same author -> language+architecture independence, NOT organizational independence (governance item)"
+}

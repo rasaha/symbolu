@@ -1,0 +1,16 @@
+# BASE-UNIT/1.0 unit	aliases(;)	base	factor	class
+percent	%;pct;percent	PERCENT	1	PERCENT
+usd	usd;dollars;$	USD	1	CURRENCY:USD
+eur	eur;euros	EUR	1	CURRENCY:EUR
+second	s;sec;seconds	s	1	TIME
+minute	min;minutes	s	60	TIME
+hour	h;hr;hours	s	3600	TIME
+day	d;days	s	86400	TIME
+metre	m;meter;meters	m	1	LENGTH
+kilometre	km	m	1000	LENGTH
+centimetre	cm	m	0.01	LENGTH
+gram	g;grams	kg	0.001	MASS
+kilogram	kg;kilograms	kg	1	MASS
+celsius	c;degc	K	OFFSET:273.15	TEMPERATURE
+kelvin	k	K	1	TEMPERATURE
+count	count;items;units	COUNT	1	COUNT

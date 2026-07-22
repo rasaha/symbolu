@@ -1,0 +1,53 @@
+{
+ "fixture_id": "DT06",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 1,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "ASSURED",
+   "findings": [],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:fad8f5c73b714ed573aa95752449be4ea94c88398e26cb4bbb413b951d8cf9e7"
+ },
+ "trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:0859f0662b19edbc5dcba17c28632057f7cdd546888d792c71edf3264cdea2b3",
+  "artifact_text": "{\"validation_entry_id\":\"V1\",\"statement\":\"acme owns system b\"}"
+ },
+ "redacted_trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:0859f0662b19edbc5dcba17c28632057f7cdd546888d792c71edf3264cdea2b3"
+ }
+}

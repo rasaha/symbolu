@@ -1,0 +1,10 @@
+# BASE-CONF-MAP/1.0 form	input	band
+categorical	HIGH	HIGH
+categorical	MEDIUM	MEDIUM
+categorical	LOW	LOW
+categorical	NONE	NONE
+categorical	UNRESOLVED	NONE
+scalar	>=0.66	HIGH
+scalar	>=0.33 and <0.66	MEDIUM
+scalar	>0 and <0.33	LOW
+scalar	==0	NONE

@@ -1,0 +1,148 @@
+{
+ "total": 28,
+ "pass": 28,
+ "fail": 0,
+ "na": 0,
+ "tests": [
+  {
+   "test": "json_empty",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_array",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_dup_top",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_dup_nested",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_bom",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_bad_utf8",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_lone_hi",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_lone_lo",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_valid_pair",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_leadzero",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_leadplus",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_nan",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_inf",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_negzero",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_exp",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_depth64",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "json_depth65",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "jaccard_formula",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "jaccard_dupcollapse",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "lemma_owns",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "outcome_violation",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "outcome_limitation",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "outcome_assured",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "res_confus_18",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "res_invis_16",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "res_engcore_127",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "frac_035_boundary",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "frac_085_boundary",
+   "result": "PASS",
+   "detail": ""
+  }
+ ]
+}

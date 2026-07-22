@@ -1,0 +1,1 @@
+{"defect":"INPUT_INTEGRITY_FAILURE","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"EM02","mapping":"{\"statement\":\"acme owns system b\",\"validation_entry_id\":\"\"}","outcome_derivation":"§8.1(INPUT_INTEGRITY_FAILURE) -> INDETERMINATE","phenomenon":"explicit_map_defect","reason":"empty/malformed validation_entry_id"}

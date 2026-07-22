@@ -1,0 +1,14 @@
+# BASE-PRED-PROHIB/1.0 canonical	never_equates(;)
+owns	operates;licenses;distributes;manages
+operates	owns
+manages	owns
+licenses	owns;distributes
+distributes	owns;licenses
+permits	requires;prohibits
+prohibits	permits;requires
+requires	permits;prohibits
+governs	recommends
+applies_to	exempts
+causes	correlates with;depends_on
+depends_on	causes
+supersedes	amends

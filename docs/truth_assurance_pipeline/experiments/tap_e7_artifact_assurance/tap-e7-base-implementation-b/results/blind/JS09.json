@@ -1,0 +1,68 @@
+{
+ "fixture_id": "JS09",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "INPUT_INTEGRITY_FAILURE",
+    "polarity": "EVALUATION_LIMITATION"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 0,
+   "evaluated_assertive": 0,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 1,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 0,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "INDETERMINATE",
+   "findings": [
+    {
+     "category": "INPUT_INTEGRITY_FAILURE",
+     "polarity": "EVALUATION_LIMITATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 0,
+    "evaluated_assertive": 0,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 1
+   }
+  },
+  "projection_pi_sha256": "sha-256:1cd34ac9a779608607d5d7d582ac4c89802e6b1beda595aa241e96fbc80ff586"
+ },
+ "trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "INPUT_INTEGRITY_FAILURE"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:a78f3e1fd4fec5c9ff4c23bcac813b2e2d61fb6c5fcabe6b1ca4c08b38e6ff3c",
+  "artifact_text": "{\"k\":01}"
+ },
+ "redacted_trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "INPUT_INTEGRITY_FAILURE"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:a78f3e1fd4fec5c9ff4c23bcac813b2e2d61fb6c5fcabe6b1ca4c08b38e6ff3c"
+ }
+}

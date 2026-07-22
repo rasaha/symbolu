@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"entries":{"items":{"type":"object"},"type":"array"}},"required":["entries"],"title":"ValidationRecord fixture","type":"object"}

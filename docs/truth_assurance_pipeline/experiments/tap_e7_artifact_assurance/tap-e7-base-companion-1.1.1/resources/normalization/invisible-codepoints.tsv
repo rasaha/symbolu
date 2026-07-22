@@ -1,0 +1,17 @@
+# BASE-INVISIBLE/1.0 codepoint	name	class	disposition	suspicious
+U+200B	ZERO WIDTH SPACE	format	strip-and-flag	1
+U+200C	ZERO WIDTH NON-JOINER	format	strip-and-flag	1
+U+200D	ZERO WIDTH JOINER	format	strip-and-flag	1
+U+200E	LEFT-TO-RIGHT MARK	bidi	strip-and-flag	1
+U+200F	RIGHT-TO-LEFT MARK	bidi	strip-and-flag	1
+U+202A	LEFT-TO-RIGHT EMBEDDING	bidi	strip-and-flag	1
+U+202B	RIGHT-TO-LEFT EMBEDDING	bidi	strip-and-flag	1
+U+202D	LEFT-TO-RIGHT OVERRIDE	bidi	reject	1
+U+202E	RIGHT-TO-LEFT OVERRIDE	bidi	reject	1
+U+2066	LEFT-TO-RIGHT ISOLATE	bidi	strip-and-flag	1
+U+2069	POP DIRECTIONAL ISOLATE	bidi	strip-and-flag	1
+U+FEFF	ZERO WIDTH NO-BREAK SPACE	format	strip-and-flag	1
+U+00A0	NO-BREAK SPACE	space	normalize	0
+U+2009	THIN SPACE	space	normalize	0
+U+2007	FIGURE SPACE	space	normalize	0
+U+FE0F	VARIATION SELECTOR-16	variation	strip-and-flag	1

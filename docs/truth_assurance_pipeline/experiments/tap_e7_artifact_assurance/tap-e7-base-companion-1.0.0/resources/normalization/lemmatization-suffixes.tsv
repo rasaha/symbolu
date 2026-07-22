@@ -1,0 +1,13 @@
+# BASE-LEMMA-SUFFIX/1.0 rule_id	pattern	transform	guard
+M1	ies$	->y	len(stem)>=3
+M2	sses$	->ss	
+M3	(s|x|z|ch|sh)es$	->\1	
+M4	([^s])s$	->\1	not ss$ and stem is not in NOSTRIP
+M5	ied$	->y	
+M6	([^aeiou])ed$	->\1	stem in KNOWN or len>=3
+M7	ed$	->e	stem+e in KNOWN
+M8	ing$	->	stem in KNOWN or len>=3
+M9	ing$	->e	stem+e in KNOWN
+M10	er$	-> (adj only)	POS=ADJ
+M11	est$	-> (adj only)	POS=ADJ
+ID	(else)	identity	

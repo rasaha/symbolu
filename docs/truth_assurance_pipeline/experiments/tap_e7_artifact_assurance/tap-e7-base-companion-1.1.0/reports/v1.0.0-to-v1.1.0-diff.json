@@ -1,0 +1,5066 @@
+{
+ "changed_files": 562,
+ "changes": [
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2c98800335c9964e4f9a8eb19840d63eb4a3786494ab37d018fc283a1d63c5a2",
+   "path": "corpus/A01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0e428d2c4231f46d43e416d7474e37ebeee016016e0756a48629569168b60426",
+   "path": "corpus/A02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ba8e415e2c21b5b7798a19ee46b8d762da6487b90261a9a756d8eed30295c227",
+   "path": "corpus/A03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:31ea1441fb317d2520cbc5508f57347828bdb834ee8db8cfad4e30d946f32836",
+   "path": "corpus/A04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:9d130c65dd74ac3e5b23851614bc271c48547bc757ebc95a0b1d0ec44ddcc9d9",
+   "path": "corpus/A05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:eb4e9583f6113c8ea0443fd6e4ef33cb92a8dd0ab5584319e937acd7200f85cc",
+   "path": "corpus/A06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ab327c602fcbbd4ac288e5fbc895db90f53634d5b8e0b57a35d3216b78fa838b",
+   "path": "corpus/A07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a6146911eba98dae1b411030516124161ed66e9f75ba374511fdff13c68ad9ad",
+   "path": "corpus/A08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ef866fd70a936e1aa1222dc6985efd3a6b33055cf4d5cdd251f305ccb49369cb",
+   "path": "corpus/A09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:d03dca2fc421114b806d7de3d4047f3b3df553b4f11e60eb74f72c30995470a7",
+   "path": "corpus/B01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0770f21098700981bb7dc92dd625990315960ab523ea74fd5f2d638cb8c96c0c",
+   "path": "corpus/B02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0132e752668a0671a4c4dc6e6949b28102c001ea9d0f6a0589de81182c730110",
+   "path": "corpus/B03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0e31622cc804ce819af4b9a14b95e59dfa1668a9b7d89ab230c17fa444891188",
+   "path": "corpus/B04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:7b518724aaf2d05a74a91b6ae22cbb5ed4a9a871494ccd4cdfd10aa70bd4f850",
+   "path": "corpus/B05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e87499b3ff4b6f14b0b5ae5ff13efbf46e9a9e99ab6bc78d915630494429db0b",
+   "path": "corpus/B06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c0baefdd231ae7ff4717d30a91c87f8b0df33c2f52421cd9296ab525bacad30a",
+   "path": "corpus/B07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:28151530deee6f03ae1d805844e8e01e27ba5b69f37ec4f7c93f3fbba7b1037f",
+   "path": "corpus/B08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:145b2a6365af73df8bf99a6ac659d1ed0b067f565b08c401e85b2bf53a94c8bd",
+   "path": "corpus/B09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2383325cc4f2a3fed94e6422995932e2e20dc153982c96112940afe0f4e693fc",
+   "path": "corpus/B10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c0d46b5d52e86849528cbff3617ce119434319be604431511dc3422033f8e22a",
+   "path": "corpus/B11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:14945ac62f69d5596efadb0ebdb9b8dfca3b35e22341bb2b9058da073b28918a",
+   "path": "corpus/B12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0066a6549b401564d99a92c78124b4b740d3dd39c77a6a22c19e3e09b28e0225",
+   "path": "corpus/B13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:773b1273a403da261de3521422e1a1b01b671a6263243beb1d259f86b9b66432",
+   "path": "corpus/B14.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:54a5e9feef671e18b32fe84506482696a6a2caefb648913c8a4b61f26cebb5fb",
+   "path": "corpus/C01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b19a0b05f8a475fe674e23cac2f99da07218f3e0008bee0eb930dc10e70b826d",
+   "path": "corpus/C02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ecec05680f172e2d074e4e4ee485d6996b480554c4d18590d02fb114b2198aac",
+   "path": "corpus/C03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:fe39587afa0192cc1d13e23532a87b4a342ef618f80f7ae30ba6aab099982872",
+   "path": "corpus/C04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:18a33f0940c8a463bde0537eb3c6fd4e2fb7fd0534f65762d65ca0bc8ae216d7",
+   "path": "corpus/C05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:79ea00f7d32c8bd9f38c054b8e4c8ed54fab14f82ee7cdbf05c40773875d67e5",
+   "path": "corpus/C06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:3b23d062bae43450913a456a320bbb92fe7330522da7d85c77166b5564393e89",
+   "path": "corpus/C07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:49bc0598c08cd8666d2878284b7af2c90d1d3cdbbba20da33e35243a6b358a95",
+   "path": "corpus/C08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0034eeabc639099875677ef3b3dbde7b733312dbd4361444e4a15e74e72afee9",
+   "path": "corpus/C09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:1b68a0727514c60d06876fcbea9fe92f46431535358d78ef6205127c5627cfc5",
+   "path": "corpus/C10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:3174185fb445e14a0b3b93e1044a65d43fb78a4d4cc7e34dbc89dea31ab8f766",
+   "path": "corpus/C11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:4a1cecdd059379fae25cfddc5a89a94aa6fd6a7a31c3a5045ece56b135db211d",
+   "old_hash": null,
+   "path": "corpus/CR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:6c3effef6bb385e854e63b718f879931072fbc905d29432d68fbaf2994c02e53",
+   "old_hash": null,
+   "path": "corpus/CR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:18290586b764109a7abdc30b98676bef3af80dfb397043bb074d1cb75e4e7766",
+   "old_hash": null,
+   "path": "corpus/CR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:443ed796d9dd21640ec5c015f2f48873ac7da0b7960c50a6db19a54aa2979870",
+   "path": "corpus/D01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:21cb81893ce931ea2d72b7cf66639823506c3ae1ab384446e3bd9e398373e617",
+   "path": "corpus/D01j.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a05d44c498ab3233c525198223bd8cf44a4b86050cc7d6f28a38178732cb7aa6",
+   "path": "corpus/D02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e236099c85c1fbe6080522202c90aee0c50d160d52a1339b8fd8ff324713fdcb",
+   "path": "corpus/D03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:d8cafe8a573ea885be7f4a75e3ef04b74e59dd70bbb4f193ef6a5ce5ee75f229",
+   "path": "corpus/D04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:44b047cddc718977574065fbd113662e3d9f0eb79218ce996726676a38f5597c",
+   "path": "corpus/D04j.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c66f9a56fe118ca61ec71d09d8185e13b76191c65e116a85ef14556b0bc0b753",
+   "path": "corpus/D05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:8d470a744a293d94e2819de624d4451d9795c10062b2567694a4f822f00a7ab2",
+   "path": "corpus/D06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:08214b3b387fe8263d01d3a7e498a5a07a99ed24d655dd62a47702ad9e11a306",
+   "path": "corpus/D07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:84a1cd8d9705723db08e79ec2e513d9224244a084542bf61dcf116721bbbf700",
+   "path": "corpus/D07j.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:214ab071d21a957516adbbea94e5b25406959ef5c010ad11d442903ce7b9a61a",
+   "path": "corpus/D08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:8b95502a717ee7b242599c7b2a186d178985b03ef0df03e5508902c81acfde89",
+   "path": "corpus/D09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:39d0ef5c30c84ba7239ab1f978b291ac5761faf7e9eacb892d645bf88e87204f",
+   "path": "corpus/D10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c9ae009ae227ae6e918915d8a3b92b07696e54846bafac4c156586207c191b6a",
+   "path": "corpus/D11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f49834b34d7f47233fcafb535da5f5f28db61edd8ed787325842993239a241bb",
+   "path": "corpus/D12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:181ef85a6a5163d0c590f9cd89101268d3b485d6750b5c4eedb446c17798f5c2",
+   "path": "corpus/D13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:0b9a10659db55b53c6f06c3f85b884054b4aac05d92f996ebb20c9998dcce6da",
+   "old_hash": null,
+   "path": "corpus/DT01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:25830ad2e221b69a74511c4f115b2ad7122adcf43ab1f97acc613083e0a00161",
+   "old_hash": null,
+   "path": "corpus/DT02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:8b14970061eceee8aff13e12d8ac409f4dab89aa3b9262473c92944dd9c248ba",
+   "old_hash": null,
+   "path": "corpus/DT03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e1b30d7df4ce97e6f7f0551134fabf38d3bb2b4c8b79c7d4d7060f89098cf7ae",
+   "old_hash": null,
+   "path": "corpus/DT04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:bc55d609c84b8d091699979380035c6e2060949356c4aff9f8ccabb498d23e05",
+   "old_hash": null,
+   "path": "corpus/DT05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e5520c16b86de712034baafd5f8753742678e7d85a60e2e63bcc66a7e1914e0d",
+   "old_hash": null,
+   "path": "corpus/DT06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:d2add40a1da71a45ba9239ce820b498593ff73a0471b2296200bbf53e12920e0",
+   "old_hash": null,
+   "path": "corpus/DT07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:9c862e421b085b459c1aaa920973a75af7d7edcf72718dcb1c47bc9f0ee9a63d",
+   "old_hash": null,
+   "path": "corpus/DT08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:74d39a4cb6d5a3f6ec5895cc1286794278f44f68db7bdf67467e7a427f7f73d2",
+   "old_hash": null,
+   "path": "corpus/DT09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e5dc637eb715a7faecba7d87db46400874b6f6b41c9defe417437cd62c8a92ce",
+   "old_hash": null,
+   "path": "corpus/DT10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae1f3e2a470a082446b260e23e3d4011b181cd7bf629e5f9eaaebfae26688bb1",
+   "path": "corpus/E01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:638d541fa7111cf96a491788e962e87a34e6919421242c017e637fa61d3d0438",
+   "path": "corpus/E02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:fc58f7e63e286be802825baed1947ea29785d318b7f65874b45c48f5e7d244ac",
+   "path": "corpus/E03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f56737b404e3c6c0c6c2bba72f17e8028bd157ffc395d5dfb8669e628b0e6f9d",
+   "path": "corpus/E04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:139aa3e20bfda11d9863ad8bae99bca332719c8299ad9bac2af9cf243d194df7",
+   "path": "corpus/E05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0a0e4bdc2e50bfeffe645f51f936163f680ab4331fb82a8e94bdb057f41b0d84",
+   "path": "corpus/E06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:91279950ef40ee41536c705ea3c124d7995322835fd8960e3710caa95fd464cf",
+   "path": "corpus/E07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:80bfa60a58bd2a1690e936ed1a980d24a16129e2425129f1a2e12bd538a81b8e",
+   "path": "corpus/E08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:dd9c151bccdfd61a3f633d41b0c5fc06ba45383973530120ae394a91e60475b7",
+   "old_hash": null,
+   "path": "corpus/EM01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:53725bc3a92ab166c1b2eb0890872b1b4a66bf6b83fe573f72e921d2adbde70c",
+   "old_hash": null,
+   "path": "corpus/EM02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:48a3e933fd08ffffe7d8289d1a8fd5f440823d80590b629990ce16f85d77e527",
+   "old_hash": null,
+   "path": "corpus/EM03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:b0202e756c4c4cfe0cb577ea16a8f1305862295b784c30ee9c368902e464914b",
+   "old_hash": null,
+   "path": "corpus/EM04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:93391b1eae3682adf8dccadb9cd157b0ba72d151aafe2d951d5604272614b3f1",
+   "old_hash": null,
+   "path": "corpus/EM05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:11e0dc4fdb79157cd57cdb077197ed0d1b116238d8895c8c8015e912b447aa18",
+   "path": "corpus/F01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b667372adc21d9f700720683c2dba084252aae7d776b057568d48086bd45cf25",
+   "path": "corpus/F02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b96e97a0b23d81579961a8e846b30e12be1ae4befb73b6a1b44b21262105fa6a",
+   "path": "corpus/F03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:55659dc3a9befc52dfe44c0c6fd2ca54fd24ab8b6d97e710ef5507c31c8ab985",
+   "path": "corpus/F04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:d9318536b9d8c4e881fa89d3ad82afef9485002035148f3559fc5eb2ba06992e",
+   "path": "corpus/F05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7c4fb1f02d9ab781c6a0731a63388dfa5036bf4a440b9a47c1c358c4afb8fd0",
+   "path": "corpus/F06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2163b3bf4a8549674fc48cdd720fdf494c7be0f51805ea83a822553aa8ac572f",
+   "path": "corpus/F07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:bc86d180332aa88808f351be5b3acb99980c66d2b8b8b562086415c7934c5e81",
+   "path": "corpus/G01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c3d2d8936c576891b8cf4e393d2995d9f9bed62085d5e2bcf955cadb66d28b24",
+   "path": "corpus/G02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c87e6688344e4bc370f8094be15f072aedead5033b44f889a36142f1ce942496",
+   "path": "corpus/G03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:1a36c25004c1bd21b1fe25b1d5573b41359e6c36210f63c2efc953b01f8e6a57",
+   "path": "corpus/G04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:97d60e6ce41bbd1d6bccff025ffcd734d9e0d80ec2fdff4257d557641dc264f1",
+   "path": "corpus/G05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:3d8eb4e4ab157f628b9395b9af3a65530a5842a0555479fd443d152c82915228",
+   "path": "corpus/G06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e9405163d2fbc640a5d067e0242b3c7aa6374490b9c50f2245c0be77188b6e55",
+   "path": "corpus/G07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:9531badd6126fbc990cd0edff82b1277e09f0ab65f14996327afa9dab0f25335",
+   "path": "corpus/G08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c5158dbd6e2abae4a27dffb49f6e751d9a53d2a17618f8034623c9921f1951c0",
+   "path": "corpus/G09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0c40d07b629a3c6e44f02ffc11c2aeab2c2c7d60b11995f992b7fb0ce7a5f7dc",
+   "path": "corpus/G10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:8ee0b80fdfac3f8a90773504d6a8e4eecc5b97dc007613e60c8636b4b08204f7",
+   "path": "corpus/H01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f3481d4c8abf7067ae84248b865d67c4938a3c6e0d171cc2993c1dd18b5da4ac",
+   "path": "corpus/H02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:327ceea6fbe0c3d62dd050142979d66b42f6aa8d555b5699b157f077f96d72a5",
+   "path": "corpus/H03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:9a0a6009b5cfb2c6998917d80b5bbc70e0ac23ced9a6b3937501698a019cd899",
+   "path": "corpus/H04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:75178a0f7a2b8c04f810ea8ce74b7b623dad5c79a19485cf255b36cdd3b4bba2",
+   "path": "corpus/H05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:3f2b0e95273dd3e3af7aafce1d2a2c561d6ed6987849bb56eed04ab0cd8e8f97",
+   "path": "corpus/H06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:bc3fde35602f8b1324d34bd5fd4f08fa08a730cdeb33a74f75c31882234fb248",
+   "path": "corpus/H07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:eac047617ca12725b58986f09858de4430c083bf2fb30fc0dc563b58e12fe8b3",
+   "path": "corpus/H08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f68564af1397601219a7c49c8cc48b00e7d3e0086372778c8adcd9bb15f66008",
+   "path": "corpus/H09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a04a66281874e5410f7768c1dc7eb258f192a1e4e54312589efede6d2502e9b7",
+   "path": "corpus/H10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2c9e2166eb7b4b371556847969c532aaaa1b30222b73c2ceb77e1ce88c77d70d",
+   "path": "corpus/H11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:6cb9f676949bcff4609fbfdac738696ee1722619dcdac988418ca4d6eac354d7",
+   "path": "corpus/H12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:d7fed99640dd7029c96571e9910383f2462fe61edaa14c413dccb176f920d9b4",
+   "path": "corpus/H13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:11d3485f52d42ab5f3cfe2a607835046fecbeb2b73c79850387d946beb8224d3",
+   "path": "corpus/H14.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:9609481cff9fa1e41b96a2e5e56e29a99840d7b94a10cbfd16615ec37f180beb",
+   "path": "corpus/H15.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:eca4681625c3c1c1d9d144cf5d9780e5761cd1c34887dae50d9242ad57ac7884",
+   "path": "corpus/H16.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:fc1f2ee156ddd56310ca4bc4155339c775d1069866aa923365d0390648939969",
+   "path": "corpus/H17.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:831442af701903de3e9b5b05e1a73f62a9a78c5dcec64abe76c63ad89fb1e37a",
+   "path": "corpus/H18.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2c696ea55d40d057f2e87cbfa889ee80b35fba690d607b89ea7469317c45abb7",
+   "path": "corpus/H19.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:4af00441e1e706c84740b48c55ea37771261eaf9d6f4432993b328db214fd760",
+   "path": "corpus/H20.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:02c1ab93b89207d648f873209d0716d015497d8ba2f39bc67016f45d2c63a2a5",
+   "path": "corpus/H21.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f4720444505ff632a2d076c358a5527a3b1fa59212c047f8dd67de8701333e78",
+   "path": "corpus/H22.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:40b60cbca51b6ea60f802b6feca0e56b6eb27671833e6e4c40348b730fe4b969",
+   "path": "corpus/H23.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:0b54f9ce086526289d2a4e14c43542ea486f27287847dfa03287a786c49d91de",
+   "old_hash": null,
+   "path": "corpus/INF01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c4407c875dd6f5a76cdc95fbdb3485f0a3f3faf5c0b4fe0a2e56922c1de05394",
+   "old_hash": null,
+   "path": "corpus/INF02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c5621fd3c5615e1143b3c5be707a6f131808021a68d77c3437291623f160d940",
+   "old_hash": null,
+   "path": "corpus/INF03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:4810121bec0e1103102158b5425a04bb7ca8434108fd304f865f244b96f2cb91",
+   "old_hash": null,
+   "path": "corpus/INF04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ac058e1cbcc5159153aadf8185d49cbd6a8663f34596d43d0645c80e4208654f",
+   "path": "corpus/J01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:50228414f6d29c078ad61d64b826c0bb8b8fa740180b01920148e4781a725c8b",
+   "path": "corpus/J02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e21dbd59a16451e70ae508167d10d416bfba475f0b9bddb9436561e04b29ab15",
+   "path": "corpus/J03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:53b7a1c763c59e939c2aa0bd8aa38f438b72825ea45b5a4cbdfe78d7c8f063be",
+   "path": "corpus/J04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:28e6dc24cb4a785ff176c03138992e321f3fb2e70998e54fedc26a44579c5781",
+   "path": "corpus/J05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b440f23ac0292f5c394ec0f0251cd150322abd9debcfa9b01b52ce3fc9394760",
+   "path": "corpus/J06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:af2982eb0573d8604c26d3eabd390ded3afeebb2c46816359a5b93088bcedfb7",
+   "path": "corpus/J07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:eb5b7a1e8191d40282beecbf2808157e00d03e92fbe9b39103dc14660b589e9f",
+   "path": "corpus/J08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:7b39da3e4f56f4ad38fc1fee750e9964faf29ae17c7651f3d752d75377f86ea0",
+   "path": "corpus/J09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:434daf56c42a48ca5b7da45ee2db9ef5dbb4b4f938b9d459b918c62713d5b11a",
+   "path": "corpus/J10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c5e68b09afa67fcadef97d6c60770e850db8209a9d44bb08286e0872069e1693",
+   "old_hash": null,
+   "path": "corpus/JS01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:2def9dedafc4b5e9ccc9d1ae1aa5ae9816166cc3ad753236f9326c14af558791",
+   "old_hash": null,
+   "path": "corpus/JS02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:eeb19c15bf2b9a1a5c08b4648cdb932ee4d1da6dd0da81842de11f9ac1dcfc42",
+   "old_hash": null,
+   "path": "corpus/JS03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:0a19f4659e4ffa69a035be58990ab92e2c8a2c86f0d64fef04fee8172a27ec27",
+   "old_hash": null,
+   "path": "corpus/JS04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:4cec0cfa7f7d8b865ce7caea49e573ac1d1c6fe694a2e4418360bd1575f5e510",
+   "old_hash": null,
+   "path": "corpus/JS05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:dc6961ab56807595a575e054fbdffa4f6bdc4a01a534b2c0fc70a68a6c04711e",
+   "old_hash": null,
+   "path": "corpus/JS06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:7318169f28c055bff4bf391f27465c6d144c2a485e097293fcf77f6f8bb0b6e8",
+   "old_hash": null,
+   "path": "corpus/JS07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:6db5623bc1d9b8d563f9a5239d935f15f3fea4d5e1fc5d18883efd9b195fa991",
+   "old_hash": null,
+   "path": "corpus/JS08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:8bdffbb192d1fe02257d7dd25e86c549f6297182617ea3acf115be377f49685f",
+   "old_hash": null,
+   "path": "corpus/JS09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:9b82c11174f2af2ed2be9b2469de2f30136db5e6ef1e9a67772999940235c827",
+   "old_hash": null,
+   "path": "corpus/JS10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:152d21be0f87b805f4e7d35db98a34fbcb08e17db057db08e88a7c1b4ba6de5a",
+   "old_hash": null,
+   "path": "corpus/JS11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:177b0271e40c5e53bb833c6c38a728203c031627d5391fea95f53571179c3b61",
+   "old_hash": null,
+   "path": "corpus/JS12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:faca8e531ae09998f5c37fc4d238f3c1ccc0868a2230b40339a1f1eac6501703",
+   "old_hash": null,
+   "path": "corpus/JS13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:1d31567560039dae50ae7b631a1aef10e269b730f58b8978b177f9f2882d74c5",
+   "old_hash": null,
+   "path": "corpus/JS14.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:a6d616e7087663dc443e41ea466376db536d4218d5a6120dfe8e118b873a886e",
+   "old_hash": null,
+   "path": "corpus/JS15.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:7c8acaec4338ec244a6b9e926fe6364cb5faf4a82694eff1bb75387e810f8f86",
+   "old_hash": null,
+   "path": "corpus/JS16.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:7653a8f07a1152cf8cc9a2162f8bc02a18a1e55b5bbed6ad078f8e39480d4790",
+   "old_hash": null,
+   "path": "corpus/JS17.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:fbdad15d5dfeb07b91224f9e2203b5bd2f4dcf758b92cd220d19f9fc77108fa9",
+   "old_hash": null,
+   "path": "corpus/JS18.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:094434a22bc3eff4dfadb362ad50b173585c805d44d91548b86a3fce3e13a240",
+   "old_hash": null,
+   "path": "corpus/JS19.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:8ab53faaa479a31f2dcd4e0392c7c0d5b5ca882d6157896f3e62ae8023ef041c",
+   "old_hash": null,
+   "path": "corpus/JS20.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:60c01ae4e2b9e4e6a4b063a923cecb2c9efb01e9f8b39ffefead19895ad9630a",
+   "old_hash": null,
+   "path": "corpus/JS21.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:2a17a62036651192ae7be3296d44930a6d49e57d4184cd56cb2a2aa3e8180728",
+   "old_hash": null,
+   "path": "corpus/JS22.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:f98db8a9769251251652550f362cf95ae81408dbc0bfd3b4e8876883f70774d2",
+   "old_hash": null,
+   "path": "corpus/LX01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:7223559c8620293c8c21b16c187c60e227425dfa4b8fdec9ebfdd6e759f0d06d",
+   "old_hash": null,
+   "path": "corpus/LX02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:245d54647c15bd8255a3306cf5ab7d5972b76a47ef14772f5bf50990c1f4b9a0",
+   "old_hash": null,
+   "path": "corpus/LX03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:077a7c6d26c3d29e87448f37a97dd161d89ddc8e6b668d95f0d7bc354138a486",
+   "old_hash": null,
+   "path": "corpus/LX04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e72e1b791146a3f01aa28ffea0430d79b28df2e2367437fa17392452b0705995",
+   "old_hash": null,
+   "path": "corpus/LX05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:99afa2a5b1b02d315a7163cd208073e41307160951ef3f95353603f9f4014512",
+   "old_hash": null,
+   "path": "corpus/LX06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c7220e4005f751843178700d07451388e921f68def69554e53cc9dad4df776bb",
+   "old_hash": null,
+   "path": "corpus/MD01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:6c5a017143641c4de540edd49f051933c5161c32fa88f5a63fb54f12ae78caf4",
+   "path": "corpus/P01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:903e1cb7311d823adc2fe5b49ba057d0e517f8390677aab2a69dff6c56c14a3c",
+   "path": "corpus/P02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:bb867e2260358180726f17a5f6f27e7cf15ed09e5c8adb9b8b7cf6340fed2612",
+   "path": "corpus/P03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:8c770f0923f298c455490590a0f3883b50d218fef1df951af11c0f13886a18e2",
+   "path": "corpus/P04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cdb7cbf1eb031d44ae16b235962d54a26732d7a43e4173411c7af3314c173042",
+   "path": "corpus/P05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:3c4d7e3545cd1c58ca0ca47efc92a5f7593ecd6b758d8a001492d30f0f84481f",
+   "path": "corpus/P06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:8cd0ded646573ce1c76b00083a00e316959ec2f11e52b5c223e658bd815a1ab5",
+   "old_hash": null,
+   "path": "corpus/PR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:58a317a5c6ce2be17af3eacc769e8b7a92d0d46fd6e864c0acc1179bd4e1acec",
+   "old_hash": null,
+   "path": "corpus/PR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:657ee8f34105c9ed27ef659e9f00fe89641fbef18011eea963f986eefc77038e",
+   "old_hash": null,
+   "path": "corpus/PR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:bde785990b50f9806953047c7f860fb189b64c316bba2ac92d3c84aeb483832b",
+   "old_hash": null,
+   "path": "corpus/PR04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:87878af0eecae8a7a29146185d1b8b34d3b17c7a5a4eea057c6580f5246e0955",
+   "old_hash": null,
+   "path": "corpus/PR05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:cb083ba020b726b338c37b36d3409ce1ca87d3d9babc769be3c83d2625754a17",
+   "old_hash": null,
+   "path": "corpus/PR06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:000af035fcd4461ce0166f0b593bd49e5b549a392f56062e718f1a19d1c28ea4",
+   "old_hash": null,
+   "path": "corpus/PV01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:d6d9781cacfc16cf39bfe1f849ef06703fb6bcf5ddfc0e92974d19154242122e",
+   "old_hash": null,
+   "path": "corpus/PV02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:87ebf7ce42f04e189d029dcc3a66c3d1dd6666ae964ed8cae1513fe5208fde9f",
+   "old_hash": null,
+   "path": "corpus/PV03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:a3fbadfec77973d400db1be3eb588c34bf3ffe296b2716849ad4440e10624539",
+   "old_hash": null,
+   "path": "corpus/PV04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:67bc5638d352595ed2b6216a83be9847b66c81640aac84cbbb131dbcce7e4bf0",
+   "path": "corpus/S01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:9639b3055f6e83e39b8caeba96e9ce813f48a8668d5b7a35959acd444399e7d1",
+   "path": "corpus/S02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5761e5c0dc55ecfd84ca4117ed125399b1efd8fc790324f4deb272ce29d3e2fd",
+   "path": "corpus/S03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e375bf30c45acccc514bc3af270091689b911ab5e2a2079a08ee1aa02c7082bb",
+   "path": "corpus/S04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a403b76b81ae56da479bd13963a9ee44d63cbc4040b61374ee4a8ae91aeeaccd",
+   "path": "corpus/S05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f1da8a807c05fd7937dd288140e95916b6fc66bd2e51ae16ae515fc3d56123c3",
+   "path": "corpus/S06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:51e9127321a8526a1316765f71ba83724d567ce9e20b693184f4853fafc73ee3",
+   "path": "corpus/S07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:097436cc917f7240d270107db4ee4c7c25b067f0a1ae407ca07902a2380f8b2f",
+   "path": "corpus/S08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f0d54030f90f86d9e61bc56f3a50cf8c84154dc7429381d032896fa2a027cd7e",
+   "path": "corpus/S09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:eafe58e9da1df5facb5d5449cb7c1f3255248cfd229dc20b76b72894736ed9bc",
+   "path": "corpus/S10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f1044aa99af1f9dbcddff02d0f81e60b54edf4986d6a92e7fddde34c78ab42fb",
+   "path": "corpus/S11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:1eb6ba08df700ed3d3c4385713c5a64874d0f68705c0ecbd7c954e14834837d7",
+   "path": "corpus/S12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:56064911484240fc319b3784d0a9ef1b56cd304f73e48c9a3d3b48f25f449c6f",
+   "path": "corpus/S13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:1796abb1488864e5e1e9081e35756b92316e20d4914cc05d2187bfd23acef910",
+   "path": "corpus/S14.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:84ae9672d523380fd0471f7a66f3bafe920748ed554c6644d2a3d8fb7796428c",
+   "path": "corpus/S15.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:8101e3b4eec7bacf28ab79a891c39c2d882221fa15baa076b4895319e3cd9c91",
+   "path": "corpus/S16.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c9029a421e651e71d9cecc25000c123a44be2ed2db8751ee2f9a73b15e73c1dc",
+   "path": "corpus/S17.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5f499a9e3d6b6cf53f4ca62b7ee4698fcfec451d68c96ebb74f12d6cf3f6cd07",
+   "path": "corpus/S18.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:4ac30add0a6eefbdaba04bdb4b69142f9debb0861965347823a3d4a5850ef51b",
+   "path": "corpus/S19.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ed146fb834563c562be28fd9ef7c4245985280b2b549cf5f7903fb14667d0f94",
+   "path": "corpus/S20.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e49b757f2a184249b36f1f4caf8dc2c0773be01e5c420b38499d68d618f83dbd",
+   "old_hash": null,
+   "path": "corpus/SEC01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:2845013419c1224af57bccc78aabfd1e7061e52ebc6fde0865007da7178af448",
+   "old_hash": null,
+   "path": "corpus/SEC02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:b2f70f9288b12c9a5a440a73bec17b4a3b25974cdba25e0ea4bbe306317c4a7b",
+   "old_hash": null,
+   "path": "corpus/SEC03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e228156985caf220aecace518575aaae99c93ec3554c83e7ee4ff018625a3938",
+   "old_hash": null,
+   "path": "corpus/SEC04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:a2b130abd76d659add6e45819975bcd22a0dae666ea0336bb17ac38869268251",
+   "old_hash": null,
+   "path": "corpus/SEC05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:71e8edaa350ebd927a27dfc705b4f5511b2fb5c48b0096d1385f7faf56cd5e50",
+   "old_hash": null,
+   "path": "corpus/SEC06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:756636338dfa29f476b42f13c04be64b34d01c4c2584a967866080e6620d1f35",
+   "old_hash": null,
+   "path": "corpus/SEC07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:86076dbb3cd349e8861309a07336949b6e68c415bcbcc1200d28de216f657839",
+   "old_hash": null,
+   "path": "corpus/SEC08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:9043216d03a1d65fffb91d33e87c57838787e96352259b35ebafb54a88422a53",
+   "old_hash": null,
+   "path": "corpus/SEC10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:1365a4aed1b613e8e712da5722c803b113f361e36b8ce6cbc85da03f8ee79975",
+   "old_hash": null,
+   "path": "corpus/SEC11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:1f4679a5660361fee50b8eb03a8e86849f2826268c0ba1e45fa5aa95e036505e",
+   "old_hash": null,
+   "path": "corpus/SEC12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:b05d338b144b8b1dc3d31bf92a68b574d1e6b873a497afbe3cb2d8d3e84afaa5",
+   "old_hash": null,
+   "path": "corpus/SV01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:aa63ebd95f98cc224dd0d13c2ef9a898c2b8c55ecf4d7428508c2de400323842",
+   "old_hash": null,
+   "path": "corpus/SV02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:77e7e114e3ed7dbf5c3d3d4792dda3eeff1a280cc7ecdd256ededc62c544a0bf",
+   "old_hash": null,
+   "path": "corpus/SV03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:bf4feb698156148ea41201413c6ffc7d33e8fe946ccc1e132437a8abd94972dd",
+   "old_hash": null,
+   "path": "corpus/SV04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:8325d1df3db573a207f3f000f77fe1f2df4e4a2381be70b5b5eae5e128d07adb",
+   "old_hash": null,
+   "path": "corpus/SV05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:140950ceead4145f40468a9b6b32aa30b77ebc0689503647df052eeb3bdc8339",
+   "old_hash": null,
+   "path": "corpus/UC01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:791501921c821e71b2cc6dbab2e3bfcdd1d2c6ee846ad10a38a6ffe7c7d8b61d",
+   "old_hash": null,
+   "path": "corpus/UC02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:5c9c67ce76af5c11afdec83fbd63bd3b6d07c959768525a6a5f9e5e4522a7571",
+   "old_hash": null,
+   "path": "corpus/UC03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:ddf070c5a6bca0bf1362c517f9e0b8849ced6e47b5432b0f1cfc063d1daed5e8",
+   "old_hash": null,
+   "path": "corpus/UC04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:b1349bd6ee2749c6af7ac515357917947e3f2752d83792a167a83c801f47e41b",
+   "old_hash": null,
+   "path": "corpus/UC05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:db86e20d7086540cdaf59cf337113ae7c982fef3a3245e8b9ca3b8ee8b6f3de5",
+   "old_hash": null,
+   "path": "corpus/UC06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:d0819e7b31901476bb6fd83c09149185bc488b4ac2edb2454a54fe02796e1da7",
+   "old_hash": null,
+   "path": "corpus/UC07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:06365ad7f36083d674d02fa5977a9eae363ab8271abc816b1e751f930839e2c2",
+   "old_hash": null,
+   "path": "corpus/UC08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:d1c87c128813c3c7dbff1c766588a12742ae512084e5337050a07a27d7cfc623",
+   "old_hash": null,
+   "path": "corpus/UC09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c19f3f8e5bdb1d935cbff4ca724df3fd796896ab8f80f096e54387d585e8967f",
+   "path": "corpus/Z01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:fda9da7af747a693b785d5ca82787b84e7147a8b30710b9c52c08528da072780",
+   "path": "corpus/Z02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:75bb07ef6b3657590d6d69e28d4f866275bc4e37a65cc7ad5c85579432ef9b1f",
+   "path": "corpus/Z03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:d509bdb64b9324d219b962f7ec1ee8f7f5ea95d15fc7d0b138af972efd271bd9",
+   "path": "corpus/Z04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:315d9bc1c0746e1b9735f7cc7eecb07428698274030a3b33ce2d985b699d2695",
+   "path": "corpus/Z05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:88d6b664486a268a853c32da69a75b34c1d258cbeaf0a37d1abecd0f313e0e72",
+   "path": "corpus/Z06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:e10f1d0b6e08e644776627f0a5d5482ca2259239700bd06b5dc7ad9305dea11e",
+   "path": "corpus/Z07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:6fb03a00d2c371f4111b77dd9b94c2aec674c1dac72cc3d0d16cdfe735b3c675",
+   "path": "corpus/Z08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:e2cb004993947d443345e7ecba29c6956efa8822fdcd871eeff62e37a935318a",
+   "old_hash": null,
+   "path": "corpus/ZR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c3a458d977b88a71113144bc5d3e57159818621d01c455f5086089011aad9741",
+   "old_hash": null,
+   "path": "corpus/ZR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:9f523f6a005106796c0e3a956aabc826765fa7868e7b24903c713dae2f182af1",
+   "old_hash": null,
+   "path": "corpus/ZR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "FIXTURE_INPUT_CORRECTION",
+   "new_hash": "sha-256:c6a8dcf4c6d4e8ea2ead92252e3be29cfbaf0117da01851bc6ec758e2195225d",
+   "old_hash": null,
+   "path": "corpus/ZR04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:5c020308ae3bd178f74ace74b189a4a1db8a1add9ac53f5914defcc51c0f1c14",
+   "old_hash": null,
+   "path": "derivations/CR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f85b8ca9784b2aaeec897a90b8a837855c8d0b1275f62134ecbff8fbf756bf97",
+   "old_hash": null,
+   "path": "derivations/CR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:eee94409e5a7d43d240f035dc895b55a5d8385c8f51561375a91a91a87898877",
+   "old_hash": null,
+   "path": "derivations/CR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:0c4b51a3a5b0f4c42c3a3ba61daa9e9c550ea4aab9aa66257316ff7b1b76b955",
+   "old_hash": null,
+   "path": "derivations/DT01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:3810cf617981010893ba0f12c76f27dbf4378fe76e9bb9bb0e367a4ea7964f5e",
+   "old_hash": null,
+   "path": "derivations/DT02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:8cbea23c19d349c5471fedc3c9d4259801f65b4b2b1b08aeb4ea2454b3cfbba2",
+   "old_hash": null,
+   "path": "derivations/DT03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:9807af0e9e095730677c99c052bc5046cc051631dde00a324ec592073d75d713",
+   "old_hash": null,
+   "path": "derivations/DT04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:06efba0911e6f35230910f514b00c0554f040f98550243c6482033c446c5980e",
+   "old_hash": null,
+   "path": "derivations/DT05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:3df6edd8af3ba521d80b9b59f7262b2a18c2cda60f71d969125b56e61cc90da7",
+   "old_hash": null,
+   "path": "derivations/DT06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:6f7fe9a26a019057712647f0dc57a7cce70759dbf1b60e1c9c643c2664184643",
+   "old_hash": null,
+   "path": "derivations/DT07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:ee14157069e6c2b680b01cdac8033c1acd846587b53a5677cc01857af67e8378",
+   "old_hash": null,
+   "path": "derivations/DT08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:ce829f81fe7ae0078ea7c78cd4700358ba093fdce417e17192f7287ec5c5f2a8",
+   "old_hash": null,
+   "path": "derivations/DT09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:b3c4ae4fbd5e9a6ac183fb43c13ca1165f4259d445174997b9c12d97a48c61a7",
+   "old_hash": null,
+   "path": "derivations/DT10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:262ddf011c3a87f4115015fe7ae16c31bba4efe11ef8d7bc41379cccfbcd0814",
+   "old_hash": null,
+   "path": "derivations/EM01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:3f5b3bf2055eb40bdd278d2de72c2ab9dee5c9ebdcf04b7efb2460484cd3ffd4",
+   "old_hash": null,
+   "path": "derivations/EM02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:e26ff73f44650ee1e42fe4e0d0cf2a0be66767635337409280d26a2dd6f2054a",
+   "old_hash": null,
+   "path": "derivations/EM03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:66df62893e23c7b5073871ca70fc815983ba5f0006a518cf565d6a35f6695bf3",
+   "old_hash": null,
+   "path": "derivations/EM04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:23c04d7c04b8537fb525af0906ef580c44444df7f97ff1c3bbd9acf86d96a93b",
+   "old_hash": null,
+   "path": "derivations/EM05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:76ff54d8f839700360155b36a17108c8e1e075458f72933838dc7986e459022a",
+   "old_hash": null,
+   "path": "derivations/INF01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:d601997129c5d0bb73306a6fd546f0c01a97d91435787d801819ab44b2adb58f",
+   "old_hash": null,
+   "path": "derivations/INF02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:b5a7ce29bb3cc1d88bbf74fb31b71fcdf07892aa996577bb6c579263b42681c6",
+   "old_hash": null,
+   "path": "derivations/INF03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:e44c9673113d19f12800f109685ea9922d69126fbbb2a6634060655551ce3548",
+   "old_hash": null,
+   "path": "derivations/INF04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:a05d59ddf9ee85cccf5579c6728f05ea2acfa0d3e88b49ec0f018392b6e67083",
+   "old_hash": null,
+   "path": "derivations/JS01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:bf450d8ce5a0d67fca6adbcf12d70f78bc1f835daaca8e501efe13c2eacf6486",
+   "old_hash": null,
+   "path": "derivations/JS02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:5d8a52948e7409ee3520bce84ad56944c0307897c8aa32e323e369285578dfb7",
+   "old_hash": null,
+   "path": "derivations/JS03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:077c396cb90ad01cc1bdb0b942eb75e3d61515d216c0d87a2b9d4c01e7126e14",
+   "old_hash": null,
+   "path": "derivations/JS04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:22d625a06f80e7829c7e57088ad1f38e615528e0aab1a10b25930881a51ac762",
+   "old_hash": null,
+   "path": "derivations/JS05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:13c3a9942a00966b647ee0fb6d7f1b1398baabc57dfe194b3680dce948ff2a29",
+   "old_hash": null,
+   "path": "derivations/JS06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c96a94ab2128fd2b607db11b7f2ce33abcd9f9123e20cca05c8802912dd6e549",
+   "old_hash": null,
+   "path": "derivations/JS07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f99b6e5fee2f5017311d47a8a63e02468c67caf1fbb62a1e29bb219549e474d6",
+   "old_hash": null,
+   "path": "derivations/JS08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:fd91c00c12ee6a79df9515df1884871bc93718a0de369e7eacb1ac8e918b66c4",
+   "old_hash": null,
+   "path": "derivations/JS09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:6e91a350d1557a8ba1793484b44ab412353382a4023cd86058a537ba4cfb2836",
+   "old_hash": null,
+   "path": "derivations/JS10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:7797eb17a145b7db24154161a03fe54c906851212d0246098b865b405fef71f1",
+   "old_hash": null,
+   "path": "derivations/JS11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f3a0c9735f1a0432ff23681b44107a88af2d1c19c91d59d06451454acfe7bab0",
+   "old_hash": null,
+   "path": "derivations/JS12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f1974524171f8c4d05503ecdb4d43dc92edcce9e79fa104468be5cba439ffdbb",
+   "old_hash": null,
+   "path": "derivations/JS13.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f7552906f6a05bda2b1e7694477d31640a447accbf9b24b85819b177a10c0e99",
+   "old_hash": null,
+   "path": "derivations/JS14.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:54e9aaf432d2ea5a29749123f514b5a53c33e58a8b54706bfa98881583de584f",
+   "old_hash": null,
+   "path": "derivations/JS15.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:e21f8c689babf464cd9c2eef2da96ba86327240d08129121eab57d37601f3f44",
+   "old_hash": null,
+   "path": "derivations/JS16.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:7aef5203f280b6e9c40e6a66fab4694cda2ccc72306d9311ed2dc65aba09c9be",
+   "old_hash": null,
+   "path": "derivations/JS17.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:01bbcac4633802744b01cccc4ac5a8f14f96b40a44b840aa806c8d88364286e9",
+   "old_hash": null,
+   "path": "derivations/JS18.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:5cf99edc1ef5c3e84ad19b602c9a82174c9c4a7e492f6cf47a8388b2525d5a48",
+   "old_hash": null,
+   "path": "derivations/JS19.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:1bf0a5479cd5554b63101c41abbc9134f6885dd84ee4799d155d0f4b0a573d31",
+   "old_hash": null,
+   "path": "derivations/JS20.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:df8cc9cb561f0fcd60e9901ddd77e02a46137d981bbf46a8690165ce456f2d83",
+   "old_hash": null,
+   "path": "derivations/JS21.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:0c9f2963c5adcb11b69182dfeacbde751b577e3ee082d3d780af9e0d562cd1c3",
+   "old_hash": null,
+   "path": "derivations/JS22.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:8c88e260e9bf4483dd352170a7a096c9169945ee2c510e8552167d4ce30dbc78",
+   "old_hash": null,
+   "path": "derivations/LX01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:51c66bee83540cbc92e55f7624a582a4e6280422284651dcb4bcc6e99abf3aae",
+   "old_hash": null,
+   "path": "derivations/LX02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:28ef866efcb910dc7c2f075fe3d7c8d709172c964df37c34b299126576f58380",
+   "old_hash": null,
+   "path": "derivations/LX03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:a0d6e85e1d73d5e09060656a2521b9552458c05bec687ad40a0c80d2784040ca",
+   "old_hash": null,
+   "path": "derivations/LX04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:618d27731129d52943bf4ca33272ac3cf1d51e057b82f473482ffbf8e018246c",
+   "old_hash": null,
+   "path": "derivations/LX05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:d0ba604f641e28e3d4f6fddc3e794ed4de594928d4cd328ad526c07fb2a0baac",
+   "old_hash": null,
+   "path": "derivations/LX06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:8f18233aead96e8c4c975b6c3a3f91e7f940c04ce78914c782fa473a1b86c045",
+   "old_hash": null,
+   "path": "derivations/MD01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:726a48f4a497974304d2f661c3c3dd33570632e45e9cf680c6e7b086354a7a12",
+   "old_hash": null,
+   "path": "derivations/PR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:0c81a2d9225259ea544ed3f66edd82889a6cec564bc21b0ed0b76d41ad675c95",
+   "old_hash": null,
+   "path": "derivations/PR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:67e6a898c1a324b410d3dee5ed8f4aae650817f927e47bf8dbd4fdb140842c5d",
+   "old_hash": null,
+   "path": "derivations/PR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c4c1725d11ac55cd4ff326f9db401348a6086491f995ac310c9ed17b9cb4bf01",
+   "old_hash": null,
+   "path": "derivations/PR04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:f9e3ead974bec25f93cb507283dfec2c4199247d80a4cabf3a527e17355d4c25",
+   "old_hash": null,
+   "path": "derivations/PR05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:892066ce2d6f20e3c00529cd9ecf61d2dc77ab0a09e883ffa3dd93cf647127cd",
+   "old_hash": null,
+   "path": "derivations/PR06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:03ab571f0be9ca73a27cd56718c703f43ef8c1cfc062c611d60e84515ccd4606",
+   "old_hash": null,
+   "path": "derivations/PV01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c3cfc3d352c674cae9e0b60f8d95ca282c4ca093c6572b7d0d034936095d6816",
+   "old_hash": null,
+   "path": "derivations/PV02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:0189d94922dc1b092d176fe610bb5aea457421c2c4c8589d624316e1be351aeb",
+   "old_hash": null,
+   "path": "derivations/PV03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:2e39ad83b17934a23dffe847a710d63e390d82450524480476681306d7e01946",
+   "old_hash": null,
+   "path": "derivations/PV04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:8d10f90d05fb599a526e71b36e8e24672fa7f41457b4a8d407e0c40b24c7d70d",
+   "old_hash": null,
+   "path": "derivations/SEC01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:d5d9daeb5e88439922ce1d9010a73dde28c29010f3669461a8849bcbfc4487f5",
+   "old_hash": null,
+   "path": "derivations/SEC02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:52eb770a1aea79f79ffe734e2a87c7ff0c2128d378632a4086502c109bb323b5",
+   "old_hash": null,
+   "path": "derivations/SEC03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:570af65c7db50699267f4dda37e1bb61c089c5703ff18f51b48bb89f4c46412c",
+   "old_hash": null,
+   "path": "derivations/SEC04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:1cbe3307e2b1507596f82995c318e1abdd5427abcfa9ce5c877a398cd1c58d8c",
+   "old_hash": null,
+   "path": "derivations/SEC05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:529f4402f32ecb04711ff3b3cdaec4497f7b59b69e5ae5c74a64fe9f7b8edc9c",
+   "old_hash": null,
+   "path": "derivations/SEC06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:45e27ba4527abaa81897073231d0ad73003ada1dc08478cb3b323a0298da3d9d",
+   "old_hash": null,
+   "path": "derivations/SEC07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:fb965bb060f781d7504dc0e06514bd2986137dd7eb15e671340a6687902e602b",
+   "old_hash": null,
+   "path": "derivations/SEC08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:08239fc07bb38b9ecfe31bcd51fc5d6189cde2b816ec90b74860665a1fae58ea",
+   "old_hash": null,
+   "path": "derivations/SEC10.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:6843645de48e17c34555fbd36e35867eeb98625b607bdf2f846e243072b2004f",
+   "old_hash": null,
+   "path": "derivations/SEC11.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:3271b51196872e195c40aeac0f4f528f0daeddfa6cf23e2238d7e2e34fa055b0",
+   "old_hash": null,
+   "path": "derivations/SEC12.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:001145e678152166783419167e1c71447c6acd16064d476b2e5d5ebc3a002a20",
+   "old_hash": null,
+   "path": "derivations/SV01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:32b8f009d5738724f6c44bdc8bf37e708d7285ea661816796a804edd8783264f",
+   "old_hash": null,
+   "path": "derivations/SV02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:b731fc0d72327945436fb7a8193562a73aad967fead79fb85cb19140ba6f5eaa",
+   "old_hash": null,
+   "path": "derivations/SV03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:b3fe1352a56c848c1c4a9831ab371973f3a1f3eb3de52ab6e3f076ce3e58908a",
+   "old_hash": null,
+   "path": "derivations/SV04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:2b9d4fe32b9884a072ddfcd918682f4ae0ef136acea7a79b4d160c75edab5103",
+   "old_hash": null,
+   "path": "derivations/SV05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:64308f0aae96ef99920eb12ad5a983386422bd138001b7f80b975f520dc4af68",
+   "old_hash": null,
+   "path": "derivations/UC01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:b9b351f75fe8ebbaf0fbff748573fe6e103f415e2c0aca0156860d706e575742",
+   "old_hash": null,
+   "path": "derivations/UC02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:91cea77a6dd27f488e46079176984ad1ccfa29302a662bbb21871f9b089265dd",
+   "old_hash": null,
+   "path": "derivations/UC03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c3ed06fd39ef5355bc54ecc218ed90c13f874302df6d22ff321aff291283c50c",
+   "old_hash": null,
+   "path": "derivations/UC04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c5097ed9776b5e96bf73b772d49bbf4245ed014df54f3babb5d6b7901ef4d9fe",
+   "old_hash": null,
+   "path": "derivations/UC05.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:2288239cbaeac49b7aec7dac1640f8668882af494f442e58b1b1aa4d88bb78e5",
+   "old_hash": null,
+   "path": "derivations/UC06.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:97dd2c35836cf3c0939b1820a187afacb5808d35237bfd5476573bb94edacf30",
+   "old_hash": null,
+   "path": "derivations/UC07.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:69b5c16e51bac99303244b0b2ec930f8f4bdfe2c6535e564bf5a989f8f45ee87",
+   "old_hash": null,
+   "path": "derivations/UC08.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:a1e50f819e8dff6371d93cfeef991ee0d3dc96539bd761ad7ba310a3c14c2c69",
+   "old_hash": null,
+   "path": "derivations/UC09.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:8a534462f67166bb1b0c3d76f53b10db54cbea95140bbdaa3cbbdeb7721b4cd6",
+   "old_hash": null,
+   "path": "derivations/ZR01.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:732c267d2ff99816c17a6a687c8e18338731f1122670edee04293b603cbd349d",
+   "old_hash": null,
+   "path": "derivations/ZR02.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:c1a299f74040079f1e1603512014cd43e4f2e474a2cb6a13cea7e8e0610c5a68",
+   "old_hash": null,
+   "path": "derivations/ZR03.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "DERIVATION_EVIDENCE_ADDITION",
+   "new_hash": "sha-256:96c601c370a786f4f6764dabfd625c9eb26ad35bbb62511b000bfd4e83802a15",
+   "old_hash": null,
+   "path": "derivations/ZR04.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/A01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/A02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/A03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/A04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/A05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/A06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/A07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/A08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/A09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:86b5f0cfcd2e24d002627cc74f42c061d6bc46eb7d5b4b2e9699ea7718d4a4dd",
+   "path": "expected/B02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/B07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/B08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/B09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/B11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/B12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B13.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/B14.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/C01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/C02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/C03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "path": "expected/C04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/C05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5254beea3190149d11e0d6e68aabdaa29b2fd8b0cf6a5173e5c759c98ad2a998",
+   "path": "expected/C06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/C07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "path": "expected/C08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/C09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/C10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5f0eb8e0d714259d032f99d02c600a7f7813ba49a8b432ecf9243d4f7e988fae",
+   "path": "expected/C11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/CR01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/CR02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "old_hash": null,
+   "path": "expected/CR03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/D01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/D01j.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5c52a3304abf6a2ce11c727b05a59d782aacadde58bd95a9a0cf6e9951154688",
+   "path": "expected/D02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5c52a3304abf6a2ce11c727b05a59d782aacadde58bd95a9a0cf6e9951154688",
+   "path": "expected/D03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:683be291e8b13eba2e114bcd5478e98399e6d5ab54eef88bf85ce52c3bb3e7b7",
+   "path": "expected/D04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0b372481fbc43ca71c06ec0ff5fb9400aa03863cbfe082748af96b2f0f02355b",
+   "path": "expected/D04j.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:0a1a209318caa617483537c82056ba2b019be3427ceb693cf74875834dc6899e",
+   "path": "expected/D05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/D06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:bd9164a4cd9c2e6525cd3b9c0b40d4fbbcdcf672cbf819786d130cec8faeff84",
+   "path": "expected/D07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:bd9164a4cd9c2e6525cd3b9c0b40d4fbbcdcf672cbf819786d130cec8faeff84",
+   "path": "expected/D07j.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5013470662115e387789bab94a2fdafbb55eb14a7baff82d45ada456be859539",
+   "path": "expected/D08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f69f80a42f5daa6beae1f701934c1fc0ba2262e937e6786cab840c5d304d6d70",
+   "path": "expected/D09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/D10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "path": "expected/D11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a157a470ae1f7195b7ea85b4f1ac82e41b64405d0256570d64dcc058b370012b",
+   "path": "expected/D12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c3590bc713145dd7d9fc641e8bc849b047a7f22343cc8523a57296e75c93932b",
+   "path": "expected/D13.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/DT06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/DT07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/DT08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/DT10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5f0eb8e0d714259d032f99d02c600a7f7813ba49a8b432ecf9243d4f7e988fae",
+   "path": "expected/E01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:7c41ae25431b8de31f26781881faae39d99a0f71e49be4b379ec17540b29b0e6",
+   "path": "expected/E02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:12ffffea77b18ad3bd7fca117c1ff3fd1ab99a2eeaf244a0a8b9134fa4067cd8",
+   "path": "expected/E03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "path": "expected/E04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/E05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:683be291e8b13eba2e114bcd5478e98399e6d5ab54eef88bf85ce52c3bb3e7b7",
+   "path": "expected/E06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/E07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/E08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/EM01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/EM02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/EM03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/EM04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/EM05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:683be291e8b13eba2e114bcd5478e98399e6d5ab54eef88bf85ce52c3bb3e7b7",
+   "path": "expected/F01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/F02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:a1796faa8622ec0bac6745ac32d4ff686045f3c0793446f947867c7c16562346",
+   "path": "expected/F03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/F04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:16d489596f468d39435b8310e607be4dbf1d8b0e1fadca9a35dc1802d2d79f4b",
+   "path": "expected/F05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/F06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/F07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/G02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/G10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/H01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/H12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/H13.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H14.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H15.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/H16.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H17.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H18.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H19.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H20.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "path": "expected/H21.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H22.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/H23.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:5c52a3304abf6a2ce11c727b05a59d782aacadde58bd95a9a0cf6e9951154688",
+   "old_hash": null,
+   "path": "expected/INF01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:832a1b5a8d084bfb68008c1c5739aa79e5b1fc15be5e4f6cf4c6065dc0f25810",
+   "old_hash": null,
+   "path": "expected/INF02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:bd9164a4cd9c2e6525cd3b9c0b40d4fbbcdcf672cbf819786d130cec8faeff84",
+   "old_hash": null,
+   "path": "expected/INF03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:5013470662115e387789bab94a2fdafbb55eb14a7baff82d45ada456be859539",
+   "old_hash": null,
+   "path": "expected/INF04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/J01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "path": "expected/J02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/J03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5254beea3190149d11e0d6e68aabdaa29b2fd8b0cf6a5173e5c759c98ad2a998",
+   "path": "expected/J04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/J05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5254beea3190149d11e0d6e68aabdaa29b2fd8b0cf6a5173e5c759c98ad2a998",
+   "path": "expected/J06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/J07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/J08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/J09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/J10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/JS01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/JS08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/JS12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/JS13.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "old_hash": null,
+   "path": "expected/JS14.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/JS15.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/JS16.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/JS17.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/JS18.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/JS19.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/JS20.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/JS21.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/JS22.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/LX01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "old_hash": null,
+   "path": "expected/LX02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/LX03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:5254beea3190149d11e0d6e68aabdaa29b2fd8b0cf6a5173e5c759c98ad2a998",
+   "old_hash": null,
+   "path": "expected/LX04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/LX05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:5254beea3190149d11e0d6e68aabdaa29b2fd8b0cf6a5173e5c759c98ad2a998",
+   "old_hash": null,
+   "path": "expected/LX06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:16d489596f468d39435b8310e607be4dbf1d8b0e1fadca9a35dc1802d2d79f4b",
+   "old_hash": null,
+   "path": "expected/MD01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/P01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/P02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/P03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/P04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/P05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:701ca8d364c6d6927c977b667f7546fc8ad99e43eaeca68d98b61bee0276b2aa",
+   "path": "expected/P06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/PR06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/PV01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/PV02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/PV03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/PV04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/S01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/S02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/S03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/S04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/S08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/S09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/S10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/S11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/S12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S13.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "path": "expected/S14.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:5f0eb8e0d714259d032f99d02c600a7f7813ba49a8b432ecf9243d4f7e988fae",
+   "path": "expected/S15.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "path": "expected/S16.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S17.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "path": "expected/S18.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "path": "expected/S19.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "path": "expected/S20.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/SEC01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "old_hash": null,
+   "path": "expected/SEC02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/SEC03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/SEC04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:c3590bc713145dd7d9fc641e8bc849b047a7f22343cc8523a57296e75c93932b",
+   "old_hash": null,
+   "path": "expected/SEC05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/SEC06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/SEC07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/SEC08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:5f8394ecea4ca3eb554968b92a7f8a91f4131c0bd8a742360ef14779242fb62e",
+   "old_hash": null,
+   "path": "expected/SEC10.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:c7f25c9dcb67c3422a60c6f95a5a2d3b01c89f2dea3dfab2113fc6dbecad7fad",
+   "old_hash": null,
+   "path": "expected/SEC11.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:cc3446da363d9b8820f7f1e7416006cbd522d22ad825664b5c9b5e014f466a14",
+   "old_hash": null,
+   "path": "expected/SEC12.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:0b372481fbc43ca71c06ec0ff5fb9400aa03863cbfe082748af96b2f0f02355b",
+   "old_hash": null,
+   "path": "expected/SV01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:682090b4855a80b43046d787879d5b1cd41f041763e2834744061085427794f0",
+   "old_hash": null,
+   "path": "expected/SV02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:63abc8d69f621bc27a3bbcf20ed25d0fa7ef3d0448960ad30c44424a826e1c9d",
+   "old_hash": null,
+   "path": "expected/SV03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:e1794cee82a8304e9f56156212da272bc3fa229628ea91d4b860f5d70fe077b6",
+   "old_hash": null,
+   "path": "expected/SV04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:e0f9cd9304ef00263d5483ddace8a8335b573bccba12a2e7f12fcd52f46f3354",
+   "old_hash": null,
+   "path": "expected/SV05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/UC01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/UC02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/UC03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/UC04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:2113e2b91a0620ae9d35e8a857126d8c7d6ae5f27cd0b747d615b81c480261eb",
+   "old_hash": null,
+   "path": "expected/UC05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:b26e472ebbbb3a740c34eef41b9f9f151844d47cab61b9b8bd9eeea115c0ae63",
+   "old_hash": null,
+   "path": "expected/UC06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "old_hash": null,
+   "path": "expected/UC07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "old_hash": null,
+   "path": "expected/UC08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "old_hash": null,
+   "path": "expected/UC09.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z05.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z06.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z07.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "REMOVED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": null,
+   "old_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "path": "expected/Z08.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/ZR01.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/ZR02.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/ZR03.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "ADDED",
+   "corpus_oracle_impact": true,
+   "detail_class": "EXPECTED_RESULT_CORRECTION",
+   "new_hash": "sha-256:f5c1a3107cb44ef36a0799dfee736e7f4ca1ea608b9a387f11af105c89458da8",
+   "old_hash": null,
+   "path": "expected/ZR04.expected.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "HASH_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "HASH_UPDATE",
+   "new_hash": "sha-256:65ccd95d9751c092b18a363f67a4a880316220fbc6bc89c0f3f0c4dcebc45186",
+   "old_hash": "sha-256:ae9db80fe891dcac9046d4240900c8e2c143a1e1360956f88fb18db475afea55",
+   "path": "hashes/corpus-root.txt",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "HASH_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "HASH_UPDATE",
+   "new_hash": "sha-256:4aae36bd6053b678a62af04bc359430a9f0432f509cd927403f99279786eb12c",
+   "old_hash": "sha-256:da6ae1e4f827ac41e89563ff9276021ac92bd9a98f93fb5ee772910f026939f8",
+   "path": "hashes/package-root.txt",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "HASH_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "HASH_UPDATE",
+   "new_hash": "sha-256:3a3d95f3eb7c4b7dd39e7bf8d0a5909a83b558b59bd9f117afb1e916c5acd4ad",
+   "old_hash": "sha-256:8cd27d818e6c14f4ed19d8bd6130e77357077c9fb314aae3e4d2a77967ea4c48",
+   "path": "hashes/resource-root.txt",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "HASH_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "HASH_UPDATE",
+   "new_hash": "sha-256:388432633b3be9ddb85559ca77dc5785ac61ad47a3ba6f98c9357145e3505137",
+   "old_hash": "sha-256:426713b01d581f647bd46fd052f84482cc0c808126f4e4e3db24ec145852c6ad",
+   "path": "hashes/sha256sums.txt",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "MANIFEST_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "MANIFEST_UPDATE",
+   "new_hash": "sha-256:942d071aa33eed5c02f8fcda050e5e9904626c7849ba03cbff0b0667a92f96c0",
+   "old_hash": "sha-256:1bdcf72f301e12f48bce18e0dc4c83396d0642a5ffdce16d6f9b940667b0337f",
+   "path": "manifest/corpus-manifest.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "MANIFEST_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "MANIFEST_UPDATE",
+   "new_hash": "sha-256:10080c775b40fba6b65a51164afbd31f72a0a0d35b76cbf13f4b204be579678a",
+   "old_hash": "sha-256:4c68592ae6faf536e48cc73e978afc2eb994592c29cfe7a2706452d4427c33ff",
+   "path": "manifest/release-manifest.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "MANIFEST_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "MANIFEST_UPDATE",
+   "new_hash": "sha-256:0e144e9452c2ed360af63ae641a75d05ca4845c1fa9fc21f1e85eda9591f3c17",
+   "old_hash": "sha-256:98e3d2626816e90832cb1b4d4d467efc5ddae18b41bd239f5f9d2b215c36827d",
+   "path": "manifest/resource-manifest.json",
+   "runtime_semantic_impact": false
+  },
+  {
+   "change_class": "SCHEMA_UPDATE",
+   "corpus_oracle_impact": false,
+   "detail_class": "SCHEMA_UPDATE",
+   "new_hash": "sha-256:1da951c46ca24cd4c1ee2951d41f394d6e4b4a870889a7e77a11197ed593d1e0",
+   "old_hash": "sha-256:7cdb1532e40020c2eba0857bcae8e5941866ba682118b6eec9b0859a19bb31ed",
+   "path": "schemas/corpus-fixture.schema.json",
+   "runtime_semantic_impact": false
+  }
+ ],
+ "note": "schemas/corpus-fixture.schema.json is a SCHEMA_UPDATE (fixture-schema extension: +image modality, +input recipes); it is not outcome-affecting and is excluded from the runtime config_fingerprint, which is byte-identical to v1.0.0",
+ "runtime_resource_change_paths": [],
+ "runtime_resource_changes": 0
+}

@@ -1,0 +1,1 @@
+{"defect":"INPUT_INTEGRITY_FAILURE","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"EM03","mapping":"{\"statement\":\"globex owns module c\",\"validation_entry_id\":\"V1\"}","outcome_derivation":"§8.1(INPUT_INTEGRITY_FAILURE) -> INDETERMINATE","phenomenon":"explicit_map_defect","reason":"explicit mapping to V1 but proposition contradicts entry"}

@@ -1,0 +1,1 @@
+{"attack":"bidi_override","code_point":"U+202E","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC08","outcome_derivation":"§8.1(INPUT_INTEGRITY_FAILURE) -> INDETERMINATE","phenomenon":"security","rule":"RLO disposition reject -> INPUT_INTEGRITY_FAILURE"}

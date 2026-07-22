@@ -1,0 +1,94 @@
+{
+ "informative": [
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "MEANING_DISTORTION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF01",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "CERTAINTY_OVERSTATEMENT"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF02",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "SCOPE_EXPANSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF03",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "QUALIFICATION_OMISSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF04",
+   "pass": false,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  }
+ ]
+}

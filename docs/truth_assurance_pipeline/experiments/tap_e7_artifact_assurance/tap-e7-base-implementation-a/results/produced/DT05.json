@@ -1,0 +1,53 @@
+{
+ "assurance_record": {
+  "evaluation_summary": {
+   "evaluated_assertive": 1,
+   "evaluation_limitations": 0,
+   "positive_violations": 0,
+   "total_assertive": 1,
+   "unevaluated_assertive": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "companion_method_counts": {
+     "no_match": 0,
+     "unresolved": 0
+    },
+    "correspondence_method_counts": {
+     "exact": 1,
+     "explicit": 0,
+     "lexical": 0,
+     "structured": 0
+    },
+    "correspondence_units_total": 1
+   }
+  },
+  "findings": [],
+  "outcome": "ASSURED",
+  "projection_pi": {
+   "evaluation_summary": {
+    "evaluated_assertive": 1,
+    "evaluation_limitations": 0,
+    "positive_violations": 0,
+    "total_assertive": 1,
+    "unevaluated_assertive": 0
+   },
+   "findings": [],
+   "outcome": "ASSURED"
+  },
+  "projection_pi_sha256": "sha-256:fad8f5c73b714ed573aa95752449be4ea94c88398e26cb4bbb413b951d8cf9e7"
+ },
+ "authoritative": true,
+ "fixture_id": "DT05",
+ "redacted_trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:71df5e0db43f9526fc740c7cb00d48490245079ba1ce022d6d50d8b6eab47ca9",
+  "findings": [],
+  "outcome": "ASSURED"
+ },
+ "trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:71df5e0db43f9526fc740c7cb00d48490245079ba1ce022d6d50d8b6eab47ca9",
+  "artifact_text": "ACME OWNS SYSTEM B",
+  "findings": [],
+  "outcome": "ASSURED"
+ }
+}

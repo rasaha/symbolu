@@ -1,0 +1,1 @@
+{"attack":"claim_merging","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC11","outcome_derivation":"§8.1(FABRICATION) -> NOT_ASSURED","phenomenon":"security","rule":"merged numeric aggregate '22' not supported by any single entry; no correspondence >=T_reject -> FABRICATION"}

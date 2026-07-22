@@ -1,0 +1,1 @@
+{"attack":"verifier_instruction","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC02","outcome_derivation":"§8.1(<none>) -> ASSURED","payload_present":true,"phenomenon":"security","rule":"embedded verifier instruction ignored; exact match to V1 -> ASSURED"}

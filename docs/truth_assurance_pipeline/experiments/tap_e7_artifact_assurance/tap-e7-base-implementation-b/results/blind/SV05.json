@@ -1,0 +1,69 @@
+{
+ "fixture_id": "SV05",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "MISLEADING_CONTRADICTION_OMISSION",
+    "polarity": "POSITIVE_VIOLATION",
+    "validation_ref": "V1"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 1,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 1,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "NOT_ASSURED",
+   "findings": [
+    {
+     "category": "MISLEADING_CONTRADICTION_OMISSION",
+     "polarity": "POSITIVE_VIOLATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 1,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:41772c4462435826203ae322ab48602e7b3e0570cdd56c3b10d1c7af585998ad"
+ },
+ "trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "MISLEADING_CONTRADICTION_OMISSION"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:b76903e14efc365643690a1406c8f1b4aad6f171b53ad591c3978affea8a0193",
+  "artifact_text": "{\"statement\":\"vendor permits export\",\"validation_entry_id\":\"V1\"}"
+ },
+ "redacted_trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "MISLEADING_CONTRADICTION_OMISSION"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:b76903e14efc365643690a1406c8f1b4aad6f171b53ad591c3978affea8a0193"
+ }
+}

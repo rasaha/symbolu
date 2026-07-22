@@ -1,0 +1,1 @@
+{"adjudication":"A: VR entity now carries the accented alias 'systém' (U+00E9); artifact precomposed matches exactly. No diacritic folding.","code_points":["U+00E9"],"correspondence_stage":"exact","defect":"FIXTURE_INPUT_CORRECTION","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"UC08","outcome":"ASSURED","phenomenon":"unicode"}

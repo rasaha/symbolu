@@ -1,0 +1,7 @@
+{
+ "fixtures_evaluated": 90,
+ "expected_or_derivation_reads_during_blind": [],
+ "blind_boundary_intact": true,
+ "config_fingerprint_recomputed": "sha-256:d01e466e5bb57d6a1a00d42b01fb9943d9208e6e39b6a90413a0b247b0416734",
+ "config_fingerprint_match": true
+}

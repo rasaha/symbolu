@@ -1,0 +1,21 @@
+{
+ "authoritative": true,
+ "classification": "PACKAGE_DEFECT",
+ "diffs": [
+  "outcome",
+  "findings",
+  "evaluation_summary",
+  "projection_pi",
+  "projection_hash"
+ ],
+ "expected_findings": [],
+ "expected_outcome": "ASSURED",
+ "fixture": "UC09",
+ "pass": false,
+ "produced_findings": [
+  "CORRESPONDENCE_UNRESOLVED"
+ ],
+ "produced_outcome": "INDETERMINATE",
+ "projection_match": false,
+ "root_cause": "Artifact entity 'system-with-acute' differs from VR entity 'system' by a diacritic; BASE publishes no diacritic-folding rule, so NFC keeps them distinct -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Expected ASSURED is unreachable from the bytes. Root: fixture asserted a clean structured match without the tokens actually matching."
+}

@@ -1,0 +1,1 @@
+{"artifact_stance":"flat assertion","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SV02","outcome_derivation":"§8.1(UNCERTAINTY_SUPPRESSION) -> NOT_ASSURED","phenomenon":"uncertainty_suppression","rule":"entry status=UNKNOWN but artifact asserts flatly -> UNCERTAINTY_SUPPRESSION","vr_status":"UNKNOWN"}

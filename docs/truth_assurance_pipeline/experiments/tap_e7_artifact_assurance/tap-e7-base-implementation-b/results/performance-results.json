@@ -1,0 +1,10 @@
+{
+ "fixtures": 90,
+ "total_runtime_ms": 441.31,
+ "median_fixture_ms": 0.095,
+ "p95_fixture_ms": 7.717,
+ "max_fixture_ms": 242.5717,
+ "largest_json_fixture": "JS17",
+ "deterministic_replay_identical": true,
+ "blind_bundle_sha256": "sha-256:15fa6f3ed0b8c36b659215577293344b59b2cd35f8175d023c13d7e48d094705"
+}

@@ -1,0 +1,8 @@
+{
+ "runtime_source_scanned": [
+  "verifier.js"
+ ],
+ "fixture_id_strings_in_runtime_src": [],
+ "permitted": 0,
+ "pass": true
+}

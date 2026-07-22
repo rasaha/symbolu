@@ -1,0 +1,48 @@
+{
+ "total": 8,
+ "pass": 8,
+ "fail": 0,
+ "na": 0,
+ "tests": [
+  {
+   "test": "injection_ignored",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "verifier_instruction_ignored",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "hidden_html",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "bidi_reject",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "dup_json_key",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "homoglyph_unresolved",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "result_independent_of_identity",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "unsupported_modality",
+   "result": "PASS",
+   "detail": ""
+  }
+ ]
+}

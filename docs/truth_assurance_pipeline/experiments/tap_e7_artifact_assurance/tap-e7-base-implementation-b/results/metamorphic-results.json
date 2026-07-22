@@ -1,0 +1,83 @@
+{
+ "total": 15,
+ "pass": 11,
+ "fail": 0,
+ "na": 4,
+ "tests": [
+  {
+   "test": "M1_json_order_same_pi",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M2_dup_tokens_same",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M3_nfc_equal",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M4_accent_distinct_no_alias",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M5_confusable_no_merge",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M6_zwsp_not_erased",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M9_excluded_metadata_same_pi",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M7_finding_order",
+   "result": "N/A_ENGINE",
+   "detail": "multi-finding canonical ordering is engine-level"
+  },
+  {
+   "test": "M10_quotation_endorsement",
+   "result": "N/A_ENGINE",
+   "detail": "endorsement semantics engine-level"
+  },
+  {
+   "test": "M11_negation_polarity",
+   "result": "N/A_ENGINE",
+   "detail": "negation-reversal fidelity engine-level"
+  },
+  {
+   "test": "M12_scope_overlap",
+   "result": "N/A_ENGINE",
+   "detail": "scope comparison engine-level"
+  },
+  {
+   "test": "M13_unknown_predicate_no_structured",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M14_invalid_explicit_not_repaired",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M15_corpus_root_excluded",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M16_stage_termination_exact_over_lexical",
+   "result": "PASS",
+   "detail": ""
+  }
+ ]
+}

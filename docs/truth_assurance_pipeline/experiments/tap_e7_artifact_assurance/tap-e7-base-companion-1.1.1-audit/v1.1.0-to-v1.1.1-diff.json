@@ -1,0 +1,160 @@
+{
+ "changed_files": 19,
+ "runtime_resource_changes": 0,
+ "changed_paths": [
+  "corpus/DT03.json",
+  "corpus/SEC05.json",
+  "corpus/UC07.json",
+  "corpus/UC08.json",
+  "corpus/UC09.json",
+  "derivations/DT03.json",
+  "derivations/SEC05.json",
+  "derivations/UC07.json",
+  "derivations/UC08.json",
+  "derivations/UC09.json",
+  "expected/SEC05.expected.json",
+  "expected/UC07.expected.json",
+  "expected/UC08.expected.json",
+  "expected/UC09.expected.json",
+  "hashes/corpus-root.txt",
+  "hashes/package-root.txt",
+  "hashes/sha256sums.txt",
+  "manifest/corpus-manifest.json",
+  "manifest/release-manifest.json"
+ ],
+ "changes": [
+  {
+   "path": "corpus/DT03.json",
+   "old_hash": "sha-256:8b14970061eceee8aff13e12d8ac409f4dab89aa3b9262473c92944dd9c248ba",
+   "new_hash": "sha-256:31e6216c44effa070f2a09e380a08f63add8934b2e8358a815baf75fc45925a3",
+   "change_class": "FIXTURE_INPUT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "corpus/SEC05.json",
+   "old_hash": "sha-256:a2b130abd76d659add6e45819975bcd22a0dae666ea0336bb17ac38869268251",
+   "new_hash": "sha-256:80867fc6b6f96931259e2dc587992567dc53fe9d06d1b81622e41709d7c826e2",
+   "change_class": "FIXTURE_INPUT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "corpus/UC07.json",
+   "old_hash": "sha-256:d0819e7b31901476bb6fd83c09149185bc488b4ac2edb2454a54fe02796e1da7",
+   "new_hash": "sha-256:60bf4fae8df00b63e3ebc651b4eff44d356b8064ff13644ecdd994f18aac11d1",
+   "change_class": "FIXTURE_INPUT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "corpus/UC08.json",
+   "old_hash": "sha-256:06365ad7f36083d674d02fa5977a9eae363ab8271abc816b1e751f930839e2c2",
+   "new_hash": "sha-256:18019a908b8af6588faa7233f57ced12e326649efa4fa9681ae483bc3610eb28",
+   "change_class": "FIXTURE_INPUT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "corpus/UC09.json",
+   "old_hash": "sha-256:d1c87c128813c3c7dbff1c766588a12742ae512084e5337050a07a27d7cfc623",
+   "new_hash": "sha-256:cfd875b51cf277c390ec4b43aac5cb433a8b98cacc2b8d81d3adbcc1e83c2d2e",
+   "change_class": "FIXTURE_INPUT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "derivations/DT03.json",
+   "old_hash": "sha-256:8cbea23c19d349c5471fedc3c9d4259801f65b4b2b1b08aeb4ea2454b3cfbba2",
+   "new_hash": "sha-256:2adfb529c4c6c203da88da98adef7ff07b4dc47b58005c3fe6ffafe47ceb0171",
+   "change_class": "DERIVATION_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "derivations/SEC05.json",
+   "old_hash": "sha-256:1cbe3307e2b1507596f82995c318e1abdd5427abcfa9ce5c877a398cd1c58d8c",
+   "new_hash": "sha-256:42e240cb28c134b706783de3e10f7d4f3728e792cdfb726c0e7e3dc563e7e4db",
+   "change_class": "DERIVATION_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "derivations/UC07.json",
+   "old_hash": "sha-256:97dd2c35836cf3c0939b1820a187afacb5808d35237bfd5476573bb94edacf30",
+   "new_hash": "sha-256:c416facd643071211aebcd344c633993c9245cddc5bd03430925bb7ace42b4f9",
+   "change_class": "DERIVATION_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "derivations/UC08.json",
+   "old_hash": "sha-256:69b5c16e51bac99303244b0b2ec930f8f4bdfe2c6535e564bf5a989f8f45ee87",
+   "new_hash": "sha-256:36f75c7ae46b06925548a582d9f2730ca6773608d459da5961e0270db2ce2ad8",
+   "change_class": "DERIVATION_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "derivations/UC09.json",
+   "old_hash": "sha-256:a1e50f819e8dff6371d93cfeef991ee0d3dc96539bd761ad7ba310a3c14c2c69",
+   "new_hash": "sha-256:c6e43f32548dbcca9eb1f14cf7442b9fbaec82b23c0d122ae4c75a92ecbcfdc6",
+   "change_class": "DERIVATION_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "expected/SEC05.expected.json",
+   "old_hash": "sha-256:c3590bc713145dd7d9fc641e8bc849b047a7f22343cc8523a57296e75c93932b",
+   "new_hash": "sha-256:b6dee6f91562ed91627b07a120eb7f97196d97ce77197d640d42dbeefba5841a",
+   "change_class": "EXPECTED_RESULT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "expected/UC07.expected.json",
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "change_class": "EXPECTED_RESULT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "expected/UC08.expected.json",
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "change_class": "EXPECTED_RESULT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "expected/UC09.expected.json",
+   "old_hash": "sha-256:ae69274201a1646938607080bb419394851d39c3e71f764d21cf3ca022bc58de",
+   "new_hash": "sha-256:fd684770fdaf5902161066b72a3e286ac4317eaed646d3929a0c01da6c5d2687",
+   "change_class": "EXPECTED_RESULT_CORRECTION",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "hashes/corpus-root.txt",
+   "old_hash": "sha-256:65ccd95d9751c092b18a363f67a4a880316220fbc6bc89c0f3f0c4dcebc45186",
+   "new_hash": "sha-256:6699ba9dbf2e28aef752e9f81e17e2e74b559848173cf29a36bd53fcffd7a2f0",
+   "change_class": "HASH_UPDATE",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "hashes/package-root.txt",
+   "old_hash": "sha-256:4aae36bd6053b678a62af04bc359430a9f0432f509cd927403f99279786eb12c",
+   "new_hash": "sha-256:5fd6432af505b3da96e6861f3199106679834c926997bef18d61e332be28805a",
+   "change_class": "HASH_UPDATE",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "hashes/sha256sums.txt",
+   "old_hash": "sha-256:388432633b3be9ddb85559ca77dc5785ac61ad47a3ba6f98c9357145e3505137",
+   "new_hash": "sha-256:2c562f35ff4a98ac0872e03fa2f45c082c04721b5eda2ce6532aa56fd35d60bd",
+   "change_class": "HASH_UPDATE",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "manifest/corpus-manifest.json",
+   "old_hash": "sha-256:942d071aa33eed5c02f8fcda050e5e9904626c7849ba03cbff0b0667a92f96c0",
+   "new_hash": "sha-256:0aa3e7f2617ce1915cb890603c69a31e119d4e044eb419380b22b619b85102fd",
+   "change_class": "MANIFEST_UPDATE",
+   "runtime_semantic_impact": false
+  },
+  {
+   "path": "manifest/release-manifest.json",
+   "old_hash": "sha-256:10080c775b40fba6b65a51164afbd31f72a0a0d35b76cbf13f4b204be579678a",
+   "new_hash": "sha-256:f3755054a0c3bbf5417c890b9a9429d14ea528ed61d1783e472e87357264a7bb",
+   "change_class": "MANIFEST_UPDATE",
+   "runtime_semantic_impact": false
+  }
+ ]
+}

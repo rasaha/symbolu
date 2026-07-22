@@ -1,0 +1,1 @@
+{"attack":"html_comment","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC04","outcome_derivation":"§8.1(PROCESSING_FAILURE) -> INDETERMINATE","payload_present":true,"phenomenon":"security","rule":"HTML comment not a BASE-MD production -> PROCESSING_FAILURE"}

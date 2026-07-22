@@ -1,0 +1,2 @@
+# BASE-STOP/1.0 non-content tokens are defined ONLY by token-classes.tsv + POS/cue files.
+# There is no separate implementation-defined stop list. This file is a normative marker.

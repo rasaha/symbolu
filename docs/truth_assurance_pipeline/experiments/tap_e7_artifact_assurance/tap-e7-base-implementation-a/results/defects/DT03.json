@@ -1,0 +1,21 @@
+{
+ "authoritative": true,
+ "classification": "PACKAGE_DEFECT",
+ "diffs": [
+  "outcome",
+  "findings",
+  "evaluation_summary",
+  "projection_pi",
+  "projection_hash"
+ ],
+ "expected_findings": [],
+ "expected_outcome": "ASSURED",
+ "fixture": "DT03",
+ "pass": false,
+ "produced_findings": [
+  "FABRICATION"
+ ],
+ "produced_outcome": "NOT_ASSURED",
+ "projection_match": false,
+ "root_cause": "Fixture artifact is the bare demonstration word 'System-with-acute', not a proposition; it cannot correspond to VR entry 'acme owns system b'. A faithful matcher yields FABRICATION, not ASSURED. Root: determinism helper stored the demo token as the CandidateArtifact instead of a faithful proposition."
+}

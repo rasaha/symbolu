@@ -1,0 +1,10 @@
+{
+ "fixtures": 90,
+ "config_fingerprint_unchanged_vs_v100": true,
+ "resource_root": "sha-256:a6ab878888a5cc98e660fc18b9d8da603cdf999c9989b2a5b1b40acfdc10d175",
+ "schema_root": "sha-256:d1f1a95c70e75b1f58453fef43022a99ef349fde4f834e4286cbff629783bcc8",
+ "corpus_root": "sha-256:642e7ecbbdb03508a12589961741a13ed1ccf9398b784889c2c4b57cde7ee5b1",
+ "config_fingerprint": "sha-256:d01e466e5bb57d6a1a00d42b01fb9943d9208e6e39b6a90413a0b247b0416734",
+ "package_root": "sha-256:bff7685055fb99e9bec1ebfe3cec150f56540cd16421d36f40962ade9975f5ff",
+ "failures": []
+}

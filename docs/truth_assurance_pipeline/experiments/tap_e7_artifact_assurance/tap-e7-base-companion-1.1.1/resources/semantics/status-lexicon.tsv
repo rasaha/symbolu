@@ -1,0 +1,27 @@
+# BASE-STATUS-LEX/1.0 phrase	status	scope	neg_result
+the evidence supports	SUPPORTED	full	INSUFFICIENT_EVIDENCE
+it is established that	SUPPORTED	full	INSUFFICIENT_EVIDENCE
+the evidence contradicts	CONTRADICTED	full	INSUFFICIENT_EVIDENCE
+it is false that	CONTRADICTED	full	SUPPORTED
+disproven	CONTRADICTED	full	INSUFFICIENT_EVIDENCE
+supported only under	PARTIALLY_SUPPORTED	full	UNSUPPORTED
+supported only for	PARTIALLY_SUPPORTED	full	UNSUPPORTED
+partly supported	PARTIALLY_SUPPORTED	full	INSUFFICIENT_EVIDENCE
+supported in part	PARTIALLY_SUPPORTED	full	INSUFFICIENT_EVIDENCE
+evidence partially supports	PARTIALLY_SUPPORTED	full	INSUFFICIENT_EVIDENCE
+partly supported but uncertain	PARTIALLY_SUPPORTED	full	INSUFFICIENT_EVIDENCE
+the evidence does not support	UNSUPPORTED	full	SUPPORTED
+no support for	UNSUPPORTED	full	SUPPORTED
+there is no evidence that	UNSUPPORTED	full	SUPPORTED
+no evidence supports	UNSUPPORTED	full	SUPPORTED
+evidence does not establish	UNSUPPORTED	full	SUPPORTED
+not established	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+cannot be established	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+insufficient evidence	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+evidence is inconclusive	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+not proven	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+not clearly supported	INSUFFICIENT_EVIDENCE	full	SUPPORTED
+outside the evaluated scope	OUT_OF_SCOPE	full	OUT_OF_SCOPE
+not assessed	OUT_OF_SCOPE	full	OUT_OF_SCOPE
+status unknown	UNKNOWN	full	UNKNOWN
+cannot be determined	UNKNOWN	full	UNKNOWN

@@ -1,0 +1,69 @@
+{
+ "assurance_record": {
+  "evaluation_summary": {
+   "evaluated_assertive": 1,
+   "evaluation_limitations": 0,
+   "positive_violations": 1,
+   "total_assertive": 1,
+   "unevaluated_assertive": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "companion_method_counts": {
+     "no_match": 0,
+     "unresolved": 0
+    },
+    "correspondence_method_counts": {
+     "exact": 0,
+     "explicit": 1,
+     "lexical": 0,
+     "structured": 0
+    },
+    "correspondence_units_total": 1
+   }
+  },
+  "findings": [
+   {
+    "category": "STATUS_UPGRADE",
+    "finding_index": 0,
+    "polarity": "POSITIVE_VIOLATION",
+    "validation_ref": "V1"
+   }
+  ],
+  "outcome": "NOT_ASSURED",
+  "projection_pi": {
+   "evaluation_summary": {
+    "evaluated_assertive": 1,
+    "evaluation_limitations": 0,
+    "positive_violations": 1,
+    "total_assertive": 1,
+    "unevaluated_assertive": 0
+   },
+   "findings": [
+    {
+     "category": "STATUS_UPGRADE",
+     "polarity": "POSITIVE_VIOLATION"
+    }
+   ],
+   "outcome": "NOT_ASSURED"
+  },
+  "projection_pi_sha256": "sha-256:1803458fabf96c32abc7be704e40d0e1d1e19ff11ea4698fd6de9078ded4ede8"
+ },
+ "authoritative": true,
+ "fixture_id": "SV01",
+ "redacted_trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:852e22e6b39f56000d6a6588276e1ec8978d99c6d891460085e26a8decfe7edf",
+  "findings": [
+   "STATUS_UPGRADE"
+  ],
+  "outcome": "NOT_ASSURED"
+ },
+ "trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:852e22e6b39f56000d6a6588276e1ec8978d99c6d891460085e26a8decfe7edf",
+  "artifact_text": "{\"statement\":\"acme owns system b\",\"validation_entry_id\":\"V1\"}",
+  "findings": [
+   "STATUS_UPGRADE"
+  ],
+  "outcome": "NOT_ASSURED"
+ }
+}

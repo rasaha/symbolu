@@ -1,0 +1,41 @@
+(* BASE-MD/1.0 - complete self-contained PEG grammar. Every nonterminal defined. *)
+Document    <- Block* EOF
+Block       <- FencedCode / ATXHeading / Blockquote / Table / OList / UList / LinkDef / FootnoteDef / Paragraph / BlankLine
+BlankLine   <- WS* LineEnd
+ATXHeading  <- Hash ' ' Inline+ LineEnd
+Hash        <- '#' '#'? '#'? '#'? '#'? '#'?
+Blockquote  <- ('>' ' '? Inline* LineEnd)+
+OList       <- (Indent? Number ('.' / ')') ' ' Inline+ LineEnd)+
+UList       <- (Indent? ('-' / '*' / '+') ' ' Inline+ LineEnd)+
+Table       <- HeaderRow DelimiterRow DataRow+
+HeaderRow   <- '|' (CellText '|')+ LineEnd
+DelimiterRow<- '|' (WS* '-'+ WS* '|')+ LineEnd
+DataRow     <- '|' (CellText '|')+ LineEnd
+CellText    <- (!'|' !LineEnd Char)*
+FencedCode  <- Fence Lang? LineEnd (!Fence AnyLine)* Fence LineEnd
+Fence       <- '```'
+Lang        <- (!LineEnd Char)+
+LinkDef     <- '[' Id ']' ':' ' ' URL LineEnd
+FootnoteDef <- '[^' Id ']' ':' ' ' Inline+ LineEnd
+Paragraph   <- (Inline+ LineEnd)+ (BlankLine / EOF)
+Inline      <- Strong / Emphasis / RefLink / InlineLink / FootnoteRef / Escape / Text
+Strong      <- ('**' (!'**' Inline)+ '**') / ('__' (!'__' Inline)+ '__')
+Emphasis    <- ('*' (!'*' Inline)+ '*') / ('_' (!'_' Inline)+ '_')
+InlineLink  <- '[' Text ']' '(' URL ')'
+RefLink     <- '[' Text ']' '[' Id ']'
+FootnoteRef <- '[^' Id ']'
+Escape      <- '\\' Punct
+Text        <- (!SpecialStart Char)+
+SpecialStart<- '**' / '__' / '*' / '_' / '[' / '`' / '\\' / LineEnd
+Id          <- (Alnum / '-' / '_')+
+URL         <- (!')' !WS !LineEnd Char)+
+Number      <- Digit+
+Digit       <- '0'..'9'
+Alnum       <- 'a'..'z' / 'A'..'Z' / Digit
+Indent      <- (' ' ' ' / '\t')
+Punct       <- '!'..'/' / ':'..'@' / '['..'`' / '{'..'~'
+WS          <- ' ' / '\t'
+Char        <- !LineEnd .
+AnyLine     <- (!LineEnd .)* LineEnd
+LineEnd     <- '\n' / '\r\n'
+EOF         <- !.

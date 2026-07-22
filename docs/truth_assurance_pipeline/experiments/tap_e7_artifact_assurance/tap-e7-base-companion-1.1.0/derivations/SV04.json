@@ -1,0 +1,1 @@
+{"artifact_citation":"S9","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SV04","outcome_derivation":"§8.1(CITATION_MISMATCH) -> NOT_ASSURED","phenomenon":"citation_mismatch","rule":"artifact cites id not in entry.citation_ids -> CITATION_MISMATCH","vr_citation_ids":["S1"]}

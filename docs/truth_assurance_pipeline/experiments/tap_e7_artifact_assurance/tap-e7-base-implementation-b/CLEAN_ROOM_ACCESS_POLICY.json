@@ -1,0 +1,21 @@
+{
+ "policy_id": "impl-b-clean-room/1.0",
+ "package": "tap-e7-base-companion-1.1.1",
+ "readable_during_development_and_blind": [
+  "tap-e7-base-companion-1.1.1/resources/**",
+  "tap-e7-base-companion-1.1.1/grammar/**",
+  "tap-e7-base-companion-1.1.1/schemas/**",
+  "tap-e7-base-companion-1.1.1/manifest/**",
+  "tap-e7-base-companion-1.1.1/hashes/**",
+  "tap-e7-base-companion-1.1.1/corpus/*.json (input envelope only)"
+ ],
+ "forbidden_before_blind_completes": [
+  "tap-e7-base-companion-1.1.1/expected/**",
+  "tap-e7-base-companion-1.1.1/derivations/**",
+  "tap-e7-base-companion-1.1.1-audit/**",
+  "tap-e7-base-implementation-a/**",
+  "corpus fixture fields: expected, phenomenon, purpose, group, authoritative, derivation_ref"
+ ],
+ "enforcement": "run_blind_conformance.js wraps fs.readFileSync: logs every package path read and throws on any expected/ or derivations/ read while blind flag is active; blind loader projects each fixture to {modality, validation_record, artifact, profile_ref, release_ref}.",
+ "author_independence_caveat": "Implementation A and B were authored by the same agent. This trial establishes LANGUAGE and ARCHITECTURE independence (Python class-based vs JavaScript functional-pipeline, distinct strict-JSON strategy), not ORGANIZATIONAL independence. Genuine third-party authorship remains a governance precondition for Stable promotion and is stated as such."
+}

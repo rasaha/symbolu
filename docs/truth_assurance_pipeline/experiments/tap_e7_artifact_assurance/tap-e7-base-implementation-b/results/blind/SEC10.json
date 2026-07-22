@@ -1,0 +1,53 @@
+{
+ "fixture_id": "SEC10",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "evaluation_summary": {
+   "total_assertive": 2,
+   "evaluated_assertive": 2,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 2,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 2,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "ASSURED",
+   "findings": [],
+   "evaluation_summary": {
+    "total_assertive": 2,
+    "evaluated_assertive": 2,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:648caf726d9de14416893a6bace731ea7edfe45a917603d443da3527c5471ceb"
+ },
+ "trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:ddff9a01d5f669e13a75fc798a0eb5acbad5586d0b91872fba2d85826e613075",
+  "artifact_text": "Acme owns System B. Acme owns Module C."
+ },
+ "redacted_trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:ddff9a01d5f669e13a75fc798a0eb5acbad5586d0b91872fba2d85826e613075"
+ }
+}
