@@ -186,14 +186,24 @@ def build():
         row, join_via = _resolve(pse_key, pse_entry, idx)
         cov = coverage["consonants" if kind == "C" else "vowels"]
         if row is None:
-            unmapped[pse_key] = {
-                "kind": "consonant" if kind == "C" else "vowel",
-                "disposition": "EXPLICIT_ABSTENTION",
-                "reason": v3.get("ksha_note") if pse_key == "ksha"
-                else "no varṇa→drive mapping exists in the B1.12 frozen source for this key",
-                "runtime_effect": "engine emits '(no lexicon entry)'; varṇa contributes nothing "
-                                  "to the essence — surfaced, never silently back-filled",
-            }
+            if pse_key == "ksha":
+                unmapped[pse_key] = {
+                    "kind": "consonant (conjunct क्ष)",
+                    "disposition": "RESOLVED_BY_PARSER_DECOMPOSITION",
+                    "reason": v3.get("ksha_note"),
+                    "runtime_effect": "the parser normalizes the conjunct forms (kṣ / ksh / x / kSh) to "
+                                      "the atomic sequence [ka, ssa] = k + ṣ, which resolve against the "
+                                      "authoritative B1.12 mappings for k and ṣ. No synthetic ksha drive "
+                                      "row is invented; क्ष never reaches a drive lookup as a single unit.",
+                }
+            else:
+                unmapped[pse_key] = {
+                    "kind": "consonant" if kind == "C" else "vowel",
+                    "disposition": "EXPLICIT_ABSTENTION",
+                    "reason": "no varṇa→drive mapping exists in the B1.12 frozen source for this key",
+                    "runtime_effect": "engine emits '(no lexicon entry)'; varṇa contributes nothing "
+                                      "to the essence — surfaced, never silently back-filled",
+                }
             cov[pse_key] = "UNMAPPED"
             return
         b = row.get("binding_vritti")
@@ -321,7 +331,8 @@ def main(argv=None):
     print(f"  source: {B1_12_SOURCE.relative_to(_REPO)}  sha256={provenance['source']['sha256'][:16]}…")
     print(f"  consonants mapped: {cov['consonants_mapped']}/{cov['consonants_total']}")
     print(f"  vowels mapped:     {cov['vowels_mapped']}/{cov['vowels_total']}")
-    print(f"  unmapped (explicit abstention): {sorted(provenance['unmapped']) or 'none'}")
+    print(f"  no drive row (see disposition — ksha is parser-decomposed): "
+          f"{sorted(provenance['unmapped']) or 'none'}")
 
     if args.check:
         print("  --check: not writing files.")

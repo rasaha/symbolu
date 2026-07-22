@@ -9,30 +9,17 @@
 ## Summary
 
 - Drive/gloss (`essence_short`) changed: **24/24** words (expected — this IS the mapping-source swap).
-- Structural fields changed (valence, trajectory roles, controlling element, tone, deterministic reflection, honesty): **7** field-diffs.
-- New abstentions (varṇa unmapped in B1.12, e.g. `ksha`): **2** words.
+- Structural fields changed (valence, trajectory roles, controlling element, tone, deterministic reflection, honesty): **0** field-diffs.
+- New abstentions (varṇa unmapped in B1.12, e.g. `ksha`): **0** words.
 - Honesty violations introduced: **0**.
 
 ## Structural changes (should be minimal — architecture is unchanged)
 
-All 7 structural field-diffs are confined to **2 word(s)**, of which **0** are NOT explained by a new abstention.
-
-| word | field | abstention-driven? | old | new |
-|---|---|:--:|---|---|
-| xozence | valence | yes (ksha) | `mixed` | `liberating` |
-| xozence | trajectory_roles | yes (ksha) | `['SOURCE', 'INTEGRATION', 'TENSION', 'TRANSFORMA` | `['SOURCE', 'TENSION', 'TRANSFORMATION', 'INTEGRA` |
-| xozence | controlling_element | yes (ksha) | `water` | `air` |
-| xozence | tone | yes (ksha) | `turning·resolved` | `expansive·resolved` |
-| xozence | reflection_essence_line | yes (ksha) | `Xozence loosens and lets go like a current, runs` | `Xozence draws inward like a breath, holds like a` |
-| kṣamā | trajectory_roles | yes (ksha) | `['SOURCE', 'INTEGRATION', 'INTEGRATION', 'RESOLU` | `['SOURCE', 'INTEGRATION', 'RESOLUTION']` |
-| kṣamā | reflection_essence_line | yes (ksha) | `Kṣamā eases outward like a breath, settles into ` | `Kṣamā draws inward like a breath, settles into a` |
-
-*Every diff above is downstream of the single `ksha` (क्ष) abstention — v3 has no compound kṣa row (it decomposes क्ष → k + ṣ), so words containing क्ष lose that beat, which shifts their derived roles/element/tone. No structural change occurs on any word whose varṇas are all mapped: the trajectory/renderer architecture is untouched.*
+**None.** Every structural field (valence, trajectory roles, controlling element, tone, deterministic reflection, honesty_ok) is byte-identical old→new. Only the varṇa→drive gloss payload changed, confirming the swap is isolated to the symbolic substrate.
 
 ## New abstentions (explicit, surfaced — never silent)
 
-- `xozence`: varṇa(s) ['ksha'] have no B1.12 mapping → engine emits '(no lexicon entry)'.
-- `kṣamā`: varṇa(s) ['ksha'] have no B1.12 mapping → engine emits '(no lexicon entry)'.
+None in this corpus.
 
 ## Drive/gloss changes (per word) — recorded, not judged
 
@@ -48,7 +35,7 @@ All 7 structural field-diffs are confined to **2 word(s)**, of which **0** are N
 | knife | `−Īrṣyā⤳Muditā → +I-ness, doing self → −Bhaya⤳Abhaya` | `−envy — the sting at another's success; covetous resentment at another` |
 | happy | `−Avidyā / Rātri⤳Parā-vidyā → +Birth of cognition / raw potential → +Ma` | `−outward / visible vision — fixation on the manifest, physically-seen,` |
 | courage | `−Āśā⤳Nirāśā → +Completion, closure → −Birth of cognition / raw potenti` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
-| xozence | `−Mithyā-jñāna⤳Aparā-vidyā → +Completion, closure → −Practical thought,` | `+Completion, closure → −Practical thought, benefit → −moha — blind att` |
+| xozence | `−Āśā⤳Nirāśā → +Transmutation of desire / grounded containment → +Compl` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
 | cognade | `−Aviveka⤳Viveka → +Completion, closure → −Ceṣṭā⤳Sthiti → +Viveka → +Bi` | `−viveka distorted — discernment hardening into judgmentalism / separat` |
 | kāla | `−Āśā⤳Nirāśā → +Ongoing thought / expansion → +Karuṇā / Sneha   ⟹ [+Bir` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
 | karma | `−Āśā⤳Nirāśā → +Birth of cognition / raw potential → −Sarvanāśa⤳Prāṇaśa` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
@@ -60,7 +47,7 @@ All 7 structural field-diffs are confined to **2 word(s)**, of which **0** are N
 | kleśa | `−Āśā⤳Nirāśā → +Karuṇā / Sneha → +Practical thought, benefit → +Directe` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
 | śānti | `−Restless acquisition / material greed⤳Directed energy / purposeful ma` | `−artha as possessive acquisition — worldly purpose pursued and possess` |
 | ṣaṭ | `−Kāma / Tamoguṇa⤳Transmutation of desire / grounded containment → +Bir` | `−kāma — worldly / physical desire and longing: grasping for wealth, op` |
-| kṣamā | `−Mithyā-jñāna⤳Aparā-vidyā → +Birth of cognition / raw potential → +Anu` | `+Birth of cognition / raw potential → +disciplined containment that ho` |
+| kṣamā | `−Āśā⤳Nirāśā → +Transmutation of desire / grounded containment → +Birth` | `−āśā as grasping / clinging hope — goaded toward a specific outcome or` |
 | yoga | `−Aviśvāsa⤳Viśvāsa → +Completion, closure → +Sthiti   ⟹ [+Birth of cogn` | `−aviśvāsa — self-doubt that cannot commit: lack of confidence and wave` |
 
 *Old glosses are short two-pole labels (e.g. `Hope`/`Detach`); new glosses are the B1.12 binding/liberating vṛtti prose (verbatim). `_short()` truncates each at the first `(`.*

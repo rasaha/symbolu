@@ -80,13 +80,13 @@ def test_source_has_no_evaluator_fields_either():
     assert not _scan_keys(_load(B1_12_SOURCE))
 
 
-def test_coverage_and_explicit_abstention():
+def test_coverage_and_ksha_disposition():
     can = _load(CANONICAL)
     cs = can["coverage_summary"]
     assert cs["consonants_mapped"] == 33 and cs["consonants_total"] == 34
     assert cs["vowels_mapped"] == 12 and cs["vowels_total"] == 12
-    assert cs["unmapped_keys"] == ["ksha"]
-    assert can["unmapped"]["ksha"]["disposition"] == "EXPLICIT_ABSTENTION"
+    assert cs["unmapped_keys"] == ["ksha"]                 # no synthetic ksha drive row
+    assert can["unmapped"]["ksha"]["disposition"] == "RESOLVED_BY_PARSER_DECOMPOSITION"
 
 
 def test_ssa_glyph_join_respects_sibilant_swap():
@@ -108,13 +108,13 @@ def test_engine_consumes_string_poles_and_runs():
     assert d and d["essence_short"]
 
 
-def test_ksha_is_explicit_not_silent():
+def test_ksha_decomposes_to_k_plus_ss_no_synthetic_row():
     import varna_lens as V
-    assert "ksha" not in V.CONS                                  # unmapped in B1.12
-    ph, warn = V.phonemes_roman("kṣa")                          # क्ष → ksha + a
+    assert "ksha" not in V.CONS                                  # no synthetic ksha drive row
+    ph, warn = V.phonemes_roman("kṣa")                          # क्ष → k + ṣ (ka + ssa)
+    assert [(t, k) for t, k, _s in ph] == [("C", "ka"), ("C", "ssa"), ("V", "a")]
     out = V.read(ph, model="op")
-    txt = V.format_reading("kṣa", "roman", out, warn)
-    assert "no lexicon entry" in txt                            # surfaced explicitly, not silent
+    assert "no lexicon entry" not in V.format_reading("kṣa", "roman", out, warn)
 
 
 def test_adapter_is_deterministic():

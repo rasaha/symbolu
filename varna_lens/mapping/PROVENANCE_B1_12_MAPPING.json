@@ -64,10 +64,10 @@
   },
   "unmapped": {
     "ksha": {
-      "kind": "consonant",
-      "disposition": "EXPLICIT_ABSTENTION",
+      "kind": "consonant (conjunct क्ष)",
+      "disposition": "RESOLVED_BY_PARSER_DECOMPOSITION",
       "reason": "no compound kṣa producer — the parser decomposes क्ष → k + ṣ; kṣa is not a merged row.",
-      "runtime_effect": "engine emits '(no lexicon entry)'; varṇa contributes nothing to the essence — surfaced, never silently back-filled"
+      "runtime_effect": "the parser normalizes the conjunct forms (kṣ / ksh / x / kSh) to the atomic sequence [ka, ssa] = k + ṣ, which resolve against the authoritative B1.12 mappings for k and ṣ. No synthetic ksha drive row is invented; क्ष never reaches a drive lookup as a single unit."
     }
   },
   "counts": {
@@ -79,7 +79,7 @@
   "generated": {
     "canonical": {
       "path": "varna_lens/mapping/varna_mapping_b1_12_canonical.json",
-      "sha256": "8c7515e72cd0ae85dd1cf1ed4348918e5e39ae5597d01078f53df5fcd2536c5e"
+      "sha256": "9b8c745642713b25b899ae501a9bc66dd684e65dc9867cebda26f678b9a5b0ab"
     },
     "lexicon": {
       "path": "varna_lens/lexicon_b1_12.json",
