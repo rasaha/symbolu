@@ -15,6 +15,8 @@ NOT an experiment, NOT a prereg, NOT evidence, NOT wired into any scored/eval pa
 rescue, NOT a Track B unblock. No ontology, no Sanskrit privilege, no semantic-truth claim.
 """
 from __future__ import annotations
+# RETIRED (research-only) — reads the retired Layer-2 synthesis; superseded by the canonical Symbolic
+# Profile. Kept for reproducibility; not on any production path. See experiments/retired/layer2_bridge/.
 
 import argparse
 import json

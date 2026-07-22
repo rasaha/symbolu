@@ -25,18 +25,41 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-# Authoritative set (verbatim from Sanskrit_letters_full.docx). Each varṇa has two STATES of expression
-# (never moral poles, never chosen from external good/bad/useful/auspicious labels):
+# Each varṇa has two STATES of expression (never moral poles, never chosen from external
+# good/bad/useful/auspicious labels):
 #   binding_state    = worldly, contractive, attachment-forming, bondage-producing expression
 #   liberating_state = sublimated, unbinding, expansive, dharma/mokṣa-oriented expression
 # Readers use internally: leading_vritti = binding_state, counter_vritti = liberating_state.
-LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
+#
+# AUTHORITATIVE varṇa→drive MAPPING: the B1.12 frozen mapping (varna_native_stage1_merged_v3.json),
+# consumed through the generated, engine-shaped `lexicon_b1_12.json`. The prior
+# `lexicon_authoritative.json` is retained ONLY as a versioned comparison artifact — it is NEVER an
+# automatic fallback. Set VARNA_LENS_MAPPING=<path> to override the source explicitly (used solely by
+# the old-vs-new regression harness). A missing mapping file is a hard error, never a silent fallback.
+_DEFAULT_MAPPING = _HERE / "lexicon_b1_12.json"
+
+
+def active_mapping_path() -> Path:
+    """Resolve the active varṇa→drive mapping file. Single source of truth for every consumer
+    (engine, renderer, reflection). Raises rather than falling back to the old mapping."""
+    override = os.environ.get("VARNA_LENS_MAPPING")
+    p = Path(override).expanduser() if override else _DEFAULT_MAPPING
+    if not p.exists():
+        raise FileNotFoundError(
+            f"varna_lens mapping not found: {p} (VARNA_LENS_MAPPING={override!r}). No silent fallback "
+            f"to the old mapping is permitted; generate it via "
+            f"varna_lens/tools/build_varna_mapping_from_b1_12.py")
+    return p
+
+
+LEX = json.loads(active_mapping_path().read_text(encoding="utf-8"))
 
 
 def _pole_disp(p):
@@ -88,7 +111,7 @@ _RETRO_ASCII = [("Th", "ttha"), ("Dh", "ddha"), ("Sh", "ssa"),
 
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
 _CONS = _RETRO_ASCII + [
-         ("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
+         ("kṣ", "ksha"), ("ksh", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
          ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("sh", "sha"),
          ("ṅ", "nga"), ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"),
          ("ṣ", "ssa"), ("x", "ksha"),
@@ -123,6 +146,33 @@ def _match(s, pos, table):
     return None, 0
 
 
+# क्ष is a CONJUNCT, not an atomic varṇa. The authoritative B1.12 mapping carries no compound kṣa row
+# (`ksha_note`: "the parser decomposes क्ष → k + ṣ; kṣa is not a merged row"). So the tokenizer records
+# the conjunct forms (kṣ / ksh / x) as a transient `ksha` token, and this narrow, deterministic
+# normalization rewrites every such token into its two atomic varṇas — ka (k) then ssa (ṣ), in source
+# order — which resolve against the authoritative B1.12 mappings for k and ṣ. No synthetic ksha mapping
+# is invented. `kSh` already tokenizes directly to ka + ssa via the retroflex-ASCII rule (Sh→ssa), so
+# every supported conjunct form converges to the identical canonical sequence [ka, ssa].
+_CONJUNCT_DECOMPOSITION = {"ksha": ["ka", "ssa"]}
+
+
+def _normalize_conjuncts(phonemes):
+    """Rewrite conjunct tokens to their atomic varṇa sequence (order-preserving, deterministic).
+    Only the leading unit keeps the source surface; continuation units carry an empty surface so the
+    decomposition is visible and never confused with a distinct written letter."""
+    if not any(t == "C" and k in _CONJUNCT_DECOMPOSITION for t, k, _s in phonemes):
+        return phonemes
+    out = []
+    for typ, key, surf in phonemes:
+        if typ == "C" and key in _CONJUNCT_DECOMPOSITION:
+            parts = _CONJUNCT_DECOMPOSITION[key]
+            for j, pk in enumerate(parts):
+                out.append(("C", pk, surf if j == 0 else ""))
+        else:
+            out.append((typ, key, surf))
+    return out
+
+
 def phonemes_roman(word: str):
     """Literal acoustic tokenization (NO inherent-'a' injection, so ka ≠ ak). Returns ([(type,key,surf)],
     warnings). type ∈ {'C','V'}. IAST already writes every vowel, so this is faithful for Sanskrit."""
@@ -139,7 +189,7 @@ def phonemes_roman(word: str):
         if vk:
             out.append(("V", vk, s[pos:pos + vl])); pos += vl; continue
         warn.append(f"skipped {s[pos]!r}"); pos += 1
-    return out, warn
+    return _normalize_conjuncts(out), warn
 
 
 def phonemes_cmudict(word: str):

@@ -1,0 +1,30 @@
+{
+  "schema": "symbolic_profile_provenance_v1",
+  "contract": {
+    "module": "varna_lens/symbolic_profile.py",
+    "schema_version": "1.0",
+    "builder_version": "1.0.0",
+    "parser_version": "varna_lens.tokenizer+conjunct_normalization.v1"
+  },
+  "mapping_authority": {
+    "artifact": "experiments/primitive_sequence_recovery/frozen/varna_native_stage1_merged_v3.json",
+    "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+    "consumed_via": "varna_lens/lexicon_b1_12.json",
+    "active_lexicon_sha256": "87b4eda775d856f5dc5956379cbaad3f971f6f7f4a90dd56fe78978a19556c7d"
+  },
+  "frozen_fixture": {
+    "path": "varna_lens/symbolic_profile_fixture.json",
+    "sha256": "2ec85b882411770ec2d297343eec1a68a8b41c9bb29c95734e234481107a7aec",
+    "profile_id": "sp_8423bf8def028b7e"
+  },
+  "retired_layer2_bridge": {
+    "archive": "experiments/retired/layer2_bridge/",
+    "vocab_sha256": "8896519c1f440013ad300fe2ee8c32b02fed695ed2b6a0d95bd6e5457896be87",
+    "status": "RESEARCH_ONLY / superseded by canonical Symbolic Profile"
+  },
+  "freeze": {
+    "b1_12_sole_authority": true,
+    "production_reads_old_lexicon": false,
+    "production_reads_bridge_vocab": false
+  }
+}

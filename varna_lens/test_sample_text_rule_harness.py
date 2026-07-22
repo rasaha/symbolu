@@ -10,6 +10,17 @@ marked.
     python3 varna_lens/test_sample_text_rule_harness.py
 """
 from __future__ import annotations
+import os as _os, sys as _sys
+# RETIRED historical-regression: validates the retired Layer-2 bridge, defined only under the pre-B1.12
+# lexicon. Skips under the active B1.12 mapping; runs its original assertions under the old-lexicon
+# fixture. See experiments/retired/layer2_bridge/README.md.
+if not _os.environ.get("VARNA_LENS_MAPPING", "").endswith("lexicon_authoritative.json"):
+    if "pytest" in _sys.modules:
+        import pytest as _pytest
+        _pytest.skip("retired Layer-2 bridge test (needs old-lexicon fixture)", allow_module_level=True)
+    else:
+        print("SKIP: retired Layer-2 bridge test (set VARNA_LENS_MAPPING=<repo>/varna_lens/lexicon_authoritative.json to run)")
+        raise SystemExit(0)
 
 import pathlib
 import sys

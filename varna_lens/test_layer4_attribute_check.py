@@ -11,6 +11,17 @@ and each demo word has >=1 UNSUPPORTED attribute (inventory not target-fit).
     python3 varna_lens/test_layer4_attribute_check.py
 """
 from __future__ import annotations
+import os as _os, sys as _sys
+# RETIRED historical-regression: validates the retired Layer-2 bridge, defined only under the pre-B1.12
+# lexicon. Skips under the active B1.12 mapping; runs its original assertions under the old-lexicon
+# fixture. See experiments/retired/layer2_bridge/README.md.
+if not _os.environ.get("VARNA_LENS_MAPPING", "").endswith("lexicon_authoritative.json"):
+    if "pytest" in _sys.modules:
+        import pytest as _pytest
+        _pytest.skip("retired Layer-2 bridge test (needs old-lexicon fixture)", allow_module_level=True)
+    else:
+        print("SKIP: retired Layer-2 bridge test (set VARNA_LENS_MAPPING=<repo>/varna_lens/lexicon_authoritative.json to run)")
+        raise SystemExit(0)
 
 import json
 import re
@@ -201,7 +212,8 @@ def test_layer4_does_not_alter_layer2_or_layer3():
 
 
 def test_sibling_frozen_files_unchanged():
-    targets = ["lexicon_authoritative.json", "layer2_bridge_vocab.json",
+    # layer2_bridge_vocab.json archived to experiments/retired/layer2_bridge/ on Layer-2 retirement.
+    targets = ["lexicon_authoritative.json",
                "layer3_dictionary_anchors.json", "generation_conditioning_prompt_demo.py"]
     before = {t: (HERE / t).read_bytes() for t in targets}
     _with_fake(lambda: [L4.render_layer4(w) for w in _DEMO])

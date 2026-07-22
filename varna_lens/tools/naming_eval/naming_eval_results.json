@@ -1,0 +1,823 @@
+{
+  "corpus_size": 26,
+  "deterministic_per_item": [
+    {
+      "id": "brand_ai",
+      "category": "brand",
+      "seed": "insight",
+      "c_random_source": "clarity",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 71,
+        "B_profile": 543,
+        "C_random": 541,
+        "D_minimal": 212
+      },
+      "growth_B_over_A": 472,
+      "growth_D_over_A": 141,
+      "B_vs_C_char_diff": 8,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_pharma",
+      "category": "brand",
+      "seed": "renewal",
+      "c_random_source": "patience",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 74,
+        "B_profile": 514,
+        "C_random": 507,
+        "D_minimal": 190
+      },
+      "growth_B_over_A": 440,
+      "growth_D_over_A": 116,
+      "B_vs_C_char_diff": 28,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_fintech",
+      "category": "brand",
+      "seed": "trust",
+      "c_random_source": "silence",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 67,
+        "B_profile": 487,
+        "C_random": 482,
+        "D_minimal": 182
+      },
+      "growth_B_over_A": 420,
+      "growth_D_over_A": 115,
+      "B_vs_C_char_diff": 21,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_electronics",
+      "category": "brand",
+      "seed": "clarity",
+      "c_random_source": "insight",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 71,
+        "B_profile": 541,
+        "C_random": 543,
+        "D_minimal": 167
+      },
+      "growth_B_over_A": 470,
+      "growth_D_over_A": 96,
+      "B_vs_C_char_diff": 6,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_edu",
+      "category": "brand",
+      "seed": "curiosity",
+      "c_random_source": "insight",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 68,
+        "B_profile": 555,
+        "C_random": 540,
+        "D_minimal": 166
+      },
+      "growth_B_over_A": 487,
+      "growth_D_over_A": 98,
+      "B_vs_C_char_diff": 60,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_enterprise",
+      "category": "brand",
+      "seed": "order",
+      "c_random_source": "rakṣā",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 66,
+        "B_profile": 401,
+        "C_random": 402,
+        "D_minimal": 186
+      },
+      "growth_B_over_A": 335,
+      "growth_D_over_A": 120,
+      "B_vs_C_char_diff": 4,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_health",
+      "category": "brand",
+      "seed": "compassion",
+      "c_random_source": "knowledge",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 69,
+        "B_profile": 647,
+        "C_random": 654,
+        "D_minimal": 181
+      },
+      "growth_B_over_A": 578,
+      "growth_D_over_A": 112,
+      "B_vs_C_char_diff": 30,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_auto",
+      "category": "brand",
+      "seed": "swift",
+      "c_random_source": "growth",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 69,
+        "B_profile": 454,
+        "C_random": 471,
+        "D_minimal": 194
+      },
+      "growth_B_over_A": 385,
+      "growth_D_over_A": 125,
+      "B_vs_C_char_diff": 71,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_gaming",
+      "category": "brand",
+      "seed": "courage",
+      "c_random_source": "śānti",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 68,
+        "B_profile": 417,
+        "C_random": 423,
+        "D_minimal": 186
+      },
+      "growth_B_over_A": 349,
+      "growth_D_over_A": 118,
+      "B_vs_C_char_diff": 25,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "brand_industrial",
+      "category": "brand",
+      "seed": "stability",
+      "c_random_source": "compassion",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 68,
+        "B_profile": 621,
+        "C_random": 646,
+        "D_minimal": 173
+      },
+      "growth_B_over_A": 553,
+      "growth_D_over_A": 105,
+      "B_vs_C_char_diff": 98,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "prod_premium_short",
+      "category": "product",
+      "seed": "silence",
+      "c_random_source": "balance",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 80,
+        "B_profile": 496,
+        "C_random": 493,
+        "D_minimal": 190
+      },
+      "growth_B_over_A": 416,
+      "growth_D_over_A": 110,
+      "B_vs_C_char_diff": 10,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "prod_multilingual",
+      "category": "product",
+      "seed": "growth",
+      "c_random_source": "balance",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 76,
+        "B_profile": 479,
+        "C_random": 489,
+        "D_minimal": 174
+      },
+      "growth_B_over_A": 403,
+      "growth_D_over_A": 98,
+      "B_vs_C_char_diff": 40,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "prod_suffix",
+      "category": "product",
+      "seed": "knowledge",
+      "c_random_source": "assistance",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 71,
+        "B_profile": 657,
+        "C_random": 663,
+        "D_minimal": 188
+      },
+      "growth_B_over_A": 586,
+      "growth_D_over_A": 117,
+      "B_vs_C_char_diff": 25,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "agent_support",
+      "category": "agent",
+      "seed": "patience",
+      "c_random_source": "delight",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 69,
+        "B_profile": 502,
+        "C_random": 499,
+        "D_minimal": 179
+      },
+      "growth_B_over_A": 433,
+      "growth_D_over_A": 110,
+      "B_vs_C_char_diff": 9,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "agent_finance",
+      "category": "agent",
+      "seed": "prudence",
+      "c_random_source": "curiosity",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 68,
+        "B_profile": 571,
+        "C_random": 555,
+        "D_minimal": 178
+      },
+      "growth_B_over_A": 503,
+      "growth_D_over_A": 110,
+      "B_vs_C_char_diff": 63,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "agent_medical",
+      "category": "agent",
+      "seed": "care",
+      "c_random_source": "focus",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 69,
+        "B_profile": 319,
+        "C_random": 359,
+        "D_minimal": 184
+      },
+      "growth_B_over_A": 250,
+      "growth_D_over_A": 115,
+      "B_vs_C_char_diff": 160,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "agent_coding",
+      "category": "agent",
+      "seed": "focus",
+      "c_random_source": "shield",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 67,
+        "B_profile": 357,
+        "C_random": 372,
+        "D_minimal": 160
+      },
+      "growth_B_over_A": 290,
+      "growth_D_over_A": 93,
+      "B_vs_C_char_diff": 59,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "portfolio_rename",
+      "category": "portfolio",
+      "seed": "order",
+      "c_random_source": "rakṣā",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 89,
+        "B_profile": 424,
+        "C_random": 425,
+        "D_minimal": 209
+      },
+      "growth_B_over_A": 335,
+      "growth_D_over_A": 120,
+      "B_vs_C_char_diff": 4,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "portfolio_family",
+      "category": "portfolio",
+      "seed": "assistance",
+      "c_random_source": "knowledge",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 84,
+        "B_profile": 676,
+        "C_random": 669,
+        "D_minimal": 196
+      },
+      "growth_B_over_A": 592,
+      "growth_D_over_A": 112,
+      "B_vs_C_char_diff": 27,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_similar",
+      "category": "difficult",
+      "seed": "clarity",
+      "c_random_source": "insight",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 75,
+        "B_profile": 546,
+        "C_random": 547,
+        "D_minimal": 172
+      },
+      "growth_B_over_A": 471,
+      "growth_D_over_A": 97,
+      "B_vs_C_char_diff": 6,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_multiling_ambig",
+      "category": "difficult",
+      "seed": "delight",
+      "c_random_source": "patience",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 72,
+        "B_profile": 503,
+        "C_random": 504,
+        "D_minimal": 194
+      },
+      "growth_B_over_A": 431,
+      "growth_D_over_A": 122,
+      "B_vs_C_char_diff": 7,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_sanskrit",
+      "category": "difficult",
+      "seed": "śānti",
+      "c_random_source": "courage",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 74,
+        "B_profile": 430,
+        "C_random": 423,
+        "D_minimal": 195
+      },
+      "growth_B_over_A": 356,
+      "growth_D_over_A": 121,
+      "B_vs_C_char_diff": 27,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_sanskrit2",
+      "category": "difficult",
+      "seed": "kṣamā",
+      "c_random_source": "order",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 73,
+        "B_profile": 395,
+        "C_random": 409,
+        "D_minimal": 176
+      },
+      "growth_B_over_A": 322,
+      "growth_D_over_A": 103,
+      "B_vs_C_char_diff": 57,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_conjunct",
+      "category": "difficult",
+      "seed": "rakṣā",
+      "c_random_source": "order",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 69,
+        "B_profile": 406,
+        "C_random": 405,
+        "D_minimal": 184
+      },
+      "growth_B_over_A": 337,
+      "growth_D_over_A": 115,
+      "B_vs_C_char_diff": 6,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_invented",
+      "category": "difficult",
+      "seed": "shield",
+      "c_random_source": "focus",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 74,
+        "B_profile": 380,
+        "C_random": 364,
+        "D_minimal": 172
+      },
+      "growth_B_over_A": 306,
+      "growth_D_over_A": 98,
+      "B_vs_C_char_diff": 61,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    },
+    {
+      "id": "hard_competing",
+      "category": "difficult",
+      "seed": "balance",
+      "c_random_source": "silence",
+      "determinism": true,
+      "distinct_arms": true,
+      "tokens": {
+        "A_baseline": 70,
+        "B_profile": 483,
+        "C_random": 485,
+        "D_minimal": 171
+      },
+      "growth_B_over_A": 413,
+      "growth_D_over_A": 101,
+      "B_vs_C_char_diff": 8,
+      "injected_claim_phrases": 0,
+      "injected_raw_decode_tokens": 0
+    }
+  ],
+  "ablation_per_item": [
+    {
+      "id": "brand_ai",
+      "field_token_cost": {
+        "abl_no_trajectory": 43,
+        "abl_no_binding": 186,
+        "abl_no_liberating": 186,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 543
+    },
+    {
+      "id": "brand_pharma",
+      "field_token_cost": {
+        "abl_no_trajectory": 47,
+        "abl_no_binding": 155,
+        "abl_no_liberating": 181,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 514
+    },
+    {
+      "id": "brand_fintech",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 144,
+        "abl_no_liberating": 182,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 487
+    },
+    {
+      "id": "brand_electronics",
+      "field_token_cost": {
+        "abl_no_trajectory": 46,
+        "abl_no_binding": 165,
+        "abl_no_liberating": 200,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 541
+    },
+    {
+      "id": "brand_edu",
+      "field_token_cost": {
+        "abl_no_trajectory": 53,
+        "abl_no_binding": 181,
+        "abl_no_liberating": 192,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 555
+    },
+    {
+      "id": "brand_enterprise",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 117,
+        "abl_no_liberating": 124,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 401
+    },
+    {
+      "id": "brand_health",
+      "field_token_cost": {
+        "abl_no_trajectory": 57,
+        "abl_no_binding": 247,
+        "abl_no_liberating": 213,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 647
+    },
+    {
+      "id": "brand_auto",
+      "field_token_cost": {
+        "abl_no_trajectory": 39,
+        "abl_no_binding": 132,
+        "abl_no_liberating": 159,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 454
+    },
+    {
+      "id": "brand_gaming",
+      "field_token_cost": {
+        "abl_no_trajectory": 47,
+        "abl_no_binding": 113,
+        "abl_no_liberating": 133,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 417
+    },
+    {
+      "id": "brand_industrial",
+      "field_token_cost": {
+        "abl_no_trajectory": 54,
+        "abl_no_binding": 196,
+        "abl_no_liberating": 243,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 621
+    },
+    {
+      "id": "prod_premium_short",
+      "field_token_cost": {
+        "abl_no_trajectory": 49,
+        "abl_no_binding": 159,
+        "abl_no_liberating": 152,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 496
+    },
+    {
+      "id": "prod_multilingual",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 135,
+        "abl_no_liberating": 174,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 479
+    },
+    {
+      "id": "prod_suffix",
+      "field_token_cost": {
+        "abl_no_trajectory": 57,
+        "abl_no_binding": 220,
+        "abl_no_liberating": 249,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 657
+    },
+    {
+      "id": "agent_support",
+      "field_token_cost": {
+        "abl_no_trajectory": 51,
+        "abl_no_binding": 164,
+        "abl_no_liberating": 160,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 502
+    },
+    {
+      "id": "agent_finance",
+      "field_token_cost": {
+        "abl_no_trajectory": 52,
+        "abl_no_binding": 209,
+        "abl_no_liberating": 184,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 571
+    },
+    {
+      "id": "agent_medical",
+      "field_token_cost": {
+        "abl_no_trajectory": 36,
+        "abl_no_binding": 76,
+        "abl_no_liberating": 84,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 319
+    },
+    {
+      "id": "agent_coding",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 103,
+        "abl_no_liberating": 94,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 357
+    },
+    {
+      "id": "portfolio_rename",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 117,
+        "abl_no_liberating": 124,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 424
+    },
+    {
+      "id": "portfolio_family",
+      "field_token_cost": {
+        "abl_no_trajectory": 60,
+        "abl_no_binding": 245,
+        "abl_no_liberating": 225,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 676
+    },
+    {
+      "id": "hard_similar",
+      "field_token_cost": {
+        "abl_no_trajectory": 47,
+        "abl_no_binding": 166,
+        "abl_no_liberating": 201,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 546
+    },
+    {
+      "id": "hard_multiling_ambig",
+      "field_token_cost": {
+        "abl_no_trajectory": 42,
+        "abl_no_binding": 151,
+        "abl_no_liberating": 182,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 503
+    },
+    {
+      "id": "hard_sanskrit",
+      "field_token_cost": {
+        "abl_no_trajectory": 41,
+        "abl_no_binding": 127,
+        "abl_no_liberating": 134,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 430
+    },
+    {
+      "id": "hard_sanskrit2",
+      "field_token_cost": {
+        "abl_no_trajectory": 40,
+        "abl_no_binding": 104,
+        "abl_no_liberating": 122,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 395
+    },
+    {
+      "id": "hard_conjunct",
+      "field_token_cost": {
+        "abl_no_trajectory": 40,
+        "abl_no_binding": 109,
+        "abl_no_liberating": 131,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 406
+    },
+    {
+      "id": "hard_invented",
+      "field_token_cost": {
+        "abl_no_trajectory": 38,
+        "abl_no_binding": 101,
+        "abl_no_liberating": 112,
+        "abl_no_provenance": 31,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 380
+    },
+    {
+      "id": "hard_competing",
+      "field_token_cost": {
+        "abl_no_trajectory": 48,
+        "abl_no_binding": 149,
+        "abl_no_liberating": 158,
+        "abl_no_provenance": 30,
+        "abl_shuffled_order": 0
+      },
+      "B_full_tokens": 483
+    }
+  ],
+  "aggregate": {
+    "n_items": 26,
+    "prompt_growth_B_over_A_tokens": {
+      "mean": 420.5,
+      "stdev": 92.0,
+      "ci95": [
+        385.1,
+        455.9
+      ],
+      "min": 250,
+      "max": 592
+    },
+    "prompt_growth_D_over_A_tokens": {
+      "mean": 111.1,
+      "stdev": 10.9
+    },
+    "random_control_B_vs_C_char_diff": {
+      "mean": 35.4,
+      "max": 160
+    },
+    "determinism_all": true,
+    "distinct_arms_all": true,
+    "injected_claim_phrases_total": 0,
+    "injected_raw_decode_tokens_total": 0,
+    "ablation_field_token_cost_mean": {
+      "abl_no_trajectory": 45.3,
+      "abl_no_binding": 152.7,
+      "abl_no_liberating": 165.3,
+      "abl_no_provenance": 30.7,
+      "abl_shuffled_order": 0
+    }
+  },
+  "outcome_metrics": {
+    "status": "LLM_UNAVAILABLE",
+    "reason": "no API key / model reachable in this environment; outcome metrics require a live LLM for generation and blinded judging and were not run (not fabricated)."
+  }
+}

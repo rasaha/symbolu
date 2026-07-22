@@ -24,8 +24,9 @@ _LEX = None
 def _expanded(key):
     global _LEX
     if _LEX is None:
-        p = pathlib.Path(__file__).with_name("lexicon_authoritative.json")
-        _LEX = json.loads(p.read_text(encoding="utf-8"))["consonants"]
+        # Same active mapping the engine uses (B1.12 substrate by default). Elemental imagery is
+        # preserved presentation scaffolding carried in the generated lexicon, not a drive mapping.
+        _LEX = json.loads(V.active_mapping_path().read_text(encoding="utf-8"))["consonants"]
     return (_LEX.get(key) or {}).get("expanded_properties") or {}
 
 
@@ -106,10 +107,17 @@ def _role(i, sign, has_transform):
     return "TENSION"
 
 
-def trajectory(word, by="hybrid"):
-    """Deterministic trajectory from engine output. Returns the three-layer data (no LLM, no mutation)."""
+def trajectory(word, by="hybrid", _analysis=None):
+    """Deterministic trajectory from engine output. Returns the three-layer data (no LLM, no mutation).
+
+    `_analysis` optionally supplies a pre-computed (d, src) from V.analyze(word, model="op", ...) so a
+    caller (e.g. the canonical Symbolic Profile builder) can reuse one analysis instead of recomputing;
+    the structural logic below is unchanged and remains the single source of trajectory truth."""
     kw = {"hybrid": {"hybrid": True}, "sound": {}, "spelling": {"roman": True}}.get(by, {"hybrid": True})
-    d, src, _warn = V.analyze(word, model="op", **kw)
+    if _analysis is not None:
+        d, src = _analysis
+    else:
+        d, src, _warn = V.analyze(word, model="op", **kw)
     seq = d["sequence"]
     body, summary = _parse_essence_short(d["essence_short"])
     keys = _surviving_keys(seq)
@@ -324,12 +332,30 @@ OUTPUT: only the Layer-3 prose for {mode}. No headings, no restating the traject
 MODES = list(MODE_SPEC)
 
 
-def render(word, mode="essence_line", by="hybrid", use_llm=False):
-    """Render a word into the three layers. Layer 3 = LLM if explicitly enabled AND clean, else the
-    deterministic fallback. The deterministic chain (Layer 1) is always present."""
+def _traj_view(profile):
+    """Reconstruct the (deterministic) trajectory dict this module renders from, reading it straight out
+    of the canonical Symbolic Profile. The renderer is a pure CONSUMER: it never writes back into the
+    profile, and every field here is copied out (no mutation of profile state)."""
+    t = profile.trajectory
+    word = profile.input.get("source_text") or profile.decomposition.get("normalized_input")
+    return {"word": word, "by": profile.input.get("reading_mode", "hybrid"),
+            "layer1": {"chain": t["chain"], "interaction": t["interaction"],
+                       "essence": t["whole_word_essence"], "valence": t["valence"]},
+            "trajectory": list(t["roles"]),
+            "controlling_element": t["controlling_element"], "tone": t["tone"],
+            "tone_parts": dict(t["tone_parts"]),
+            "stages": [{"key": s["varna_key"], "sign": s["sign"], "transform": s["transform"],
+                        "gloss": s["text"], "role": s["role"], "element": s["element"]}
+                       for s in t["stages"]]}
+
+
+def render_from_profile(profile, mode="essence_line", use_llm=False):
+    """Render a canonical Symbolic Profile into the three layers. The profile is the source of truth;
+    this function derives imagery/phrasing/tone/order but writes nothing back into it."""
     if mode not in MODE_SPEC:
         raise ValueError(f"unknown mode {mode!r}; choose from {MODES}")
-    traj = trajectory(word, by)
+    traj = _traj_view(profile)                              # a private view; profile is not mutated
+    word = traj["word"]
     prompt = render_prompt(traj, mode)
 
     text = None
@@ -344,7 +370,7 @@ def render(word, mode="essence_line", by="hybrid", use_llm=False):
     if text is None:
         text = _fallback(word, traj, mode)
 
-    return {"word": word, "mode": mode, "by": by,
+    return {"word": word, "mode": mode, "by": traj["by"],
             "layer1_engine": traj["layer1"],
             "layer2_trajectory": {"trajectory": traj["trajectory"],
                                   "controlling_element": traj["controlling_element"],
@@ -355,6 +381,14 @@ def render(word, mode="essence_line", by="hybrid", use_llm=False):
             "layer3_reflection": text,
             "prompt": prompt,
             "honesty_ok": not honesty_violations(text)}
+
+
+def render(word, mode="essence_line", by="hybrid", use_llm=False):
+    """Render a word into the three layers, THROUGH the canonical Symbolic Profile (the runtime source of
+    truth). Builds the profile once, then consumes it — no independent reconstruction of symbolic state."""
+    from symbolic_profile import build_symbolic_profile      # lazy import avoids a load-time cycle
+    profile = build_symbolic_profile(source_text=word, by=by)
+    return render_from_profile(profile, mode, use_llm=use_llm)
 
 
 def format_text(res):
