@@ -1,0 +1,1 @@
+{"artifact_stance":"plain assertion","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SV01","outcome_derivation":"§8.1(STATUS_UPGRADE) -> NOT_ASSURED","phenomenon":"status_upgrade","rule":"explicit-mapped entry status=CONTRADICTED but artifact asserts positively -> STATUS_UPGRADE","vr_status":"CONTRADICTED"}

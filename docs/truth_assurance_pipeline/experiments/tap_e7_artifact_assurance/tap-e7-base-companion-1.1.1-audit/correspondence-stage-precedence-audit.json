@@ -1,0 +1,670 @@
+{
+ "total": 86,
+ "failures": [],
+ "rows": [
+  {
+   "fixture": "CR01",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "CR02",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "CR03",
+   "stored_method": [
+    "structured"
+   ],
+   "independent_method": [
+    "structured"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT01",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT02",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT03",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT04",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT05",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT06",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT07",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT08",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT09",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "DT10",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "EM01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "EM02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "EM03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "EM04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "EM05",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS01",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "JS02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS05",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS06",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS07",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS08",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "JS09",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS10",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS11",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS12",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS13",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "JS14",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "JS15",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS16",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS17",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS18",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS19",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS20",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS21",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "JS22",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "LX01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "LX02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "LX03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "LX04",
+   "stored_method": [
+    "lexical"
+   ],
+   "independent_method": [
+    "lexical"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "LX05",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "LX06",
+   "stored_method": [
+    "lexical"
+   ],
+   "independent_method": [
+    "lexical"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "MD01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "PR01",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PR02",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PR03",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PR04",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PR05",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PR06",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "PV01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "PV02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "PV03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "PV04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC01",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SEC02",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SEC03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC05",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SEC06",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC07",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC08",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC10",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SEC11",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SEC12",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "SV01",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SV02",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SV03",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SV04",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "SV05",
+   "stored_method": [
+    "explicit"
+   ],
+   "independent_method": [
+    "explicit"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "UC01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC05",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC06",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "UC07",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "UC08",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "UC09",
+   "stored_method": [
+    "exact"
+   ],
+   "independent_method": [
+    "exact"
+   ],
+   "pass": true
+  },
+  {
+   "fixture": "ZR01",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "ZR02",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "ZR03",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  },
+  {
+   "fixture": "ZR04",
+   "stored_method": [],
+   "independent_method": [],
+   "pass": true
+  }
+ ]
+}

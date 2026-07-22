@@ -1,0 +1,1 @@
+{"attack":"claim_splitting","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC10","outcome_derivation":"§8.1(<none>) -> ASSURED","phenomenon":"security","rule":"two artifact assertions each exact-match a distinct entry -> both ASSURED"}

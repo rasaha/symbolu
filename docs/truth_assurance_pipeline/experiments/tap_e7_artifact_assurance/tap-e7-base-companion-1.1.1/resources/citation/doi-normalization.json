@@ -1,0 +1,1 @@
+{"resource_id":"BASE-DOI","rules":["strip https://doi.org/ or doi:","lowercase","NFC"],"version":"1.0"}

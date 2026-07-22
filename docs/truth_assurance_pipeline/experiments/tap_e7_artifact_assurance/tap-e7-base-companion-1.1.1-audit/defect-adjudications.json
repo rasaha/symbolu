@@ -1,0 +1,30 @@
+{
+ "adjudications": [
+  {"fixture": "DT03", "reported": "artifact 'Systém' cannot correspond to 'acme owns system b'; expected ASSURED, Impl A derived FABRICATION",
+   "verdict": "A_FIXTURE_INPUT_WRONG",
+   "reproduction": "Bare word 'Systém' shares no content token with the VR proposition -> Jaccard 0 -> < T_reject 0.35 -> FABRICATION. Impl A is correct.",
+   "correction": "Replaced artifact with a complete proposition 'acme owns café system b' and gave the VR entry the record-supplied accented alias 'café'. Precomposed (U+00E9) and decomposed (e+U+0301) forms are the NFC pair in alt_representation; both correspond EXACT to the record alias. No diacritic folding introduced.",
+   "runtime_semantic_impact": false},
+  {"fixture": "UC08", "reported": "artifact 'systém' != VR 'system'; expected ASSURED unsupported (no diacritic fold)",
+   "verdict": "A_FIXTURE_INPUT_WRONG",
+   "reproduction": "NFC preserves 'é'; 'systém' != 'system' -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Impl A is correct.",
+   "correction": "Resolution A: VR entity now carries the accented alias 'systém' (U+00E9); the precomposed artifact matches it EXACT. The relation is established by a record-supplied alias, not by diacritic folding.",
+   "runtime_semantic_impact": false},
+  {"fixture": "UC09", "reported": "same as UC08 (decomposed artifact)",
+   "verdict": "A_FIXTURE_INPUT_WRONG",
+   "reproduction": "decomposed 'e+U+0301' NFC-normalizes to precomposed 'systém'; equals the record alias -> EXACT. Impl A is correct.",
+   "correction": "Resolution A: VR alias 'systém' precomposed; artifact decomposed; NFC makes them identical -> EXACT match -> ASSURED.",
+   "runtime_semantic_impact": false},
+  {"fixture": "UC07", "reported": "expected method 'structured'; Impl A derived 'exact'",
+   "verdict": "D_METHOD_HISTOGRAM_WRONG",
+   "reproduction": "NBSP (U+00A0, disposition normalize) -> space; normalized artifact proposition equals the VR proposition. Correspondence staging is explicit->exact->structured->lexical; the earliest terminal stage is EXACT. Impl A is correct.",
+   "correction": "Expected correspondence_method_counts corrected structured->exact; outcome/findings/projection unchanged (ASSURED).",
+   "runtime_semantic_impact": false},
+  {"fixture": "SEC05", "reported": "expected method 'structured'; Impl A derived 'exact' (same finding CITATION_MISMATCH)",
+   "verdict": "D_METHOD_HISTOGRAM_WRONG",
+   "reproduction": "'[S9]' is a non-content CITATION_MARKER; visible proposition exact-matches V1 -> stage EXACT. Fidelity on citation_ids ([S1] vs cited S9) still yields CITATION_MISMATCH -> NOT_ASSURED. Impl A is correct.",
+   "correction": "Expected correspondence_method_counts corrected structured->exact; finding/outcome/projection unchanged (CITATION_MISMATCH, NOT_ASSURED).",
+   "runtime_semantic_impact": false}
+ ],
+ "note": "For all five, Implementation A produced the correct byte-faithful result and the v1.1.0 fixture was wrong. No case was adjudicated as an Implementation A defect. No correction touches a frozen runtime semantic (thresholds, precedence, taxonomy, polarity, band order, scope, verify-only) or any runtime resource."
+}

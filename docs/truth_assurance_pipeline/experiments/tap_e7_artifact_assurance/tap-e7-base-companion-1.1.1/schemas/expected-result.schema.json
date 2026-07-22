@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"evaluation_summary":{"type":"object"},"findings":{"type":"array"},"outcome":{"enum":["ASSURED","NOT_ASSURED","INDETERMINATE"]}},"required":["outcome","findings","evaluation_summary"],"title":"Expected result","type":"object"}

@@ -1,0 +1,17 @@
+# BASE-PRED-EQUIV/1.0 canonical	equivalents(;)	dir
+applies_to	applies to;covers;is applicable to	s2o
+causes	causes;results in	s2o
+depends_on	depends on;relies on	s2o
+distributes	distributes;resells	s2o
+exempts	exempts;exempted from	s2o
+governs	governs;controls;is the governing authority for	s2o
+licenses	licenses;grants a license for	s2o
+manages	manages;administers	s2o
+operates	operates;runs	s2o
+owns	owns;is owner of;holds ownership of	s2o
+part_of	is part of;is a component of	s2o
+permits	permits;allows	s2o
+prohibits	prohibits;forbids	s2o
+requires	requires;mandates	s2o
+supersedes	supersedes;replaces	s2o
+said	said;stated;reported;claims	s2o

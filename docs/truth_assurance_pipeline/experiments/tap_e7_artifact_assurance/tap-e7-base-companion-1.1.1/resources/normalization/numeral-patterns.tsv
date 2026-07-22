@@ -1,0 +1,6 @@
+# BASE-NUM/1.0 name	regex	canonical
+integer	^-?[0-9]+$	canonical_decimal
+decimal	^-?[0-9]+\.[0-9]+$	canonical_decimal
+percent	^-?[0-9]+(\.[0-9]+)?%$	percent_value
+thousands	^[0-9]{1,3}(,[0-9]{3})+$	strip_commas_decimal
+exp	^-?[0-9]+(\.[0-9]+)?[eE][+-]?[0-9]+$	canonical_decimal
