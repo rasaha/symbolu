@@ -87,6 +87,36 @@ def test_blind_shuffle_hides_and_recovers_labels():
     assert J.blind_shuffle(picks, salt="item1")[1] == l2a      # deterministic
 
 
+def test_live_parsing_helpers():
+    import run_live_eval as RE
+    assert RE._names_from("1. Aria\n2) Lumen — bright\nSure, here:\nNova") == ["Aria", "Lumen", "Nova"]
+    assert RE._first_json('x {"opt_1": {"memorability": 4}} y') == {"opt_1": {"memorability": 4}}
+    assert RE._first_json("no json here") == {}
+
+
+def test_live_aggregate_stats_paired():
+    import run_live_eval as RE
+    def mk(idn, qB, qA):
+        js = {"jm1": {"A_baseline": qA, "B_profile": qB, "C_random": qA, "D_minimal": qA}}
+        return {"id": idn, "judge_scores": js, "constraint_satisfaction": {a: 1.0 for a in js["jm1"]},
+                "usage": {a: {"prompt_tokens": 100, "completion_tokens": 20} for a in js["jm1"]}}
+    agg = RE.aggregate([mk("i1", 4.2, 3.6), mk("i2", 4.0, 3.8)], ["jm1"])
+    p = agg["paired"]["B_minus_A_baseline"]
+    assert p["wins_B"] == 2 and p["losses_B"] == 0 and p["mean_delta"] > 0 and p["cohen_d"] is not None
+
+
+def test_llm_client_unconfigured_is_safe():
+    import os
+    import llm_client as L
+    if not (os.environ.get("MISTRAL_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")):
+        try:
+            L.chat("mistral:mistral-large-latest", "hi")
+            raised = False
+        except L.LLMError:
+            raised = True
+        assert raised, "chat must raise LLMError when unconfigured (never fabricate)"
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     fails = []
