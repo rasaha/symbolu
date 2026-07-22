@@ -118,7 +118,8 @@ def classify(summ):
         all95 = s["final_acc"]["min"] >= 0.95
         no_collapse = s["final_acc"]["min"] >= 0.80
         higher_entropy = s["entropy"]["mean"] > dfull["entropy"]["mean"] + 0.05
-        finite_margin = s["margin"]["mean"] <= ALPHA + 0.5
+        # pos-neg margin ranges in [-2*alpha, 2*alpha] (each score in [-alpha, alpha]).
+        finite_margin = s["margin"]["mean"] <= 2.0 * ALPHA + 0.5
         hard_improved = [c for c in PREREGISTERED_HARD
                          if s["conditions"][c]["mean"] > dfull_hard[c] + 0.05]
         not_worse_than_C = all(
@@ -137,12 +138,13 @@ def classify(summ):
     if not any_learns:
         category = "BOUND_PREVENTS_LEARNING"
     else:
+        # BOUNDED_QUAD_SUPPORTED requires ALL primary criteria (spec 10), including 6
+        # (not materially worse than Arm C on the hard conditions).
         supported = [l for l in res if res[l]["reaches_95_all_seeds"]
                      and res[l]["entropy_higher_than_Dfull"] and res[l]["finite_margin"]
-                     and res[l]["n_hard_improved"] >= 2]
+                     and res[l]["n_hard_improved"] >= 2 and res[l]["not_worse_than_C_on_hard"]]
         binding_ok = [l for l in res if res[l]["reaches_95_all_seeds"]
                       and res[l]["entropy_higher_than_Dfull"] and res[l]["finite_margin"]]
-        controls_magnitude_no_gen = [l for l in binding_ok if res[l]["n_hard_improved"] == 0]
         if supported:
             category = "BOUNDED_QUAD_SUPPORTED"
         elif binding_ok and all(res[l]["n_hard_improved"] == 0 for l in binding_ok):
