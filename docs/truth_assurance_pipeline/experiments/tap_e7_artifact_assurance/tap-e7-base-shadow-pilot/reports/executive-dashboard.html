@@ -1,0 +1,44 @@
+<!doctype html><meta charset=utf-8><title>TAP-E7-BASE Shadow Pilot Dashboard</title><style>
+:root{color-scheme:light dark}
+*{box-sizing:border-box}
+.wrap{max-width:860px;margin:0 auto;padding:24px;font:15px/1.5 system-ui,sans-serif}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:26px 0 10px;border-bottom:1px solid #8884;padding-bottom:4px}
+.sub{color:#888;margin:0 0 18px}code{background:#8882;padding:1px 5px;border-radius:4px}
+.tiles{display:flex;flex-wrap:wrap;gap:12px}
+.tile{flex:1 1 120px;background:#8881;border-radius:10px;padding:14px;text-align:center}
+.tile.warn{background:#c9310f18}
+.tv{font-size:26px;font-weight:700}.tl{font-size:12px;color:#999;margin-top:4px}
+.row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.lbl{width:130px;font-size:13px}.track{flex:1;background:#8882;border-radius:6px;height:16px;max-width:360px}
+.fill{display:block;height:16px;border-radius:6px}.num{width:34px;text-align:right;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #8883}
+.oc{font-weight:600}.ASSURED{color:#3a9}.NOT_ASSURED{color:#c55}.INDETERMINATE{color:#c93}
+.foot{color:#999;font-size:12px;margin-top:20px}ul{padding-left:18px}li{margin:4px 0}
+@media(prefers-color-scheme:dark){body{background:#111;color:#ddd}}
+</style><div class="wrap">
+<h1>TAP-E7-BASE Shadow Pilot — Executive Dashboard</h1>
+<p class="sub">Read-only observational pilot · engine bound to <code>tap-e7-base-companion/1.2.0</code> · 162 synthetic artifacts across 9 domains · TAP-E7 influenced no decision.</p>
+<div class="tiles">
+  <div class="tile"><div class="tv">1</div><div class="tl">Precision<br><small>zero false alarms</small></div></div>
+  <div class="tile"><div class="tv">0.75</div><div class="tl">Recall (overall)</div></div>
+  <div class="tile"><div class="tv">1</div><div class="tl">Recall<br><small>BASE-detectable</small></div></div>
+  <div class="tile"><div class="tv">22%</div><div class="tl">Indeterminate<br><small>routed to humans</small></div></div>
+  <div class="tile warn"><div class="tv">36</div><div class="tl">Engine-gap misses<br><small>scope / qualifier</small></div></div>
+</div>
+<h2>Outcome distribution</h2>
+<div class="chart">
+<div class="row"><span class="lbl">ASSURED</span><span class="track"><span class="fill" style="width:120px;background:#3a9"></span></span><span class="num">54</span></div>
+<div class="row"><span class="lbl">NOT_ASSURED</span><span class="track"><span class="fill" style="width:160px;background:#c55"></span></span><span class="num">72</span></div>
+<div class="row"><span class="lbl">INDETERMINATE</span><span class="track"><span class="fill" style="width:80px;background:#c93"></span></span><span class="num">36</span></div>
+</div>
+<h2>Detection by issue type</h2>
+<table><thead><tr><th>Issue</th><th>In BASE scope</th><th>Flag rate</th><th>Typical outcome</th></tr></thead><tbody><tr><td>faithful</td><td>✓ yes</td><td>0.00</td><td class="oc ASSURED">ASSURED</td></tr><tr><td>unsupported_assertion</td><td>✓ yes</td><td>1.00</td><td class="oc NOT_ASSURED">NOT_ASSURED</td></tr><tr><td>status_upgrade</td><td>✓ yes</td><td>1.00</td><td class="oc NOT_ASSURED">NOT_ASSURED</td></tr><tr><td>citation_mismatch</td><td>✓ yes</td><td>1.00</td><td class="oc NOT_ASSURED">NOT_ASSURED</td></tr><tr><td>provenance_mismatch</td><td>✓ yes</td><td>1.00</td><td class="oc NOT_ASSURED">NOT_ASSURED</td></tr><tr><td>integrity_homoglyph</td><td>✓ yes</td><td>1.00</td><td class="oc INDETERMINATE">INDETERMINATE</td></tr><tr><td>certainty_inflation</td><td>— gap</td><td>1.00</td><td class="oc INDETERMINATE">INDETERMINATE</td></tr><tr><td>scope_expansion</td><td>— gap</td><td>0.00</td><td class="oc ASSURED">ASSURED</td></tr><tr><td>omitted_qualifier</td><td>— gap</td><td>0.00</td><td class="oc ASSURED">ASSURED</td></tr></tbody></table>
+<h2>Read this honestly</h2>
+<ul>
+<li><b>Strength:</b> perfect precision — every faithful artifact was ASSURED; fabrication, status-upgrade, citation/provenance mismatch, and Unicode spoofing were flagged 100%.</li>
+<li><b>Bounded recall:</b> 36 scope-expansion / omitted-qualifier artifacts were ASSURED — BASE cannot see semantic distortions that leave the content-token set unchanged.</li>
+<li><b>Correct escalation:</b> 22% INDETERMINATE routes spoofed/ambiguous inputs to human review rather than asserting.</li>
+<li><b>Verdict:</b> a high-precision structural triage layer — a complement to, not a replacement for, human semantic review.</li>
+</ul>
+<p class="foot">reviewer agreement &amp; review time are design metrics requiring human reviewers (N/A in this synthetic demonstration).</p>
+</div>

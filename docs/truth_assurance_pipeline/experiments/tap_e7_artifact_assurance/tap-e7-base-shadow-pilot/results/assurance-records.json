@@ -1,0 +1,2162 @@
+[
+ {
+  "id": "compliance-faithful-1",
+  "domain": "compliance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "compliance-faithful-2",
+  "domain": "compliance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "compliance-unsupported_assertion-1",
+  "domain": "compliance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "compliance-unsupported_assertion-2",
+  "domain": "compliance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "compliance-status_upgrade-1",
+  "domain": "compliance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "compliance-status_upgrade-2",
+  "domain": "compliance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "compliance-citation_mismatch-1",
+  "domain": "compliance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "compliance-citation_mismatch-2",
+  "domain": "compliance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "compliance-provenance_mismatch-1",
+  "domain": "compliance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "compliance-provenance_mismatch-2",
+  "domain": "compliance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "compliance-integrity_homoglyph-1",
+  "domain": "compliance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "compliance-integrity_homoglyph-2",
+  "domain": "compliance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "compliance-certainty_inflation-1",
+  "domain": "compliance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "compliance-certainty_inflation-2",
+  "domain": "compliance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "compliance-scope_expansion-1",
+  "domain": "compliance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "compliance-scope_expansion-2",
+  "domain": "compliance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "compliance-omitted_qualifier-1",
+  "domain": "compliance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "compliance-omitted_qualifier-2",
+  "domain": "compliance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "financial-faithful-1",
+  "domain": "financial",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "financial-faithful-2",
+  "domain": "financial",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "financial-unsupported_assertion-1",
+  "domain": "financial",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "financial-unsupported_assertion-2",
+  "domain": "financial",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "financial-status_upgrade-1",
+  "domain": "financial",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "financial-status_upgrade-2",
+  "domain": "financial",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "financial-citation_mismatch-1",
+  "domain": "financial",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "financial-citation_mismatch-2",
+  "domain": "financial",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "financial-provenance_mismatch-1",
+  "domain": "financial",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "financial-provenance_mismatch-2",
+  "domain": "financial",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "financial-integrity_homoglyph-1",
+  "domain": "financial",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "financial-integrity_homoglyph-2",
+  "domain": "financial",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "financial-certainty_inflation-1",
+  "domain": "financial",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "financial-certainty_inflation-2",
+  "domain": "financial",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "financial-scope_expansion-1",
+  "domain": "financial",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "financial-scope_expansion-2",
+  "domain": "financial",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "financial-omitted_qualifier-1",
+  "domain": "financial",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "financial-omitted_qualifier-2",
+  "domain": "financial",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "insurance-faithful-1",
+  "domain": "insurance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "insurance-faithful-2",
+  "domain": "insurance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "insurance-unsupported_assertion-1",
+  "domain": "insurance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "insurance-unsupported_assertion-2",
+  "domain": "insurance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "insurance-status_upgrade-1",
+  "domain": "insurance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "insurance-status_upgrade-2",
+  "domain": "insurance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "insurance-citation_mismatch-1",
+  "domain": "insurance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "insurance-citation_mismatch-2",
+  "domain": "insurance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "insurance-provenance_mismatch-1",
+  "domain": "insurance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "insurance-provenance_mismatch-2",
+  "domain": "insurance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "insurance-integrity_homoglyph-1",
+  "domain": "insurance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "insurance-integrity_homoglyph-2",
+  "domain": "insurance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "insurance-certainty_inflation-1",
+  "domain": "insurance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "insurance-certainty_inflation-2",
+  "domain": "insurance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "insurance-scope_expansion-1",
+  "domain": "insurance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "insurance-scope_expansion-2",
+  "domain": "insurance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "insurance-omitted_qualifier-1",
+  "domain": "insurance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "insurance-omitted_qualifier-2",
+  "domain": "insurance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-faithful-1",
+  "domain": "healthcare",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "healthcare-faithful-2",
+  "domain": "healthcare",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "healthcare-unsupported_assertion-1",
+  "domain": "healthcare",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "healthcare-unsupported_assertion-2",
+  "domain": "healthcare",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "healthcare-status_upgrade-1",
+  "domain": "healthcare",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "healthcare-status_upgrade-2",
+  "domain": "healthcare",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "healthcare-citation_mismatch-1",
+  "domain": "healthcare",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "healthcare-citation_mismatch-2",
+  "domain": "healthcare",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "healthcare-provenance_mismatch-1",
+  "domain": "healthcare",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "healthcare-provenance_mismatch-2",
+  "domain": "healthcare",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "healthcare-integrity_homoglyph-1",
+  "domain": "healthcare",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "healthcare-integrity_homoglyph-2",
+  "domain": "healthcare",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "healthcare-certainty_inflation-1",
+  "domain": "healthcare",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-certainty_inflation-2",
+  "domain": "healthcare",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-scope_expansion-1",
+  "domain": "healthcare",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-scope_expansion-2",
+  "domain": "healthcare",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-omitted_qualifier-1",
+  "domain": "healthcare",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "healthcare-omitted_qualifier-2",
+  "domain": "healthcare",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "legal-faithful-1",
+  "domain": "legal",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "legal-faithful-2",
+  "domain": "legal",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "legal-unsupported_assertion-1",
+  "domain": "legal",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "legal-unsupported_assertion-2",
+  "domain": "legal",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "legal-status_upgrade-1",
+  "domain": "legal",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "legal-status_upgrade-2",
+  "domain": "legal",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "legal-citation_mismatch-1",
+  "domain": "legal",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "legal-citation_mismatch-2",
+  "domain": "legal",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "legal-provenance_mismatch-1",
+  "domain": "legal",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "legal-provenance_mismatch-2",
+  "domain": "legal",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "legal-integrity_homoglyph-1",
+  "domain": "legal",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "legal-integrity_homoglyph-2",
+  "domain": "legal",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "legal-certainty_inflation-1",
+  "domain": "legal",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "legal-certainty_inflation-2",
+  "domain": "legal",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "legal-scope_expansion-1",
+  "domain": "legal",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "legal-scope_expansion-2",
+  "domain": "legal",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "legal-omitted_qualifier-1",
+  "domain": "legal",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "legal-omitted_qualifier-2",
+  "domain": "legal",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "governance-faithful-1",
+  "domain": "governance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "governance-faithful-2",
+  "domain": "governance",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "governance-unsupported_assertion-1",
+  "domain": "governance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "governance-unsupported_assertion-2",
+  "domain": "governance",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "governance-status_upgrade-1",
+  "domain": "governance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "governance-status_upgrade-2",
+  "domain": "governance",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "governance-citation_mismatch-1",
+  "domain": "governance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "governance-citation_mismatch-2",
+  "domain": "governance",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "governance-provenance_mismatch-1",
+  "domain": "governance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "governance-provenance_mismatch-2",
+  "domain": "governance",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "governance-integrity_homoglyph-1",
+  "domain": "governance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "governance-integrity_homoglyph-2",
+  "domain": "governance",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "governance-certainty_inflation-1",
+  "domain": "governance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "governance-certainty_inflation-2",
+  "domain": "governance",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "governance-scope_expansion-1",
+  "domain": "governance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "governance-scope_expansion-2",
+  "domain": "governance",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "governance-omitted_qualifier-1",
+  "domain": "governance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "governance-omitted_qualifier-2",
+  "domain": "governance",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "audit-faithful-1",
+  "domain": "audit",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "audit-faithful-2",
+  "domain": "audit",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "audit-unsupported_assertion-1",
+  "domain": "audit",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "audit-unsupported_assertion-2",
+  "domain": "audit",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "audit-status_upgrade-1",
+  "domain": "audit",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "audit-status_upgrade-2",
+  "domain": "audit",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "audit-citation_mismatch-1",
+  "domain": "audit",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "audit-citation_mismatch-2",
+  "domain": "audit",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "audit-provenance_mismatch-1",
+  "domain": "audit",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "audit-provenance_mismatch-2",
+  "domain": "audit",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "audit-integrity_homoglyph-1",
+  "domain": "audit",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "audit-integrity_homoglyph-2",
+  "domain": "audit",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "audit-certainty_inflation-1",
+  "domain": "audit",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "audit-certainty_inflation-2",
+  "domain": "audit",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "audit-scope_expansion-1",
+  "domain": "audit",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "audit-scope_expansion-2",
+  "domain": "audit",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "audit-omitted_qualifier-1",
+  "domain": "audit",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "audit-omitted_qualifier-2",
+  "domain": "audit",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "policy-faithful-1",
+  "domain": "policy",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "policy-faithful-2",
+  "domain": "policy",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "policy-unsupported_assertion-1",
+  "domain": "policy",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "policy-unsupported_assertion-2",
+  "domain": "policy",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "policy-status_upgrade-1",
+  "domain": "policy",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "policy-status_upgrade-2",
+  "domain": "policy",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "policy-citation_mismatch-1",
+  "domain": "policy",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "policy-citation_mismatch-2",
+  "domain": "policy",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "policy-provenance_mismatch-1",
+  "domain": "policy",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "policy-provenance_mismatch-2",
+  "domain": "policy",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "policy-integrity_homoglyph-1",
+  "domain": "policy",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "policy-integrity_homoglyph-2",
+  "domain": "policy",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "policy-certainty_inflation-1",
+  "domain": "policy",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "policy-certainty_inflation-2",
+  "domain": "policy",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "policy-scope_expansion-1",
+  "domain": "policy",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "policy-scope_expansion-2",
+  "domain": "policy",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "policy-omitted_qualifier-1",
+  "domain": "policy",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "policy-omitted_qualifier-2",
+  "domain": "policy",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-faithful-1",
+  "domain": "agent_summary",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "agent_summary-faithful-2",
+  "domain": "agent_summary",
+  "issue": "faithful",
+  "gt_issue": false,
+  "detectable": true,
+  "human_assessment": "CLEAN",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "artifact restates the validated fact"
+ },
+ {
+  "id": "agent_summary-unsupported_assertion-1",
+  "domain": "agent_summary",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "agent_summary-unsupported_assertion-2",
+  "domain": "agent_summary",
+  "issue": "unsupported_assertion",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "FABRICATION"
+  ],
+  "tap_flags": true,
+  "note": "artifact asserts a claim with no validated support"
+ },
+ {
+  "id": "agent_summary-status_upgrade-1",
+  "domain": "agent_summary",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "agent_summary-status_upgrade-2",
+  "domain": "agent_summary",
+  "issue": "status_upgrade",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "STATUS_UPGRADE"
+  ],
+  "tap_flags": true,
+  "note": "validated record CONTRADICTS the claim; artifact asserts it flatly"
+ },
+ {
+  "id": "agent_summary-citation_mismatch-1",
+  "domain": "agent_summary",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "agent_summary-citation_mismatch-2",
+  "domain": "agent_summary",
+  "issue": "citation_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "CITATION_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact cites S9; record supports only S1"
+ },
+ {
+  "id": "agent_summary-provenance_mismatch-1",
+  "domain": "agent_summary",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "agent_summary-provenance_mismatch-2",
+  "domain": "agent_summary",
+  "issue": "provenance_mismatch",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "NOT_ASSURED",
+  "tap_findings": [
+   "PROVENANCE_MISMATCH"
+  ],
+  "tap_flags": true,
+  "note": "artifact attributes to a source outside the record provenance"
+ },
+ {
+  "id": "agent_summary-integrity_homoglyph-1",
+  "domain": "agent_summary",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "agent_summary-integrity_homoglyph-2",
+  "domain": "agent_summary",
+  "issue": "integrity_homoglyph",
+  "gt_issue": true,
+  "detectable": true,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "artifact entity uses a Cyrillic homoglyph (spoof risk)"
+ },
+ {
+  "id": "agent_summary-certainty_inflation-1",
+  "domain": "agent_summary",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-certainty_inflation-2",
+  "domain": "agent_summary",
+  "issue": "certainty_inflation",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "INDETERMINATE",
+  "tap_findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "tap_flags": true,
+  "note": "record confidence is LOW; artifact states it as certain (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-scope_expansion-1",
+  "domain": "agent_summary",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-scope_expansion-2",
+  "domain": "agent_summary",
+  "issue": "scope_expansion",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is EU-scoped; artifact drops the scope (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-omitted_qualifier-1",
+  "domain": "agent_summary",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ },
+ {
+  "id": "agent_summary-omitted_qualifier-2",
+  "domain": "agent_summary",
+  "issue": "omitted_qualifier",
+  "gt_issue": true,
+  "detectable": false,
+  "human_assessment": "ISSUE",
+  "tap_outcome": "ASSURED",
+  "tap_findings": [],
+  "tap_flags": false,
+  "note": "record is conditional; artifact omits the qualifier (engine-level nuance)"
+ }
+]

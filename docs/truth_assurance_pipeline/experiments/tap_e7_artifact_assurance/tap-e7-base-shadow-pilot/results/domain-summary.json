@@ -1,0 +1,92 @@
+[
+ {
+  "domain": "agent_summary",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "audit",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "compliance",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "financial",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "governance",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "healthcare",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "insurance",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "legal",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ },
+ {
+  "domain": "policy",
+  "n": 18,
+  "assured": 6,
+  "not_assured": 8,
+  "indeterminate": 4,
+  "gt_issue": 16,
+  "flagged_issue": 12,
+  "issue_recall": 0.75
+ }
+]
