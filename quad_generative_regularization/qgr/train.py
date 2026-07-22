@@ -51,6 +51,14 @@ class TrainConfig:
     # candidate key per query, preserving candidate-set size / causal visibility / position
     # distribution. Task targets are UNCHANGED. Used only in the conditional follow-up.
     shuffle_aux_labels: bool = False
+    # Early-only auxiliary schedule (schedule-ablation experiment): the auxiliary loss is
+    # active for the first `aux_cutoff_frac` of optimizer steps, then its coefficient is set
+    # EXACTLY to zero (hard cutoff, no gradual decay). 1.0 == full-duration (existing Arm D).
+    aux_cutoff_frac: float = 1.0
+
+    def cutoff_step(self) -> int:
+        """First step at which the auxiliary coefficient is exactly zero."""
+        return int(self.aux_cutoff_frac * self.steps)
 
 
 def _effective_lambda(tcfg: TrainConfig) -> float:
@@ -101,13 +109,15 @@ def _forward(model: QuadTransformer, tokens, arm: str):
     return model(tokens, expose_quad=True)  # D / D0
 
 
-def _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head=None) -> Dict[str, float]:
+def _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head=None,
+                      measure_aux: bool = True) -> Dict[str, float]:
     """Separate task vs aux gradient measurement on a fixed diagnostic minibatch.
 
     Excluded from per-step timing (spec section 15.2). Only meaningful for arms with aux.
     Gradients are measured w.r.t. the SHARED model parameters (embeddings + blocks + head),
     the parameters both task and aux gradients touch, to confirm the aux signal reaches the
-    shared model (spec sections 15.2, 17.6).
+    shared model (spec sections 15.2, 17.6). When `measure_aux` is False (e.g. after an
+    early-only cutoff) only the task-gradient norm is recorded.
     """
     params = [p for p in model.parameters() if p.requires_grad]
     out = _forward(model, diag_batch.tokens, tcfg.arm if tcfg.arm != "D0" else "D")
@@ -116,6 +126,13 @@ def _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head=None) -> 
 
     if not _uses_aux_code(tcfg.arm):
         return {}
+    if not measure_aux:
+        # Auxiliary inactive (post-cutoff): record task-grad norm only, aux fields zeroed.
+        flat0 = torch.cat([g.reshape(-1) if g is not None else torch.zeros(p.numel())
+                           for g, p in zip(g_task, params)])
+        return {"task_grad_norm": float(flat0.norm()), "aux_grad_norm": 0.0,
+                "aux_to_task_ratio": 0.0, "grad_cosine": 0.0,
+                "aux_grad_negligible_frac": 1.0}
     al = _compute_aux(
         TrainConfig(arm="D" if tcfg.arm in ("D", "D0") else "C", tau=tcfg.tau,
                     objective=tcfg.objective, margin=tcfg.margin),
@@ -171,6 +188,7 @@ def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
     val_seed = tcfg.seed if val_seed is None else val_seed
 
     lam = _effective_lambda(tcfg)
+    cutoff = tcfg.cutoff_step()   # first step with auxiliary coefficient == 0
     history: List[Dict] = []
     grad_history: List[Dict] = []
     step_times: List[float] = []
@@ -181,19 +199,23 @@ def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
         model.train()
         for grp in opt.param_groups:
             grp["lr"] = lr_at(step)
+        # Hard cutoff: auxiliary coefficient is EXACTLY zero once step >= cutoff.
+        aux_active = _uses_aux_code(tcfg.arm) and step < cutoff
+        aux_coeff = lam if aux_active else 0.0
         batch = generate_batch(mqar_cfg, split_seed(tcfg.seed, "train", step),
                                tcfg.batch_size, device)
         aux_batch = batch
-        if tcfg.shuffle_aux_labels and _uses_aux_code(tcfg.arm):
+        if tcfg.shuffle_aux_labels and aux_active:
             shuf_gen = torch.Generator().manual_seed(split_seed(tcfg.seed, "train", step) + 1)
             aux_batch = _shuffle_labels(batch, shuf_gen)
         t0 = time.perf_counter()
         out = _forward(model, batch.tokens, tcfg.arm)
         tl = task_loss(out["logits"], batch.targets)
-        if _uses_aux_code(tcfg.arm):
+        if aux_active:
             al = _compute_aux(tcfg, out, aux_batch, relation_head)
-            loss = tl + lam * al
+            loss = tl + aux_coeff * al          # task loss + active auxiliary
         else:
+            # After cutoff (or Arm A), the loss and its gradients come ONLY from task loss.
             al = torch.zeros((), device=device)
             loss = tl
         opt.zero_grad(set_to_none=True)
@@ -209,14 +231,17 @@ def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
                                   min(tcfg.eval_batches, 4), tcfg.batch_size, device)
             history.append({
                 "step": step, "task_loss": float(tl), "aux_loss": float(al),
+                "aux_active": bool(aux_active), "aux_coeff": float(aux_coeff),
                 "val_acc": ev["acc"], "val_seq_acc": ev["seq_acc"],
                 "val_task_loss": ev["task_loss"], **{f"mech_{k}": v for k, v in mech.items()},
             })
 
         if tcfg.grad_diag_every > 0 and step % tcfg.grad_diag_every == 0:
-            gd = _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head)
+            gd = _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head,
+                                   measure_aux=aux_active)
             if gd:
                 gd["step"] = step
+                gd["aux_active"] = bool(aux_active)
                 grad_history.append(gd)
 
     final_val = evaluate(model, mqar_cfg, val_seed, "val", tcfg.eval_batches * 2,
@@ -224,6 +249,8 @@ def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
     return {
         "arm": tcfg.arm,
         "seed": tcfg.seed,
+        "aux_cutoff_frac": tcfg.aux_cutoff_frac,
+        "cutoff_step": cutoff,
         "history": history,
         "grad_history": grad_history,
         "final_val": final_val,
