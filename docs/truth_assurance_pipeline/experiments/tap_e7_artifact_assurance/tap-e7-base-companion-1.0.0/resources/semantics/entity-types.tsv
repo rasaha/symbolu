@@ -1,0 +1,12 @@
+# BASE-ENTITY-TYPES/1.0 type	extraction_cue
+PERSON_ORG	proper-noun span; org suffixes Inc/Corp/Ltd/LLC
+GEO	gazetteer=record-supplied only
+JURISDICTION	'<X> law' / 'under <X>'
+PRODUCT	proper noun + optional version
+VERSION	v?<num>(.<num>)+
+DATE	BASE-DATE match
+TIMERANGE	between/after/before DATE
+QUANTITY	NUMBER+UNIT
+CURRENCY	CURRENCY unit + NUMBER
+PERCENT	NUMBER '%'
+SOURCE_ID	citation marker / record source id

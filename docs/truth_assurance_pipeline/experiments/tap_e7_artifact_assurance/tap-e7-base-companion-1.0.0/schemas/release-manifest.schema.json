@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"files":{"type":"array"},"release_id":{"type":"string"}},"required":["release_id","files"],"title":"Release manifest","type":"object"}

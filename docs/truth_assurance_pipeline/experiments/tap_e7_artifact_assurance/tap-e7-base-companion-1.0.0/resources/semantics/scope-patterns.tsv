@@ -1,0 +1,12 @@
+# BASE-SCOPE-PATTERN/1.0 dim	pattern
+geo	in <GEO>
+jurisdiction	under <JURISDICTION>( law)?
+population	for <POPULATION>
+product	<PRODUCT>
+version	v?<num>(.<num>)+
+temporal	(after|before|between) <DATE>
+condition	(only )?(if|when|unless|provided) <CLAUSE>
+exception	except <CLAUSE>
+prerequisite	requires <CLAUSE>
+dependency	depends on <CLAUSE>
+quantifier	(all|some|no|each)
