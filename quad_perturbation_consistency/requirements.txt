@@ -1,0 +1,7 @@
+# CPU-only research package. Reuses the prior quad_generative_regularization package read-only.
+# Install the CPU build of torch (no CUDA needed); the wheel runs on CPU.
+torch==2.4.1
+numpy>=1.24,<2
+scipy>=1.10
+matplotlib>=3.7
+pytest>=7.0

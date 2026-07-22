@@ -1,0 +1,86 @@
+{
+  "lambdas": [
+    0.03,
+    0.1,
+    0.3
+  ],
+  "pilot_seeds": [
+    100,
+    101
+  ],
+  "bd_a_mean_hard": {
+    "100": 0.7217881944444444,
+    "101": 0.6206597222222222
+  },
+  "grid": {
+    "0.03": {
+      "per_seed": {
+        "100": {
+          "mean_hard": 0.6866319444444444,
+          "in_dist": 1.0,
+          "entropy": 0.5867726960112644,
+          "healthy": true,
+          "delta_vs_A": -0.03515625
+        },
+        "101": {
+          "mean_hard": 0.5948350694444444,
+          "in_dist": 1.0,
+          "entropy": 0.7819207215528221,
+          "healthy": true,
+          "delta_vs_A": -0.02582465277777779
+        }
+      },
+      "mean_hard": 0.6407335069444444,
+      "mean_delta_vs_A": -0.030490451388888895,
+      "min_in_dist": 1.0,
+      "all_healthy": true
+    },
+    "0.1": {
+      "per_seed": {
+        "100": {
+          "mean_hard": 0.6883680555555556,
+          "in_dist": 1.0,
+          "entropy": 0.619228646128779,
+          "healthy": true,
+          "delta_vs_A": -0.03342013888888884
+        },
+        "101": {
+          "mean_hard": 0.6538628472222222,
+          "in_dist": 1.0,
+          "entropy": 0.6655849577513762,
+          "healthy": true,
+          "delta_vs_A": 0.033203125
+        }
+      },
+      "mean_hard": 0.6711154513888888,
+      "mean_delta_vs_A": -0.00010850694444441977,
+      "min_in_dist": 1.0,
+      "all_healthy": true
+    },
+    "0.3": {
+      "per_seed": {
+        "100": {
+          "mean_hard": 0.6953125,
+          "in_dist": 1.0,
+          "entropy": 0.629905302977836,
+          "healthy": true,
+          "delta_vs_A": -0.02647569444444442
+        },
+        "101": {
+          "mean_hard": 0.6631944444444444,
+          "in_dist": 1.0,
+          "entropy": 0.7785703629691957,
+          "healthy": true,
+          "delta_vs_A": 0.04253472222222221
+        }
+      },
+      "mean_hard": 0.6792534722222222,
+      "mean_delta_vs_A": 0.008029513888888895,
+      "min_in_dist": 1.0,
+      "all_healthy": true
+    }
+  },
+  "frozen_lambda": 0.3,
+  "selection_rule": "highest mean-hard among lambdas that are health-guardrail clean and reach >=0.95 in-distribution on both pilot seeds; chosen to give the method its most favorable fair configuration",
+  "wall_clock_s": 409.74647545814514
+}
