@@ -1,0 +1,68 @@
+{
+ "assurance_record": {
+  "evaluation_summary": {
+   "evaluated_assertive": 0,
+   "evaluation_limitations": 0,
+   "positive_violations": 1,
+   "total_assertive": 1,
+   "unevaluated_assertive": 1,
+   "x-tap-e7-base-evaluation-summary": {
+    "companion_method_counts": {
+     "no_match": 1,
+     "unresolved": 0
+    },
+    "correspondence_method_counts": {
+     "exact": 0,
+     "explicit": 0,
+     "lexical": 0,
+     "structured": 0
+    },
+    "correspondence_units_total": 1
+   }
+  },
+  "findings": [
+   {
+    "category": "FABRICATION",
+    "finding_index": 0,
+    "polarity": "POSITIVE_VIOLATION"
+   }
+  ],
+  "outcome": "NOT_ASSURED",
+  "projection_pi": {
+   "evaluation_summary": {
+    "evaluated_assertive": 0,
+    "evaluation_limitations": 0,
+    "positive_violations": 1,
+    "total_assertive": 1,
+    "unevaluated_assertive": 1
+   },
+   "findings": [
+    {
+     "category": "FABRICATION",
+     "polarity": "POSITIVE_VIOLATION"
+    }
+   ],
+   "outcome": "NOT_ASSURED"
+  },
+  "projection_pi_sha256": "sha-256:f2a87cd2bb2f39a57d4444235a201488091f3f16508685ce36c9b1ea9f554092"
+ },
+ "authoritative": true,
+ "fixture_id": "DT03",
+ "redacted_trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:6173b80eef112994ca857401d1949279c289cdc38eb4959791aeb75ef0fb7fc5",
+  "findings": [
+   "FABRICATION"
+  ],
+  "outcome": "NOT_ASSURED"
+ },
+ "trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:6173b80eef112994ca857401d1949279c289cdc38eb4959791aeb75ef0fb7fc5",
+  "artifact_text": "Syst\u00e9m",
+  "findings": [
+   "FABRICATION"
+  ],
+  "outcome": "NOT_ASSURED"
+ }
+}

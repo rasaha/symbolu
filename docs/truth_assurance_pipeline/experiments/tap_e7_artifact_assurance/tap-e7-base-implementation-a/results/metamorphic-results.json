@@ -1,0 +1,68 @@
+{
+ "tests": [
+  {
+   "test": "M1_json_member_order_same_pi",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M2_nfc_equiv_same_correspondence",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M3_excluded_metadata_same_pi",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M4_repeated_tokens_same_jaccard",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M5_finding_order_canonical",
+   "result": "N/A_ENGINE",
+   "detail": "single-finding mandatory corpus; multi-finding canonical ordering is engine-level"
+  },
+  {
+   "test": "M6_redaction_same_findings_outcome",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M7_quotation_not_endorsement",
+   "result": "N/A_ENGINE",
+   "detail": "attribution/endorsement semantics are engine-level (informative track)"
+  },
+  {
+   "test": "M8_negation_polarity",
+   "result": "N/A_ENGINE",
+   "detail": "negation-reversal fidelity is engine-level (MEANING_DISTORTION, informative track)"
+  },
+  {
+   "test": "M9_broader_scope_not_faithful",
+   "result": "N/A_ENGINE",
+   "detail": "scope comparison is engine-level (SCOPE_EXPANSION, informative track)"
+  },
+  {
+   "test": "M10_unknown_predicate_no_structured",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M11_homoglyph_no_silent_merge",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "M12_corpus_change_no_fp_change",
+   "result": "PASS",
+   "detail": ""
+  }
+ ],
+ "total": 12,
+ "pass": 8,
+ "fail": 0,
+ "na": 4
+}

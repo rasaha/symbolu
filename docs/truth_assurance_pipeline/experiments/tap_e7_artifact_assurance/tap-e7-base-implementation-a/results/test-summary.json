@@ -1,0 +1,26 @@
+{
+ "unit": {
+  "total": 32,
+  "pass": 32,
+  "fail": 0,
+  "na": 0
+ },
+ "metamorphic": {
+  "total": 12,
+  "pass": 8,
+  "fail": 0,
+  "na": 4
+ },
+ "security": {
+  "total": 8,
+  "pass": 8,
+  "fail": 0,
+  "na": 0
+ },
+ "privacy": {
+  "total": 3,
+  "pass": 3,
+  "fail": 0,
+  "na": 0
+ }
+}

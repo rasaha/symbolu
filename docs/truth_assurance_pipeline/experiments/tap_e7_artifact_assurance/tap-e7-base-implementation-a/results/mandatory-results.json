@@ -1,0 +1,1634 @@
+{
+ "rows": [
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "CR01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "CR02",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "CR03",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT02",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "PACKAGE_DEFECT",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT03",
+   "pass": false,
+   "produced_findings": [
+    "FABRICATION"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": false,
+   "root_cause": "Fixture artifact is the bare demonstration word 'System-with-acute', not a proposition; it cannot correspond to VR entry 'acme owns system b'. A faithful matcher yields FABRICATION, not ASSURED. Root: determinism helper stored the demo token as the CandidateArtifact instead of a faithful proposition."
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT04",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT05",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT06",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT07",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT08",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT09",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "DT10",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "EM01",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "EM02",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "EM03",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "EM04",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "EM05",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "MEANING_DISTORTION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF01",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "CERTAINTY_OVERSTATEMENT"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF02",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "SCOPE_EXPANSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF03",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": false,
+   "classification": "NON_MANDATORY_INFORMATIVE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [
+    "QUALIFICATION_OMISSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "INF04",
+   "pass": false,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": false,
+   "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS02",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS03",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS04",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS05",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS06",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS07",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS08",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS09",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS10",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS11",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS12",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS13",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS14",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS15",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS16",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS17",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS18",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS19",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "JS20",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS21",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "JS22",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "LX01",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "FABRICATION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "LX02",
+   "pass": true,
+   "produced_findings": [
+    "FABRICATION"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "LX03",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "LX04",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "LX05",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "LX06",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "UNSUPPORTED_MODALITY"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "MD01",
+   "pass": true,
+   "produced_findings": [
+    "UNSUPPORTED_MODALITY"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR02",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR03",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR04",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR05",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "PR06",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "PV01",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "PV02",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "PV03",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "PV04",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "SEC01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "SEC02",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC03",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC04",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "SEMANTIC_PASS_WITH_ALLOWED_TRACE_DIFFERENCE",
+   "diffs": [
+    "evaluation_summary"
+   ],
+   "expected_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SEC05",
+   "pass": false,
+   "produced_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": "Projection Pi + outcome + findings match; only the non-projected x-tap correspondence_method_counts differ (produced 'exact' vs fixture 'structured'). Root: fixture labelled a full-text normalized exact match as 'structured', inconsistent with CR02 (same string labelled 'exact') and the exact-before-structured staging order. SPEC_AMBIGUITY on the exact/structured boundary for free-text S-V-O; not outcome-affecting."
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC06",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC07",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC08",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "SEC10",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "FABRICATION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SEC11",
+   "pass": true,
+   "produced_findings": [
+    "FABRICATION"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "SEC12",
+   "pass": true,
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "STATUS_UPGRADE"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SV01",
+   "pass": true,
+   "produced_findings": [
+    "STATUS_UPGRADE"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "UNCERTAINTY_SUPPRESSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SV02",
+   "pass": true,
+   "produced_findings": [
+    "UNCERTAINTY_SUPPRESSION"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "PROVENANCE_MISMATCH"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SV03",
+   "pass": true,
+   "produced_findings": [
+    "PROVENANCE_MISMATCH"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SV04",
+   "pass": true,
+   "produced_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "MISLEADING_CONTRADICTION_OMISSION"
+   ],
+   "expected_outcome": "NOT_ASSURED",
+   "fixture": "SV05",
+   "pass": true,
+   "produced_findings": [
+    "MISLEADING_CONTRADICTION_OMISSION"
+   ],
+   "produced_outcome": "NOT_ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC01",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC02",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC03",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC04",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC05",
+   "pass": true,
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_outcome": "INDETERMINATE",
+   "fixture": "UC06",
+   "pass": true,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "SEMANTIC_PASS_WITH_ALLOWED_TRACE_DIFFERENCE",
+   "diffs": [
+    "evaluation_summary"
+   ],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "UC07",
+   "pass": false,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": "Projection Pi + outcome + findings match; only the non-projected x-tap correspondence_method_counts differ (produced 'exact' vs fixture 'structured'). Root: fixture labelled a full-text normalized exact match as 'structured', inconsistent with CR02 (same string labelled 'exact') and the exact-before-structured staging order. SPEC_AMBIGUITY on the exact/structured boundary for free-text S-V-O; not outcome-affecting."
+  },
+  {
+   "authoritative": true,
+   "classification": "PACKAGE_DEFECT",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "UC08",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Artifact entity 'system-with-acute' differs from VR entity 'system' by a diacritic; BASE publishes no diacritic-folding rule, so NFC keeps them distinct -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Expected ASSURED is unreachable from the bytes. Root: fixture asserted a clean structured match without the tokens actually matching."
+  },
+  {
+   "authoritative": true,
+   "classification": "PACKAGE_DEFECT",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "UC09",
+   "pass": false,
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "projection_match": false,
+   "root_cause": "Artifact entity 'system-with-acute' differs from VR entity 'system' by a diacritic; BASE publishes no diacritic-folding rule, so NFC keeps them distinct -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Expected ASSURED is unreachable from the bytes. Root: fixture asserted a clean structured match without the tokens actually matching."
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "ZR01",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "ZR02",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "ZR03",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  },
+  {
+   "authoritative": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "expected_findings": [],
+   "expected_outcome": "ASSURED",
+   "fixture": "ZR04",
+   "pass": true,
+   "produced_findings": [],
+   "produced_outcome": "ASSURED",
+   "projection_match": true,
+   "root_cause": null
+  }
+ ],
+ "summary": {
+  "informative_detail": [
+   {
+    "authoritative": false,
+    "classification": "NON_MANDATORY_INFORMATIVE",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [
+     "MEANING_DISTORTION"
+    ],
+    "expected_outcome": "NOT_ASSURED",
+    "fixture": "INF01",
+    "pass": false,
+    "produced_findings": [
+     "CORRESPONDENCE_UNRESOLVED"
+    ],
+    "produced_outcome": "INDETERMINATE",
+    "projection_match": false,
+    "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+   },
+   {
+    "authoritative": false,
+    "classification": "NON_MANDATORY_INFORMATIVE",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [
+     "CERTAINTY_OVERSTATEMENT"
+    ],
+    "expected_outcome": "NOT_ASSURED",
+    "fixture": "INF02",
+    "pass": false,
+    "produced_findings": [
+     "CORRESPONDENCE_UNRESOLVED"
+    ],
+    "produced_outcome": "INDETERMINATE",
+    "projection_match": false,
+    "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+   },
+   {
+    "authoritative": false,
+    "classification": "NON_MANDATORY_INFORMATIVE",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [
+     "SCOPE_EXPANSION"
+    ],
+    "expected_outcome": "NOT_ASSURED",
+    "fixture": "INF03",
+    "pass": false,
+    "produced_findings": [
+     "CORRESPONDENCE_UNRESOLVED"
+    ],
+    "produced_outcome": "INDETERMINATE",
+    "projection_match": false,
+    "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+   },
+   {
+    "authoritative": false,
+    "classification": "NON_MANDATORY_INFORMATIVE",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [
+     "QUALIFICATION_OMISSION"
+    ],
+    "expected_outcome": "NOT_ASSURED",
+    "fixture": "INF04",
+    "pass": false,
+    "produced_findings": [],
+    "produced_outcome": "ASSURED",
+    "projection_match": false,
+    "root_cause": "Engine-dependent category; verifier abstains (unresolved/none). Requires full semantic comparison not derivable from published resources: SPECIFICATION_UNDERSPECIFIED for a resource-only verifier."
+   }
+  ],
+  "informative_fail": 4,
+  "informative_pass": 0,
+  "informative_total": 4,
+  "mandatory_exact_pass": 81,
+  "mandatory_implementation_defects": 0,
+  "mandatory_package_defects": 3,
+  "mandatory_residuals": [
+   {
+    "authoritative": true,
+    "classification": "PACKAGE_DEFECT",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [],
+    "expected_outcome": "ASSURED",
+    "fixture": "DT03",
+    "pass": false,
+    "produced_findings": [
+     "FABRICATION"
+    ],
+    "produced_outcome": "NOT_ASSURED",
+    "projection_match": false,
+    "root_cause": "Fixture artifact is the bare demonstration word 'System-with-acute', not a proposition; it cannot correspond to VR entry 'acme owns system b'. A faithful matcher yields FABRICATION, not ASSURED. Root: determinism helper stored the demo token as the CandidateArtifact instead of a faithful proposition."
+   },
+   {
+    "authoritative": true,
+    "classification": "SEMANTIC_PASS_WITH_ALLOWED_TRACE_DIFFERENCE",
+    "diffs": [
+     "evaluation_summary"
+    ],
+    "expected_findings": [
+     "CITATION_MISMATCH"
+    ],
+    "expected_outcome": "NOT_ASSURED",
+    "fixture": "SEC05",
+    "pass": false,
+    "produced_findings": [
+     "CITATION_MISMATCH"
+    ],
+    "produced_outcome": "NOT_ASSURED",
+    "projection_match": true,
+    "root_cause": "Projection Pi + outcome + findings match; only the non-projected x-tap correspondence_method_counts differ (produced 'exact' vs fixture 'structured'). Root: fixture labelled a full-text normalized exact match as 'structured', inconsistent with CR02 (same string labelled 'exact') and the exact-before-structured staging order. SPEC_AMBIGUITY on the exact/structured boundary for free-text S-V-O; not outcome-affecting."
+   },
+   {
+    "authoritative": true,
+    "classification": "SEMANTIC_PASS_WITH_ALLOWED_TRACE_DIFFERENCE",
+    "diffs": [
+     "evaluation_summary"
+    ],
+    "expected_findings": [],
+    "expected_outcome": "ASSURED",
+    "fixture": "UC07",
+    "pass": false,
+    "produced_findings": [],
+    "produced_outcome": "ASSURED",
+    "projection_match": true,
+    "root_cause": "Projection Pi + outcome + findings match; only the non-projected x-tap correspondence_method_counts differ (produced 'exact' vs fixture 'structured'). Root: fixture labelled a full-text normalized exact match as 'structured', inconsistent with CR02 (same string labelled 'exact') and the exact-before-structured staging order. SPEC_AMBIGUITY on the exact/structured boundary for free-text S-V-O; not outcome-affecting."
+   },
+   {
+    "authoritative": true,
+    "classification": "PACKAGE_DEFECT",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [],
+    "expected_outcome": "ASSURED",
+    "fixture": "UC08",
+    "pass": false,
+    "produced_findings": [
+     "CORRESPONDENCE_UNRESOLVED"
+    ],
+    "produced_outcome": "INDETERMINATE",
+    "projection_match": false,
+    "root_cause": "Artifact entity 'system-with-acute' differs from VR entity 'system' by a diacritic; BASE publishes no diacritic-folding rule, so NFC keeps them distinct -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Expected ASSURED is unreachable from the bytes. Root: fixture asserted a clean structured match without the tokens actually matching."
+   },
+   {
+    "authoritative": true,
+    "classification": "PACKAGE_DEFECT",
+    "diffs": [
+     "outcome",
+     "findings",
+     "evaluation_summary",
+     "projection_pi",
+     "projection_hash"
+    ],
+    "expected_findings": [],
+    "expected_outcome": "ASSURED",
+    "fixture": "UC09",
+    "pass": false,
+    "produced_findings": [
+     "CORRESPONDENCE_UNRESOLVED"
+    ],
+    "produced_outcome": "INDETERMINATE",
+    "projection_match": false,
+    "root_cause": "Artifact entity 'system-with-acute' differs from VR entity 'system' by a diacritic; BASE publishes no diacritic-folding rule, so NFC keeps them distinct -> Jaccard 3/5 -> CORRESPONDENCE_UNRESOLVED. Expected ASSURED is unreachable from the bytes. Root: fixture asserted a clean structured match without the tokens actually matching."
+   }
+  ],
+  "mandatory_semantic_pass_allowed_trace_diff": 2,
+  "mandatory_total": 86,
+  "package_defect_fixtures": [
+   "DT03",
+   "UC08",
+   "UC09"
+  ],
+  "semantic_pass_fixtures": [
+   "SEC05",
+   "UC07"
+  ]
+ }
+}

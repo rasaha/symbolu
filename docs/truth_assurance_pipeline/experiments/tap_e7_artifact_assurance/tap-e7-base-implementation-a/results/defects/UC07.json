@@ -1,0 +1,15 @@
+{
+ "authoritative": true,
+ "classification": "SEMANTIC_PASS_WITH_ALLOWED_TRACE_DIFFERENCE",
+ "diffs": [
+  "evaluation_summary"
+ ],
+ "expected_findings": [],
+ "expected_outcome": "ASSURED",
+ "fixture": "UC07",
+ "pass": false,
+ "produced_findings": [],
+ "produced_outcome": "ASSURED",
+ "projection_match": true,
+ "root_cause": "Projection Pi + outcome + findings match; only the non-projected x-tap correspondence_method_counts differ (produced 'exact' vs fixture 'structured'). Root: fixture labelled a full-text normalized exact match as 'structured', inconsistent with CR02 (same string labelled 'exact') and the exact-before-structured staging order. SPEC_AMBIGUITY on the exact/structured boundary for free-text S-V-O; not outcome-affecting."
+}

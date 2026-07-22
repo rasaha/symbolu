@@ -1,0 +1,53 @@
+{
+ "assurance_record": {
+  "evaluation_summary": {
+   "evaluated_assertive": 2,
+   "evaluation_limitations": 0,
+   "positive_violations": 0,
+   "total_assertive": 2,
+   "unevaluated_assertive": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "companion_method_counts": {
+     "no_match": 0,
+     "unresolved": 0
+    },
+    "correspondence_method_counts": {
+     "exact": 2,
+     "explicit": 0,
+     "lexical": 0,
+     "structured": 0
+    },
+    "correspondence_units_total": 2
+   }
+  },
+  "findings": [],
+  "outcome": "ASSURED",
+  "projection_pi": {
+   "evaluation_summary": {
+    "evaluated_assertive": 2,
+    "evaluation_limitations": 0,
+    "positive_violations": 0,
+    "total_assertive": 2,
+    "unevaluated_assertive": 0
+   },
+   "findings": [],
+   "outcome": "ASSURED"
+  },
+  "projection_pi_sha256": "sha-256:648caf726d9de14416893a6bace731ea7edfe45a917603d443da3527c5471ceb"
+ },
+ "authoritative": true,
+ "fixture_id": "SEC10",
+ "redacted_trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:ddff9a01d5f669e13a75fc798a0eb5acbad5586d0b91872fba2d85826e613075",
+  "findings": [],
+  "outcome": "ASSURED"
+ },
+ "trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:ddff9a01d5f669e13a75fc798a0eb5acbad5586d0b91872fba2d85826e613075",
+  "artifact_text": "Acme owns System B. Acme owns Module C.",
+  "findings": [],
+  "outcome": "ASSURED"
+ }
+}

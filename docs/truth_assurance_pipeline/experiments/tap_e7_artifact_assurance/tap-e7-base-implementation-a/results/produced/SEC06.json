@@ -1,0 +1,68 @@
+{
+ "assurance_record": {
+  "evaluation_summary": {
+   "evaluated_assertive": 0,
+   "evaluation_limitations": 1,
+   "positive_violations": 0,
+   "total_assertive": 1,
+   "unevaluated_assertive": 1,
+   "x-tap-e7-base-evaluation-summary": {
+    "companion_method_counts": {
+     "no_match": 0,
+     "unresolved": 1
+    },
+    "correspondence_method_counts": {
+     "exact": 0,
+     "explicit": 0,
+     "lexical": 0,
+     "structured": 0
+    },
+    "correspondence_units_total": 1
+   }
+  },
+  "findings": [
+   {
+    "category": "CORRESPONDENCE_UNRESOLVED",
+    "finding_index": 0,
+    "polarity": "EVALUATION_LIMITATION"
+   }
+  ],
+  "outcome": "INDETERMINATE",
+  "projection_pi": {
+   "evaluation_summary": {
+    "evaluated_assertive": 0,
+    "evaluation_limitations": 1,
+    "positive_violations": 0,
+    "total_assertive": 1,
+    "unevaluated_assertive": 1
+   },
+   "findings": [
+    {
+     "category": "CORRESPONDENCE_UNRESOLVED",
+     "polarity": "EVALUATION_LIMITATION"
+    }
+   ],
+   "outcome": "INDETERMINATE"
+  },
+  "projection_pi_sha256": "sha-256:cb144001a546d2481c4701fa012d2ff29e32dcf929efaaf29f83fffd301fd24c"
+ },
+ "authoritative": true,
+ "fixture_id": "SEC06",
+ "redacted_trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:8f156091bca3209b03fcb11f89bdea28112521641127478c87c740dd23b33c79",
+  "findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "outcome": "INDETERMINATE"
+ },
+ "trace": {
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:8f156091bca3209b03fcb11f89bdea28112521641127478c87c740dd23b33c79",
+  "artifact_text": "the \u0441ompany owns system b",
+  "findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "outcome": "INDETERMINATE"
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "fixtures": 90,
+ "total_runtime_s": 0.539,
+ "median_fixture_ms": 0.067,
+ "p95_fixture_ms": 0.5,
+ "max_fixture_ms": 236.199,
+ "largest_json_fixture": "JS17",
+ "peak_memory_mb": 15.2,
+ "deterministic_replay_identical": true,
+ "replay_total_s": 0.62,
+ "produced_bundle_sha256": "946077d32bc3eee7f8d33e105389b32bf2312c2e3ef687d8e4aae19548970340"
+}
