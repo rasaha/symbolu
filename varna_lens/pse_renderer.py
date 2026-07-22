@@ -24,8 +24,9 @@ _LEX = None
 def _expanded(key):
     global _LEX
     if _LEX is None:
-        p = pathlib.Path(__file__).with_name("lexicon_authoritative.json")
-        _LEX = json.loads(p.read_text(encoding="utf-8"))["consonants"]
+        # Same active mapping the engine uses (B1.12 substrate by default). Elemental imagery is
+        # preserved presentation scaffolding carried in the generated lexicon, not a drive mapping.
+        _LEX = json.loads(V.active_mapping_path().read_text(encoding="utf-8"))["consonants"]
     return (_LEX.get(key) or {}).get("expanded_properties") or {}
 
 

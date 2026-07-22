@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "generator_version": "1.0.0",
+  "source": {
+    "artifact": "experiments/primitive_sequence_recovery/frozen/varna_native_stage1_merged_v3.json",
+    "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+    "schema_version": "native_merged_v3"
+  },
+  "presentation_scaffolding": {
+    "artifact": "varna_lens/lexicon_authoritative.json",
+    "sha256": "ecfb6beb621c021ea5ef598522ad70e218a4ceed7f30450bcca94ea070f787aa"
+  },
+  "coverage": {
+    "consonants": {
+      "ba": "MAPPED (via devanagari → b)",
+      "bha": "MAPPED (via devanagari → bh)",
+      "ca": "MAPPED (via devanagari → c)",
+      "cha": "MAPPED (via devanagari → ch)",
+      "da": "MAPPED (via devanagari → d)",
+      "dda": "MAPPED (via devanagari → ḍ)",
+      "ddha": "MAPPED (via devanagari → ḍh)",
+      "dha": "MAPPED (via devanagari → dh)",
+      "ga": "MAPPED (via devanagari → g)",
+      "gha": "MAPPED (via devanagari → gh)",
+      "ha": "MAPPED (via devanagari → h)",
+      "ja": "MAPPED (via devanagari → j)",
+      "jha": "MAPPED (via devanagari → jh)",
+      "ka": "MAPPED (via devanagari → k)",
+      "kha": "MAPPED (via devanagari → kh)",
+      "ksha": "UNMAPPED",
+      "la": "MAPPED (via devanagari → l)",
+      "ma": "MAPPED (via devanagari → m)",
+      "na": "MAPPED (via devanagari → n)",
+      "nga": "MAPPED (via devanagari → ṅ)",
+      "nna": "MAPPED (via devanagari → ṇ)",
+      "nya": "MAPPED (via devanagari → ñ)",
+      "pa": "MAPPED (via devanagari → p)",
+      "pha": "MAPPED (via devanagari → ph)",
+      "ra": "MAPPED (via devanagari → r)",
+      "sa": "MAPPED (via devanagari → s)",
+      "sha": "MAPPED (via devanagari → ś)",
+      "ssa": "MAPPED (via devanagari → ṣ)",
+      "ta": "MAPPED (via devanagari → t)",
+      "tha": "MAPPED (via devanagari → th)",
+      "tta": "MAPPED (via devanagari → ṭ)",
+      "ttha": "MAPPED (via devanagari → ṭh)",
+      "va": "MAPPED (via devanagari → v)",
+      "ya": "MAPPED (via devanagari → y)"
+    },
+    "vowels": {
+      "a": "MAPPED (via source_key → a)",
+      "aa": "MAPPED (via source_key → ā)",
+      "ah": "MAPPED (via source_key → ḥ)",
+      "ai": "MAPPED (via source_key → ai)",
+      "am": "MAPPED (via source_key → ṃ)",
+      "au": "MAPPED (via source_key → au)",
+      "e": "MAPPED (via source_key → e)",
+      "i": "MAPPED (via source_key → i)",
+      "ii": "MAPPED (via source_key → ī)",
+      "o": "MAPPED (via source_key → o)",
+      "u": "MAPPED (via source_key → u)",
+      "uu": "MAPPED (via source_key → ū)"
+    }
+  },
+  "unmapped": {
+    "ksha": {
+      "kind": "consonant",
+      "disposition": "EXPLICIT_ABSTENTION",
+      "reason": "no compound kṣa producer — the parser decomposes क्ष → k + ṣ; kṣa is not a merged row.",
+      "runtime_effect": "engine emits '(no lexicon entry)'; varṇa contributes nothing to the essence — surfaced, never silently back-filled"
+    }
+  },
+  "counts": {
+    "consonants_mapped": 33,
+    "consonants_total": 34,
+    "vowels_mapped": 12,
+    "vowels_total": 12
+  },
+  "generated": {
+    "canonical": {
+      "path": "varna_lens/mapping/varna_mapping_b1_12_canonical.json",
+      "sha256": "8c7515e72cd0ae85dd1cf1ed4348918e5e39ae5597d01078f53df5fcd2536c5e"
+    },
+    "lexicon": {
+      "path": "varna_lens/lexicon_b1_12.json",
+      "sha256": "87b4eda775d856f5dc5956379cbaad3f971f6f7f4a90dd56fe78978a19556c7d"
+    }
+  }
+}

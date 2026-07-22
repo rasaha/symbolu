@@ -25,18 +25,41 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-# Authoritative set (verbatim from Sanskrit_letters_full.docx). Each varṇa has two STATES of expression
-# (never moral poles, never chosen from external good/bad/useful/auspicious labels):
+# Each varṇa has two STATES of expression (never moral poles, never chosen from external
+# good/bad/useful/auspicious labels):
 #   binding_state    = worldly, contractive, attachment-forming, bondage-producing expression
 #   liberating_state = sublimated, unbinding, expansive, dharma/mokṣa-oriented expression
 # Readers use internally: leading_vritti = binding_state, counter_vritti = liberating_state.
-LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
+#
+# AUTHORITATIVE varṇa→drive MAPPING: the B1.12 frozen mapping (varna_native_stage1_merged_v3.json),
+# consumed through the generated, engine-shaped `lexicon_b1_12.json`. The prior
+# `lexicon_authoritative.json` is retained ONLY as a versioned comparison artifact — it is NEVER an
+# automatic fallback. Set VARNA_LENS_MAPPING=<path> to override the source explicitly (used solely by
+# the old-vs-new regression harness). A missing mapping file is a hard error, never a silent fallback.
+_DEFAULT_MAPPING = _HERE / "lexicon_b1_12.json"
+
+
+def active_mapping_path() -> Path:
+    """Resolve the active varṇa→drive mapping file. Single source of truth for every consumer
+    (engine, renderer, reflection). Raises rather than falling back to the old mapping."""
+    override = os.environ.get("VARNA_LENS_MAPPING")
+    p = Path(override).expanduser() if override else _DEFAULT_MAPPING
+    if not p.exists():
+        raise FileNotFoundError(
+            f"varna_lens mapping not found: {p} (VARNA_LENS_MAPPING={override!r}). No silent fallback "
+            f"to the old mapping is permitted; generate it via "
+            f"varna_lens/tools/build_varna_mapping_from_b1_12.py")
+    return p
+
+
+LEX = json.loads(active_mapping_path().read_text(encoding="utf-8"))
 
 
 def _pole_disp(p):

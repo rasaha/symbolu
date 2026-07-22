@@ -17,11 +17,11 @@ import varna_lens as V
 
 _LEX = None
 def _lex():
-    """Lexicon consonants dict (cached)."""
+    """Lexicon consonants dict (cached). Uses the active varṇa→drive mapping (B1.12 substrate by
+    default) — the same file the engine loads, resolved via varna_lens.active_mapping_path()."""
     global _LEX
     if _LEX is None:
-        p = pathlib.Path(__file__).with_name("lexicon_authoritative.json")
-        _LEX = json.loads(p.read_text(encoding="utf-8"))["consonants"]
+        _LEX = json.loads(V.active_mapping_path().read_text(encoding="utf-8"))["consonants"]
     return _LEX
 
 

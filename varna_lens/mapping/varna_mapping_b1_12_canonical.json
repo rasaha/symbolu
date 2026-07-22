@@ -1,0 +1,977 @@
+{
+  "schema_version": "1.0",
+  "_purpose": "Single authoritative varṇa→drive mapping for the PSE Varṇa Tool, generated deterministically from the B1.12 frozen mapping. Contains ONLY drive payload + mechanical metadata + provenance. NO evaluator/scoring material.",
+  "source": {
+    "artifact": "experiments/primitive_sequence_recovery/frozen/varna_native_stage1_merged_v3.json",
+    "artifact_type": "varna_native_stage1_merged_lexicon",
+    "schema_version": "native_merged_v3",
+    "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+    "operator_ruling": {
+      "consonant_authority": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+      "vowel_marker_authority": "varna_lens/lexicon_authoritative_varna.json (vowels + am/ah only)",
+      "consonant_lens_rows_imported": false,
+      "rejected_conflicting_consonants": [
+        "sha",
+        "ssa",
+        "ha"
+      ]
+    }
+  },
+  "generator": {
+    "script": "varna_lens/tools/build_varna_mapping_from_b1_12.py",
+    "version": "1.0.0",
+    "deterministic": true,
+    "llm_used": false,
+    "join_priority": [
+      "devanagari",
+      "source_key",
+      "canonical_parser_unit",
+      "alias"
+    ]
+  },
+  "excluded_from_source": [
+    "BSR/0-100 resonance scores",
+    "relationship-type labels",
+    "opposition/implication/consequence/no_relationship evaluator judgments",
+    "evaluator prose",
+    "cross-model agreement",
+    "per-word verdicts",
+    "evaluator-derived confidence",
+    "any LLM-generated interpretation"
+  ],
+  "coverage_summary": {
+    "consonants_mapped": 33,
+    "consonants_total": 34,
+    "vowels_mapped": 12,
+    "vowels_total": 12,
+    "unmapped_keys": [
+      "ksha"
+    ]
+  },
+  "mappings": {
+    "a": {
+      "binding_drive": "restless starting without sustaining",
+      "liberating_drive": "Birth of cognition / raw potential",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "a",
+        "v3_source_key": "a",
+        "v3_iast": "a",
+        "devanagari": "अ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "a"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "aa": {
+      "binding_drive": "overextension, inflation",
+      "liberating_drive": "Ongoing thought / expansion",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ā",
+        "v3_source_key": "aa",
+        "v3_iast": "ā",
+        "devanagari": "आ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "aa",
+          "ā"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ah": {
+      "binding_drive": "compulsion, clinging pull",
+      "liberating_drive": "Attraction, Nectar-pull",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ḥ",
+        "v3_source_key": "ah",
+        "v3_iast": "ḥ",
+        "devanagari": "ः",
+        "category": "visarga",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ḥ"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ai": {
+      "binding_drive": "paternalism, overcontrol 'for your own good'",
+      "liberating_drive": "Welfare, materialization",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ai",
+        "v3_source_key": "ai",
+        "v3_iast": "ai",
+        "devanagari": "ऐ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ai"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "am": {
+      "binding_drive": "purging without integration, loss of vital essence",
+      "liberating_drive": "Repulsion, Detox",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṃ",
+        "v3_source_key": "am",
+        "v3_iast": "ṃ",
+        "devanagari": "ं",
+        "category": "anusvara",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ṁ",
+          "ṃ"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "au": {
+      "binding_drive": "abandonment, cutting off prematurely",
+      "liberating_drive": "Surrender, Letting-go",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "au",
+        "v3_source_key": "au",
+        "v3_iast": "au",
+        "devanagari": "औ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "au"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ba": {
+      "binding_drive": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+      "liberating_drive": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "b",
+        "v3_source_key": "ba",
+        "v3_iast": "b",
+        "devanagari": "ब",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "b"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "bha": {
+      "binding_drive": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+      "liberating_drive": "breaking the entrancing spell into clear sense — withdrawing the mind (pratyāhāra) along the path of righteousness, no longer spellbound (aided by kīrtana / devotional song)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "bh",
+        "v3_source_key": "bha",
+        "v3_iast": "bh",
+        "devanagari": "भ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "bh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ca": {
+      "binding_drive": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+      "liberating_drive": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "c",
+        "v3_source_key": "ca",
+        "v3_iast": "c",
+        "devanagari": "च",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "c"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "cha": {
+      "binding_drive": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+      "liberating_drive": "steadiness that keeps mental function intact under load — holding the mind operational under a strain that would otherwise break it",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ch",
+        "v3_source_key": "cha",
+        "v3_iast": "ch",
+        "devanagari": "छ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ch"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "da": {
+      "binding_drive": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+      "liberating_drive": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "d",
+        "v3_source_key": "da",
+        "v3_iast": "d",
+        "devanagari": "द",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "d"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "dda": {
+      "binding_drive": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+      "liberating_drive": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ḍ",
+        "v3_source_key": "dda",
+        "v3_iast": "ḍ",
+        "devanagari": "ड",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "D",
+          "ḍ"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ddha": {
+      "binding_drive": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned",
+      "liberating_drive": "compassion that shields the maligned — restraint from gratuitous cruelty; if life must be taken, with the minimum of pain (the spirit of Neohumanism)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ḍh",
+        "v3_source_key": "ddha",
+        "v3_iast": "ḍh",
+        "devanagari": "ढ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "Dh",
+          "ḍh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "dha": {
+      "binding_drive": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+      "liberating_drive": "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "dh",
+        "v3_source_key": "dha",
+        "v3_iast": "dh",
+        "devanagari": "ध",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "dh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "e": {
+      "binding_drive": "overthinking, nitpicking",
+      "liberating_drive": "Practical thought, benefit",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "e",
+        "v3_source_key": "e",
+        "v3_iast": "e",
+        "devanagari": "ए",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "e"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ga": {
+      "binding_drive": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+      "liberating_drive": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "g",
+        "v3_source_key": "ga",
+        "v3_iast": "g",
+        "devanagari": "ग",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "g"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "gha": {
+      "binding_drive": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+      "liberating_drive": "mamatā made to TRANSCEND time, space and individuality — love expanded past its relative boundaries into universal affection that holds the loved on an open hand (achievable only by human beings, through persistent, intense effort)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "gh",
+        "v3_source_key": "gha",
+        "v3_iast": "gh",
+        "devanagari": "घ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "gh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ha": {
+      "binding_drive": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+      "liberating_drive": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "h",
+        "v3_source_key": "ha",
+        "v3_iast": "h",
+        "devanagari": "ह",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "h"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "i": {
+      "binding_drive": "self-absorption, ego-centric doing",
+      "liberating_drive": "I-ness, doing self",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "i",
+        "v3_source_key": "i",
+        "v3_iast": "i",
+        "devanagari": "इ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "i"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ii": {
+      "binding_drive": "over-specialization, isolation",
+      "liberating_drive": "Specialization of self",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ī",
+        "v3_source_key": "ii",
+        "v3_iast": "ī",
+        "devanagari": "ई",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ee",
+          "ii",
+          "ī"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "ja": {
+      "binding_drive": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+      "liberating_drive": "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "j",
+        "v3_source_key": "ja",
+        "v3_iast": "j",
+        "devanagari": "ज",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "j"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "jha": {
+      "binding_drive": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
+      "liberating_drive": "sufficiency — appetite that releases at 'enough'; wanting stilled at contentment, the surplus grip let go",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "jh",
+        "v3_source_key": "jha",
+        "v3_iast": "jh",
+        "devanagari": "झ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "jh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ka": {
+      "binding_drive": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+      "liberating_drive": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "k",
+        "v3_source_key": "ka",
+        "v3_iast": "k",
+        "devanagari": "क",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "k",
+          "q"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "kha": {
+      "binding_drive": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+      "liberating_drive": "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "kh",
+        "v3_source_key": "kha",
+        "v3_iast": "kh",
+        "devanagari": "ख",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "kh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "la": {
+      "binding_drive": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+      "liberating_drive": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "l",
+        "v3_source_key": "la",
+        "v3_iast": "l",
+        "devanagari": "ल",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "l"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ma": {
+      "binding_drive": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+      "liberating_drive": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "m",
+        "v3_source_key": "ma",
+        "v3_iast": "m",
+        "devanagari": "म",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "m"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "na": {
+      "binding_drive": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+      "liberating_drive": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "n",
+        "v3_source_key": "na",
+        "v3_iast": "n",
+        "devanagari": "न",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "n"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "nga": {
+      "binding_drive": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+      "liberating_drive": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṅ",
+        "v3_source_key": "nga",
+        "v3_iast": "ṅ",
+        "devanagari": "ङ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ṅ"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "nna": {
+      "binding_drive": "envy — the sting at another's success; covetous resentment at another's good fortune",
+      "liberating_drive": "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṇ",
+        "v3_source_key": "nna",
+        "v3_iast": "ṇ",
+        "devanagari": "ण",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "N",
+          "ṇ"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "nya": {
+      "binding_drive": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+      "liberating_drive": "transparency — inner intent and outer act coincide; no pretense, being what one appears",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ñ",
+        "v3_source_key": "nya",
+        "v3_iast": "ñ",
+        "devanagari": "ञ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ñ"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "o": {
+      "binding_drive": "premature closure, stagnation",
+      "liberating_drive": "Completion, closure",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "o",
+        "v3_source_key": "o",
+        "v3_iast": "o",
+        "devanagari": "ओ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "o"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "pa": {
+      "binding_drive": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+      "liberating_drive": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "p",
+        "v3_source_key": "pa",
+        "v3_iast": "p",
+        "devanagari": "प",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "p"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "pha": {
+      "binding_drive": "bhaya — fear: collapse or flight before danger; the shrinking, dread and panic under threat",
+      "liberating_drive": "abhaya — steadiness meeting a genuine threat; unshaken presence in the face of danger",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ph",
+        "v3_source_key": "pha",
+        "v3_iast": "ph",
+        "devanagari": "फ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "SECONDARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "ph",
+          "f"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ra": {
+      "binding_drive": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+      "liberating_drive": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "r",
+        "v3_source_key": "ra",
+        "v3_iast": "r",
+        "devanagari": "र",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "r"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "sa": {
+      "binding_drive": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+      "liberating_drive": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "s",
+        "v3_source_key": "sa",
+        "v3_iast": "s",
+        "devanagari": "स",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "s"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "sha": {
+      "binding_drive": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+      "liberating_drive": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ś",
+        "v3_source_key": "sha",
+        "v3_iast": "ś",
+        "devanagari": "श",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "sh",
+          "ś"
+        ],
+        "source_artifact": "varna_acoustic_roots_primary_source.json (corrects v3.1 ś/ṣ swap)",
+        "join_via": "devanagari"
+      }
+    },
+    "ssa": {
+      "binding_drive": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+      "liberating_drive": "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṣ",
+        "v3_source_key": "s'a",
+        "v3_iast": "ṣ",
+        "devanagari": "ष",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "Sh",
+          "ṣ"
+        ],
+        "source_artifact": "varna_acoustic_roots_primary_source.json (corrects v3.1 ś/ṣ swap)",
+        "join_via": "devanagari"
+      }
+    },
+    "ta": {
+      "binding_drive": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+      "liberating_drive": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "t",
+        "v3_source_key": "ta",
+        "v3_iast": "t",
+        "devanagari": "त",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "INFERRED",
+        "parser_reachable": true,
+        "aliases": [
+          "t"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "tha": {
+      "binding_drive": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+      "liberating_drive": "warm buoyancy lifting one's own dejection — the mood rising out of melancholy into brightness",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "th",
+        "v3_source_key": "tha",
+        "v3_iast": "th",
+        "devanagari": "थ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "SECONDARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "th"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "tta": {
+      "binding_drive": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+      "liberating_drive": "pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṭ",
+        "v3_source_key": "tta",
+        "v3_iast": "ṭ",
+        "devanagari": "ट",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "T",
+          "ṭ"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ttha": {
+      "binding_drive": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
+      "liberating_drive": "repentance discharged into acceptance — the remorse over one's past act released, the realization-of-impropriety turned into amendment rather than endless self-torment",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ṭh",
+        "v3_source_key": "ttha",
+        "v3_iast": "ṭh",
+        "devanagari": "ठ",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "Th",
+          "ṭh"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "u": {
+      "binding_drive": "tunnel vision, missing the whole picture",
+      "liberating_drive": "Zoom, contraction",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "u",
+        "v3_source_key": "u",
+        "v3_iast": "u",
+        "devanagari": "उ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "u"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "uu": {
+      "binding_drive": "fixation, obsessive holding",
+      "liberating_drive": "Sustained attention, holding",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "ū",
+        "v3_source_key": "uu",
+        "v3_iast": "ū",
+        "devanagari": "ऊ",
+        "category": "vowel",
+        "activation_scope": "DEVELOPMENT_ONLY",
+        "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "oo",
+          "uu",
+          "ū"
+        ],
+        "source_artifact": "varna_lens/lexicon_authoritative_varna.json",
+        "join_via": "source_key"
+      }
+    },
+    "va": {
+      "binding_drive": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+      "liberating_drive": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "v",
+        "v3_source_key": "va",
+        "v3_iast": "v",
+        "devanagari": "व",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "INFERRED",
+        "liberating_pole_provenance": "PRIMARY_ATTESTED",
+        "parser_reachable": true,
+        "aliases": [
+          "v",
+          "w"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    },
+    "ya": {
+      "binding_drive": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+      "liberating_drive": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+      "mechanical_metadata": {
+        "v3_canonical_parser_unit": "y",
+        "v3_source_key": "ya",
+        "v3_iast": "y",
+        "devanagari": "य",
+        "category": "consonant",
+        "activation_scope": "CONFIRMATORY_BACKBONE",
+        "binding_pole_provenance": "PRIMARY_ATTESTED",
+        "liberating_pole_provenance": "AUTHORED_PROVISIONAL",
+        "parser_reachable": true,
+        "aliases": [
+          "y"
+        ],
+        "source_artifact": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json",
+        "join_via": "devanagari"
+      }
+    }
+  },
+  "unmapped": {
+    "ksha": {
+      "kind": "consonant",
+      "disposition": "EXPLICIT_ABSTENTION",
+      "reason": "no compound kṣa producer — the parser decomposes क्ष → k + ṣ; kṣa is not a merged row.",
+      "runtime_effect": "engine emits '(no lexicon entry)'; varṇa contributes nothing to the essence — surfaced, never silently back-filled"
+    }
+  }
+}
