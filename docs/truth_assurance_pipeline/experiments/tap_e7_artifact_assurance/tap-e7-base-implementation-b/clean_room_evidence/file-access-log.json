@@ -1,0 +1,12 @@
+{
+ "package_paths_read": [
+  "manifest/release-manifest.json",
+  "manifest/resource-manifest.json",
+  "resources/language/eng-core.txt",
+  "resources/language/pos-cues.tsv",
+  "resources/normalization/invisible-codepoints.tsv",
+  "resources/normalization/lemmatization-irregular.tsv",
+  "resources/normalization/unicode-confusables.tsv"
+ ],
+ "any_forbidden": false
+}

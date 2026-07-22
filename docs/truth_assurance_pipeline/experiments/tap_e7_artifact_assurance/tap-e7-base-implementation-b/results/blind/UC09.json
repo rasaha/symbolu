@@ -1,0 +1,53 @@
+{
+ "fixture_id": "UC09",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 1,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "ASSURED",
+   "findings": [],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:fad8f5c73b714ed573aa95752449be4ea94c88398e26cb4bbb413b951d8cf9e7"
+ },
+ "trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:7f791511f090d34e1218f3475d223b2d1f95e5b19a532502839a09be9ffe1d2d",
+  "artifact_text": "acme owns systém b"
+ },
+ "redacted_trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:7f791511f090d34e1218f3475d223b2d1f95e5b19a532502839a09be9ffe1d2d"
+ }
+}

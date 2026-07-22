@@ -1,0 +1,68 @@
+{
+ "fixture_id": "SEC11",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "FABRICATION",
+    "polarity": "POSITIVE_VIOLATION"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 0,
+   "unevaluated_assertive": 1,
+   "positive_violations": 1,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 1
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "NOT_ASSURED",
+   "findings": [
+    {
+     "category": "FABRICATION",
+     "polarity": "POSITIVE_VIOLATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 0,
+    "unevaluated_assertive": 1,
+    "positive_violations": 1,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:f2a87cd2bb2f39a57d4444235a201488091f3f16508685ce36c9b1ea9f554092"
+ },
+ "trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "FABRICATION"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:860225a311f446631c2dba26c096ae0011632867646da58bd30f6484da5b75c9",
+  "artifact_text": "Total reported is 22."
+ },
+ "redacted_trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "FABRICATION"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:860225a311f446631c2dba26c096ae0011632867646da58bd30f6484da5b75c9"
+ }
+}

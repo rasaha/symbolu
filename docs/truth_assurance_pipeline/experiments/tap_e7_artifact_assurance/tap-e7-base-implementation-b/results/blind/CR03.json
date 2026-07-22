@@ -1,0 +1,53 @@
+{
+ "fixture_id": "CR03",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 1,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "ASSURED",
+   "findings": [],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:fad8f5c73b714ed573aa95752449be4ea94c88398e26cb4bbb413b951d8cf9e7"
+ },
+ "trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:e61b6c54ec1c90f8f8c54467b1a9e34d708c3f8c8a0bff3ae0092f0eaf90e5cf",
+  "artifact_text": "{\"subject\":\"acme\",\"predicate\":\"owns\",\"object\":\"system b\"}"
+ },
+ "redacted_trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:e61b6c54ec1c90f8f8c54467b1a9e34d708c3f8c8a0bff3ae0092f0eaf90e5cf"
+ }
+}

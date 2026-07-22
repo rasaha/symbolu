@@ -1,0 +1,69 @@
+{
+ "fixture_id": "SV04",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "CITATION_MISMATCH",
+    "polarity": "POSITIVE_VIOLATION",
+    "validation_ref": "V1"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 1,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 1,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "NOT_ASSURED",
+   "findings": [
+    {
+     "category": "CITATION_MISMATCH",
+     "polarity": "POSITIVE_VIOLATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 1,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:ea1f43d48b7b0aabe41957d06543b3785b29c9cab9a9987ffe2c6d56f4303eec"
+ },
+ "trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "CITATION_MISMATCH"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:24ee0447068b537299f1d2fb4acf728cc5506ba795eeb5b7ac9919bf622db2ba",
+  "artifact_text": "{\"statement\":\"acme owns system b\",\"citation\":\"S9\",\"validation_entry_id\":\"V1\"}"
+ },
+ "redacted_trace": {
+  "outcome": "NOT_ASSURED",
+  "findings": [
+   "CITATION_MISMATCH"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:24ee0447068b537299f1d2fb4acf728cc5506ba795eeb5b7ac9919bf622db2ba"
+ }
+}

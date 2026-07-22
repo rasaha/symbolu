@@ -1,0 +1,68 @@
+{
+ "fixture_id": "UC06",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "CORRESPONDENCE_UNRESOLVED",
+    "polarity": "EVALUATION_LIMITATION"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 0,
+   "unevaluated_assertive": 1,
+   "positive_violations": 0,
+   "evaluation_limitations": 1,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 1,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "INDETERMINATE",
+   "findings": [
+    {
+     "category": "CORRESPONDENCE_UNRESOLVED",
+     "polarity": "EVALUATION_LIMITATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 0,
+    "unevaluated_assertive": 1,
+    "positive_violations": 0,
+    "evaluation_limitations": 1
+   }
+  },
+  "projection_pi_sha256": "sha-256:cb144001a546d2481c4701fa012d2ff29e32dcf929efaaf29f83fffd301fd24c"
+ },
+ "trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:b0f06fd25602a3e3b187e1ccde84852b6732d1c0ae6c39a855e556a6356fe3e3",
+  "artifact_text": "acme owns ‫system b"
+ },
+ "redacted_trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "CORRESPONDENCE_UNRESOLVED"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:b0f06fd25602a3e3b187e1ccde84852b6732d1c0ae6c39a855e556a6356fe3e3"
+ }
+}

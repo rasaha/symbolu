@@ -1,0 +1,84 @@
+{
+ "rows": [
+  {
+   "fixture": "INF01",
+   "authoritative": false,
+   "pass": false,
+   "classification": "INFORMATIVE_NON_GATE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "MEANING_DISTORTION"
+   ]
+  },
+  {
+   "fixture": "INF02",
+   "authoritative": false,
+   "pass": false,
+   "classification": "INFORMATIVE_NON_GATE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CERTAINTY_OVERSTATEMENT"
+   ]
+  },
+  {
+   "fixture": "INF03",
+   "authoritative": false,
+   "pass": false,
+   "classification": "INFORMATIVE_NON_GATE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [],
+   "expected_findings": [
+    "SCOPE_EXPANSION"
+   ]
+  },
+  {
+   "fixture": "INF04",
+   "authoritative": false,
+   "pass": false,
+   "classification": "INFORMATIVE_NON_GATE",
+   "diffs": [
+    "outcome",
+    "findings",
+    "evaluation_summary",
+    "projection_pi",
+    "projection_hash"
+   ],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [],
+   "expected_findings": [
+    "QUALIFICATION_OMISSION"
+   ]
+  }
+ ]
+}

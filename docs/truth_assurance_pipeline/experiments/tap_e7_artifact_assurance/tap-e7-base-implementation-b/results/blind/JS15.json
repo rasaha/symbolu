@@ -1,0 +1,68 @@
+{
+ "fixture_id": "JS15",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   {
+    "finding_index": 0,
+    "category": "PROCESSING_FAILURE",
+    "polarity": "EVALUATION_LIMITATION"
+   }
+  ],
+  "evaluation_summary": {
+   "total_assertive": 0,
+   "evaluated_assertive": 0,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 1,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 0,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 0
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "INDETERMINATE",
+   "findings": [
+    {
+     "category": "PROCESSING_FAILURE",
+     "polarity": "EVALUATION_LIMITATION"
+    }
+   ],
+   "evaluation_summary": {
+    "total_assertive": 0,
+    "evaluated_assertive": 0,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 1
+   }
+  },
+  "projection_pi_sha256": "sha-256:f718efcd0fd3ec41f1c8a0dec5766805f5ea0c0e0c67b80915fb395b8e73498d"
+ },
+ "trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "PROCESSING_FAILURE"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:1530dfb97c0ae3bed54a4bba7c511a602593ab12fc4981108f1d0824811bf692",
+  "artifact_text": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"
+ },
+ "redacted_trace": {
+  "outcome": "INDETERMINATE",
+  "findings": [
+   "PROCESSING_FAILURE"
+  ],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:1530dfb97c0ae3bed54a4bba7c511a602593ab12fc4981108f1d0824811bf692"
+ }
+}

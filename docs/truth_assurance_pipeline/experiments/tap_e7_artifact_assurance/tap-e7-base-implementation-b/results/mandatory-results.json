@@ -1,0 +1,1142 @@
+{
+ "summary": {
+  "mandatory_total": 86,
+  "mandatory_exact_pass": 86,
+  "mandatory_fail": 0,
+  "informative_total": 4,
+  "informative_pass": 0,
+  "informative_fail": 4
+ },
+ "rows": [
+  {
+   "fixture": "CR01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "CR02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "CR03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT07",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT08",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT09",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "DT10",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "EM01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "EM02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "EM03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "EM04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "EM05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS07",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS08",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS09",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS10",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS11",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS12",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS13",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS14",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS15",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS16",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS17",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS18",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS19",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS20",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "JS21",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "JS22",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "LX01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "LX02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "FABRICATION"
+   ],
+   "expected_findings": [
+    "FABRICATION"
+   ]
+  },
+  {
+   "fixture": "LX03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "LX04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "LX05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "LX06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "MD01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "UNSUPPORTED_MODALITY"
+   ],
+   "expected_findings": [
+    "UNSUPPORTED_MODALITY"
+   ]
+  },
+  {
+   "fixture": "PR01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PR02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PR03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PR04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PR05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PR06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "PV01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "PV02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "PV03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "PV04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "SEC01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "SEC02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "SEC03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "SEC04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "SEC05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "expected_findings": [
+    "CITATION_MISMATCH"
+   ]
+  },
+  {
+   "fixture": "SEC06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "SEC07",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "SEC08",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "SEC10",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "SEC11",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "FABRICATION"
+   ],
+   "expected_findings": [
+    "FABRICATION"
+   ]
+  },
+  {
+   "fixture": "SEC12",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "PROCESSING_FAILURE"
+   ],
+   "expected_findings": [
+    "PROCESSING_FAILURE"
+   ]
+  },
+  {
+   "fixture": "SV01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "STATUS_UPGRADE"
+   ],
+   "expected_findings": [
+    "STATUS_UPGRADE"
+   ]
+  },
+  {
+   "fixture": "SV02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "UNCERTAINTY_SUPPRESSION"
+   ],
+   "expected_findings": [
+    "UNCERTAINTY_SUPPRESSION"
+   ]
+  },
+  {
+   "fixture": "SV03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "PROVENANCE_MISMATCH"
+   ],
+   "expected_findings": [
+    "PROVENANCE_MISMATCH"
+   ]
+  },
+  {
+   "fixture": "SV04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "CITATION_MISMATCH"
+   ],
+   "expected_findings": [
+    "CITATION_MISMATCH"
+   ]
+  },
+  {
+   "fixture": "SV05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "NOT_ASSURED",
+   "expected_outcome": "NOT_ASSURED",
+   "produced_findings": [
+    "MISLEADING_CONTRADICTION_OMISSION"
+   ],
+   "expected_findings": [
+    "MISLEADING_CONTRADICTION_OMISSION"
+   ]
+  },
+  {
+   "fixture": "UC01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "UC02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "UC03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "UC04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "UC05",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ],
+   "expected_findings": [
+    "INPUT_INTEGRITY_FAILURE"
+   ]
+  },
+  {
+   "fixture": "UC06",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "INDETERMINATE",
+   "expected_outcome": "INDETERMINATE",
+   "produced_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ],
+   "expected_findings": [
+    "CORRESPONDENCE_UNRESOLVED"
+   ]
+  },
+  {
+   "fixture": "UC07",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "UC08",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "UC09",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "ZR01",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "ZR02",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "ZR03",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  },
+  {
+   "fixture": "ZR04",
+   "authoritative": true,
+   "pass": true,
+   "classification": "EXACT_PASS",
+   "diffs": [],
+   "produced_outcome": "ASSURED",
+   "expected_outcome": "ASSURED",
+   "produced_findings": [],
+   "expected_findings": []
+  }
+ ]
+}

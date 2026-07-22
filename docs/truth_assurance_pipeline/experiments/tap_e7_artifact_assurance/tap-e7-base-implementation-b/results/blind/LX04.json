@@ -1,0 +1,53 @@
+{
+ "fixture_id": "LX04",
+ "authoritative": true,
+ "assurance_record": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "evaluation_summary": {
+   "total_assertive": 1,
+   "evaluated_assertive": 1,
+   "unevaluated_assertive": 0,
+   "positive_violations": 0,
+   "evaluation_limitations": 0,
+   "x-tap-e7-base-evaluation-summary": {
+    "correspondence_units_total": 1,
+    "correspondence_method_counts": {
+     "explicit": 0,
+     "exact": 0,
+     "structured": 0,
+     "lexical": 1
+    },
+    "companion_method_counts": {
+     "unresolved": 0,
+     "no_match": 0
+    }
+   }
+  },
+  "projection_pi": {
+   "outcome": "ASSURED",
+   "findings": [],
+   "evaluation_summary": {
+    "total_assertive": 1,
+    "evaluated_assertive": 1,
+    "unevaluated_assertive": 0,
+    "positive_violations": 0,
+    "evaluation_limitations": 0
+   }
+  },
+  "projection_pi_sha256": "sha-256:fad8f5c73b714ed573aa95752449be4ea94c88398e26cb4bbb413b951d8cf9e7"
+ },
+ "trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:f040ae7b8433001ebd9537e4d98f3866f7047cd106c6f688c89ff6dceb3a8ac3",
+  "artifact_text": "system node server network module cluster record vendor report auditor device region sector domain segment channel gateway archive ledger"
+ },
+ "redacted_trace": {
+  "outcome": "ASSURED",
+  "findings": [],
+  "artifact_ptr": "/artifact/parts/0",
+  "artifact_sha256": "sha-256:f040ae7b8433001ebd9537e4d98f3866f7047cd106c6f688c89ff6dceb3a8ac3"
+ }
+}

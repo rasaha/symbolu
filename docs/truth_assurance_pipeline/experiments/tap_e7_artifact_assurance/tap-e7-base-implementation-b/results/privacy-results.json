@@ -1,0 +1,23 @@
+{
+ "total": 3,
+ "pass": 3,
+ "fail": 0,
+ "na": 0,
+ "tests": [
+  {
+   "test": "redacted_no_raw_text",
+   "result": "PASS",
+   "detail": "0 leaks"
+  },
+  {
+   "test": "redacted_equal_findings_outcome",
+   "result": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "redacted_pointer_hash",
+   "result": "PASS",
+   "detail": ""
+  }
+ ]
+}
