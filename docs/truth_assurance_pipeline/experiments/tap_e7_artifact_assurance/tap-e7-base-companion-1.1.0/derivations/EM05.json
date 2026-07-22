@@ -1,0 +1,1 @@
+{"defect":"INPUT_INTEGRITY_FAILURE","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"EM05","mapping":"{\"statement\":\"x\",\"validation_entry_id\":\"EXT-1\"}","outcome_derivation":"§8.1(INPUT_INTEGRITY_FAILURE) -> INDETERMINATE","phenomenon":"explicit_map_defect","reason":"referenced entry not within supplied ValidationRecord"}

@@ -1,0 +1,1 @@
+{"derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SV05","outcome_derivation":"§8.1(MISLEADING_CONTRADICTION_OMISSION) -> NOT_ASSURED","phenomenon":"misleading_omission","rule":"entry carries counter_evidence but artifact omits it while asserting positively -> MISLEADING_CONTRADICTION_OMISSION","vr_counter_evidence":["law prohibits export"]}

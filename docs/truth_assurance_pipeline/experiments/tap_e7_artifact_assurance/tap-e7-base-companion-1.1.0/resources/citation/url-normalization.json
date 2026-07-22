@@ -1,0 +1,1 @@
+{"resource_id":"BASE-URL","rules":["RFC3986","lowercase scheme+host","remove default port","remove trailing path slash","remove fragment","percent-decode unreserved","keep query verbatim"],"version":"1.0"}

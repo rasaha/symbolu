@@ -1,0 +1,1016 @@
+{
+ "all_byte_reproducible": true,
+ "all_mapped": true,
+ "requirements": [
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard exactly T_reject=0.35",
+   "fixtures": [
+    "LX01"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-EQ-REJECT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard below 0.35 -> fabrication",
+   "fixtures": [
+    "LX02"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-BELOW-REJECT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard above 0.35 -> unresolved",
+   "fixtures": [
+    "LX03"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-ABOVE-REJECT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard exactly T_accept=0.85",
+   "fixtures": [
+    "LX04"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-EQ-ACCEPT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard below 0.85 -> unresolved",
+   "fixtures": [
+    "LX05"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-BELOW-ACCEPT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Jaccard above 0.85 -> accept",
+   "fixtures": [
+    "LX06"
+   ],
+   "missing": [],
+   "phenomenon": "lexical_jaccard",
+   "requirement": "REQ-JAC-ABOVE-ACCEPT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "explicit mapping stage",
+   "fixtures": [
+    "CR01"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map",
+   "requirement": "REQ-CORR-EXPLICIT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "exact stage",
+   "fixtures": [
+    "CR02"
+   ],
+   "missing": [],
+   "phenomenon": "exact",
+   "requirement": "REQ-CORR-EXACT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "structured stage",
+   "fixtures": [
+    "CR03"
+   ],
+   "missing": [],
+   "phenomenon": "structured",
+   "requirement": "REQ-CORR-STRUCTURED",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "valid empty object",
+   "fixtures": [
+    "JS21"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-EMPTY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "valid array",
+   "fixtures": [
+    "JS22"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-ARRAY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "duplicate top-level key",
+   "fixtures": [
+    "JS02"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-DUP-TOP",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "duplicate nested key",
+   "fixtures": [
+    "JS03"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-DUP-NESTED",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "UTF-8 BOM rejected",
+   "fixtures": [
+    "JS04"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-BOM",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "malformed UTF-8",
+   "fixtures": [
+    "JS05"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-BADUTF8",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "lone high surrogate",
+   "fixtures": [
+    "JS06"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-LONE-HI",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "lone low surrogate",
+   "fixtures": [
+    "JS07"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-LONE-LO",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "valid surrogate pair",
+   "fixtures": [
+    "JS08"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-PAIR",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "leading zero",
+   "fixtures": [
+    "JS09"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-LEADZERO",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "leading plus",
+   "fixtures": [
+    "JS10"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-LEADPLUS",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "NaN rejected",
+   "fixtures": [
+    "JS11"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-NAN",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Infinity rejected",
+   "fixtures": [
+    "JS12"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-INF",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "negative zero valid",
+   "fixtures": [
+    "JS13"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-NEGZERO",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "exponent valid",
+   "fixtures": [
+    "JS14"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-EXP",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "depth 64 within limit",
+   "fixtures": [
+    "JS16"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-DEPTH-OK",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "depth 65 exceeds",
+   "fixtures": [
+    "JS15"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-DEPTH-OVER",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "field count 100000",
+   "fixtures": [
+    "JS17"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-FIELDS-OK",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "field count 100001",
+   "fixtures": [
+    "JS18"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-FIELDS-OVER",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "string length 1048576",
+   "fixtures": [
+    "JS19"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-STR-OK",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "string length 1048577",
+   "fixtures": [
+    "JS20"
+   ],
+   "missing": [],
+   "phenomenon": "strict_json",
+   "requirement": "REQ-JSON-STR-OVER",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Greek homoglyph",
+   "fixtures": [
+    "UC01"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-HOMO-GREEK",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "Cyrillic homoglyph",
+   "fixtures": [
+    "UC02"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-HOMO-CYR",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "zero-width space",
+   "fixtures": [
+    "UC03"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-ZWSP",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "zero-width non-joiner",
+   "fixtures": [
+    "UC04"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-ZWNJ",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "bidi override reject",
+   "fixtures": [
+    "UC05"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-BIDI-REJECT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "bidi embedding strip-and-flag",
+   "fixtures": [
+    "UC06"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-BIDI-FLAG",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "non-breaking space normalize",
+   "fixtures": [
+    "UC07"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-NBSP",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "NFC precomposed/decomposed equal",
+   "fixtures": [
+    "UC08",
+    "UC09"
+   ],
+   "missing": [],
+   "phenomenon": "unicode",
+   "requirement": "REQ-UC-NFC",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "mapping references absent entry",
+   "fixtures": [
+    "EM01"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map_defect",
+   "requirement": "REQ-EM-ABSENT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "malformed entry id",
+   "fixtures": [
+    "EM02"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map_defect",
+   "requirement": "REQ-EM-MALFORMED",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "mapping contradicts entry",
+   "fixtures": [
+    "EM03"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map_defect",
+   "requirement": "REQ-EM-CONTRADICT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "two authoritative mappings",
+   "fixtures": [
+    "EM04"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map_defect",
+   "requirement": "REQ-EM-DOUBLE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "entry outside record",
+   "fixtures": [
+    "EM05"
+   ],
+   "missing": [],
+   "phenomenon": "explicit_map_defect",
+   "requirement": "REQ-EM-OUTSIDE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "incompatible profile id",
+   "fixtures": [
+    "PV01"
+   ],
+   "missing": [],
+   "phenomenon": "descriptor_mismatch",
+   "requirement": "REQ-PV-PROFILE-ID",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "incompatible profile MAJOR",
+   "fixtures": [
+    "PV02"
+   ],
+   "missing": [],
+   "phenomenon": "descriptor_mismatch",
+   "requirement": "REQ-PV-PROFILE-MAJOR",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "incompatible release id",
+   "fixtures": [
+    "PV03"
+   ],
+   "missing": [],
+   "phenomenon": "descriptor_mismatch",
+   "requirement": "REQ-PV-RELEASE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "missing profile reference",
+   "fixtures": [
+    "PV04"
+   ],
+   "missing": [],
+   "phenomenon": "descriptor_mismatch",
+   "requirement": "REQ-PV-MISSING",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "status upgrade",
+   "fixtures": [
+    "SV01"
+   ],
+   "missing": [],
+   "phenomenon": "status_upgrade",
+   "requirement": "REQ-SV-STATUS",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "uncertainty suppression",
+   "fixtures": [
+    "SV02"
+   ],
+   "missing": [],
+   "phenomenon": "uncertainty_suppression",
+   "requirement": "REQ-SV-UNCERT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "provenance mismatch",
+   "fixtures": [
+    "SV03"
+   ],
+   "missing": [],
+   "phenomenon": "provenance_mismatch",
+   "requirement": "REQ-SV-PROV",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "citation mismatch",
+   "fixtures": [
+    "SV04"
+   ],
+   "missing": [],
+   "phenomenon": "citation_mismatch",
+   "requirement": "REQ-SV-CITE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "misleading contradiction omission",
+   "fixtures": [
+    "SV05"
+   ],
+   "missing": [],
+   "phenomenon": "misleading_omission",
+   "requirement": "REQ-SV-OMIT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "unsupported modality",
+   "fixtures": [
+    "MD01"
+   ],
+   "missing": [],
+   "phenomenon": "unsupported_modality",
+   "requirement": "REQ-MODALITY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "identical replay",
+   "fixtures": [
+    "DT01"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-REPLAY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "insignificant spacing",
+   "fixtures": [
+    "DT02"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-SPACING",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "NFC precomposed/decomposed",
+   "fixtures": [
+    "DT03"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-NFC",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "trailing whitespace",
+   "fixtures": [
+    "DT04"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-TRAILWS",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "case fold",
+   "fixtures": [
+    "DT05"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-CASE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "alt JSON member order",
+   "fixtures": [
+    "DT06"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-JSON-ORDER",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "-0 == 0",
+   "fixtures": [
+    "DT07"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-NEGZERO",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "exponent == decimal",
+   "fixtures": [
+    "DT08"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-EXP",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "impl metadata excluded from Pi",
+   "fixtures": [
+    "DT09"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-META",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "trace ref vs embedded -> same Pi",
+   "fixtures": [
+    "DT10"
+   ],
+   "missing": [],
+   "phenomenon": "determinism",
+   "requirement": "REQ-DET-TRACE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "redacted trace no raw text",
+   "fixtures": [
+    "PR01"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-NORAW",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "replay reproduces findings",
+   "fixtures": [
+    "PR02"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-REPLAY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "redacted==nonredacted findings",
+   "fixtures": [
+    "PR03"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-FIND-EQ",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "redacted==nonredacted outcome",
+   "fixtures": [
+    "PR04"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-OUT-EQ",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "provenance minimization",
+   "fixtures": [
+    "PR05"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-PROVMIN",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "sensitive JSON pointer+hash",
+   "fixtures": [
+    "PR06"
+   ],
+   "missing": [],
+   "phenomenon": "privacy",
+   "requirement": "REQ-PR-PTRHASH",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "prompt injection ignored",
+   "fixtures": [
+    "SEC01"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-INJECT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "verifier instruction ignored",
+   "fixtures": [
+    "SEC02"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-VERIFIER",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "hidden HTML",
+   "fixtures": [
+    "SEC03"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-HIDDENHTML",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "HTML comment",
+   "fixtures": [
+    "SEC04"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-COMMENT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "citation alias spoof",
+   "fixtures": [
+    "SEC05"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-CITESPOOF",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "homoglyph attack",
+   "fixtures": [
+    "SEC06"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-HOMO",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "zero-width insertion",
+   "fixtures": [
+    "SEC07"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-ZW",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "bidi override",
+   "fixtures": [
+    "SEC08"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-BIDI",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "claim splitting",
+   "fixtures": [
+    "SEC10"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-SPLIT",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "claim merging",
+   "fixtures": [
+    "SEC11"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-MERGE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "malformed reference definition",
+   "fixtures": [
+    "SEC12"
+   ],
+   "missing": [],
+   "phenomenon": "security",
+   "requirement": "REQ-SEC-MALREF",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "empty text zero-assertion",
+   "fixtures": [
+    "ZR01"
+   ],
+   "missing": [],
+   "phenomenon": "zero_assertion",
+   "requirement": "REQ-ZERO-EMPTY",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "whitespace only",
+   "fixtures": [
+    "ZR02"
+   ],
+   "missing": [],
+   "phenomenon": "zero_assertion",
+   "requirement": "REQ-ZERO-WS",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "code block only",
+   "fixtures": [
+    "ZR03"
+   ],
+   "missing": [],
+   "phenomenon": "zero_assertion",
+   "requirement": "REQ-ZERO-CODE",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  },
+  {
+   "all_present": true,
+   "byte_reproducible": true,
+   "description": "heading non-clause",
+   "fixtures": [
+    "ZR04"
+   ],
+   "missing": [],
+   "phenomenon": "zero_assertion",
+   "requirement": "REQ-ZERO-HEAD",
+   "semantic_derivation": "SEMANTICALLY_DERIVABLE"
+  }
+ ],
+ "total_requirements": 84
+}

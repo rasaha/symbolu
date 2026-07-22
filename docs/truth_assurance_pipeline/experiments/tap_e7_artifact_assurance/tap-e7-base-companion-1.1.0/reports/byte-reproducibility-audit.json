@@ -1,0 +1,457 @@
+{
+ "total": 90,
+ "fail": 0,
+ "failures": [],
+ "per_fixture": [
+  {
+   "fixture": "CR01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"acme owns system b\",\"validation_entry_id\":\"V1\"}"
+  },
+  {
+   "fixture": "CR02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "(unclassified phenomenon)"
+  },
+  {
+   "fixture": "CR03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "(unclassified phenomenon)"
+  },
+  {
+   "fixture": "DT01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=False; canonical_equal=True"
+  },
+  {
+   "fixture": "DT02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT07",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT08",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT09",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "DT10",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "distinct=True; canonical_equal=True"
+  },
+  {
+   "fixture": "EM01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"acme owns system b\",\"validation_entry_id\":\"V9\"}"
+  },
+  {
+   "fixture": "EM02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"acme owns system b\",\"validation_entry_id\":\"\"}"
+  },
+  {
+   "fixture": "EM03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"globex owns module c\",\"validation_entry_id\":\"V1\"}"
+  },
+  {
+   "fixture": "EM04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"acme owns system b\",\"validation_entry_id\":[\"V1\",\"V2\"]}"
+  },
+  {
+   "fixture": "EM05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "raw={\"statement\":\"x\",\"validation_entry_id\":\"EXT-1\"}"
+  },
+  {
+   "fixture": "INF01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "informative (non-gate)"
+  },
+  {
+   "fixture": "INF02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "informative (non-gate)"
+  },
+  {
+   "fixture": "INF03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "informative (non-gate)"
+  },
+  {
+   "fixture": "INF04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "informative (non-gate)"
+  },
+  {
+   "fixture": "JS01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=61"
+  },
+  {
+   "fixture": "JS02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=25"
+  },
+  {
+   "fixture": "JS03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=2; bom=False; utf8=True; len=23"
+  },
+  {
+   "fixture": "JS04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=True; utf8=True; len=10"
+  },
+  {
+   "fixture": "JS05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=False; len=9"
+  },
+  {
+   "fixture": "JS06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=14"
+  },
+  {
+   "fixture": "JS07",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=14"
+  },
+  {
+   "fixture": "JS08",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=74"
+  },
+  {
+   "fixture": "JS09",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=8"
+  },
+  {
+   "fixture": "JS10",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=8"
+  },
+  {
+   "fixture": "JS11",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=9"
+  },
+  {
+   "fixture": "JS12",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=INPUT_INTEGRITY_FAILURE; brace_depth=1; bom=False; utf8=True; len=14"
+  },
+  {
+   "fixture": "JS13",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=68"
+  },
+  {
+   "fixture": "JS14",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=69"
+  },
+  {
+   "fixture": "JS15",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=PROCESSING_FAILURE; brace_depth=65; bom=False; utf8=True; len=391"
+  },
+  {
+   "fixture": "JS16",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=64; bom=False; utf8=True; len=385"
+  },
+  {
+   "fixture": "JS17",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=1088891"
+  },
+  {
+   "fixture": "JS18",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=PROCESSING_FAILURE; brace_depth=1; bom=False; utf8=True; len=1088903"
+  },
+  {
+   "fixture": "JS19",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=1048584"
+  },
+  {
+   "fixture": "JS20",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=PROCESSING_FAILURE; brace_depth=1; bom=False; utf8=True; len=1048585"
+  },
+  {
+   "fixture": "JS21",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=2"
+  },
+  {
+   "fixture": "JS22",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "verdict=VALID; brace_depth=1; bom=False; utf8=True; len=7"
+  },
+  {
+   "fixture": "LX01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=7/20"
+  },
+  {
+   "fixture": "LX02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=3/10"
+  },
+  {
+   "fixture": "LX03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=2/5"
+  },
+  {
+   "fixture": "LX04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=17/20"
+  },
+  {
+   "fixture": "LX05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=4/5"
+  },
+  {
+   "fixture": "LX06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "jaccard=9/10"
+  },
+  {
+   "fixture": "MD01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "(unclassified phenomenon)"
+  },
+  {
+   "fixture": "PR01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PR02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PR03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PR04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PR05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PR06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "redacted_leaks=[]"
+  },
+  {
+   "fixture": "PV01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "profile_ref={'profile_id': 'other-profile', 'profile_version': '1.0'} release_ref=tap-e7-base-companion/1.1.0"
+  },
+  {
+   "fixture": "PV02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "profile_ref={'profile_id': 'tap-e7-base', 'profile_version': '2.0'} release_ref=tap-e7-base-companion/1.1.0"
+  },
+  {
+   "fixture": "PV03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "profile_ref={'profile_id': 'tap-e7-base', 'profile_version': '1.0'} release_ref=tap-e7-base-companion/9.9.9"
+  },
+  {
+   "fixture": "PV04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "profile_ref={} release_ref=tap-e7-base-companion/1.1.0"
+  },
+  {
+   "fixture": "SEC01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=prompt_injection"
+  },
+  {
+   "fixture": "SEC02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=verifier_instruction"
+  },
+  {
+   "fixture": "SEC03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=hidden_html"
+  },
+  {
+   "fixture": "SEC04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=html_comment"
+  },
+  {
+   "fixture": "SEC05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=citation_spoof"
+  },
+  {
+   "fixture": "SEC06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=homoglyph"
+  },
+  {
+   "fixture": "SEC07",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=zero_width"
+  },
+  {
+   "fixture": "SEC08",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=bidi_override"
+  },
+  {
+   "fixture": "SEC10",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=claim_splitting"
+  },
+  {
+   "fixture": "SEC11",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=claim_merging"
+  },
+  {
+   "fixture": "SEC12",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "attack=malformed_ref_def"
+  },
+  {
+   "fixture": "SV01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "entry={'status': 'CONTRADICTED', 'provenance_ids': None, 'citation_ids': None, 'counter_evidence': None}"
+  },
+  {
+   "fixture": "SV02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "entry={'status': 'UNKNOWN', 'provenance_ids': None, 'citation_ids': None, 'counter_evidence': None}"
+  },
+  {
+   "fixture": "SV03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "entry={'status': 'SUPPORTED', 'provenance_ids': ['S1'], 'citation_ids': None, 'counter_evidence': None}"
+  },
+  {
+   "fixture": "SV04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "entry={'status': 'SUPPORTED', 'provenance_ids': None, 'citation_ids': ['S1'], 'counter_evidence': None}"
+  },
+  {
+   "fixture": "SV05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "entry={'status': 'SUPPORTED', 'provenance_ids': None, 'citation_ids': None, 'counter_evidence': ['law prohibits export']}"
+  },
+  {
+   "fixture": "UC01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+03BF"
+  },
+  {
+   "fixture": "UC02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+0441"
+  },
+  {
+   "fixture": "UC03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+200B"
+  },
+  {
+   "fixture": "UC04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+200C"
+  },
+  {
+   "fixture": "UC05",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+202E"
+  },
+  {
+   "fixture": "UC06",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+202B"
+  },
+  {
+   "fixture": "UC07",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps=U+00A0"
+  },
+  {
+   "fixture": "UC08",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps="
+  },
+  {
+   "fixture": "UC09",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "special_cps="
+  },
+  {
+   "fixture": "ZR01",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "zero-assertion"
+  },
+  {
+   "fixture": "ZR02",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "zero-assertion"
+  },
+  {
+   "fixture": "ZR03",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "zero-assertion"
+  },
+  {
+   "fixture": "ZR04",
+   "status": "BYTE_REPRODUCIBLE",
+   "detail": "zero-assertion"
+  }
+ ]
+}

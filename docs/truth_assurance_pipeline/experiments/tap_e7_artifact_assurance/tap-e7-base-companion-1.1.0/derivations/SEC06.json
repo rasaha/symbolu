@@ -1,0 +1,1 @@
+{"attack":"homoglyph","code_point":"U+0441","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC06","outcome_derivation":"§8.1(CORRESPONDENCE_UNRESOLVED) -> INDETERMINATE","phenomenon":"security","rule":"Cyrillic ES confusable inside entity -> unresolved","skeleton":"c"}

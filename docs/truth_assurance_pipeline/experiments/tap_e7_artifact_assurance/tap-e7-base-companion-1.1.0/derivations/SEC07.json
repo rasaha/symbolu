@@ -1,0 +1,1 @@
+{"attack":"zero_width","code_point":"U+200B","derivation_status":"SEMANTICALLY_DERIVABLE","fixture_id":"SEC07","outcome_derivation":"§8.1(CORRESPONDENCE_UNRESOLVED) -> INDETERMINATE","phenomenon":"security","rule":"ZWSP strip-and-flag suspicious -> unresolved"}

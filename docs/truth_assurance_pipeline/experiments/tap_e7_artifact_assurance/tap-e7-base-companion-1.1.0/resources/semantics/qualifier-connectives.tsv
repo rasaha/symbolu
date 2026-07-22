@@ -1,0 +1,10 @@
+# BASE-QUALCONN/1.0 connective	direction	needs_punct
+although	fwd	0
+but	fwd	1
+except	fwd	0
+however	fwd	1
+note that	fwd	0
+only	fwd	0
+provided	fwd	0
+unless	fwd	0
+whereas	fwd	1
