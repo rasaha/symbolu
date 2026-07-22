@@ -10,6 +10,17 @@ verdict/signal fields; no ML imports; no result files; JSON-missing falls back t
     python3 varna_lens/test_layer2_bridge_vocab.py
 """
 from __future__ import annotations
+import os as _os, sys as _sys
+# RETIRED historical-regression: validates the retired Layer-2 bridge, defined only under the pre-B1.12
+# lexicon. Skips under the active B1.12 mapping; runs its original assertions under the old-lexicon
+# fixture. See experiments/retired/layer2_bridge/README.md.
+if not _os.environ.get("VARNA_LENS_MAPPING", "").endswith("lexicon_authoritative.json"):
+    if "pytest" in _sys.modules:
+        import pytest as _pytest
+        _pytest.skip("retired Layer-2 bridge test (needs old-lexicon fixture)", allow_module_level=True)
+    else:
+        print("SKIP: retired Layer-2 bridge test (set VARNA_LENS_MAPPING=<repo>/varna_lens/lexicon_authoritative.json to run)")
+        raise SystemExit(0)
 
 import io
 import contextlib
@@ -83,7 +94,9 @@ def test_no_duplicate_or_inconsistent_keys():
                 _check(f"consistent bridge for canonical key {k!r}", seen[k] == v)
             seen[k] = v
     # JSON keys themselves are unique (dict) — assert file parses to a dict with unique keys
-    raw = json.loads((HERE / "layer2_bridge_vocab.json").read_text(encoding="utf-8"))["bridge"]
+    # archived to experiments/retired/layer2_bridge/ on Layer-2 retirement.
+    _vocab = HERE.parent / "experiments" / "retired" / "layer2_bridge" / "layer2_bridge_vocab.json"
+    raw = json.loads(_vocab.read_text(encoding="utf-8"))["bridge"]
     _check("JSON bridge is a dict (unique keys)", isinstance(raw, dict) and len(raw) == len(S.BRIDGE))
 
 

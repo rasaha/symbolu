@@ -20,6 +20,8 @@ already returned CORRECTNESS_DEGRADED. No arm claims resonance is true; no ontol
 semantic-truth / word-origin claims.
 """
 from __future__ import annotations
+# RETIRED (research-only) — arm A reads the retired Layer-2 synthesis; superseded by the canonical
+# Symbolic Profile. Kept for reproducibility; not on any production path. See experiments/retired/layer2_bridge/.
 
 import argparse
 import pathlib

@@ -20,6 +20,8 @@ Layer 3, the Layer 5 prompt demo, any evaluation prereg path, or any scored path
 Sanskrit privilege, no semantic-truth claim, no Track G rescue, no Track B unblock.
 """
 from __future__ import annotations
+# RETIRED (research-only) — reads the retired Layer-2 synthesis; superseded by the canonical Symbolic
+# Profile. Kept for reproducibility; not on any production path. See experiments/retired/layer2_bridge/.
 
 import argparse
 import json

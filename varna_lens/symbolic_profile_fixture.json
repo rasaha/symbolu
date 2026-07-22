@@ -1,0 +1,254 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "sp_8423bf8def028b7e",
+  "input": {
+    "concern_id": null,
+    "canonical_concept": null,
+    "source_text": "compassion",
+    "reading_mode": "hybrid"
+  },
+  "decomposition": {
+    "normalized_input": "compassion",
+    "varna_keys": [
+      "ka",
+      "o",
+      "ma",
+      "pa",
+      "a",
+      "sha",
+      "i",
+      "nna"
+    ],
+    "tokens": [
+      {
+        "index": 0,
+        "source_span": "K",
+        "type": "C",
+        "varna_key": "ka",
+        "iast": "Ka",
+        "devanagari": "क",
+        "mapping_status": "mapped"
+      },
+      {
+        "index": 1,
+        "source_span": "AH0",
+        "type": "V",
+        "varna_key": "o",
+        "iast": "o (ओ)",
+        "devanagari": "",
+        "mapping_status": "vowel"
+      },
+      {
+        "index": 2,
+        "source_span": "M",
+        "type": "C",
+        "varna_key": "ma",
+        "iast": "Ma",
+        "devanagari": "म",
+        "mapping_status": "mapped"
+      },
+      {
+        "index": 3,
+        "source_span": "P",
+        "type": "C",
+        "varna_key": "pa",
+        "iast": "Pa",
+        "devanagari": "प",
+        "mapping_status": "mapped"
+      },
+      {
+        "index": 4,
+        "source_span": "AE1",
+        "type": "V",
+        "varna_key": "a",
+        "iast": "a (अ)",
+        "devanagari": "",
+        "mapping_status": "vowel"
+      },
+      {
+        "index": 5,
+        "source_span": "SH",
+        "type": "C",
+        "varna_key": "sha",
+        "iast": "Śa",
+        "devanagari": "श",
+        "mapping_status": "mapped"
+      },
+      {
+        "index": 6,
+        "source_span": "AH0",
+        "type": "V",
+        "varna_key": "i",
+        "iast": "i (इ)",
+        "devanagari": "",
+        "mapping_status": "vowel"
+      },
+      {
+        "index": 7,
+        "source_span": "N",
+        "type": "C",
+        "varna_key": "nna",
+        "iast": "Ṇa",
+        "devanagari": "ण",
+        "mapping_status": "mapped"
+      }
+    ]
+  },
+  "poles": {
+    "binding": [
+      {
+        "varna_key": "ka",
+        "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "source_mapping_id": "varna.ka.binding"
+      },
+      {
+        "varna_key": "ma",
+        "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "source_mapping_id": "varna.ma.binding"
+      },
+      {
+        "varna_key": "pa",
+        "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+        "source_mapping_id": "varna.pa.binding"
+      },
+      {
+        "varna_key": "sha",
+        "text": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "source_mapping_id": "varna.sha.binding"
+      },
+      {
+        "varna_key": "nna",
+        "text": "envy — the sting at another's success; covetous resentment at another's good fortune",
+        "source_mapping_id": "varna.nna.binding"
+      }
+    ],
+    "liberating": [
+      {
+        "varna_key": "ka",
+        "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "source_mapping_id": "varna.ka.liberating"
+      },
+      {
+        "varna_key": "ma",
+        "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "source_mapping_id": "varna.ma.liberating"
+      },
+      {
+        "varna_key": "pa",
+        "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)",
+        "source_mapping_id": "varna.pa.liberating"
+      },
+      {
+        "varna_key": "sha",
+        "text": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "source_mapping_id": "varna.sha.liberating"
+      },
+      {
+        "varna_key": "nna",
+        "text": "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+        "source_mapping_id": "varna.nna.liberating"
+      }
+    ]
+  },
+  "trajectory": {
+    "roles": [
+      "SOURCE",
+      "INTEGRATION",
+      "TRANSFORMATION",
+      "INTEGRATION",
+      "INTEGRATION",
+      "INTEGRATION",
+      "INTEGRATION",
+      "RESOLUTION"
+    ],
+    "valence": "liberating",
+    "controlling_element": "water",
+    "tone": "expansive·open",
+    "tone_parts": {
+      "weight": "expansive",
+      "flow": "steady",
+      "resolution": "open"
+    },
+    "chain": "−āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire⤳aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result → +Completion, closure → −praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse⤳disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating → +the upward turn — goodwill that dissolves revulsion; anurakti → +Birth of cognition / raw potential → +purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging → +I-ness, doing self → −envy — the sting at another's success; covetous resentment at another's good fortune⤳muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+    "interaction": "«Ka»(−) āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire  ⤳ aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result  →  «o»(+) Completion, closure  →  «Ma»(−) praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse  ⤳ disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating  →  «Pa»(+) the upward turn — goodwill that dissolves revulsion; anurakti  →  «a»(+) Birth of cognition / raw potential  →  «Śa»(+) purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging  →  «i»(+) I-ness, doing self  →  «Ṇa»(−) envy — the sting at another's success; covetous resentment at another's good fortune  ⤳ muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+    "whole_word_essence": null,
+    "stages": [
+      {
+        "varna_key": "ka",
+        "role": "SOURCE",
+        "sign": "−",
+        "transform": true,
+        "element": "water",
+        "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+      },
+      {
+        "varna_key": "o",
+        "role": "INTEGRATION",
+        "sign": "+",
+        "transform": false,
+        "element": null,
+        "text": "Completion, closure"
+      },
+      {
+        "varna_key": "ma",
+        "role": "TRANSFORMATION",
+        "sign": "−",
+        "transform": true,
+        "element": null,
+        "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+      },
+      {
+        "varna_key": "pa",
+        "role": "INTEGRATION",
+        "sign": "+",
+        "transform": false,
+        "element": null,
+        "text": "the upward turn — goodwill that dissolves revulsion; anurakti"
+      },
+      {
+        "varna_key": "a",
+        "role": "INTEGRATION",
+        "sign": "+",
+        "transform": false,
+        "element": null,
+        "text": "Birth of cognition / raw potential"
+      },
+      {
+        "varna_key": "sha",
+        "role": "INTEGRATION",
+        "sign": "+",
+        "transform": false,
+        "element": null,
+        "text": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging"
+      },
+      {
+        "varna_key": "i",
+        "role": "INTEGRATION",
+        "sign": "+",
+        "transform": false,
+        "element": null,
+        "text": "I-ness, doing self"
+      },
+      {
+        "varna_key": "nna",
+        "role": "RESOLUTION",
+        "sign": "−",
+        "transform": true,
+        "element": null,
+        "text": "envy — the sting at another's success; covetous resentment at another's good fortune"
+      }
+    ]
+  },
+  "provenance": {
+    "mapping_source": "experiments/primitive_sequence_recovery/frozen/varna_native_stage1_merged_v3.json",
+    "mapping_sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+    "active_lexicon": "lexicon_b1_12.json",
+    "parser_version": "varna_lens.tokenizer+conjunct_normalization.v1",
+    "profile_builder_version": "1.0.0"
+  },
+  "status": {
+    "complete": true,
+    "abstentions": [],
+    "warnings": []
+  }
+}

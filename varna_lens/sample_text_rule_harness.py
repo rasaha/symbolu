@@ -18,6 +18,9 @@ Hard rules:
 NOT an experiment, NOT a prereg, NOT evidence, NOT a Track G rescue, NOT a Track B unblock.
 """
 from __future__ import annotations
+# RETIRED (research-only) — superseded by the canonical Symbolic Profile
+# (varna_lens/symbolic_profile.py). Kept runnable for reproducibility; not on any production path.
+# See experiments/retired/layer2_bridge/README.md.
 
 import argparse
 import pathlib
@@ -71,7 +74,11 @@ _INLINE_BRIDGE = {
     "mūrcchā": "deluded obsession/entrancement",
     "jāgaraṇa": "awareness/awakening",
 }
-_BRIDGE_JSON = HERE / "layer2_bridge_vocab.json"
+# RETIRED (research-only): this bridge vocabulary was archived to experiments/retired/layer2_bridge/
+# after the B1.12 migration (measured 0/66 coverage under the new string-valued poles; superseded by
+# direct canonical Symbolic Profile consumption). Loaded from the archive for reproducibility only; the
+# inline fallback keeps this harness runnable. No production path reads it.
+_BRIDGE_JSON = (HERE.parent / "experiments" / "retired" / "layer2_bridge" / "layer2_bridge_vocab.json")
 
 
 def _load_bridge():

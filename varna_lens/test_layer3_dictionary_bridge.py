@@ -10,6 +10,17 @@ modified by importing/running Layer 3.
     python3 varna_lens/test_layer3_dictionary_bridge.py
 """
 from __future__ import annotations
+import os as _os, sys as _sys
+# RETIRED historical-regression: validates the retired Layer-2 bridge, defined only under the pre-B1.12
+# lexicon. Skips under the active B1.12 mapping; runs its original assertions under the old-lexicon
+# fixture. See experiments/retired/layer2_bridge/README.md.
+if not _os.environ.get("VARNA_LENS_MAPPING", "").endswith("lexicon_authoritative.json"):
+    if "pytest" in _sys.modules:
+        import pytest as _pytest
+        _pytest.skip("retired Layer-2 bridge test (needs old-lexicon fixture)", allow_module_level=True)
+    else:
+        print("SKIP: retired Layer-2 bridge test (set VARNA_LENS_MAPPING=<repo>/varna_lens/lexicon_authoritative.json to run)")
+        raise SystemExit(0)
 
 import io
 import contextlib
@@ -150,8 +161,8 @@ def test_layer3_does_not_alter_layer2():
 
 
 def test_sibling_frozen_files_unchanged():
-    targets = ["lexicon_authoritative.json", "layer2_bridge_vocab.json",
-               "generation_conditioning_prompt_demo.py"]
+    # layer2_bridge_vocab.json was archived to experiments/retired/layer2_bridge/ on Layer-2 retirement.
+    targets = ["lexicon_authoritative.json", "generation_conditioning_prompt_demo.py"]
     before = {t: (HERE / t).read_bytes() for t in targets}
     _with_fake(lambda: [L3.render_layer3(w) for w in ("mercy", "love", "anger", "peace")])
     for t in targets:
