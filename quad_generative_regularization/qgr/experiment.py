@@ -37,6 +37,10 @@ class FrozenConfig:
     context_length: int = 64
     dropout: float = 0.0
     aux_layer: int = -1
+    # bounded Quad retrieval geometry (research variant; off by default)
+    bounded: bool = False
+    bound_alpha: float = 4.0
+    bound_eps: float = 1e-6
     # base MQAR (in-distribution)
     num_kv: int = 4
     num_queries: int = 2
@@ -63,7 +67,9 @@ class FrozenConfig:
 
     def model_cfg(self) -> QuadConfig:
         return QuadConfig(self.vocab_size, self.hidden_size, self.num_layers, self.num_heads,
-                          self.ff_size, self.context_length, self.dropout, self.aux_layer)
+                          self.ff_size, self.context_length, self.dropout, self.aux_layer,
+                          bounded=self.bounded, bound_alpha=self.bound_alpha,
+                          bound_eps=self.bound_eps)
 
     def base_mqar(self) -> MQARConfig:
         return MQARConfig(self.num_kv, self.num_queries, self.num_distractors,

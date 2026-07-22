@@ -47,6 +47,14 @@ class QuadConfig:
     aux_layer: int = -1
     # Padding token id (position 0 reserved). Embedding uses padding_idx.
     pad_id: int = 0
+    # Bounded Quad retrieval geometry (research-only architectural variant): L2-normalize the
+    # authentic projected query/key immediately before the retrieval dot product and scale by a
+    # fixed, non-learnable alpha, so |S^Q_bounded| = |alpha * <q_hat, k_hat>| <= alpha. This
+    # removes the unbounded-logit pathway identified by the score-dynamics analysis. When
+    # bounded=False the model is the unbounded baseline (identical to prior experiments).
+    bounded: bool = False
+    bound_alpha: float = 4.0
+    bound_eps: float = 1e-6
 
     def resolved_aux_layer(self) -> int:
         return self.aux_layer if self.aux_layer >= 0 else self.num_layers + self.aux_layer
@@ -61,7 +69,8 @@ class QuadAttention(nn.Module):
     Dense mode (Top-K = N) is used so the score is the exact softmax attention score.
     """
 
-    def __init__(self, hidden_size: int, num_heads: int, dropout: float = 0.0):
+    def __init__(self, hidden_size: int, num_heads: int, dropout: float = 0.0,
+                 bounded: bool = False, bound_alpha: float = 4.0, bound_eps: float = 1e-6):
         super().__init__()
         if hidden_size % num_heads != 0:
             raise ValueError(
@@ -71,6 +80,10 @@ class QuadAttention(nn.Module):
         self.num_heads = num_heads
         self.head_dim = hidden_size // num_heads
         self.scale = self.head_dim ** -0.5
+        # Bounded retrieval geometry (fixed, non-learnable): see QuadConfig.
+        self.bounded = bounded
+        self.bound_alpha = float(bound_alpha)
+        self.bound_eps = float(bound_eps)
 
         # Query from input; Key/Value from memory (== hidden states here). bias=False
         # exactly as in the canonical BindingCacheQuadQuery.
@@ -101,8 +114,15 @@ class QuadAttention(nn.Module):
         K = self.W_k(m_norm).view(B, N, H, d_h).transpose(1, 2)   # [B,H,N,d_h]
         V = self.W_v(m_norm).view(B, N, H, d_h).transpose(1, 2)   # [B,H,N,d_h]
 
-        # Authentic Quad score: scaled dot product, per head.
-        scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B,H,N,N]
+        if self.bounded:
+            # Bounded Quad geometry: L2-normalize the projected query/key per head, then a
+            # fixed non-learnable scale. S^Q = alpha * <q_hat, k_hat>  in  [-alpha, alpha].
+            q_hat = Q / (Q.norm(dim=-1, keepdim=True) + self.bound_eps)
+            k_hat = K / (K.norm(dim=-1, keepdim=True) + self.bound_eps)
+            scores = self.bound_alpha * torch.matmul(q_hat, k_hat.transpose(-2, -1))
+        else:
+            # Authentic (unbounded) Quad score: scaled dot product, per head.
+            scores = torch.matmul(Q, K.transpose(-2, -1)) * self.scale  # [B,H,N,N]
 
         if causal:
             mask = torch.triu(
@@ -137,7 +157,9 @@ class QuadBlock(nn.Module):
 
     def __init__(self, cfg: QuadConfig):
         super().__init__()
-        self.attn = QuadAttention(cfg.hidden_size, cfg.num_heads, cfg.dropout)
+        self.attn = QuadAttention(cfg.hidden_size, cfg.num_heads, cfg.dropout,
+                                  bounded=cfg.bounded, bound_alpha=cfg.bound_alpha,
+                                  bound_eps=cfg.bound_eps)
         self.ff = FeedForward(cfg.hidden_size, cfg.ff_size, cfg.dropout)
 
     def forward(self, x: Tensor, causal: bool = True) -> Tuple[Tensor, Tensor]:

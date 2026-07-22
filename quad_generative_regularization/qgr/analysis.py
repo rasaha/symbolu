@@ -160,11 +160,32 @@ def temperature_counterfactual(model, batch: MQARBatch,
     return res
 
 
+@torch.no_grad()
+def projection_norms(model, batch: MQARBatch) -> Dict:
+    """Phase 8: raw (pre-normalization) vs normalized projected query/key norms at the aux
+    layer. For a bounded model the normalized norm is ~1; watching the RAW norm reveals whether
+    training responds to the bound by inflating pre-normalization magnitudes (it cannot change
+    the bounded score, so inflation would be a no-op escape attempt)."""
+    out = model(batch.tokens, expose_hidden=True)
+    h = out["aux_hidden"]
+    attn = model.blocks[model._aux_layer].attn
+    q = attn.W_q(attn.norm_q(h))
+    k = attn.W_k(attn.norm_m(h))
+    eps = getattr(attn, "bound_eps", 1e-6)
+    return {
+        "raw_q_norm": float(q.norm(dim=-1).mean()),
+        "raw_k_norm": float(k.norm(dim=-1).mean()),
+        "norm_q_normalized": float((q / (q.norm(dim=-1, keepdim=True) + eps)).norm(dim=-1).mean()),
+        "norm_k_normalized": float((k / (k.norm(dim=-1, keepdim=True) + eps)).norm(dim=-1).mean()),
+    }
+
+
 def full_snapshot(model, batch: MQARBatch) -> Dict:
     """All read-only diagnostics at one training checkpoint."""
     snap = {}
     snap.update({f"dyn_{k}": v for k, v in quad_score_dynamics(model, batch).items()})
     snap.update({f"grad_{k}": v for k, v in gradient_norms(model, batch).items()})
     snap.update({f"geom_{k}": v for k, v in representation_geometry(model, batch).items()})
+    snap.update({f"pnorm_{k}": v for k, v in projection_norms(model, batch).items()})
     snap["temp"] = temperature_counterfactual(model, batch)
     return snap
