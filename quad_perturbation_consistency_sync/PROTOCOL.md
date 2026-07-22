@@ -1,6 +1,6 @@
 # Experimental Protocol — Perturbation-Consistent Quad Retrieval
 
-**Track:** separate package `quad_perturbation_consistency/` (imports `qgr` read-only; the prior
+**Track:** separate package `quad_perturbation_consistency_sync/` (imports `qgr` read-only; the prior
 Quad track is unmodified). **Pre-registered before results were read.**
 
 > This is a **falsification** study. The null hypothesis is that task-only learning (BD-A)

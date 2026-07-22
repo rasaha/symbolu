@@ -1,6 +1,6 @@
 # Perturbation-Consistent Quad Retrieval — Final Report
 
-**Track:** `quad_perturbation_consistency/` (separate; imports `qgr` read-only; prior Quad track
+**Track:** `quad_perturbation_consistency_sync/` (separate; imports `qgr` read-only; prior Quad track
 and conclusions unmodified). **Compute:** CPU-only. **Data:** `RESULTS_SYNC/`.
 **Decision:** **SYNC_MATCHES_BD_A** — the null hypothesis is **not rejected**.
 
