@@ -1,0 +1,1406 @@
+{
+  "corpus": [
+    {
+      "word": "love",
+      "note": "frozen L2/3/4 input"
+    },
+    {
+      "word": "mercy",
+      "note": "frozen L2/3/4 input"
+    },
+    {
+      "word": "anger",
+      "note": "frozen L2/3/4 input"
+    },
+    {
+      "word": "peace",
+      "note": "frozen L2/3/4 input"
+    },
+    {
+      "word": "compassion",
+      "note": "multi-varṇa (English)"
+    },
+    {
+      "word": "courage",
+      "note": "multi-varṇa (English)"
+    },
+    {
+      "word": "śānti",
+      "note": "contains ś (śa → artha)"
+    },
+    {
+      "word": "ṣaṭ",
+      "note": "contains ṣ (ṣa → kāma)"
+    },
+    {
+      "word": "kṣamā",
+      "note": "conjunct-normalized kṣ → k + ṣ"
+    },
+    {
+      "word": "dama",
+      "note": "Sanskrit, mixed poles"
+    },
+    {
+      "word": "kāla",
+      "note": "Sanskrit, mixed poles"
+    },
+    {
+      "word": "yoga",
+      "note": "Sanskrit, mixed poles"
+    }
+  ],
+  "per_arm": {
+    "A_direct": [
+      {
+        "word": "love",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 482,
+          "est_tokens": 121
+        },
+        "payload": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour moves toward compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect, and dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma) is the resolving principle"
+      },
+      {
+        "word": "mercy",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 436,
+          "est_tokens": 109
+        },
+        "payload": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse moves toward disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating, and mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity') is the resolving principle"
+      },
+      {
+        "word": "anger",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 452,
+          "est_tokens": 113
+        },
+        "payload": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired moves toward conduct that stands without outward performance — action done for its own sake, needing no audience or applause, and will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation is the resolving principle"
+      },
+      {
+        "word": "peace",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 449,
+          "est_tokens": 113
+        },
+        "payload": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall) moves toward the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam), and mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity') is the resolving principle"
+      },
+      {
+        "word": "compassion",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 420,
+          "est_tokens": 105
+        },
+        "payload": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire moves toward aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object), and muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it is the resolving principle"
+      },
+      {
+        "word": "courage",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 413,
+          "est_tokens": 104
+        },
+        "payload": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire moves toward aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object), and agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership is the resolving principle"
+      },
+      {
+        "word": "śānti",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 1,
+          "forbidden_detail": {
+            "means": 1
+          },
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 522,
+          "est_tokens": 131
+        },
+        "payload": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire) moves toward purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment), and the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names) is the resolving principle"
+      },
+      {
+        "word": "ṣaṭ",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 469,
+          "est_tokens": 118
+        },
+        "payload": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude moves toward physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released, and pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply) is the resolving principle"
+      },
+      {
+        "word": "kṣamā",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 454,
+          "est_tokens": 114
+        },
+        "payload": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire moves toward aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object), and disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating is the resolving principle"
+      },
+      {
+        "word": "dama",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 409,
+          "est_tokens": 103
+        },
+        "payload": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct moves toward acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition, and disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating is the resolving principle"
+      },
+      {
+        "word": "kāla",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 470,
+          "est_tokens": 118
+        },
+        "payload": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire moves toward aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object), and compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect is the resolving principle"
+      },
+      {
+        "word": "yoga",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 464,
+          "est_tokens": 116
+        },
+        "payload": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others moves toward self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path, and will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation is the resolving principle"
+      }
+    ],
+    "B_legacy": [
+      {
+        "word": "love",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "mercy",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "anger",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "peace",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "compassion",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "courage",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "śānti",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "ṣaṭ",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "kṣamā",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "dama",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "kāla",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      },
+      {
+        "word": "yoga",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 3,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 83,
+          "est_tokens": 21
+        },
+        "payload": "[unresolved] moves toward [unresolved], and [unresolved] is the resolving principle"
+      }
+    ],
+    "C_compress": [
+      {
+        "word": "love",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 99,
+          "est_tokens": 25
+        },
+        "payload": "kruratā moves toward compassion that protects the vulnerable, and dharma is the resolving principle"
+      },
+      {
+        "word": "mercy",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 109,
+          "est_tokens": 28
+        },
+        "payload": "praśraya / praṇāśa moves toward disciplined containment that holds form, and mokṣa is the resolving principle"
+      },
+      {
+        "word": "anger",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 169,
+          "est_tokens": 43
+        },
+        "payload": "dambha as vanity moves toward conduct that stands without outward performance, and will-force applied to arouse one's dormant higher potential is the resolving principle"
+      },
+      {
+        "word": "peace",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 72,
+          "est_tokens": 18
+        },
+        "payload": "ghṛṇā moves toward the upward turn, and mokṣa is the resolving principle"
+      },
+      {
+        "word": "compassion",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 121,
+          "est_tokens": 31
+        },
+        "payload": "āśā as grasping / clinging hope moves toward aspiring hope held WITHOUT attachment, and muditā is the resolving principle"
+      },
+      {
+        "word": "courage",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 157,
+          "est_tokens": 40
+        },
+        "payload": "āśā as grasping / clinging hope moves toward aspiring hope held WITHOUT attachment, and agency exercised WITHOUT inflating the 'I' is the resolving principle"
+      },
+      {
+        "word": "śānti",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 157,
+          "est_tokens": 40
+        },
+        "payload": "artha as possessive acquisition moves toward purposeful action without possessive bondage, and the cessation of dullness/staticity is the resolving principle"
+      },
+      {
+        "word": "ṣaṭ",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 120,
+          "est_tokens": 30
+        },
+        "payload": "kāma moves toward physical longing sublimated / redirected toward the higher, and pramita vāk is the resolving principle"
+      },
+      {
+        "word": "kṣamā",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 154,
+          "est_tokens": 39
+        },
+        "payload": "āśā as grasping / clinging hope moves toward aspiring hope held WITHOUT attachment, and disciplined containment that holds form is the resolving principle"
+      },
+      {
+        "word": "dama",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 138,
+          "est_tokens": 35
+        },
+        "payload": "lajjā as inhibition moves toward acting unhindered by social shame, and disciplined containment that holds form is the resolving principle"
+      },
+      {
+        "word": "kāla",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 154,
+          "est_tokens": 39
+        },
+        "payload": "āśā as grasping / clinging hope moves toward aspiring hope held WITHOUT attachment, and compassion that protects the vulnerable is the resolving principle"
+      },
+      {
+        "word": "yoga",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 3,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 100.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 100.0,
+          "unsupported_introduced": 0,
+          "unsupported_terms": [],
+          "binding_liberating_distinct": true,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 127,
+          "est_tokens": 32
+        },
+        "payload": "aviśvāsa moves toward self-efficacy, and will-force applied to arouse one's dormant higher potential is the resolving principle"
+      }
+    ],
+    "D_none": [
+      {
+        "word": "love",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "mercy",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "anger",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "peace",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "compassion",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "courage",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "śānti",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "ṣaṭ",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "kṣamā",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "dama",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "kāla",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      },
+      {
+        "word": "yoga",
+        "coverage": {
+          "poles_total": 3,
+          "poles_represented": 0,
+          "unresolved": 0,
+          "missing_key": 0,
+          "coverage_pct": 0.0
+        },
+        "fidelity": {
+          "source_concepts_retained_pct": 0.0,
+          "unsupported_introduced": 0,
+          "binding_liberating_distinct": false,
+          "order_preserved": true
+        },
+        "honesty": {
+          "forbidden_decode_tokens": 0,
+          "forbidden_detail": {},
+          "semantic_additions": 0
+        },
+        "tokens": {
+          "chars": 0,
+          "est_tokens": 0
+        },
+        "payload": ""
+      }
+    ]
+  },
+  "summary": {
+    "A_direct": {
+      "coverage_pct_mean": 100.0,
+      "unresolved_total": 0,
+      "fidelity_retained_pct_mean": 100.0,
+      "unsupported_introduced_total": 0,
+      "binding_liberating_distinct_words": 12,
+      "honesty_forbidden_tokens_total": 1,
+      "semantic_additions_total": 0,
+      "distinct_payloads": 12,
+      "corpus_size": 12,
+      "differentiation_pct": 100.0,
+      "chars_mean": 453.3,
+      "est_tokens_mean": 113.8
+    },
+    "B_legacy": {
+      "coverage_pct_mean": 0.0,
+      "unresolved_total": 36,
+      "fidelity_retained_pct_mean": 0.0,
+      "unsupported_introduced_total": 0,
+      "binding_liberating_distinct_words": 0,
+      "honesty_forbidden_tokens_total": 0,
+      "semantic_additions_total": 0,
+      "distinct_payloads": 1,
+      "corpus_size": 12,
+      "differentiation_pct": 8.3,
+      "chars_mean": 83.0,
+      "est_tokens_mean": 21.0
+    },
+    "C_compress": {
+      "coverage_pct_mean": 100.0,
+      "unresolved_total": 0,
+      "fidelity_retained_pct_mean": 100.0,
+      "unsupported_introduced_total": 0,
+      "binding_liberating_distinct_words": 12,
+      "honesty_forbidden_tokens_total": 0,
+      "semantic_additions_total": 0,
+      "distinct_payloads": 12,
+      "corpus_size": 12,
+      "differentiation_pct": 100.0,
+      "chars_mean": 131.4,
+      "est_tokens_mean": 33.3
+    },
+    "D_none": {
+      "coverage_pct_mean": 0.0,
+      "unresolved_total": 0,
+      "fidelity_retained_pct_mean": 0.0,
+      "unsupported_introduced_total": 0,
+      "binding_liberating_distinct_words": 0,
+      "honesty_forbidden_tokens_total": 0,
+      "semantic_additions_total": 0,
+      "distinct_payloads": 1,
+      "corpus_size": 12,
+      "differentiation_pct": 8.3,
+      "chars_mean": 0.0,
+      "est_tokens_mean": 0.0
+    }
+  }
+}
