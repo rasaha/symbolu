@@ -164,8 +164,14 @@ def _grad_diagnostics(model, tcfg, mqar_cfg, diag_batch, relation_head=None,
 
 
 def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
-              val_seed: Optional[int] = None) -> Dict:
-    """Train one arm. Returns history + final model + summary."""
+              val_seed: Optional[int] = None, analysis_hook=None,
+              analysis_every: int = 0) -> Dict:
+    """Train one arm. Returns history + final model + summary.
+
+    `analysis_hook`, if given, is called as analysis_hook(step, model, relation_head,
+    aux_active) every `analysis_every` steps. It is READ-ONLY instrumentation: it must not
+    (and here does not) alter the optimizer state, so training remains bit-identical to a run
+    without the hook (same seed -> same parameters). Used by the score-dynamics analysis."""
     device = tcfg.device
     torch.manual_seed(tcfg.seed)
     model = build_model(cfg, tcfg.seed).to(device)
@@ -243,6 +249,10 @@ def train_arm(cfg: QuadConfig, mqar_cfg: MQARConfig, tcfg: TrainConfig,
                 gd["step"] = step
                 gd["aux_active"] = bool(aux_active)
                 grad_history.append(gd)
+
+        if analysis_hook is not None and analysis_every > 0 and (
+                step % analysis_every == 0 or step == tcfg.steps - 1):
+            analysis_hook(step, model, relation_head, bool(aux_active))
 
     final_val = evaluate(model, mqar_cfg, val_seed, "val", tcfg.eval_batches * 2,
                          tcfg.batch_size, device)
