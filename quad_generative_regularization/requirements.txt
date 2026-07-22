@@ -1,0 +1,6 @@
+# CPU-only research package. Install the CPU build of torch (no CUDA needed).
+# On a restricted proxy, install torch from the default PyPI index (the wheel runs on CPU).
+torch==2.4.1
+numpy>=1.24,<2
+matplotlib>=3.7
+pytest>=7.0
