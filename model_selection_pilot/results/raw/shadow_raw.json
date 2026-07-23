@@ -1,0 +1,697 @@
+{
+  "p002_structured_extraction": {
+    "fast_small": {
+      "completion_tokens": 35,
+      "error": null,
+      "output_text": "{\"currency\": \"USD?\", \"date\": \"2026-02-15\", \"invoice_no\": \"INV-2026001\", \"po_number\": \"PO-5001?\", \"total\": \"8364.27\", \"vendor\": \"Globex Ltd?\"}",
+      "prompt_tokens": 168
+    },
+    "long_context": {
+      "completion_tokens": 34,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-02-15\", \"invoice_no\": \"INV-2026001\", \"po_number\": \"PO-5001\", \"total\": \"8364.27\", \"vendor\": \"Globex Ltd\"}",
+      "prompt_tokens": 168
+    },
+    "medium_general": {
+      "completion_tokens": 35,
+      "error": null,
+      "output_text": "{\"currency\": \"USD?\", \"date\": \"2026-02-15\", \"invoice_no\": \"INV-2026001\", \"po_number\": \"PO-5001?\", \"total\": \"8364.27?\", \"vendor\": \"Globex Ltd\"}",
+      "prompt_tokens": 168
+    },
+    "open_weight": {
+      "completion_tokens": 23,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-02-15?\", \"invoice_no\": \"INV-2026001\", \"vendor\": \"Globex Ltd\"}",
+      "prompt_tokens": 168
+    },
+    "strong_reason": {
+      "completion_tokens": 34,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-02-15?\", \"invoice_no\": \"INV-2026001\", \"po_number\": \"PO-5001\", \"total\": \"8364.27\", \"vendor\": \"Globex Ltd\"}",
+      "prompt_tokens": 168
+    }
+  },
+  "p004_structured_extraction": {
+    "fast_small": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-04-15?\", \"invoice_no\": \"INV-2026003\", \"po_number\": \"PO-5003\", \"total\": \"9690.43\", \"vendor\": \"Umbrella Services\"}",
+      "prompt_tokens": 170
+    },
+    "long_context": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-04-15?\", \"invoice_no\": \"INV-2026003\", \"po_number\": \"PO-5003\", \"total\": \"9690.43\", \"vendor\": \"Umbrella Services\"}",
+      "prompt_tokens": 170
+    },
+    "medium_general": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-04-15\", \"invoice_no\": \"INV-2026003\", \"po_number\": \"PO-5003\", \"total\": \"9690.43\", \"vendor\": \"Umbrella Services?\"}",
+      "prompt_tokens": 170
+    },
+    "open_weight": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-04-15?\", \"invoice_no\": \"INV-2026003\", \"po_number\": \"PO-5003?\", \"total\": \"9690.43\", \"vendor\": \"Umbrella Services\"}",
+      "prompt_tokens": 170
+    },
+    "strong_reason": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-04-15\", \"invoice_no\": \"INV-2026003\", \"po_number\": \"PO-5003\", \"total\": \"9690.43\", \"vendor\": \"Umbrella Services?\"}",
+      "prompt_tokens": 170
+    }
+  },
+  "p006_structured_extraction": {
+    "fast_small": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-06-15\", \"invoice_no\": \"INV-2026005\", \"po_number\": \"PO-5005?\", \"total\": \"3498.31\", \"vendor\": \"Stark Materials\"}",
+      "prompt_tokens": 171
+    },
+    "long_context": {
+      "completion_tokens": 23,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-06-15\", \"po_number\": \"PO-5005\", \"vendor\": \"Stark Materials\"}",
+      "prompt_tokens": 171
+    },
+    "medium_general": {
+      "completion_tokens": 29,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-06-15\", \"invoice_no\": \"INV-2026005\", \"total\": \"3498.31\", \"vendor\": \"Stark Materials\"}",
+      "prompt_tokens": 171
+    },
+    "open_weight": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-06-15\", \"invoice_no\": \"INV-2026005\", \"po_number\": \"PO-5005?\", \"total\": \"3498.31\", \"vendor\": \"Stark Materials?\"}",
+      "prompt_tokens": 171
+    },
+    "strong_reason": {
+      "completion_tokens": 30,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-06-15\", \"invoice_no\": \"INV-2026005\", \"po_number\": \"PO-5005\", \"vendor\": \"Stark Materials\"}",
+      "prompt_tokens": 171
+    }
+  },
+  "p008_structured_extraction": {
+    "fast_small": {
+      "completion_tokens": 34,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-08-15\", \"invoice_no\": \"INV-2026007\", \"po_number\": \"PO-5007\", \"total\": \"4990.46\", \"vendor\": \"Hooli Cloud\"}",
+      "prompt_tokens": 164
+    },
+    "long_context": {
+      "completion_tokens": 23,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-08-15\", \"invoice_no\": \"INV-2026007\", \"po_number\": \"PO-5007\"}",
+      "prompt_tokens": 164
+    },
+    "medium_general": {
+      "completion_tokens": 29,
+      "error": null,
+      "output_text": "{\"currency\": \"USD\", \"date\": \"2026-08-15\", \"invoice_no\": \"INV-2026007\", \"po_number\": \"PO-5007\", \"vendor\": \"Hooli Cloud\"}",
+      "prompt_tokens": 164
+    },
+    "open_weight": {
+      "completion_tokens": 30,
+      "error": null,
+      "output_text": "{\"currency\": \"USD?\", \"date\": \"2026-08-15\", \"invoice_no\": \"INV-2026007\", \"po_number\": \"PO-5007\", \"vendor\": \"Hooli Cloud?\"}",
+      "prompt_tokens": 164
+    },
+    "strong_reason": {
+      "completion_tokens": 35,
+      "error": null,
+      "output_text": "{\"currency\": \"USD?\", \"date\": \"2026-08-15\", \"invoice_no\": \"INV-2026007\", \"po_number\": \"PO-5007\", \"total\": \"4990.46\", \"vendor\": \"Hooli Cloud\"}",
+      "prompt_tokens": 164
+    }
+  },
+  "p011_schema_constrained_generation": {
+    "medium_general": {
+      "completion_tokens": 22,
+      "error": null,
+      "output_text": "{\"component\": \"billing\", \"owner\": \"team-1\", \"severity\": \"medium\", \"ticket_id\": \"TK-9001\"}",
+      "prompt_tokens": 134
+    },
+    "strong_reason": {
+      "completion_tokens": 17,
+      "error": null,
+      "output_text": "{\"component\": \"billing?\", \"owner\": \"team-1\", \"ticket_id\": \"TK-9001\"}",
+      "prompt_tokens": 134
+    }
+  },
+  "p013_schema_constrained_generation": {
+    "medium_general": {
+      "completion_tokens": 21,
+      "error": null,
+      "output_text": "{\"component\": \"auth?\", \"owner\": \"team-3?\", \"severity\": \"low\", \"ticket_id\": \"TK-9003\"}",
+      "prompt_tokens": 132
+    },
+    "strong_reason": {
+      "completion_tokens": 20,
+      "error": null,
+      "output_text": "{\"component\": \"auth?\", \"owner\": \"team-3\", \"severity\": \"low\", \"ticket_id\": \"TK-9003\"",
+      "prompt_tokens": 132
+    }
+  },
+  "p015_schema_constrained_generation": {
+    "medium_general": {
+      "completion_tokens": 20,
+      "error": null,
+      "output_text": "{\"component\": \"api\", \"owner\": \"team-1\", \"severity\": \"high\", \"ticket_id\": \"TK-9005\"}",
+      "prompt_tokens": 131
+    },
+    "strong_reason": {
+      "completion_tokens": 20,
+      "error": null,
+      "output_text": "{\"component\": \"api\", \"owner\": \"team-1\", \"severity\": \"high\", \"ticket_id\": \"TK-9005\"}",
+      "prompt_tokens": 131
+    }
+  },
+  "p017_schema_constrained_generation": {
+    "medium_general": {
+      "completion_tokens": 22,
+      "error": null,
+      "output_text": "{\"component\": \"billing\", \"owner\": \"team-3\", \"severity\": \"medium\", \"ticket_id\": \"TK-9007\"}",
+      "prompt_tokens": 133
+    },
+    "strong_reason": {
+      "completion_tokens": 22,
+      "error": null,
+      "output_text": "{\"component\": \"billing\", \"owner\": \"team-3\", \"severity\": \"medium\", \"ticket_id\": \"TK-9007\"}",
+      "prompt_tokens": 133
+    }
+  },
+  "p020_classification": {
+    "fast_small": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"label\": \"account_access\"}",
+      "prompt_tokens": 109
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "medium_general": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "open_weight": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    }
+  },
+  "p022_classification": {},
+  "p024_classification": {
+    "fast_small": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "medium_general": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "open_weight": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    }
+  },
+  "p026_classification": {
+    "fast_small": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"label\": \"refund\"}",
+      "prompt_tokens": 109
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"label\": \"compliance\"}",
+      "prompt_tokens": 109
+    },
+    "medium_general": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"label\": \"refund\"}",
+      "prompt_tokens": 109
+    },
+    "open_weight": {
+      "completion_tokens": 7,
+      "error": null,
+      "output_text": "{\"label\": \"technical_support\"}",
+      "prompt_tokens": 109
+    },
+    "strong_reason": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"label\": \"refund\"}",
+      "prompt_tokens": 109
+    }
+  },
+  "p029_summarization": {
+    "fast_small": {
+      "completion_tokens": 21,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 02:00 UTC\", \"Root cause was a network failure\"]}",
+      "prompt_tokens": 220
+    },
+    "medium_general": {
+      "completion_tokens": 28,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 02:00 UTC\", \"Root cause was a network failure\", \"2 services were affected\"]}",
+      "prompt_tokens": 220
+    },
+    "open_weight": {
+      "completion_tokens": 38,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 02:00 UTC\", \"Root cause was a network failure\", \"2 services were affected\", \"Service was restored within 3 hours\"]}",
+      "prompt_tokens": 220
+    }
+  },
+  "p031_summarization": {
+    "fast_small": {
+      "completion_tokens": 29,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 04:00 UTC\", \"Root cause was a config failure\", \"UNSUPPORTED: the CEO resigned\"]}",
+      "prompt_tokens": 206
+    },
+    "long_context": {
+      "completion_tokens": 37,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 04:00 UTC\", \"Root cause was a config failure\", \"4 services were affected\", \"Service was restored within 3 hours\"]}",
+      "prompt_tokens": 206
+    },
+    "medium_general": {
+      "completion_tokens": 36,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 04:00 UTC\", \"Root cause was a config failure\", \"4 services were affected\", \"UNSUPPORTED: the CEO resigned\"]}",
+      "prompt_tokens": 206
+    },
+    "open_weight": {
+      "completion_tokens": 28,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 04:00 UTC\", \"Root cause was a config failure\", \"4 services were affected\"]}",
+      "prompt_tokens": 206
+    },
+    "strong_reason": {
+      "completion_tokens": 37,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 04:00 UTC\", \"Root cause was a config failure\", \"4 services were affected\", \"Service was restored within 3 hours\"]}",
+      "prompt_tokens": 206
+    }
+  },
+  "p033_summarization": {
+    "fast_small": {
+      "completion_tokens": 27,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 06:00 UTC\", \"Root cause was a disk failure\", \"1 services were affected\"]}",
+      "prompt_tokens": 213
+    },
+    "long_context": {
+      "completion_tokens": 37,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 06:00 UTC\", \"Root cause was a disk failure\", \"1 services were affected\", \"Service was restored within 3 hours\"]}",
+      "prompt_tokens": 213
+    },
+    "medium_general": {
+      "completion_tokens": 27,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 06:00 UTC\", \"Root cause was a disk failure\", \"1 services were affected\"]}",
+      "prompt_tokens": 213
+    },
+    "open_weight": {
+      "completion_tokens": 35,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 06:00 UTC\", \"Root cause was a disk failure\", \"1 services were affected\", \"UNSUPPORTED: the CEO resigned\"]}",
+      "prompt_tokens": 213
+    },
+    "strong_reason": {
+      "completion_tokens": 37,
+      "error": null,
+      "output_text": "{\"summary_points\": [\"Outage began at 06:00 UTC\", \"Root cause was a disk failure\", \"1 services were affected\", \"Service was restored within 3 hours\"]}",
+      "prompt_tokens": 213
+    }
+  },
+  "p035_summarization": {},
+  "p038_long_document_qa": {
+    "fast_small": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_4\"}",
+      "prompt_tokens": 1597
+    },
+    "medium_general": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1597
+    },
+    "open_weight": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_4\"}",
+      "prompt_tokens": 1597
+    }
+  },
+  "p040_long_document_qa": {
+    "fast_small": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1580
+    },
+    "long_context": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"4 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1580
+    },
+    "medium_general": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"4 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1580
+    },
+    "open_weight": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"4 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1580
+    },
+    "strong_reason": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"4 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1580
+    }
+  },
+  "p042_long_document_qa": {
+    "fast_small": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"1 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1584
+    },
+    "long_context": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"1 business days\", \"evidence_id\": \"para_4\"}",
+      "prompt_tokens": 1584
+    },
+    "medium_general": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"1 business days\", \"evidence_id\": \"para_4\"}",
+      "prompt_tokens": 1584
+    },
+    "open_weight": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1584
+    },
+    "strong_reason": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"1 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1584
+    }
+  },
+  "p044_long_document_qa": {
+    "fast_small": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_0\"}",
+      "prompt_tokens": 1598
+    },
+    "long_context": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"3 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1598
+    },
+    "medium_general": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1598
+    },
+    "open_weight": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"10 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1598
+    },
+    "strong_reason": {
+      "completion_tokens": 13,
+      "error": null,
+      "output_text": "{\"answer\": \"3 business days\", \"evidence_id\": \"para_6\"}",
+      "prompt_tokens": 1598
+    }
+  },
+  "p047_grounded_comparison": {
+    "fast_small": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "long_context": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "medium_general": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "open_weight": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "strong_reason": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 138
+    }
+  },
+  "p049_grounded_comparison": {},
+  "p051_grounded_comparison": {
+    "fast_small": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 136
+    },
+    "long_context": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 136
+    },
+    "medium_general": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 136
+    },
+    "open_weight": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 136
+    },
+    "strong_reason": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 136
+    }
+  },
+  "p053_grounded_comparison": {
+    "fast_small": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "medium_general": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"A_stricter\"}",
+      "prompt_tokens": 138
+    },
+    "open_weight": {
+      "completion_tokens": 6,
+      "error": null,
+      "output_text": "{\"verdict\": \"B_stricter\"}",
+      "prompt_tokens": 138
+    }
+  },
+  "p056_clause_identification": {
+    "fast_small": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c2\"]}",
+      "prompt_tokens": 316
+    },
+    "long_context": {
+      "completion_tokens": 7,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\", \"c1\"]}",
+      "prompt_tokens": 316
+    },
+    "medium_general": {
+      "completion_tokens": 8,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\", \"c1\", \"c3\"]}",
+      "prompt_tokens": 316
+    },
+    "open_weight": {
+      "completion_tokens": 8,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\", \"c1\", \"c3\"]}",
+      "prompt_tokens": 316
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c1\"]}",
+      "prompt_tokens": 316
+    }
+  },
+  "p058_clause_identification": {
+    "fast_small": {
+      "completion_tokens": 7,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\", \"c2\"]}",
+      "prompt_tokens": 323
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\"]}",
+      "prompt_tokens": 323
+    },
+    "medium_general": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\"]}",
+      "prompt_tokens": 323
+    },
+    "open_weight": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"clause_ids\": []}",
+      "prompt_tokens": 323
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\"]}",
+      "prompt_tokens": 323
+    }
+  },
+  "p060_clause_identification": {
+    "fast_small": {
+      "completion_tokens": 8,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c3\", \"c4\", \"c5\"]}",
+      "prompt_tokens": 317
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c3\"]}",
+      "prompt_tokens": 317
+    },
+    "medium_general": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"clause_ids\": []}",
+      "prompt_tokens": 317
+    },
+    "open_weight": {
+      "completion_tokens": 10,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c2\", \"c3\", \"c4\", \"c5\"]}",
+      "prompt_tokens": 317
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c3\"]}",
+      "prompt_tokens": 317
+    }
+  },
+  "p062_clause_identification": {
+    "fast_small": {
+      "completion_tokens": 8,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c0\", \"c1\", \"c2\"]}",
+      "prompt_tokens": 303
+    },
+    "long_context": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c1\"]}",
+      "prompt_tokens": 303
+    },
+    "medium_general": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c1\"]}",
+      "prompt_tokens": 303
+    },
+    "open_weight": {
+      "completion_tokens": 4,
+      "error": null,
+      "output_text": "{\"clause_ids\": []}",
+      "prompt_tokens": 303
+    },
+    "strong_reason": {
+      "completion_tokens": 5,
+      "error": null,
+      "output_text": "{\"clause_ids\": [\"c1\"]}",
+      "prompt_tokens": 303
+    }
+  }
+}

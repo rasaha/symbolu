@@ -1,0 +1,50 @@
+{
+  "abstain": {
+    "min_predicted_quality": 0.0,
+    "note": "v1 abstains only when the eligible set is empty; confidence-abstain is future work."
+  },
+  "constraint_precedence": [
+    "enterprise-hard-policy",
+    "verified-provider-fact",
+    "benchmark-measured",
+    "runtime-observed",
+    "model-advisory"
+  ],
+  "evidence_fusion": {
+    "advisory_confidence": 0.4,
+    "base_weights": {
+      "benchmark-measured": 1.0,
+      "model-advisory": 0.7,
+      "provider-declared": 0.5,
+      "runtime-observed": 1.4
+    },
+    "benchmark_confidence": 0.6,
+    "declared_confidence": 0.3,
+    "telemetry_confidence_k": 12
+  },
+  "scoring": {
+    "cost_weight_source": "task.utility_weights.cost",
+    "latency_weight_source": "task.utility_weights.latency",
+    "quality_weight_source": "task.utility_weights.quality"
+  },
+  "self_assessment_allowed_fields": [
+    "recommended_decomposition",
+    "anticipated_tool_requirement",
+    "anticipated_reasoning_difficulty",
+    "anticipated_execution_limitation",
+    "suitability_estimate"
+  ],
+  "self_assessment_forbidden_fields": [
+    "price",
+    "pricing",
+    "latency",
+    "expected_latency",
+    "compliance",
+    "deployment",
+    "deployment_eligibility",
+    "context_limit",
+    "hard_context_limit",
+    "provider_availability"
+  ],
+  "version": "policy_v1"
+}

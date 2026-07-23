@@ -1,0 +1,742 @@
+{
+  "enterprise_policy": {
+    "approved_providers": [
+      "internal",
+      "vendor_alpha",
+      "vendor_beta",
+      "vendor_gamma",
+      "vendor_delta"
+    ]
+  },
+  "n_tasks": 37,
+  "priority_profiles": {
+    "balanced": [
+      1.0,
+      0.45,
+      0.35
+    ],
+    "cost_first": [
+      0.7,
+      1.0,
+      0.25
+    ],
+    "latency_first": [
+      0.8,
+      0.25,
+      1.0
+    ],
+    "quality_first": [
+      1.0,
+      0.15,
+      0.1
+    ]
+  },
+  "synthetic_assumptions": {
+    "note": "quality of a (model,task) is the weighted average of the model's TRUE caps over the task's required_caps, with context-rot penalties; cost/latency are deterministic functions of price/base-latency and task size."
+  },
+  "tasks": [
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 6,
+      "note": "",
+      "required_caps": {
+        "extraction": 1.0,
+        "structured_output": 0.4
+      },
+      "task_class": "extraction",
+      "task_id": "t001_extraction",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_cost": 0.5
+      },
+      "input_tokens_k": 20,
+      "note": "",
+      "required_caps": {
+        "extraction": 1.0,
+        "structured_output": 0.4
+      },
+      "task_class": "extraction",
+      "task_id": "t002_extraction",
+      "utility_weights": {
+        "cost": 1.0,
+        "latency": 0.25,
+        "quality": 0.7
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.68,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 40,
+      "note": "",
+      "required_caps": {
+        "extraction": 1.0,
+        "structured_output": 0.4
+      },
+      "task_class": "extraction",
+      "task_id": "t003_extraction",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.65,
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_latency_ms": 500
+      },
+      "input_tokens_k": 2,
+      "note": "",
+      "required_caps": {
+        "classification": 1.0
+      },
+      "task_class": "classification",
+      "task_id": "t004_classification",
+      "utility_weights": {
+        "cost": 0.25,
+        "latency": 1.0,
+        "quality": 0.8
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_cost": 0.05
+      },
+      "input_tokens_k": 4,
+      "note": "",
+      "required_caps": {
+        "classification": 1.0
+      },
+      "task_class": "classification",
+      "task_id": "t005_classification",
+      "utility_weights": {
+        "cost": 1.0,
+        "latency": 0.25,
+        "quality": 0.7
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "note": "",
+      "required_caps": {
+        "classification": 1.0
+      },
+      "task_class": "classification",
+      "task_id": "t006_classification",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 10,
+      "note": "",
+      "required_caps": {
+        "reasoning": 0.3,
+        "summarization": 1.0
+      },
+      "task_class": "summarization",
+      "task_id": "t007_summarization",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 30,
+      "note": "",
+      "required_caps": {
+        "reasoning": 0.3,
+        "summarization": 1.0
+      },
+      "task_class": "summarization",
+      "task_id": "t008_summarization",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_cost": 0.6
+      },
+      "input_tokens_k": 18,
+      "note": "",
+      "required_caps": {
+        "reasoning": 0.3,
+        "summarization": 1.0
+      },
+      "task_class": "summarization",
+      "task_id": "t009_summarization",
+      "utility_weights": {
+        "cost": 1.0,
+        "latency": 0.25,
+        "quality": 0.7
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.75,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_tools": true
+      },
+      "input_tokens_k": 8,
+      "note": "",
+      "required_caps": {
+        "coding": 1.0,
+        "reasoning": 0.3
+      },
+      "task_class": "coding",
+      "task_id": "t010_coding",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_tools": true
+      },
+      "input_tokens_k": 16,
+      "note": "",
+      "required_caps": {
+        "coding": 1.0,
+        "reasoning": 0.3
+      },
+      "task_class": "coding",
+      "task_id": "t011_coding",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.78,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_tools": true
+      },
+      "input_tokens_k": 30,
+      "note": "",
+      "required_caps": {
+        "coding": 1.0,
+        "reasoning": 0.3
+      },
+      "task_class": "coding",
+      "task_id": "t012_coding",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.68,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_tokens_k": 6,
+      "note": "",
+      "required_caps": {
+        "extraction": 0.3,
+        "structured_output": 1.0
+      },
+      "task_class": "structured_output_generation",
+      "task_id": "t013_structured_output_generation",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_tokens_k": 12,
+      "note": "",
+      "required_caps": {
+        "extraction": 0.3,
+        "structured_output": 1.0
+      },
+      "task_class": "structured_output_generation",
+      "task_id": "t014_structured_output_generation",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.7,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 90,
+      "note": "needs large ctx",
+      "required_caps": {
+        "long_context": 1.0,
+        "reasoning": 0.5
+      },
+      "task_class": "long_context_analysis",
+      "task_id": "t015_long_context_analysis",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.7,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 160,
+      "note": "context trap vs declared",
+      "required_caps": {
+        "long_context": 1.0,
+        "reasoning": 0.5
+      },
+      "task_class": "long_context_analysis",
+      "task_id": "t016_long_context_analysis",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 350,
+      "note": "very large ctx",
+      "required_caps": {
+        "long_context": 1.0,
+        "reasoning": 0.5
+      },
+      "task_class": "long_context_analysis",
+      "task_id": "t017_long_context_analysis",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.78,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 6,
+      "note": "",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t018_reasoning",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.74,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 12,
+      "note": "",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t019_reasoning",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.8,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 10,
+      "note": "high bar",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t020_reasoning",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "note": "",
+      "required_caps": {
+        "multilingual": 1.0,
+        "summarization": 0.3
+      },
+      "task_class": "multilingual",
+      "task_id": "t021_multilingual",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 14,
+      "note": "",
+      "required_caps": {
+        "multilingual": 1.0,
+        "summarization": 0.3
+      },
+      "task_class": "multilingual",
+      "task_id": "t022_multilingual",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "privacy": "high",
+        "require_on_prem": true
+      },
+      "input_tokens_k": 10,
+      "note": "PHI on-prem",
+      "required_caps": {
+        "extraction": 0.7,
+        "summarization": 0.6
+      },
+      "task_class": "privacy_sensitive",
+      "task_id": "t023_privacy_sensitive",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "privacy": "high",
+        "require_on_prem": true
+      },
+      "input_tokens_k": 6,
+      "note": "confidential",
+      "required_caps": {
+        "extraction": 0.7,
+        "summarization": 0.6
+      },
+      "task_class": "privacy_sensitive",
+      "task_id": "t024_privacy_sensitive",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_tools": true
+      },
+      "input_tokens_k": 8,
+      "note": "",
+      "required_caps": {
+        "reasoning": 0.4,
+        "tool_use": 1.0
+      },
+      "task_class": "tool_requiring",
+      "task_id": "t025_tool_requiring",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.72,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_tools": true
+      },
+      "input_tokens_k": 14,
+      "note": "",
+      "required_caps": {
+        "reasoning": 0.4,
+        "tool_use": 1.0
+      },
+      "task_class": "tool_requiring",
+      "task_id": "t026_tool_requiring",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.64,
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_latency_ms": 450
+      },
+      "input_tokens_k": 4,
+      "note": "tight SLA",
+      "required_caps": {
+        "classification": 0.7,
+        "extraction": 0.6
+      },
+      "task_class": "latency_sensitive",
+      "task_id": "t027_latency_sensitive",
+      "utility_weights": {
+        "cost": 0.25,
+        "latency": 1.0,
+        "quality": 0.8
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_latency_ms": 700
+      },
+      "input_tokens_k": 6,
+      "note": "",
+      "required_caps": {
+        "classification": 0.7,
+        "extraction": 0.6
+      },
+      "task_class": "latency_sensitive",
+      "task_id": "t028_latency_sensitive",
+      "utility_weights": {
+        "cost": 0.25,
+        "latency": 1.0,
+        "quality": 0.8
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_cost": 0.08
+      },
+      "input_tokens_k": 12,
+      "note": "hard cap",
+      "required_caps": {
+        "classification": 0.5,
+        "summarization": 0.7
+      },
+      "task_class": "cost_sensitive",
+      "task_id": "t029_cost_sensitive",
+      "utility_weights": {
+        "cost": 1.0,
+        "latency": 0.25,
+        "quality": 0.7
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_cost": 0.15
+      },
+      "input_tokens_k": 20,
+      "note": "",
+      "required_caps": {
+        "classification": 0.5,
+        "summarization": 0.7
+      },
+      "task_class": "cost_sensitive",
+      "task_id": "t030_cost_sensitive",
+      "utility_weights": {
+        "cost": 1.0,
+        "latency": 0.25,
+        "quality": 0.7
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_modality": "image"
+      },
+      "input_tokens_k": 12,
+      "note": "multimodal doc",
+      "required_caps": {
+        "extraction": 1.0,
+        "structured_output": 0.4
+      },
+      "task_class": "extraction",
+      "task_id": "t031_extraction",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.8,
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "note": "frontier is best but not on allow-list; policy must reject it",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t900_reasoning_trap",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.7,
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "max_context_k": 160
+      },
+      "input_tokens_k": 160,
+      "note": "declared 200k but true effective 128k -> trap",
+      "required_caps": {
+        "long_context": 1.0,
+        "reasoning": 0.5
+      },
+      "task_class": "long_context_analysis",
+      "task_id": "t901_ctx_trap",
+      "utility_weights": {
+        "cost": 0.15,
+        "latency": 0.1,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.78,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 5,
+      "note": "cheapest-eligible picks a too-weak model; policy should not",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t902_cheap_fails_quality",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.62,
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_modality": "image",
+        "require_on_prem": true
+      },
+      "input_tokens_k": 6,
+      "note": "on-prem + image => empty eligible set; must abstain",
+      "required_caps": {
+        "extraction": 1.0,
+        "structured_output": 0.4
+      },
+      "task_class": "extraction",
+      "task_id": "t903_zero_eligible",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.66,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 16,
+      "note": "multiple near-optimal picks",
+      "required_caps": {
+        "reasoning": 0.3,
+        "summarization": 1.0
+      },
+      "task_class": "summarization",
+      "task_id": "t904_ambiguous",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    {
+      "acceptable_quality_threshold": 0.7,
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_latency_ms": 700
+      },
+      "input_tokens_k": 6,
+      "note": "strong models too slow for SLA",
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "t905_latency_quality",
+      "utility_weights": {
+        "cost": 0.25,
+        "latency": 1.0,
+        "quality": 0.8
+      }
+    }
+  ],
+  "version": "corpus_v1"
+}
