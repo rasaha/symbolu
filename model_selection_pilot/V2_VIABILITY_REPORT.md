@@ -6,6 +6,50 @@ do not create a frozen V2 manifest. **That condition is triggered: V2 is NONVIAB
 
 ---
 
+## Fresh viability re-check — 2026-07-23 (Google credential supplied) — SUPERSEDES the unauthenticated-Google findings below
+
+A Google Gemini API credential was supplied and verified. This section reflects the
+**verified** state and supersedes the earlier "Google unauthenticated" assessment in the
+sections below; the earlier text is retained for the audit trail.
+
+**Verified by real inference (a model counts only after a successful minimal inference):**
+
+| Provider | Model | Executable? | Evidence |
+|---|---|---|---|
+| Anthropic (Claude) | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` | **YES** | real inference (prior check) |
+| Google (**Gemma**) | `gemma-4-31b-it` (1122 ms), `gemma-4-26b-a4b-it` | **YES** | real inference this session |
+| Google (**Gemini**) | `gemini-2.0-flash`, `-flash-lite`, `gemini-2.5-pro` | **NO — billing/quota (429)** | "You exceeded your current quota, check your plan and billing" |
+| Google (Gemini) | `gemini-2.5-flash` | **NO — 404** | model not available to account/version |
+
+Google auth succeeded (41 models advertise `generateContent`); the **only executable
+Google text lineage is Gemma** — all Gemini models are quota/billing-blocked (429) or 404.
+
+**Updated gate status:**
+
+- **≥2 providers — NOW MET** (Anthropic + Google, both executable by real inference).
+- **≥4 models — reachable** (2 Claude + 2 Gemma).
+- **≥3 distinct families — NOT MET.** Exactly **two** executable families: **Claude** and
+  **Gemma** (unambiguously distinct lineages; no stretching). Gemini — the only candidate
+  third — is **not executable** (billing/quota), and a model counts only after a
+  successful inference. (Even if Gemini billing were enabled, whether Gemini and Gemma
+  count as two *distinct* families or one shared Google lineage is a definitional call the
+  experiment owner must make; the robust path to a third family is a genuinely distinct
+  architecture from a distinct provider.)
+
+**Updated verdict: STILL NONVIABLE — now solely on the ≥3-distinct-family requirement
+(verified: only Claude + Gemma are executable). STOP stands: no V2 manifest is frozen and
+no paid pilot runs.** Failure category for Gemini: **rate-limit/billing restriction**.
+
+**To make V2 viable now:** add a genuinely distinct **third** model family that is both
+reachable and executable — e.g. enable billing on the Gemini project **and** obtain the
+owner's ruling that Gemini is a family distinct from Gemma; or provide a reachable,
+executable distinct-architecture provider (OpenAI GPT, a Bedrock/Llama endpoint, or
+Mistral — currently all proxy-denied or uncredentialed). Only ~$0.0004 of verification
+inference was spent (Anthropic + Gemma); Gemini 429s were free. Keys were confined to the
+session scratchpad, never committed, and deleted after use.
+
+---
+
 ## Reachable providers (network / proxy layer)
 
 Tested by direct `CONNECT` through the enforced agent proxy (the proxy must not be
