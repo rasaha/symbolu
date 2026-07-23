@@ -47,6 +47,8 @@ class Scenario:
     override_actor: Optional[str] = None
     override_rationale: Optional[str] = None
     corrupt_audit: bool = False
+    tap_unavailable: bool = False
+    actiongate_unavailable: bool = False
     now: float = 1_000_000.0
 
 
@@ -193,6 +195,12 @@ class Orchestrator:
             else:
                 return self._terminal(res, env, ctx, "PROVIDER_FAILED", [Failure.PROVIDER_EXECUTION_FAILED.value])
 
+        # ---- governance-component availability: degrade to fail-closed refusal,
+        #      never silent allow (Phase 16 safe-degradation) --------------------
+        if sc.tap_unavailable:
+            return self._terminal(res, env, ctx, "GOVERNANCE_UNAVAILABLE",
+                                  [Failure.GOVERNANCE_COMPONENT_UNAVAILABLE.value])
+
         # ---- TAP / assertion governance (mock): what may be ASSERTED -------
         tap = self.tap.govern(px.payload["model_output_ref"], env, now, sc.assertion)
         res.component_calls += 1
@@ -205,6 +213,10 @@ class Orchestrator:
         # ---- assertion-only path: no proposed action ----------------------
         if sc.proposed_action is None:
             return self._terminal(res, env, ctx, "ASSERTION_DELIVERED", [])
+
+        if sc.actiongate_unavailable:
+            return self._terminal(res, env, ctx, "GOVERNANCE_UNAVAILABLE",
+                                  [Failure.GOVERNANCE_COMPONENT_UNAVAILABLE.value])
 
         # ---- Action governance (mock): what may be DONE (invariants 5,6) ---
         authority = ctx.authority_envelope()
