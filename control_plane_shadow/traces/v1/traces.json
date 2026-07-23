@@ -659,13 +659,11 @@
       "trace_id": "T07"
     },
     "expected_action": null,
-    "expected_assertion": null,
-    "expected_reason_namespaces": [
-      "RUNTIME"
-    ],
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
     "expected_selection": "SELECTED",
-    "expected_terminal": "PROVIDER_FAILED",
-    "note": "",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "provider vanishes after selection; fallback re-enters and recovers",
     "provider_outcome": "DISAPPEARED",
     "tap_case_id": "E4D01",
     "tap_unavailable": false,
@@ -758,7 +756,7 @@
     "expected_assertion": null,
     "expected_reason_namespaces": [],
     "expected_selection": "SELECTED",
-    "expected_terminal": "COMPLETED",
+    "expected_terminal": "ASSERTION_DELIVERED",
     "note": "fallback re-enters eligibility",
     "provider_outcome": "FAILURE",
     "tap_case_id": "E4D01",
@@ -1722,7 +1720,7 @@
     "trace_id": "T18"
   },
   {
-    "action_op": "notify",
+    "action_op": "SECRET_READ",
     "action_with_approval": false,
     "action_with_evidence": false,
     "actiongate_unavailable": true,

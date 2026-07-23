@@ -118,11 +118,13 @@ def all_traces() -> List[Trace]:
                    expected_terminal="ASSERTION_DELIVERED", note="EG excludes one; MP picks from rest"))
     # 7 provider disappears after selection
     T.append(Trace("T07", "provider_disappears", _env("T07"), _specs(full), _task("T07"),
-                   provider_outcome="DISAPPEARED", expected_terminal="PROVIDER_FAILED",
-                   expected_reason_namespaces=["RUNTIME"], component_tier_ceiling="TIER2"))
+                   provider_outcome="DISAPPEARED", tap_case_id="E4D01", action_op=None,
+                   expected_assertion="ALLOW", expected_terminal="ASSERTION_DELIVERED",
+                   component_tier_ceiling="TIER2",
+                   note="provider vanishes after selection; fallback re-enters and recovers"))
     # 8 fallback succeeds (provider fails, re-enter, next succeeds)
     T.append(Trace("T08", "fallback_succeeds", _env("T08"), _specs(full), _task("T08"),
-                   provider_outcome="FAILURE", expected_terminal="COMPLETED",
+                   provider_outcome="FAILURE", expected_terminal="ASSERTION_DELIVERED",
                    tap_case_id="E4D01", action_op=None, note="fallback re-enters eligibility",
                    component_tier_ceiling="TIER2"))
     # 9 fallback also fails
@@ -175,7 +177,7 @@ def all_traces() -> List[Trace]:
                    expected_reason_namespaces=["RUNTIME"]))
     # 19 ActionGate unavailable
     T.append(Trace("T19", "actiongate_unavailable", _env("T19"), _specs(full), _task("T19"),
-                   tap_case_id="E4D01", actiongate_unavailable=True, action_op="notify",
+                   tap_case_id="E4D01", actiongate_unavailable=True, action_op="SECRET_READ",
                    expected_terminal="GOVERNANCE_UNAVAILABLE", expected_reason_namespaces=["RUNTIME"]))
     # 20 telemetry unavailable (non-fatal)
     T.append(Trace("T20", "telemetry_unavailable", _env("T20"), _specs(full), _task("T20"),
