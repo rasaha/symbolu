@@ -1,5 +1,39 @@
 # Execution Attempt Report — Pre-Execution Gate FAILED (no real run)
 
+## Attempt 2 (credentials supplied) — gate still FAILS at "≥2 providers"
+
+*Two provider keys were supplied directly (Anthropic, Mistral). Re-running the
+pre-execution gate with them:*
+
+| Provider | Verification (least-cost, real) | Result |
+|---|---|---|
+| **Anthropic** | `POST /v1/messages`, 1 output token | **Key VALID / authenticated** — server returned a genuine API error (`model_not_found` for the probed snapshot, with a real `request_id`), i.e. auth succeeded. Reachable (in the proxy allowlist). |
+| **Mistral** | `GET /v1/models` (free) | **BLOCKED by sandbox network policy** — the agent proxy denied `CONNECT api.mistral.ai:443` with `403` ("policy denial"). Unreachable regardless of key validity; the proxy must not be bypassed. |
+
+**Distinct reachable providers = 1 (Anthropic only).** The mandatory gate requires
+**≥ 2 providers** (and ≥ 3 model families across providers, ≥ 4 heterogeneous
+executable models). With Mistral blocked at the network layer and no other provider
+keys, that gate **cannot be met.**
+
+The experiment is frozen (registry, corpus, arms, policy, scorer, thresholds, stats),
+so substituting Mistral models into the registry to manufacture a second provider is
+**not permitted** — and Mistral is unreachable anyway. Therefore, per the protocol and
+the explicit stop-on-gate-failure instruction, execution **did not proceed**. Keys were
+used only for verification, stored only in the session scratchpad (outside the repo),
+never written to the repo or committed, and deleted after the check. Tests: 17/17 pass.
+
+**Gate verdict: FAIL (mandatory "≥2 providers"). Falsification verdict remains
+UNRESOLVED — the policy is still untested on real models. No offline-stub result is
+substituted. Interim default unchanged: Category 2 (retain static routing), definitive
+recommendation deferred.** To unblock: add a second reachable provider — either
+credentials for a provider already in the proxy allowlist, or an environment whose
+network policy permits a second provider's endpoint (e.g. OpenAI/Bedrock as in the
+frozen registry).
+
+---
+
+*(Attempt 1, below, is retained verbatim for the record.)*
+
 **Verdict: the shadow experiment was NOT begun. The pre-execution gate failed at
 Step 1 (credential detection) and Step 2 (endpoint verification): no usable real-LLM
 endpoint is reachable in this environment. Per the protocol, a stop at the gate is a
