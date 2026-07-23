@@ -1,0 +1,976 @@
+{
+  "meta": {
+    "domain": "document-intelligence-enterprise-operations",
+    "n_dev": 35,
+    "n_shadow": 28,
+    "n_total": 63,
+    "note": "SYNTHETIC documents, no real PII; ground truth in _oracle (policy must not read it).",
+    "task_classes": [
+      "classification",
+      "clause_identification",
+      "grounded_comparison",
+      "long_document_qa",
+      "schema_constrained_generation",
+      "structured_extraction",
+      "summarization"
+    ],
+    "version": "pilot_corpus_v1"
+  },
+  "tasks": [
+    {
+      "_oracle": {
+        "fields": {
+          "currency": "USD",
+          "date": "2026-01-15",
+          "invoice_no": "INV-2026000",
+          "po_number": "PO-5000",
+          "total": "3745.78",
+          "vendor": "Acme Supplies"
+        }
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "max_latency_ms": 1500
+      },
+      "input_text": "INVOICE\nVendor: Acme Supplies\nInvoice No: INV-2026000\nDate: 2026-01-15\nPO Number: PO-5000\nAmount Due: USD 3745.78\nTerms: Net 30. Please remit to accounts payable. Policy applicable accordance and under subject to agreement with in enterprise and agreement to accordance reasonable services in under to review under applicable and the policy and provide in review notice provide audit reasonable notice subject subject services to reasonable.",
+      "input_tokens_k": 0.11,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "invoice_no",
+          "vendor",
+          "date",
+          "total",
+          "currency",
+          "po_number"
+        ],
+        "type": "object"
+      },
+      "task_class": "structured_extraction",
+      "task_id": "p001_structured_extraction"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "currency": "USD",
+          "date": "2026-03-15",
+          "invoice_no": "INV-2026002",
+          "po_number": "PO-5002",
+          "total": "3584.12",
+          "vendor": "Initech Corp"
+        }
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_text": "INVOICE\nVendor: Initech Corp\nInvoice No: INV-2026002\nDate: 2026-03-15\nPO Number: PO-5002\nAmount Due: USD 3584.12\nTerms: Net 30. Please remit to accounts payable. Applicable in this provide to the applicable provide and accordance provide enterprise services this with the policy in in audit audit audit subject and to with services and to agreement review shall review review reasonable enterprise enterprise to review under.",
+      "input_tokens_k": 0.106,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "invoice_no",
+          "vendor",
+          "date",
+          "total",
+          "currency",
+          "po_number"
+        ],
+        "type": "object"
+      },
+      "task_class": "structured_extraction",
+      "task_id": "p003_structured_extraction"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "currency": "USD",
+          "date": "2026-05-15",
+          "invoice_no": "INV-2026004",
+          "po_number": "PO-5004",
+          "total": "5923.53",
+          "vendor": "Wayne Logistics"
+        }
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_latency_ms": 1500
+      },
+      "input_text": "INVOICE\nVendor: Wayne Logistics\nInvoice No: INV-2026004\nDate: 2026-05-15\nPO Number: PO-5004\nAmount Due: USD 5923.53\nTerms: Net 30. Please remit to accounts payable. Review with and the subject enterprise review policy audit shall the reasonable to with accordance and with under this policy subject subject this subject the to provide with with with this accordance and with reasonable review to the under notice.",
+      "input_tokens_k": 0.103,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "invoice_no",
+          "vendor",
+          "date",
+          "total",
+          "currency",
+          "po_number"
+        ],
+        "type": "object"
+      },
+      "task_class": "structured_extraction",
+      "task_id": "p005_structured_extraction"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "currency": "USD",
+          "date": "2026-07-15",
+          "invoice_no": "INV-2026006",
+          "po_number": "PO-5006",
+          "total": "1964.34",
+          "vendor": "Soylent Foods"
+        }
+      },
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "require_on_prem": true
+      },
+      "input_text": "INVOICE\nVendor: Soylent Foods\nInvoice No: INV-2026006\nDate: 2026-07-15\nPO Number: PO-5006\nAmount Due: USD 1964.34\nTerms: Net 30. Please remit to accounts payable. Policy enterprise services applicable enterprise reasonable and and services agreement this the with enterprise and in enterprise the shall notice party under agreement accordance reasonable policy audit with agreement and enterprise policy services and under audit policy policy in provide.",
+      "input_tokens_k": 0.113,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "invoice_no",
+          "vendor",
+          "date",
+          "total",
+          "currency",
+          "po_number"
+        ],
+        "type": "object"
+      },
+      "task_class": "structured_extraction",
+      "task_id": "p007_structured_extraction"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "currency": "USD",
+          "date": "2026-09-15",
+          "invoice_no": "INV-2026008",
+          "po_number": "PO-5008",
+          "total": "3085.73",
+          "vendor": "Acme Supplies"
+        }
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_text": "INVOICE\nVendor: Acme Supplies\nInvoice No: INV-2026008\nDate: 2026-09-15\nPO Number: PO-5008\nAmount Due: USD 3085.73\nTerms: Net 30. Please remit to accounts payable. Accordance this review subject party agreement agreement with this accordance applicable notice the with with and subject and the and the and with accordance and enterprise and the enterprise accordance in agreement under the and agreement subject with the and.",
+      "input_tokens_k": 0.106,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "invoice_no",
+          "vendor",
+          "date",
+          "total",
+          "currency",
+          "po_number"
+        ],
+        "type": "object"
+      },
+      "task_class": "structured_extraction",
+      "task_id": "p009_structured_extraction"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "component": "auth",
+          "owner": "team-0",
+          "severity": "low",
+          "ticket_id": "TK-9000"
+        }
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_text": "Create a normalized ticket record. Raw note: severity low issue in the auth component, assigned to team-0, id TK-9000. With audit audit audit this party with and and this and accordance this under agreement and in accordance under under audit and with under shall.",
+      "input_tokens_k": 0.066,
+      "min_acceptable_quality": 0.75,
+      "required_schema": {
+        "fields": [
+          "ticket_id",
+          "severity",
+          "component",
+          "owner"
+        ],
+        "strict": true,
+        "type": "object"
+      },
+      "task_class": "schema_constrained_generation",
+      "task_id": "p010_schema_constrained_generation"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "component": "api",
+          "owner": "team-2",
+          "severity": "high",
+          "ticket_id": "TK-9002"
+        }
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_text": "Create a normalized ticket record. Raw note: severity high issue in the api component, assigned to team-2, id TK-9002. Services services accordance services reasonable party audit enterprise reasonable review under accordance audit the and provide shall to party to provide to party party notice.",
+      "input_tokens_k": 0.074,
+      "min_acceptable_quality": 0.75,
+      "required_schema": {
+        "fields": [
+          "ticket_id",
+          "severity",
+          "component",
+          "owner"
+        ],
+        "strict": true,
+        "type": "object"
+      },
+      "task_class": "schema_constrained_generation",
+      "task_id": "p012_schema_constrained_generation"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "component": "billing",
+          "owner": "team-0",
+          "severity": "medium",
+          "ticket_id": "TK-9004"
+        }
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_text": "Create a normalized ticket record. Raw note: severity medium issue in the billing component, assigned to team-0, id TK-9004. This applicable agreement party party agreement with audit reasonable policy party with with provide under party and party enterprise under this provide the subject party.",
+      "input_tokens_k": 0.074,
+      "min_acceptable_quality": 0.75,
+      "required_schema": {
+        "fields": [
+          "ticket_id",
+          "severity",
+          "component",
+          "owner"
+        ],
+        "strict": true,
+        "type": "object"
+      },
+      "task_class": "schema_constrained_generation",
+      "task_id": "p014_schema_constrained_generation"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "component": "auth",
+          "owner": "team-2",
+          "severity": "low",
+          "ticket_id": "TK-9006"
+        }
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_text": "Create a normalized ticket record. Raw note: severity low issue in the auth component, assigned to team-2, id TK-9006. With under audit provide applicable shall this policy reasonable the reasonable provide policy policy services enterprise provide with audit accordance services shall enterprise shall provide.",
+      "input_tokens_k": 0.077,
+      "min_acceptable_quality": 0.75,
+      "required_schema": {
+        "fields": [
+          "ticket_id",
+          "severity",
+          "component",
+          "owner"
+        ],
+        "strict": true,
+        "type": "object"
+      },
+      "task_class": "schema_constrained_generation",
+      "task_id": "p016_schema_constrained_generation"
+    },
+    {
+      "_oracle": {
+        "fields": {
+          "component": "api",
+          "owner": "team-0",
+          "severity": "high",
+          "ticket_id": "TK-9008"
+        }
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "require_structured_strict": true
+      },
+      "input_text": "Create a normalized ticket record. Raw note: severity high issue in the api component, assigned to team-0, id TK-9008. Audit notice services review with and shall policy with this reasonable notice accordance shall to agreement policy policy the accordance under and the reasonable agreement.",
+      "input_tokens_k": 0.073,
+      "min_acceptable_quality": 0.75,
+      "required_schema": {
+        "fields": [
+          "ticket_id",
+          "severity",
+          "component",
+          "owner"
+        ],
+        "strict": true,
+        "type": "object"
+      },
+      "task_class": "schema_constrained_generation",
+      "task_id": "p018_schema_constrained_generation"
+    },
+    {
+      "_oracle": {
+        "label": "shipping"
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {},
+      "input_text": "My order shipped two weeks ago and still has not arrived. This with review subject enterprise subject and enterprise this audit and policy shall and under agreement provide to with subject.",
+      "input_tokens_k": 0.047,
+      "label_set": [
+        "billing",
+        "technical_support",
+        "account_access",
+        "shipping",
+        "compliance",
+        "refund"
+      ],
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "task_class": "classification",
+      "task_id": "p019_classification"
+    },
+    {
+      "_oracle": {
+        "label": "technical_support"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {},
+      "input_text": "The dashboard returns a 500 error when I export data. In and enterprise provide with in to audit provide provide party in policy this with to review accordance under audit.",
+      "input_tokens_k": 0.043,
+      "label_set": [
+        "billing",
+        "technical_support",
+        "account_access",
+        "shipping",
+        "compliance",
+        "refund"
+      ],
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "task_class": "classification",
+      "task_id": "p021_classification"
+    },
+    {
+      "_oracle": {
+        "label": "compliance"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_cost": 0.02
+      },
+      "input_text": "Please provide a copy of your SOC 2 report for our audit. Audit subject agreement and in in with shall and provide party review policy audit applicable in to enterprise provide party.",
+      "input_tokens_k": 0.045,
+      "label_set": [
+        "billing",
+        "technical_support",
+        "account_access",
+        "shipping",
+        "compliance",
+        "refund"
+      ],
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "task_class": "classification",
+      "task_id": "p023_classification"
+    },
+    {
+      "_oracle": {
+        "label": "technical_support"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_cost": 0.02
+      },
+      "input_text": "The dashboard returns a 500 error when I export data. The to to with accordance services agreement accordance provide and enterprise with services with enterprise subject policy and with in.",
+      "input_tokens_k": 0.047,
+      "label_set": [
+        "billing",
+        "technical_support",
+        "account_access",
+        "shipping",
+        "compliance",
+        "refund"
+      ],
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "task_class": "classification",
+      "task_id": "p025_classification"
+    },
+    {
+      "_oracle": {
+        "label": "shipping"
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "max_cost": 0.02,
+        "require_on_prem": true
+      },
+      "input_text": "My order shipped two weeks ago and still has not arrived. And and policy audit with the policy services shall notice subject provide to reasonable reasonable to this party review review.",
+      "input_tokens_k": 0.046,
+      "label_set": [
+        "billing",
+        "technical_support",
+        "account_access",
+        "shipping",
+        "compliance",
+        "refund"
+      ],
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "task_class": "classification",
+      "task_id": "p027_classification"
+    },
+    {
+      "_oracle": {
+        "distractor": "the CEO resigned",
+        "key_facts": [
+          "Outage began at 01:00 UTC",
+          "Root cause was a config failure",
+          "1 services were affected",
+          "Service was restored within 3 hours",
+          "A post-incident review is scheduled"
+        ]
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "require_on_prem": true
+      },
+      "input_text": "INCIDENT REPORT. Outage began at 01:00 UTC Root cause was a config failure 1 services were affected Service was restored within 3 hours A post-incident review is scheduled. Agreement review party reasonable subject review audit and in this review notice this and policy agreement and and policy and party enterprise accordance policy reasonable the provide review under services with subject audit under and and provide enterprise and notice under with reasonable with agreement audit review services reasonable review with services applicable shall party accordance shall to enterprise and.",
+      "input_tokens_k": 0.147,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "summary_points"
+        ],
+        "type": "object"
+      },
+      "task_class": "summarization",
+      "task_id": "p028_summarization"
+    },
+    {
+      "_oracle": {
+        "distractor": "the CEO resigned",
+        "key_facts": [
+          "Outage began at 03:00 UTC",
+          "Root cause was a disk failure",
+          "3 services were affected",
+          "Service was restored within 3 hours",
+          "A post-incident review is scheduled"
+        ]
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "max_latency_ms": 1500
+      },
+      "input_text": "INCIDENT REPORT. Outage began at 03:00 UTC Root cause was a disk failure 3 services were affected Service was restored within 3 hours A post-incident review is scheduled. Agreement this review services with agreement services review to and accordance and to reasonable services applicable audit the applicable and accordance notice party and applicable reasonable this policy provide shall enterprise enterprise audit services applicable enterprise agreement agreement party party in enterprise accordance review shall review party enterprise provide with party with the this shall in subject this enterprise policy.",
+      "input_tokens_k": 0.154,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "summary_points"
+        ],
+        "type": "object"
+      },
+      "task_class": "summarization",
+      "task_id": "p030_summarization"
+    },
+    {
+      "_oracle": {
+        "distractor": "the CEO resigned",
+        "key_facts": [
+          "Outage began at 05:00 UTC",
+          "Root cause was a network failure",
+          "5 services were affected",
+          "Service was restored within 3 hours",
+          "A post-incident review is scheduled"
+        ]
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "require_on_prem": true
+      },
+      "input_text": "INCIDENT REPORT. Outage began at 05:00 UTC Root cause was a network failure 5 services were affected Service was restored within 3 hours A post-incident review is scheduled. Shall the applicable services agreement services policy with shall applicable policy applicable notice notice agreement accordance reasonable with and with policy review with the with party accordance with with in shall enterprise party party shall to agreement with party shall policy and the shall this notice enterprise and reasonable and and to this under to audit in accordance provide subject.",
+      "input_tokens_k": 0.143,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "summary_points"
+        ],
+        "type": "object"
+      },
+      "task_class": "summarization",
+      "task_id": "p032_summarization"
+    },
+    {
+      "_oracle": {
+        "distractor": "the CEO resigned",
+        "key_facts": [
+          "Outage began at 07:00 UTC",
+          "Root cause was a config failure",
+          "2 services were affected",
+          "Service was restored within 3 hours",
+          "A post-incident review is scheduled"
+        ]
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {
+        "max_cost": 0.02
+      },
+      "input_text": "INCIDENT REPORT. Outage began at 07:00 UTC Root cause was a config failure 2 services were affected Service was restored within 3 hours A post-incident review is scheduled. With shall policy and policy to party enterprise agreement this provide with accordance review review agreement notice review audit provide policy reasonable party with in enterprise audit enterprise enterprise notice the to and notice in shall party reasonable services subject accordance party in provide to party reasonable subject and subject this shall applicable audit to with in agreement provide agreement.",
+      "input_tokens_k": 0.146,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "summary_points"
+        ],
+        "type": "object"
+      },
+      "task_class": "summarization",
+      "task_id": "p034_summarization"
+    },
+    {
+      "_oracle": {
+        "distractor": "the CEO resigned",
+        "key_facts": [
+          "Outage began at 01:00 UTC",
+          "Root cause was a disk failure",
+          "4 services were affected",
+          "Service was restored within 3 hours",
+          "A post-incident review is scheduled"
+        ]
+      },
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_text": "INCIDENT REPORT. Outage began at 01:00 UTC Root cause was a disk failure 4 services were affected Service was restored within 3 hours A post-incident review is scheduled. With subject notice with provide enterprise accordance under under under review accordance with notice reasonable party review services with applicable applicable party party notice with agreement the subject and notice subject enterprise and party in this party party with enterprise party agreement and shall notice audit shall the to in the subject reasonable enterprise and policy audit services notice and.",
+      "input_tokens_k": 0.145,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "summary_points"
+        ],
+        "type": "object"
+      },
+      "task_class": "summarization",
+      "task_id": "p036_summarization"
+    },
+    {
+      "_oracle": {
+        "answer": "1 business days",
+        "evidence_id": "para_3",
+        "question": "How long do refund requests take to process?",
+        "wrong_answer": "10 business days"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_cost": 0.02,
+        "require_on_prem": true
+      },
+      "input_text": "ENTERPRISE POLICY MANUAL\n[para_0] This review applicable audit to under and under with in audit and services services to review party reasonable notice to policy services the audit and this the review and agreement provide in applicable audit audit shall enterprise enterprise policy party review to and with notice services shall services policy in under enterprise in in and services notice provide with party this shall review enterprise provide to the this reasonable policy enterprise notice accordance provide applicable enterprise agreement party shall with to notice with under policy audit under shall in in with policy in with accordance with under with services subject under notice the and the review services shall to enterprise under under party this and audit subject and review to.\n[para_1] Notice review with accordance notice notice this provide review under shall notice accordance party accordance policy shall notice with under agreement and to in with under with subject applicable under under audit shall enterprise party shall agreement party to notice policy audit with review and reasonable shall services policy the to the this subject and audit enterprise notice and shall with policy and audit shall under subject this applicable and services subject under under the policy notice subject services audit policy applicable applicable services and reasonable reasonable agreement to and party and with accordance applicable subject agreement notice with with under provide party this this shall and and the and to applicable subject accordance this audit party provide in to.\n[para_2] And and agreement services reasonable with applicable services this this in party and notice notice and with and and audit subject agreement accordance this services under agreement party shall to with to in agreement notice enterprise review under to under policy to under with agreement to subject the in in provide agreement enterprise services policy with services this with shall the with this review accordance party enterprise accordance services review notice policy and reasonable services audit and subject with policy with to under the the services notice services notice shall to applicable reasonable to party shall notice services provide policy with with policy with under subject and with agreement with this accordance policy in in provide subject policy under in.\n[para_3] Refund requests are processed within 1 business days of approval. And the reasonable party notice services in accordance enterprise subject and to audit agreement to with with provide enterprise applicable with with enterprise provide services under provide the agreement audit.\n[para_4] Notice audit with applicable enterprise this and under party subject with and provide party provide in accordance subject the subject this review enterprise under policy enterprise and under applicable audit notice agreement and applicable to under accordance with agreement under and policy in and agreement and under agreement services accordance subject applicable notice with services in to review in subject with agreement notice review this audit reasonable the reasonable under and with policy notice shall subject under review reasonable services shall this applicable applicable subject with to applicable and accordance under audit audit services shall accordance agreement with and with under and enterprise with with enterprise this services audit party accordance this review services policy enterprise with review provide with.\n[para_5] With notice the agreement and review accordance this applicable audit with accordance reasonable and in shall shall party applicable and and under enterprise enterprise under audit and to with services services reasonable enterprise in with provide to with notice with this with and party and in accordance review this with audit the accordance subject audit reasonable agreement enterprise enterprise party accordance and in in party services accordance this notice the this and shall in enterprise the accordance subject to with subject review audit with party provide this enterprise and party services accordance and subject reasonable services and services notice and enterprise audit services under party enterprise to reasonable with this and agreement policy enterprise with review in services notice with.\n[para_6] Review party this in party with audit party notice services with audit policy notice with agreement services to and in the under with provide shall and applicable subject shall subject agreement and under applicable in review the this subject the with the accordance policy audit agreement accordance provide applicable in reasonable audit review reasonable enterprise with services applicable policy policy in and with shall shall subject with in with in reasonable party under enterprise policy policy audit with this and notice policy review enterprise enterprise party notice and this with services agreement reasonable shall services services to this and to party reasonable enterprise party shall enterprise party enterprise notice agreement shall party audit party with and review with under in.\n[para_7] And notice services notice with review this applicable shall in and under enterprise audit subject notice review review policy enterprise enterprise agreement under party enterprise shall enterprise to audit provide shall in services reasonable services audit reasonable to audit policy shall provide notice notice audit audit under applicable in review shall subject and provide shall applicable provide applicable and review agreement audit to enterprise reasonable and under with the provide in provide services with subject applicable review to the and under notice accordance in enterprise this applicable shall shall subject provide in and shall under agreement enterprise services with applicable subject agreement services in this services provide to to reasonable policy party shall services reasonable to provide notice to applicable.",
+      "input_tokens_k": 1.505,
+      "min_acceptable_quality": 0.7,
+      "question": "How long do refund requests take to process?",
+      "required_schema": {
+        "fields": [
+          "answer",
+          "evidence_id"
+        ],
+        "type": "object"
+      },
+      "task_class": "long_document_qa",
+      "task_id": "p037_long_document_qa"
+    },
+    {
+      "_oracle": {
+        "answer": "3 business days",
+        "evidence_id": "para_5",
+        "question": "How long do refund requests take to process?",
+        "wrong_answer": "10 business days"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {},
+      "input_text": "ENTERPRISE POLICY MANUAL\n[para_0] Services and shall and and and notice provide agreement policy shall agreement reasonable this with review subject party shall shall agreement review and with notice and audit with audit the with party in provide under to policy shall with and with provide review under subject agreement provide applicable notice reasonable the notice notice audit shall and this with in review subject shall the in audit party party enterprise notice agreement reasonable and and provide with party with audit and to subject the and in and this shall policy under services this under provide party shall audit provide with applicable review the accordance party this under review review with enterprise accordance subject policy notice under policy enterprise notice agreement with shall.\n[para_1] Enterprise with agreement policy accordance and and shall this notice subject this with applicable and audit and provide to to under enterprise review the subject the and with reasonable agreement policy shall the notice agreement shall the in enterprise provide shall accordance with under agreement to to services reasonable to applicable the this policy under enterprise accordance enterprise enterprise applicable under and provide enterprise services to accordance party policy to audit with under policy with shall to and enterprise party and and services in in reasonable applicable review reasonable applicable under agreement party and with enterprise this this policy enterprise shall agreement accordance under and and agreement shall shall in with audit services under under this with provide to audit.\n[para_2] Notice and notice audit and with notice with and provide provide in provide notice the and services enterprise with shall the the party shall policy reasonable accordance in with to in provide party audit reasonable enterprise and this reasonable reasonable subject subject enterprise services and services to policy applicable enterprise policy and accordance applicable the applicable accordance and audit subject with to to services accordance audit agreement the provide party notice shall the provide agreement to subject notice shall in accordance subject services shall in provide in provide enterprise to services audit the under notice notice party the provide with accordance provide under subject in and with audit with provide party accordance review subject services in policy under audit notice.\n[para_3] Enterprise accordance accordance party party agreement and the shall with and applicable provide and subject and enterprise with the notice with with and with with notice to and to under services this audit and enterprise audit agreement with and notice in provide enterprise notice reasonable agreement the party enterprise provide shall shall the audit to with under and enterprise services with notice in enterprise and services to to shall review with to reasonable shall in agreement shall the notice and notice under subject in under policy party this reasonable audit and provide review notice policy notice shall review policy applicable with agreement accordance applicable review shall and in applicable and applicable and notice with subject agreement provide subject reasonable notice.\n[para_4] Review enterprise to applicable party policy under notice audit audit shall accordance review services services and reasonable agreement subject party reasonable reasonable with audit with with services in subject agreement applicable with shall enterprise applicable accordance policy this this provide the accordance review under under enterprise reasonable subject notice to with with subject party applicable notice with agreement policy and agreement under with review and this and enterprise party policy in shall notice review notice shall policy to reasonable and applicable and notice enterprise in party this in shall to enterprise reasonable reasonable with with to accordance review accordance the the in accordance this shall party this and services subject with reasonable enterprise and enterprise notice accordance reasonable and policy.\n[para_5] Refund requests are processed within 3 business days of approval. Services notice and with notice shall with with the with shall applicable accordance with reasonable shall this provide the with this reasonable and in reasonable policy enterprise party and in.\n[para_6] Services the policy services agreement accordance and services shall and to and to audit applicable shall with party notice subject this enterprise review accordance this this reasonable shall provide under policy party the agreement applicable notice reasonable review accordance shall with with with provide policy policy enterprise the with accordance agreement with shall policy notice audit notice with in audit to services this party and provide applicable provide audit shall with with with applicable provide enterprise in accordance accordance in subject under review notice party the the this agreement reasonable accordance enterprise applicable and agreement services to to notice under accordance services with with and to in accordance accordance enterprise enterprise enterprise under accordance the under and review review the.\n[para_7] Policy and policy in accordance applicable under accordance under with provide services audit subject with notice provide audit in notice review enterprise with review audit subject this with shall agreement accordance shall party services and provide to applicable party under agreement services agreement and and subject notice and subject the shall with party under audit this shall services review subject under policy accordance in accordance enterprise applicable reasonable provide enterprise accordance and notice and audit provide policy reasonable the notice policy the provide policy with shall the enterprise to and review applicable this this services to enterprise enterprise enterprise the agreement with and to services to services audit and the with review policy shall party review in party and services.",
+      "input_tokens_k": 1.518,
+      "min_acceptable_quality": 0.7,
+      "question": "How long do refund requests take to process?",
+      "required_schema": {
+        "fields": [
+          "answer",
+          "evidence_id"
+        ],
+        "type": "object"
+      },
+      "task_class": "long_document_qa",
+      "task_id": "p039_long_document_qa"
+    },
+    {
+      "_oracle": {
+        "answer": "5 business days",
+        "evidence_id": "para_3",
+        "question": "How long do refund requests take to process?",
+        "wrong_answer": "10 business days"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {},
+      "input_text": "ENTERPRISE POLICY MANUAL\n[para_0] Reasonable this and reasonable provide services and audit reasonable policy review reasonable enterprise in to services accordance with and policy the under audit enterprise this review subject party agreement shall party and with subject to reasonable party provide the under reasonable notice this to under reasonable party accordance party applicable review notice policy this reasonable notice services in in shall the this enterprise review accordance audit this with enterprise enterprise to reasonable shall to shall accordance accordance applicable with applicable applicable policy provide with this agreement shall review review review reasonable agreement with shall and applicable applicable reasonable review enterprise agreement subject to party in with the shall subject services in applicable review in audit agreement in in agreement with.\n[para_1] The agreement the to the audit review this accordance review to applicable in shall with services policy provide with and enterprise this reasonable provide services the accordance party agreement policy subject under audit policy services in audit provide policy in accordance agreement review and provide reasonable notice and the subject under under under agreement to and subject enterprise shall the with and in policy enterprise under provide accordance with to audit this agreement with with this shall and notice in shall the applicable services agreement in agreement and accordance provide audit with and services services with with to policy in shall applicable notice enterprise applicable in audit subject reasonable provide party accordance with applicable shall this in applicable with review.\n[para_2] Applicable audit review the under the and review and the party the party services with and applicable agreement and review with audit enterprise provide agreement policy accordance the policy audit and in provide services party services shall audit applicable notice and party the accordance audit accordance reasonable accordance applicable this review this this applicable reasonable in policy this services subject with the services services the subject notice agreement agreement under accordance this under policy review audit provide notice the notice review with under with with and shall with under party agreement enterprise services the and enterprise to review notice under provide audit policy enterprise policy this agreement enterprise provide provide with agreement notice applicable audit the notice reasonable this this.\n[para_3] Refund requests are processed within 5 business days of approval. Applicable provide notice with enterprise notice with notice agreement reasonable agreement reasonable agreement under policy services shall to applicable policy this accordance reasonable this policy provide to with the subject.\n[para_4] Party and applicable with accordance reasonable under and to policy agreement in subject reasonable this with the with in enterprise enterprise notice under review under and applicable reasonable the in and party provide under enterprise this reasonable agreement under subject accordance provide services with accordance and notice in agreement policy to agreement agreement enterprise reasonable agreement policy shall enterprise party provide notice applicable enterprise review subject in in with applicable this services notice applicable audit agreement reasonable accordance in this with with audit notice notice audit with reasonable to the accordance audit policy reasonable accordance party to under and subject under this policy in shall and reasonable with services audit applicable enterprise enterprise services review with applicable this review services.\n[para_5] Services provide this subject reasonable accordance agreement agreement and in provide with audit with and agreement with shall agreement the policy applicable in to enterprise in services and with agreement policy to enterprise with applicable with subject and enterprise notice with and under with enterprise in review services to shall enterprise reasonable shall this agreement agreement policy and applicable applicable under audit party policy in review enterprise services with to with to audit and accordance accordance notice under to in and in to with provide to accordance accordance in policy and audit policy audit in and shall accordance to agreement shall this services notice subject to shall notice subject with policy services accordance in subject this services this in in.\n[para_6] Party under party this audit provide provide with to and audit audit under subject review review subject reasonable notice the shall agreement to under applicable the to and and review with party reasonable party enterprise this and in shall audit under agreement provide reasonable agreement policy and notice with review with with party with to shall accordance accordance under party policy shall audit under review under the accordance to with the provide with provide this with shall reasonable services under under this applicable notice reasonable the to notice the agreement under the accordance audit agreement with reasonable review and services agreement and reasonable this with notice to services party accordance and provide review review services to applicable shall subject this.\n[para_7] And party under enterprise applicable accordance party reasonable policy audit provide and policy to services provide with policy agreement shall audit services policy with with under notice party in in shall with the audit this audit this subject shall policy with applicable and and notice under services under and applicable shall party reasonable audit services agreement this the shall under party and and services and this subject party enterprise party policy reasonable enterprise party enterprise with the subject enterprise subject policy provide review agreement and policy accordance audit with notice provide reasonable with and in with in to services with with review reasonable and applicable policy in applicable and party in under with audit with with with with the and.",
+      "input_tokens_k": 1.536,
+      "min_acceptable_quality": 0.7,
+      "question": "How long do refund requests take to process?",
+      "required_schema": {
+        "fields": [
+          "answer",
+          "evidence_id"
+        ],
+        "type": "object"
+      },
+      "task_class": "long_document_qa",
+      "task_id": "p041_long_document_qa"
+    },
+    {
+      "_oracle": {
+        "answer": "2 business days",
+        "evidence_id": "para_5",
+        "question": "How long do refund requests take to process?",
+        "wrong_answer": "10 business days"
+      },
+      "business_priority": "balanced",
+      "hard_constraints": {
+        "max_cost": 0.02
+      },
+      "input_text": "ENTERPRISE POLICY MANUAL\n[para_0] And this reasonable party party with applicable enterprise and party accordance applicable policy reasonable this enterprise under services this under applicable to party to review under and this and with reasonable with under to party applicable applicable with with under notice the provide and review and review and reasonable agreement this reasonable agreement review and shall enterprise audit review reasonable in to party reasonable services provide provide agreement party review party services enterprise this the audit in party services policy reasonable accordance policy audit audit party to party reasonable with in under agreement accordance policy reasonable notice accordance and review services applicable agreement party review provide to under shall reasonable notice and and to services review accordance applicable under policy.\n[para_1] Agreement notice policy with services with accordance party and review shall to the enterprise with with notice accordance with shall notice the the policy with party policy party this and under review notice agreement and shall provide enterprise with with the review and with with to reasonable applicable shall to with policy with this accordance under services in audit the subject under agreement and provide policy and subject this the review accordance this under notice services services the with accordance shall with to accordance with and subject with policy party under in with shall policy this party review services this agreement under party policy in audit with review applicable the review review audit in policy this to audit accordance reasonable.\n[para_2] Notice notice audit applicable notice reasonable party shall the accordance services and to enterprise notice shall policy in accordance audit policy and and notice agreement with to party agreement reasonable shall agreement with to audit with under review notice reasonable services and enterprise the notice party agreement services accordance under review reasonable the audit shall enterprise policy agreement the review accordance reasonable reasonable applicable under and provide subject and this party this reasonable in under under notice subject under accordance accordance accordance party audit agreement services services under reasonable review notice provide party agreement with services policy under services and audit party provide in with with reasonable applicable agreement reasonable and to with under with with shall provide audit in.\n[para_3] Provide review notice this review in audit with notice with and audit in provide accordance agreement this shall to review in applicable this review audit applicable provide with agreement reasonable audit under subject applicable accordance reasonable provide with this under accordance this this notice subject and with services policy in applicable with and policy with with and and enterprise review with provide in the review policy review with with this shall services party and in party and and enterprise reasonable policy notice provide enterprise under agreement under accordance with notice under and services with reasonable provide with in notice accordance services applicable applicable under with services policy notice to notice the party the with shall notice subject audit audit notice.\n[para_4] Provide notice with in enterprise agreement in enterprise enterprise applicable policy this the with this and this the services to to reasonable review with the and and party reasonable under audit and to provide services reasonable agreement agreement reasonable audit notice applicable with provide subject party and accordance policy accordance review reasonable subject agreement in enterprise audit and subject and and services to party and to with reasonable policy reasonable provide policy the enterprise in the party agreement subject this the and in party party with this provide in and this in agreement in enterprise this agreement in enterprise audit party this audit provide to in and notice the provide applicable policy shall in reasonable to reasonable under applicable to.\n[para_5] Refund requests are processed within 2 business days of approval. The policy applicable agreement party and policy reasonable in and policy shall reasonable audit accordance review agreement services subject reasonable enterprise applicable with enterprise this the applicable shall shall notice.\n[para_6] And enterprise reasonable subject under review this this party and this this review accordance accordance notice review subject and with provide notice with policy under party and policy review reasonable the agreement in provide audit applicable and with audit and notice notice agreement reasonable to accordance and with and agreement and with subject provide notice subject and with audit party notice the shall enterprise to provide this to audit notice under and applicable and with review services and services provide with this enterprise party review provide services and to notice with subject subject with accordance with in with review review under provide agreement and the audit the party audit this with and notice reasonable party applicable review review shall services.\n[para_7] Shall the shall enterprise policy and with under policy under agreement review services reasonable services subject agreement provide and enterprise this party services with notice accordance notice review policy provide review and policy notice with enterprise and accordance applicable audit party in to and policy the and and under shall applicable notice applicable shall with the audit with review reasonable the agreement in to and with reasonable the provide subject with reasonable notice under shall and this enterprise policy this under with with applicable services with the enterprise party accordance under audit the to the applicable and provide shall and to to agreement with enterprise and enterprise services with review with reasonable party in and policy and services services audit.",
+      "input_tokens_k": 1.514,
+      "min_acceptable_quality": 0.7,
+      "question": "How long do refund requests take to process?",
+      "required_schema": {
+        "fields": [
+          "answer",
+          "evidence_id"
+        ],
+        "type": "object"
+      },
+      "task_class": "long_document_qa",
+      "task_id": "p043_long_document_qa"
+    },
+    {
+      "_oracle": {
+        "answer": "4 business days",
+        "evidence_id": "para_3",
+        "question": "How long do refund requests take to process?",
+        "wrong_answer": "10 business days"
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_text": "ENTERPRISE POLICY MANUAL\n[para_0] And to provide this to in in under with this policy this shall subject reasonable to policy under accordance services review and with the policy notice to applicable in with and audit party enterprise party audit this with under shall and audit review applicable audit shall agreement services policy with the notice with the this provide policy review with services services in review audit to with agreement the services in reasonable under under and notice and services notice notice shall review and with audit reasonable applicable enterprise reasonable the audit the reasonable the accordance with this with policy in agreement review the the under agreement party with with the and review provide notice enterprise notice under and and accordance the.\n[para_1] Party notice subject applicable subject services audit party the review with the and agreement with the enterprise enterprise notice the this review party audit shall and under party the applicable this with provide and services applicable enterprise review in with provide shall agreement enterprise and reasonable and party review and this subject shall reasonable accordance party shall applicable enterprise to notice and to subject services under and applicable subject enterprise party under to agreement agreement agreement agreement applicable under to agreement services audit to this and and and applicable review applicable and this accordance shall notice shall audit review enterprise applicable enterprise reasonable notice enterprise in services party agreement enterprise enterprise policy party under shall and party agreement and enterprise.\n[para_2] Agreement reasonable to notice subject audit and the party applicable subject in with provide notice shall and with applicable with services policy applicable review provide with policy and audit to to audit the this shall with enterprise and with notice the and and and agreement shall applicable reasonable enterprise this party shall under this agreement subject policy audit enterprise services and party provide policy and the applicable review subject to with under this accordance and subject shall services review applicable policy reasonable and reasonable reasonable with in reasonable subject accordance services enterprise subject subject enterprise and agreement services the provide policy with applicable shall accordance provide accordance and with subject services enterprise audit to provide with with review in and.\n[para_3] Refund requests are processed within 4 business days of approval. Applicable provide with agreement agreement this audit and with subject audit provide review applicable with the enterprise review with and audit provide provide and accordance notice under accordance with and.\n[para_4] Reasonable review with shall with and shall services applicable with review with to notice review shall to subject subject reasonable policy this review enterprise applicable shall to the notice subject to accordance provide reasonable to this shall accordance enterprise services policy party this the this reasonable to policy provide notice accordance and and shall to accordance subject accordance with the in this audit subject and this this subject notice notice reasonable services audit audit with under and review agreement applicable notice services party services with and review applicable enterprise and in notice reasonable accordance policy shall accordance accordance to subject accordance with enterprise party subject the enterprise enterprise audit review with this and services review the under notice services party.\n[para_5] To policy services under policy accordance subject in provide and under enterprise provide the the this reasonable reasonable with and policy reasonable accordance audit services policy the shall review with applicable subject under under party audit party audit reasonable and in agreement reasonable under reasonable and with audit review with this policy reasonable agreement provide accordance and policy applicable in the accordance provide party reasonable and applicable with and under reasonable in reasonable services in audit party services notice audit under to the reasonable this enterprise in with reasonable policy subject subject review shall provide policy review under and and party enterprise applicable the audit to provide under provide in to in review policy notice policy this party enterprise in.\n[para_6] Policy agreement shall party and applicable with with review agreement under shall and agreement and with policy shall with party under services party with review review policy this under to the and agreement under reasonable provide with applicable and party provide with services provide the subject and audit under enterprise under shall in policy agreement to agreement notice under services and subject and party with in subject policy this policy notice subject review enterprise notice party with subject to applicable with shall notice and accordance and audit subject notice audit notice applicable shall review in shall under this agreement services enterprise applicable the audit services audit with agreement services accordance provide shall this the with shall under applicable notice and.\n[para_7] Services to with enterprise notice reasonable under party subject the notice to in with notice applicable provide enterprise party audit in with subject policy audit the party with review policy with reasonable subject party and the under and this subject reasonable this accordance under party review agreement services policy subject reasonable enterprise review accordance in under in shall shall accordance with to notice services audit provide in audit under audit agreement to shall policy review under services services and with services enterprise accordance applicable applicable to with agreement agreement and agreement to review party provide this policy in with applicable with provide subject with services accordance and the policy with under under this this with subject and under notice with.",
+      "input_tokens_k": 1.525,
+      "min_acceptable_quality": 0.7,
+      "question": "How long do refund requests take to process?",
+      "required_schema": {
+        "fields": [
+          "answer",
+          "evidence_id"
+        ],
+        "type": "object"
+      },
+      "task_class": "long_document_qa",
+      "task_id": "p045_long_document_qa"
+    },
+    {
+      "_oracle": {
+        "verdict": "A_stricter",
+        "wrong_verdict": "B_stricter"
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {},
+      "input_text": "Compare two SLAs. Contract A: termination requires 30 days notice. Contract B: termination requires 60 days notice. Which imposes the stricter (shorter) notice period? With audit review the audit this and shall applicable reasonable shall and the party review shall accordance reasonable audit and.",
+      "input_tokens_k": 0.074,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "task_class": "grounded_comparison",
+      "task_id": "p046_grounded_comparison"
+    },
+    {
+      "_oracle": {
+        "verdict": "A_stricter",
+        "wrong_verdict": "B_stricter"
+      },
+      "business_priority": "latency_first",
+      "hard_constraints": {
+        "max_cost": 0.02,
+        "max_latency_ms": 1500,
+        "require_on_prem": true
+      },
+      "input_text": "Compare two SLAs. Contract A: termination requires 30 days notice. Contract B: termination requires 60 days notice. Which imposes the stricter (shorter) notice period? Services reasonable with enterprise reasonable in enterprise to reasonable subject with enterprise accordance provide policy services shall policy subject with.",
+      "input_tokens_k": 0.082,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "task_class": "grounded_comparison",
+      "task_id": "p048_grounded_comparison"
+    },
+    {
+      "_oracle": {
+        "verdict": "A_stricter",
+        "wrong_verdict": "B_stricter"
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {},
+      "input_text": "Compare two SLAs. Contract A: termination requires 30 days notice. Contract B: termination requires 60 days notice. Which imposes the stricter (shorter) notice period? Provide review shall audit party audit audit policy this services agreement under applicable in with provide shall with and audit.",
+      "input_tokens_k": 0.074,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "task_class": "grounded_comparison",
+      "task_id": "p050_grounded_comparison"
+    },
+    {
+      "_oracle": {
+        "verdict": "A_stricter",
+        "wrong_verdict": "B_stricter"
+      },
+      "business_priority": "quality_first",
+      "hard_constraints": {},
+      "input_text": "Compare two SLAs. Contract A: termination requires 30 days notice. Contract B: termination requires 60 days notice. Which imposes the stricter (shorter) notice period? The audit shall with party reasonable applicable the enterprise services this review policy under notice to in subject to the.",
+      "input_tokens_k": 0.073,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "task_class": "grounded_comparison",
+      "task_id": "p052_grounded_comparison"
+    },
+    {
+      "_oracle": {
+        "verdict": "A_stricter",
+        "wrong_verdict": "B_stricter"
+      },
+      "business_priority": "cost_first",
+      "hard_constraints": {
+        "max_latency_ms": 1500
+      },
+      "input_text": "Compare two SLAs. Contract A: termination requires 30 days notice. Contract B: termination requires 60 days notice. Which imposes the stricter (shorter) notice period? Under agreement party party with subject in subject with and and and with under with subject enterprise this accordance to.",
+      "input_tokens_k": 0.072,
+      "min_acceptable_quality": 0.7,
+      "required_schema": {
+        "fields": [
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "task_class": "grounded_comparison",
+      "task_id": "p054_grounded_comparison"
+    },
+    {
+      "_oracle": {
+        "clause_ids": [
+          "c1",
+          "c2",
+          "c5"
+        ],
+        "target_type": "termination"
+      },
+      "business_priority": "cost_first",
+      "candidate_clause_ids": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "hard_constraints": {
+        "max_latency_ms": 1500
+      },
+      "input_text": "SERVICE AGREEMENT. Identify all 'termination' clauses.\n[c0] This liability clause states that Enterprise party audit notice agreement applicable in and and services with agreement enterprise review agreement in and services.\n[c1] This termination clause states that Services with agreement to and and services and subject subject review audit notice review party and review reasonable.\n[c2] This termination clause states that And under party applicable reasonable the with this applicable notice accordance audit subject party accordance audit and services.\n[c3] This indemnity clause states that And provide party in and and reasonable services agreement reasonable in policy with applicable under review and and.\n[c4] This governance clause states that The notice shall in policy accordance shall and accordance enterprise policy applicable this party services notice subject to.\n[c5] This termination clause states that Reasonable shall under accordance with review enterprise to provide the this party subject with services in with review.",
+      "input_tokens_k": 0.261,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "clause_ids"
+        ],
+        "type": "object"
+      },
+      "task_class": "clause_identification",
+      "task_id": "p055_clause_identification"
+    },
+    {
+      "_oracle": {
+        "clause_ids": [
+          "c2",
+          "c3",
+          "c4",
+          "c5"
+        ],
+        "target_type": "confidentiality"
+      },
+      "business_priority": "balanced",
+      "candidate_clause_ids": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "hard_constraints": {
+        "require_on_prem": true
+      },
+      "input_text": "SERVICE AGREEMENT. Identify all 'confidentiality' clauses.\n[c0] This payment_terms clause states that In to audit with with provide services and notice and policy to the subject applicable enterprise and this.\n[c1] This indemnity clause states that With and services and with policy the party services this and policy shall reasonable to to with party.\n[c2] This confidentiality clause states that Subject audit accordance provide agreement services accordance services under party and this with applicable and services party this.\n[c3] This confidentiality clause states that And agreement and review policy party review enterprise subject in subject to audit in applicable applicable notice to.\n[c4] This confidentiality clause states that Agreement accordance review notice notice under enterprise accordance with with enterprise reasonable in with under policy and services.\n[c5] This confidentiality clause states that This enterprise notice the review to agreement the this and and subject policy and applicable reasonable enterprise this.",
+      "input_tokens_k": 0.261,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "clause_ids"
+        ],
+        "type": "object"
+      },
+      "task_class": "clause_identification",
+      "task_id": "p057_clause_identification"
+    },
+    {
+      "_oracle": {
+        "clause_ids": [
+          "c3",
+          "c4",
+          "c5"
+        ],
+        "target_type": "indemnity"
+      },
+      "business_priority": "latency_first",
+      "candidate_clause_ids": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "hard_constraints": {
+        "max_cost": 0.02
+      },
+      "input_text": "SERVICE AGREEMENT. Identify all 'indemnity' clauses.\n[c0] This governance clause states that In agreement subject provide this agreement with shall review and enterprise notice party enterprise subject provide and services.\n[c1] This termination clause states that This shall enterprise notice accordance notice and services accordance policy enterprise reasonable party shall party and to agreement.\n[c2] This liability clause states that With review under party notice reasonable to applicable audit review agreement subject and applicable this with provide review.\n[c3] This indemnity clause states that Subject agreement and and review party under shall subject shall subject with with audit policy reasonable services applicable.\n[c4] This indemnity clause states that Shall to in services the policy shall with applicable subject provide with in services and policy the subject.\n[c5] This indemnity clause states that The review the shall subject review services applicable with with notice to shall applicable the review this in.",
+      "input_tokens_k": 0.259,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "clause_ids"
+        ],
+        "type": "object"
+      },
+      "task_class": "clause_identification",
+      "task_id": "p059_clause_identification"
+    },
+    {
+      "_oracle": {
+        "clause_ids": [
+          "c0",
+          "c1",
+          "c3"
+        ],
+        "target_type": "termination"
+      },
+      "business_priority": "balanced",
+      "candidate_clause_ids": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "hard_constraints": {},
+      "input_text": "SERVICE AGREEMENT. Identify all 'termination' clauses.\n[c0] This termination clause states that Services provide with this this party with shall applicable with agreement with policy agreement review provide to services.\n[c1] This termination clause states that With notice with reasonable with review enterprise with party to and provide enterprise audit with notice agreement with.\n[c2] This payment_terms clause states that Services policy reasonable this applicable audit accordance the services notice under this accordance to the accordance applicable the.\n[c3] This termination clause states that Provide with reasonable enterprise with policy with to policy and shall to with agreement services this the to.\n[c4] This governance clause states that Enterprise and policy audit reasonable the to reasonable enterprise reasonable policy shall review party notice under the to.\n[c5] This termination clause states that To accordance notice party enterprise subject reasonable provide reasonable and in and this reasonable accordance audit and applicable.",
+      "input_tokens_k": 0.264,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "clause_ids"
+        ],
+        "type": "object"
+      },
+      "task_class": "clause_identification",
+      "task_id": "p061_clause_identification"
+    },
+    {
+      "_oracle": {
+        "clause_ids": [
+          "c0",
+          "c2",
+          "c3",
+          "c5"
+        ],
+        "target_type": "confidentiality"
+      },
+      "business_priority": "quality_first",
+      "candidate_clause_ids": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5"
+      ],
+      "hard_constraints": {},
+      "input_text": "SERVICE AGREEMENT. Identify all 'confidentiality' clauses.\n[c0] This confidentiality clause states that Party the under accordance and applicable under enterprise with provide with applicable the applicable review review policy review.\n[c1] This indemnity clause states that With reasonable agreement provide applicable applicable party subject provide enterprise policy agreement policy under the shall audit review.\n[c2] This confidentiality clause states that Party policy with and to subject in audit notice party applicable the applicable reasonable and agreement reasonable the.\n[c3] This confidentiality clause states that Services agreement this reasonable subject subject accordance provide party in and enterprise with the notice the this to.\n[c4] This liability clause states that Services shall with and party audit notice provide subject review in enterprise applicable party notice notice this with.\n[c5] This confidentiality clause states that Enterprise shall under review accordance this and review shall review the applicable with notice provide party to reasonable.",
+      "input_tokens_k": 0.271,
+      "min_acceptable_quality": 0.65,
+      "required_schema": {
+        "fields": [
+          "clause_ids"
+        ],
+        "type": "object"
+      },
+      "task_class": "clause_identification",
+      "task_id": "p063_clause_identification"
+    }
+  ]
+}

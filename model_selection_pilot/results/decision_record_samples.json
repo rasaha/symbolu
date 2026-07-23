@@ -1,0 +1,1707 @@
+{
+  "p002_structured_extraction": {
+    "F2": {
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight",
+        "strong_reason"
+      ],
+      "eliminated": [],
+      "fallback_chain": [
+        "fast_small",
+        "medium_general",
+        "long_context",
+        "strong_reason"
+      ],
+      "gate": [
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "result": "indeterminate-pass (low evidence)"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "result": "indeterminate-pass (low evidence)"
+        }
+      ],
+      "mode": "F2",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.0159,
+            "latency_penalty": -0.0545,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000114,
+          "est_latency_ms": 1216.2,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "utility": 0.6355
+        },
+        {
+          "components": {
+            "cost_penalty": -0.04,
+            "latency_penalty": -0.0318,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000286,
+          "est_latency_ms": 709.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "utility": 0.6341
+        },
+        {
+          "components": {
+            "cost_penalty": -0.1075,
+            "latency_penalty": -0.0409,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.00077,
+          "est_latency_ms": 912.2,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "utility": 0.5574
+        },
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.0727,
+            "quality": 0.7456
+          },
+          "confidence": 0.2,
+          "est_cost": 0.001074,
+          "est_latency_ms": 1621.6,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "utility": 0.5229
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0473,
+            "latency_penalty": -0.1,
+            "quality": 0.6228
+          },
+          "confidence": 0.2,
+          "est_cost": 0.000339,
+          "est_latency_ms": 2229.7,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6666
+            }
+          ],
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "utility": 0.4755
+        }
+      ],
+      "selected": "open_weight",
+      "self_assessment_used": false,
+      "task_class": "structured_extraction",
+      "task_id": "p002_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.3333
+    },
+    "G": {
+      "_preflight_candidates": 5,
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight"
+      ],
+      "eliminated": [
+        {
+          "constraint": "min_quality",
+          "model": "strong_reason",
+          "provenance": "gate",
+          "reason": "predicted quality 0.6785 < min 0.7",
+          "stage": "quality-gate"
+        }
+      ],
+      "fallback_chain": [
+        "fast_small",
+        "medium_general",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6785,
+          "result": "fail-min-quality"
+        }
+      ],
+      "mode": "G",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 300,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.0159,
+            "latency_penalty": -0.075,
+            "quality": 0.7488
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000114,
+          "est_latency_ms": 1216.2,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.7488,
+          "utility": 0.6579
+        },
+        {
+          "components": {
+            "cost_penalty": -0.04,
+            "latency_penalty": -0.0438,
+            "quality": 0.719
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000286,
+          "est_latency_ms": 709.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "utility": 0.6352
+        },
+        {
+          "components": {
+            "cost_penalty": -0.1075,
+            "latency_penalty": -0.0563,
+            "quality": 0.7488
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.00077,
+          "est_latency_ms": 912.2,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "utility": 0.585
+        },
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.1,
+            "quality": 0.8183
+          },
+          "confidence": 0.4,
+          "est_cost": 0.001074,
+          "est_latency_ms": 1621.6,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "utility": 0.5683
+        }
+      ],
+      "selected": "open_weight",
+      "self_assessment_used": true,
+      "task_class": "structured_extraction",
+      "task_id": "p002_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.5333
+    }
+  },
+  "p004_structured_extraction": {
+    "F2": {
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight",
+        "strong_reason"
+      ],
+      "eliminated": [],
+      "fallback_chain": [
+        "open_weight",
+        "medium_general",
+        "long_context",
+        "strong_reason"
+      ],
+      "gate": [
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "result": "indeterminate-pass (low evidence)"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "result": "indeterminate-pass (low evidence)"
+        }
+      ],
+      "mode": "F2",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.08,
+            "latency_penalty": -0.3182,
+            "quality": 0.5647
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000288,
+          "est_latency_ms": 709.6,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "utility": 0.1665
+        },
+        {
+          "components": {
+            "cost_penalty": -0.032,
+            "latency_penalty": -0.5455,
+            "quality": 0.5647
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000115,
+          "est_latency_ms": 1216.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "utility": -0.0127
+        },
+        {
+          "components": {
+            "cost_penalty": -0.2153,
+            "latency_penalty": -0.4091,
+            "quality": 0.5647
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000775,
+          "est_latency_ms": 912.4,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "utility": -0.0596
+        },
+        {
+          "components": {
+            "cost_penalty": -0.3,
+            "latency_penalty": -0.7273,
+            "quality": 0.5965
+          },
+          "confidence": 0.2,
+          "est_cost": 0.00108,
+          "est_latency_ms": 1622.0,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "utility": -0.4308
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0947,
+            "latency_penalty": -1.0,
+            "quality": 0.4982
+          },
+          "confidence": 0.2,
+          "est_cost": 0.000341,
+          "est_latency_ms": 2230.2,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6666
+            }
+          ],
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "utility": -0.5965
+        }
+      ],
+      "selected": "fast_small",
+      "self_assessment_used": false,
+      "task_class": "structured_extraction",
+      "task_id": "p004_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.3333
+    },
+    "G": {
+      "_preflight_candidates": 5,
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight"
+      ],
+      "eliminated": [
+        {
+          "constraint": "min_quality",
+          "model": "strong_reason",
+          "provenance": "gate",
+          "reason": "predicted quality 0.6785 < min 0.7",
+          "stage": "quality-gate"
+        }
+      ],
+      "fallback_chain": [
+        "medium_general",
+        "open_weight",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6785,
+          "result": "fail-min-quality"
+        }
+      ],
+      "mode": "G",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 300,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.08,
+            "latency_penalty": -0.4375,
+            "quality": 0.5752
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000288,
+          "est_latency_ms": 709.6,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "utility": 0.0577
+        },
+        {
+          "components": {
+            "cost_penalty": -0.2153,
+            "latency_penalty": -0.5625,
+            "quality": 0.599
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000775,
+          "est_latency_ms": 912.4,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "utility": -0.1787
+        },
+        {
+          "components": {
+            "cost_penalty": -0.032,
+            "latency_penalty": -0.75,
+            "quality": 0.5752
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000115,
+          "est_latency_ms": 1216.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "utility": -0.2068
+        },
+        {
+          "components": {
+            "cost_penalty": -0.3,
+            "latency_penalty": -1.0,
+            "quality": 0.6546
+          },
+          "confidence": 0.4,
+          "est_cost": 0.00108,
+          "est_latency_ms": 1622.0,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "utility": -0.6454
+        }
+      ],
+      "selected": "fast_small",
+      "self_assessment_used": true,
+      "task_class": "structured_extraction",
+      "task_id": "p004_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.5333
+    }
+  },
+  "p006_structured_extraction": {
+    "F2": {
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight",
+        "strong_reason"
+      ],
+      "eliminated": [],
+      "fallback_chain": [
+        "open_weight",
+        "medium_general",
+        "strong_reason",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "result": "indeterminate-pass (low evidence)"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "result": "indeterminate-pass (low evidence)"
+        }
+      ],
+      "mode": "F2",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.1273,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000289,
+          "est_latency_ms": 709.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "utility": 0.4453
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0535,
+            "latency_penalty": -0.2182,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000116,
+          "est_latency_ms": 1216.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "utility": 0.4342
+        },
+        {
+          "components": {
+            "cost_penalty": -0.359,
+            "latency_penalty": -0.1636,
+            "quality": 0.7059
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000778,
+          "est_latency_ms": 912.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "utility": 0.1833
+        },
+        {
+          "components": {
+            "cost_penalty": -0.1579,
+            "latency_penalty": -0.4,
+            "quality": 0.6228
+          },
+          "confidence": 0.2,
+          "est_cost": 0.000342,
+          "est_latency_ms": 2230.5,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6666
+            }
+          ],
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "utility": 0.0649
+        },
+        {
+          "components": {
+            "cost_penalty": -0.5,
+            "latency_penalty": -0.2909,
+            "quality": 0.7456
+          },
+          "confidence": 0.2,
+          "est_cost": 0.001083,
+          "est_latency_ms": 1622.2,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "utility": -0.0453
+        }
+      ],
+      "selected": "fast_small",
+      "self_assessment_used": false,
+      "task_class": "structured_extraction",
+      "task_id": "p006_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.3333
+    },
+    "G": {
+      "_preflight_candidates": 5,
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight"
+      ],
+      "eliminated": [
+        {
+          "constraint": "min_quality",
+          "model": "strong_reason",
+          "provenance": "gate",
+          "reason": "predicted quality 0.6785 < min 0.7",
+          "stage": "quality-gate"
+        }
+      ],
+      "fallback_chain": [
+        "open_weight",
+        "medium_general",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6785,
+          "result": "fail-min-quality"
+        }
+      ],
+      "mode": "G",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 300,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.175,
+            "quality": 0.719
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000289,
+          "est_latency_ms": 709.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.719,
+          "utility": 0.4107
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0535,
+            "latency_penalty": -0.3,
+            "quality": 0.719
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000116,
+          "est_latency_ms": 1216.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "utility": 0.3655
+        },
+        {
+          "components": {
+            "cost_penalty": -0.359,
+            "latency_penalty": -0.225,
+            "quality": 0.7488
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000778,
+          "est_latency_ms": 912.5,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "utility": 0.1648
+        },
+        {
+          "components": {
+            "cost_penalty": -0.5,
+            "latency_penalty": -0.4,
+            "quality": 0.8183
+          },
+          "confidence": 0.4,
+          "est_cost": 0.001083,
+          "est_latency_ms": 1622.2,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "utility": -0.0817
+        }
+      ],
+      "selected": "fast_small",
+      "self_assessment_used": true,
+      "task_class": "structured_extraction",
+      "task_id": "p006_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.5333
+    }
+  },
+  "p008_structured_extraction": {
+    "F2": {
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight",
+        "strong_reason"
+      ],
+      "eliminated": [],
+      "fallback_chain": [
+        "fast_small",
+        "strong_reason",
+        "medium_general",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "result": "indeterminate-pass (low evidence)"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.3333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.2,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "result": "indeterminate-pass (low evidence)"
+        }
+      ],
+      "mode": "F2",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1044,
+            "latency_penalty": -0.1636,
+            "quality": 0.4941
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000111,
+          "est_latency_ms": 1215.6,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.7059,
+          "utility": 0.2261
+        },
+        {
+          "components": {
+            "cost_penalty": -0.2667,
+            "latency_penalty": -0.0955,
+            "quality": 0.4941
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.000283,
+          "est_latency_ms": 709.1,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.7059,
+          "utility": 0.132
+        },
+        {
+          "components": {
+            "cost_penalty": -0.3149,
+            "latency_penalty": -0.3,
+            "quality": 0.436
+          },
+          "confidence": 0.2,
+          "est_cost": 0.000334,
+          "est_latency_ms": 2228.6,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6666
+            }
+          ],
+          "model": "strong_reason",
+          "predicted_quality": 0.6228,
+          "utility": -0.1789
+        },
+        {
+          "components": {
+            "cost_penalty": -0.7156,
+            "latency_penalty": -0.1227,
+            "quality": 0.4941
+          },
+          "confidence": 0.3333,
+          "est_cost": 0.00076,
+          "est_latency_ms": 911.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7059,
+          "utility": -0.3442
+        },
+        {
+          "components": {
+            "cost_penalty": -1.0,
+            "latency_penalty": -0.2182,
+            "quality": 0.5219
+          },
+          "confidence": 0.2,
+          "est_cost": 0.001062,
+          "est_latency_ms": 1620.8,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.7456,
+          "utility": -0.6963
+        }
+      ],
+      "selected": "open_weight",
+      "self_assessment_used": false,
+      "task_class": "structured_extraction",
+      "task_id": "p008_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.3333
+    },
+    "G": {
+      "_preflight_candidates": 5,
+      "abstain_reason": null,
+      "abstained": false,
+      "eligible": [
+        "fast_small",
+        "long_context",
+        "medium_general",
+        "open_weight"
+      ],
+      "eliminated": [
+        {
+          "constraint": "min_quality",
+          "model": "strong_reason",
+          "provenance": "gate",
+          "reason": "predicted quality 0.6785 < min 0.7",
+          "stage": "quality-gate"
+        }
+      ],
+      "fallback_chain": [
+        "fast_small",
+        "medium_general",
+        "long_context"
+      ],
+      "gate": [
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "fast_small",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.5333,
+          "min_required": 0.7,
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "result": "pass"
+        },
+        {
+          "confidence": 0.4,
+          "min_required": 0.7,
+          "model": "strong_reason",
+          "predicted_quality": 0.6785,
+          "result": "fail-min-quality"
+        }
+      ],
+      "mode": "G",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 300,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1044,
+            "latency_penalty": -0.225,
+            "quality": 0.5033
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000111,
+          "est_latency_ms": 1215.6,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "medium",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.75
+            }
+          ],
+          "model": "open_weight",
+          "predicted_quality": 0.719,
+          "utility": 0.1739
+        },
+        {
+          "components": {
+            "cost_penalty": -0.2667,
+            "latency_penalty": -0.1313,
+            "quality": 0.5242
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.000283,
+          "est_latency_ms": 709.1,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "fast_small",
+          "predicted_quality": 0.7488,
+          "utility": 0.1262
+        },
+        {
+          "components": {
+            "cost_penalty": -0.7156,
+            "latency_penalty": -0.1687,
+            "quality": 0.5242
+          },
+          "confidence": 0.5333,
+          "est_cost": 0.00076,
+          "est_latency_ms": 911.7,
+          "evidence": [
+            {
+              "confidence": 0.3333,
+              "n": 4,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.75
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.85
+            }
+          ],
+          "model": "medium_general",
+          "predicted_quality": 0.7488,
+          "utility": -0.3602
+        },
+        {
+          "components": {
+            "cost_penalty": -1.0,
+            "latency_penalty": -0.3,
+            "quality": 0.5728
+          },
+          "confidence": 0.4,
+          "est_cost": 0.001062,
+          "est_latency_ms": 1620.8,
+          "evidence": [
+            {
+              "confidence": 0.2,
+              "n": 2,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8334
+            },
+            {
+              "advisory_fields": {
+                "anticipated_execution_weakness": "none",
+                "anticipated_reasoning_difficulty": "low",
+                "likely_tool_requirement": false,
+                "recommended_prompting_strategy": "structured_json",
+                "suggested_decomposition": "single_pass"
+              },
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9334
+            }
+          ],
+          "model": "long_context",
+          "predicted_quality": 0.8183,
+          "utility": -0.7272
+        }
+      ],
+      "selected": "open_weight",
+      "self_assessment_used": true,
+      "task_class": "structured_extraction",
+      "task_id": "p008_structured_extraction",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": 0.5333
+    }
+  },
+  "p022_classification": {
+    "F2": {
+      "abstain_reason": "no model satisfies hard/technical constraints",
+      "abstained": true,
+      "eligible": [],
+      "eliminated": [
+        {
+          "constraint": "residency",
+          "model": "fast_small",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "long_context",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "medium_general",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "open_weight",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "strong_reason",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        }
+      ],
+      "fallback_chain": [],
+      "gate": [],
+      "mode": "F2",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [],
+      "selected": null,
+      "self_assessment_used": false,
+      "task_class": "classification",
+      "task_id": "p022_classification",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": null
+    },
+    "G": {
+      "_preflight_candidates": 0,
+      "abstain_reason": "no model satisfies hard/technical constraints",
+      "abstained": true,
+      "eligible": [],
+      "eliminated": [
+        {
+          "constraint": "residency",
+          "model": "fast_small",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "long_context",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "medium_general",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "open_weight",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        },
+        {
+          "constraint": "residency",
+          "model": "strong_reason",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem",
+          "stage": "hard/technical"
+        }
+      ],
+      "fallback_chain": [],
+      "gate": [],
+      "mode": "G",
+      "policy_version": "pilot_policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 300,
+      "regime": "mature",
+      "registry_version": "pilot_registry_v1",
+      "scored": [],
+      "selected": null,
+      "self_assessment_used": true,
+      "task_class": "classification",
+      "task_id": "p022_classification",
+      "telemetry_version": "pilot_registry_v1:mature",
+      "uncertainty": null
+    }
+  }
+}

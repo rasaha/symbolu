@@ -1,0 +1,379 @@
+{
+  "enterprise_policy": {
+    "approved_deployment_modes": [
+      "approved-cloud",
+      "on-prem"
+    ],
+    "approved_providers": [
+      "anthropic",
+      "openai",
+      "bedrock"
+    ],
+    "note": "governance plane; hard constraints per task may further restrict."
+  },
+  "models": {
+    "fast_small": {
+      "provider_facts": {
+        "base_latency_ms": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "observed-estimate",
+          "source": "provider public pricing/model docs",
+          "value": 700,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "context_limit_tokens": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": 200000,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "deployment_mode": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "approved-cloud",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "endpoint_type": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "saas-api",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "model_version": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "claude-3-5-haiku-20241022",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "pricing_per_mtok": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": {
+            "basis": "per 1M tokens",
+            "in": 0.8,
+            "out": 4.0
+          },
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "provider": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "anthropic",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "structured_output_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "prompt-json",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "tool_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": true,
+          "verification_status": "published-docs-not-live-verified"
+        }
+      },
+      "stub_profile": "fast_small"
+    },
+    "long_context": {
+      "provider_facts": {
+        "base_latency_ms": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "observed-estimate",
+          "source": "provider public pricing/model docs",
+          "value": 1600,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "context_limit_tokens": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": 200000,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "deployment_mode": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "approved-cloud",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "endpoint_type": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "saas-api",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "model_version": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "claude-3-7-sonnet-20250219",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "pricing_per_mtok": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": {
+            "basis": "per 1M tokens",
+            "in": 3.0,
+            "out": 15.0
+          },
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "provider": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "anthropic",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "structured_output_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "prompt-json",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "tool_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": true,
+          "verification_status": "published-docs-not-live-verified"
+        }
+      },
+      "stub_profile": "long_context"
+    },
+    "medium_general": {
+      "provider_facts": {
+        "base_latency_ms": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "observed-estimate",
+          "source": "provider public pricing/model docs",
+          "value": 900,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "context_limit_tokens": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": 128000,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "deployment_mode": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "approved-cloud",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "endpoint_type": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "saas-api",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "model_version": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "gpt-4o-2024-11-20",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "pricing_per_mtok": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": {
+            "basis": "per 1M tokens",
+            "in": 2.5,
+            "out": 10.0
+          },
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "provider": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "openai",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "structured_output_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "json-schema-strict",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "tool_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": true,
+          "verification_status": "published-docs-not-live-verified"
+        }
+      },
+      "stub_profile": "medium"
+    },
+    "open_weight": {
+      "provider_facts": {
+        "base_latency_ms": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "observed-estimate",
+          "source": "provider public pricing/model docs",
+          "value": 1200,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "context_limit_tokens": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": 128000,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "deployment_mode": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "approved-cloud",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "endpoint_type": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "bedrock-runtime",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "model_version": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "meta.llama3-1-70b-instruct-v1:0",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "pricing_per_mtok": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": {
+            "basis": "per 1M tokens (Bedrock)",
+            "in": 0.72,
+            "out": 0.72
+          },
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "provider": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "bedrock",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "structured_output_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "prompt-json",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "tool_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": true,
+          "verification_status": "published-docs-not-live-verified"
+        }
+      },
+      "stub_profile": "open_weight"
+    },
+    "strong_reason": {
+      "provider_facts": {
+        "base_latency_ms": {
+          "caveat": "reasoning model; higher TTFT + hidden reasoning tokens",
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "observed-estimate",
+          "source": "provider public pricing/model docs",
+          "value": 2200,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "context_limit_tokens": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": 200000,
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "deployment_mode": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "approved-cloud",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "endpoint_type": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "saas-api",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "model_version": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "o3-mini-2025-01-31",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "pricing_per_mtok": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": {
+            "basis": "per 1M tokens",
+            "in": 1.1,
+            "out": 4.4
+          },
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "provider": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "openai",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "structured_output_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": "json-schema-strict",
+          "verification_status": "published-docs-not-live-verified"
+        },
+        "tool_support": {
+          "date_verified": "2025-01 (author knowledge cutoff; RE-VERIFY before real run)",
+          "provenance": "provider-declared",
+          "source": "provider public pricing/model docs",
+          "value": true,
+          "verification_status": "published-docs-not-live-verified"
+        }
+      },
+      "stub_profile": "strong_reason"
+    }
+  },
+  "verification_caveat": "Pricing/context/deployment are provider-published values, NOT live-verified in this sandbox and NOT model-generated. Re-verify against live endpoints before any real run.",
+  "version": "pilot_registry_v1"
+}
