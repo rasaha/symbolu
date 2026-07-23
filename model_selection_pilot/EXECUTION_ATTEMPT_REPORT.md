@@ -1,5 +1,49 @@
 # Execution Attempt Report — Pre-Execution Gate FAILED (no real run)
 
+## Attempt 3 (full environment verification) — gate FAILS; two distinct causes
+
+*Ran the full environment-verification gate with failure classification. New verified
+findings beyond Attempt 2:*
+
+**Provider reachability (frozen registry providers = anthropic, openai, bedrock):**
+
+| Provider | Classification | Detail |
+|---|---|---|
+| anthropic | **reachable + authenticated** | `GET /v1/models` succeeded |
+| openai | **missing credential** | `OPENAI_API_KEY` unset |
+| bedrock | **invalid credential** | AWS `InvalidClientTokenId` |
+| *mistral* | **network-policy denial** | proxy `403` on `CONNECT api.mistral.ai:443` — **and Mistral is NOT a frozen-registry provider**; using it would require a new experimental version (not authorized) |
+
+→ **Reachable frozen-registry providers = 1 (Anthropic).** Fails the mandatory
+**≥2 providers / ≥3 families / ≥4 heterogeneous executable models** gate.
+
+**New finding — the frozen Anthropic model IDs are not accessible to this account.**
+`GET /v1/models` (Anthropic) returned this account's accessible models:
+`claude-sonnet-5, claude-fable-5, claude-opus-4-8, claude-opus-4-7, claude-sonnet-4-6,
+claude-opus-4-6, claude-opus-4-5-20251101, claude-haiku-4-5-20251001,
+claude-sonnet-4-5-20250929`. The frozen registry pins `claude-3-5-haiku-20241022` and
+`claude-3-7-sonnet-20250219`, which return `model_not_found` here (a valid key +
+`model_not_found` is **not** an executable model). So **even the one reachable provider
+cannot run its frozen-registry snapshots as pinned** — updating those IDs would itself
+require a new experimental version, which is not authorized.
+
+**Verdict: gate FAILS (categories: network-policy denial [mistral, out-of-scope];
+missing credential [openai]; invalid credential [bedrock]; model-unavailable-to-account
+[frozen Anthropic snapshots]).** Not statistically viable — no configuration of ≥2
+frozen providers exists here. Stopped per the frozen stop-on-gate-failure rule. No paid
+inference beyond free `/v1/models` + one 1-token auth probe; keys used only for
+verification, kept in the session scratchpad outside the repo, never committed. Tests
+17/17. Falsification verdict remains **UNRESOLVED**; no stub substituted; interim
+default unchanged (Category 2; definitive recommendation deferred).
+
+**To unblock, BOTH are required:** (a) a genuinely reachable **second** frozen-registry
+provider (OpenAI key, or valid AWS+Bedrock access, permitted by network policy); and
+(b) either an environment whose Anthropic account exposes the frozen model snapshots, or
+an explicitly declared **new experimental version** that re-pins model IDs to
+account-accessible ones (which the frozen protocol forbids doing silently).
+
+---
+
 ## Attempt 2 (credentials supplied) — gate still FAILS at "≥2 providers"
 
 *Two provider keys were supplied directly (Anthropic, Mistral). Re-running the
