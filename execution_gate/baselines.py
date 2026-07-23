@@ -6,12 +6,12 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-from gate import ExecutionGate
-from model import GateConfig
-from policy import PolicyWeights, select as policy_select
-from registry import ExecutableRegistry, ExecStatus, ModelRecord
-from scenarios import Scenario, T0
-from states import EligibilityDecision
+from execution_gate.gate import ExecutionGate
+from execution_gate.model import GateConfig
+from execution_gate.policy import PolicyWeights, select as policy_select
+from execution_gate.registry import ExecutableRegistry, ExecStatus, ModelRecord
+from execution_gate.scenarios import Scenario, T0
+from execution_gate.states import EligibilityDecision
 
 STATIC_ALLOWLIST_PROVIDERS = {"anthropic", "google"}   # a plausible manual config
 

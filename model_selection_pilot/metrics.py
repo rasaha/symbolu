@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from common import percentile
+from model_selection_pilot.common import percentile
 
 PRIORITY_WEIGHTS = {
     "quality_first": (1.0, 0.15, 0.10), "balanced": (1.0, 0.50, 0.40),

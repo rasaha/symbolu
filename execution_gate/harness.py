@@ -9,9 +9,9 @@ from __future__ import annotations
 import os
 from typing import Dict, List
 
-import baselines as bl
-from scenarios import SCENARIOS, Scenario, GroundTruth
-from states import EligibilityState
+from execution_gate import baselines as bl
+from execution_gate.scenarios import SCENARIOS, Scenario, GroundTruth
+from execution_gate.states import EligibilityState
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 VIOLATION_QUALITY_PENALTY = 1.0   # a policy violation is worse than a plain failure
@@ -135,7 +135,7 @@ def print_summary(res: Dict):
 
 
 if __name__ == "__main__":
-    from common_io import save_json  # noqa
+    from execution_gate.common_io import save_json  # noqa
     r = run()
     save_json(os.path.join(RESULTS_DIR, "evaluation.json"), r)
     print_summary(r)

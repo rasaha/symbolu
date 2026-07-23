@@ -18,14 +18,14 @@ PKG = os.path.dirname(HERE)
 if PKG not in sys.path:
     sys.path.insert(0, PKG)
 
-import baselines as bl  # noqa: E402
-import harness as H  # noqa: E402
-from gate import ExecutionGate  # noqa: E402
-from model import Candidate, GateConfig, Request, Signal  # noqa: E402
-from policy import select as policy_select, PolicyWeights  # noqa: E402
-from reason_codes import ReasonCode, normalize_raw  # noqa: E402
-from registry import ExecutableRegistry, ExecStatus, ModelRecord  # noqa: E402
-from states import (Evidence, EvidenceSource, EligibilityState, Verdict)  # noqa: E402
+from execution_gate import baselines as bl  # noqa: E402
+from execution_gate import harness as H  # noqa: E402
+from execution_gate.gate import ExecutionGate  # noqa: E402
+from execution_gate.model import Candidate, GateConfig, Request, Signal  # noqa: E402
+from execution_gate.policy import select as policy_select, PolicyWeights  # noqa: E402
+from execution_gate.reason_codes import ReasonCode, normalize_raw  # noqa: E402
+from execution_gate.registry import ExecutableRegistry, ExecStatus, ModelRecord  # noqa: E402
+from execution_gate.states import (Evidence, EvidenceSource, EligibilityState, Verdict)  # noqa: E402
 
 NOW = 1_000_000.0
 

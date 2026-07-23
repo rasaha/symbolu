@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-import simulator as sim
-from common import percentile
+from model_selection_experiment import simulator as sim
+from model_selection_experiment.common import percentile
 
 REQUIRED_RECORD_FIELDS = [
     "arm", "task_id", "selected", "abstained", "eligible", "eliminated",

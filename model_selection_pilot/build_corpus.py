@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 
-from common import CORPUS_VERSION, DATA_DIR, approx_tokens, det_unit, save_json
+from model_selection_pilot.common import CORPUS_VERSION, DATA_DIR, approx_tokens, det_unit, save_json
 
 VENDORS = ["Acme Supplies", "Globex Ltd", "Initech Corp", "Umbrella Services", "Wayne Logistics",
            "Stark Materials", "Soylent Foods", "Hooli Cloud"]

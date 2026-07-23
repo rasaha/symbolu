@@ -27,7 +27,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from common import approx_tokens, clamp, det_signed, det_unit
+from model_selection_pilot.common import approx_tokens, clamp, det_signed, det_unit
 
 
 @dataclass

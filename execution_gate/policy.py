@@ -11,9 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from model import Request
-from registry import ModelRecord
-from states import EligibilityDecision, EligibilityState
+from execution_gate.model import Request
+from execution_gate.registry import ModelRecord
+from execution_gate.states import EligibilityDecision, EligibilityState
 
 
 @dataclass

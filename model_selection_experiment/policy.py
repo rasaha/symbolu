@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from common import POLICY_VERSION, REGISTRY_VERSION, weighted_caps
+from model_selection_experiment.common import POLICY_VERSION, REGISTRY_VERSION, weighted_caps
 
 
 class SelfAssessmentViolation(ValueError):

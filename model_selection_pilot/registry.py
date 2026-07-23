@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from common import DATA_DIR, REGISTRY_VERSION, save_json
+from model_selection_pilot.common import DATA_DIR, REGISTRY_VERSION, save_json
 
 _SRC = "provider public pricing/model docs"
 _ASOF = "2025-01 (author knowledge cutoff; RE-VERIFY before real run)"

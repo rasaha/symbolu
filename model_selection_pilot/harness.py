@@ -14,15 +14,15 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List
 
-import arms
-import costguard as cg
-import execute
-import metrics
-import policy as pol
-import telemetry as tele
-from advisory import PREFLIGHT_TOKENS_IN, PREFLIGHT_TOKENS_OUT
-from common import REGIMES, RESULTS_DIR, load_json, save_json
-from provider import resolve_adapters
+from model_selection_pilot import arms as arms
+from model_selection_pilot import costguard as cg
+from model_selection_pilot import execute as execute
+from model_selection_pilot import metrics as metrics
+from model_selection_pilot import policy as pol
+from model_selection_pilot import telemetry as tele
+from model_selection_pilot.advisory import PREFLIGHT_TOKENS_IN, PREFLIGHT_TOKENS_OUT
+from model_selection_pilot.common import REGIMES, RESULTS_DIR, load_json, save_json
+from model_selection_pilot.provider import resolve_adapters
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 MAX_SPEND_USD = float(os.environ.get("PILOT_MAX_SPEND_USD", "5.00"))

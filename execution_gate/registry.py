@@ -10,10 +10,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from gate import ExecutionGate
-from model import Candidate, Request
-from reason_codes import ReasonCode
-from states import EligibilityDecision
+from execution_gate.gate import ExecutionGate
+from execution_gate.model import Candidate, Request
+from execution_gate.reason_codes import ReasonCode
+from execution_gate.states import EligibilityDecision
 
 
 class ExecStatus(str, Enum):

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-import policy as pol
+from model_selection_experiment import policy as pol
 
 FIXED_DEFAULT_MODEL = "m_medium_general"
 
@@ -119,7 +119,7 @@ def arm_E_benchmark_only(task, registry, ent_policy, telemetry, policy, regime, 
         if not covered:
             # no benchmark coverage -> fall back to declared overall (optimistic)
             return models[mid]["declared"]["declared_overall"]["value"] - 0.001
-        from common import weighted_caps
+        from model_selection_experiment.common import weighted_caps
         return weighted_caps(covered, {c: req[c] for c in covered})
 
     ranked = sorted(elig, key=lambda m: (-bench_q(m), m))

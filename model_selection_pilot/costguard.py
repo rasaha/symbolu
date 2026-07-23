@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from common import approx_tokens
+from model_selection_pilot.common import approx_tokens
 
 
 class CostCapExceeded(RuntimeError):

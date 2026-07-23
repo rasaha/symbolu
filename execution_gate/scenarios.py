@@ -15,9 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from model import Candidate, Request, Signal
-from reason_codes import ReasonCode
-from states import Evidence, EvidenceSource
+from execution_gate.model import Candidate, Request, Signal
+from execution_gate.reason_codes import ReasonCode
+from execution_gate.states import Evidence, EvidenceSource
 
 T0 = 1_000_000.0  # fixed evaluation instant
 

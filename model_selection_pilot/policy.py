@@ -21,8 +21,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-import advisory as adv
-from common import POLICY_VERSION, clamp
+from model_selection_pilot import advisory as adv
+from model_selection_pilot.common import POLICY_VERSION, clamp
 
 ALLOWED_TASK_VIEW_FIELDS = {
     "task_id", "task_class", "input_tokens_k", "business_priority", "hard_constraints",

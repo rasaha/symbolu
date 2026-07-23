@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from model import Candidate, GateConfig, Request, Signal
-from reason_codes import ReasonCode
-from states import (
+from execution_gate.model import Candidate, GateConfig, Request, Signal
+from execution_gate.reason_codes import ReasonCode
+from execution_gate.states import (
     Criticality,
     Evidence,
     EvidenceSource,

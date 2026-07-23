@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-import policy as pol
+from model_selection_pilot import policy as pol
 
 FIXED_DEFAULT = "medium_general"
 STATIC_RULES = {
