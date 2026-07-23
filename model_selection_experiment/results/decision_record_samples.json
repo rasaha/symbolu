@@ -1,0 +1,1894 @@
+{
+  "t900_reasoning_trap": {
+    "F": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": null,
+      "arm": "F",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        }
+      ],
+      "fallback_chain": [
+        "m_coding_spec",
+        "m_medium_general",
+        "m_long_multi",
+        "m_small_local"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.0933,
+            "quality": 0.9077
+          },
+          "est_cost": 9.0,
+          "est_latency_ms": 1493.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.9436,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8913,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.9077,
+          "utility": 0.6644
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0583,
+            "latency_penalty": -0.0533,
+            "quality": 0.748
+          },
+          "est_cost": 3.5,
+          "est_latency_ms": 853.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7931,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.7133,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.748,
+          "utility": 0.6363
+        },
+        {
+          "components": {
+            "cost_penalty": -0.025,
+            "latency_penalty": -0.04,
+            "quality": 0.5896
+          },
+          "est_cost": 1.5,
+          "est_latency_ms": 640.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.5239,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.5994,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.5896,
+          "utility": 0.5246
+        },
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.1,
+            "quality": 0.713
+          },
+          "est_cost": 8.0,
+          "est_latency_ms": 1600.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7214,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6893,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.713,
+          "utility": 0.4797
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0033,
+            "latency_penalty": -0.0167,
+            "quality": 0.351
+          },
+          "est_cost": 0.2,
+          "est_latency_ms": 266.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.5422,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.3112,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.347,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_small_local",
+          "predicted_quality": 0.351,
+          "utility": 0.331
+        }
+      ],
+      "selected": "m_strong_reason",
+      "task_class": "reasoning",
+      "task_id": "t900_reasoning_trap"
+    },
+    "G": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": {
+        "m_coding_spec": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.8591
+        },
+        "m_long_multi": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.7449
+        },
+        "m_medium_general": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.6784
+        },
+        "m_small_local": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "high",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.0
+        },
+        "m_strong_reason": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "low",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.9559
+        }
+      },
+      "arm": "G",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        }
+      ],
+      "fallback_chain": [
+        "m_coding_spec",
+        "m_medium_general",
+        "m_long_multi",
+        "m_small_local"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.004,
+      "preflight_latency_ms": 220,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.0933,
+            "quality": 0.9137
+          },
+          "est_cost": 9.0,
+          "est_latency_ms": 1493.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.9436,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8913,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9559,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.9137,
+          "utility": 0.6704
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0583,
+            "latency_penalty": -0.0533,
+            "quality": 0.7618
+          },
+          "est_cost": 3.5,
+          "est_latency_ms": 853.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7931,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.7133,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.8591,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.7618,
+          "utility": 0.6501
+        },
+        {
+          "components": {
+            "cost_penalty": -0.025,
+            "latency_penalty": -0.04,
+            "quality": 0.6007
+          },
+          "est_cost": 1.5,
+          "est_latency_ms": 640.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.5239,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.5994,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.6784,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.6007,
+          "utility": 0.5357
+        },
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.1,
+            "quality": 0.7169
+          },
+          "est_cost": 8.0,
+          "est_latency_ms": 1600.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7214,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6893,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.7449,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.7169,
+          "utility": 0.4836
+        },
+        {
+          "components": {
+            "cost_penalty": -0.0033,
+            "latency_penalty": -0.0167,
+            "quality": 0.3072
+          },
+          "est_cost": 0.2,
+          "est_latency_ms": 266.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.5422,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.3112,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.347,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.0,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_small_local",
+          "predicted_quality": 0.3072,
+          "utility": 0.2872
+        }
+      ],
+      "selected": "m_strong_reason",
+      "task_class": "reasoning",
+      "task_id": "t900_reasoning_trap"
+    }
+  },
+  "t901_ctx_trap": {
+    "F": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": null,
+      "arm": "F",
+      "eligible": [
+        "m_long_multi",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "context",
+          "model": "m_coding_spec",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 64k"
+        },
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "context",
+          "model": "m_medium_general",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 32k"
+        },
+        {
+          "constraint": "context",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 8k"
+        }
+      ],
+      "fallback_chain": [
+        "m_strong_reason"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.1,
+            "quality": 0.8404
+          },
+          "est_cost": 160.0,
+          "est_latency_ms": 3500.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8384,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8376,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.8404,
+          "utility": 0.6071
+        },
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.0933,
+            "quality": 0.8223
+          },
+          "est_cost": 180.0,
+          "est_latency_ms": 3266.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8445,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8021,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.8223,
+          "utility": 0.579
+        }
+      ],
+      "selected": "m_long_multi",
+      "task_class": "long_context_analysis",
+      "task_id": "t901_ctx_trap"
+    },
+    "G": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": {
+        "m_long_multi": {
+          "anticipated_execution_limitation": "context pressure",
+          "anticipated_reasoning_difficulty": "low",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "decompose",
+          "suitability_estimate": 0.922
+        },
+        "m_strong_reason": {
+          "anticipated_execution_limitation": "context pressure",
+          "anticipated_reasoning_difficulty": "high",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "decompose",
+          "suitability_estimate": 0.6038
+        }
+      },
+      "arm": "G",
+      "eligible": [
+        "m_long_multi",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "context",
+          "model": "m_coding_spec",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 64k"
+        },
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "context",
+          "model": "m_medium_general",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 32k"
+        },
+        {
+          "constraint": "context",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "input 160k exceeds declared context 8k"
+        }
+      ],
+      "fallback_chain": [
+        "m_strong_reason"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.004,
+      "preflight_latency_ms": 220,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.1333,
+            "latency_penalty": -0.1,
+            "quality": 0.8506
+          },
+          "est_cost": 160.0,
+          "est_latency_ms": 3500.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8384,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8376,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.922,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.8506,
+          "utility": 0.6173
+        },
+        {
+          "components": {
+            "cost_penalty": -0.15,
+            "latency_penalty": -0.0933,
+            "quality": 0.7951
+          },
+          "est_cost": 180.0,
+          "est_latency_ms": 3266.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8445,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8021,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.6038,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.7951,
+          "utility": 0.5518
+        }
+      ],
+      "selected": "m_long_multi",
+      "task_class": "long_context_analysis",
+      "task_id": "t901_ctx_trap"
+    }
+  },
+  "t902_cheap_fails_quality": {
+    "F": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": null,
+      "arm": "F",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        }
+      ],
+      "fallback_chain": [
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason",
+        "m_long_multi"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.175,
+            "latency_penalty": -0.1867,
+            "quality": 0.748
+          },
+          "est_cost": 2.1875,
+          "est_latency_ms": 833.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7931,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.7133,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.748,
+          "utility": 0.3863
+        },
+        {
+          "components": {
+            "cost_penalty": -0.075,
+            "latency_penalty": -0.14,
+            "quality": 0.5896
+          },
+          "est_cost": 0.9375,
+          "est_latency_ms": 625.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.5239,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.5994,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.5896,
+          "utility": 0.3746
+        },
+        {
+          "components": {
+            "cost_penalty": -0.01,
+            "latency_penalty": -0.0583,
+            "quality": 0.351
+          },
+          "est_cost": 0.125,
+          "est_latency_ms": 260.4,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.5422,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.3112,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.347,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_small_local",
+          "predicted_quality": 0.351,
+          "utility": 0.2827
+        },
+        {
+          "components": {
+            "cost_penalty": -0.45,
+            "latency_penalty": -0.3267,
+            "quality": 0.9077
+          },
+          "est_cost": 5.625,
+          "est_latency_ms": 1458.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.9436,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8913,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.9077,
+          "utility": 0.131
+        },
+        {
+          "components": {
+            "cost_penalty": -0.4,
+            "latency_penalty": -0.35,
+            "quality": 0.713
+          },
+          "est_cost": 5.0,
+          "est_latency_ms": 1562.5,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7214,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6893,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.713,
+          "utility": -0.037
+        }
+      ],
+      "selected": "m_coding_spec",
+      "task_class": "reasoning",
+      "task_id": "t902_cheap_fails_quality"
+    },
+    "G": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": {
+        "m_coding_spec": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.7609
+        },
+        "m_long_multi": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.8304
+        },
+        "m_medium_general": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.6607
+        },
+        "m_small_local": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "high",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.4721
+        },
+        "m_strong_reason": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "low",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.9402
+        }
+      },
+      "arm": "G",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        }
+      ],
+      "fallback_chain": [
+        "m_medium_general",
+        "m_small_local",
+        "m_strong_reason",
+        "m_long_multi"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.004,
+      "preflight_latency_ms": 220,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.175,
+            "latency_penalty": -0.1867,
+            "quality": 0.7496
+          },
+          "est_cost": 2.1875,
+          "est_latency_ms": 833.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7931,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.7133,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.7609,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.7496,
+          "utility": 0.3879
+        },
+        {
+          "components": {
+            "cost_penalty": -0.075,
+            "latency_penalty": -0.14,
+            "quality": 0.5985
+          },
+          "est_cost": 0.9375,
+          "est_latency_ms": 625.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.5239,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.5994,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.6607,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.5985,
+          "utility": 0.3835
+        },
+        {
+          "components": {
+            "cost_penalty": -0.01,
+            "latency_penalty": -0.0583,
+            "quality": 0.3661
+          },
+          "est_cost": 0.125,
+          "est_latency_ms": 260.4,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.5422,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.3112,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.347,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.4721,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_small_local",
+          "predicted_quality": 0.3661,
+          "utility": 0.2978
+        },
+        {
+          "components": {
+            "cost_penalty": -0.45,
+            "latency_penalty": -0.3267,
+            "quality": 0.9118
+          },
+          "est_cost": 5.625,
+          "est_latency_ms": 1458.3,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.9436,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8913,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9402,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.9118,
+          "utility": 0.1351
+        },
+        {
+          "components": {
+            "cost_penalty": -0.4,
+            "latency_penalty": -0.35,
+            "quality": 0.7276
+          },
+          "est_cost": 5.0,
+          "est_latency_ms": 1562.5,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "1/1 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7214,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6893,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.8304,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.7276,
+          "utility": -0.0224
+        }
+      ],
+      "selected": "m_coding_spec",
+      "task_class": "reasoning",
+      "task_id": "t902_cheap_fails_quality"
+    }
+  },
+  "t903_zero_eligible": {
+    "F": {
+      "abstain_reason": "no model satisfies all hard constraints (empty eligible set)",
+      "abstained": true,
+      "advisory_used": null,
+      "arm": "F",
+      "eligible": [],
+      "eliminated": [
+        {
+          "constraint": "residency",
+          "model": "m_coding_spec",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_long_multi",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_medium_general",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "modality",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "required modality 'image' unsupported"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_strong_reason",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        }
+      ],
+      "fallback_chain": [],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [],
+      "selected": null,
+      "task_class": "extraction",
+      "task_id": "t903_zero_eligible"
+    },
+    "G": {
+      "abstain_reason": "no model satisfies all hard constraints (empty eligible set)",
+      "abstained": true,
+      "advisory_used": null,
+      "arm": "G",
+      "eligible": [],
+      "eliminated": [
+        {
+          "constraint": "residency",
+          "model": "m_coding_spec",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_long_multi",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_medium_general",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        },
+        {
+          "constraint": "modality",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "required modality 'image' unsupported"
+        },
+        {
+          "constraint": "residency",
+          "model": "m_strong_reason",
+          "provenance": "enterprise-hard-policy",
+          "reason": "deployment not on-prem (residency)"
+        }
+      ],
+      "fallback_chain": [],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [],
+      "selected": null,
+      "task_class": "extraction",
+      "task_id": "t903_zero_eligible"
+    }
+  },
+  "t904_ambiguous": {
+    "F": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": null,
+      "arm": "F",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "context",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "input 16k exceeds declared context 8k"
+        }
+      ],
+      "fallback_chain": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_strong_reason"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.0,
+      "preflight_latency_ms": 0.0,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.075,
+            "latency_penalty": -0.14,
+            "quality": 0.6778
+          },
+          "est_cost": 3.0,
+          "est_latency_ms": 680.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.6691,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6703,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.6778,
+          "utility": 0.4628
+        },
+        {
+          "components": {
+            "cost_penalty": -0.175,
+            "latency_penalty": -0.1867,
+            "quality": 0.6941
+          },
+          "est_cost": 7.0,
+          "est_latency_ms": 906.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7099,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6672,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.6941,
+          "utility": 0.3324
+        },
+        {
+          "components": {
+            "cost_penalty": -0.4,
+            "latency_penalty": -0.35,
+            "quality": 0.8043
+          },
+          "est_cost": 16.0,
+          "est_latency_ms": 1700.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8126,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.792,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.8043,
+          "utility": 0.0543
+        },
+        {
+          "components": {
+            "cost_penalty": -0.45,
+            "latency_penalty": -0.3267,
+            "quality": 0.8263
+          },
+          "est_cost": 18.0,
+          "est_latency_ms": 1586.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8109,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8251,
+              "weight": 1.217391304347826
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.8263,
+          "utility": 0.0496
+        }
+      ],
+      "selected": "m_medium_general",
+      "task_class": "summarization",
+      "task_id": "t904_ambiguous"
+    },
+    "G": {
+      "abstain_reason": null,
+      "abstained": false,
+      "advisory_used": {
+        "m_coding_spec": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.8074
+        },
+        "m_long_multi": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "low",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.8071
+        },
+        "m_medium_general": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "medium",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.698
+        },
+        "m_strong_reason": {
+          "anticipated_execution_limitation": "none",
+          "anticipated_reasoning_difficulty": "low",
+          "anticipated_tool_requirement": false,
+          "confidence": 0.4,
+          "provenance": "model-advisory",
+          "recommended_decomposition": "single-pass",
+          "suitability_estimate": 0.9607
+        }
+      },
+      "arm": "G",
+      "eligible": [
+        "m_coding_spec",
+        "m_long_multi",
+        "m_medium_general",
+        "m_strong_reason"
+      ],
+      "eliminated": [
+        {
+          "constraint": "approved_providers",
+          "model": "m_external_frontier",
+          "provenance": "enterprise-hard-policy",
+          "reason": "provider 'vendor_omega' not on approved list"
+        },
+        {
+          "constraint": "context",
+          "model": "m_small_local",
+          "provenance": "verified-provider-fact",
+          "reason": "input 16k exceeds declared context 8k"
+        }
+      ],
+      "fallback_chain": [
+        "m_coding_spec",
+        "m_strong_reason",
+        "m_long_multi"
+      ],
+      "policy_version": "policy_v1",
+      "preflight_cost": 0.004,
+      "preflight_latency_ms": 220,
+      "regime": "mature",
+      "registry_version": "registry_v1",
+      "scored": [
+        {
+          "components": {
+            "cost_penalty": -0.075,
+            "latency_penalty": -0.14,
+            "quality": 0.6803
+          },
+          "est_cost": 3.0,
+          "est_latency_ms": 680.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.7733,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.6691,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6703,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.698,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_medium_general",
+          "predicted_quality": 0.6803,
+          "utility": 0.4653
+        },
+        {
+          "components": {
+            "cost_penalty": -0.175,
+            "latency_penalty": -0.1867,
+            "quality": 0.7082
+          },
+          "est_cost": 7.0,
+          "est_latency_ms": 906.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8489,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.7099,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.6672,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.8074,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_coding_spec",
+          "predicted_quality": 0.7082,
+          "utility": 0.3465
+        },
+        {
+          "components": {
+            "cost_penalty": -0.45,
+            "latency_penalty": -0.3267,
+            "quality": 0.8431
+          },
+          "est_cost": 18.0,
+          "est_latency_ms": 1586.7,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8978,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8109,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.8251,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.9607,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_strong_reason",
+          "predicted_quality": 0.8431,
+          "utility": 0.0664
+        },
+        {
+          "components": {
+            "cost_penalty": -0.4,
+            "latency_penalty": -0.35,
+            "quality": 0.8047
+          },
+          "est_cost": 16.0,
+          "est_latency_ms": 1700.0,
+          "evidence": [
+            {
+              "confidence": 0.3,
+              "provenance": "provider-declared",
+              "source": "provider-declared",
+              "value": 0.8711,
+              "weight": 0.15
+            },
+            {
+              "confidence": 0.6,
+              "coverage": "2/2 required caps",
+              "provenance": "benchmark-measured",
+              "source": "benchmark-measured",
+              "value": 0.8126,
+              "weight": 0.6
+            },
+            {
+              "confidence": 0.8696,
+              "n": 80,
+              "provenance": "runtime-observed",
+              "source": "runtime-observed",
+              "value": 0.792,
+              "weight": 1.217391304347826
+            },
+            {
+              "confidence": 0.4,
+              "provenance": "model-advisory",
+              "source": "model-advisory",
+              "value": 0.8071,
+              "weight": 0.27999999999999997
+            }
+          ],
+          "model": "m_long_multi",
+          "predicted_quality": 0.8047,
+          "utility": 0.0547
+        }
+      ],
+      "selected": "m_medium_general",
+      "task_class": "summarization",
+      "task_id": "t904_ambiguous"
+    }
+  }
+}

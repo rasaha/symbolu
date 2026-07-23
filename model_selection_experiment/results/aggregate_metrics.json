@@ -1,0 +1,542 @@
+{
+  "ablation_G_minus_F": {
+    "cold": {
+      "F": {
+        "constraint_violation_rate": 0.027,
+        "mean_cost_per_successful_task": 22.2267,
+        "mean_regret": 0.0859,
+        "p95_latency_ms": 3080.0,
+        "quality_threshold_success_rate": 0.4054,
+        "unnecessary_strongest_use_rate": 0.027
+      },
+      "G": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 25.7865,
+        "mean_regret": 0.0049,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G_minus_F": {
+        "constraint_violation_rate": -0.027,
+        "mean_cost_per_successful_task": 3.5598,
+        "mean_regret": -0.081,
+        "p95_latency_ms": 640.0,
+        "quality_threshold_success_rate": 0.1351,
+        "unnecessary_strongest_use_rate": -0.027
+      }
+    },
+    "mature": {
+      "F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "p95_latency_ms": 3500.0,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.1615,
+        "mean_regret": 0.0095,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G_minus_F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": -0.6359,
+        "mean_regret": -0.0066,
+        "p95_latency_ms": 220.0,
+        "quality_threshold_success_rate": 0.027,
+        "unnecessary_strongest_use_rate": 0.0
+      }
+    },
+    "partial": {
+      "F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "p95_latency_ms": 3500.0,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.1615,
+        "mean_regret": 0.0102,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G_minus_F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": -0.6359,
+        "mean_regret": -0.0059,
+        "p95_latency_ms": 220.0,
+        "quality_threshold_success_rate": 0.027,
+        "unnecessary_strongest_use_rate": 0.0
+      }
+    }
+  },
+  "adversarial_advisory": {
+    "cold": {
+      "F": {
+        "constraint_violation_rate": 0.027,
+        "mean_cost_per_successful_task": 22.2267,
+        "mean_regret": 0.0859,
+        "p95_latency_ms": 3080.0,
+        "quality_threshold_success_rate": 0.4054,
+        "unnecessary_strongest_use_rate": 0.027
+      },
+      "G_adversarial": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 27.3803,
+        "mean_regret": 0.0079,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.027
+      },
+      "regret_delta_vs_F": -0.078
+    },
+    "mature": {
+      "F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "p95_latency_ms": 3500.0,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G_adversarial": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.1615,
+        "mean_regret": 0.0095,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "regret_delta_vs_F": -0.0066
+    },
+    "partial": {
+      "F": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "p95_latency_ms": 3500.0,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G_adversarial": {
+        "constraint_violation_rate": 0.0,
+        "mean_cost_per_successful_task": 28.1929,
+        "mean_regret": 0.0128,
+        "p95_latency_ms": 3720.0,
+        "quality_threshold_success_rate": 0.4865,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "regret_delta_vs_F": -0.0033
+    }
+  },
+  "by_regime": {
+    "cold": {
+      "A": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.5676,
+        "constraint_violation_rate": 0.4324,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": 1.6071,
+        "mean_regret": 0.9675,
+        "n_tasks": 37,
+        "p50_latency_ms": 640.0,
+        "p95_latency_ms": 750.0,
+        "p95_regret": 2.4333,
+        "quality_threshold_success_rate": 0.1892,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "B": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.0,
+        "constraint_violation_rate": 1.0,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": null,
+        "mean_regret": 2.3047,
+        "n_tasks": 37,
+        "p50_latency_ms": null,
+        "p95_latency_ms": null,
+        "p95_regret": 2.7231,
+        "quality_threshold_success_rate": 0.0,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "C": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 40.65,
+        "mean_regret": 0.0928,
+        "n_tasks": 37,
+        "p50_latency_ms": 650.0,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.4912,
+        "quality_threshold_success_rate": 0.2973,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "D": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 23.7728,
+        "mean_regret": 0.055,
+        "n_tasks": 37,
+        "p50_latency_ms": 893.3,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.2831,
+        "quality_threshold_success_rate": 0.6216,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "E": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.7568,
+        "constraint_violation_rate": 0.0541,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 14.116,
+        "mean_regret": 0.2657,
+        "n_tasks": 37,
+        "p50_latency_ms": 1481.7,
+        "p95_latency_ms": 2248.7,
+        "p95_regret": 0.9598,
+        "quality_threshold_success_rate": 0.6757,
+        "unnecessary_strongest_use_rate": 0.1622
+      },
+      "F": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.7838,
+        "constraint_violation_rate": 0.027,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 22.2267,
+        "mean_regret": 0.0859,
+        "n_tasks": 37,
+        "p50_latency_ms": 840.0,
+        "p95_latency_ms": 3080.0,
+        "p95_regret": 0.0969,
+        "quality_threshold_success_rate": 0.4054,
+        "unnecessary_strongest_use_rate": 0.027
+      },
+      "G": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 25.7865,
+        "mean_regret": 0.0049,
+        "n_tasks": 37,
+        "p50_latency_ms": 1086.7,
+        "p95_latency_ms": 3720.0,
+        "p95_regret": 0.031,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      }
+    },
+    "mature": {
+      "A": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.5676,
+        "constraint_violation_rate": 0.4324,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": 1.6071,
+        "mean_regret": 0.9675,
+        "n_tasks": 37,
+        "p50_latency_ms": 640.0,
+        "p95_latency_ms": 750.0,
+        "p95_regret": 2.4333,
+        "quality_threshold_success_rate": 0.1892,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "B": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.0,
+        "constraint_violation_rate": 1.0,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": null,
+        "mean_regret": 2.3047,
+        "n_tasks": 37,
+        "p50_latency_ms": null,
+        "p95_latency_ms": null,
+        "p95_regret": 2.7231,
+        "quality_threshold_success_rate": 0.0,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "C": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 40.65,
+        "mean_regret": 0.0928,
+        "n_tasks": 37,
+        "p50_latency_ms": 650.0,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.4912,
+        "quality_threshold_success_rate": 0.2973,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "D": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 23.7728,
+        "mean_regret": 0.055,
+        "n_tasks": 37,
+        "p50_latency_ms": 893.3,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.2831,
+        "quality_threshold_success_rate": 0.6216,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "E": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.7568,
+        "constraint_violation_rate": 0.0541,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 14.116,
+        "mean_regret": 0.2657,
+        "n_tasks": 37,
+        "p50_latency_ms": 1481.7,
+        "p95_latency_ms": 2248.7,
+        "p95_regret": 0.9598,
+        "quality_threshold_success_rate": 0.6757,
+        "unnecessary_strongest_use_rate": 0.1622
+      },
+      "F": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "n_tasks": 37,
+        "p50_latency_ms": 843.3,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.0911,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 26.1615,
+        "mean_regret": 0.0095,
+        "n_tasks": 37,
+        "p50_latency_ms": 1086.7,
+        "p95_latency_ms": 3720.0,
+        "p95_regret": 0.032,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      }
+    },
+    "partial": {
+      "A": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.5676,
+        "constraint_violation_rate": 0.4324,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": 1.6071,
+        "mean_regret": 0.9675,
+        "n_tasks": 37,
+        "p50_latency_ms": 640.0,
+        "p95_latency_ms": 750.0,
+        "p95_regret": 2.4333,
+        "quality_threshold_success_rate": 0.1892,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "B": {
+        "abstention_rate": 0.0,
+        "completion_rate": 0.0,
+        "constraint_violation_rate": 1.0,
+        "empty_eligible_handled": 0,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.0,
+        "mean_cost_per_successful_task": null,
+        "mean_regret": 2.3047,
+        "n_tasks": 37,
+        "p50_latency_ms": null,
+        "p95_latency_ms": null,
+        "p95_regret": 2.7231,
+        "quality_threshold_success_rate": 0.0,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "C": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 40.65,
+        "mean_regret": 0.0928,
+        "n_tasks": 37,
+        "p50_latency_ms": 650.0,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.4912,
+        "quality_threshold_success_rate": 0.2973,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "D": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 23.7728,
+        "mean_regret": 0.055,
+        "n_tasks": 37,
+        "p50_latency_ms": 893.3,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.2831,
+        "quality_threshold_success_rate": 0.6216,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "E": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.7568,
+        "constraint_violation_rate": 0.0541,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": null,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 14.116,
+        "mean_regret": 0.2657,
+        "n_tasks": 37,
+        "p50_latency_ms": 1481.7,
+        "p95_latency_ms": 2248.7,
+        "p95_regret": 0.9598,
+        "quality_threshold_success_rate": 0.6757,
+        "unnecessary_strongest_use_rate": 0.1622
+      },
+      "F": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 26.7974,
+        "mean_regret": 0.0161,
+        "n_tasks": 37,
+        "p50_latency_ms": 843.3,
+        "p95_latency_ms": 3500.0,
+        "p95_regret": 0.0911,
+        "quality_threshold_success_rate": 0.5135,
+        "unnecessary_strongest_use_rate": 0.0
+      },
+      "G": {
+        "abstention_rate": 0.1892,
+        "completion_rate": 0.8108,
+        "constraint_violation_rate": 0.0,
+        "empty_eligible_handled": 7,
+        "explanation_completeness_rate": 1.0,
+        "fallback_offered_rate": 0.6757,
+        "mean_cost_per_successful_task": 26.1615,
+        "mean_regret": 0.0102,
+        "n_tasks": 37,
+        "p50_latency_ms": 1100.0,
+        "p95_latency_ms": 3720.0,
+        "p95_regret": 0.032,
+        "quality_threshold_success_rate": 0.5405,
+        "unnecessary_strongest_use_rate": 0.0
+      }
+    }
+  },
+  "determinism_check_passed": true,
+  "meta": {
+    "advisory_preflight_cost": 0.004,
+    "advisory_preflight_latency_ms": 220,
+    "arm_labels": {
+      "A": "Fixed default",
+      "B": "Strongest (unconstrained)",
+      "C": "Cheapest-eligible",
+      "D": "Static rules",
+      "E": "Benchmark-only",
+      "F": "Policy (no self-assessment)",
+      "G": "Policy + bounded self-assessment"
+    },
+    "corpus_version": "corpus_v1",
+    "ground_truth_version": "ground_truth_v1",
+    "n_tasks": 37,
+    "policy_version": "policy_v1",
+    "regimes": [
+      "cold",
+      "partial",
+      "mature"
+    ],
+    "registry_version": "registry_v1",
+    "synthetic_assumptions": {
+      "advisory_bias": 0.06,
+      "advisory_noise": 0.1,
+      "context_rot_soft": 0.7,
+      "registry": {
+        "benchmark_confidence": 0.6,
+        "benchmark_gap_rate": 0.28,
+        "benchmark_noise": 0.08,
+        "declared_context_inflation": {
+          "m_coding_spec": 1.0,
+          "m_external_frontier": 1.0,
+          "m_long_multi": 1.25,
+          "m_medium_general": 1.0,
+          "m_small_local": 1.0,
+          "m_strong_reason": 1.56
+        },
+        "declared_optimism": 0.12,
+        "note": "cost/latency/deployment/provider/modality are accurate facts; quality is the uncertain quantity every arm must estimate."
+      },
+      "telemetry_obs_noise": 0.1
+    }
+  },
+  "routing_stability": {
+    "F": {
+      "cold": 1.0,
+      "mature": 1.0,
+      "partial": 1.0
+    },
+    "G": {
+      "cold": 1.0,
+      "mature": 1.0,
+      "partial": 0.973
+    }
+  }
+}

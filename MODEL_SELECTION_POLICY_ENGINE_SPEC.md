@@ -9,6 +9,10 @@
 > that a future execution engine would run. The deliverable is the *decision framework*; the engine
 > that executes it is downstream and, as this document argues, comparatively commoditized.
 >
+> **Empirical validation.** A deterministic experiment testing this design against six simpler routing
+> strategies lives in `model_selection_experiment/` (see its `FALSIFICATION_ASSESSMENT.md`): the policy
+> reduced selection regret ~71% below static rules while holding hard-constraint violations at zero.
+>
 > **What this document is not.** It is not a ranking of today's models ("which model is best?"). That
 > question is unanswerable in the abstract and obsolete within weeks. This specification answers the
 > durable question: **"what measurable criteria determine which model should be chosen for a given task

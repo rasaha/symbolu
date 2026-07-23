@@ -1,0 +1,711 @@
+{
+  "caps": [
+    "reasoning",
+    "coding",
+    "extraction",
+    "summarization",
+    "classification",
+    "long_context",
+    "multilingual",
+    "structured_output",
+    "tool_use"
+  ],
+  "models": {
+    "m_coding_spec": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 800
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "high"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 64
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.8489
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "approved_cloud"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 0.35
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "medium"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "vendor_gamma"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": false
+        }
+      },
+      "id": "m_coding_spec",
+      "label": "coding specialist model",
+      "measured": {
+        "capability_scores": {
+          "classification": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7399
+          },
+          "extraction": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.666
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.5031
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7931
+          },
+          "structured_output": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8598
+          },
+          "summarization": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6849
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8675
+          }
+        }
+      }
+    },
+    "m_external_frontier": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 1100
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "high"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 150
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.9944
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "external_api"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text",
+            "image"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 1.3
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "low"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "vendor_omega"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": true
+        }
+      },
+      "id": "m_external_frontier",
+      "label": "external frontier model (non-approved provider)",
+      "measured": {
+        "capability_scores": {
+          "classification": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8736
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8527
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8614
+          },
+          "structured_output": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8474
+          },
+          "summarization": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8237
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8254
+          }
+        }
+      }
+    },
+    "m_long_multi": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 1500
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "high"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 500
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.8711
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "approved_cloud"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text",
+            "image"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 0.8
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "medium"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "vendor_delta"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": false
+        }
+      },
+      "id": "m_long_multi",
+      "label": "long-context / multimodal model",
+      "measured": {
+        "capability_scores": {
+          "classification": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7056
+          },
+          "coding": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6189
+          },
+          "extraction": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7549
+          },
+          "long_context": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8969
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8532
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7214
+          },
+          "summarization": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8399
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6638
+          }
+        }
+      }
+    },
+    "m_medium_general": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 600
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "medium"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 32
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.7733
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "approved_cloud"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 0.15
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "medium"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "vendor_alpha"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": false
+        }
+      },
+      "id": "m_medium_general",
+      "label": "medium general model",
+      "measured": {
+        "capability_scores": {
+          "classification": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7275
+          },
+          "coding": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.5408
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6789
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.5239
+          },
+          "structured_output": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.653
+          },
+          "summarization": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7127
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7767
+          }
+        }
+      }
+    },
+    "m_small_local": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 250
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "low"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 8
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.5422
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "on_prem"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 0.02
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "high"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "internal"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": false
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": false
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": false
+        }
+      },
+      "id": "m_small_local",
+      "label": "small local model",
+      "measured": {
+        "capability_scores": {
+          "classification": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6591
+          },
+          "coding": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.3491
+          },
+          "extraction": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6281
+          },
+          "long_context": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.1957
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.2745
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.3112
+          },
+          "structured_output": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.5814
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.2145
+          }
+        }
+      }
+    },
+    "m_strong_reason": {
+      "declared": {
+        "base_latency_ms": {
+          "provenance": "provider-declared",
+          "value": 1400
+        },
+        "capability_tier": {
+          "caveat": "optimistic; marketing-biased",
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": "high"
+        },
+        "declared_context_k": {
+          "caveat": "advertised; may exceed effective",
+          "provenance": "provider-declared",
+          "value": 200
+        },
+        "declared_overall": {
+          "confidence": 0.3,
+          "provenance": "provider-declared",
+          "value": 0.8978
+        },
+        "deployment": {
+          "provenance": "provider-declared",
+          "value": "approved_cloud"
+        },
+        "modalities_in": {
+          "provenance": "provider-declared",
+          "value": [
+            "text"
+          ]
+        },
+        "price_per_ktok": {
+          "provenance": "provider-declared",
+          "value": 0.9
+        },
+        "privacy_tier": {
+          "provenance": "provider-declared",
+          "value": "medium"
+        },
+        "provider": {
+          "provenance": "provider-declared",
+          "value": "vendor_beta"
+        },
+        "structured_strict": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "tool_calling": {
+          "provenance": "provider-declared",
+          "value": true
+        },
+        "trains_on_data": {
+          "provenance": "provider-declared",
+          "value": false
+        }
+      },
+      "id": "m_strong_reason",
+      "label": "strong reasoning model",
+      "measured": {
+        "capability_scores": {
+          "coding": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.6215
+          },
+          "long_context": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7949
+          },
+          "multilingual": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7508
+          },
+          "reasoning": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.9436
+          },
+          "summarization": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.7711
+          },
+          "tool_use": {
+            "as_of": "2026-05",
+            "confidence": 0.6,
+            "method": "held-out synthetic eval",
+            "provenance": "benchmark-measured",
+            "value": 0.8048
+          }
+        }
+      }
+    }
+  },
+  "synthetic_assumptions": {
+    "benchmark_confidence": 0.6,
+    "benchmark_gap_rate": 0.28,
+    "benchmark_noise": 0.08,
+    "declared_context_inflation": {
+      "m_coding_spec": 1.0,
+      "m_external_frontier": 1.0,
+      "m_long_multi": 1.25,
+      "m_medium_general": 1.0,
+      "m_small_local": 1.0,
+      "m_strong_reason": 1.56
+    },
+    "declared_optimism": 0.12,
+    "note": "cost/latency/deployment/provider/modality are accurate facts; quality is the uncertain quantity every arm must estimate."
+  },
+  "version": "registry_v1"
+}

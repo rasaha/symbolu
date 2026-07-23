@@ -11,6 +11,10 @@
 > is skepticism: the burden of proof is on self-assessment to demonstrate marginal value, not on the
 > critic to disprove it.
 >
+> **Empirical validation.** The G-vs-F ablation in `model_selection_experiment/` tests this document's
+> central prediction and confirms it: bounded self-assessment cut cold-start routing regret ~94% and
+> decayed to near-zero marginal value once telemetry matured, with no net harm even when overconfident.
+>
 > **Relationship to the Policy Engine.** The Model Selection Policy specification
 > (`MODEL_SELECTION_POLICY_ENGINE_SPEC.md`) established a four-class provenance model —
 > **declared / measured / observed**, plus enterprise governance. This document asks whether

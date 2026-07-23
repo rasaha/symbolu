@@ -12,6 +12,10 @@
 > architectural question and applies a skeptical default: **more metadata is not assumed to be
 > valuable, and a "missing standard" must be shown to be missing, not merely imagined.**
 >
+> **Related experiment.** This document's conclusion — that capability data belongs in an
+> enterprise-internal registry with declared/measured/observed provenance rather than a new cross-vendor
+> standard — is exercised concretely by the provenance-tagged registry in `model_selection_experiment/`.
+>
 > **The distributed-systems framing, taken seriously.** The task invites an analogy to how distributed
 > systems advertise supported features before interaction (TLS cipher negotiation, HTTP content
 > negotiation, gRPC reflection, WSDL/OpenAPI, WebRTC SDP, mDNS/Bonjour service discovery). This document
