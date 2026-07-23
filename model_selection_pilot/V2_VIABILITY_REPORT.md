@@ -40,9 +40,10 @@ after a minimum-cost inference succeeds.
 ## Family classification (per the fixed operational definition)
 
 Family = distinct pretraining lineage / base architecture; size/tier variants count as
-one. Executable families here: **{Claude}** only. Google (Gemini) would be a second
-family *if* credentialed, but no valid Google credential exists. No third
-distinct-architecture family is even network-reachable.
+one. Executable families here: **{Claude}** only. Google is network-reachable but
+unauthenticated, so its account-accessible models, executable model IDs, and qualifying
+architectural lineages are **unknown** (not enumerated or verified by real inference). It
+may contribute one or more lineages; this has not been established.
 
 ## Verified pricing
 
@@ -71,16 +72,20 @@ uncredentialed anyway. Tests: **17/17 pass**.
 ## Unresolved blockers
 
 1. **Only one executable provider** (Anthropic). Fails mandatory **≥2 providers**.
-2. **Only one executable family** (Claude). Fails mandatory **≥3 distinct families** —
-   and this cannot be met in the current environment even with ideal credentials, because
-   only two distinct-architecture providers (Anthropic, Google) are network-reachable.
+2. **Only one executable family** (Claude). Fails mandatory **≥3 distinct families** in
+   the current (unauthenticated-Google) state. Whether it can be met under valid Google
+   credentials is **unknown**: Google's executable models and qualifying family count have
+   not been enumerated, so impossibility is **not** established here.
 3. Google reachable but **uncredentialed**; OpenAI/Bedrock/others **proxy-denied or
    invalid**.
 
 ## Viability verdict — STOP
 
-**NONVIABLE.** The ≥4 models / ≥2 providers / ≥3 families requirement cannot be met.
-Per the V2 procedure, **no V2 capability registry, no V2 provider-binding manifest, and
+**Currently NONVIABLE** because only one provider and one distinct model family are
+executable. Google is reachable but unauthenticated, so its executable models and
+qualifying family count are unknown; a valid Google credential would require a fresh
+viability check. If Google contributes only one qualifying lineage, a third reachable
+model family would still be required. Per the V2 procedure, **no V2 capability registry, no V2 provider-binding manifest, and
 no frozen V2 run manifest are created, and no paid pilot is executed.** Only free /
 least-cost verification inference was performed (~$0.0002 total, on Anthropic, for
 executability proof); keys were confined to the session scratchpad (outside the repo),
@@ -88,12 +93,15 @@ never committed, and deleted after use.
 
 ## What would make V2 viable (actionable)
 
-- The cheapest path to a **second provider/family** is a **valid Google Gemini API key**
-  (its endpoint is already network-reachable) — but that yields only 2 families, still
-  short of ≥3 under the strict definition.
-- Meeting **≥3 distinct families** requires an environment whose network policy permits a
-  **third** distinct-architecture provider endpoint (e.g. OpenAI or a Bedrock/Llama or
-  Mistral endpoint) **and** valid credentials for ≥2 of the reachable providers.
+- The cheapest path to a **second provider** is a **valid Google credential** (its
+  endpoint is already network-reachable). This requires a **fresh viability check**:
+  enumerate Google's account-accessible models and verify executability by real inference,
+  then count qualifying architectural lineages. If Google contributes ≥2 qualifying
+  lineages the ≥3-family bar may be reachable via Anthropic + Google; if it contributes
+  only one, a **third** reachable model family would still be required.
+- A third distinct family, if needed, requires an environment whose network policy permits
+  another distinct-architecture provider endpoint (e.g. OpenAI, Bedrock/Llama, or Mistral)
+  with valid credentials.
 - Alternatively, run in an environment matching V1's frozen providers (Anthropic +
   OpenAI + Bedrock) with valid credentials and network access.
 
