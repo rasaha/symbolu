@@ -11,10 +11,18 @@ from . import (metrics, negation, modality, uncertainty, qualifiers, scope, nume
 from .taxonomy import Disposition
 
 
+import re
+_DANGLING = re.compile(r"^\s*(it|they|this|that|these|those|he|she)\b", re.I)
+
+
 def _claim_disposition(gold_claim: Dict[str, Any], produced_text, risk_class: str) -> str:
     if produced_text is None:
         return Disposition.OMITTED_CLAIM.value
     gt = gold_claim["text"]
+    # dangling pronoun subject: the claim cannot be evaluated / retrieves evidence for an ambiguous
+    # entity -> reference error (only when gold has a concrete noun subject, i.e. it should have resolved)
+    if _DANGLING.match(produced_text) and not _DANGLING.match(gt):
+        return Disposition.REFERENCE_ERROR.value
     # order: meaning inversions first (most severe), then scope/attribution/numeric, then qualifier
     if not negation.preserved(gt, produced_text):
         return Disposition.NEGATION_ERROR.value
