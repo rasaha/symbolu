@@ -1,0 +1,87 @@
+{
+  "artifact_sha256": {
+    "data/final_review_v1/final_review.json": "0447da125c50d14a6b885bf522adea81b47447aef09458a0827ef977a7f5e25d",
+    "data/manifest.json": "f84824320f91f19791851e5f62fda0f8cbd3de02b77f7a9d73acd0c6df0bd01f",
+    "data/training_v1/training.json": "979987d8dad4ca6c2865efbeddad8a98f2652ab093a020def9f005f8da46b106"
+  },
+  "config_sha256": "ac08415841fcc629c615a16af02edbf9c86ab0c4251ba6e81b2277f19c146a92",
+  "future_eval_config": {
+    "adjudication": "separated adjudicator; UNRESOLVED is a valid terminus; never forces consensus",
+    "audit_version": "review_audit_v1",
+    "decision_rule": "Metrics describe reviewer behaviour only. No metric outcome converts to a claim of policy correctness or human validation without a separately-scoped human study.",
+    "enforcement": "DISABLED",
+    "external_customer_pilot": "BLOCKED (human validation NOT EVALUATED)",
+    "frozen_minimal_policy_version": "minimal_evidence_policy_v1",
+    "frozen_thresholds": {
+      "max_override_rate": 0.4,
+      "max_reviewer_reviewer_disagreement_rate": 0.4,
+      "max_unresolved_rate": 0.2,
+      "min_reviewer_system_agreement_high_risk": 0.8,
+      "min_trap_catch_rate": 0.8
+    },
+    "human_validation": "NOT_EVALUATED",
+    "immediate_stop_conditions": [
+      "enforcement_attempt",
+      "external_action_execution",
+      "prohibited_or_unapproved_data",
+      "sensitive_data_leakage",
+      "blinding_breach",
+      "reviewer_identity_leakage",
+      "unrecorded_reviewer_override",
+      "audit_chain_failure",
+      "frozen_policy_drift",
+      "frozen_component_drift",
+      "native_actiongate_semantic_loss",
+      "downstream_threshold_lowered",
+      "simulation_labeled_as_human_validation",
+      "undeletable_pilot_data",
+      "external_customer_onboarded"
+    ],
+    "interface_version": "review_interface_v1",
+    "label_schema_version": "reviewer_label_v1",
+    "metrics": [
+      "reviewer_reviewer_agreement",
+      "reviewer_system_agreement",
+      "trap_catch_rate",
+      "override_rate",
+      "disagreement_taxonomy"
+    ],
+    "native_actiongate_outcomes": [
+      "ALLOW",
+      "ALLOW_WITH_CONSTRAINTS",
+      "DENY",
+      "ESCALATE_TO_HUMAN",
+      "REQUEST_MORE_EVIDENCE",
+      "SIMULATE_AND_RETRY"
+    ],
+    "no_final_set_tuning": true,
+    "no_policy_change_during_review": true,
+    "no_threshold_lowering": true,
+    "obligation_vocabulary": [
+      "E0",
+      "E1",
+      "E2",
+      "E3",
+      "E4",
+      "ER"
+    ],
+    "policy_modified": false,
+    "production_readiness": "NOT_READY",
+    "qualification_required": true,
+    "qualification_source": "training set only (never the final set)",
+    "reviewer_count": 0,
+    "reviewer_roster": [],
+    "reviewers_per_artifact": 2,
+    "runner_version": "reviewer_ready_policy_runner_v1",
+    "subgroup_analyses": [
+      "risk_tier",
+      "claim_family",
+      "trap_type",
+      "edge_type",
+      "action_bearing",
+      "source_kind"
+    ]
+  },
+  "manifest_sha256": "450dbc378dcaeac6700b70d277680a5b67e1cdd44921625c2d2c1a455d2c0923",
+  "n_artifacts": 3
+}
