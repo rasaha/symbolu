@@ -1,0 +1,93 @@
+"""Verification guard for the Bounded Governed Inference Natural-Artifact Shadow Pilot.
+
+Fails on drift of ANY prior outcome-bearing artifact this pilot must NOT rebuild, modify, or
+re-evaluate. This pilot consumes every completed component and the customer-shadow-readiness
+package READ-ONLY; it modifies no frozen logic or artifact.
+
+Guarded set (22 artifacts):
+  - five completed research tracks (17 artifacts),
+  - the completed governed_inference_pilot frozen baseline at ab237af (4 artifacts),
+  - the completed customer_shadow_readiness differential-action study (1 artifact).
+
+Run in CI/tests before any outcome-bearing comparison. The guard MUST fail on drift.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import sys
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+FROZEN = {
+    # ---- five completed research tracks (17) ----
+    "assertion_governance/data/corpus_v1.json":
+        "f16ed3885a5124f18d1f223535b24dc8e416035be7d31008961bf6ef6512ce95",
+    "assertion_governance/eval_results/evaluation_v1.json":
+        "90dc6b3a235404193f784090b0372169d2eb7c341b0b0169abb2200e8c49325d",
+    "assertion_gate_robustness/data/v1/corpus.json":
+        "b86c24be5dcb6585ad083cdf710790d4236e0a4a19e2e90baafad791e3350297",
+    "assertion_gate_robustness/eval_results/robustness_v1.json":
+        "d2d5d0f8a9d4c390048ca16882aa1fb1ddf70a63fdb752447daa15da41b0661e",
+    "evidence_assurance/data/ea_corpus_v1_1.json":
+        "92fa5e7943fee313b9cd90f746d80e465e1c5540c713ed79b1d81d3d41746dbd",
+    "evidence_assurance/eval_results/baselines_v1.json":
+        "4cdeee9f04161753ac49a1e796d0d2e2d193d8be686b1ba86da893565ac32a3d",
+    "evidence_assurance/eval_results/assurance_v1.json":
+        "6035d11f0df9ee40050e42bfbfd2d5620eb1fedd0fbef9ffb20d847d51267e03",
+    "evidence_assurance/eval_results/experiments_v1.json":
+        "92017ea785fbdd442f97017b5ed36d43054f5a38cdd5d71c2de91ca1a8ff5636",
+    "evidence_assurance/eval_results/ablation_v1.json":
+        "7fd70408df6333edaa4183d9412cb2f570765d5dc320b21ad9664c608641013f",
+    "claim_integrity/data/v1/corpus.json":
+        "1fe856cc10de9d473ec5b533053b6f39e7ed5441bf59460848b4302f3de2c17a",
+    "claim_integrity/eval_results/baselines.json":
+        "d4276b3b460c6ca538b9e6895b534fd2851f44b8427930e252a05425fa0f7123",
+    "claim_integrity/eval_results/adversarial.json":
+        "f22e830d0d1a6f6b1c8a683366278a3508d43b43a2439055b6025ba0520fa5a7",
+    "claim_integrity/eval_results/downstream.json":
+        "d459c26ab5ef3af3ad1d24ac30be40c02c8e6e554f308c3dde624c4d2259f0a7",
+    "claim_integrity/eval_results/ablation.json":
+        "7af3acd437ab68d52bf9a736d6ac6f8c16b35931ec369678202aee85d06c923d",
+    "scope_integrity/data/v1/corpus.json":
+        "13207b376bce748565f90646488bd9fe9a91625965b8ab5d458ec9f00399bc3c",
+    "scope_integrity/eval_results/downstream.json":
+        "4da5851bd1b947e3d89a4c5be41c1c2f3ca9bade10c5f1bed8adcb7aaa4d7213",
+    "scope_integrity/eval_results/ablation.json":
+        "c27515763612aedf66161c15b5c3c9570546040e081c2e02ab40f0d867277658",
+    # ---- governed_inference_pilot frozen baseline (ab237af) (4) ----
+    "governed_inference_pilot/data/v1/corpus.json":
+        "8f04960c9e876c925eb89ad2be214defd57af887723967fa4fe238951e8fc354",
+    "governed_inference_pilot/eval_results/evaluation.json":
+        "3cc5dd8f946f07c075c17b95bc99159bac4670bd3ebc62e4f24e17f6ab244a10",
+    "governed_inference_pilot/eval_results/cascade_latency_cost.json":
+        "5350d0280c118563ade53c535e6ac86d471f2e079920821a755f476e573064e1",
+    "governed_inference_pilot/eval_results/mvc.json":
+        "1fbe5ddfd9ad7ade093398d68930140d690ffddb3f766ce8bbccae09580c442a",
+    # ---- customer_shadow_readiness completed study (1) ----
+    "customer_shadow_readiness/eval_results/differential_action.json":
+        "5a51af38412a6091b51e8240927db0f97ca737476d78c07664a23782aa86aebb",
+}
+
+
+def _sha(path: str) -> str:
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def verify() -> bool:
+    ok = True
+    for rel, expect in FROZEN.items():
+        p = os.path.join(_ROOT, rel)
+        if not os.path.exists(p):
+            print(f"MISSING: {rel}"); ok = False; continue
+        got = _sha(p)
+        print(f"{'OK' if got == expect else 'DRIFT'}: {rel} {got[:16]}")
+        if got != expect:
+            ok = False
+    print(f"total guarded artifacts: {len(FROZEN)}")
+    return ok
+
+
+if __name__ == "__main__":
+    sys.exit(0 if verify() else 1)
