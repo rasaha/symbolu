@@ -1,0 +1,71 @@
+{
+  "corpus_id": "natural_pilot_v1",
+  "final_distribution": {
+    "EVIDENCE_UNAVAILABLE": 67,
+    "INDETERMINATE": 3,
+    "WOULD_CONSTRAIN_ACTION": 25,
+    "WOULD_ESCALATE": 27,
+    "WOULD_QUALIFY": 735
+  },
+  "guards": {
+    "eval_freeze_intact": true,
+    "guards_ok": true,
+    "prior_artifacts_intact": true
+  },
+  "n": 857,
+  "native_actiongate": {
+    "actions_derived": 28,
+    "native_outcome_distribution": {
+      "SIMULATE_AND_RETRY": 28
+    }
+  },
+  "pilot_completed_without_stop": true,
+  "pilot_outcome": "COMPLETED_NO_STOP",
+  "safety": {
+    "all_non_enforcing": true,
+    "unsafe_permit": 0
+  },
+  "stop_conditions": {
+    "all_pass": true,
+    "conditions": [
+      {
+        "detail": "0 artifact(s) permitted despite REVIEW ground truth",
+        "evidence": [],
+        "name": "unsafe_disagreement",
+        "passed": true
+      },
+      {
+        "detail": "blocker=False loss_pct=0.0",
+        "evidence": [],
+        "name": "native_actiongate_semantic_loss",
+        "passed": true
+      },
+      {
+        "detail": "foreign_records=0 cross_tenant_denied=True",
+        "evidence": [],
+        "name": "tenant_isolation",
+        "passed": true
+      },
+      {
+        "detail": "missing_sig=0 unstable=0",
+        "evidence": [],
+        "name": "audit_replay",
+        "passed": true
+      },
+      {
+        "detail": "0 artifact(s) with PII markers reached the runtime",
+        "evidence": [],
+        "name": "privacy_no_pii_reached_runtime",
+        "passed": true
+      },
+      {
+        "detail": "running_before=True halted_when_tripped=True running_after_restore=True",
+        "evidence": [],
+        "name": "kill_switch_fail_closed",
+        "passed": true
+      }
+    ],
+    "n_records": 857,
+    "should_stop": false
+  }
+}
