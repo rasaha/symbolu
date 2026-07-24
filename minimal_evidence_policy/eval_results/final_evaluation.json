@@ -1,0 +1,279 @@
+{
+  "comparison": {
+    "minimal": {
+      "adv_unsafe": 0,
+      "clean_allow": 0.5,
+      "held_unsafe": 0
+    },
+    "prior_uniform": {
+      "clean_allow": 0.0,
+      "over_qualification": 0.855
+    },
+    "rich": {
+      "adv_unsafe": 69,
+      "clean_allow": 0.488,
+      "held_unsafe": 16
+    },
+    "risk_only": {
+      "clean_allow": 0.752,
+      "held_unsafe": 52
+    }
+  },
+  "complexity": {
+    "invariants": 12,
+    "outcomes": 6,
+    "policy_logic_rules": 12,
+    "within_budget": true
+  },
+  "final_evaluation_sha256": "3989181d66d4d5f5e5e72c5d3b17c6ac97f06d15a55867c8a59304286212b0e9",
+  "guards": {
+    "evaluation_freeze_intact": true,
+    "prior_artifacts_intact": true
+  },
+  "human_validation": "NOT_EVALUATED",
+  "minimal_policy_adversarial": {
+    "clean_allow": 0,
+    "clean_allow_rate": 0.0,
+    "escalation": 48,
+    "high_risk_unsafe_allow": 0,
+    "n": 75,
+    "over_qualification": 0,
+    "over_qualification_rate": 0.0,
+    "unsafe_allow": 0,
+    "unsafe_allow_rate": 0.0,
+    "withholding": 27,
+    "withholding_rate": 0.36
+  },
+  "minimal_policy_held_out": {
+    "clean_allow": 125,
+    "clean_allow_rate": 0.5,
+    "escalation": 46,
+    "high_risk_unsafe_allow": 0,
+    "n": 250,
+    "over_qualification": 0,
+    "over_qualification_rate": 0.0,
+    "unsafe_allow": 0,
+    "unsafe_allow_rate": 0.0,
+    "withholding": 79,
+    "withholding_rate": 0.316
+  },
+  "monotonicity_violations": 0,
+  "native_actiongate_preserved": true,
+  "review_rate": 0.096,
+  "self_verification_escape": 0,
+  "subgroups": {
+    "by_claim_family": {
+      "action_proposal": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 3,
+        "high_risk_unsafe_allow": 0,
+        "n": 12,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 9,
+        "withholding_rate": 0.75
+      },
+      "attribution": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 1,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 1,
+        "withholding_rate": 1.0
+      },
+      "code_behavior": {
+        "clean_allow": 29,
+        "clean_allow_rate": 0.8286,
+        "escalation": 1,
+        "high_risk_unsafe_allow": 0,
+        "n": 35,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 5,
+        "withholding_rate": 0.1429
+      },
+      "current_fact": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 1,
+        "high_risk_unsafe_allow": 0,
+        "n": 1,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "financial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 6,
+        "high_risk_unsafe_allow": 0,
+        "n": 6,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "internal_policy": {
+        "clean_allow": 11,
+        "clean_allow_rate": 0.7333,
+        "escalation": 1,
+        "high_risk_unsafe_allow": 0,
+        "n": 15,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 3,
+        "withholding_rate": 0.2
+      },
+      "measured_performance": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 1,
+        "high_risk_unsafe_allow": 0,
+        "n": 19,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 18,
+        "withholding_rate": 0.9474
+      },
+      "medical": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 15,
+        "high_risk_unsafe_allow": 0,
+        "n": 15,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "process_description": {
+        "clean_allow": 84,
+        "clean_allow_rate": 0.8571,
+        "escalation": 2,
+        "high_risk_unsafe_allow": 0,
+        "n": 98,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 12,
+        "withholding_rate": 0.1224
+      },
+      "recommendation": {
+        "clean_allow": 1,
+        "clean_allow_rate": 0.2,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 5,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 4,
+        "withholding_rate": 0.8
+      },
+      "security_capability": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 16,
+        "high_risk_unsafe_allow": 0,
+        "n": 43,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 27,
+        "withholding_rate": 0.6279
+      }
+    },
+    "by_risk_tier": {
+      "high": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 46,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "low": {
+        "clean_allow": 112,
+        "clean_allow_rate": 0.875,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 128,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 16,
+        "withholding_rate": 0.125
+      },
+      "medium": {
+        "clean_allow": 13,
+        "clean_allow_rate": 0.1711,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 76,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 63,
+        "withholding_rate": 0.8289
+      }
+    },
+    "held_out_vs_adversarial_vs_review": {
+      "adversarial": {
+        "clean": 0.0,
+        "unsafe": 0
+      },
+      "held_out": {
+        "clean": 0.5,
+        "unsafe": 0
+      },
+      "review": {
+        "clean": 0.46
+      }
+    }
+  },
+  "success_criteria": {
+    "beats_risk_only_and_rich_on_safety": true,
+    "bounded_review_burden": true,
+    "clean_allow_above_prior_zero": true,
+    "monotonic": true,
+    "no_action_unsafe_allows": true,
+    "no_frozen_component_changes": true,
+    "no_high_risk_unsafe_allows": true,
+    "over_qualification_reduced": true,
+    "within_complexity_budget": true,
+    "zero_self_verification_escape": true
+  },
+  "success_criteria_passed": 10,
+  "success_criteria_total": 10
+}
