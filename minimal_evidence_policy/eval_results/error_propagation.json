@@ -1,0 +1,87 @@
+{
+  "baseline_unsafe_allows_at_gold": 6,
+  "error_propagation_sha256": "79bdfe34f286476f24eb7f0f042d1acfa5adad88d7ec0b51cab518b78bab21f6",
+  "errors": [
+    {
+      "error": "risk_downgrade",
+      "induced_unsafe_allows": 178,
+      "items_affected": 178,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "factual_as_opinion",
+      "induced_unsafe_allows": 164,
+      "items_affected": 164,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "generated_as_evidence",
+      "induced_unsafe_allows": 164,
+      "items_affected": 164,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "actionability_omitted",
+      "induced_unsafe_allows": 143,
+      "items_affected": 143,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "current_as_timeless",
+      "induced_unsafe_allows": 143,
+      "items_affected": 143,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "source_authoritative_no_basis",
+      "induced_unsafe_allows": 52,
+      "items_affected": 143,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "fixture_as_telemetry",
+      "induced_unsafe_allows": 52,
+      "items_affected": 143,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "stale_as_current",
+      "induced_unsafe_allows": 52,
+      "items_affected": 143,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "ER_forced_to_E1",
+      "induced_unsafe_allows": 14,
+      "items_affected": 14,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "E4_downgraded_to_E2",
+      "induced_unsafe_allows": 10,
+      "items_affected": 21,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "attribution_as_truth",
+      "induced_unsafe_allows": 0,
+      "items_affected": 56,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "unknown_forced_internal",
+      "induced_unsafe_allows": 0,
+      "items_affected": 14,
+      "propagates_to_unsafe": false
+    }
+  ],
+  "most_dangerous": [
+    "risk_downgrade",
+    "factual_as_opinion",
+    "generated_as_evidence",
+    "actionability_omitted",
+    "current_as_timeless"
+  ],
+  "n_items": 325,
+  "note": "each error mutates the correct obligation; induced_unsafe = correctly-withheld claims turned into clean ALLOWs. Burden-stripping errors propagate; evidence-absent errors are absorbed by the contract's fail-closed asymmetry."
+}
