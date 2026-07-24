@@ -27,6 +27,14 @@ from reviewer_ready_pilot.review_interface import _BLINDED_FIELDS  # noqa: F401 
 VALID_ROLES = {"TECHNICAL REVIEWER", "POLICY-RISK REVIEWER", "DOMAIN REVIEWER", "INDEPENDENT ADJUDICATOR"}
 _PLACEHOLDER = re.compile(r"^\s*\[.*\]\s*$")          # e.g. "[R1_ID]", "[YES/NO]"
 _MOCKISH = re.compile(r"\b(mock|test|dummy|fake|sample|example|placeholder)\b", re.I)
+# Substantive-independence exclusion (REVIEWER_GOVERNANCE_PROTOCOL.md / REVIEWER_RECRUITMENT_PLAN.md):
+# "No reviewer who authored the frozen policy's rules or has a stake in its acceptance." A self-declared
+# COI = YES attests a declaration was filed; it does NOT waive a structural stake. This flag is categorical
+# and independent of the checkbox.
+_STAKEHOLDER = re.compile(
+    r"\b(founder|co-?founder|owner of|product owner|policy (author|owner)|authored the (policy|rules?)"
+    r"|created the (policy|system|architecture)|inventor|maintainer of the (policy|rules?)"
+    r"|stake in (its|the policy'?s) acceptance)\b", re.I)
 
 
 def is_placeholder(v: Any) -> bool:
@@ -122,6 +130,14 @@ def validate_reviewer(slot: str, r: Dict[str, Any], *, required: bool = True,
     # approved access scope
     if is_placeholder(r.get("access_scope")):
         failures.append("approved access scope is missing / unfilled placeholder")
+
+    # substantive independence: exclude authors of / stakeholders in the frozen policy (categorical;
+    # a self-declared COI = YES does not waive it). Applies to reviewers, not the adjudicator role check.
+    stake_text = f"{role or ''} {r.get('expertise', '') or ''}"
+    if not is_adj and _STAKEHOLDER.search(stake_text):
+        failures.append("independence: declared role/expertise indicates authorship of or a stake in the "
+                        "policy's acceptance (e.g. founder / product owner); the governance protocol "
+                        "excludes stakeholders regardless of a self-declared COI = YES")
 
     # no prohibited artifacts assigned
     assigned = set(r.get("assigned_artifacts", []) or [])

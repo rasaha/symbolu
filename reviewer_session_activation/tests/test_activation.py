@@ -98,6 +98,27 @@ def test_missing_coi_blocks():
     assert any("conflict-of-interest" in f for f in elig.reviewers[0].failures)
 
 
+def test_founder_stakeholder_excluded_despite_coi_yes():
+    """A founder / product owner has a structural stake in the policy's acceptance; the governance
+    protocol excludes stakeholders regardless of a self-declared COI = YES."""
+    roster = _real_roster()
+    roster["R1"]["expertise"] = "Founder and technical product owner of the governed inference architecture"
+    elig = eligibility.evaluate_roster(roster)
+    assert elig.activatable is False
+    r1 = elig.reviewers[0]
+    assert r1.passed is False
+    assert any("independence" in f and "stake" in f for f in r1.failures)
+    # the independent policy-risk reviewer is unaffected
+    assert elig.reviewers[1].passed is True
+
+
+def test_independent_reviewer_not_flagged():
+    roster = _real_roster()
+    roster["R2"]["expertise"] = "Independent engineering, operations, governance, risk, or compliance reviewer"
+    elig = eligibility.evaluate_roster(roster)
+    assert all(not any("independence" in f for f in r.failures) for r in elig.reviewers)
+
+
 def test_prohibited_artifact_assignment_blocks():
     roster = _real_roster()
     roster["R1"]["assigned_artifacts"] = ["final-set-item-1"]
