@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "final_min": 60,
+    "final_review": 100,
+    "final_target": 100,
+    "training": 20
+  },
+  "dataset_version": "reviewer_calibration_v1",
+  "evidence_status": "SUFFICIENT",
+  "final_sha256": "3435aafb100c421265aaa186aad2a3769788ba45ff2c5068baf56526f44a2669",
+  "natural_available": 569,
+  "training_sha256": "0b12978550d4689f94fc8407e8bfada4b61f1173cb1f92ee6986b8f87c47c084"
+}
