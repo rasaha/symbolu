@@ -1,0 +1,97 @@
+{
+  "corpus": "ci_corpus_v1",
+  "phase21_stage_cost": {
+    "audit": 1,
+    "dimension_detect": 3,
+    "nonassertive_filter": 1,
+    "reference_resolution": 2,
+    "safe_split": 2,
+    "segmentation": 1,
+    "span_detection": 1,
+    "validation": 4
+  },
+  "phase22_ablation": {
+    "-nonassertive_filter": {
+      "evidence_query_altered": 0,
+      "evidence_query_altered_rate": 0.0,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 78,
+      "unsafe_delivery": 78,
+      "unsafe_delivery_rate": 0.0682
+    },
+    "-reference_resolution": {
+      "evidence_query_altered": 104,
+      "evidence_query_altered_rate": 0.0909,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 78,
+      "unsafe_delivery": 78,
+      "unsafe_delivery_rate": 0.0682
+    },
+    "-safe_split": {
+      "evidence_query_altered": 78,
+      "evidence_query_altered_rate": 0.0682,
+      "false_rejection": 0,
+      "false_rejection_rate": 0.0,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 0,
+      "unsafe_delivery": 0,
+      "unsafe_delivery_rate": 0.0
+    },
+    "FULL": {
+      "evidence_query_altered": 0,
+      "evidence_query_altered_rate": 0.0,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 78,
+      "unsafe_delivery": 78,
+      "unsafe_delivery_rate": 0.0682
+    }
+  },
+  "phase23_comparators": {
+    "FULL_component": {
+      "evidence_query_altered": 0,
+      "evidence_query_altered_rate": 0.0,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 78,
+      "unsafe_delivery": 78,
+      "unsafe_delivery_rate": 0.0682
+    },
+    "SC1_sentence+negation": {
+      "evidence_query_altered": 104,
+      "evidence_query_altered_rate": 0.0909,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 78,
+      "unsafe_delivery": 78,
+      "unsafe_delivery_rate": 0.0682
+    },
+    "SC2_clause+qualifier": {
+      "evidence_query_altered": 104,
+      "evidence_query_altered_rate": 0.0909,
+      "false_rejection": 0,
+      "false_rejection_rate": 0.0,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 0,
+      "unsafe_delivery": 650,
+      "unsafe_delivery_rate": 0.5682
+    },
+    "SC3_preserve_unless_conj": {
+      "evidence_query_altered": 0,
+      "evidence_query_altered_rate": 0.0,
+      "false_rejection": 78,
+      "false_rejection_rate": 0.0682,
+      "n_gold_claims": 1144,
+      "ungoverned_claim": 312,
+      "unsafe_delivery": 519,
+      "unsafe_delivery_rate": 0.4537
+    }
+  }
+}

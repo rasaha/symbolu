@@ -34,7 +34,12 @@ class ClaimIntegrityResult:
     audit: Dict[str, Any] = field(default_factory=dict)
 
 
-def decompose(text: str) -> ClaimIntegrityResult:
+ALL_FEATURES = frozenset({"reference_resolution", "safe_split", "nonassertive_filter"})
+
+
+def decompose(text: str, enabled: frozenset = ALL_FEATURES) -> ClaimIntegrityResult:
+    """`enabled` selects which mechanisms are active - the full set by default; the ablation study
+    (Phase 22) removes one at a time to measure its downstream weight."""
     spans = segmentation.segment(text)
     produced: List[ProducedClaim] = []
     codes: List[str] = []
@@ -42,13 +47,13 @@ def decompose(text: str) -> ClaimIntegrityResult:
     prev_text = ""
 
     for span, dependent in spans:
-        if _non_assertive(span):
+        if "nonassertive_filter" in enabled and _non_assertive(span):
             codes.append("CI.NON_ASSERTIVE_SKIPPED")   # rhetorical question / aside: do NOT extract
             continue
         working = span
         ref_ok = True
         rcodes: List[str] = []
-        if dependent:
+        if dependent and "reference_resolution" in enabled:
             working, ref_ok, antecedent = references.resolve(span, prev_text)
             if ref_ok:
                 rcodes.append("CI.REFERENCE_RESOLVED")
@@ -57,7 +62,7 @@ def decompose(text: str) -> ClaimIntegrityResult:
                 unresolved = True
 
         # split a conjunction only when safe (both sides independent, no spanning modifier)
-        pieces = _safe_split(working)
+        pieces = _safe_split(working) if "safe_split" in enabled else _naive_split(working)
         for piece in pieces:
             dims = detect.detect_dimensions(piece)
             produced.append(ProducedClaim(text=piece, dimensions=dims,
@@ -77,6 +82,13 @@ def _non_assertive(span: str) -> bool:
     """Rhetorical question or non-assertive aside: ends with '?' (and is not a claim). The taxonomy
     commits that rhetorical_non_assertive text must not be extracted as a claim (failure type 45)."""
     return span.strip().endswith("?")
+
+
+def _naive_split(clause: str) -> List[str]:
+    """Ablation of safe_split: split on any ' and '/' but ', ignoring spanning modifiers."""
+    import re
+    parts = re.split(r"\s+\b(?:and|but)\b\s+", clause)
+    return [p.rstrip(". ") + "." for p in parts if p.strip()]
 
 
 def _safe_split(clause: str) -> List[str]:
