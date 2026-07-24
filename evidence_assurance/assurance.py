@@ -45,7 +45,13 @@ def _fresh_ok(case: Dict[str, Any]) -> bool:
     return not (years and max(years) < 2018)
 
 
-def assess(case: Dict[str, Any]) -> AssuranceResult:
+LAYERS = ("alignment", "counterevidence", "provenance", "authority", "freshness", "independence")
+ALL_LAYERS = frozenset(LAYERS)
+
+
+def assess(case: Dict[str, Any], enabled: frozenset = ALL_LAYERS) -> AssuranceResult:
+    """Compose the layers into one disposition. `enabled` selects which layers are active — the full
+    set by default; the ablation study (Phase 18) removes one layer at a time to measure its weight."""
     prov = provenance.analyze(case)
     iv = independence.assess(case)
     al = alignment.assess(case)
@@ -74,28 +80,28 @@ def assess(case: Dict[str, Any]) -> AssuranceResult:
     #    (Scope inflation alone is handled later as a limitation, not a misalignment. Old publication
     #    years are staleness, handled at step 5 — not counted here as temporal misalignment, which
     #    would double-count the same year signal and swallow every STALE case.)
-    if not al.passage_supports_claim or not al.jurisdiction_ok:
+    if "alignment" in enabled and (not al.passage_supports_claim or not al.jurisdiction_ok):
         codes.extend(c for c in al.reason_codes if c != "EA.TEMPORAL_MISMATCH")
         return result(ES.MISALIGNED)
 
     # 2. Credible counterevidence found (not the irrelevant/false-conflict noise) → conflicted.
-    if cv.found:
+    if "counterevidence" in enabled and cv.found:
         codes.append("EA.COUNTEREVIDENCE_FOUND")
         return result(ES.CONFLICTED)
 
     # 3. Provenance cannot be trusted (fabricated diversity / missing provenance) → cannot decide.
     #    Independence returns UNKNOWN exactly here; never certify from untrusted metadata.
-    if iv.verdict == "UNKNOWN" or prov.missing_provenance:
+    if "provenance" in enabled and (iv.verdict == "UNKNOWN" or prov.missing_provenance):
         codes.append("EA.PROVENANCE_UNTRUSTED")
         return result(ES.INDETERMINATE)
 
     # 4. Source not authoritative for a high-risk decision.
-    if not _authority_ok(case):
+    if "authority" in enabled and not _authority_ok(case):
         codes.append("EA.AUTHORITY_MISMATCH")
         return result(ES.AUTHORITY_MISMATCH)
 
     # 5. Evidence outdated / superseded.
-    if not _fresh_ok(case) or prov.superseded_or_stale:
+    if "freshness" in enabled and (not _fresh_ok(case) or prov.superseded_or_stale):
         codes.append("EA.STALE")
         return result(ES.STALE)
 
@@ -103,12 +109,12 @@ def assess(case: Dict[str, Any]) -> AssuranceResult:
     #    failure gate: an aligned-but-wrong claim on a single source lands here too, and DEPENDENT is
     #    NOT delivered as positively supported, so it does not escape. (Clean-dependent-correct lands
     #    here as well — and its gold IS DEPENDENT, so that is correct, not a false block.)
-    if iv.verdict == "DUPLICATE":
+    if "independence" in enabled and iv.verdict == "DUPLICATE":
         codes.append("EA.DEPENDENT_SINGLE_SOURCE")
         return result(ES.DEPENDENT)
 
     # 7. Not a duplicate, but too little genuine independent support to certify.
-    if iv.effective_independent <= 1.0:
+    if "independence" in enabled and iv.effective_independent <= 1.0:
         codes.append("EA.INSUFFICIENT_INDEPENDENCE")
         return result(ES.INSUFFICIENT)
 

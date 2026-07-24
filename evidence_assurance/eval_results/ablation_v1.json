@@ -1,0 +1,105 @@
+{
+  "corpus": "ea_corpus_v1_1",
+  "phase17_layer_cost_probes": {
+    "alignment": 2,
+    "authority": 1,
+    "counterevidence": 9,
+    "freshness": 1,
+    "independence": 2,
+    "provenance": 3
+  },
+  "phase18_ablation": {
+    "-alignment": {
+      "accuracy": 0.6667,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 16,
+      "escape": 0.1057,
+      "false_block": 0.0
+    },
+    "-authority": {
+      "accuracy": 0.7372,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 17,
+      "escape": 0.0386,
+      "false_block": 0.1136
+    },
+    "-counterevidence": {
+      "accuracy": 0.6346,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 9,
+      "escape": 0.0854,
+      "false_block": 0.1136
+    },
+    "-freshness": {
+      "accuracy": 0.601,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 17,
+      "escape": 0.1057,
+      "false_block": 0.1136
+    },
+    "-independence": {
+      "accuracy": 0.6843,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 16,
+      "escape": 0.1057,
+      "false_block": 0.1136
+    },
+    "-provenance": {
+      "accuracy": 0.7676,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 15,
+      "escape": 0.0,
+      "false_block": 0.1136
+    },
+    "FULL": {
+      "accuracy": 0.7676,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 18,
+      "escape": 0.0,
+      "false_block": 0.1136
+    }
+  },
+  "phase19_defense_in_depth_adversarial": {
+    "FULL": {
+      "benign_cf_escape": 0.0,
+      "cost_probes": 18,
+      "fabricated_cf_escape": 0.0
+    },
+    "independence+alignment": {
+      "benign_cf_escape": 0.0,
+      "cost_probes": 4,
+      "fabricated_cf_escape": 0.1923
+    },
+    "independence+counterevidence": {
+      "benign_cf_escape": 0.0,
+      "cost_probes": 11,
+      "fabricated_cf_escape": 0.25
+    },
+    "independence_only": {
+      "benign_cf_escape": 0.0,
+      "cost_probes": 2,
+      "fabricated_cf_escape": 0.5
+    }
+  },
+  "phase19_minimal_sufficient_benign": {
+    "full_cost": 18,
+    "minimal_subset": [
+      "independence"
+    ],
+    "removed_without_raising_cf_escape": [
+      "counterevidence",
+      "provenance",
+      "alignment",
+      "authority",
+      "freshness"
+    ],
+    "subset_cost": 2,
+    "subset_result": {
+      "accuracy": 0.2949,
+      "correlated_failure_escape": 0.0,
+      "cost_probes": 2,
+      "escape": 0.3659,
+      "false_block": 0.0
+    }
+  }
+}
