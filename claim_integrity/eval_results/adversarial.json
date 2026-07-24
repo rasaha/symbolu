@@ -14,12 +14,13 @@
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "B_sentence_split",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
@@ -30,13 +31,14 @@
         "normative_status": 1,
         "population": 2,
         "ranges": 2,
+        "reference": 1,
         "scope": 1,
         "temporal_scope": 2
       },
-      "drift_rate": 0.56,
+      "drift_rate": 0.6,
       "method": "C_clause_split",
       "n": 25,
-      "silent_drift": 14
+      "silent_drift": 15
     },
     {
       "dims_hit": {
@@ -125,62 +127,68 @@
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "H_citation_aware_split",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "I_llm_simple",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "J_llm_schema",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "K_llm_selfcheck",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "L_hybrid",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
         "population": 1,
+        "reference": 1,
         "scope": 1
       },
-      "drift_rate": 0.08,
+      "drift_rate": 0.12,
       "method": "M_equivalence_filter",
       "n": 25,
-      "silent_drift": 2
+      "silent_drift": 3
     },
     {
       "dims_hit": {
@@ -202,13 +210,14 @@
         "normative_status": 1,
         "population": 2,
         "ranges": 2,
+        "reference": 1,
         "scope": 1,
         "temporal_scope": 2
       },
-      "drift_rate": 0.56,
+      "drift_rate": 0.6,
       "method": "O_aggressive_split",
       "n": 25,
-      "silent_drift": 14
+      "silent_drift": 15
     },
     {
       "dims_hit": {},
@@ -228,13 +237,14 @@
       "dims_hit": {
         "attribution": 1,
         "population": 1,
+        "reference": 1,
         "scope": 1,
         "temporal_scope": 1
       },
-      "drift_rate": 0.16,
+      "drift_rate": 0.2,
       "method": "R_learned_comparator",
       "n": 25,
-      "silent_drift": 4
+      "silent_drift": 5
     }
   ]
 }
