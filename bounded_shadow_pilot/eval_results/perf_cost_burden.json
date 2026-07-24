@@ -1,0 +1,39 @@
+{
+  "config": "FULL_STACK_HIGH_RISK",
+  "corpus_id": "natural_pilot_v1",
+  "governance_cost": {
+    "note": "governance overhead only; the real cost is the un-made model call (out of scope)",
+    "per_artifact_usd": 0.0,
+    "total_estimated_usd": 0.0
+  },
+  "governance_latency_units": {
+    "max": 7,
+    "median": 6,
+    "note": "deterministic units from the frozen trace; excludes the (never-made) model call",
+    "p95": 7
+  },
+  "n": 857,
+  "reviewer_burden": {
+    "artifacts_routed_to_review": 99,
+    "burden_rate": 0.1155,
+    "by_disposition": {
+      "EVIDENCE_UNAVAILABLE": 67,
+      "INDETERMINATE": 3,
+      "WOULD_ESCALATE": 27,
+      "WOULD_QUALIFY": 2
+    },
+    "by_use_case": {
+      "compliance_summary_review": 13,
+      "cybersecurity_advisory_review": 27,
+      "enterprise_policy_interpretation": 6,
+      "it_operations_guidance": 6,
+      "software_engineering_recommendation_review": 47
+    },
+    "note": "over-qualified deliveries do NOT add review burden (they deliver with caveats); burden comes from withholds/escalations/indeterminate"
+  },
+  "storage": {
+    "minimized_per_artifact_bytes": 272.3,
+    "minimized_total_bytes": 233325,
+    "note": "data-minimized shadow record: dispositions + reason codes + replay signature only"
+  }
+}

@@ -1,0 +1,583 @@
+{
+  "baselines": {
+    "A_uniform_strong": {
+      "adversarial": {
+        "acceptable_accuracy": 0.3,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.3,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.112,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.036,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "B_uniform_qualify": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "C_risk_only": {
+      "adversarial": {
+        "acceptable_accuracy": 0.3,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.3,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.78,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.332,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "D_domain_only": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.5,
+        "unsafe_assignments": 50,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1cb66a8e1efda6a1: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1f6b97a630e0f3af: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25597b62888dbb8a: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25d860d285f71a23: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 40
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.844,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.296,
+        "n": 250,
+        "unsafe_assignment_rate": 0.132,
+        "unsafe_assignments": 33,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-40348dd62d409094: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-42844d0487b992a0: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-4775422b1c7fc966: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 33
+      }
+    },
+    "E_claim_type_only": {
+      "adversarial": {
+        "acceptable_accuracy": 0.5,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.5,
+        "n": 100,
+        "unsafe_assignment_rate": 0.2,
+        "unsafe_assignments": 20,
+        "unsafe_examples": [
+          "adv-019840f5c0f43d33: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-1cde5c1a4831187e: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-2a4f2d92be6e3552: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-548077b7c3a439d7: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-5ac6831caabeaadc: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-5d3cfb5c82e53a36: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-5dd1b93fda83151e: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-674136017ebc925d: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 20
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.764,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.572,
+        "n": 250,
+        "unsafe_assignment_rate": 0.04,
+        "unsafe_assignments": 10,
+        "unsafe_examples": [
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-4db0ab33abd4af2f: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5b0d181791fa8d09: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d54b84fd345b4c8: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-66e878bde6cc7a2b: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 10
+      }
+    },
+    "F_source_role_only": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.5,
+        "unsafe_assignments": 50,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1cb66a8e1efda6a1: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1f6b97a630e0f3af: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25597b62888dbb8a: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25d860d285f71a23: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 40
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.368,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.28,
+        "n": 250,
+        "unsafe_assignment_rate": 0.076,
+        "unsafe_assignments": 19,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4db0ab33abd4af2f: gold=HUMAN_REVIEW_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-4f960fbaff61f86e: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-4f97ad677e870354: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 19
+      }
+    },
+    "G_claim_type_risk": {
+      "adversarial": {
+        "acceptable_accuracy": 0.7,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.7,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.672,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.572,
+        "n": 250,
+        "unsafe_assignment_rate": 0.012,
+        "unsafe_assignments": 3,
+        "unsafe_examples": [
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 3
+      }
+    },
+    "H_source_authority": {
+      "adversarial": {
+        "acceptable_accuracy": 0.1,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.1,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.04,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.02,
+        "n": 250,
+        "unsafe_assignment_rate": 0.052,
+        "unsafe_assignments": 13,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4db0ab33abd4af2f: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4f960fbaff61f86e: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4f97ad677e870354: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 13
+      }
+    },
+    "I_claim_type_source": {
+      "adversarial": {
+        "acceptable_accuracy": 0.5,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.5,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.784,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.564,
+        "n": 250,
+        "unsafe_assignment_rate": 0.028,
+        "unsafe_assignments": 7,
+        "unsafe_examples": [
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5b0d181791fa8d09: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d54b84fd345b4c8: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-66e878bde6cc7a2b: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-6fe06d0ebb1bbf2a: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 7
+      }
+    },
+    "J_claim_type_source_risk": {
+      "adversarial": {
+        "acceptable_accuracy": 0.8,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.8,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.66,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.56,
+        "n": 250,
+        "unsafe_assignment_rate": 0.012,
+        "unsafe_assignments": 3,
+        "unsafe_examples": [
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 3
+      }
+    },
+    "K_global_threshold_reduction": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.5,
+        "unsafe_assignments": 50,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1cb66a8e1efda6a1: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1f6b97a630e0f3af: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25597b62888dbb8a: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25d860d285f71a23: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 40
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.844,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.296,
+        "n": 250,
+        "unsafe_assignment_rate": 0.132,
+        "unsafe_assignments": 33,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-40348dd62d409094: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-42844d0487b992a0: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-4775422b1c7fc966: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 33
+      }
+    },
+    "L_lowrisk_bypass": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "M_internal_always_auth": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.1,
+        "unsafe_assignments": 10,
+        "unsafe_examples": [
+          "adv-019840f5c0f43d33: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-1cde5c1a4831187e: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-548077b7c3a439d7: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-5ac6831caabeaadc: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-5d3cfb5c82e53a36: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-674136017ebc925d: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-6cb2a0d93e68f150: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "adv-87c1ba5b36822a90: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 10
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.02,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.012,
+        "n": 250,
+        "unsafe_assignment_rate": 0.068,
+        "unsafe_assignments": 17,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4db0ab33abd4af2f: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4f960fbaff61f86e: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-4f97ad677e870354: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 17
+      }
+    },
+    "N_impl_always_auth": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.5,
+        "unsafe_assignments": 50,
+        "unsafe_examples": [
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-0aea7ca372233134: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-134d3057e6abdd4c: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-25d860d285f71a23: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-28ba008a9fe4c6d4: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-2a4f2d92be6e3552: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "adv-2ce7707b25bba0ff: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 50
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.34,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.276,
+        "n": 250,
+        "unsafe_assignment_rate": 0.076,
+        "unsafe_assignments": 19,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-4db0ab33abd4af2f: gold=HUMAN_REVIEW_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-4f960fbaff61f86e: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+          "nat2-4f97ad677e870354: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 19
+      }
+    },
+    "O_nogate_all_lowrisk": {
+      "adversarial": {
+        "acceptable_accuracy": 0.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.5,
+        "unsafe_assignments": 50,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1cb66a8e1efda6a1: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-1f6b97a630e0f3af: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25597b62888dbb8a: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "adv-25d860d285f71a23: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 40
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.176,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.0,
+        "n": 250,
+        "unsafe_assignment_rate": 0.132,
+        "unsafe_assignments": 33,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-3c74d33fbee5273d: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-40348dd62d409094: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-416537f662730083: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-42844d0487b992a0: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-449531be2ad42ee3: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-4775422b1c7fc966: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 33
+      }
+    },
+    "P_simple_contextual": {
+      "adversarial": {
+        "acceptable_accuracy": 0.2,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.2,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.772,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.568,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "Q_reference": {
+      "adversarial": {
+        "acceptable_accuracy": 0.5,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.5,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.736,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.56,
+        "n": 250,
+        "unsafe_assignment_rate": 0.024,
+        "unsafe_assignments": 6,
+        "unsafe_examples": [
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-514843945263f993: gold=HUMAN_REVIEW_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-5b0d181791fa8d09: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d54b84fd345b4c8: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED pred=INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+          "nat2-6fe06d0ebb1bbf2a: gold=HUMAN_REVIEW_REQUIRED pred=CONTEXTUAL_SUPPORT_SUFFICIENT"
+        ],
+        "unsafe_high_risk_assignments": 6
+      }
+    },
+    "R_oracle": {
+      "adversarial": {
+        "acceptable_accuracy": 1.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 1.0,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 1.0,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 1.0,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    },
+    "S_learned": {
+      "adversarial": {
+        "acceptable_accuracy": 0.2,
+        "claim_type_accuracy_vs_gold_rubric": 0.0,
+        "exact_accuracy": 0.2,
+        "n": 100,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      },
+      "held_out_natural": {
+        "acceptable_accuracy": 0.892,
+        "claim_type_accuracy_vs_gold_rubric": 0.636,
+        "exact_accuracy": 0.82,
+        "n": 250,
+        "unsafe_assignment_rate": 0.0,
+        "unsafe_assignments": 0,
+        "unsafe_examples": [],
+        "unsafe_high_risk_assignments": 0
+      }
+    }
+  },
+  "baselines_sha256": "284c1e94ab2e3a703555818be0d8d24c8f3b11c64c8cdd85dd61a885b888e83e",
+  "dataset_version": "evidence_obligation_v1",
+  "note": "A-J heuristic/single-feature; K-O unsafe shortcuts; P simple; Q reference; R oracle; S learned (fit on DEVELOPMENT only)."
+}

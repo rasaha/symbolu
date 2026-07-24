@@ -1,0 +1,184 @@
+{
+  "comparison": {
+    "oracle_R": {
+      "clean_allow": 0.296,
+      "unsafe_allow": 0
+    },
+    "prior_uniform": {
+      "clean_allow": 0.0,
+      "over_qualification": 0.855
+    },
+    "reference_Q": {
+      "adversarial_unsafe": 10,
+      "clean_allow": 0.584,
+      "over_qualification": 0.02,
+      "unsafe_allow": 10
+    },
+    "risk_only_C": {
+      "clean_allow": 0.668,
+      "unsafe_allow": 16
+    }
+  },
+  "final_evaluation_sha256": "d81f619767a1982c6b79658ec94b7ee9c21d2b3d0409b9794b77e012356f3bc5",
+  "guards": {
+    "evaluation_freeze_intact": true,
+    "prior_artifacts_intact": true
+  },
+  "reference_component_adversarial": {
+    "clean_allow": 10,
+    "clean_allow_rate": 0.1,
+    "escalation": 80,
+    "high_risk_unsafe_allow": 10,
+    "n": 100,
+    "over_qualification": 0,
+    "over_qualification_rate": 0.0,
+    "unsafe_allow": 10,
+    "unsafe_allow_rate": 0.1,
+    "unsafe_examples": [
+      "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-134d3057e6abdd4c: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-28ba008a9fe4c6d4: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-5d2904267d84c5db: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-7b4459129d12da9e: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-7b61362f47dab998: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-97284aae05095a21: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+      "adv-c05a247f469fb64b: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW"
+    ],
+    "withholding": 10,
+    "withholding_rate": 0.1
+  },
+  "reference_component_held_out": {
+    "clean_allow": 146,
+    "clean_allow_rate": 0.584,
+    "escalation": 51,
+    "high_risk_unsafe_allow": 0,
+    "n": 250,
+    "over_qualification": 5,
+    "over_qualification_rate": 0.02,
+    "unsafe_allow": 10,
+    "unsafe_allow_rate": 0.04,
+    "unsafe_examples": [
+      "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-46e70b793700dd2f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-490002d07fe12ca6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-4b6b2463f902bcb7: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-51958e2a491272e9: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-5b6fe90979cc3ce6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+      "nat2-5bd173af201cc8e1: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+    ],
+    "withholding": 48,
+    "withholding_rate": 0.192
+  },
+  "subgroups": {
+    "by_claim_family": {
+      "attribution": {
+        "clean_allow_rate": 0.0,
+        "n": 2,
+        "unsafe_allow": 0
+      },
+      "code_behavior": {
+        "clean_allow_rate": 0.8588,
+        "n": 85,
+        "unsafe_allow": 2
+      },
+      "financial": {
+        "clean_allow_rate": 0.0,
+        "n": 6,
+        "unsafe_allow": 0
+      },
+      "mathematical": {
+        "clean_allow_rate": 0.3333,
+        "n": 6,
+        "unsafe_allow": 1
+      },
+      "medical": {
+        "clean_allow_rate": 0.0,
+        "n": 10,
+        "unsafe_allow": 0
+      },
+      "performance": {
+        "clean_allow_rate": 0.0,
+        "n": 24,
+        "unsafe_allow": 0
+      },
+      "policy": {
+        "clean_allow_rate": 0.0,
+        "n": 5,
+        "unsafe_allow": 0
+      },
+      "process_description": {
+        "clean_allow_rate": 0.6442,
+        "n": 104,
+        "unsafe_allow": 4
+      },
+      "recommendation": {
+        "clean_allow_rate": 0.6,
+        "n": 5,
+        "unsafe_allow": 3
+      },
+      "temporal": {
+        "clean_allow_rate": 0.3333,
+        "n": 3,
+        "unsafe_allow": 0
+      }
+    },
+    "by_risk_tier": {
+      "high": {
+        "clean_allow_rate": 0.25,
+        "n": 68,
+        "unsafe_allow": 0
+      },
+      "low": {
+        "clean_allow_rate": 0.7126,
+        "n": 167,
+        "unsafe_allow": 0
+      },
+      "medium": {
+        "clean_allow_rate": 0.6667,
+        "n": 15,
+        "unsafe_allow": 10
+      }
+    },
+    "by_source_role": {
+      "generated_documentation": {
+        "clean_allow_rate": 0.0,
+        "n": 16,
+        "unsafe_allow": 0
+      },
+      "primary_implementation": {
+        "clean_allow_rate": 0.6293,
+        "n": 232,
+        "unsafe_allow": 10
+      },
+      "test_artifact": {
+        "clean_allow_rate": 0.0,
+        "n": 2,
+        "unsafe_allow": 0
+      }
+    },
+    "held_out_vs_adversarial": {
+      "adversarial": {
+        "clean_allow_rate": 0.1,
+        "unsafe_allow": 10
+      },
+      "held_out": {
+        "clean_allow_rate": 0.584,
+        "unsafe_allow": 10
+      }
+    }
+  },
+  "success_criteria": {
+    "bounded_false_withholding": true,
+    "clean_allow_materially_above_prior_zero": true,
+    "deterministic_replay": true,
+    "improves_over_claim_type_only": true,
+    "improves_over_risk_only": false,
+    "no_adversarial_unsafe_allows": false,
+    "no_frozen_component_changes": true,
+    "no_high_risk_unsafe_allows": true,
+    "over_qualification_materially_reduced": true
+  },
+  "success_criteria_passed": 7,
+  "success_criteria_total": 9
+}

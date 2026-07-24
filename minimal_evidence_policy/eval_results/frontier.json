@@ -1,0 +1,217 @@
+{
+  "admissible_safe_and_useful": [
+    "O_oracle",
+    "K_minimal_no_invariants",
+    "H_claim_source_risk",
+    "M_minimal_review_fallback",
+    "Full_minimal",
+    "N_learned"
+  ],
+  "best_safe_useful": "O_oracle",
+  "frontier": [
+    {
+      "adversarial_unsafe_allow": 75,
+      "approx_rules": 1,
+      "clean_allow_rate": 1.0,
+      "held_unsafe_allow": 109,
+      "high_risk_unsafe_allow": 46,
+      "metadata_fields": 0,
+      "policy": "B_global_threshold",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 5,
+      "clean_allow_rate": 0.752,
+      "held_unsafe_allow": 52,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 1,
+      "policy": "D_risk_only",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 3,
+      "clean_allow_rate": 0.748,
+      "held_unsafe_allow": 62,
+      "high_risk_unsafe_allow": 15,
+      "metadata_fields": 1,
+      "policy": "F_source_role_only",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 5,
+      "clean_allow_rate": 0.716,
+      "held_unsafe_allow": 43,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 1,
+      "policy": "J_minimal_risk_floor",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 6,
+      "approx_rules": 0,
+      "clean_allow_rate": 0.544,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 0,
+      "policy": "O_oracle",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 2,
+      "clean_allow_rate": 0.512,
+      "held_unsafe_allow": 5,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 1,
+      "policy": "C_lowrisk_bypass",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 13,
+      "approx_rules": 12,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 1,
+      "policy": "E_claim_type_only",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 13,
+      "approx_rules": 15,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 2,
+      "policy": "G_claim_source",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 17,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 3,
+      "policy": "H_claim_source_risk",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 12,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 3,
+      "policy": "K_minimal_no_invariants",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 13,
+      "approx_rules": 10,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 3,
+      "policy": "L_minimal_no_upward_only",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 24,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 4,
+      "policy": "M_minimal_review_fallback",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 24,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 4,
+      "policy": "Full_minimal",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 0,
+      "clean_allow_rate": 0.492,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 2,
+      "policy": "N_learned",
+      "review_rate": null,
+      "safe": true,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 69,
+      "approx_rules": 90,
+      "clean_allow_rate": 0.488,
+      "held_unsafe_allow": 16,
+      "high_risk_unsafe_allow": 1,
+      "metadata_fields": 8,
+      "policy": "I_rich_component",
+      "review_rate": null,
+      "safe": false,
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 0,
+      "clean_allow_rate": 0.0,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "metadata_fields": 0,
+      "policy": "A_prior_uniform",
+      "review_rate": null,
+      "safe": true,
+      "useful": false
+    }
+  ],
+  "frontier_sha256": "a36f17f43cb0ff4be990cd28443cbf2d4d894773a9eb7baac2736667cb46e1c3",
+  "minimal_earns_use": {
+    "beats_rich_component_on_safety": true,
+    "beats_risk_only_on_safety": true,
+    "simpler_safe_policies_matching_clean_allow": [
+      "O_oracle",
+      "K_minimal_no_invariants",
+      "H_claim_source_risk"
+    ],
+    "verdict": "EARNS USE ON SAFETY vs risk-only/rich, but simpler safe variants match its clean-allow -> the minimal policy's value is its guaranteed safety, not a clean-allow edge"
+  },
+  "prior_clean_allow": 0.0
+}

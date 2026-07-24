@@ -1,0 +1,119 @@
+{
+  "architectural_decision": "3 REDUCE TO CLAIM-TYPE + SOURCE-ROLE POLICY",
+  "decision_sha256": "4397bcfc44c28918085ca4beea7f89a79bfbaee459ba2f3bcc14d9410f61f9b7",
+  "dimension_findings": {
+    "concept_validated": true,
+    "distinct_stage_justified": false,
+    "global_calibration_sufficient": false,
+    "reference_adversarial_unsafe": 10,
+    "risk_only_dominates_on_clean_allow": true
+  },
+  "nulls": {
+    "H0-10_no_over_qual_reduction": {
+      "note": "85.5% -> 2%",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-11_weakens_high_risk_safety": {
+      "note": "RETAINED for reference (10 adversarial unsafe); REJECTED for concept (oracle 0)",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-12_ea_already_captures": {
+      "note": "obligation-fed EA 58% vs uniform-derivation EA 0% -> obligation is the lever",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-13_simple_comparator_matches": {
+      "note": "RETAINED: risk-only matches/beats reference at 3 vs 90 rules",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-14_reviewers_disagree_too_much": {
+      "note": "RETAINED: reviewer agreement 0.316",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-15_cause_is_derivation_not_obligation": {
+      "note": "obligation policy (a better derivation) is the effective lever",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-16_global_threshold_as_good": {
+      "note": "global threshold reduction: 100 adversarial unsafe",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-17_distinct_stage_unnecessary": {
+      "note": "RETAINED: risk-only policy suffices; 90-rule stage not justified over 3 rules",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-18_readiness_still_blocked": {
+      "note": "RETAINED: adversarial leak + reviewer instability + no real review",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-1_uniform_as_good": {
+      "note": "uniform 0% clean vs contextual 58%/oracle 30%",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-2_risk_tier_alone": {
+      "note": "RETAINED: risk-only 0.668 >= reference 0.584 at fewer rules",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-3_claim_type_alone": {
+      "note": "reference beats claim-type-only on clean allow at <= unsafe",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-4_source_role_no_value": {
+      "note": "ablating source_role costs 27pp clean allow (value for utility)",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-5_authority_unreliable": {
+      "note": "authority validation accuracy 1.0 on canonical set (not full natural)",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-6_impl_self_verification_unsafe": {
+      "note": "circular guard: 0 unsafe self-support, 0 false authority",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-7_internal_authoritative_unreliable": {
+      "note": "oracle uses internal-authoritative obligations at 0 unsafe",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-8_no_gate_increases_unsafe": {
+      "note": "0/500 high-risk-or-factual no-gate assignments",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-9_no_clean_allow_improvement": {
+      "note": "0% -> 58.4% (reference) / 29.6% (oracle)",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    }
+  },
+  "nulls_rejected": 12,
+  "nulls_retained": 6,
+  "nulls_total": 18,
+  "pilot_decision": "D FIX EVIDENCE OBLIGATION FIRST",
+  "separated_dimensions": {
+    "algorithmic_complexity": "90-rule component not justified over a 3-rule risk / claim+source policy",
+    "architectural_need": "the obligation CONCEPT is needed (uniform/global fail); a distinct rich stage is not",
+    "customer_pilot_readiness": "blocked: fix classifier adversarial safety + real review first",
+    "high_risk_safety": "held-out high-risk unsafe 0; adversarial disguise leaks 10 (reference)",
+    "latency": "obligation assignment is sub-ms, stdlib-only, deterministic",
+    "metadata_requirements": "claim-type + source-role + risk are the load-bearing features",
+    "natural_artifact_utility": "large gain: 0% -> 29.6% (safe oracle) / 58.4% (reference)",
+    "operational_maturity": "shadow-only, read-only; no real reviewers/evidence/traffic",
+    "production_readiness": "NOT established",
+    "reviewer_burden": "simulated agreement 0.316; overrides skew stricter; real study required"
+  }
+}

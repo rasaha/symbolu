@@ -1,0 +1,19 @@
+{
+  "calibration_decision": "8 NOT ENOUGH HUMAN EVIDENCE",
+  "decision_sha256": "69480585d48b41d8872786b08a3279c25a6794c5aec74e46e4c829ed62155517",
+  "human_validation": "NOT_EVALUATED",
+  "outcome_review_status": "NOT_ENOUGH_HUMAN_EVIDENCE",
+  "pilot_decision": "I NOT ENOUGH HUMAN EVIDENCE",
+  "rationale": "The apparatus, frozen policy runner, ground-truth protocol, metrics, stop conditions, and evaluation freeze are all complete and ready, but there are 0 real reviewers (minimum 2). No human agreement, safety, or utility evidence exists, and none may be synthesized from mock or rubric output. Therefore the calibration decision is Option 8 (NOT ENOUGH HUMAN EVIDENCE) and the pilot decision is Option I (NOT ENOUGH HUMAN EVIDENCE). External-pilot progression is not recommended; the constructive next step, when real reviewers are available, is to run the frozen outcome-bearing review that is already built.",
+  "reviewer_count": 0,
+  "separated_dimensions": {
+    "explanation_quality": "NOT EVALUATED",
+    "external_pilot_readiness": "BLOCKED (human validation missing)",
+    "high_risk_readiness": "NOT EVALUATED",
+    "policy_safety": "technically 0 unsafe (prior track), NOT human-validated",
+    "policy_utility": "48% clean allow system output, NOT human-validated",
+    "production_readiness": "NOT established",
+    "review_burden": "NOT EVALUATED",
+    "reviewer_evidence": "NONE (0 real reviewers; min 2)"
+  }
+}

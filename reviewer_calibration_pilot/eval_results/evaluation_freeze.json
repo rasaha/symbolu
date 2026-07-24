@@ -1,0 +1,58 @@
+{
+  "artifact_sha256": {
+    "data/final_review_v1/final_review.json": "43fa025d4946bdf5162ab3d53e50d768d5840e76debbbf745d9a5707b5917844",
+    "data/manifest.json": "fb240ff715b7f116f53842910050a2821a2e98ece2aba6ffefe84d8e2805a41f",
+    "data/training_v1/training.json": "7483ec925a074fe12c53901228fdf7699159f8b9742f77b3ef71d8726afd79c5",
+    "eval_results/dry_run.json": "07a37823f2fff6d9470f490dce62b52af66f9f0426114140332f65d0ccf9e2b4"
+  },
+  "eval_config": {
+    "adjudication": "independent adjudicator; conservative on safety-relevant disagreement; record unresolved",
+    "external_pilot": "BLOCKED (human validation NOT EVALUATED)",
+    "frozen_minimal_policy_version": "minimal_evidence_policy_v1",
+    "human_validation": "NOT_EVALUATED",
+    "interface_version": "review_interface_v1",
+    "metrics": [
+      "acceptable_obligation_agreement",
+      "unsafe_allow_disagreement",
+      "high_risk_unsafe_allow_disagreement",
+      "source_authority_agreement",
+      "clean_allow_agreement",
+      "override_rate",
+      "review_time"
+    ],
+    "no_final_set_tuning": true,
+    "no_policy_change_during_review": true,
+    "obligation_vocabulary": [
+      "E0",
+      "E1",
+      "E2",
+      "E3",
+      "E4",
+      "ER"
+    ],
+    "orchestrator_version": "reviewer_calibration_orchestrator_v1",
+    "reviewer_count": 0,
+    "reviewer_guide_version": "reviewer_calibration_pilot/REVIEWER_GUIDE.md",
+    "reviewer_roster": [],
+    "runner_version": "reviewer_calibration_policy_runner_v1",
+    "stop_conditions_frozen": true,
+    "subgroup_analyses": [
+      "risk_tier",
+      "obligation_level",
+      "trap_type",
+      "action_bearing",
+      "source_authority"
+    ],
+    "thresholds": {
+      "max_stricter_override_rate": 0.4,
+      "max_unresolved_rate": 0.2,
+      "max_unsafe_allow_disagreement_rate": 0.02,
+      "min_acceptable_obligation_agreement": 0.7,
+      "min_explanation_usefulness": 2.5,
+      "min_high_risk_obligation_agreement": 0.8
+    },
+    "training_completed": false
+  },
+  "manifest_sha256": "71092708117fa7ddc5c22deddb62122292c0dd13947c2512e7c4982244d567aa",
+  "n_artifacts": 4
+}

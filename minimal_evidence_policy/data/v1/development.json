@@ -1,0 +1,2720 @@
+[
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-001ef6d4004594cd",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/core.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a72.8.12 vectorized entry across outer decoding steps.\n\nInputs:\n    sources_batch       shape (T, M, L, V) \u2014 probabilities for T\n                        outer steps, M sources each\n    config              BCVFLLMConfig (\u00a72.8.4)\n    valid_masks_batch   optional shape (T, M, L) boolean mask\n    return_per_source   if True, returns (total_cost[T,], per_source[T,M])\n\nReturns:\n    total_cost: shape (T,)\n    per_source: shape (T, M), only if return_per_source=True",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-003dcc660559dcb1",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "varna_lens/RULES.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Var\u1e47a Lens \u2014 The Rule (single, vowel-attachment polarity)\n\n> Interpretive lens \u2014 not a universal claim, not part of C\u00d7R\u00d7S. One frozen lexicon\n> (`lexicon_authoritative.json`), one rule, applied identically every time.\n>\n> **Layer boundary note** (see `LAYERS_ONTOLOGY_THEORY_IMPLEMENTATION.md`): automata / minimization claims\n> classify the current \u03c1 implementation only. They do not classify the completed acoustic ontology or future\n> reading-theory variants.\n\n## The reference: each letter's two poles\nEvery consonant has two poles in the lexicon: a **worldly** (binding) v\u1e5btti and a **spiritual** (liberating)\ncounter \u2014 Ka = *\u0100\u015b\u0101* (Hope) \u2194 *Nir\u0101\u015b\u0101* (Detachment); La = *Kr\u016brat\u0101* (Cruelty) \u2194 *Karu\u1e47\u0101* (Compassion); \u2026 A\nvowel has one **active essence** \u2014 a = *Birth of cognition*, \u0101 = *Expansion*, o = *Closure*, \u2026\n\n## The one rule (vowel-attachment polarity)\nEach **consonant** takes its pole from whether a **vowel attaches** to it:\n\n- **Onset** \u2014 a **vowel immediately follows** the consonant (CV) \u2192 its **spiritual (counter) pole (+)**.\n- **Bare** \u2014 **no vowel after** it (word-final, or before another consonant) \u2192 its **worldly pole (\u2212)**.\n- The **word's first consonant** \u2192 its **worldly pole (\u2212)** (the leading seed) \u2014 e.g. Ka = *Hope*.\n- A **\u2212** (worldly) consonant is shown easing into its spiritual counter: `worldly \u2933 counter`.\n\nThis is why **art \u2248 compassion** and **time \u2248 cruelty**: in *kala* (\u0915\u0932\u093e, art) the `la` has a vowel \u2192 La\u207a\n**Compassion**; in *kaal* (\u0915\u093e\u0932, time, schwa-dropped) the final `L` is bare \u2192 La\u207b **Cruelty**.\n\n(**Doubled consonant** \u2014 *happy* pp, *kill* ll: the **1st** occurrence \u2192 **spiritual (+)**, the **2nd** \u2192\n**worldly (\u2212)**. e.g. *kill* = \u2026 La\u207a **Compassion** \u2192 La\u207b **Cruelty**.)\n\n(**Vowels:** a vowel takes its active essence; **+** when a consonant precedes it, **\u2212** when it leads.)\n\n**Final-vowel rule:** a vowel at the **end** of the word is reported separately as the **whole-word essence**\n(\u27f9 [\u2026]) and removed from the stitched chain \u2014 **but it still",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-01db84e596ceb2ad",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "trading2/core/utility.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Bayesian Utility Function\n\nRisk-adjusted utility calculation for the Bayesian trading system.\nSimilar to trading/core/utility.py but adapted for Bayesian posteriors.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-023c689b5ed1445f",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e4_governance_truth/corpus/cases.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "TAP-E4 governance corpus (NEW, independently authored).\n\nEach case describes a governance SITUATION and one or more candidate authorities\n(``PolicySpec``). From the specs the builders synthesize:\n\n  * a TAP-E2 ``RetrievalRecord`` (frozen upstream structure) \u2014 one ``EvidenceUnit`` per\n    spec, carrying the document type + authority level that fixes its governance tier;\n  * a TAP-E3 ``RelationshipRecord`` (frozen upstream structure) \u2014 one governance\n    ``RelationshipAssertion`` per spec (GOVERNS/REQUIRES/\u2026), plus SUPERSEDES and EXEMPTS\n    assertions, with every governance attribute placed in the assertion ``scope`` map.\n\nThe relationship inputs are authored to be already-perfect (upstream confidence 1.0): this\nstudy evaluates the GOVERNANCE resolution layer, not upstream extraction. Ground truth\n(``expected_authority``/``expected_status``/disqualifiers) is newly authored here; no\nupstream gold is reused.\n\nSplits: ``dev`` (development / configuration selection) and ``eval`` (locked development\nevaluation \u2014 inspected during iteration; see LEAKAGE_AUDIT, not a blind holdout).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-0266a27bad1ae4b3",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "symbolu_neural/internal_policy_controller/INTERNAL_POLICY_CONTROLLER_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Internal Draft\u2192Policy\u2192Final-Answer Symbol-U Controller \u2014 Report\n\n**Final question:** *Does an internal draft\u2192policy\u2192final-answer Symbol-U controller\nwork better than (1) direct token-level injection, (2) hidden-state modulation,\n(3) external API control packet, and (4) generic self-refinement?*\n\n**Short answer (honest):**\n- It is the **best architectural fit** Symbol-U has had (sentence-level critic of a\n  completed draft \u2014 the right granularity). Better *shape* than (1) and (2).\n- But it **does not work better** on the bottom line. It **loses to generic\n  self-refinement (4)** and is **crushed by a trivial sentiment critic**, because\n  the bottleneck is **critic diagnostic accuracy** and Symbol-U \u2014 being\n  phonological \u2014 can barely diagnose *semantic/pragmatic* draft flaws (0.333 vs\n  0.200 chance; content critic 0.533; sentiment critic 1.000). The **ontology is\n  irrelevant** (relabeled critic = Symbol-U critic exactly).\n\nAll generation/revision is **SMOKE-ONLY** (no pretrained LLM / API available\noffline). The **critic diagnostic-accuracy** result, however, is assumption-light\n(supervised, ground-truth flaw labels, held-out) \u2014 and it is the decisive finding.\n\n---\n\n## 1. Architecture reviewed\n\nDraft\u2192policy\u2192final is a **critique-and-revise / self-refinement** loop (Self-Refine,\nReflexion, Constitutional AI's critique\u2192revise) \u2014 **not** RLHF (no training, no\nreward model). Its one structural advantage for Symbol-U: it evaluates a\n**completed draft as a whole**, which is Symbol-U's native granularity (a property\nof finished utterances, not token transitions or mid-stream hidden states). That\nresolves the granularity mismatch that sank the internal-neural attempts.\n\n**The catch (decisive):** standard self-refinement uses *the LLM itself* as critic\n\u2014 which can read the draft's *meaning*. Replacing it with a Symbol-U critic that\nreads *phonology* is a **downgrade in critic quality**. Right granularity, wrong\nfeature: the flaws a critic must catch (speculation, escalati",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-028948aeb41b1315",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "execution_gate/frozen/replay_v1/artifacts/policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "ModelPolicy \u2014 the downstream 'should execute?' selector.\n\nSelects the preferred model ONLY from ExecutionGate-eligible candidates. It never\ninterprets raw provider errors (it consumes reason codes) and never selects an\nineligible model. Utility is a provider-neutral quality/cost/latency trade-off; this\nis deliberately simple \u2014 the scientific selection engine is the frozen Model Selection\nPolicy, which this track does not modify.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0292cfb21e270259",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/core/metrics.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Reset all counters/samples, keeping collector identity.\n\nUsed after a warmup phase: the controller and cache state are\npreserved, but metrics start fresh so that only steady-state\nperformance is measured.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-038ba2728daf0bdf",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "truth_assurance_pipeline/tap_e3_relationship_truth/README.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# TAP-E3 \u2014 Relationship Analysis\n\nThe third TAP research layer. Given an `IntentRecord` (TAP-E1) and a `RetrievalRecord`\n(TAP-E2) \u2014 both consumed through their **frozen public interfaces** \u2014 it determines **what\nrelationship each retrieved evidence unit establishes**, with direction, polarity,\nmodality, temporality, scope, conditions, exceptions, conflicts, gaps, and per-unit\nprovenance.\n\n> **\"Truth\" here is narrow:** a faithful representation of the relationship *asserted,\n> qualified, negated, alleged, conditioned, or contradicted by the evidence* \u2014 **not**\n> metaphysical truth, governance applicability, claim support, or a user answer. TAP-E3\n> may represent \"Policy A applies to contractors\"; it must not decide that Policy A is the\n> controlling policy here (Governance Resolution), nor whether a final claim is justified (Claim\n> Truth).\n\n## Honesty (read first)\n\n- New, independently authored synthetic corpus; TAP-E2 query gold is not reused.\n- **Deterministic, pattern-based extraction over sentences authored to be parseable** \u2014\n  not general NLU. Entity detection uses each unit's known entities, not open NER.\n- The eval split is content-hash locked and preregistered, but was inspected during\n  iterative engineering \u2014 a **locked development evaluation, not an untouched/interpreter-\n  blind holdout** (not double-blind).\n- Mechanism/construction validation only \u2014 no claim of production semantic understanding\n  or external generalization.\n\n## Layout\n\n```\ntap_e3_relationship_truth/\n\u251c\u2500\u2500 ontology.py     # 49-type versioned ontology + predicate lexicon + inverses\n\u251c\u2500\u2500 schema.py       # RelationshipRecord/Assertion/Conflict/Gap (all dimensions separate)\n\u251c\u2500\u2500 normalization.py polarity.py modality.py temporality.py   # dimension detectors\n\u251c\u2500\u2500 extractor.py    # 15-stage pipeline + A\u2013F baselines + gap detection + trace\n\u251c\u2500\u2500 conflict.py confidence.py validator.py\n\u251c\u2500\u2500 metrics.py      # per-dimension metrics + independent critical failures\n\u251c\u2500\u2500 harness.py      # E1\u2192E2\u2192E3 driver, dev",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-03d70c6760931f88",
+    "claim_actionability": "none",
+    "claim_family": "recommendation",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/archetype_recovery_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "ARCHETYPE RECOVERY (forced-choice \"absolute match\") falsification.\n\nStricter than archetype_test.py: instead of a soft 1-5 fit rating (which lets a reader project a fit\nonto any evocative chain), the judge must PICK which archetype a chain belongs to, from a lineup of K\n(the correct one + K-1 decoys). There is a definite right/wrong answer, so projection cannot help.\n\nIf the real sound->propensity map is an \"absolute match\", the real chain should identify its own\narchetype ABOVE CHANCE and ABOVE both a scrambled lexicon and a random-symbolic lexicon.\n\nPre-registered in PREREG_ARCHETYPE_RECOVERY.md.\n\nJudges:  --judge random   (NULL; must land at chance = 1/K)\n         --judge wordnet  (deterministic semantic; reproducible)\n         --judge llm      (confirmatory; blind sub-agents via emit_items/score_items)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-03ed009ade361379",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e2_trusted_retrieval/corpus/__init__.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "TAP-E2 retrieval corpus: synthetic enterprise documents + graded query gold.\nNEW for this study; no TAP-E1 prompt reused.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-040af5b7ebee4b29",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/speculative.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Synthetic 2-source (target, draft) benchmark.\n\nEach question has `num_candidates` candidate draft continuations.\nExactly one candidate is \"correct\" (i.e., its first token matches\nthe target's peaked distribution). The others are distractors\nthat the target would reject under standard rejection sampling.\n\nThe mock sources are deterministic peaked distributions:\n  - target peaks sharply on `correct_token` (peak=10, noise=0).\n  - draft peaks softly on `correct_token` (peak=5, noise=0.5).\n\nBoth sources are CANDIDATE-AGNOSTIC at lookahead time \u2014 the\nobservable's per-candidate score comes from inspecting the\ncandidate tokens against the sources' (identical-across-candidates)\ndistributions. Matches \u00a711 probe-harness semantics.\n\nPure NumPy, no torch. Serves two purposes:\n  1. Validates the existing observable family on M=2.\n  2. Gives us end-to-end plumbing + an offline CI fixture for\n     the speculative-decoding pivot.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-043049aae1731d82",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/test_data/phase1b_validation_test_results_v3_1.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase-1b Validation Test Results (v3.1)\n\n**Date:** 2025-12-15\n**Mapper Version:** 3.1\n**Test File:** `tests/test_phase1b_validation_v3_1.py`\n**Status:** **29 PASSED** | 0 FAILED\n\n---\n\n## Summary\n\n| Metric | Value |\n|--------|-------|\n| Total Tests | 29 |\n| Passed | 29 |\n| Failed | 0 |\n| Duration | 0.11s |\n| Platform | Linux (Python 3.11.14) |\n\n---\n\n## Test Results by Group\n\n### 1. Minimal Sanity Tests (3/3 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_single_consonant_sa` | PASSED | \"sa\" -> 1 unit, is_consonant=True, bridge=\"escape_pressure\" |\n| `test_single_vowel_a` | PASSED | \"a\" -> 1 unit, is_vowel=True, bridge=\"birth_of_cognition\" |\n| `test_aspirated_vs_unaspirated_contrast` | PASSED | \"ka kha\" -> ka(unaspirated) vs kha(aspirated), different meanings |\n\n### 2. CV Structure Tests (2/2 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_cv_pattern_consonants_only` | PASSED | \"sa da\" -> cluster_order=\"C\" |\n| `test_cv_pattern_with_vowel` | PASSED | \"sa a\" -> cluster_order=\"CV\" |\n\n### 3. Semantic Safety Tests (1/1 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_sad_no_semantic_leakage` | PASSED | \"sad\" -> [\"sa\", \"d\"], NO \"sadness\" inference |\n\n### 4. Vowel-First Negation Tests (1/1 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_ab_no_negation_logic` | PASSED | \"ab\" -> [\"a\", \"b\"], NO negation logic applied |\n\n### 5. Unknown Handling Tests (3/3 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_garbage_input_all_unknown` | PASSED | Garbage input produces opaque unknowns |\n| `test_completely_unknown_sequence` | PASSED | \"xyz\" -> all unknown, no classification |\n| `test_unknown_count_function` | PASSED | count_unknown() correctly identifies unknowns |\n\n### 6. Cross-Language Tests (2/2 PASSED)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_english_word_tub` | PASSED | \"tub\" -> [\"t\", \"u\"",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-04b00cdf18f55060",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "robotics_reliability_bench/acp_shadow/bcvf_replica.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Faithful replicas of the three production BCVF call-site selections.\n\nThese reproduce EXACTLY what each production call site does to pick a winner,\nusing the REAL ``symbolu_robotics.formulas.bcvf`` scorer. They live in the eval\nharness (not the ACP package) so the ACP core stays production-independent. They\nare READ-ONLY reproductions \u2014 no production object is constructed or mutated;\nproduction code is unchanged.\n\nLine references pin each replica to the production logic it mirrors:\n* deliberative:      tiers/deliberative.py:150-159  (score_candidates -> argmax)\n* conflict:          coordination/conflict_resolution.py:392-412\n                     (score -> *(1+0.3*priority)*(1+0.4*safety) -> renorm -> argmax)\n* task_allocation:   coordination/task_allocation.py:358-376\n                     (score -> *(1+0.1*priority) -> renorm -> argmax)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-05297d87289e7b4e",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/dataset.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Load the underlying dataset and populate self._questions.\n\nOverridden by sibling benchmarks (e.g. HaluEvalBenchmark) that\nshare the model/paraphrase/cache machinery but pull from a\ndifferent source.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0575fa23121af10e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/test_data/phase3_rule_test_results_v3_0.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase-3.0 Rule Engine Test Results\n\n**Version:** 3.0\n**Date:** 2025-12-15\n**Test File:** `tests/test_phase3_rule_engine_v3_0.py`\n**Status:** ALL TESTS PASSED (57/57)\n\n---\n\n## Executive Summary\n\nPhase-3.0 is a **TEST-ONLY** and **RULE-ONLY** evaluation layer that operates on Phase-2 output (`Phase2ModifiedUnit`). It exists solely to:\n\n- Validate rule applicability\n- Validate containment\n- Validate isolation from lower phases\n\n**Any violation of isolation is a hard failure.**\n\n---\n\n## Test Results\n\n```\n======================== 57 passed, 2 warnings in 0.20s ========================\n```\n\n### Test Breakdown by Group\n\n| Group | Tests | Passed | Description |\n|-------|-------|--------|-------------|\n| A - Structural Integrity | 7 | 7 | Hash preservation, unit count, Phase-1b extraction |\n| B - Rule-Only Enforcement | 6 | 6 | Categorical flags only, no free-form text |\n| C - Forbidden Behavior | 7 | 7 | Emotion/intent/meaning/language terms blocked |\n| D - Rule Eligibility Only | 8 | 8 | Allowed vs forbidden rule inspections |\n| E - Determinism | 6 | 6 | Reproducibility, no randomness |\n| F - Isolation Regression Guard | 11 | 11 | Phase-1b/Phase-2 unchanged |\n| Red-Flag Tests | 8 | 8 | Hard failure detection |\n| Style Constraints | 3 | 3 | No LLM/probabilities/randomness |\n| Final Comprehensive | 1 | 1 | Complete isolation verification |\n| **TOTAL** | **57** | **57** | **100% PASS RATE** |\n\n---\n\n## Detailed Test Results\n\n### Group A: Structural Integrity (7 tests)\n\n| Test | Status | Description |\n|------|--------|-------------|\n| `test_same_number_of_units` | PASSED | Phase-3 outputs same count as Phase-2 inputs |\n| `test_phase2_objects_preserved_by_reference` | PASSED | Phase-2 objects not copied/modified |\n| `test_phase2_hash_unchanged` | PASSED | Phase-2 hash identical after Phase-3 |\n| `test_phase1b_extraction_still_works` | PASSED | Phase-1b extractable from Phase-2 after Phase-3 |\n| `test_phase1b_integrity_via_phase2` | PASSED | Phase-1b integrity verified |\n| `tes",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-059d58ccb0259fc9",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/run_schedule_ablation.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Early-only auxiliary schedule ablation.\n\nHypothesis: Quad-native supervision is useful for establishing associative binding EARLY,\nbut continuing the auxiliary pressure after binding is learned over-sharpens the Quad score\nand harms generalization.\n\nReuses existing Arm A / Arm C / Arm D-full results from RESULTS/results.json (frozen; not\nre-run). Adds Arm D-10 / D-25 / D-50 (auxiliary active for the first 10/25/50% of steps, then\nhard-zeroed) on the same three seeds, same frozen config. Writes RESULTS_SCHEDULE/.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-059fc6c257cc9274",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/kv_policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Set boundary sensitivity for an existing block. The caller\ndetermines what constitutes a boundary (sentence start, paragraph\nbreak, discourse marker, etc.) and passes a score in [0, 1].\n\nThis is the primary interface for callers that discover boundary\ninformation after initial block admission. For callers that know\nboundary status at admission time, ``ensure_block()`` also accepts\nan optional ``boundary_score`` parameter.\n\nNo-op if ``block_id`` is unknown. Does not change any other\nblock state.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-05f392b954f033ce",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/crs_pseudoword_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Structural decode (Design A). Returns (seq, struct_score) with struct_score = (lib\u2212bind)/(lib+bind)\nfrom emergent_valence \u2014 a PURE SIGN/POSITION quantity (gloss-independent).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0686c555d27ba8d9",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e1_intent/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Origin of a single field value. Every inferred field must point to\nsupporting spans or context references (Section 8).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0714b40c83107cda",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e1_intent/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Versioned, serializable typed model for the TAP-E1 Intent Understanding Layer.\n\nStdlib-only, deterministic, frozen dataclasses. This module defines *what a\nstructured interpretation of a user request looks like* \u2014 it does not decide\ntruth, retrieval, policy, authorization, or the final response.\n\nNothing here reads a resolver, retriever, governance engine, evidence packet,\nclaim validator, or any production TAP orchestration. It is self-contained to\nthe ``tap_e1_intent`` package.\n\nSchema versioning\n-----------------\n``SCHEMA_VERSION`` is bumped on any breaking change to field names or semantics.\n``IntentRecord.to_dict`` / ``from_dict`` round-trip losslessly so a record can be\nlocked by content hash and re-validated later.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0805d2bdbab813b7",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/speculative.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Soft peak + Gaussian noise: the draft model's analog of a target\ndistribution. Lower peak height (less confident) + random jitter\n(imperfect imitation of target).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-0822d77cd96edb75",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "robotics_reliability_bench/acp_shadow2/corpus.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Phase-2 real-scenario corpus (physical-safety shadow validation).\n\nProvenance labels (milestone \u00a75): scenarios are drawn from the repository's own\n``tests/test_safety.py`` ``TrajectoryValidator`` fixtures (INTEGRATION_TEST) and\nsupplemented with AUTHORED_DETERMINISTIC cases for the required families the\nfixtures do not cover. There is NO real-sensor data in this repo, so nothing is\nlabeled RECORDED_DATA; no scenario is described as real-sensor evidence.\n\nEach candidate is a joint-space trajectory (positions per point, optional\nvelocities/accelerations/ee-pose) + obstacles/human, with a human-known\n``ground_truth_safe`` label. The real ``TrajectoryValidator`` produces the\n*measured* verdict; the corpus label is what a reviewer expects.\n\nTrajectories are stored as plain lists (JSON-serializable); the harness builds\n``TrajectoryPoint`` objects at run time. Deterministic \u2014 no RNG.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0858aebe6d58059c",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "acp/ACP_PHASE1_PREREGISTRATION.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# ACP Phase 1 \u2014 Preregistration\n\n**Committed BEFORE the final shadow benchmark runs.** Everything below\n(constraints, thresholds, missing-data policy, lexicographic order, comparison\nclasses, success criteria, corpus split, verdict rules) is frozen at commit\ntime. Deviations are appended post-hoc, never edited silently.\n\n**Milestone rule honored:** shadow-only; production BCVF remains authoritative;\nno call-site migration; no actuation through ACP; no real-sensor claim.\n\n---\n\n## 1. Frozen hard-constraint definitions (per call site)\n\nOnly constraints backed by data the call site actually provides. Provenance:\n`PROD` = threshold taken from existing production code; `POLICY` = ACP policy\nthreshold frozen here. Everything else is **UNAVAILABLE** and NOT implemented\n(no fabrication).\n\n| call site | constraint id | rule | provenance | applies to |\n|---|---|---|---|---|\n| deliberative | `SAFE_FALLBACK` | STOP/HOLD/wait \u21d2 admissible | POLICY (safe posture) | wait |\n| deliberative | `OBSTACLE_CLEARANCE` | `min_obstacle_distance_m >= 0.5` | PROD (`deliberative.py:212`) | move_to |\n| conflict | `SAFE_FALLBACK` | STOP \u21d2 admissible | POLICY | MUTUAL_STOP |\n| conflict | `SAFETY_SCORE_FLOOR` | `safety_score >= 0.5` | POLICY | all strategies |\n| conflict | `FEASIBILITY_FLOOR` | `feasibility(forward_score) >= 0.3` | POLICY | all strategies |\n| task_alloc | `CAPABILITY_MATCH` | `capability_match >= 0.5` | PROD (`task_allocation.py:239`) | all bids |\n| task_alloc | `LOAD_LIMIT` | `current_load <= 0.9` | PROD (`task_allocation.py:243`) | all bids |\n| task_alloc | `COHERENCE_FLOOR` | `coherence >= 0.4` | PROD (`coherence_threshold`) | all bids |\n\n**UNAVAILABLE at every call site (NOT implemented):** collision-margin-in-metres,\nstopping distance, actuator limits, stability/ZMP, trajectory validity \u2014 the\ncall sites do not carry this data; it lives in the separate `safety/` modules\nthat are not wired into these decision points. See `ACP_HARD_CONSTRAINTS.md`.\n\n## 2. Missing-data policy (fro",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-08d2a149399a25f7",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "acp/AI_CONTROL_PLANE_EXECUTIVE_SUMMARY.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# AI Control Plane \u2014 Executive Summary (V2.2)\n\nInvestor-safe. Separates **measured evidence** from **architectural\ninterpretation**. Nothing here is a production or platform claim.\n\n## What we set out to show\n\nThat the three independent infrastructure layers Ugence has built \u2014 **Context\nMinimization**, **ActionGate** (authorization), and **ACP** (operational safety) \u2014\nwork together as **one integrated AI Control Plane** on a real enterprise AI\noperation, end to end.\n\n## What we measured (fact)\n\nOn 15 enterprise Kubernetes scenarios, in shadow mode, fully offline and\ndeterministic:\n\n- The **real** Context Minimization compressor reduced context by **72 % on\n  average** while preserving **100 %** of the information both downstream layers\n  need.\n- **Downstream invariance was 100 %:** the compressed context produced the\n  **identical** proposed action, authorization decision, and operational-safety\n  decision as the full context. Compression changed nothing that mattered.\n- The **real** ActionGate and the **real** ACP then evaluated the **same, bound**\n  action \u2014 one identity linking the reduced context \u2192 the authorized action \u2192 the\n  operationally-judged candidate \u2192 a single hypothetical-execution id.\n- **Ownership stayed clean:** 0 duplicated-logic, 0 ownership violations. Context\n  Minimization never authorizes; ActionGate never judges operational readiness;\n  ACP never authorizes. Execution is eligible only when **every** layer passes.\n- **All 10 safety invariants held**, everything was **deterministic**, and there\n  were **zero** changes to any authoritative system and **zero** cluster\n  mutations.\n\n**Measured verdicts:** Context layer `AUTHORIZED_CONTEXT_SUPPORTED`; Action layer\n`DETERMINISTIC_AUTHORIZATION_SUPPORTED`; Operational layer\n`OPERATIONAL_SAFETY_SUPPORTED`; Integrated stack\n`AI_CONTROL_PLANE_SUPPORTED_WITH_LIMITATIONS`.\n\n## What this demonstrates (supported interpretation)\n\nThe AI Control Plane is **one coherent system, not three separate products bolt",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-08d2e6aaae6454f5",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_22_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 22 Merge-Safety Audit Report\n\n**Audit Date:** 2025-12-12\n**Auditor:** Phase 22 Merge-Safety Review\n**Branch:** `claude/phase-22-mirror-time-cycle-01URYA3aHvxmt57CCcSAQgMk`\n**Phase:** Phase 22 - Mirror-Time Cycle Engine (MTCE) v1.0\n\n---\n\n## Executive Summary\n\n### \u2705 VERDICT: **SAFE TO MERGE**\n\nPhase 22 (Mirror-Time Cycle Engine) has been comprehensively audited and verified to maintain all 11 non-negotiable behavioral invariants. The implementation is:\n\n- **Observation-Only**: Phase 22 never affects routing, mapper, scoring, safety, or persona semantics\n- **Zero-LLM**: Contains no LLM API calls whatsoever\n- **Fully Deterministic**: Identical inputs always produce identical outputs\n- **Gracefully Degrading**: Returns empty MirrorTimeCycleSummary when loop_history is missing\n- **Backward Compatible**: All existing clients continue to work without modification\n\n**Total Tests:** 144 (35 existing integration + 109 new invariance tests)\n**Pass Rate:** 100%\n**Risk Level:** **MINIMAL**\n**Recommendation:** **APPROVE FOR MERGE**\n\n**Production Code Changes:**\n- **1 scoping fix** in `session_store.py`: Moved 4 phases' variable initialization outside conditional block (Phases 47-50)\n- **Net change:** -22 lines (code simplification)\n- **Impact:** NEGLIGIBLE (null-safety improvement only)\n\n---\n\n## 1. Behavioral Invariance Checklist\n\n### \u2705 Invariant 1: Routing Invariance\n\n**Status:** VERIFIED\n**Evidence:**\n- \u274c No routing imports in mirror_time_cycle.py\n- \u274c No routing references in MTCE computation functions\n- \u2705 Phase 22 only appears in CoherenceEngine (correct observation point)\n- \u2705 Routing modules do not import or reference MTCE metrics\n- \u2705 MTCE metrics (cycle_type, forward_gradient, reversal_bias) are never used in routing decisions\n\n**Test Coverage:** 10 tests in `TestRoutingInvariance`\n\n**Code Evidence:**\n```bash\n$ grep -r \"cycle_type\\|forward_gradient\\|reversal_bias\" symbolu/core/routing/\n# (no matches - confirmed zero routing imports)\n\n$ grep -r \"mirror_time_cycle\\|Mirr",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-08d3aff028aeb7f8",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/logging_util.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Return branch / commit / dirty-flag via the `git` CLI.\n\nReturns ``{\"available\": False}`` if git isn't on PATH or the path\nisn't a git repo.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0a42e858da758ebf",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/run_bounded.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Phase 9: post-hoc temperature on the unbounded D-full logits (from RESULTS_DYNAMICS)\nmatched to the bounded alpha scale. Temperature can match ENTROPY but is ranking-invariant,\nso it cannot change D-full's hard-condition accuracy \u2014 any BD-D hard-condition difference is\ntherefore a training-time effect, not rescaling.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-0af4e9856f80d3f1",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/core.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute the per-pair BCVF cost plus diagnostic stats (\u00a72.5.3).\n\nInputs:\n    p_i, p_j    shape (L, V) \u2014 probability sequences for one pair\n                at one outer step, along the lookahead axis\n    config      BCVFLLMConfig (\u00a72.8.4)\n    valid_mask  optional shape matching the signal domain \u2014 boolean;\n                True at stencil centers where both sources have\n                defined logits per \u00a72.7.4. None \u21d2 all valid.\n\nReturns: (pair_cost, max_signal_norm, gate_activation_count)\n\nSECOND-order path is V1 default. ZEROTH/FIRST retained for \u00a73\nablation only; FIRST breaks Lemma 1 case 2 (\u00a72.6.4 / \u00a72.8.3).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0c0472cc955e69f1",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/causal.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Does the Quad score mirror hidden-state geometry? Correlate the query-position\nrepresentational dissimilarity matrices (RDMs) of hidden states vs Quad scores. High\ncorrelation => the Quad score reflects hidden geometry rather than adding new structure.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0c4e7caf30de16a4",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/kv_policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Enable the Stage 1 boundary-sensitivity signal by setting its\nweight in the scoring formula. By default, both phases use the\nsame weight. Pass ``prefill`` or ``decode`` to differentiate.\n\nThe boundary weight is additive alongside the existing four\nsignals. Recommended starting value: 0.10.\n\nDoes NOT modify the global PHASE_WEIGHTS constant (which is\nlocked by ADR-0001). Only this instance's scoring is affected.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0c757f9851a4afed",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/traces/loader.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Load a trace file.\n\nArgs:\n    path: Path to trace file\n    format: Trace format (\"auto\", \"csv\", \"msr\", \"binary\")\n    max_events: Maximum number of events to load (None = all)\n    page_size: Page size for address-to-page conversion\n\nReturns:\n    List of TraceEvent objects",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0c9d88a0554951ea",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/causal_world_model.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Forward pass with causal reasoning.\n\nArgs:\n    x: [B, N, D] token embeddings\n    causal_state: Optional existing causal state\n    entity_mask: [B, N] optional entity position mask\n\nReturns:\n    output: [B, N, D] output embeddings\n    causal_state: Updated causal state\n    dag_loss: DAG constraint loss",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0d3fabdc51ae3955",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "acp/CONTEXT_TO_ACTION_IDENTITY_BINDING.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Context-to-Action Identity Binding (V2.2 \u00a76)\n\nProves all three layers bind to the same operation, from the reduced context all\nthe way to hypothetical execution. Code:\n`robotics_reliability_bench/acp_control_plane/identity_chain.py` (+ the V2.1\n`identity_binding.py` for the ActionGate\u2194ACP sub-binding).\n\n## The chain\n\n```\ncontext digest\n      \u2502   (the reduced context actually handed to the LLM stage)\n      \u25bc\naction hash (ActionGate)\n      \u2502   (the envelope ActionGate authorized)\n      \u25bc\nACP candidate identity\n      \u2502   (the CloudActionCandidate ACP judged)\n      \u25bc\nhypothetical execution identity\n      (digest of all of the above \u2014 one id for the whole pipeline)\n```\n\n## The three digests + the execution identity\n\n- `context_digest = ctx:sha256({context_id, base, surviving_spans})` \u2014 binds the\n  exact reduced context (surviving span ids + text + base). Any change to what the\n  LLM saw changes the whole chain.\n- `actiongate_action_hash` \u2014 the **real** ActionGate action hash of the envelope\n  built from the proposed action (`action_gate_ref.projection.action_hash`).\n- `acp_candidate_identity` \u2014 the ACP `CloudActionCandidate.identity` (frozen ACP\n  domain-separated identity).\n- `execution_identity = exec:sha256({context_digest, proposed_action_digest,\n  action_hash, candidate_identity})` \u2014 one id for the whole hypothetical execution.\n\nSchemas are **not merged**: the three identities are deliberately different values\n(different domains); the chain *links* them, it does not equate them.\n\n## `verify_chain` \u2014 fail-closed\n\nThe decisive check (`identity_chain.verify_chain`):\n\n> the action ActionGate + ACP evaluated must be **exactly** the action the reader\n> derived from the reduced context.\n\nIf `reader_op_facts != stack_op_facts` \u2192 `CONTEXT_TO_ACTION_MISMATCH`\n(`CONTEXT_IDENTITY_MISMATCH` end-to-end class), and the operation is not eligible.\nMissing context digest / action hash / candidate identity also fail closed.\n\nThis is the whole-pipeline analogue of the V2.1 ActionGate",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0d5300f27c7b8710",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/hp_quad.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Complete Hierarchical Phase-Quad block.\n\nCombines:\n- Local attention (Level 1)\n- Hierarchical Phase Integrator (Levels 1-3)\n- Hierarchical Quad Proposal (multi-granularity retrieval)\n- Top-down modulation",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-0d5eb72a7bbb41aa",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading2/core/utility.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute penalty from posterior uncertainty.\n\nHigh uncertainty in parameters means we should be more cautious.\nThis is unique to Bayesian approach - EMA has no uncertainty measure.\n\nReturns penalty in [0, 0.5].",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-0eb6dec1b51765a4",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/analysis.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Read-only diagnostics for the Quad score dynamics analysis (analysis-only workstream).\n\nNothing here changes training or inference. Every function takes a model and a fixed batch\nand returns JSON-friendly measurements:\n\n  * quad_score_dynamics   - Phase 2/5: pos/neg/margin/entropy/variance + logit histogram\n  * gradient_norms        - Phase 2: |dL_task/dS^Q|, |dL/dh|, |dL/dW_q|, |dL/dW_k|\n  * representation_geometry - Phase 3/5: hidden cosine, projected q/k cosine, raw logits, probs\n  * temperature_counterfactual - Phase 4: entropy/top1/margin/ranking under S^Q/T (offline)\n\nAll measurements are taken over QUERY positions, restricted to each query's causally-visible\ncandidate keys (correct key + earlier distractor keys), matching the deployed retrieval.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-0fc2c81bcdd7ac7c",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/core/adaptive_gain.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Mark gain as bootstrapped so warmup ramp starts at 100%.\n\nWhen historical data has been replayed, the controller doesn't\nneed a conservative ramp \u2014 it already knows the system.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": false,
+    "artifact_id": "mep-104beda78bd0e44e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/_report.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Write ``data`` as pretty-printed JSON to ``path``. Non-native\ntypes (enums, dataclasses, sets) fall back to ``str`` so the\nwriter never raises on a serialization surprise.\n\nCreates parent directories as needed.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1090cfb9bb2fd695",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/core/coherence.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute agreement within a signal group.\n\nAgreement is high when signals are all elevated or all calm.\nAgreement is low when signals disagree (some up, some down).\n\nReturns value in [0, 1].",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-11f792f1ecb4b21c",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "execution_gate/frozen/replay_v1/artifacts/baselines.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Routing baselines (Phase 7). Each returns an ordered attempt sequence of model_ids\n(plus gate decisions where applicable). The harness simulates the sequence against ground\ntruth. Do not assume the gate wins.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1277058d595c2598",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e2_trusted_retrieval/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Versioned, serializable RetrievalRecord schema for TAP-E2.\n\nThe RetrievalRecord is the sole output of the Evidence Retrieval Layer. It selects\ncandidate evidence; it does NOT judge factual correctness, policy applicability,\nrelationship validity, authorization, claim truth, or response quality, and it does\nNOT answer the user.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1297293023b3875d",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e3_relationship_truth/corpus/cases.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "TAP-E3 relationship corpus (NEW, independently authored).\n\nEach case owns one or more evidence units (built as TAP-E2 ``EvidenceUnit`` objects \u2014 a\nfrozen upstream structure used for interface compatibility, not modified) assembled into\na TAP-E2 ``RetrievalRecord`` that feeds TAP-E3. The relationship gold is newly authored\nfor this study; TAP-E2 query annotations are NOT reused as relationship gold.\n\nGround truth allows multiple acceptable normalized predicate forms\n(``acceptable_predicates``) so ontology-equivalent representations are not penalized.\n\nSplits: dev (development) and eval (locked development evaluation \u2014 see LEAKAGE_AUDIT).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-12d5a86ee8ccd49c",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e2_trusted_retrieval/ranking.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Multi-signal, interpretable candidate ranking for TAP-E2.\n\nRanking combines independent, interpretable signals \u2014 no opaque single-score model.\nEvery candidate keeps its per-signal `RankingSignals`, so a downstream consumer (or a\nhuman) can see WHY a unit ranked where it did.\n\nSignals:\n  lexical                 \u2014 idf-weighted token overlap (from the index)\n  semantic                \u2014 concept-vector cosine (from the index)\n  authority               \u2014 source authority rank, normalized\n  freshness               \u2014 newer effective year preferred; deprecated penalized\n  provenance_completeness \u2014 1.0 iff full provenance\n  specificity             \u2014 shorter, entity-bearing units are more specific\n  redundancy_penalty      \u2014 subtracted for near-duplicate content already ranked\n\nThe weights are fixed and documented; simpler baselines zero out subsets of signals.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-12f801eec5f20634",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading2/core/utility.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute bonus when Elliott wave aligns with other signals.\n\nReturns bonus in [-0.15, 0.15].",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1323c4e919efd3c4",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "robotics_reliability_bench/acp_shadow/run_shadow_bench.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Executable ACP Phase-1 shadow benchmark.\n\nRuns the deterministic corpus through the ACP shadow evaluator and the faithful\nBCVF replicas, classifies every candidate set, checks authorization\nrevalidation, verifies deterministic-rerun identity, and writes machine-readable\nrecords + metrics. Makes ZERO production calls that mutate state \u2014 production\nbehaviour is unchanged by construction.\n\n    python -m robotics_reliability_bench.acp_shadow.run_shadow_bench",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-134ba200cc4ca98c",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/RESULTS_H1_CONVERGENCE.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Results \u2014 H1 Interpretive Convergence (the first positive result)\n\n> Hypothesis from `VARNA_PROFILE_METHOD.md`. **H1:** given a word's var\u1e47a profile, independent readers\n> produce *convergent* readings \u2014 i.e. the profile reliably **channels** interpretation. This is a\n> property of the system as a generative instrument; it is **not** a claim of veridical decoding (H3,\n> falsified). Harness: `convergence_test.py`. Verdict by rule.\n\n## Design\n8 words; for each, the var\u1e47a profile under **real / scrambled / random** lexicons, plus a **no-seed\nfloor** (readers write a sketch with no profile at all). 5 independent blind readers each authored a\n2-sentence character sketch per item, seeing only the chain (never the word or condition). **Convergence\n= mean pairwise content-word cosine** of the 5 readers' sketches for an item (higher = readers channeled\nto a more shared reading). Bootstrap CIs over words.\n\n## Results\n\n| condition | convergence |\n|---|---|\n| **real profile** | **0.218**  (95% CI 0.181\u20130.257) |\n| scrambled profile | 0.229 |\n| random-symbolic profile | 0.177 |\n| no-seed floor | 0.076  (95% CI 0.037\u20130.149) |\n\n- **\u0394 real \u2212 no-seed = +0.142** \u2192 real's CI floor (0.181) is well above the floor (0.076):\n  **H1 SUPPORTED** \u2014 the profile channels readers to a shared reading ~3\u00d7 the no-seed baseline.\n- **\u0394 real \u2212 scrambled = \u22120.011** (95% CI \u22120.048 \u2026 +0.032) \u2192 the channeling is **structural**, not from\n  the specific sound\u2192gloss mapping (consistent with the six prior nulls).\n- **\u0394 real \u2212 random = +0.041** (95% CI +0.013 \u2026 +0.071) \u2192 coherent propensity vocabulary channels\n  modestly **more** than neutral nouns (a small, real \"vocabulary\" effect).\n\n### VERDICT: **INTERPRETIVE_CONVERGENCE_SUPPORTED (structural)**\n\n## What this does and does not establish\n\n**Establishes (positive):**\n- The var\u1e47a profile is a **reliable generative instrument**: the same deterministic profile reliably\n  steers independent readers toward a *shared* reading, far above free association. Combine",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-13da0dfa37990070",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e3_relationship_truth/temporality.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Deterministic temporality + date-interval extraction.\n\nRepresents the temporal relationship STATED in the evidence (current / historical /\nfuture / superseded / conditional-time / unresolved) and preserves explicit\nvalid_from / valid_until when present. It does NOT decide legal applicability.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-146ed08dcab651da",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/run_score_dynamics.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Quad score dynamics analysis (analysis-only; training/inference unchanged).\n\nInstruments Arms A, C, D over the frozen protocol (3 seeds) with read-only snapshots of the\nQuad score distribution, gradient norms, representation geometry, and an offline temperature\ncounterfactual. Writes RESULTS_DYNAMICS/. No losses/regularizers/temperature-scaling are added\nto training; the analysis hook is verified bit-identical to an un-instrumented run\n(tests/test_analysis.py).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-14ab00ae690d1638",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/__init__.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a76 Phase 4 \u2014 benchmark, metrics, \u00a71.10 threshold evaluation.\n\nPublic API:\n  dataset   : Question + Benchmark protocol + MockBenchmark +\n              TruthfulQABenchmark scaffold.\n  scoring   : three teacher-forced MC scoring functions, one per\n              \u00a71.10 decoder.\n  harness   : run_benchmark(benchmark, decoders) driver.\n  metrics   : accuracy, McNemar paired test, latency stats,\n              \u00a71.10 classify_phase_six_result.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-14ce7024fcc95b1e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/causal_datasets.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "PyTorch Dataset wrapper for causal datasets.\n\nConverts text examples to tensor format suitable for model training.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-14dc38965cb813b6",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/run_causal.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Causal localization of associative binding (read-only).\n\nReproduces the frozen trained checkpoints DETERMINISTICALLY (same config+seed -> bit-identical\nparams, verified by tests/test_equivalence.py + test_bounded), then runs, as read-only\ninference analyses: pathway ablation (Phase 1-2), linear probes (Phase 3), integrated gradients\n(Phase 4), activation patching / mediation (Phase 5), and RSA. No retraining, no optimizer /\narchitecture / loss changes; the only optimization is small EXTERNAL linear probes.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-153ebc0be8aeb166",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/metrics.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute the paired McNemar test between two decoders.\n\n`a_correct` and `b_correct` are boolean arrays of equal length\nindicating per-question correctness. Returns `McNemarResult`\nwith discordant-pair counts, the chi-square-style statistic,\nand an exact two-sided binomial p-value.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-15b8a3560b9826e1",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/dataset.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Real TruthfulQA-MC loader.\n\n**Status.** Scaffold only. Requires `datasets`, `transformers`,\nand `torch` (delayed imports). Real-model execution is\nhard-gated on \u00a70.6 rule 1; verification against an actual\nmodel happens in a GPU environment.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-15eb808c1436ef71",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/harness.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Score every choice under `decoder_name`, return\n(predicted_index, per_choice_scores, elapsed_s).\n\n\u00a76.2 Phase 2: when `fast_scoring=True` and all sources implement\nthe `score_teacher_forced` protocol, vanilla + blend use the\nsingle-forward-pass batched scoring path (~15\u00d7 speedup). The\ntrust path stays on the speculation-based `lookahead/commit`\nloop to preserve \u00a72.3.2 forward-lookahead semantics. Sources\nwithout batched scoring (e.g., test stubs) auto-fall-back to\nthe slow path.\n\nPer-question source reuse: when batched scoring is active we\nconstruct sources ONCE per question (not per choice), since\n`score_teacher_forced` is stateless and the sources don't\nmutate across choices. This is an additional ~5\u00d7 speedup by\neliminating redundant source-construction.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1646bc8733d9595d",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/core/damping.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Suppresses action when system is volatile.\n\nUses baseline-relative variance: a system with naturally high metric\nvariance (e.g., batch processing cluster) won't be permanently damped.\nOnly variance ABOVE its own normal triggers damping.\n\nAsymmetric EMA:\n- Rising signal: alpha=0.10 (detect spikes in ~10 cycles)\n- Falling signal: alpha=0.20 (recover in ~5 cycles)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-166e12eceff921e1",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e1_intent/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "One append-only audit-ledger entry (Section 8: provenance is append-only,\ndefault assumptions must be visible and removable).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1779e09c168c82f8",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "ndol/sim/density.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "W3 capacity / density model \u2014 how many more KV tokens fit per unit of NAND\nsilicon when bulk goes to dense QLC, at preserved quality.\n\nThis is the *robust*, unconditional half of W3 (the latency half, in\nrun_tiered.py, is conditional on access pattern). Capacity is deterministic, so\nthis is an analytical model, not a simulation \u2014 the right tool for the job.\n\nTwo quality-preserving density levers compound:\n  1. Quantization  : int4_protected stores fewer logical bits/token than bf16,\n                     at bf16-parity quality (measured ~1.8\u00d7 net, incl. sidecar).\n  2. Cell density  : QLC packs 4 bits/cell vs TLC's 3. Bulk 4-bit codes are\n                     error-tolerant (already lossy-quantized + ECC), so they\n                     ride QLC; the precision-critical *protected* bits stay on\n                     the more reliable TLC.\n\nHonest nuance surfaced by this model: SLC (1 bit/cell) is the WORST tier for\ncapacity, so the capacity-optimal placement puts protected on TLC \u2014 the\n*opposite* of the latency-optimal placement (protected\u2192SLC for speed). The\nprotect mask is the placement signal; the chosen tier depends on the objective.\nThe one objective-independent win is **bulk \u2192 QLC**.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1858527353e7af6a",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "resonant_model/run_benchmark.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Binding Benchmark Runner\n=========================\n\nRuns the full binding benchmark:\n  1. Generate synthetic dataset (200 examples)\n  2. Train + evaluate Model A (softmax baseline)\n  3. Train + evaluate Model B (selected variant)\n  4. Statistical comparison\n  5. Print structured report\n  6. Behavioral pass criteria evaluation\n  7. Interference cross-term diagnostics (when model supports it)\n\nModel B variants:\n  resonance           \u2014 Original broadcast interference (key-side bias)\n  quadratic           \u2014 Bilinear attention control (no interference)\n  query_conditioned   \u2014 Query-conditioned interference interaction (O(L\u00b2))\n  feature_interference \u2014 Interference injected as embedding feature\n  hybrid              \u2014 Quadratic + interference falsification test\n  scalable            \u2014 Scalable quadratic (low-rank, multi-channel)\n\nUsage:\n    python -m resonant_model.run_benchmark\n    python -m resonant_model.run_benchmark --model-b-type quadratic\n    python -m resonant_model.run_benchmark --model-b-type hybrid\n    python -m resonant_model.run_benchmark --model-b-type scalable --bilinear-rank 32 --bilinear-channels 4",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-186babcd0a228eb7",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_33_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# PHASE 33 \u2014 MERGE SAFETY REPORT\n## Persona Schema Adaptive Routing (Observation-Only, Experimental)\n\n**Version**: v3.0\n**Status**: COMPLETE \u2014 SAFE TO MERGE\n**Date**: 2025-12-10\n**Auditor**: Claude (Anthropic)\n**Branch**: `claude/phase-33-merge-safety-012BoTaaLk6KrkzChKSNwd12`\n\n---\n\n## Executive Summary\n\n**VERDICT: \u2705 SAFE TO MERGE**\n\nPhase 33 introduces the **Persona Schema Adaptive Routing Layer**, an experimental, observation-only analytics system that computes persona schema alignment signals. This layer maps user coherence patterns to different persona schemas (sage, analyst, coach, friendly, regulator, neutral) for diagnostic and research purposes.\n\n**Critical Design Principle**: Schema routing is **metadata-only** and **NEVER affects actual persona selection, routing, or tone computation**. All computations are purely observational.\n\n**Key Findings:**\n- \u2705 Zero behavioral changes to routing (TTOR/MLCR), mappers (HRM/LCM/LAM), coherence scoring, fusion, DHA, or policy engine\n- \u2705 Schema alignment is experimental metadata \u2014 persona selection logic remains unchanged\n- \u2705 Fully deterministic and reproducible (same inputs \u2192 same outputs)\n- \u2705 Gracefully degrades with missing inputs (no crashes, safe fallbacks)\n- \u2705 Zero-LLM guarantee (pure mathematical transforms, no model calls)\n- \u2705 Backward-compatible API changes (new fields are additive)\n- \u2705 Domain and interaction mode restrictions correctly enforced (therapy/identity + SMART_INSIGHT/DEEP_ADAPTIVE only)\n- \u2705 Comprehensive test coverage (33 passed, 1 skipped)\n\n**Final Verdict**: Phase 33 is **SAFE TO MERGE**. No blocking issues found.\n\n---\n\n## Behavioral Invariance Checklist (11 Items)\n\n| # | Invariant | Status | Summary |\n|---|-----------|--------|---------|\n| 1 | Routing invariance (TTOR/MLCR) | \u2705 PASS | No schema_adaptive references in routing files |\n| 2 | Mapper invariance (HRM/LCM/LAM) | \u2705 PASS | No schema_adaptive references in mapper files |\n| 3 | Coherence score invariance (v1/v2/v3/fused/UCF) | \u2705 PASS | Schem",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-191f605f9adad519",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/interface.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Allocate state for a new sequence.\n\nArgs:\n    sequence_id: Unique sequence identifier\n    max_blocks: Maximum blocks for this sequence\n\nReturns:\n    True if allocation successful",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1a2213b6ddf61376",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/core.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a72.5.3 / \u00a72.8.11 full J_BCVF at a single outer decoding step.\n\nInputs:\n    sources       list of M arrays, each shape (L, V)\n    config        BCVFLLMConfig (\u00a72.8.4)\n    valid_masks   optional list of M arrays, each shape (L,), boolean\n\nReturns: BCVFLLMResult with per-pair AND per-source attribution.\n\nRaises:\n    ValueError \u2014 on shape mismatch, M<2, L<3, or non-finite input\n                 (NaN/Inf guard per \u00a72.7.6).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1a31a106c723fa03",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading/tick_processor/imbalance.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Order Flow Imbalance\n====================\n\nCalculates order flow imbalance from tick data.\nKey indicator for detecting buying/selling pressure.\n\nMethods:\n1. Volume Imbalance: (buy_vol - sell_vol) / total_vol\n2. Trade Imbalance: (buy_trades - sell_trades) / total_trades\n3. Dollar Imbalance: weighted by trade value\n4. Cumulative Delta: running sum of signed volume",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1a889030b3976189",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/core/coherence.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Computes multi-signal agreement for infrastructure metrics.\n\nV1: Rule-based agreement scoring.\nA signal is \"elevated\" if it's above a threshold (default 0.5 on normalized [0,1]).\nCoherence is high when elevated signals agree across groups.\n\nV2: Hysteresis band prevents oscillation when coherence hovers near\na decision threshold. Uses a small dead-band around the previous value\nso minor fluctuations don't cause the output to flicker.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1aaccf50ff8f4939",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/readiness.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Evaluates system readiness for deployments.\n\nUsage:\n    checker = ReadinessChecker(config)\n    result = checker.check(\n        plasticity=0.25,\n        stability=0.34,\n        last_action_time=time.time() - 30,\n        active_rollback_watches=1,\n    )\n    # result.ready = False\n    # result.reason = \"Plasticity 0.250 below threshold 0.300; ...\"",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1acb90b7156ecdd6",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading/tick_processor/aggregator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Convert aggregated signals to TickObservables.\n\nArgs:\n    signals: Aggregated signals from process_tick\n    volatility_anchor: Reference volatility for ratio\n    avg_tps: Average ticks per second for ratio\n\nReturns:\n    TickObservables for state evolution",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1ad4c8e6a11e2d81",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/hp_quad.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute boundary probability and binary decision.\n\nArgs:\n    h: Hidden state, either [B, N, D] for sequence or [B, D] for single\n    phase: Phase state [B, D_phase]\n\nReturns:\n    z_soft: Boundary probability (for training)\n    z_hard: Binary boundary decision (for gating)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1b58caa21a7b08d7",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/kv_policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Lightweight block registration. Creates block metadata without\nrecording any attention \u2014 used on admission. Idempotent: re-calls\nwith an existing block_id are a no-op and do not increment _step.\n\n``boundary_score`` (Stage 1, optional, default 0.0): boundary\nsensitivity hint in [0, 1].\n\n``band_class`` (Stage 2, optional, default 1.0): multiplicative\nscore modifier. >1.0 = global, 1.0 = neutral, <1.0 = local.\n\n``instability_hint`` (Stage 3, optional, default 0.0): future\nfull-read demand in [0, 1]. Higher = unstable = keep in cache.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1b77370cb11a85a9",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/analysis.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Phase 8: raw (pre-normalization) vs normalized projected query/key norms at the aux\nlayer. For a bounded model the normalized norm is ~1; watching the RAW norm reveals whether\ntraining responds to the bound by inflating pre-normalization magnitudes (it cannot change\nthe bounded score, so inflation would be a no-op escape attempt).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1b8e554cbe3e2a83",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e1_intent/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "A character range into the raw request text. Deterministic extractions\nmust retain these (Section 7).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1b9b38b65c0881cc",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/rollback.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Check all active watches against current metrics.\n\nCall this every polling cycle with fresh metrics.\n\nArgs:\n    current_metrics: Current normalized metrics.\n    current_time: Current timestamp (defaults to now).\n\nReturns:\n    List of watches that resolved this cycle (STABLE, DEGRADED, etc.)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": false,
+    "artifact_id": "mep-1baf2d9f152117e8",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/PREREG_VARNA_BOUNDARIES.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# PRE-REGISTRATION (DESIGN) \u2014 Unified Var\u1e47a Model: One Meaning, Two Fixed Boundaries\n\n**Document type:** Pre-registration design.\n**Status:** DESIGN draft \u2014 no implementation, no data, no run, no freeze. Frozen-on-commit applies to the artifact list only once a run is approved.\n**Standing prohibitions:** No implementation here. Stage A (the SO(4) operator system) is **not used and not modified**. No data collected, nothing computed.\n\n> **Relation to prior work.** This design collapses B0 / Version A / Version B into **one var\u1e47a meaning accessed through two *fixed* boundaries**. It reuses the existing alignment machinery (RSA: Mantel / partial-Mantel / scrambled-table null) conceptually; it does **not** decode single-word meanings by hand (no narration, no joiners).\n\n> **Interpretive scope (read first).** A positive result shows only that the table's per-var\u1e47a structure tracks a **real perceptual (External) or self-effect (Internal) dimension beyond generic iconicity** \u2014 a narrow, representational result. It does **not** prove the v\u1e5btti meanings are correct, the compositional word-meaning claim, the (dropped) physical/mental-plane claims, or Symbol-U.\n\n## 0. Shared core model (frozen)\n- Each var\u1e47a has **one** fixed v\u1e5btti meaning, taken verbatim from the frozen `lexicon_wordformation.json` (`word_formation_reading`). There are **not** separate internal/external meanings.\n- \"External\" and \"internal\" are **two boundaries of that one meaning**, selected by a **protocol-level fixed rule**, never per word:\n  1. **Spelling \u2192 External-boundary test (E).**\n  2. **Pronunciation \u2192 Internal-boundary test (I).**\n- Confirmatory composition is **equal-weight, consonant-only** over the v\u1e5btti vocabulary (as in the synonym-selection scaffold); ordered/operator composition is **exploratory only**.\n- Both tests are **alignment (RSA)** tests \u2014 they compare *structures across words*, never decode a single word's meaning.\n\n---\n\n## Parallel specification (Requirements 1\u20137)\n\n| | **E \u2014 Extern",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1bb00f1cb94b7f61",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/dataset.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a76.2 dataset abstraction \u2014 ``Question`` + ``Benchmark`` protocol.\n\nA benchmark is a sequence of multi-choice ``Question`` objects plus\na factory that produces \u00a74.2 ``Source`` instances for each question\nunder the M=3 V1 configuration (base + two paraphrased).\n\nTwo implementations are shipped:\n\n    MockBenchmark \u2014 synthetic, deterministic, torch-free. Used for\n        offline unit testing and for the \u00a76 MockSource-backed sweep\n        (equivalent of \u00a73 Phase 1.5 at the benchmark layer).\n\n    TruthfulQABenchmark \u2014 real TruthfulQA-MC loader, delayed\n        imports of ``datasets``, ``transformers``, and ``torch``.\n        Skeleton \u2014 not executed against a real model in this\n        environment per \u00a70.6 rule 1.\n\n``Question.choice_tokens`` carries each candidate answer as a list\nof integer token IDs. ``MockBenchmark`` fabricates these directly;\n``TruthfulQABenchmark`` would tokenize with a real tokenizer.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1bb5e058f54c023c",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_39_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 39 Merge-Safety Report\n## Multi-Horizon Temporal Forecasting Engine (MHTFE) v1.0\n\n**Report Date:** 2025-12-11\n**Phase:** 39 \u2014 Multi-Horizon Temporal Forecasting Engine\n**Status:** \u2705 **SAFE TO MERGE**\n**Confidence Level:** HIGH (100% confidence, zero regression risk)\n\n---\n\n## Executive Summary\n\nPhase 39 implements the **Multi-Horizon Temporal Forecasting Engine (MHTFE)**, a deterministic, zero-LLM, observation-only forecasting engine that predicts how coherence, continuity, identity, drift, and entropy metrics are expected to evolve across three distinct temporal horizons: **H1 (Short-Term: 1\u20133 turns)**, **H2 (Mid-Term: 4\u20138 turns)**, and **H3 (Long-Term: 9\u201320 turns)**. MHTFE builds upon Phase 38 TCFM by providing multi-scale temporal predictions with horizon-specific risk amplification, cross-horizon consensus analysis, and stability projection, while maintaining strict behavioral invariance across all pipeline components.\n\n### What MHTFE Adds\n\n- **New formula module:** `multi_horizon_temporal_forecasting.py` with pure-math multi-horizon forecasting computation\n- **Three temporal horizons:** H1 (1-3 turns), H2 (4-8 turns), H3 (9-20 turns)\n- **Per-horizon metrics:** coherence_slope, continuity_slope, drift_risk, entropy_risk, forecast_strength, forecast_band\n- **Cross-horizon analytics:**\n  - **FCI (Forecast Consensus Index):** Agreement across horizons [0.0, 1.0]\n  - **FSE (Future Stability Envelope):** Uncertainty-modulated stability [0.0, 1.0]\n- **New CoherenceState fields:** H1/H2/H3 slopes, drift risks, entropy risks, forecast strengths, bands, FCI, FSE, diagnostic tags, and histories\n- **New Unified API block:** `multi_horizon_forecast` field for JSON-safe diagnostics\n- **New observer fields:** MHTFE metrics in `CoherenceObservation` for UI/analytics (18 new fields)\n- **47 comprehensive tests:** Full coverage across formula math, integration, API, and invariance\n- **7 validation tests:** End-to-end validation of core functionality\n\n### What MHTFE Does NO",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1c1f63cedfdf2e8f",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "acp/LIVE_K8S_SHADOW_METHOD.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Live K8s Shadow Method (V2.1 \u00a77, \u00a78)\n\nHow the integrated ActionGate + ACP shadow benchmark runs and measures, and what\nis real vs reproduced. Code:\n`robotics_reliability_bench/acp_k8s_integrated/{harness,run_integrated_bench}.py`.\nResults: `robotics_reliability_bench/results/acp_k8s_integrated_results.json`.\n\n## What is real\n\n- **ActionGate is the real frozen engine.** Every verdict comes from\n  `action_gate_ref.gate.evaluate` over a real 24-field envelope\n  (schema-validated), the real signed Kubernetes policy bundle\n  (`action_gateway_k8s.policy` + `action_gate_ref.policy.sign_policy`), real\n  `kubernetes_admission` / `simulation` / `rollback_attestation` evidence, real\n  approvals, a real `action_hash`, and real dispositive rules. No synthetic\n  verdict is ever supplied. Different outcomes come from **real inputs**: an\n  out-of-scope namespace or non-compliant manifest makes the real deterministic\n  admission check withhold evidence \u2192 real `DENY`; a missing dry-run simulation \u2192\n  real `SIMULATE_AND_RETRY`; a delete without approval \u2192 real `ESCALATE_TO_HUMAN`.\n- **ACP is the real frozen core + real `cloud_controller`.** Readiness, policy\n  bounds, and safety bounds are computed by the actual\n  `ReadinessChecker` / `PolicyEngine` / `SafetyBounds`.\n- **The hashing/binding is real.** `manifest_digest` and `current_state_hash` use\n  the real ActionGate domain-digest conventions, so the cross-layer binding is\n  byte-exact.\n\n## What is reproduced (and honestly labelled)\n\nA live / kind / k3d cluster is **infeasible** here: no `kubectl` / `kind` / `k3d` /\n`minikube` / `kubernetes` client, and the provisioners need network-gated\ndownloads; **no repository fake API server exists**. So the Deployment *state* is\nmodelled from the real `action_gateway_k8s` fixture (`web` / `gw-web`, ns\n`protected`, `replicas: 1`) with `resourceVersion`, `availableReplicas`,\nreadiness, freeze, and dependency health **authored** (`AUTHORED_DETERMINISTIC`).\nThis is exactly the milestone's state",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1c7fa837983b381e",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading2/core/utility.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute utility from observables and current state.\n\nArgs:\n    obs: Current market observables\n    state: Current Bayesian state\n\nReturns:\n    UtilityResult with utility score and components",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": false,
+    "artifact_id": "mep-1cadab20552b489e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/causal.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Integrated-gradients attribution of the correct-token logit to the attention vs FF\noutput activations at `layer` (baseline = zero activation). Read-only (model params fixed;\ngradients are only used for attribution, never applied).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1d1da67f38e2b6ff",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/speculative.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a712 Speculative-decoding benchmark adapters.\n\nTwo classes:\n\n  SpeculativeDecodingMockBenchmark\n    Synthetic, deterministic, torch-free. Lets the \u00a711 probe harness\n    exercise a 2-source (target, draft) configuration without needing\n    real models loaded. Validates that observables transfer from the\n    hallucination problem to the spec-dec problem at the plumbing\n    level.\n\n  SpeculativeDecodingBenchmark\n    Real target + draft model pair. DEFERRED \u2014 skeleton only in this\n    commit; full implementation (candidate generation + acceptance\n    labels via rejection sampling) is next-session work. The class\n    raises NotImplementedError until the implementation lands.\n\nShape:\n- Each question is a prompt.\n- Choices are candidate draft continuations (K tokens each).\n- correct_index = the candidate with highest expected acceptance\n  rate (for mock: synthesized ground-truth; for real: computed by\n  running target on each candidate).\n- make_sources returns a length-2 list: [target_source, draft_source].",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1d525ed742855af6",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "execution_gate/frozen/replay_v1/artifacts/scenarios.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Deterministic scenario suite (Phase 8).\n\nEach scenario carries (a) the gate-visible SIGNALS (evidence, possibly stale/wrong) and\n(b) GROUND TRUTH \u2014 what actually happens on a real call. The gap between them is where\nfalse-eligible / false-ineligible arise, so the evaluation is not rigged for the gate.\n\nIncludes replay records distilled from the real V1/V2 investigation (credentials and\nproject identifiers removed): proxy 403 denials, Gemini free-tier 429, Anthropic\nmodel_not_found, invalid AWS/Google creds, Claude/Gemma executable.\n\nBase time T0 is fixed (no system clock) so everything is replayable.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1dd297d07db0709d",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Acoustic Unit Mapper \u2014 Expressive Delta (EXPERIMENTAL)\n=======================================================\n\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551                              \u26a0\ufe0f  EXPERIMENTAL  \u26a0\ufe0f                              \u2551\n\u2551                                                                                \u2551\n\u2551  This module is EXPERIMENTAL and must NOT be used in production pipelines     \u2551\n\u2551  or governance decisions. It exists solely as a testbed for evaluating        \u2551\n\u2551  expressive-acoustic correctness enhancements.                                \u2551\n\u2551                                                                                \u2551\n\u2551  CANONICAL MODULE: symbolu/formulas/acoustic_unit_mapper.py                   \u2551\n\u2551  This delta does NOT replace or modify the canonical module.                  \u2551\n\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\nEXPRESSIVE DELTA PURPOSE:\n    This experimental module explores structural metadata fields that preserve\n    expressive directionality WITHOUT interpretation. It is a controlled delta\n    for evaluation only.\n\nDELTA CHANGES FROM CANONICAL MODULE:\n    1. vowel_first: bool \u2014 Detects when vowel precedes consonant in unit\n    2. expressive_anchor: Literal[\"consonant\", \"vowel\"] \u2014 Directional marker\n    3. cluster_order: str \u2014 Explicit CV/VC ordering preservation\n    4. Consonant-anchored segmentation (vowels as wrappers, not nuclei)\n    5. Raw order fidelity (sa \u2260 as, no normalization collapse)\n\nCORE/SUBSTRATE INVARIANTS (PRESERVED \u2014 NON-NEGOTIABLE):\n    - NO semantics: No knowledge of meaning\n    - NO intent: No inference of user purpose\n    - NO routing: No control flow direction\n    - NO policy: No behavioral decisions\n    - NO LLM calls: Purely deterministic, rule-based\n    - NO vrtti values: No emotional/intentional mapping\n    - NO ontology/guna/kosha: No philosophical categorization\n    - DETERMINISTIC: Same input always produces same output\n    - LANGUAGE-AGNOSTIC: Works on phonetic structure only\n    - READ-ONLY: Pure transformation with no side effects\n    - NON-AUTHORITATIVE: Cannot influence governance or routing\n\nThis is still substrate, not intelligence.\n\nVersion: 0.1-experimental\nDate: 2025-12-15\nBased on: symbolu/formulas/acoustic_unit_mapper.py v1.0",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1def43ed4a88ec56",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_35_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 35 \u2014 Predictive Persona Drift Model (PPDM) v1.0\n\n## MERGE SAFETY REPORT\n\n**Report Date:** 2025-12-11\n**Phase:** 35 \u2014 Predictive Persona Drift Model (DMP, DDS, DSS)\n**Status:** \u2705 **SAFE TO MERGE**\n**Confidence Level:** \ud83d\udfe2 **HIGH (100%)**\n\n---\n\n## 1. EXECUTIVE SUMMARY\n\n### Merge Recommendation\n**Phase 35 Predictive Persona Drift Model is SAFE TO MERGE.**\n\n### What Phase 35 Introduces\n\nPhase 35 implements the **Predictive Persona Drift Model (PPDM) v1.0**, a deterministic, zero-LLM formula that forecasts future persona drift direction and magnitude using the full Symbol-U v3.0 signal stack. The PPDM produces:\n\n1. **Drift Magnitude Prediction (DMP)**: Estimated future drift intensity [0.0, 1.0]\n2. **Drift Direction Scores (DDS)**: Predicted drift direction components (toward_structure, toward_warmth, toward_grounding) [0.0, 1.0]\n3. **Drift Stability Score (DSS)**: Confidence in drift trajectory [0.0, 1.0]\n4. **Drift Likelihood Band**: Classification as \"LOW\", \"MEDIUM\", or \"HIGH\"\n5. **Predicted Drift Horizon**: Turns ahead for prediction (typically 3-5 turns)\n6. **Diagnostic Tags**: Deterministic tags like DRIFT_RISK_RISING, HARMONICS_INFLUENCE_HIGH, ENTROPY_VOLATILITY_HIGH, etc.\n\nThe PPDM leverages signals from across the Symbol-U stack:\n- **Phase 34 Identity Harmonics**: CIH, AIH, RIH, identity stability, flexibility, entropy\n- **Phase 17 Semantic/Cognitive**: Semantic integrity, cognitive drift v3\n- **Phase 18 Temporal Entropy**: Temporal entropy volatility\n- **Phase 24 Resonance Weighting**: Resonance weighting entropy\n- **Phase 27 Symbolic Harmonization**: Symbolic harmonization index\n- **Phase 26 Unified Consciousness**: Consciousness order index\n- **Coherence Fusion**: Fused coherence scores\n\n### Critical Properties\n\nPhase 35 is designed with **strict safety guarantees**:\n\n- \u2705 **Zero-LLM**: Purely rule-based, deterministic mathematical formulas only \u2014 no AI/ML inference\n- \u2705 **Observation-only**: Does NOT modify routing, mapper activation, coherence scoring,",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1ea66c84984973d4",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/core/damping.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute damping factor.\n\nArgs:\n    metric_variance: Variance of primary metrics over recent window.\n        Higher = more volatile system.\n    coherence_instability: How much signals disagree. 0 = full agreement.\n\nReturns:\n    DampingResult with damping factor and internal state.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-1f1c65b7dbbac64e",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "acp/ACP_V2_1_INVESTOR_SUMMARY.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# ACP V2.1 \u2014 Internal Summary (measured evidence vs vision)\n\nInvestor-safe. This separates **what we measured** from **what we believe** and\n**what we have not shown**. Nothing here is a production or platform claim.\n\n## The question we set out to answer\n\n> Can the complete Ugence governance stack independently evaluate both\n> *authorization* (ActionGate) and *operational safety* (ACP) for the same exact\n> Kubernetes action, with clean ownership, deterministic composition, and zero\n> impact on the authoritative runtime?\n\n## What we measured (fact)\n\n- We ran the **real** ActionGate authorization engine and the **real** ACP\n  operational-safety adapter on the **same, cryptographically-bound** Kubernetes\n  Deployment operation, across 18 scenarios, in shadow mode.\n- The two layers composed into **8 well-defined outcome classes** with **0**\n  contradictory-ownership errors and **0** duplicated constraints.\n- **All 13 safety invariants held**, including the two that matter most\n  commercially: an ActionGate **denial is never overridden**, and ACP **never\n  grants authorization**. Execution is *hypothetically* eligible only when **both**\n  layers pass.\n- Both layers independently caught **post-approval tampering** (a changed replica\n  state or a modified patch) at commit time.\n- Everything was **deterministic** (identical reruns, identical authorization\n  hashes) and had **zero** impact on any authoritative path \u2014 no cluster was\n  touched, no execution token minted.\n- The ACP decision core is the **frozen V1 core, unchanged** (hash-verified);\n  ActionGate was **unmodified** \u2014 we only invoked it.\n\n**Measured verdicts:** integrated composition `INTEGRATED_STACK_SUPPORTED`;\nlive-Kubernetes evidence `LIVE_K8S_SHADOW_LIMITED`; product evidence\n`CONTROL_PLANE_STACK_PARTIALLY_VALIDATED`.\n\n## What this demonstrates (supported interpretation)\n\nThe two-layer \"authorized **and** operationally safe\" governance model is\n**architecturally real**, not a slide. Two independently-built en",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1f9381ffb9de6606",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/hp_quad.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Configuration for Hierarchical Phase-Quad.\n\nAttributes:\n    num_levels: Number of hierarchy levels (default: 3)\n    d_phase_levels: Phase dimension per level (default: (128, 256, 512))\n    chunk_sizes: Chunk sizes per level (default: (1, 8, 64))\n    boundary_threshold: Threshold for boundary detection (default: 0.5)\n    boundary_temperature: Temperature for soft boundaries (default: 1.0)\n    target_boundary_rate: Target rate for boundary regularization (default: 0.15)\n    window_size: Local attention window size (default: 64)\n    num_proposals: Number of Quad proposals per level (default: 4)\n    dropout: Dropout rate (default: 0.1)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-1f9c1d4442d5ab84",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/speculative.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Pull the prompt text from a dataset row. Schema-aware:\nHaluEval-QA rows have `question`; TruthfulQA rows have\n`question`; generic fallback to a `prompt` field.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1f9fef4b2fc62837",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/PREREG_SYNONYM_SELECTION_VERSION_B.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# PRE-REGISTRATION (DESIGN) \u2014 Var\u1e47a\u2013Perception Alignment (Synonym Selection, Version B)\n\n**Document type:** Pre-registration design (the **preferred clean gate**; bridge-free on the human side).\n**Version:** B (design draft).\n**Status:** DESIGN \u2014 not frozen, not run. No data, no fit, no computation. Frozen-on-commit applies to \u00a717 once a run is approved.\n**Standing prohibitions:** No implementation here. Stage A (the SO(4) operator system) is **not used and not modified**. No data collected, nothing computed.\n\n> **Relation to Version A.** Version A (`PREREG_SYNONYM_SELECTION.md`) tests the **compositional, word-level** synonym-selection claim, but through a **subjective target\u2192v\u1e5btti coding bridge** that reliability gates can *measure* but not *eliminate*. **Version B removes that bridge entirely**: humans judge only acoustic qualities (never meanings/v\u1e5bttis), and the frozen table is compared to those judgments. **Version B is the preferred clean gate; Version A is conditional/deferred** (see \u00a70 and Version A \u00a713a). If both are run, the order is **B first, then A** \u2014 and A runs only if B returns `PERCEPTION_ALIGNED` *and* a less-subjective word-level bridge is available.\n\n> **Interpretive scope (read first).** Version B evaluates the **representation's alignment with perception** (whether the table's per-var\u1e47a structure is phonetically iconic), **not** the truth of the v\u1e5btti ontology and **not** the compositional word-meaning claim. A positive does not prove the meanings are correct, nor Symbol-U; a null bounds the table's phonetic grounding at the var\u1e47a level only.\n\n## 0. Scope and sequencing\nThis protocol answers **one** question: *does the acoustic representation derived from the frozen var\u1e47a table correspond to reproducible human perception of sound, better than randomized mappings (and beyond generic phonetics)?* It deliberately **does not** test composition, word meaning, etymology, mythology, intention, Stage A, or full Symbol-U. It is the gate; Version A is t",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-1fc822acd6616ca1",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "quad_generative_regularization/DERIVATION.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 1 \u2014 Mathematical Analysis of the Task-Loss Gradient on the Quad Score\n\nAnalysis-only. No losses, regularizers, temperature scaling, or architecture changes are\nintroduced. This derives `\u2202L_task/\u2202S^Q` for the authentic Quad retrieval and states the\npredictions the empirical instrumentation (Phases 2\u20135) then tests.\n\n## 1. Setup and notation\n\nFor a query position `i` (one head; the argument is per-head and sums trivially), let the\ncausally-visible candidate keys be `j \u2208 C_i`. The authentic Quad score, attention weights, and\nattended value are\n\n```\nS_{ij} = \u27e8 W_q\u00b7LN(h_i),  W_k\u00b7LN(h_j) \u27e9 / \u221ad_h          (the Quad logit)\na_{ij} = softmax_j(S_{ij}) = e^{S_{ij}} / \u03a3_{k\u2208C_i} e^{S_{ik}}\no_i    = \u03a3_{j\u2208C_i} a_{ij} v_j ,     v_j = W_v\u00b7LN(h_j)\n```\n\n`o_i` propagates through the residual/FFN/final-norm/vocab-head to the cross-entropy loss `L`.\nWrite the upstream gradient into the attended output as the vector `\u03b4_i \u2261 \u2202L/\u2202o_i \u2208 \u211d^{d_h}`.\n\n## 2. Gradient of the task loss w.r.t. the Quad score\n\nUsing the softmax Jacobian `\u2202a_{im}/\u2202S_{ij} = a_{im}(\u03b4_{mj} \u2212 a_{ij})` and `\u2202o_i/\u2202a_{im} = v_m`:\n\n```\n\u2202L/\u2202S_{ij} = \u03a3_m (\u2202L/\u2202o_i)\u00b7v_m \u00b7 a_{im}(\u03b4_{mj} \u2212 a_{ij})\n           = a_{ij} \u27e8\u03b4_i, v_j\u27e9 \u2212 a_{ij} \u03a3_m a_{im} \u27e8\u03b4_i, v_m\u27e9\n```\n\nwhich collapses (since `\u03a3_m a_{im} v_m = o_i`) to the exact, compact form\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502   \u2202L_task/\u2202S_{ij} = a_{ij} \u00b7 \u27e8 \u03b4_i , v_j \u2212 o_i \u27e9          \u2502   (\u2605)\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\nThe gradient on a Quad logit is the **attention weight** `a_{ij}` times the **alignment**\n`\u27e8\u03b4_i, v_j \u2212 o_i\u27e9` between the upstream error direction and how much candidate `j`'s value\ndeviates from the currently attended output. The gradient-descent update is\n`\u0394S_{ij} \u221d \u2212a_{ij}\u27e8\u03b4_i, v_j \u2212 o_i\u27e9`.\n\n## 3. Why correct scores rise and incorrect scores fall\n\nMoving `o_i` toward the correct value `v_{j\u207a}` reduces the loss, so the loss-reducing direction\n`\u2212\u03b4_i` is positively aligned with `v_{j\u207a} \u2212 o_i`, i.e. `",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-204985af343d81ee",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "acp/RESPONSIBILITY_MATRIX.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Responsibility Matrix (V2.2 \u00a77)\n\nSeparation-of-responsibility proof for the AI Control Plane. Each layer owns a\ndisjoint concern; none duplicates or overrides another. Verified structurally\n(source scans in `run_control_plane_bench.py` + `test_control_plane.py`):\n**duplicated-logic count 0, ownership violations 0.**\n\n| layer | owner of | inputs | outputs | authority | failure mode |\n|---|---|---|---|---|---|\n| **Context Minimization** | *relevance* \u2014 what the model needs to see | original context (spans) + protect_fn + signed policy | reduced context (surviving spans) | **none** \u2014 preprocessing; never authorizes, never judges safety | fail-closed: restores necessary spans / returns full original (`fell_back`); never silently drops a protected span |\n| **LLM stage (reader)** | *proposal* \u2014 what action to take | reduced context | proposed `KubernetesOperation` | **none** \u2014 proposes only | `INSUFFICIENT_CONTEXT` if a critical span is gone (no action proposed) |\n| **ActionGate** | *authorization* \u2014 may this be done? | proposed action \u2192 envelope, signed policy, evidence, approvals, state hash | outcome + action_hash + dispositive rules | **authorization authority** (sole) | `DENY` / non-final; never evaluates operational readiness |\n| **ACP** | *operational safety* \u2014 is it safe now? | same action \u2192 `CloudWorldState` + `CloudActionCandidate` | recommendation + evidence + trace | **operational-safety evaluator** (sole) | `HOLD` / `REOBSERVE`; never authorizes |\n| **Composition** | *combination* \u2014 link the verdicts | ActionGate outcome + ACP result (identity-bound) | one of 8 classes + eligibility | **none** \u2014 links, never overrides | `COMPOSITION_IDENTITY_MISMATCH` / `SHADOW_ERROR` |\n\n## The non-duplication guarantees (structural, source-scanned)\n\n- **Context Minimization never authorizes and never judges operational safety.**\n  Its only \"decision\" concept is preserving the *ActionGate decision invariance*\n  of the compression (it calls the gate to check it didn't corrup",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-2061efd6842138f6",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e1_intent/schema.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Where a field's value came from. Every extracted or inferred field must\ncarry one of these (Section 8). ``EXPLICIT_TEXT`` and\n``DETERMINISTIC_EXTRACTION`` are authoritative; the rest are weaker.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-20648319b8919a7b",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/archetype_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "judge_scores: list of {id: {\"1\":1-5,\"2\":1-5,\"3\":1-5}} (one dict per blind judge).\nAverages per-word over judges, maps slots back to arms, computes deltas + verdict.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-207732def245a363",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/crs_pseudoword_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Independent sharp(+)/round(\u2212) score in [-1,1] from the parsed keys. Defined OUTSIDE the var\u1e47a\nontology, so a var\u1e47a score predicting it is a non-circular cross-check.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-2079749fa41564b1",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/core/state.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compute fast-path coherence score.\n\nC_fast = \u03b1\u00b7c + \u03b2\u00b7(1-\u03b4) + \u03b3\u00b7cos(\u03c6 - \u03c6\u0304)\n\nArgs:\n    mean_phase: System mean phase \u03c6\u0304\n    config: CoherenceConfig with weights\n\nReturns:\n    Fast coherence score in [0, 1]",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-207efecf9895f57a",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "acp/LIVE_K8S_SCENARIO_CORPUS.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Live K8s Scenario Corpus (V2.1 \u00a76)\n\n18 deterministic scenarios. Code:\n`robotics_reliability_bench/acp_k8s_integrated/corpus.py`. Base Deployment state\nis the **real** `action_gateway_k8s` fixture (`web` / `gw-web`, ns `protected`,\n`replicas: 1`); the discriminating operational variable is authored where no\noffline source exists. Provenance:\n`REPOSITORY_INTEGRATION_FIXTURE` 1 \u00b7 `AUTHORED_DETERMINISTIC` 13 \u00b7\n`SYNTHETIC_UNIT` 4. No local-cluster data is called production customer evidence.\n\n| # | scenario | provenance | real ActionGate | ACP | expected composition class |\n|---|---|---|---|---|---|\n| 1 | authorized_healthy_scale | REPO_FIXTURE | ALLOW | PROCEED | `AUTHORIZED_AND_OPERATIONALLY_SAFE` |\n| 2 | unauthorized_but_safe | AUTHORED | DENY (ns) | safe | `BLOCKED_BY_AUTHORIZATION` |\n| 3 | authorized_readiness_cooldown | AUTHORED | ALLOW | HOLD | `HELD_BY_OPERATIONAL_SAFETY` |\n| 4 | authorized_excessive_replicas | AUTHORED | ALLOW | HOLD | `HELD_BY_OPERATIONAL_SAFETY` |\n| 5 | stale_operational_state | AUTHORED | ALLOW | stale | `REQUEST_FRESH_OPERATIONAL_STATE` |\n| 6 | state_drift_after_eval | SYNTHETIC | ALLOW | PROCEED | `AUTHORIZED_\u2026SAFE` + commit reject (both) |\n| 7 | modified_patch_after_eval | SYNTHETIC | ALLOW | PROCEED | `AUTHORIZED_\u2026SAFE` + commit reject (both) |\n| 8 | rollout_missing_rollback | AUTHORED | ALLOW | HOLD | `HELD_BY_OPERATIONAL_SAFETY` |\n| 9 | active_freeze_window | AUTHORED | ALLOW | HOLD | `HELD_BY_OPERATIONAL_SAFETY` |\n| 10 | dependency_unhealthy | AUTHORED | ALLOW | HOLD | `HELD_BY_OPERATIONAL_SAFETY` |\n| 11 | blocked_by_both | AUTHORED | DENY (ns) | HOLD (freeze) | `BLOCKED_BY_BOTH` |\n| 12 | ag_requests_evidence_acp_passes | AUTHORED | SIMULATE_AND_RETRY | safe | `REQUEST_MORE_EVIDENCE` |\n| 13 | ag_passes_acp_requests_fresh | AUTHORED | ALLOW | stale | `REQUEST_FRESH_OPERATIONAL_STATE` |\n| 14 | composition_identity_mismatch | SYNTHETIC | ALLOW | (divergent patch) | `COMPOSITION_IDENTITY_MISMATCH` |\n| 15 | evaluator_exception | SYNTHETIC",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-20a19591b26c5696",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/analysis.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Phase 4: offline temperature sweep on the ALREADY-TRAINED logits (no retrain, no\ninference change). Distinguishes score collapse (logits diverged) from probability\ncollapse (logits fine, softmax merely peaked): if even large T cannot restore entropy,\nthe logits themselves have diverged. Ranking is temperature-invariant by construction.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-210d96b34561fdb0",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "ndol/sim/mqsim.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Accumulates (arrival_ns, device, lba, size_sectors, is_read) and writes\nthe MQSim ASCII trace format. Arrivals are sorted ascending on write; equal\ntimestamps are nudged +1 ns to keep the stream strictly monotonic (a burst\nof concurrent requests at one decode step).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-2143eb1aec814097",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "symbolu_neural/internal_policy_controller/O2A_OFFLINE_EVALUATION_PROTOCOL.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# O2A offline evaluation protocol \u2014 PRE-REGISTERED\n\n> **Type:** pre-registration. **No code yet.** Datasets, features, baselines, metrics, and\n> thresholds are frozen **before** any implementation or data peeking. The reading \u03c1 is a\n> hypothesis on trial; it must earn the right to a policy translator (O2B) through this\n> offline gate alone \u2014 **no LLM, no API.**\n\n## 0. Pre-registration discipline\n\n1. Datasets (\u00a72) are authored and **frozen** (committed; `sha256` recorded) **before** any\n   feature or baseline is computed.\n2. Reading-feature set (\u00a73), baselines (\u00a74), metrics (\u00a75), thresholds (\u00a76) are fixed\n   **before** running. One run, one verdict.\n3. Thresholds are **not** moved after seeing data. Deviations are logged as amendments\n   with a reason, before re-running.\n\n## 1. Hypotheses\n\n- **H0 (null):** the var\u1e47a semantic reading carries no meaning-discriminating signal\n  beyond a sentiment baseline and the raw phonetic substrate; and/or it is unstable under\n  paraphrase; and/or it fails to generalize beyond curated in-lexicon vocabulary.\n- **H1 (alt):** the reading discriminates the contrasts the ontology *claims* to capture,\n  **above sentiment and above the phonetic substrate**, is stable under\n  same-meaning paraphrase (including same-meaning/different-sound), flips on\n  opposite-meaning minimal pairs, is human-recoverable, and generalizes to a holdout.\n\n## 2. Datasets (frozen before running)\n\n### 2.1 Six labeled contrast sets \u2014 mapped to Symbol-U's OWN claimed dimensions\nEach: 20 + 20 sentences, grouped as 5 meanings \u00d7 4 paraphrases per pole. Mapping the\ncontrasts to the ontology makes the test *fair to Symbol-U* \u2014 we ask whether the reading\ncaptures the distinctions it claims to make.\n\n| # | Contrast | Claimed Symbol-U dimension | Pole examples |\n|---|---|---|---|\n| C1 | **joy vs grief** | valence (liberating vs binding) | \"We're overjoyed \u2014 she said yes.\" / \"He's gone, and I'm shattered.\" |\n| C2 | **calm vs urgent** | v\u1e5btti motion / arousal | \"No rush, take",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-248b4a98e5745a9f",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/gate_actuator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Controls deployment gates for scaling coordination.\n\nUsage:\n    gate = GateActuator(GateConfig(\n        mode=GateMode.ARGOCD_SYNC,\n        argocd_url=\"https://argocd.internal:8080\",\n        argocd_token=\"...\",\n    ))\n    result = gate.execute(\n        action=GateAction.HOLD,\n        application=\"api-gateway\",\n        namespace=\"prod\",\n    )",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-24b3d95c457bc865",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/dataset.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Internal wiring for how `MockBenchmark.make_sources` fabricates\nthe three sources for a given ``Question``. Attached as metadata\nso tests can inspect it.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-250fd8cec33b1f48",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/quad_model.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Small causal transformer whose attention IS the authentic Quad scorer.\n\nforward returns logits and (optionally) the exposed Quad score at the aux layer.\nThe `expose_quad` flag only controls whether the already-computed score tensor is\n*returned*; it never changes the forward computation (see the A vs D0 equivalence\ntest).  Hidden states at each layer input are also captured so Arm C can build a\ngeneric hidden-state relational signal from the SAME layer, without touching the\nQuad score.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-252a40dbca73deea",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/RESULTS_ARCHETYPE_SIGNAL.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Results \u2014 archetype-alignment test (the \"missing middle\")\n\n> Pre-registration: `PREREG_ARCHETYPE_SIGNAL.md`. Verdict computed by the registered rule, not by hand.\n> This is a **separate hypothesis** from the lexical NO_SIGNAL and the utility NO_UTILITY_SIGNAL\n> results; this result does **not** revive either of them. Interpretive lens \u2014 **not** part of C\u00d7R\u00d7S.\n\n## The hypothesis tested\n\nNot \"can the chain identify the word *doctor*?\" (already falsified \u2014 lexical NO_SIGNAL) but the\n**missing-middle / Sattvic** claim: *does the real var\u1e47a chain depict a role-word's archetypal\n**transformation** (doctor: suffering \u2192 healing) better than a scrambled lexicon **and** a random\nsymbolic lexicon, judged blind?*\n\n- **N = 30** role/function words, each with a pre-registered `from \u2192 to` archetype authored from the\n  role alone (`wordlist_archetype.py`), before any chain was computed.\n- For each word, the lens reading rendered as a lexicon-agnostic transformation **arc** (identical\n  template across lexicons; only glosses differ).\n- **Three lexicons:** **real** (Sanskrit var\u1e47a map), **scrambled** (real (worldly,counter) pairs\n  permuted among consonants; vowel essences permuted among vowels \u2014 same vocabulary, randomized\n  sound\u2192propensity attachment), **random-symbolic** (same arc structure from a neutral, concrete-noun\n  pool). S = 20 seeded control lexicons, averaged.\n- Required gate: **ARCHETYPE_SIGNAL_DETECTED only if real beats BOTH controls** \u2014 CI_lower(\u0394_scr) > 0\n  **and** CI_lower(\u0394_rnd) > 0 (and \u2265 MIN_EFFECT = 0.30 for product-meaningfulness).\n\n## Confirmatory arm \u2014 5 blind LLM judges (within-item, hidden lexicon identity, randomized slot order)\n\nEach judge saw the archetype `from \u2192 to` and the three chains unlabeled, and scored each chain's fit\n1\u20135. Per-word scores averaged over the 5 judges; bootstrap CI (10 000 resamples) over the 30 words.\n\n| arm | fit (1\u20135) |\n|---|---|\n| **real** | **2.987** |\n| scrambled | 2.947 |\n| random-symbolic | 1.767 |\n\n- **\u0394_scr = real \u2212 s",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-25a39bd4c403b424",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/config.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Symbol-U Configuration\n======================\n\nConfiguration for Symbol-U's pluggable provider architecture.\nSupports two modes:\n- \"enterprise\": Symbolic/auditable providers (hash embedding, phoneme routing)\n- \"consumer\": Pre-trained/semantic providers (learned embedding, trained routing)\n\nLicense Types:\n- ENT-XXXX-XXXX-XXXX: Enterprise license (symbolic providers only)\n- CON-XXXX-XXXX-XXXX: Consumer license (learned providers only)\n- DEV-XXXX-XXXX-XXXX: Development license (full access)\n\nUsage:\n    from symbolu.config import SymboluConfig\n\n    # Enterprise mode with license\n    config = SymboluConfig(\n        mode=\"enterprise\",\n        license_key=\"ENT-ABCD-1234-EFGH\",\n    )\n\n    # Consumer mode with license\n    config = SymboluConfig(\n        mode=\"consumer\",\n        license_key=\"CON-WXYZ-5678-IJKL\",\n    )\n\n    # Development mode (no license required)\n    config = SymboluConfig(mode=\"enterprise\", enforce_license=False)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  }
+]

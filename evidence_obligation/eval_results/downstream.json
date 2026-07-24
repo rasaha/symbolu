@@ -1,0 +1,403 @@
+{
+  "dataset_version": "evidence_obligation_v1",
+  "downstream_sha256": "6ea045ffadc8c86b20d5c27fce34e496f740590fa86b8a00a97493b607fd83bc",
+  "note": "obligation -> frozen EvidenceAssurance delivery. unsafe_allow = clean ALLOW for a gold-high-burden or adversarial claim.",
+  "policies": {
+    "A_uniform_strong": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 90,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 68,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 182,
+        "withholding_rate": 0.728
+      }
+    },
+    "C_risk_only": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 90,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 10,
+        "over_qualification_rate": 0.1,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 167,
+        "clean_allow_rate": 0.668,
+        "escalation": 68,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 15,
+        "over_qualification_rate": 0.06,
+        "unsafe_allow": 16,
+        "unsafe_allow_rate": 0.064,
+        "unsafe_examples": [
+          "nat2-34b65aa4e5f21ae1: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-362b97a5cd6c4217: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-367db5875f1aae8f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-388df87c8fa76093: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-3a405a2ef6ac0f3c: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-40136d1111f669a2: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-584a2d1d76828ffc: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-5962b1f6fa246658: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "E_claim_type_only": {
+      "adversarial": {
+        "clean_allow": 20,
+        "clean_allow_rate": 0.2,
+        "escalation": 70,
+        "high_risk_unsafe_allow": 20,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 20,
+        "unsafe_allow_rate": 0.2,
+        "unsafe_examples": [
+          "adv-0aea7ca372233134: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-134d3057e6abdd4c: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-28ba008a9fe4c6d4: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-3fdaef7611bb0311: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-5b2b9dd4f53aa1ef: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-5d2904267d84c5db: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-5f571c05cba78133: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 86,
+        "clean_allow_rate": 0.344,
+        "escalation": 48,
+        "high_risk_unsafe_allow": 2,
+        "n": 250,
+        "over_qualification": 5,
+        "over_qualification_rate": 0.02,
+        "unsafe_allow": 10,
+        "unsafe_allow_rate": 0.04,
+        "unsafe_examples": [
+          "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-43939dc709145df1: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "nat2-46e70b793700dd2f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-490002d07fe12ca6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-4b6b2463f902bcb7: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-51958e2a491272e9: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-5d7f6aead9ffe0f2: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW"
+        ],
+        "withholding": 111,
+        "withholding_rate": 0.444
+      }
+    },
+    "K_global_threshold_reduction": {
+      "adversarial": {
+        "clean_allow": 100,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 90,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 100,
+        "unsafe_allow_rate": 1.0,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-019840f5c0f43d33: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0aea7ca372233134: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-0b8111a5c5fc0b3c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW"
+        ],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 250,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 15,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 46,
+        "unsafe_allow_rate": 0.184,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "nat2-34b65aa4e5f21ae1: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-362b97a5cd6c4217: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-367db5875f1aae8f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-388df87c8fa76093: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-3a405a2ef6ac0f3c: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "O_nogate_all_lowrisk": {
+      "adversarial": {
+        "clean_allow": 100,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 90,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 100,
+        "unsafe_allow_rate": 1.0,
+        "unsafe_examples": [
+          "adv-0043480d8069a11c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-019840f5c0f43d33: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0987c5ff4d5d2043: gold=POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0aea7ca372233134: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-0b8111a5c5fc0b3c: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW",
+          "adv-0e07dab7f64a6318: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-12cc9f66ed9dafa6: gold=EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED -> ALLOW"
+        ],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 250,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 15,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 46,
+        "unsafe_allow_rate": 0.184,
+        "unsafe_examples": [
+          "nat2-3376ef05ea43f0fc: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "nat2-34b65aa4e5f21ae1: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-362b97a5cd6c4217: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-367db5875f1aae8f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-388df87c8fa76093: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-3a405a2ef6ac0f3c: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "P_simple_contextual": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 90,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 66,
+        "clean_allow_rate": 0.264,
+        "escalation": 68,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 5,
+        "over_qualification_rate": 0.02,
+        "unsafe_allow": 8,
+        "unsafe_allow_rate": 0.032,
+        "unsafe_examples": [
+          "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-46e70b793700dd2f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-490002d07fe12ca6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-4b6b2463f902bcb7: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-51958e2a491272e9: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-6d9ce109eafbb5a6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-7c1bc4f232445eeb: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 111,
+        "withholding_rate": 0.444
+      }
+    },
+    "Q_reference": {
+      "adversarial": {
+        "clean_allow": 10,
+        "clean_allow_rate": 0.1,
+        "escalation": 80,
+        "high_risk_unsafe_allow": 10,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 10,
+        "unsafe_allow_rate": 0.1,
+        "unsafe_examples": [
+          "adv-10983b65e6d0a8a0: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-134d3057e6abdd4c: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-28ba008a9fe4c6d4: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-5d2904267d84c5db: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-7b4459129d12da9e: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-7b61362f47dab998: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-97284aae05095a21: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW",
+          "adv-c05a247f469fb64b: gold=INDEPENDENT_CORROBORATION_REQUIRED -> ALLOW"
+        ],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 146,
+        "clean_allow_rate": 0.584,
+        "escalation": 51,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 5,
+        "over_qualification_rate": 0.02,
+        "unsafe_allow": 10,
+        "unsafe_allow_rate": 0.04,
+        "unsafe_examples": [
+          "nat2-377e6277d666d3cf: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-38bc54cfa986d5f4: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-46e70b793700dd2f: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-490002d07fe12ca6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-4b6b2463f902bcb7: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-51958e2a491272e9: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-5b6fe90979cc3ce6: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW",
+          "nat2-5bd173af201cc8e1: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 48,
+        "withholding_rate": 0.192
+      }
+    },
+    "R_oracle": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 90,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 74,
+        "clean_allow_rate": 0.296,
+        "escalation": 68,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 4,
+        "over_qualification_rate": 0.016,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 104,
+        "withholding_rate": 0.416
+      }
+    },
+    "S_learned": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 70,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 20,
+        "over_qualification_rate": 0.2,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 10,
+        "withholding_rate": 0.1
+      },
+      "held_out_natural": {
+        "clean_allow": 83,
+        "clean_allow_rate": 0.332,
+        "escalation": 65,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 14,
+        "over_qualification_rate": 0.056,
+        "unsafe_allow": 1,
+        "unsafe_allow_rate": 0.004,
+        "unsafe_examples": [
+          "nat2-77f13d4bf6c05b9d: gold=TELEMETRY_OR_MEASUREMENT_REQUIRED -> ALLOW"
+        ],
+        "withholding": 88,
+        "withholding_rate": 0.352
+      }
+    },
+    "prior_derivation_uniform": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 100,
+        "over_qualification": 100,
+        "over_qualification_rate": 1.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 250,
+        "over_qualification_rate": 1.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "unsafe_examples": [],
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    }
+  },
+  "prior_reference": {
+    "clean_allow_rate": 0.0,
+    "over_qualification_rate": 0.855
+  }
+}

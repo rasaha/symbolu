@@ -1,0 +1,85 @@
+{
+  "chosen_option": "4  DO NOT PROCEED (external) - fix utility/calibration first; gate the external pilot",
+  "chosen_option_index": 4,
+  "dimension_findings": {
+    "actiongate_native_preserved": true,
+    "auditable": true,
+    "enough_evidence": true,
+    "safe": true,
+    "stopped": false,
+    "unhandled_new_failures": false,
+    "useful": false
+  },
+  "external_single_customer_pilot": "GATED - conditioned on the utility-calibration prerequisites in SINGLE_CUSTOMER_PILOT_PLAN.md",
+  "option_verdicts": [
+    {
+      "chosen": false,
+      "option": "1  PROCEED to single-customer external shadow pilot (unconditional)",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "2  PROCEED to single-customer external shadow pilot WITH binding conditions",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "3  PROCEED but INTERNAL single-tenant natural shadow pilot first (not external)",
+      "reason": "not selected"
+    },
+    {
+      "chosen": true,
+      "option": "4  DO NOT PROCEED (external) - fix utility/calibration first; gate the external pilot",
+      "reason": "selected by evidence gate"
+    },
+    {
+      "chosen": false,
+      "option": "5  DO NOT PROCEED - fix native ActionGate semantics first",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "6  DO NOT PROCEED - fix safety first",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "7  DO NOT PROCEED - fix auditability/explainability first",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "8  NOT ENOUGH EVIDENCE - insufficient natural artifacts",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "9  NOT ENOUGH EVIDENCE - natural language caused unhandled new failures",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "10 STOP - a serious safety/privacy/isolation/audit/control failure occurred",
+      "reason": "not selected"
+    },
+    {
+      "chosen": false,
+      "option": "11 DO NOT PROCEED - the runtime is fundamentally unsuitable for natural artifacts",
+      "reason": "not selected"
+    }
+  ],
+  "options": [
+    "1  PROCEED to single-customer external shadow pilot (unconditional)",
+    "2  PROCEED to single-customer external shadow pilot WITH binding conditions",
+    "3  PROCEED but INTERNAL single-tenant natural shadow pilot first (not external)",
+    "4  DO NOT PROCEED (external) - fix utility/calibration first; gate the external pilot",
+    "5  DO NOT PROCEED - fix native ActionGate semantics first",
+    "6  DO NOT PROCEED - fix safety first",
+    "7  DO NOT PROCEED - fix auditability/explainability first",
+    "8  NOT ENOUGH EVIDENCE - insufficient natural artifacts",
+    "9  NOT ENOUGH EVIDENCE - natural language caused unhandled new failures",
+    "10 STOP - a serious safety/privacy/isolation/audit/control failure occurred",
+    "11 DO NOT PROCEED - the runtime is fundamentally unsuitable for natural artifacts"
+  ],
+  "rationale": "Safety (0 unsafe permits, all fail-closed, non-enforcing), auditability (determinism + replay), and native ActionGate preservation (0 loss) all hold on natural artifacts, and no stop condition fired - so options 5-11 are excluded. But utility does NOT transfer (85.5% over-qualification, 0% clean allow), which is proven evidence-driven rather than a defect. Exposing an external customer to a near-zero-clean-allow runtime would be low value and could misrepresent readiness, so the unconditional/external options (1-2) are not taken. The decision is OPTION 4: do NOT proceed to the external single-customer pilot yet - gate it on the utility-calibration prerequisites. The constructive next step is OPTION 3, an INTERNAL single-tenant natural shadow pilot, to gather real natural traffic and CALIBRATE the evidence stage for evidence-free text before the external pilot is re-gated."
+}

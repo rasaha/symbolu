@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "ADVERSARIAL_OBLIGATION": 100,
+    "DEVELOPMENT": 150,
+    "HELD_OUT_NATURAL": 250
+  },
+  "dataset_version": "evidence_obligation_v1",
+  "evidence_status": "SUFFICIENT",
+  "natural_available": 786,
+  "partition_sha256": {
+    "ADVERSARIAL_OBLIGATION": "416a53449c3c0a74ba2d09f1c643a1bf26fa22f535b9a8fab5d2567bdcae6867",
+    "DEVELOPMENT": "8e88d7636573dec69338d8e5f00352ec6afb5aa88cfa7bec9a07a4e97345761f",
+    "HELD_OUT_NATURAL": "26f5b73f9d2ee7d3011011c1927c68b66b7027aea919e6a4ab7eeb47e96efca1"
+  },
+  "target_total": 500
+}

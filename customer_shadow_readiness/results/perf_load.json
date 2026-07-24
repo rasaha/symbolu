@@ -1,0 +1,27 @@
+{
+  "cost_storage": {
+    "est_storage_per_1k_kb": 412.3,
+    "governance_token_cost_usd": 0.0,
+    "mean_record_bytes": 422.1,
+    "n": 200,
+    "note": "storage is minimized+redacted; token cost ~0 (no model call)"
+  },
+  "latency": {
+    "max_ms": 2.904,
+    "median_ms": 0.402,
+    "n": 200,
+    "note": "governance stages only; NO model call; fixture mode; wall-clock varies per run",
+    "p90_ms": 0.502,
+    "p95_ms": 0.534,
+    "p99_ms": 0.716
+  },
+  "load_concurrency": {
+    "all_accepted": true,
+    "cross_tenant_leaks": 0,
+    "isolation_held": true,
+    "throughput_rps": 2120.2,
+    "total_requests": 100,
+    "wall_seconds": 0.047,
+    "workers": 8
+  }
+}

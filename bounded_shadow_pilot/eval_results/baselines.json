@@ -1,0 +1,354 @@
+{
+  "baselines": {
+    "A_always_allow": {
+      "decision_mix": {
+        "DELIVER": 857,
+        "WITHHOLD": 0
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": null,
+        "recall": 0.0
+      },
+      "safety": {
+        "unsafe_deliver_any": 6,
+        "unsafe_permit": 6,
+        "unsafe_permit_rate": 0.007
+      },
+      "utility": {
+        "false_withhold": 0,
+        "false_withhold_rate": 0.0,
+        "over_qualify": 0
+      }
+    },
+    "B_always_qualify": {
+      "decision_mix": {
+        "DELIVER": 857,
+        "WITHHOLD": 0
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": null,
+        "recall": 0.0
+      },
+      "safety": {
+        "unsafe_deliver_any": 6,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 0,
+        "false_withhold_rate": 0.0,
+        "over_qualify": 851
+      }
+    },
+    "C_always_reject": {
+      "decision_mix": {
+        "DELIVER": 0,
+        "WITHHOLD": 857
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.007,
+        "recall": 1.0
+      },
+      "safety": {
+        "unsafe_deliver_any": 0,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 851,
+        "false_withhold_rate": 0.993,
+        "over_qualify": 0
+      }
+    },
+    "D_always_escalate": {
+      "decision_mix": {
+        "DELIVER": 0,
+        "WITHHOLD": 857
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.007,
+        "recall": 1.0
+      },
+      "safety": {
+        "unsafe_deliver_any": 0,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 851,
+        "false_withhold_rate": 0.993,
+        "over_qualify": 0
+      }
+    },
+    "E_random_50": {
+      "decision_mix": {
+        "DELIVER": 439,
+        "WITHHOLD": 418
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0048,
+        "recall": 0.3333
+      },
+      "safety": {
+        "unsafe_deliver_any": 4,
+        "unsafe_permit": 4,
+        "unsafe_permit_rate": 0.0047
+      },
+      "utility": {
+        "false_withhold": 416,
+        "false_withhold_rate": 0.4854,
+        "over_qualify": 0
+      }
+    },
+    "F_keyword_security": {
+      "decision_mix": {
+        "DELIVER": 838,
+        "WITHHOLD": 19
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.1579,
+        "recall": 0.5
+      },
+      "safety": {
+        "unsafe_deliver_any": 3,
+        "unsafe_permit": 3,
+        "unsafe_permit_rate": 0.0035
+      },
+      "utility": {
+        "false_withhold": 16,
+        "false_withhold_rate": 0.0187,
+        "over_qualify": 0
+      }
+    },
+    "G_keyword_claim": {
+      "decision_mix": {
+        "DELIVER": 765,
+        "WITHHOLD": 92
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0435,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 2,
+        "unsafe_permit_rate": 0.0023
+      },
+      "utility": {
+        "false_withhold": 88,
+        "false_withhold_rate": 0.1027,
+        "over_qualify": 0
+      }
+    },
+    "H_keyword_sec_and_claim": {
+      "decision_mix": {
+        "DELIVER": 852,
+        "WITHHOLD": 5
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.4,
+        "recall": 0.3333
+      },
+      "safety": {
+        "unsafe_deliver_any": 4,
+        "unsafe_permit": 4,
+        "unsafe_permit_rate": 0.0047
+      },
+      "utility": {
+        "false_withhold": 3,
+        "false_withhold_rate": 0.0035,
+        "over_qualify": 0
+      }
+    },
+    "I_length_threshold": {
+      "decision_mix": {
+        "DELIVER": 693,
+        "WITHHOLD": 164
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0305,
+        "recall": 0.8333
+      },
+      "safety": {
+        "unsafe_deliver_any": 1,
+        "unsafe_permit": 1,
+        "unsafe_permit_rate": 0.0012
+      },
+      "utility": {
+        "false_withhold": 159,
+        "false_withhold_rate": 0.1855,
+        "over_qualify": 0
+      }
+    },
+    "J_use_case_cyber": {
+      "decision_mix": {
+        "DELIVER": 759,
+        "WITHHOLD": 98
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0408,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 2,
+        "unsafe_permit_rate": 0.0023
+      },
+      "utility": {
+        "false_withhold": 94,
+        "false_withhold_rate": 0.1097,
+        "over_qualify": 0
+      }
+    },
+    "K_governed_mvc": {
+      "decision_mix": {
+        "DELIVER": 763,
+        "WITHHOLD": 94
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0426,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 2,
+        "unsafe_permit_rate": 0.0023
+      },
+      "utility": {
+        "false_withhold": 90,
+        "false_withhold_rate": 0.105,
+        "over_qualify": 0
+      }
+    },
+    "L_governed_assertion": {
+      "decision_mix": {
+        "DELIVER": 761,
+        "WITHHOLD": 96
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0417,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 92,
+        "false_withhold_rate": 0.1074,
+        "over_qualify": 759
+      }
+    },
+    "M_governed_action": {
+      "decision_mix": {
+        "DELIVER": 827,
+        "WITHHOLD": 30
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "safety": {
+        "unsafe_deliver_any": 6,
+        "unsafe_permit": 4,
+        "unsafe_permit_rate": 0.0047
+      },
+      "utility": {
+        "false_withhold": 30,
+        "false_withhold_rate": 0.035,
+        "over_qualify": 28
+      }
+    },
+    "N_governed_full_stack": {
+      "decision_mix": {
+        "DELIVER": 735,
+        "WITHHOLD": 122
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0328,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 118,
+        "false_withhold_rate": 0.1377,
+        "over_qualify": 733
+      }
+    },
+    "O_governed_full_stack_dup": {
+      "decision_mix": {
+        "DELIVER": 735,
+        "WITHHOLD": 122
+      },
+      "n": 857,
+      "review_class_small_n": {
+        "caveat": "REVIEW positive class is tiny; precision/recall are indicative, not tight",
+        "positives_in_gt": 6,
+        "precision": 0.0328,
+        "recall": 0.6667
+      },
+      "safety": {
+        "unsafe_deliver_any": 2,
+        "unsafe_permit": 0,
+        "unsafe_permit_rate": 0.0
+      },
+      "utility": {
+        "false_withhold": 118,
+        "false_withhold_rate": 0.1377,
+        "over_qualify": 733
+      }
+    }
+  },
+  "baselines_sha256": "a36d97cd9aa1f893a88f327683685e2fd2b721a5218dd6e420eadcf4726e2842",
+  "corpus_id": "natural_pilot_v1",
+  "governed_full_stack_deterministic": true,
+  "n": 857,
+  "notes": "A-J heuristic (non-governed); K-O frozen orchestrator read-only; O duplicates N as a determinism control."
+}

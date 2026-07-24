@@ -1,0 +1,116 @@
+{
+  "architectural_decision": "1 KEEP MINIMAL EVIDENCE POLICY AS A DISTINCT STAGE",
+  "decision_sha256": "807df676aa6e5bc4848df449638b7c7ab7a85bbeddcf157aebb72d98b2808100",
+  "dimension_findings": {
+    "claim_type_safety_critical": true,
+    "human_validation_missing": true,
+    "invariants_marginal_on_this_data": true,
+    "monotonic": true,
+    "safe": true,
+    "useful": true,
+    "within_budget": true
+  },
+  "nulls": {
+    "H0-10_unsafe_action": {
+      "note": "0 action unsafe allows",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-11_review_burden_excessive": {
+      "note": "review rate 0.096 < 0.25",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-12_reviewers_cannot_agree": {
+      "note": "no real reviewers available",
+      "null_rejected": false,
+      "verdict": "NOT_EVALUATED"
+    },
+    "H0-13_rich_outperforms": {
+      "note": "minimal 0 total unsafe vs rich 85 - minimal safer at similar clean",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-14_global_threshold_as_good": {
+      "note": "global threshold 75+ unsafe",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-15_exceeds_complexity_budget": {
+      "note": "12 policy-logic rules <= 20",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-16_pilot_too_conservative": {
+      "note": "internal pilot clean allow 0.50 > 0.20",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-17_external_readiness_blocked": {
+      "note": "human validation NOT EVALUATED -> external readiness blocked",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-1_risk_only_as_good": {
+      "note": "risk-only 52 unsafe vs minimal 0 - modifiers earn use",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-2_claim_type_no_utility": {
+      "note": "claim-type is safety-critical (ablation adds 43 unsafe)",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-3_source_role_no_utility": {
+      "note": "RETAINED: source role is not a load-bearing modifier here",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-4_anti_self_verification_no_safety": {
+      "note": "RETAINED (nuanced): invariants add 0 MARGINAL safety on this set (modifiers already catch the traps); retained as classification-independent insurance - a cleaner isolation is future work",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-5_monotonicity_no_safety": {
+      "note": "monotonicity holds (0/528) and prevents the burden-stripping downgrades error-prop shows are dangerous",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-6_review_fallback_no_value": {
+      "note": "RETAINED: review fallback (M) equals Full on metrics here - 0 marginal",
+      "null_rejected": false,
+      "verdict": "RETAINED"
+    },
+    "H0-7_no_clean_improvement": {
+      "note": "0% -> 50% clean allow",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-8_no_over_qual_reduction": {
+      "note": "85.5% -> 0%",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    },
+    "H0-9_unsafe_high_risk": {
+      "note": "0 high-risk unsafe allows",
+      "null_rejected": true,
+      "verdict": "REJECTED"
+    }
+  },
+  "nulls_rejected": 12,
+  "nulls_retained_or_ne": 5,
+  "nulls_total": 17,
+  "pilot_decision": "B PROCEED TO INTERNAL SINGLE-TENANT PILOT",
+  "separated_dimensions": {
+    "architectural_need": "a small distinct obligation stage is justified (uniform/global/rich all fail)",
+    "complexity": "12 policy-logic rules (<=20); minimum viable safe = risk+claim+temporal+action",
+    "external_pilot_readiness": "BLOCKED (human validation missing)",
+    "internal_pilot_readiness": "READY (bounded, non-enforcing, audited)",
+    "latency": "sub-ms, stdlib-only, deterministic",
+    "metadata_burden": "risk + claim-type are the load-bearing metadata",
+    "production_readiness": "NOT established",
+    "reviewer_evidence": "NOT EVALUATED (no real reviewers); proxy only",
+    "safety": "0 unsafe high-risk/action, 0 self-verification escapes, monotonic",
+    "utility": "clean allow 0% -> 50%, over-qualification 85.5% -> 0%"
+  }
+}

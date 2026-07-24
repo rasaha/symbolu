@@ -1,0 +1,110 @@
+{
+  "ablation_sha256": "1dcda5ed204e1c93b330183a6b1d1e243ff620ed81aff1bed738a6432b0c00cf",
+  "ablations": {
+    "actionability": {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.5,
+      "clean_delta": 0.0,
+      "held_unsafe_allow": 0,
+      "safety_critical": false,
+      "unsafe_delta": 0,
+      "utility_critical": false
+    },
+    "claim_type": {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.716,
+      "clean_delta": 0.216,
+      "held_unsafe_allow": 43,
+      "safety_critical": true,
+      "unsafe_delta": 43,
+      "utility_critical": false
+    },
+    "invariants": {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.5,
+      "clean_delta": 0.0,
+      "held_unsafe_allow": 0,
+      "safety_critical": false,
+      "unsafe_delta": 0,
+      "utility_critical": false
+    },
+    "risk_floor": {
+      "adversarial_unsafe_allow": 6,
+      "clean_allow_rate": 0.5,
+      "clean_delta": 0.0,
+      "held_unsafe_allow": 0,
+      "safety_critical": true,
+      "unsafe_delta": 6,
+      "utility_critical": false
+    },
+    "temporal": {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.5,
+      "clean_delta": 0.0,
+      "held_unsafe_allow": 0,
+      "safety_critical": false,
+      "unsafe_delta": 0,
+      "utility_critical": false
+    }
+  },
+  "complexity_comparators": {
+    "full_minimal": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 24,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0
+    },
+    "rich_component": {
+      "adversarial_unsafe_allow": 69,
+      "approx_rules": 90,
+      "clean_allow_rate": 0.488,
+      "held_unsafe_allow": 16
+    },
+    "risk+actionability": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 6,
+      "clean_allow_rate": 0.716,
+      "held_unsafe_allow": 43
+    },
+    "risk+anti_self_verification": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 17,
+      "clean_allow_rate": 0.716,
+      "held_unsafe_allow": 43
+    },
+    "risk+claim+temporal+action": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 12,
+      "clean_allow_rate": 0.5,
+      "held_unsafe_allow": 0
+    },
+    "risk+claim_type": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 12,
+      "clean_allow_rate": 0.536,
+      "held_unsafe_allow": 9
+    },
+    "risk_only": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rules": 5,
+      "clean_allow_rate": 0.752,
+      "held_unsafe_allow": 52
+    }
+  },
+  "full_minimal": {
+    "adversarial_unsafe_allow": 0,
+    "clean_allow_rate": 0.5,
+    "held_unsafe_allow": 0
+  },
+  "minimum_viable_safe_policy": "risk+claim+temporal+action",
+  "redundant_on_this_data": [
+    "temporal",
+    "actionability",
+    "invariants"
+  ],
+  "safety_critical_elements": [
+    "risk_floor",
+    "claim_type"
+  ],
+  "utility_critical_elements": []
+}

@@ -1,0 +1,187 @@
+{
+  "corpus": "ci_corpus_v1",
+  "n_examples": 832,
+  "n_gold_claims": 1144,
+  "results": [
+    {
+      "avg_claims_per_output": 1.0,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.375,
+      "method": "A_preserve_whole",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.094,
+      "method": "B_sentence_split",
+      "model_calls": 0,
+      "rule_count": 1,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.781,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.406,
+      "method": "C_clause_split",
+      "model_calls": 0,
+      "rule_count": 2,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "spaCy/parser (unavailable -> local approx)",
+      "fragile_preservation_rate": 0.2981,
+      "mean_claim_count_error": 0.094,
+      "method": "D_dependency",
+      "model_calls": 0,
+      "rule_count": 5,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "SRL model (unavailable -> local approx)",
+      "fragile_preservation_rate": 0.2981,
+      "mean_claim_count_error": 0.094,
+      "method": "E_srl",
+      "model_calls": 0,
+      "rule_count": 5,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.781,
+      "external_deps": "OpenIE (unavailable -> local approx)",
+      "fragile_preservation_rate": 0.4572,
+      "mean_claim_count_error": 0.406,
+      "method": "F_openie",
+      "model_calls": 0,
+      "rule_count": 5,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.781,
+      "external_deps": "none (local approx)",
+      "fragile_preservation_rate": 0.4572,
+      "mean_claim_count_error": 0.406,
+      "method": "G_rule_spo",
+      "model_calls": 0,
+      "rule_count": 5,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.094,
+      "method": "H_citation_aware_split",
+      "model_calls": 0,
+      "rule_count": 2,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "LLM (no live calls -> deterministic sim)",
+      "fragile_preservation_rate": 0.8558,
+      "mean_claim_count_error": 0.094,
+      "method": "I_llm_simple",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "LLM (no live calls -> deterministic sim)",
+      "fragile_preservation_rate": 0.8767,
+      "mean_claim_count_error": 0.094,
+      "method": "J_llm_schema",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "LLM (no live calls -> deterministic sim)",
+      "fragile_preservation_rate": 0.889,
+      "mean_claim_count_error": 0.094,
+      "method": "K_llm_selfcheck",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "LLM+rules (no live calls -> deterministic sim)",
+      "fragile_preservation_rate": 0.8977,
+      "mean_claim_count_error": 0.094,
+      "method": "L_hybrid",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": true
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.094,
+      "method": "M_equivalence_filter",
+      "model_calls": 0,
+      "rule_count": 2,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.156,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.219,
+      "method": "N_minimal_split",
+      "model_calls": 0,
+      "rule_count": 3,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.781,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 0.9091,
+      "mean_claim_count_error": 0.406,
+      "method": "O_aggressive_split",
+      "model_calls": 0,
+      "rule_count": 2,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 1.0,
+      "mean_claim_count_error": 0.094,
+      "method": "P_claim_integrity",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.375,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 1.0,
+      "mean_claim_count_error": 0.0,
+      "method": "Q_oracle",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": false
+    },
+    {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "trained extractor (unavailable -> fixed-rule sim)",
+      "fragile_preservation_rate": 0.8304,
+      "mean_claim_count_error": 0.094,
+      "method": "R_learned_comparator",
+      "model_calls": 0,
+      "rule_count": 4,
+      "simulated": true
+    }
+  ]
+}

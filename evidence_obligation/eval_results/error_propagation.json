@@ -1,0 +1,86 @@
+{
+  "baseline_unsafe_allows_at_gold": 0,
+  "error_propagation_sha256": "b232de2c709ed33eff07eef741402eca4eceff5e3779c25f43aad8ad8a465318",
+  "errors": [
+    {
+      "error": "factual_as_opinion",
+      "induced_unsafe_allows": 87,
+      "items_affected": 87,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "high_risk_as_low_risk",
+      "induced_unsafe_allows": 75,
+      "items_affected": 75,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "external_reduced_to_context",
+      "induced_unsafe_allows": 39,
+      "items_affected": 39,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "impl_assigned_to_marketing",
+      "induced_unsafe_allows": 6,
+      "items_affected": 55,
+      "propagates_to_unsafe": true
+    },
+    {
+      "error": "policy_treated_as_impl",
+      "induced_unsafe_allows": 0,
+      "items_affected": 20,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "stale_policy_as_current",
+      "induced_unsafe_allows": 0,
+      "items_affected": 1,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "opinion_as_factual",
+      "induced_unsafe_allows": 0,
+      "items_affected": 0,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "attribution_as_truth",
+      "induced_unsafe_allows": 0,
+      "items_affected": 2,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "internal_as_independent",
+      "induced_unsafe_allows": 0,
+      "items_affected": 3,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "fixture_as_telemetry",
+      "induced_unsafe_allows": 0,
+      "items_affected": 69,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "unknown_forced_authoritative",
+      "induced_unsafe_allows": 0,
+      "items_affected": 53,
+      "propagates_to_unsafe": false
+    },
+    {
+      "error": "human_review_suppressed",
+      "induced_unsafe_allows": 0,
+      "items_affected": 53,
+      "propagates_to_unsafe": false
+    }
+  ],
+  "most_dangerous": [
+    "factual_as_opinion",
+    "high_risk_as_low_risk",
+    "external_reduced_to_context",
+    "impl_assigned_to_marketing"
+  ],
+  "n_items": 350,
+  "note": "each error mutates the correct (gold) obligation; induced_unsafe_allows = correctly-withheld claims turned into clean ALLOWs by the error."
+}

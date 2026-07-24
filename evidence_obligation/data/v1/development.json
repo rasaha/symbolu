@@ -1,0 +1,2914 @@
+[
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-003073135bbf4e02",
+    "claim_family": "code_behavior",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/target_encoder.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Forward pass through target encoder.\n\nNote: This is wrapped in no_grad since target encoder\nshould never receive gradients.\n\nArgs:\n    x: Input tensor\n    **kwargs: Additional arguments passed to encoder\n\nReturns:\n    Encoded representation",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-00b8d90020c26405",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Update world state from observations.\n\nArgs:\n    variable_embeds: [B, V, D] variable embeddings\n    existence_probs: [B, V] existence probabilities\n    variables: List of variable names\n\nReturns:\n    Updated WorldState",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-00d124b36330fc42",
+    "claim_family": "financial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/trading_model_comparison.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Simulates EMA-based trading model behavior.\n\nCharacteristics:\n- Fixed learning rate (\u03b1)\n- Point estimates only\n- No uncertainty measure\n- Linear adaptation",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0126de8ece8fb5ef",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Lambda_ladder: band insulation to prevent collapse.\n\nWhen heads in different bands produce too-similar outputs\n(low inter-band divergence = collapse risk), suppress routing\nto coarse path, forcing full attention to preserve band specialization.\n\nCorrected sign logic:\n    Collapse risk = bands becoming indistinguishable\n    Low divergence = high similarity = collapse risk\n\n    Lambda = exp(-kappa * max(0, tau_collapse - Delta_band))\n\nWhen Delta_band < tau_collapse (bands too similar):\n    Lambda decreases -> pi* decreases -> more full attention\n\nWhen Delta_band >= tau_collapse (bands well-separated):\n    Lambda = 1 -> no suppression -> routing proceeds normally",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-01351896dfd00509",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/predictor.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Predict k-step state deltas.\n\nArgs:\n    s_context: Context state [B, T, 32] or [B, 32]\n    k_steps: Number of prediction steps (default: self.prediction_steps)\n    return_intermediates: If True, return intermediate states\n\nReturns:\n    s_pred: Final predicted state [B, T, 32] or [B, 32]\n    delta_list: List of predicted deltas [\u0394S\u2081, \u0394S\u2082, ..., \u0394S\u2096]",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-013f85d1bd592375",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/moe_ffn.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Benchmark utilities for MoE FFN.\n\nCompares dense vs MoE FFN on:\n- Throughput (tokens/sec)\n- Memory usage\n- Quality (loss/accuracy)\n- Expert utilization",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-01fbc6e5f86ba959",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/hp_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Benchmark utilities for HP-Quad.\n\nCompares standard vs hierarchical processing on:\n- Throughput\n- Boundary detection quality\n- Memory efficiency\n- Long-range dependency handling",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-020cdb884dd397e4",
+    "claim_family": "code_behavior",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/constraints.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Reference HardConstraintEvaluator with NO constraints configured.\n\nReturns an empty result set for every candidate. Composed with the selector\nthis proves the fail-closed path: no hard evidence => not admissible =>\n``NO_SAFE_ACTION`` (never a permissive default). It never authorizes.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0225bb7301b0d3d2",
+    "claim_family": "recommendation",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Set a global phase rotation to apply to \u03c6_k.\n\nFor Protected Phase / Binding Cache, we rotate \u03c6_k (not \u03c6_q) because:\n- Protected Phase uses \u03c6_k for memory accumulation (cumsum)\n- There is no \u03c6_q in this architecture (Quadratic handles queries)\n\nThis tests whether phase encodes relational structure:\n- If roles are phase-encoded in keys, rotating \u03c6_k should disrupt retrieval\n- If phase is decorative, rotation should have minimal effect\n\nArgs:\n    angle_radians: Rotation angle in radians (e.g., \u03c0/4 = 45\u00b0)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-02812f69c4f418e2",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/inspect_generation.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Determine which Symbol-U patent algorithms actually participate in generation.\n\nNOT a quality/accuracy/benchmark test. The only goal: for each patent algorithm,\ndecide whether it is connected, executed, changes hidden states, changes logits,\nchanges the generated tokens, or is an effective no-op / not connected.\n\nMethod:\n1. Trace one instrumented forward over the clean_softmax `full` model: record\n   per-module execution order, input/output shapes, and whether each module\n   changes the hidden state (residual L2) and the logits (vs module-off).\n2. Reference autoregressive generation with fixed (prompt, seed, temp, top_k,\n   top_p). Then ABLATE one module at a time (forward-time pass-through / nulled\n   entropy) and regenerate with identical settings; diff the token sequences.\n3. Classify every listed patent algorithm (including those not wired into this\n   pipeline) and print counts + the final answer.\n\nRun (after training a `full` checkpoint, see README):\n    python -m symbolu_neural.clean_softmax.inspect_generation --ckpt runs/clean/full/ckpt.pt",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-028e88ea052805b3",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "symbolu_neural/clean_softmax/CAPACITY_MATCHED_CONTROL_REPORT.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# Capacity-Matched Controls \u2014 Do the Active Symbol-U Mechanisms Learn Anything a Plain Transformer Cannot?\n\n**Research question (adversarial; not a benchmark, not the patent):** do the three\nactive Symbol-U mechanisms learn a computational behavior that a standard\nTransformer cannot reproduce with the **same parameters and FLOPs**?\n\n**Design.** Each Symbol-U mechanism is trained in its *earned-best* config\n(combined mode: contribution + residual-reg + entropy-cal) and compared to a\ncontrol with \u2248equal params **and** FLOPs, identical dataset/optimizer/lr/batch/\nseed/steps:\n\n| Symbol-U mechanism | Capacity-matched control | What it isolates |\n|---|---|---|\n| Recursive refinement (entropy-gated block \u00d73) | `RecurrentPlainRefine`: the **same shared block applied 3\u00d7**, no entropy / halting / gated-delta | only the gating machinery |\n| Deferred-Insight memory (causal prefix-summary) | `PointwiseMemoryControl`: pointwise residual FFN, params \u2248 d\u00b2 | cross-time summary vs plain pointwise capacity |\n| Full Symbol-U (refine + memory) | `recur_plain` + `mem_control` together | the whole stack vs equal capacity |\n\nReproduce: `python -m symbolu_neural.clean_softmax.run_capacity_study --steps 300\n--block 96` (and `--seed 1`). CPU, char-level, d=128, 2 layers.\n\n## Results \u2014 two seeds (val loss; lower is better)\n\nParams and FLOPs are matched to within ~0.4 % per pair (e.g. refine 825k/1.46\nMFLOP vs control 822k/1.46 MFLOP).\n\n| Mechanism | Symbol-U (s0 / s1) | Control (s0 / s1) | \u0394(S\u2212C) s0 / s1 | Verdict |\n|---|---|---|---|---|\n| Recursive refinement | 2.936 / 2.902 | **2.857 / 2.793** | **+0.078 / +0.109** | control wins **both** |\n| Deferred-Insight memory | 2.944 / 2.894 | 2.925 / 2.897 | +0.020 / \u22120.003 | tie-to-worse |\n| Full Symbol-U | 2.855 / **3.069** | 2.881 / **2.796** | \u22120.026 / **+0.273** | high-variance; avg worse |\n\nFull per-run summary (seed 0):\n\n| run | val_loss | ppl | ece | params | MFLOP/tok | ms/step |\n|---|---|---|---|---|---|---|\n| baseline | 2.947 | 19.05 | 0.0",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-02909f612a089c41",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/constraint_library.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "STOP/HOLD-type actions are inherently admissible (cannot collide).\n\nJustified from semantics: an emergency stop / hold reduces kinetic risk and\nis the safe posture. This lets a call site always retain a safe fallback\nrather than spuriously returning REQUEST_MORE_OBSERVATION when only a stop\nis available.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0314a8f00512b6c3",
+    "claim_family": "process_description",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/pcam_compare_baselines.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Drive PCAM's ``KVCachePolicy`` through the same trace via\n``simulator.pcam.trace.replay`` and collect the same metric shape\nthe baselines produce.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-033bee0b414901ff",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/adversarial_hardening.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Subspace Alignment: Prevents \"rotation attacks\" on Phase-Lock.\n\nInstead of just checking Tr(R_int \u00b7 R_ext^T), we verify that:\n1. The Pram\u0101\u1e47a (truth) subspace in R_internal aligns with\n2. The Assertion (certainty) subspace in R_external\n\nThis prevents the model from learning a rotation that satisfies\nthe Trace threshold while misaligning the SEMANTIC content.\n\nMethod: Principal Angles between subspaces\n- Extract top-k eigenvectors from each R matrix\n- Compute canonical correlations between subspaces\n- Alignment = min(cos(\u03b8_i)) for all principal angles \u03b8_i",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0407464fb08dff52",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/interfaces.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Deterministic posture machine.\n\ninputs: target posture + event/reason (+ operator for manual resets).\noutputs: an immutable ``TransitionRecord``.\ndeterminism: fixed legal-transition table.\nboundedness: O(1) transition.\nfailure: raise ``IllegalTransitionError`` on an illegal or ungated move.\nsafety_critical: YES.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-048e5cb8032e52ae",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/run_recall_study.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Does Deferred-Insight memory have a STRUCTURAL advantage over a pointwise FFN\non a task that requires long-range cross-time aggregation?\n\nThe capacity study found memory ~ FFN on the LM task \u2014 but that backbone has full\ncausal attention, which already provides cross-time mixing, making the memory\nredundant there. This experiment ISOLATES the modules: NO attention. Each mini-model\nis  embedding -> [module] -> linear head. The only cross-time mechanism is the module\nitself, so the task cleanly separates \"can aggregate across time\" from \"cannot\".\n\nTask \"running_majority\": per-position binary label = 1 if (#ones so far >= #zeros so\nfar) else 0, over a stream of 0/1 (+filler). This needs the WHOLE prefix; a pointwise\nFFN (no time mixing) must score ~chance; the memory's causal decayed prefix-mean is\nstructurally suited to it; an attention block can also do it (reference upper bound).\n\nRun:  python -m symbolu_neural.clean_softmax.run_recall_study --steps 600",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-04f76a0674f0f2ba",
+    "claim_family": "recommendation",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/phoneme_space_benchmark.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Measures theoretical consistency of Guna mappings.\n\nTests:\n- Vowels should be Sattva-dominant (clarity, openness)\n- Stops should be Tamas-dominant (obstruction)\n- Fricatives should have high Rajas (turbulence)\n- Voiced sounds should have more Rajas than voiceless\n- Sonorants should be more Sattvic than obstruents\n- Guna should be normalized (sum to 1)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TEMPORAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-05c9aa51dbb88d92",
+    "claim_family": "temporal",
+    "gold_obligation": "TEMPORAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/reflective_phase_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Extended phase state for self-reflective generation.\n\nContains standard Phase-Quad state plus reflective extensions\nfor tracking confidence, revision history, and focus areas.\n\nAttributes:\n    content_memory: [B, N, D] - accumulated content from generation\n    binding_cache: [B, K, D] - quad retrieval cache (optional)\n    confidence: [B, 1] - current confidence estimate\n    revision_count: [B, 1] - number of revisions performed\n    quality_history: [B, max_revisions] - past quality scores\n    previous_attempts: List of previous output tensors\n    revision_mode: [B, 1] - 0=generate, 1=minor_revise, 2=major_revise\n    focus_mask: [B, N] - which positions need revision attention",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0603c9e61ad9d9b2",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Differentiable acyclicity constraint using NOTEARS.\n\nThe constraint h(W) = tr(e^(W\u2218W)) - d = 0 iff W is a DAG.\n\nThis allows gradient-based learning of DAG structure while\nmaintaining the acyclicity property.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-07011c609d00369a",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/dha_expression.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Tracks user's cognitive state across conversation turns.\n\nUses v2.7 State Evolution mechanism:\n    user_vritti_{t+1} = (1 - \u03b1) \u00b7 user_vritti_t + \u03b1 \u00b7 content_vritti_t\n\nThis allows the system to remember:\n- User was skeptical 2 turns ago (Viparyaya)\n- User has been confused throughout (Vikalpa)\n- User is becoming more receptive (Pram\u0101\u1e47a increasing)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-071ba05d4f118a63",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm_streaming.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Phase 4B: convert CLI/driver pin args into a list of\n``PinSpec`` objects.\n\nTwo input sources are supported (union semantics):\n  * ``self.pin_first_n_blocks`` (int): if > 0, produces a\n    single positional PinSpec.\n  * ``self.pin_tokens_file`` (Path): if set, reads a JSON\n    file containing one or more pin specs. Each entry is a\n    dict with ``name`` plus exactly one of ``token_ids`` /\n    ``first_n_blocks_per_request``.\n\nReturns ``[]`` when neither source is configured \u2014 the\ninstall proceeds with no PinSpecs (allocate-wrap still runs\nbut pins nothing; the evictor wrap is a structural no-op).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0723c62e50140c55",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Implements three-step counterfactual reasoning:\n1. Abduction: Infer latents from evidence\n2. Action: Apply intervention\n3. Prediction: Compute counterfactual outcome",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-07abd568c8ed14f1",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "symbolu_neural/complementarity_probe/MIGRATION_NOTE.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# Migration Note \u2014 complementarity_probe vs the older detector files\n\n**Decision deferred. Do not delete anything yet.**\n\n## Why this directory exists\n\nThe older Symbol-U work lives in `symbolu_neural/clean_softmax/` (the \"detector\nfiles\": grounding probes, capacity studies, typed-head ablations, generation\ninstrumentation). It judged Symbol-U primarily by **next-token prediction inside\na Transformer** and built machinery to *use* the variables before establishing\nthere was anything to use.\n\n`SYMBOL_U_RESEARCH_STRATEGY.md` (in `clean_softmax/`) concluded that was a\ncategory error: the first question is **measurement** \u2014 does `U` carry semantic\nsignal complementary to `E`? \u2014 not generation utility. This directory is the\nclean-room implementation of that measurement, isolated so it can be evaluated on\nits own merits.\n\n## Isolation guarantees\n\n- This package imports **only** `symbolu_core.formulas.*` (the real, shared\n  mappers) and standard libs (`numpy`, optional `torch`/`transformers`).\n- It does **not** import, modify, or depend on anything under\n  `clean_softmax/`, the Hybrid Phase / Sovereign / JEPA code, or\n  `train_unified_llm.py`.\n- Nothing outside `symbolu_neural/complementarity_probe/` is changed by this work.\n\n## Canonical status\n\n| path | status |\n|---|---|\n| `symbolu_neural/clean_softmax/` (detector files) | **CANONICAL** \u2014 keep until this path proves itself |\n| `symbolu_neural/complementarity_probe/` (this) | **EXPERIMENTAL** \u2014 replacement candidate |\n\n## The later decision (NOT made now)\n\nAfter a real `--embeddings hf` run of exp2 (and, if it passes, exp1's CONTINUE\nbranch), choose one of:\n\n1. **Keep new path** \u2014 promote `complementarity_probe/` to canonical; the old\n   detector files may then be deleted *if* nothing else depends on them.\n2. **Delete older detector files** \u2014 only once (1) is decided and dependencies\n   are checked.\n3. **Merge selected pieces** \u2014 e.g. keep the old grounding harness (`run_grounding.py`)\n   as the gate-1/existence probe an",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-081854fd8e80822b",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "relationship_claim_validation/metrics.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "A/B agreement proxy: fraction of claims that did NOT require adjudication\n(Judge C) among those where both judges ran. Also counts adjudications.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-082465b1a0f60b7e",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/state_projector.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Extract a specific component from the Sovereign State.\n\nArgs:\n    S: Sovereign State [B, ..., 32]\n    component: One of 'bhava', 'kosha', 'vritti', 'guna', 'reserved'\n\nReturns:\n    Component tensor",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-087581d0b8ccf3e8",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/metrics.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Roll a list of results into a dict structured for JSON\noutput. Top level keys: 'cells' (list of per-result dicts)\nplus 'pairs' (list of (workload, baseline=lru) \u2192 CTM+ deltas).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-09247e6df2742cf4",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/state_projector.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Apply normalization constraints per plane (Pancha Kosha).\n\nAnnamaya (Physical):      Bhavas  \u2192 softmax (one dominant identity)\nPranamaya (Governance):   Koshas  \u2192 sigmoid (independent) or softmax (legacy)\nVijnanamaya (Intellectual): Vrittis \u2192 softmax (one dominant cognitive mode)\nAnandamaya (Abstract):    Gunas   \u2192 sigmoid (independent activations [0,1])\nLearning:                 Reserved \u2192 tanh (bounded feedback [-1,1])",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-096d46085272598d",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/train.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Train a single ablation and save a checkpoint.\n\npython -m symbolu_neural.clean_softmax.train --corpus data/clean_lm/corpus.txt         --ablation entropy_refine --steps 300 --out runs/clean/entropy_refine",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-09d54c1b9402fbc4",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognitive_state.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute ontological state delta loss.\n\nThis is richer than simple MSE - it includes ontological constraints.\n\nArgs:\n    state_sequence: [B, T, state_dim] sequence of states\n\nReturns:\n    loss: Total loss\n    metrics: Dict of component losses",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0a2ebf6740626984",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "cer_v0_3/cleanroom/canon.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Clean-room JCS (RFC-8785) + Action-Profile canonicalizer.\n\nIndependent reimplementation from the published specification\n(ACTION_CANONICALIZATION_AND_HASHING_SPEC.md \u00a72, \u00a77). Reproduces the exact byte\nstream the reference produces, but shares no code with it.\n\nAction Profile (as specified):\n  * UTF-8 output, no BOM, no insignificant whitespace.\n  * Object member names sorted by UTF-16 code-unit order (== UTF-16-BE byte order).\n  * JSON string escaping: the seven short escapes plus \\u00XX for other C0 controls;\n    all other characters emitted literally (no \\uXXXX expansion of non-ASCII).\n  * NO bare JSON numbers in authorization payloads -> reject. Every numeric is a\n    typed string upstream.\n  * Arrays keep declaration order EXCEPT schema-declared \"set\" paths, which are\n    order-independent (canonical children sorted) and reject duplicate elements.\n  * NFC is validated (never rewritten) on schema-declared paths.\n  * Duplicate object keys and non-finite floats are rejected.\n\nUses only the Python standard library.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0a770d02ce82897f",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/metrics.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Metric rollup for benchmark runs.\n\nThe runner produces a :class:`RunResult` per (workload, policy)\ncell. :func:`summarize` rolls a list of results into a JSON\nblob suitable for pinning in CI; :func:`markdown_table` produces\nthe human-readable cell intended for the pitch deck.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0a9c4481cb91645f",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/transformer_setup.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Register model layers for inference with weight offloading.\n\nArgs:\n    model: PyTorch nn.Module with transformer layers.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0aa56030f2dd2236",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/__init__.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Agentic \u2014 Governance and integration layer for Symbolu.\n\nThis package contains the agentic AI governance framework and the\nintegration modules that bridge governance decisions with the reasoning\nsubstrate (symbolu_core).\n\nCORE modules:\n  - agentic_framework: Safety contracts, MCP gateway, confidence gate\n  - safety: GCC runtime guard, static scanner\n  - policy: Policy engine, session policy, domain profiles\n  - posture: Posture classification and management\n  - ledger: Immutable audit ledger, replay verifier\n\nINTEGRATE modules:\n  - entropy, core, identity, motivation, sovereign, inference,\n    chitta_vritti, temporal, guna_modulation, dha, llm, api",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0ab411e65272fbed",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/complementarity_probe/exp2_incremental.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Experiment 2 \u2014 Incremental information: does `E + U` beat `E`?\n\nThe core complementarity measurement (SYMBOL_U_RESEARCH_STRATEGY.md \u00a78.2-3). On a\nlabeled semantic task, train a cross-validated linear probe on:\n\n    E            (Transformer sentence embedding alone)\n    E + U        (embedding ++ Symbol-U vector)\n    E + null     for every null (shuffled U, random, surface, phonological)\n\n`U` earns complementary value ONLY if `E+U` beats `E` AND beats every `E+null`.\nIf a random/surface/phonological stream helps as much, the gain was generic\ncapacity or a confound \u2014 not the Symbol-U ontology.\n\nIMPORTANT \u2014 backend caveat: a real conclusion requires the `hf` embedding\nbackend (a genuine semantic encoder). The default `hashing` backend is a\nnon-semantic, offline stand-in so the harness/smoke test runs without network or\na downloaded model; numbers on it validate the PIPELINE, not the hypothesis.\nThis is enforced/loud in the output.\n\nRun (smoke, offline):  python -m symbolu_neural.complementarity_probe.exp2_incremental\nRun (real):            ... --embeddings hf   (needs HF hub access)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TEMPORAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0b0b6792ca644ea7",
+    "claim_family": "temporal",
+    "gold_obligation": "TEMPORAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/augment.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Vectorized causal decayed prefix mean (same computation as the old\nO(L) python loop, no semantic change). mem[t] = sum_{s<t} (1-decay)\ndecay^{t-1-s} v[s], strictly causal (excludes current position). Stable\nfor L up to a few hundred (decay^{-t} stays bounded).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0b40f61dd9edde6a",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Run a WorkloadSpec through a real model via vLLM.\n\nThe cache pressure is created by clamping\n``gpu_memory_utilization`` low enough that the working set\nspills past HBM into ``swap_space`` (CPU pinned memory backed\nby NVMe-mmap when the OS chooses to swap).\n\nFor ``policy_name = \"ctm_plus\"``, we patch vLLM's engine via\nthe existing :func:`kv_policy.vllm_evictor.patch_vllm_engine`\nso KV-cache eviction goes through the production CTM+\nscoring math. For ``\"lru\"`` and ``\"fifo\"``, we leave vLLM's\ndefault block manager alone (vLLM's default is roughly LRU);\na true FIFO baseline would require a separate patch (TODO).",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0c4e69282b44c65b",
+    "claim_family": "mathematical",
+    "gold_obligation": "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/use/baselines.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Standard confidence baselines computed per query (read-only, no ground truth).\n\nUSE must beat these to have value. All are oriented so that HIGHER = more confident (i.e. lower\npredicted failure probability); the failure-detection orientation is handled in evaluation.\n\n  token_prob      max softmax probability of the predicted answer token\n  logprob         log of token_prob\n  neg_entropy     - Shannon entropy of the output distribution  (higher = more peaked)\n  margin          top1 - top2 output probability\n  seq_confidence  mean token_prob over all query positions in the same sequence\n  attn_neg_entropy - mean (over heads) entropy of the Quad attention distribution at the query\n  random          a fixed random score (chance-level control)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0d06465d69d9c879",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/generate.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Generation smoke test for the clean-softmax Symbol-U model.\n\nLoads a trained checkpoint and generates text autoregressively. This ONLY checks\nthat the model can load and emit tokens end-to-end. It is not a quality benchmark\nand makes no claim of improvement over any baseline.\n\nExample:\n    # train a tiny checkpoint first (see README), then:\n    python -m symbolu_neural.clean_softmax.generate         --ckpt runs/clean/full/ckpt.pt --prompt \"The model \"         --max-new-tokens 200 --temperature 0.8 --top-k 40 --seed 0",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0d22810939171e77",
+    "claim_family": "code_behavior",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognade_complete.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute adaptive decay rate from V\u1e5btti distribution.\n\nArgs:\n    vritti: [B, T, 5] or [B, 5] V\u1e5btti probabilities\n\nReturns:\n    alpha: [B, T] or [B] weighted decay rate",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0d8a92379216d9a5",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/use/dataset.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "The required evaluation suite (MQAR-scoped analogs of the prompt's dataset families).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0e299778b52c9d70",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognitive_state.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Predicts state deltas in structured CognitiveState space.\n\nThis is the Tier 3 equivalent of StateDeltaPredictor (Tier 2).\n\nKey difference:\n- Tier 2: Predicts delta in opaque 768-dim hidden space\n- Tier 3: Predicts delta in structured 124-dim meaning space\n\nTraining signal:\n    L = MSE(\u0394S_pred, \u0394S_actual)\n      + ontology_violation_penalty\n      + coherence_drift_penalty\n      + entropy_mismatch_penalty",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0e74cfbc139c6b02",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Collect all captured phi_q tensors from PhaseAttentionLayer modules.\n\nArgs:\n    model: Model containing PhaseAttentionLayer modules\n\nReturns:\n    List of phi_q tensors [B, N, H, D_h] from each layer",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0e867aea040fdae5",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/inference_rag.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Extract Sovereign State information from model output.\n\nHandles various output formats and provides graceful error handling.\n\nArgs:\n    model_output: Dictionary from model.forward()\n    logits_key: Key for logits tensor\n    state_key: Key for state tensor\n\nReturns:\n    SovereignStateInfo with extracted components, or None if extraction fails",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0e9049816584a369",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Standard O(n\u00b2) Transformer for comparison.\n\nSame architecture as PhaseTransformer but with standard attention.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0ea7bc36a5557b8a",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/transformer_setup.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Unified configuration for CTM+ transformer integration.\n\nCovers all backends and workloads. Use the class methods on\nCTMTransformerSetup for preset configurations.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0eb53fa9b0a99a46",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Extracts variable-level representations from token embeddings.\n\nIdentifies entities/concepts in text and creates variable embeddings\nfor the causal graph.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0ee348eed7aff6c5",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/dha_expression.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "DHA Expression Controller\n=========================\n\nImplements Google's insight: DHA as the \"Expression Controller\" that modulates\nHOW understanding is delivered based on USER state, not just content.\n\nKey Insight:\n------------\n- Internal State-Delta determines WHAT the system understands\n- DHA Expression determines HOW that understanding is delivered\n- Uses the SAME Chitta-Vritti framework, applied to USER state with temporal tracking\n\nArchitecture:\n-------------\nSingle-turn: Content Vritti = User Vritti (no history)\nMulti-turn:  Content Vritti \u2260 User Vritti (accumulated over conversation)\n\nThis module reuses:\n- v2.7 State Evolution for temporal tracking: \u03b8_{t+1} = (1-\u03b1)\u00b7\u03b8_t + \u03b1\u00b7\u03b8*_t\n- v2.8 Chitta-Vritti for cognitive mode detection\n- BidirectionalGunaMapper for expression style (Sattvic/Rajasic/Tamasic delivery)\n\nUsage:\n------\n    from symbolu_extensions.experimental import UserStateTracker, DHAExpressionModulator\n\n    # Track user state over conversation\n    user_tracker = UserStateTracker(decay_rate=0.4)\n\n    # Each turn: update user state from content Vritti\n    user_vritti = user_tracker.update(content_vritti)\n\n    # Modulate expression based on user state\n    modulator = DHAExpressionModulator()\n    expression_delta = modulator(\n        state_delta=raw_state_delta,\n        user_vritti=user_vritti\n    )",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0eefe3b165ff4883",
+    "claim_family": "mathematical",
+    "gold_obligation": "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/use/stats.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Statistical tests for AUROC: bootstrap CIs and the DeLong test for correlated ROC curves.\n\nThe DeLong test compares two AUROCs computed on the SAME samples (USE vs baseline), accounting\nfor their correlation \u2014 the correct test for \"does USE add predictive value beyond the baseline\".",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f10fc4a69c82f6a",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/diagnostics/rip_logger.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Capture a Reality Rip event if detected.\n\nA rip is detected when Mental > threshold AND Intellect < threshold,\nindicating the model is in an \"Insanity\" state (looping without logic).\n\nArgs:\n    step: Current training step\n    tokens: Input tokens [batch, seq] or [seq]\n    kosha_states: Kosha activations [batch, seq, 5]\n    loss_value: Current gyroscope loss value\n    loss_components: Optional breakdown of axis losses\n    tokenizer: Optional tokenizer for decoding tokens\n\nReturns:\n    True if a rip was detected and captured",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f227c3628a1be7f",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/reflective_phase_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Benchmarking utilities for Reflective Phase-Quad.\n\nProvides:\n- Component benchmarks (critic, decision gate, revision encoder)\n- Integration benchmarks (full block with revision loop)\n- Comparison benchmarks (reflective vs single-pass)\n- Quality trajectory analysis",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f2e164b620662e1",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/transformer_setup.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "CTM+ Transformer Setup\n======================\n\nUnified setup for wiring CTM+ memory management into standard transformer\ntraining and inference pipelines. Provides a single entry point that\nconfigures the appropriate CTM+ backend (CUDA, vLLM, DeepSpeed, Database)\nbased on your hardware and workload.\n\nTraining example (DeepSpeed + CUDA):\n    from CTM_plus.transformer_setup import CTMTransformerSetup\n\n    setup = CTMTransformerSetup.for_training(\n        model=model,\n        gpu_memory_gb=80,\n        cpu_memory_gb=256,\n        zero_stage=2,\n    )\n    ds_config = setup.get_deepspeed_config()\n\n    # In training loop:\n    setup.begin_forward()\n    loss = model(batch)\n    setup.end_forward()\n    setup.begin_backward()\n    loss.backward()\n    setup.end_backward()\n    setup.step()\n\nInference example (vLLM):\n    setup = CTMTransformerSetup.for_inference(\n        model=model,\n        num_gpu_blocks=2000,\n        num_cpu_blocks=20000,\n        block_size=16,\n    )\n    manager = setup.get_block_manager()\n\nCheckpoint caching (Database):\n    setup = CTMTransformerSetup.for_checkpoint_cache(\n        cache_size_mb=4096,\n    )\n    cache = setup.get_checkpoint_cache()",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f5b615c27a55572",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/planning/planner.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Planner \u2014 turns a Goal into a Plan. Runtime-owned; pluggable; deterministic default.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f797a7439c11882",
+    "claim_family": "process_description",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Phase Transformer: General-Purpose O(n) LLM\n============================================\n\nA standalone transformer that replaces O(n\u00b2) attention with O(n) phase\nsynchronization. No ontological/Bhava dependencies - pure general-purpose LLM.\n\nThis enables:\n1. Direct comparison with standard transformers\n2. Testing U1-U4 formulas in isolation\n3. Integration into any LLM architecture\n4. Potential licensing for cost savings\n\nKey Innovation (Patent U1-U4):\n------------------------------\nTraditional: Attention = softmax(QK^T/\u221ad) \u00d7 V    [O(n\u00b2)]\nPhase:       Attention emerges from phase sync    [O(n)]\n\nMean-field approximation:\n    \u03a3\u2c7c sin(\u03c6\u1d62 - \u03c6\u2c7c) \u2248 N \u00d7 sin(\u03c6\u1d62 - \u03c6_mean)\n\nUsage:\n------\n    from symbolu_core.phase_transformer import (\n        PhaseTransformer,\n        StandardTransformer,\n        compare_models,\n    )\n\n    # Create phase transformer (O(n))\n    phase_model = PhaseTransformer(\n        vocab_size=50257,\n        embed_dim=768,\n        num_layers=12,\n        num_heads=12,\n    )\n\n    # Create standard transformer (O(n\u00b2)) for comparison\n    std_model = StandardTransformer(\n        vocab_size=50257,\n        embed_dim=768,\n        num_layers=12,\n        num_heads=12,\n    )\n\n    # Compare\n    results = compare_models(phase_model, std_model, seq_lengths=[512, 1024, 2048])",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-0f86e893da20b249",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/transformer_setup.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Register optimizer states with CTM+ for offload tracking.\n\nCall after optimizer creation.\n\nArgs:\n    optimizer: PyTorch optimizer with state_dict().",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-105d82bbea703d29",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm_streaming.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "The legacy PR-2 builder.\n\nPrompt = ``[200 + (request_id_counter % 4096)] + [100] * (suggested_length - 1)``.\nThe per-request unique head token defeats vLLM's prefix caching\nso memory pressure is observable. Default builder when no\nshared-prefix flags are set; preserves PR-2 byte-identical\nbehaviour.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-107a10056a20eae3",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm_streaming.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Generates per-arrival inter-arrival delays for the\nstreaming runner. Pure-Python, deterministic per seed.\n\nTwo modes:\n  * ``pareto`` \u2014 synthesised heavy-tailed gaps via Pareto.\n  * ``replay`` \u2014 reads ``(timestamp_seconds, prompt_length)``\n    pairs from a CSV and replays them at the file's logical\n    pace.\n\nThe streaming runner consumes the schedule via\n:meth:`next_arrival_delay_seconds` and\n:meth:`next_prompt_length` until the schedule is exhausted\nor the run hits a wall-clock budget.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TEMPORAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1085fcbd2b3339bd",
+    "claim_family": "temporal",
+    "gold_obligation": "TEMPORAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/target_encoder.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Update target encoder weights via EMA.\n\nArgs:\n    context_encoder: Current context encoder\n    step: Optional step number for momentum scheduling",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-11cd42da734cc16b",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/control_plane/decision_adapter.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Map a composed control-plane outcome to the runtime's next step.\n\nThis is pure interpretation of the FROZEN outcome set \u2014 it does not decide\nanything. The runtime uses ``required_next_step`` to continue, replan, provide\nevidence, request human input, wait, or stop. It never converts a hold into\nauthorization or an authorization into operational safety.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-121597f9c41304b3",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_datasets.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "COPA (Choice of Plausible Alternatives) Dataset.\n\nA causal reasoning benchmark where the model must choose between\ntwo alternatives that are either the cause or effect of a premise.\n\nExample:\n    Premise: \"The man broke his toe.\"\n    Question: \"What was the CAUSE of this?\"\n    Alternative 1: \"He got a__(splinter.\" (incorrect)\n    Alternative 2: \"He dropped a__(hammer on his foot.\" (correct)\n    Label: 1\n\nSource: https://people.ict.usc.edu/~gordon/copa.html\nHuggingFace: super_glue/copa",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-128eb5468736976e",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Initialize Phase-JEPA Transformer.\n\nArgs:\n    config: PhaseJEPAConfig instance\n    context_encoder: Optional pre-built context encoder\n    **kwargs: Override config parameters",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-12a059e71e398932",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/benchmarks/comprehensive_benchmark.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Comprehensive Engine Benchmark\n==============================\n\nTests all three engine tiers with real-world use cases.\nGenerates shareable results for stakeholders.\n\nRun:\n    python -m symbolu.benchmarks.comprehensive_benchmark",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-12a344e05789ddcb",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/pcam_flops_to_roi.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Run the chain at multiple batch sizes.\n\nThis is the KEY test: batch size determines whether the GPU is\ncompute-bound (batch=1, weights dominate) or bandwidth-bound\n(batch>=8, KV dominates). PCAM's value scales with batch size.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1313daa5f69b0ea7",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "control_plane_shadow/baselines.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "ModelPolicy + retry only: NO ExecutionGate (selection not constrained by eligibility),\nNO TAP, NO ActionGate. Any proposed action reaches the runtime ungoverned.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1369ce5cf233af88",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/predictor.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Validate prediction against Vritti bounds.\n\nIf Viparyaya (error) is too high, dampen the prediction.\nIf Vikalpa (imagination) is too high for factual tasks, dampen.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-13f6125db5149857",
+    "claim_family": "performance",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "CTM_plus/Bench/bench_out/PARTNER_VALIDATION_NOTE.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# CTM+ Validation Status and Real-Stack Integration Path\n\n**Audience:** prospective design partner evaluating CTM+ for an\nLLM-inference deployment.\n**Status:** safe to share; conservative framing throughout.\n**Last updated:** 2026-05-15 (revised after the KV-compression\nwork-track produced the \u00a717\u2013\u00a719 results on Qwen2.5-7B: TurboQuant\n3-bit/4-bit tested-failed at the \u00a717 cosine-doesn't-imply-quality\nfinding; KIVI-style INT4 + group + asymmetric tested-passing at\n1.024\u00d7 perplexity / \u22120.90pt MMLU @ 1000q / 3.2\u00d7 real-heap\ncompression \u2014 see new \u00a75b below. Earlier revisions: 2026-05-14\npost-\u00a713.3 Phase 4 throughput closure; 2026-05-08 Phase 4 design;\n2026-05-10 Phase 4 GPU validation negative result write-up.)\n\nThis note states what CTM+ has and has not been validated to\ndo today, why a real-stack `vLLM` validation has not yet been\nrun end-to-end, and what a partner-specific integration would\nlook like.\n\n## \u00a71 What is proven today\n\n* **Mode A \u2014 synthetic tier-aware simulation.** Five rounds of\n  results plus an independent critical-audit pass plus\n  multi-seed confirmation across {42, 137, 271}. Headline\n  findings, all reproducible from `runner_sim.py`:\n  * **Chat under heavy KV pressure:** HBF + CTM+ delivers a\n    **52% latency reduction** vs DDR + LRU on `chat_32k` at\n    oversubscription 0.025. CTM+ alone contributes ~38%; HBF\n    tier alone contributes ~24%; together ~52%.\n  * **Retrieval-augmented (RAG):** CTM+'s S3-FIFO admission\n    keeps one-shot prefill chunks out of the working set\n    entirely. Slow-tier reads collapse to **0** at every\n    oversubscription tested (\u2212100% vs LRU).\n  * **Agentic (honest regression):** CTM+ is **worse** than\n    LRU on agentic workloads, with the gap amplifying under\n    heavier pressure (+12% to +192% depending on\n    oversubscription). The \u03b1=0.20 production default helps\n    in moderate regimes; a recency-floor extension (Round 6,\n    not yet implemented) is the candidate fix at heavy\n    spillover.\n* **Mode B \u2014 real-vLLM har",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-13fe65913461b95f",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/predictor.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Ontological State Predictor using phase-space dynamics.\n\nPredicts state deltas across all five planes of the 32D Sovereign State\nusing complex phasor attention. Operates in latent state space, not\ntoken or pixel space.\n\nArchitecture:\n    1. Phase-Amplitude Decomposition of input state\n    2. Intent-guided Phase Rotation\n    3. Phasor Prediction via complex cumsum (O(n))\n    4. Multi-step autoregressive rollout\n\nArgs:\n    state_dim: Sovereign State dimension (default 32)\n    hidden_dim: Predictor hidden dimension\n    num_heads: Number of attention heads for phase attention\n    head_dim: Dimension per head (default state_dim // num_heads)\n    prediction_steps: Maximum prediction steps (k-step lookahead)\n    cosine_mode: Phase attention cosine mode ('standard', 'shifted', 'complex')\n    dropout: Dropout probability",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1404dedd2a92ac9b",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/losses.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute composite loss based on training phase.\n\nTraining Phases:\n    1 (Dhy\u0101na): High VICReg, standard JEPA\n    2 (Sa\u1e43v\u0101da): Balanced VICReg + JEPA\n    3 (K\u1e5bti): Add alignment loss for cross-modal\n\nArgs:\n    s_pred: Predicted states\n    s_target: Target states\n    s_visual: Visual states (for Phase 3)\n    s_text: Text states (for Phase 3)\n    training_phase: Current training phase (1, 2, or 3)\n\nReturns:\n    Dict with 'total' and component losses",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TEMPORAL_VERIFICATION_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1453e2aa6fee355a",
+    "claim_family": "temporal",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/errors.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "The world/constraint state changed since the authorization was minted.\n\nA commit-time revalidation found the bound world-state version or\nconstraint-set version no longer matches the current one.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-14ce019673796e10",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/bcvf_autonomous/__init__.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "BCVF for Autonomous Systems.\n\nSecond-order cross-model coherence regularizer for multi-model predictive\ncontrol. See ``DESIGN.md`` for the full specification.\n\nPublic API through Phase 3 (math kernel + trace characterization +\n4-predictor framework + simulator + MPPI planner + runner):\n\n    from symbolu_robotics.bcvf_autonomous import (\n        # Phase 1 \u2014 math kernel\n        BCVFConfig, BCVFResult, CostOrder,\n        compute_bcvf_cost, compute_bcvf_cost_batch,\n        SE2Pose, body_frame_error, wrap_angle,\n        # Phase 1.5 \u2014 trace families and sensitivity sweep\n        TraceResult, generate_trace, analyze_trace,\n        run_all_traces, parameter_sensitivity_report,\n        # Phase 2 \u2014 predictor framework\n        BasePredictor, BicycleConfig, PredictorState,\n        FailureConfig, ControlInput,\n        IMUOdometry, LidarSLAM, VisualOdometry, GNSSMap,\n        create_predictor_set,\n        # Phase 3A \u2014 simulator\n        Road, Obstacle, SimConfig, SimState, Simulator,\n        make_straight_road, make_curved_road, make_urban_road,\n        # Phase 3B \u2014 MPPI planner\n        MPPIConfig, MPPIResult, MPPIPlanner,\n        PerfCostConfig, compute_perf_cost,\n        # Phase 3C \u2014 runner\n        RunConfig, RunResult, EpisodeDiagnostics,\n        Runner, load_config, benchmark_planner,\n    )",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-15018725fa852fbd",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "control_plane_shadow/adapters/tap_adapter.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Real TAP assertion-governance adapter (Phase 5/6). Wraps the TAP-E4 GovernanceResolver\n(tap_e4_governance_truth.GovernanceTruthLayer, config F) \u2014 TIER 3, deterministic, no network.\n\nSEMANTIC GAP (documented, not hidden): E4 resolves *which documented authority governs a\nsituation*, not *whether a model's claim may be asserted*. This adapter maps GovStatus to the\ncanonical assertion vocabulary as an APPROXIMATION; it does NOT claim production TAP integration.\n\nValid upstream records are built read-only from the real E4 corpus (`corpus.cases`,\n`build_retrieval_record`, `build_relationship_record`, `harness._intent`). The adapter does NOT\nmutate the engine or its frozen inputs.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-15113d103b1149ea",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cer_v0_3/acp_db/envelopes.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Immutable snapshot of the database's operational safety posture (a fixture).\n\nThese are deterministic operational facts a real read-only telemetry adapter\nwould supply; here they come from an authored fixture (no live DB telemetry).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1543dd188b13fe4f",
+    "claim_family": "recommendation",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Pre-softmax routing gate: decides full vs local attention per head per position.\n\npi(l,h,t) = sigma(alpha_b * (C_hat(l,h,t) - tau(b,h)))\n\nWhere b is the frequency band of head h.\n\nBand assignment: equal partition of heads into num_bands groups.\n- Band 0 (global): heads that should attend broadly\n- Band 1 (mid): intermediate attention span\n- Band 2 (local): heads that can use local window\n\nEach band has a learnable threshold tau_b and sharpness alpha_b.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-15f83a3e4596ad3b",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "relationship_claim_validation/judges.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Resolve each disputed predicate on evidence explicitness (deterministic):\n- both sides explicit  -> UNKNOWN (manual review)\n- only B explicit      -> CONTRADICTED\n- only A explicit      -> SUPPORTED\n- neither explicit      -> CONTRADICTED (conservative default)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-166602bd8cc36c59",
+    "claim_family": "performance",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "quad_scc_observer/REPORT.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# SCC Observer \u2014 Technical Report\n\n**Study:** independent falsification track (CPU-only). Separate package; reuses `qgr`,\n`quad_use_evaluator` (`use`), and `quad_perturbation_consistency` (`qpc`) **read-only**. No Quad\nproduction code, MQAR benchmark, model, training/inference pipeline, or previous package modified.\n**Date:** 2026-07-22 \u00b7 Frozen bounded BD-A model, 3 seeds (in-dist acc 1.000) \u00b7 5 conditions,\n~46k queries, M=4 perturbation views \u00b7 Data: `RESULTS/scc_results.json`.\n\n**Verdict:** **`SCC_ADDS_INDEPENDENT_SIGNAL` \u2014 but through exactly one of the four components (T,\ninference stability), and that signal is best understood as test-time-augmentation robustness, not\nintrinsic single-pass coherence. S contributes nothing, E is grounded verification re-described,\nand R decomposes into task difficulty plus a grounding-like feature.**\n\n> Read-only discipline (tested): inference is bit-identical with and without observation. T runs M\n> extra ordinary forward passes on semantically-equivalent views; nothing is retrained or\n> regularized. No inference-time control system is built (explicit future scope).\n\n---\n\n## 1. Objective and null\n\nDoes SCC carry **independent** predictive information about correctness **beyond confidence,\nentailment, and evidence-grounding**? SCC is treated as four separate hypotheses (S, R, E, T);\neach must independently justify its existence. **Null:** no component adds predictive value beyond\nthose baselines. We attempted to reject it component-by-component.\n\n## 2. Design (deliverable 1 \u2014 see `DESIGN.md`)\n\nModel = frozen bounded task-only Quad transformer (BD-A). A **claim** is the answer to a query\n(`k_q \u2192 v_pred`); evidence is the context bindings; correctness is exact (label only). Conditions:\nin_distribution (skipped \u2014 0 failures), long_context, distractor_robust, multi_relation,\nlong_and_hard. Combined predictors use out-of-fold logistic (no leakage); increments tested with\nDeLong on the same samples; pre-registered practical threshold",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-167ae6d29d3a8a80",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "cer_v0_3/CER_V0_3_EXECUTIVE_SUMMARY.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# CER V0.3 \u2014 Internal Executive Summary (Deliverable 17)\n\n**What this milestone did:** answered whether CER is a real, independently-implementable\ncross-domain standard \u2014 not just one team's code. It (a) reimplemented CER from the written\nspec in a clean room and proved byte-for-byte agreement, and (b) carried the identity +\ngovernance architecture into a materially non-Kubernetes domain (database mutation) with\n**zero** changes to the frozen ActionGate and ACP cores.\n\nLabels: `FACT` (measured/implemented) \u00b7 `INTERPRETATION`.\n\n## The result in one line\n`FACT`. Two independent implementations (reference + clean-room, no shared code) produce\nidentical normalized payloads, canonical bytes, and digests for every V0.1/V0.2 vector; a new\n`database.mutation.v1` profile produces a distinct non-colliding identity (`05ad2c02\u2026`) that\nthe frozen ActionGate governs directly via the pre-existing `DB_MUTATION`/R7 rule and a new\ndatabase ACP adapter reproduces all four composed outcomes \u2014 all with 0 frozen-core changes.\n\n## Four questions \u2014 all survived falsification\n`FACT`. Q1 independent implementability; Q2 non-Kubernetes domain on the same envelope; Q3\nbyte-identical canonical payloads/digests; Q4 governance precision with a new ACP domain\nadapter. Each was attacked (payload/bytes comparison not just hashes; a DB action that could\ncollide with K8s or force an inaccurate mapping; a new ACP domain that could require a core\nchange or runtime branch); none was falsified.\n\n## Five verdicts (per frozen thresholds)\n1. **Independent implementability** \u2192 `CER_INDEPENDENT_IMPLEMENTATION_CONFORMANT` (77/77 items, 0 identity-affecting ambiguity, AST-proven boundary, 0 third-party deps).\n2. **Cross-domain profile** \u2192 `CER_CROSS_DOMAIN_SUPPORTED` (direct `DB_MUTATION`/R7 mapping, 0 core changes, 0 collision).\n3. **Governance portability** \u2192 `CONTROL_PLANE_CROSS_DOMAIN_SUPPORTED` (all 4 outcomes via frozen `compose()`, 0 core change, 0 runtime branch).\n4. **Security** \u2192 `CER_SECURITY_INVARIAN",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-169e8216d6ef2804",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "quad_scc_observer/README.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# SCC Observer \u2014 CPU-only Falsification Study\n\nDoes a proposed **Semantic Coherence Controller (SCC)** contain *independent* predictive\ninformation about model correctness, **beyond confidence, entailment, and evidence-grounding**?\nSCC is tested as **four separate, falsifiable hypotheses** \u2014 S (semantic similarity), R (relational\npreservation), E (evidence support), T (inference stability) \u2014 each of which must independently\njustify its existence. This is a falsification study, not a proof of SCC.\n\nSeparate package; reuses the prior `qgr`, `quad_use_evaluator` (`use`), and\n`quad_perturbation_consistency` (`qpc`) packages **read-only**. Nothing in Quad, the MQAR\nbenchmark, the model, or any previous package is modified. All analysis is post-inference and\nobserver-only \u2014 no retraining, no regularization, no inference-time control system.\n\nSee `DESIGN.md` for the design and `REPORT.md` for results and the verdict.\n\n## Layout\n\n```\nDESIGN.md / REPORT.md / README.md\nscc/\n  _paths.py        read-only bootstrap of prior packages\n  claims.py        decode per-query claim (k_q -> v_pred) + context + retrieved key\n  features_S.py    semantic similarity (representation cosine as a feature)\n  features_R.py    relational preservation (structural)\n  features_E.py    evidence support (closed-world symbolic; open-world documented, not implemented)\n  features_T.py    inference stability under semantic-equivalence perturbations (reuses qpc)\n  baselines.py     A confidence (reuses use), B entailment proxy, C grounding\n  dataset.py       per-query feature matrix + label across seeds/conditions\n  arms.py          feature-group and arm definitions\n  evaluate.py      OOF logistic, DeLong incremental tests, calibration, verdict enum\n  redundancy.py    overlap of each SCC term with baselines\n  plots.py         figures\ntests/             read-only, feature sanity (evidence=oracle), no-leakage OOF\nrun_scc.py         main driver -> RESULTS/\n```\n\n## Reproduce\n\n```bash\npip install -r requirements.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-16d47c3d46eadaed",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Update state for a layer from PhaseAttentionLayer's return_state output.\n\nEnforces O(1) shape: state must be [B, 1, H, D_h].\nRaises ValueError if state has sequence dimension > 1.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-174b1229a4e8e16b",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/pcam_compare_baselines.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Attempt to build adapters for the three in-repo baselines. Returns\n``(adapters, skip_reasons)``. If an import fails (e.g. numpy is\nmissing), the corresponding adapter is omitted and the reason is\nsurfaced in the returned ``skip_reasons`` list.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-17c39365a57b2dbd",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Chunked forward + backward with Truncated BPTT for Phase state machines.\n\nUnlike forward_chunked (which concatenates all logits and does one backward),\nthis processes each chunk independently:\n  1. Forward chunk with prev_state (detached from previous chunk)\n  2. Compute loss on this chunk's logits\n  3. Backward on this chunk (frees chunk activations)\n  4. Carry final_state to next chunk (detached)\n\nThis keeps peak memory at O(C) instead of O(N).\n\nArgs:\n    model: HybridPhaseTransformer with forward_chunk() method\n    input_ids: [B, N] full sequence token indices\n    targets: [B, N] full sequence targets\n    chunk_size: Tokens per chunk (controls memory/compute tradeoff)\n    loss_fn: Callable(logits, targets) -> (loss, metrics_dict)\n    accumulate_grad: If True, accumulates gradients across chunks.\n                    If False, steps optimizer per chunk (not recommended).\n    grad_scaler: Optional GradScaler for mixed precision\n    autocast_dtype: Optional dtype for torch.autocast (e.g. torch.bfloat16)\n    gradient_accumulation: Number of gradient accumulation steps. Loss is scaled\n                          by 1/(num_chunks * gradient_accumulation) so that\n                          TBPTT gradient magnitude matches the standard path.\n    aux_loss_fn: Optional Callable(result_dict, chunk_targets) -> scalar loss.\n                 V10.14.10: Called per-chunk with the full result dict (including\n                 _slot_keys, _slot_vals, _slot_hidden) to compute auxiliary losses\n                 like slot retrieval loss that need to be backpropagated per-chunk.\n\nReturns:\n    Dict with:\n        'total_loss': scalar \u2014 mean loss across all chunks\n        'metrics': dict \u2014 averaged metrics from loss_fn\n        'num_chunks': int \u2014 number of chunks processed\n        'chunk_losses': list \u2014 per-chunk loss values",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1936f574587c2500",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/model/parsing.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Parse model output into typed runtime contracts. Fail closed.\n\nThe model proposes an ``actions`` array of {tool, description, arguments}. The\nruntime does NOT take a risk class from the model \u2014 the tool's risk class comes from\nthe trusted registry. Malformed or incomplete output raises ``ModelParseError``; an\nunknown tool raises ``ToolPolicyError``; a model-supplied risk field is ignored (and\nrecorded).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1949029ce4bb76c1",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/diagnostics/rip_logger.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Save a summary of all rips and fluidity events in this session.\n\nReturns:\n    Path to the saved summary file",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-196e3d6bdc237c91",
+    "claim_family": "process_description",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "agentic/hp_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Phase Integrator operating at multiple timescales.\n\nLevel 1: Fast (every token) - syntax, local context\nLevel 2: Medium (boundary-triggered) - phrases, semantic units\nLevel 3: Slow (major transitions) - paragraphs, topics\n\nEach level maintains its own phase state, updated at different frequencies.\nTop-down modulation allows slower layers to influence faster ones.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-198ad08a42af7bc7",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/action_selection.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Shared non-compensatory hard filter used by every ACP selector.\n\nA candidate is admissible iff it has at least one HARD constraint result and\nno failed HARD result. No hard evidence => not admissible (fail closed). The\nfirst failed HARD result is the dispositive rejection reason.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-19d53d2a5ae8955e",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/use/__init__.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Universal Semantic Evaluator (USE) \u2014 read-only post-inference correctness predictor.\n\nUSE observes a completed inference of the frozen Quad model and, without changing any\ncomputation, extracts phase-like states from internal channels and runs the U1-U5 peer-to-peer\ncoherence dynamics on a detached copy. The study asks \u2014 and attempts to falsify \u2014 whether the\nresulting USE-native signals predict answer correctness better than standard confidence\nbaselines. Null: internal coherence carries no predictive information beyond model confidence.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1a45fbab719f9916",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Infers latent variables from evidence.\n\nGiven observations, infers the values of exogenous/latent\nvariables that would explain the observations.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1a7fa1adc1947427",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/dha_expression.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute resistance score for DHA modulation.\n\nHigh resistance when:\n- Viparyaya (skepticism) is high\n- Vikalpa (confusion) is high\n- Pram\u0101\u1e47a (clarity) is low",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1a8c316862c2dee7",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/losses.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "STUB. Requires a helpfulness signal: does readiness-gated recall improve\ntask quality vs. no-recall? Implement as paired-rollout reward once a\nhelpfulness label / counterfactual is available (SPEC \u00a712 MRQ-8).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1ab5235b54c0f174",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "cer_v0_3/CER_SPECIFICATION_ERRATA.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# CER Specification Errata & Ambiguity Audit (Deliverable 6)\n\nEvery disagreement between the original and clean-room implementations is treated as\na **specification-review event**. This document is the \u00a710 ambiguity audit: each\ncanonicalization/identity ambiguity class is given explicit normative language.\n\n**Prior conformance vectors are never modified.** Where the two implementations agreed\n(the entire V0.1/V0.2 corpus and the new database corpus), the normative rule is the\nalready-implemented behaviour, pinned here so a third implementer cannot diverge.\n\nLabels: `FACT` (measured/implemented) \u00b7 `NORMATIVE` (rule statement).\n\n## Differential outcome\n`FACT`. Across **77** V0.1/V0.2 differential items and the **29**-case cross-domain\ncorpus, the independent implementations produced **0 identity-affecting differences**\nand **0 identity-affecting specification ambiguities**. No erratum modifies an existing\nvector. The audit below records the normative resolution for each class.\n\n## Ambiguity classes (\u00a710)\n| # | Class | `NORMATIVE` resolution | Severity if violated |\n|---|---|---|---|\n| 1 | absent vs null | A required field that is `null` is invalid (fail closed). An absent optional identity-bearing field (`rollback_plan`/`compensation_ref`/`parameters_digest`) is simply absent from the projected payload \u2014 it is NOT rendered as `null`. Absent \u2260 null-valued. | high (identity) |\n| 2 | integers vs decimals | No bare JSON numbers in the identity payload \u2014 **all numerics are typed strings** (`replicas`, `affected_count`, `max_surge`, \u2026). `\"12\"` \u2260 `\"12.0\"`; canonicalization rejects any bare int/float (`E_BARE_NUMBER`). | high |\n| 3 | Unicode normalization | Strings are NOT re-normalized at hash time. NFC is *validated* (never rewritten) only on schema-declared NFC paths (currently none for the action payload). Non-NFC on a declared path fails closed (`E_NON_NFC`). | high |\n| 4 | duplicate keys | Duplicate object keys are rejected at parse (`E_DUPLICATE_KEY`); they never silen",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1abdd5b3eba1fd64",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "relationship_claim_validation/loader.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Public (leakage-controlled) loader.\n\nExposes only the executable projection of the synthetic corpus and the public\nevidence records produced by the layer. Gold status, difficulty, family, and\nauthoring rationale are never exposed here.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1b4b5e5a2e8537a2",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/constraint_library.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Available: per-candidate safety_score floor + feasibility floor + safe\nfallback (MUTUAL_STOP). UNAVAILABLE: physical collision margin (metres),\nstopping, actuator \u2014 strategy scores are abstract.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TEMPORAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1b6fe59ad4eed09b",
+    "claim_family": "temporal",
+    "gold_obligation": "TEMPORAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Self-Motivated JEPA Wrapper with Autonomous Goal Selection.\n\nImplements the Sankalpa (Will/Intention) cycle for autonomous operation:\n\n1. OBSERVE (Pram\u0101\u1e47a): Encode current context \u2192 s_context\n2. PREDICT (Icch\u0101): Generate predictions \u2192 s_pred\n3. COMPARE (Viveka): Compute curiosity = ||s_pred - s_actual||\u00b2\n4. DECIDE (Sankalpa): Generate/update goal based on curiosity\n5. ACT (K\u1e5bti): Execute goal-directed generation\n6. LEARN (Karma): Update weights based on outcomes\n\nThe system can operate in two modes:\n- External-directed: Goals come from user input (Source=0)\n- Self-directed: Goals emerge from curiosity (Source=1)\n\nExample:\n    >>> config = SovereignJEPAConfig(autonomous_cycle_steps=4)\n    >>> model = SovereignJEPA(config)\n    >>> # Autonomous step when idle\n    >>> outputs = model.autonomous_step(context_ids)\n    >>> # The model has generated its own goal and acted on it",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1b9cb1b4b135b2bd",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/benchmark/phase2_metrics.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Phase 2 aggregate metrics (deterministic).\n\nAssembles machine-readable Phase 2 results from the parity runner, the read-only\ncanary harness, the model-integration parsing, and a governance-boundary check.\nNothing here uses a live model (recorded replay + mock only).\n\nUsage: python -m agent_runtime_migration.benchmark.phase2_metrics [--json out.json]",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1c03491a83dadce9",
+    "claim_family": "medical",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/decision_trace.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Structured decision trace (the explanation surface).\n\nEvery ACP decision emits a ``DecisionTrace`` with the full, deterministic\nrationale: candidates considered, hard constraints evaluated, each rejection's\ndispositive reason, survivors, the tie-break sequence, the outcome, and the\nworld/action/authorization identities. No black-box scalar alone is ever a valid\nexplanation. An optional BCVF diagnostic may be attached but is clearly marked\nadvisory and is never a dispositive reason.\n\nStandard-library only.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1c5fa9457191737a",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/complementarity_probe/nulls.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Null feature streams the Symbol-U vector `U` must beat to earn its place.\n\nEvery null is a feature matrix aligned row-for-row with the items, the same way\n`U` is. The complementarity claim (`E + U` beats `E`) is only meaningful if it\nALSO beats `E + null` for every relevant null below \u2014 otherwise the gain came\nfrom generic added capacity, surface form, or raw phonology, not from the\nSymbol-U *ontology*.\n\nNulls (per SYMBOL_U_RESEARCH_STRATEGY.md \u00a77):\n- ``shuffled_U``        : `U` rows permuted across items \u2014 same marginal stats,\n                          broken item\u2194U correspondence. Tests content vs capacity.\n- ``random``            : Gaussian noise, matched dim. Generic fusion capacity.\n- ``surface``           : length, vowel/consonant counts, char-bigram hashing.\n                          The spelling/orthography confound.\n- ``phonological``      : SoundClass histogram only \u2014 raw sound structure WITHOUT\n                          the Vritti ontology mapping. Isolates \"ontology vs sound\".\n\nAll deterministic given a seed.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1c7b55f938620d96",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agentic/reflective_phase_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Simple transformer-based generator as placeholder for Phase-Quad.\n\nIn production, this would be replaced with actual PhaseQuadBlock\nfrom symbolu.hp_quad or similar.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1d5780d0b8d212d1",
+    "claim_family": "medical",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/benchmarks/comprehensive_benchmark.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Test Cross-Domain Entropy Engine across all tiers.\n\nDemonstrates:\n- Entropy computation for different query types\n- Tier-specific gate behavior (DIAGNOSTIC_ONLY, MODULATION_ONLY, FULL_GATING)\n- Determinism verification",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1d64e45e0051e8fc",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/runtime/budget.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Advisory budget accountant \u2014 a runtime-local safeguard, NOT authorization.\n\nStopping a run for exceeding a step/token budget is a runtime safeguard (like\ncancellation). It never authorizes an action; it can only stop the loop early.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1e14fa5366ab1364",
+    "claim_family": "performance",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/benchmark/real_model_eval.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Real-model evaluation runner (Phase 3).\n\nGiven a real ``LanguageModel`` adapter (or a deterministic replay of CAPTURED\nreal-model responses), evaluates proposal quality, governance containment, and the\nread-only canary on the frozen real-model corpus.\n\nIf no real model is configured (``build_live_model_from_env`` returns ``None``) AND no\ncaptured-replay fixture is supplied, the runner returns\n``{\"status\": \"BLOCKED_NO_REAL_MODEL\"}`` \u2014 it NEVER fabricates model output or presents\nthe Phase-2 replay-only study as Phase-3 evidence.\n\nUsage:\n    RUNTIME_MODEL_PROVIDER=ollama RUNTIME_MODEL_ID=qwen2.5:0.5b-instruct \\\n        python -m agent_runtime_migration.benchmark.real_model_eval --json out.json\n    # or, with captured fixtures:\n    python -m agent_runtime_migration.benchmark.real_model_eval --replay <capture.json> --json out.json",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1ef5e2f021922cc3",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Apply phase rotation modulation to hidden states.\n\nThis creates a multiplicative modulation based on phase angles,\nallowing gradient flow from logits through to predicted states.\n\nArgs:\n    hidden_states: [B, T, D]\n    phase_rotation: [B, num_heads] or [B, T, num_heads]\n\nReturns:\n    Modulated hidden states [B, T, D]",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1f3ad4c3e63b8140",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/safety_adapters/candidate_bridge.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Integrate a constant joint-velocity command into TrajectoryPoints.\n\nq0: initial joint positions (n,). velocities: constant joint velocities (n,).\nDeterministic; no randomness, no clock.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1f4d25df7c5181de",
+    "claim_family": "recommendation",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/vllm_bridge.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Run a real ``vllm.LLM.generate`` call against ``model`` on\n``prompts`` and derive a ``TraceEvent`` list from the observed\nsequence shapes.\n\nRaises ``VLLMBridgeUnavailable`` if vLLM is not importable or the\nmodel cannot be loaded. Callers should treat this as a clean\nfailure path \u2014 do NOT fall back to a synthetic trace and silently\nlabel it as real.\n\nThe returned ``DerivedRunResult.trace`` is a structural\nreconstruction: admissions from block layout, attention events\nfrom token counts. For richer per-block attention mass, use\n``pcam_trace_extract.py`` (HuggingFace hook-based) instead.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-1ffbe554892a842d",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/pcam_trace_extract.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Load a HuggingFace causal LM, run ``prompt`` through it with\n``output_attentions=True``, and emit an ``ExtractedTrace``.\n\nRaises ``TraceExtractorUnavailable`` if ``torch`` or\n``transformers`` is missing. Any other failure (OOM, model not\nfound, unsupported architecture) propagates as whatever the\nunderlying library raised \u2014 the extractor does not swallow\nunrelated errors.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-20b711bfb1c6ed28",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/smoke_test.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Shape + gradient smoke test for the Symbol-U skeleton.\n\nRun where torch is available:\n    python -m symbolu_neural.smoke_test\n\nIt constructs each ablation rung on a DummyBackbone, runs a forward pass with\nrandom ids, checks the documented output shapes, composes the available losses,\nand verifies a backward pass produces gradients on the Symbol-U heads. It does\nNOT train. Exit code 0 == all interface contracts hold.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-210a60878aedca6e",
+    "claim_family": "mathematical",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Forward pass with O(n) complex phase attention.\n\nV10.2: Added prev_state for chunk-persistent phase memory.\nWhen chunking long sequences, Phase state MUST persist across chunks\nto maintain temporal continuity. This is critical for Phase to work\nas a true temporal memory, not just per-chunk memory.\n\nV10.3.8: Dual-Channel Attention Mode\nWhen dual_channel_mode=True, content and alignment are computed separately:\n    s_content = cos(\u03c6_q - \u03c6_k)           # What matches\n    s_align = cos(\u03b8_JEPA - \u03b8_SRK)        # Intent agreement\n    score = s_content * (1 + \u03b1 * s_align) # Combined\nThis prevents intent from dominating content selectivity during training.\n\nArgs:\n    x: [B, N, D] input tensor\n    causal_mask: Apply causal masking (always True for complex cumsum)\n    phase_context: Optional streaming context (legacy, not used in V2)\n    intent_phase: Optional [B, H] or [B, H, D_h] or [B, T, H, D_h] phase rotation\n                 from Ontological State Delta. Rotates query phasors to change\n                 how tokens relate based on intent/understanding.\n                 (Legacy - use intent_phase_query for dual-channel mode)\n    intent_phase_query: V10.3.8 - \u03b8_JEPA from Sensor (JEPA prediction).\n                       Affects Query side: \"What am I looking for?\"\n    intent_phase_key: V10.3.8 - \u03b8_SRK from Master (SRK understanding).\n                     Affects Key side: \"What do I understand?\"\n    prev_state: Optional [B, 1, H, D_h] complex tensor - accumulated KV state\n               from previous chunk. If provided, this is prepended to cumsum.\n               CRITICAL: Do NOT detach this - gradients must flow through time!\n    prev_norm_state: Optional [B, 1, H, D_h] real tensor - accumulated normalizer\n                    state from previous chunk.\n    return_state: If True, return (output, state_dict) where state_dict contains\n                 'final_state' and 'final_norm_state' for the next chunk.\n\nReturns:\n    output: [B, N, D] attention output\n    state_dict: (optional) {'final_state': [B, 1, H, D_h], 'final_norm_state': [B, 1, H, D_h]}",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-211e4b080a54c20b",
+    "claim_family": "medical",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agentic/hp_quad.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Hierarchical phase integration.\n\nArgs:\n    x: Input tensor [B, N, D]\n    phase_states: Optional list of phase states per level\n\nReturns:\n    output: [B, N, D] integrated output\n    phase_states: Updated phase states for each level\n    aux: Boundary statistics and diagnostics",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-21fc90a954ef4431",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Standard O(n\u00b2) softmax attention - used sparingly in grouped hybrid.\nHigh-fidelity retrieval layer to complement linear attention.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2209fddf15a9dc1c",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/bcvf_autonomous/core.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "V3.1 Definition 2. First finite difference of the disagreement.\n\nInput: (H, 3). Output: (H-1, 3).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-245d27ab2a505341",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/losses.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compose the active losses given model `aux` and a `batch` of targets.\n\nOnly computes a term when both the model produced its inputs and the batch\ncarries the needed labels \u2014 so the same function works across the ablation\nladder. Returns a dict including 'total'.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2473c7a0939bde83",
+    "claim_family": "policy",
+    "gold_obligation": "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/decision_trace.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "A trace is complete iff it carries the mandatory explanation fields\nfor its decision type. Selection outcomes must name a selected action;\nrefusal outcomes must not.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2559a71e4111e6c6",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/__main__.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "CLI entry: ``python -m ctm_bench [options]``.\n\nDefaults run the full sweep (3 workloads \u00d7 3 policies \u00d7 1 tier\nconfig = 9 cells) with seed 42 and writes a JSON summary +\nmarkdown report to stdout. Use ``--output-dir`` to write the\nreport to disk.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-25ded08e8ebc3449",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognitive_state.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Change in cognitive state: \u0394S = S_{t+1} - S_t\n\nThis is what the model learns to predict.\n\nInstead of predicting P(token_{t+1}), we predict how understanding changes.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-25ecd9b4ecb09584",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/dha_expression.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Get human-readable delivery guidance based on user state.\n\nReturns guidance for:\n- Tone (ego state adjustment)\n- Density (information dilution)\n- Pacing (Bodha vs Anum\u0101na)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-26dd39979f93257f",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/losses.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Encourage normalized entropy to track predictive error.\n\nentropy_norm:[B] in [0,1], per_example_error:[B] (e.g. per-example NLL,\ndetached + min-max normalized). Pearson-style alignment via 1 - corr.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-270915307c561e99",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/complementarity_probe/symbolu_engine.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "SymbolUEngine \u2014 deterministic wrapper over the REAL Symbol-U mappers.\n\nThis is the front end for the complementarity probe. It computes the Symbol-U\nvariable `U` for a word or sentence using the *actual* patent computation that\nalready lives in `symbolu_core.formulas` \u2014 not a re-implementation, and not the\nlexicon approximation used in the older clean_softmax detector files.\n\nThe core patent rule is phonological: every character maps to a `SoundClass`\n(stop / fricative / nasal / liquid / glide / vowel / \u2026) and each SoundClass maps\nto one of the 5 Vritti energy states (INERTIA / ACTIVATION / OSCILLATION /\nTENSION / RELEASE) via `SOUND_CLASS_VRITTI_MAP`. A word's Vritti vector is the\nnormalized histogram of its characters' Vritti states; a sentence pools its\nwords. We also expose a SoundClass histogram as an extended descriptor.\n\nThis module is intentionally torch-free and transformers-free: it runs anywhere,\nwhich keeps the cheapest experiment (synonym invariance, no LLM) fully offline.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-272009d777344570",
+    "claim_family": "performance",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/tier_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Tier model for the Mode A benchmark harness.\n\nModels a multi-level memory hierarchy (HBM \u2194 DDR / NVMe / HBF)\nwith per-tier capacity, latency, and bandwidth. The cache tracks\nwhich blocks live on which tier and what the cumulative read /\nwrite traffic is per tier.\n\nCost numbers are 2025 ballparks pinned by the test suite \u2014 a\nreport from this harness is comparable across runs because the\ncost model does not silently drift.\n\nSources for the cost numbers (all are conservative QD1 random-\naccess numbers, not best-case sequential, because KV-cache\nspillover is random-access by definition):\n\n* HBM3e: 1.15 TB/s aggregate per stack, ~200 ns access \u2014 public\n  vendor specs (Micron HBM3e, SK hynix HBM3e).\n* DDR5-6400: ~64 GB/s per channel, ~80 ns random access \u2014\n  JEDEC + recent benchmarks.\n* NVMe Gen5 SSD (random read, QD1): ~14 GB/s sequential best-\n  case, but random read at QD1 is ~10-50 \u00b5s latency with\n  effective bandwidth far below sequential. We model 5 GB/s\n  effective + 50 \u00b5s to reflect real KV-spill access patterns.\n* HBF (High Bandwidth Flash, SanDisk's announced AI-tier\n  flash): vendor-claimed ~200 GB/s aggregate at ~2 \u00b5s\n  latency. These are forward-looking specs from public\n  announcements; they may shift as silicon ships.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-27720371759ce92a",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_datasets.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute counterfactual: given factual observation, what would happen\nunder intervention?\n\nUses the three-step process:\n1. Abduction: Infer noise terms from factual\n2. Action: Apply intervention\n3. Prediction: Compute counterfactual values",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-27bc92d5cf22106f",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/pcam_vllm_harness.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Run the mock measurement harness backed by the PCAM simulator.\n\nThis produces the SAME metrics that Stage A would produce with\nreal vLLM, but derived from the simulator + roofline model.\nEvery measurement is tagged [simulated] to make clear what\nneeds real validation.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-27c3798de8ab17ec",
+    "claim_family": "code_behavior",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/safety_adapters/trajectory_adapter.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Real TrajectoryValidator -> ACP physical-evidence adapter (Phase 2).\n\nWraps the repository's REAL ``symbolu_robotics.safety.trajectory_validator``\n(deterministic joint-space validator; velocity/accel/jerk/workspace/collision/\nself-collision/human checks with the module's own thresholds) and maps its\n``ValidationReport`` to a typed ``PhysicalEvidence`` bundle + per-category HARD\n``ConstraintResult``s. No formulas are re-implemented; the real validator does\nthe work. Every result binds the exact candidate identity + world-state version.\n\nFail-closed:\n  * stale evidence (freshness > max_stale_s) -> validity STALE + a failing HARD\n    ``STALE_PHYSICAL_EVIDENCE`` result (never EXECUTE);\n  * validator raises -> validity EVALUATOR_FAILED + a failing HARD\n    ``EVALUATOR_FAILED`` result;\n  * missing trajectory -> validity MISSING + failing HARD ``MISSING_TRAJECTORY``.\n\nDeterminism: the validator's only clock use is ``validation_time_ms`` (report\nmetadata); it never enters the evidence identity or any ConstraintResult, so the\nmapped output is a deterministic function of (trajectory, obstacles, human).",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-28333e72c7d5ee79",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognade_complete.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Hard mathematical coupling: entropy = 1 - confidence\n\nThis is NOT a soft penalty - it's a mathematical identity.\nThe model cannot be both confident and uncertain.\n\nEnforced by:\n1. Computing confidence from the model\n2. Setting entropy = 1 - confidence (no freedom)\n3. Propagating this constraint through dynamics",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-289cf7be3029319a",
+    "claim_family": "code_behavior",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/diagnostics/rip_logger.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Assess the health of the training based on rip patterns.\n\nReturns:\n    Tuple of (status, message) where status is one of:\n    - 'healthy': Low rip rate, model learning to self-regulate\n    - 'active': Moderate rip rate, gyroscope working as expected\n    - 'struggling': High rip rate, may need intervention",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-29278288418e88f5",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/bcvf_autonomous/core.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "V3.1 Definition 3. Second finite difference of the disagreement.\n\na(k) = [e(k+1) - 2 e(k) + e(k-1)] / dt^2\n\nInput: (H, 3). Output: (H-2, 3). This is the core innovation.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-297f610118b32fd4",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_training/jepa/transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Phase 3 (K\u1e5bti) forward pass with gradient flow from NLL to predictor.\n\nThis method ensures that:\n1. Predicted states s_pred are NOT detached\n2. Phase rotation \u03b8 = intent_phase_projector(s_pred) maintains gradients\n3. L_nll gradients flow: L_nll \u2192 logits \u2192 \u03b8 \u2192 s_pred \u2192 predictor\n\nThe predictor learns: \"I set \u03b8=45\u00b0, got 'Cat'. Should have been \u03b8=90\u00b0 for 'Dog'.\"\n\nArgs:\n    input_ids: Token IDs [B, T]\n    attention_mask: Optional attention mask [B, T]\n    labels: Target token IDs for NLL loss [B, T]\n    context_len: Split point for context/target\n    external_karma: Optional karma state from SRK [B, 32]\n    k_steps: Override prediction steps\n    return_loss_components: Return individual loss values\n\nReturns:\n    Dictionary containing:\n        - 'loss': Combined L_jepa + L_nll with gradient bridge\n        - 'nll_loss': Token prediction loss (gradients flow to predictor!)\n        - 'jepa_loss': State prediction loss\n        - 's_pred': Predicted states\n        - 'phase_rotation': Phase angles \u03b8 from predictor\n        - 'logits': Language model logits",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "TEMPORAL_VERIFICATION_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2a4ccf5781189888",
+    "claim_family": "temporal",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/vllm_bridge.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Raised when a real-vLLM code path is requested but cannot be run.\n\nThree distinct reasons can trigger this:\n\n1. ``vllm`` is not installed.\n2. ``vllm`` is installed but the import itself fails (e.g. CUDA\n   mismatch, missing shared libraries, unsupported Python version).\n3. The requested model cannot be loaded on the current hardware.\n\nThe exception message always includes an actionable hint so a\ndemo user is never left guessing.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2a531d0727faefab",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/conftest.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Pytest config: make this package importable, put the prior qgr package on sys.path, pin threads.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2a63017460fa8312",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/losses.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Training objectives for Symbol-U.\n\nSignatures + reference implementations for the standard losses; the\nresearch-dependent ones (recall helpfulness, DHA preference) are left as\ndocumented stubs because they require labels/signals that do not yet exist\n(see SPEC \u00a712 MRQ-6/8). Full training loop is intentionally out of scope.\n\nLoss table (see README):\n  L_lm      next-token CE                       \u2014 always on\n  L_typed   Vritti/aspect supervision CE        \u2014 REQUIRED for grounding\n  L_entcal  entropy calibration                 \u2014 correlate H with error\n  L_recall  memory recall/helpfulness           \u2014 needs helpfulness signal (stub)\n  L_dha     DHA preference/style                \u2014 needs preference labels (stub)\n  L_stab    stability/convergence (ponder+delta)\u2014 from refinement core",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2b14e6cc2ff7f6d0",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/model/mock.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Realistic model-shaped mock planner.\n\nEmits plan JSON in the same shape a real planner model would (an ``actions`` array\nof {tool, description, arguments}). Deterministic given the task text. This is a\nmock (option 4), used alongside the recorded-replay adapter (option 3) for\nreproducibility. It is NOT a live model.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2b4b7a707e14d84a",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "V10.4: Compute phase confidence for conditional quad invocation.\n\nHigh confidence means phase state is stable/consistent, so quad\nretrieval can potentially be skipped to save compute.\n\nArgs:\n    memory_state: [B, N, D] - current phase memory state\n\nReturns:\n    confidence: [B, N] - per-position confidence in [0, 1]",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2bb575e0296a5318",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/adversarial_hardening.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Compute penalty for ungrounded confidence.\n\nArgs:\n    cognitive_state: [B, T, state_dim]\n    epistemic_source: [B, T] source type (0-4)\n\nReturns:\n    penalty: [B, T] penalty for claiming certainty without proper source",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2bc7abcdd33279d6",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/logic_gates.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Complete Logic Gate combining:\n- Axiom checking (hardcoded constraints)\n- Vy\u0101pti validation (learned implications)\n- Hetv\u0101bh\u0101sa detection (fallacy prevention)\n\nThis is the \"logical physics\" layer that ensures outputs\nare logically consistent, not just statistically likely.\n\nUsage:\n    logic_gate = LogicGate()\n\n    # During generation\n    validity, info = logic_gate(\n        cognitive_state=state,\n        premise=premise_embed,\n        conclusion=conclusion_embed,\n    )\n\n    if not validity:\n        # Block output or modify\n        ...",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2c01c54d50c4ad54",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Enable or disable phase diversity capture on all PhaseAttentionLayer modules.\n\nArgs:\n    model: Model containing PhaseAttentionLayer modules\n    enable: Whether to enable capture\n\nReturns:\n    Number of PhaseAttentionLayer modules found",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2c6b68d4e35fe978",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_use_evaluator/use/stats.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Bootstrap the AUROC difference (s1 - s2) on the same samples (robust complement to DeLong).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2d0de6938a07f0f8",
+    "claim_family": "mathematical",
+    "gold_obligation": "LOGICAL_OR_MATHEMATICAL_VERIFICATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognitive_state.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Project to dictionary format (matches Google's CognitiveStateProjector).\n\nArgs:\n    hidden: [B, T, hidden_dim] or [B, hidden_dim]\n\nReturns:\n    Dict with topic, ontology, entropy (computed from ontology)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2d9199cc096839e9",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "agentic/causal_world_model.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Forward pass with causal reasoning.\n\nArgs:\n    x: [B, N, D] token embeddings\n    causal_state: Optional existing causal state\n    entity_mask: [B, N] optional entity position mask\n\nReturns:\n    output: [B, N, D] output embeddings\n    causal_state: Updated causal state\n    dag_loss: DAG constraint loss",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2d98a13cfa1d6656",
+    "claim_family": "process_description",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "agent_runtime_migration/reasoning/model_reasoner.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Model reasoner \u2014 advisory reflection TEXT only. The reflection DECISION stays\ndeterministic (from the governed outcome); the model may add rationale, never a\ngovernance decision.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2db13b9d70c998c1",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognade_complete.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Create a fully configured Cognade model.\n\nArgs:\n    base_model: The base transformer model\n    hidden_dim: Hidden dimension\n    vocab_size: Vocabulary size\n    tau_base: Phase-Lock threshold\n\nReturns:\n    CognadeComplete model",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2e3f2c02ef4b9f6c",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/hybrid_rag_integration.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Initialize Hybrid RAG Engine.\n\nArgs:\n    config: Hybrid RAG configuration\n    state_projector: Pre-initialized state projector (creates one if None)\n    state_dim: Dimension of cognitive states\n    hidden_dim: Dimension of hidden states (for projector)",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2ec42f31622bec24",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Estimate KV bytes per block from the engine + model config.\n\nThe estimate is per_token = layers * kv_heads * head_dim * 2\n(bf16) for one layer's K + one layer's V, then * block_size\ntokens. Uses vLLM's loaded config when available; falls back\nto a 256 KiB-per-block default if attributes aren't found\n(better than 0, won't be far off for 7-13B GQA models).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2ee75f213ab1ac72",
+    "claim_family": "medical",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Enable or disable health diagnostics capture on all PhaseAttentionLayer modules.\n\nWhen enabled, captures phi_q, phi_k, and a_k (all detached) for health analysis.\nThis has NO effect on training - all captures are detached.\n\nArgs:\n    model: Model containing PhaseAttentionLayer modules\n    enable: Whether to enable capture\n\nReturns:\n    Number of PhaseAttentionLayer modules found",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2f713c46ba28e7e1",
+    "claim_family": "performance",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md",
+    "source_role_hint": "generated_documentation",
+    "synthetic": false,
+    "text": "# Phase 4 GPU Findings \u2014 Honest Write-up\n\n**Session date:** 2026-05-09 \u2192 2026-05-10\n**Branch:** `claude/safety-state-machine-EXAlZ`\n**Hardware:** RunPod A100 80GB\n**Model:** Qwen2.5-7B-Instruct (vLLM 0.7.3, enforce_eager=True)\n**Total GPU spend:** ~$1.60 spot\n**Audience:** partner-pitch authors, technical reviewers, the engineering\nteam's next iteration on CTM+\n\nThis document is the canonical record of what the May 2026 Phase 4\nGPU validation attempted, what it produced, and what the result\nhonestly means. It is the doc to share with a partner who asks \"did\nyour trig scoring beat LRU?\"\n\n## \u00a71. TL;DR\n\nNine GPU runs against real Qwen2.5-7B in vLLM 0.7.3, ~$2.05 total\nspot. Three durable findings, in order of significance:\n\n1. **Mechanism is dominantly active (v6).**\n   `phase4_trig_changed_pick / phase4_trig_blend_evict_calls = 61.8%`.\n   The trig signal flipped the policy's first pick on 68 of 110\n   eviction decisions. First measured proof that CTM+ Phase 4's\n   trig scoring is changing eviction decisions on a real model.\n\n2. **Per-token cache quality improves vs LRU (v5).**\n   `\u221211% swap_out per decode_token` against the proper LRU baseline\n   (v3). First measured cache-quality win against vLLM's native\n   eviction. Caveat: workload doesn't produce `swap_in_blocks > 0`,\n   so we can't directly prove evicted blocks were the \"right\" ones\n   to evict \u2014 only that fewer were evicted per unit of useful work.\n\n3. **End-to-end throughput regresses 20% on the Python prototype.**\n   The mechanism's per-evict overhead (8-candidate scoring, per-rotary\n   hook fires, K capture CPU sync) costs ~17 tokens/sec on this\n   workload. The wall-clock cost more than erases the 11% per-token\n   win at production speeds today.\n\nPlus a process finding: **the session caught seven audit-pass\nfindings** \u2014 bugs in the implementation that the prior CPU mocked\ntests had not surfaced. All seven fixed in source. A new CPU fixture\n(`tests/test_vllm_protocol_fixture.py`) drives the cross-call\nalloca",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2f9c05f7c4590914",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/runner_vllm.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Best-effort extraction of per-tier counters from vLLM.\n\nvLLM 0.7+ exposes block-swap operations via the\n``CpuGpuBlockAllocator.get_and_reset_swaps()`` method on the\nblock manager's ``block_allocator``. We snapshot the count of\nswaps that occurred during the run and convert to bytes using\nthe engine's configured block size + dtype.\n\nFor vLLM \u2264 0.6.x (older ``BlockSpaceManagerV1``), there is no\npublic swap-counter API and we fall back to zero counters\nwith a documented limitation.\n\nThe downstream :class:`RunResult` honestly reports any gaps\nvia zero-valued counters rather than fabricating numbers, and\nsets ``mode_b_counter_source`` to a string explaining what\nwas actually measured.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-2fc678f033325142",
+    "claim_family": "code_behavior",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/safety_adapters/shadow_planner_hook.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Disabled-by-default shadow hook around a live planner (Phase 3 \u00a74, \u00a77).\n\nWraps a REAL planner by composition (no production edit): ``InstrumentedTaskPlanner``\nreturns the real planner's ``Plan`` byte-identically and, only when the hook is\nENABLED, records an out-of-band ACP shadow evaluation of that plan. The hook:\n\n  * defaults OFF (``enabled=False``);\n  * never alters the returned plan and never changes the planner's exception\n    behaviour;\n  * contains ALL its own exceptions -> a shadow failure cannot block or alter the\n    authoritative path (records ``shadow_error=True`` instead);\n  * writes to a BOUNDED ring buffer so shadow logging cannot create a DoS path;\n  * produces records explicitly marked ``shadow_only=True``;\n  * never reaches an actuator/controller.\n\nCommit-time revalidation (\u00a77) is provided for the harness to check, before the\nruntime would send the action, whether the earlier ACP evaluation would still be\nvalid (world/trajectory identity unchanged, evidence fresh). It does NOT gate\nexecution.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-304d9bfef6941b07",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/complementarity_probe/exp1_invariance.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Experiment 1 \u2014 Synonym invariance of Symbol-U, per backend (no LLM, offline).\n\nThe cheapest kill switch (SYMBOL_U_RESEARCH_STRATEGY.md \u00a78.1). The patent claims\nSymbol-U is a *semantic* coordinate system. If so, synonyms (same meaning,\ndifferent sound) should map to SIMILAR `U` vectors. If `U` is really phonological\n(a function of sound), synonyms scatter.\n\nWe compute the between-vs-within invariance index over curated synonym groups,\nwith a permutation p-value, for EVERY U backend (vritti_mapper, pse_meaning,\npse_resonance, combined) plus the raw phonological (SoundClass) null. The whole\npoint of adding the PSE backends is to test whether the phoneme->MEANING layer\nmakes `U` more synonym-invariant than the vritti_mapper approximation.\n\nDecision (pre-registered):\n  index \u2248 0 (synonyms scatter)  -> FAIL: U is phonological, not semantic.\n  index >> 0 and p small        -> synonyms cluster: U carries meaning-aligned signal.\n\nRun:  python -m symbolu_neural.complementarity_probe.exp1_invariance\n      python -m symbolu_neural.complementarity_probe.exp1_invariance --backends pse_meaning",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-3103382bb5e0a979",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_extensions/experimental/cognade_complete.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Enforce confidence-entropy coupling in dynamics vector.\n\nArgs:\n    dynamics: [B, T, 4] = [coherence, entropy, confidence, momentum]\n\nReturns:\n    coupled_dynamics: [B, T, 4] with entropy = 1 - confidence",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-3122fac4edce6d1f",
+    "claim_family": "code_behavior",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/api_control_protocol/pilot.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "API control-protocol pilot orchestrator.\n\nFor each arm \u00d7 target axis \u00d7 prompt: build the control message, call the LLM\n(mock offline / anthropic real), and evaluate. Aggregates adherence, token cost,\nconsistency, and paraphrase stability.\n\nNOTE: with the `mock` backend the adherence numbers are PLUMBING-ONLY (the mock\nencodes the null by assumption). Token cost and the redundancy/structure findings\nare real regardless of backend. The decisive adherence result requires the\n`anthropic` backend (API key needed).",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-31516a348bc37f26",
+    "claim_family": "process_description",
+    "gold_obligation": "CONTEXTUAL_SUPPORT_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/errors.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "A NaN / +Inf / -Inf value reached a field that must be finite.\n\nRaised loudly rather than allowing an ambiguous value into an identity or a\nsafety-relevant margin.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-316b18a74ba890cf",
+    "claim_family": "medical",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/phase_transformer.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Two-Tier AGI Architecture: Ontological (slow/semantic) + Hybrid (fast/generation).\n\nV11.0.0: Phase rotation uses Bhava-only delta (12D), not full 32D.\n\nSeparated Sovereign State planes:\n  Phase Plane (12D Bhava-only \u2192 phase rotation):\n    [0:12]  12 Bhavas (Ontological Aspects) \u2014 WHAT mode of being\n  Control Plane (16D \u2192 CTM+/Sentinel/Governor):\n    [12:17] 5 Koshas (Consciousness Sheaths) \u2014 HOW DEEP to process\n    [17:22] 5 Vrittis (Mental Modifications) \u2014 HOW RELIABLE is this\n    [22:28] 6 Gunas (Energy States) \u2014 WHAT ENERGY dynamics\n  Learning Plane (4D \u2192 training-time only):\n    [28:32] 4 Reserved (Toroidal Feedback) \u2014 scratch/JEPA channels\n\nThis combines:\n1. Ontological Layer: Projects full 32D Sovereign State, extracts 12D Bhava delta\n2. Hybrid Layer: Local + Phase attention, conditioned on \u0394Bhava via phase rotation\n\nTheory:\n    - System 2 (Ontological): Slow, deliberate semantic reasoning\n    - System 1 (Hybrid): Fast, automatic pattern completion\n    - \u0394Bhava \u2192 Phase Rotation: Identity changes HOW tokens relate, not WHAT they are\n    - Control signals (Koshas/Vrittis/Gunas) \u2192 separate control plane, not attention\n\nInitialization:\n    - State projector biased toward O12_ABS (Absolute) and Material (Physicality)\n    - Represents \"Absolute Potential\" - pure awareness grounded in physical reality\n\nFrom ONTOLOGICAL_STATE_DELTA_DESIGN.md:\n    \"z_lower' = z_lower \u00d7 e^{i\u03b8_higher}\"\n\nUsage:\n    model = OntologicalHybridTransformer(...)\n    output = model(input_ids)  # Computes \u0394Bhava and applies phase rotation\n\nMemory (at 10M context):\n    - Token-centric: 2TB (impossible)\n    - State-Delta (Tier 2): 30GB\n    - Ontological (Tier 3): 5GB (full 32D state retained for control/diagnostics)\n    - Phase-critical: 12D Bhava only \u2192 even smaller footprint",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-3235741ad09ad579",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "benchmarks/vllm_bridge.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "vLLM real-runtime bridge for PCAM (Phase 4).\n\nThis module provides a narrow, lazy-import path for running a real\n``vllm`` inference and deriving a ``TraceEvent`` stream that can then\nbe replayed through PCAM. It is NOT imported at package load, and it\ndoes NOT take a runtime dependency on ``vllm``. The heavy import\nhappens inside ``generate_with_derived_trace`` the first time a real\nrun is requested.\n\nScope \u2014 \"shadow mode\", not \"active eviction control\"\n----------------------------------------------------\nPhase 4 runs vLLM with its default eviction policy and derives a\nPCAM-compatible trace from the observable sequence structure\n(prompt lengths, generated token counts, sequence ids). That trace\nis then replayed through ``simulator.pcam.kv_policy.KVCachePolicy``\nso PCAM can report what it *would* have done on the same workload.\n\nThis is deliberately \"shadow mode\":\n\n- It exercises a real model on real inputs.\n- It produces policy-decision numbers that are honest \u2014 PCAM really\n  did run against a real-vLLM-shaped workload.\n- It does NOT patch vLLM's internal evictor. Patching vLLM's\n  ``BlockSpaceManager`` is fragile across vLLM releases and was\n  explicitly scoped out of Phase 4.\n\nA future \"active mode\" phase will add a ``vllm.core.evictor`` ABC\nsubclass and a small monkey-patch that installs PCAM as vLLM's real\neviction policy. That phase is not this one.\n\nHonesty notes\n-------------\n- The derived trace is a structural reconstruction, not a per-layer\n  attention capture. Block admissions come from the observed\n  (prompt_length + completion_length) // block_size. Attention\n  events are synthesized as uniform-weight touches per generated\n  token \u2014 this is a correct \"the block was touched at decode step N\"\n  signal, but it is NOT the per-block attention mass a model hook\n  would give you. For that, see ``pcam_trace_extract.py``, which\n  uses HuggingFace forward hooks on a separate model run.\n- Sink tokens are derived from the PCAM default (positions < 4);\n  this matches the Phase 1 convention.\n- No model weights ship with this file. The caller must provide a\n  model name that vLLM can download or load from disk, and a GPU\n  with enough VRAM to host it.",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "INDEPENDENT_CORROBORATION_REQUIRED",
+      "HUMAN_REVIEW_REQUIRED"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-32bf83216aa336ad",
+    "claim_family": "code_behavior",
+    "gold_obligation": "HUMAN_REVIEW_REQUIRED",
+    "human_review_required": true,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_robotics/autonomous_control_plane/interfaces.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Produce a validated, immutable ``CanonicalWorldState``.\n\ninputs: raw world model (implementation-specific).\noutputs: a ``CanonicalWorldState`` (with a content ``version``).\ndeterminism: pure w.r.t. its inputs + injected clock; no ambient time.\nboundedness: O(sources); bounded by a fixed source/obstacle cap.\nfailure: raise ``SchemaValidationError`` / ``NonFiniteValueError`` on invalid\n         or stale input \u2014 never return a partially-valid snapshot.\nsafety_critical: YES (its output gates every downstream decision).",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-32c49572a6377635",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_core/inference_rag.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Simple autoregressive generation fallback.\n\nArgs:\n    model: The model\n    input_ids: Input token IDs\n    max_new_tokens: Max tokens to generate\n    temperature: Sampling temperature\n    top_k: Top-k sampling\n\nReturns:\n    Generated token IDs",
+    "unacceptable_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ],
+    "annotators_agree": false,
+    "artifact_class": "internal",
+    "artifact_id": "nat2-32e18dd2ef3716a4",
+    "claim_family": "code_behavior",
+    "gold_obligation": "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "CTM_plus/Bench/ctm_bench/sweep_utils.py",
+    "source_role_hint": "primary_implementation",
+    "synthetic": false,
+    "text": "Filter `requested_tokens` against `model.config.max_position_embeddings`.\n\nReturns ``(allowed, skipped, max_pos)``:\n  * `allowed`: lengths the model can handle. Use these for the sweep.\n  * `skipped`: lengths that exceed max_pos (would crash mid-prefill).\n  * `max_pos`: the model's window, or None if the config doesn't\n    expose it (in which case all requested lengths pass through\n    and the caller continues at their own risk).\n\nLogs a WARNING for each skipped length so the operator sees it\nin stdout before the sweep starts.\n\nDoes NOT raise. The caller decides whether to abort or proceed\nwith the filtered set \u2014 for a multi-axis sweep, dropping the\nover-window lengths and continuing is usually better than aborting\nthe whole run.",
+    "unacceptable_obligations": []
+  }
+]

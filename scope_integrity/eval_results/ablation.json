@@ -1,0 +1,82 @@
+{
+  "general": {
+    "-exception_prefix": {
+      "evq": 0.0,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    },
+    "-gating (ungated)": {
+      "evq": 0.0,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    },
+    "-postfix_exception": {
+      "evq": 0.0,
+      "false_rej": 0.0,
+      "unsafe": 0.0682
+    },
+    "-qualifier_prefix": {
+      "evq": 0.0,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    },
+    "-reference_resolution": {
+      "evq": 0.0026,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    },
+    "-subject": {
+      "evq": 0.0,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    },
+    "FULL": {
+      "evq": 0.0,
+      "false_rej": 0.0682,
+      "unsafe": 0.0
+    }
+  },
+  "scope": {
+    "-exception_prefix": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.2222
+    },
+    "-gating (ungated)": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.1111
+    },
+    "-postfix_exception": {
+      "evq": 0.0,
+      "false_rej": 0.037,
+      "unsafe": 0.2991
+    },
+    "-qualifier_prefix": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.2963
+    },
+    "-reference_resolution": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.1481
+    },
+    "-subject": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.1481
+    },
+    "FULL": {
+      "evq": 0.0,
+      "false_rej": 0.0741,
+      "unsafe": 0.1481
+    }
+  },
+  "scope_elements": [
+    "exception_prefix",
+    "postfix_exception",
+    "qualifier_prefix",
+    "subject"
+  ]
+}

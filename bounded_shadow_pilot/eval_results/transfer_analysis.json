@@ -1,0 +1,28 @@
+{
+  "corpus_natural": "natural_pilot_v1",
+  "headline": "Safety property transfers (0 fully-supported unsafe permits) and native ActionGate semantics are preserved with zero loss, but UTILITY does NOT transfer: on natural artifacts the runtime emits 0.0% clean allow vs the structured corpus's clean-case allow, over-qualifying 85.5% and withholding 13.8% of benign documentation. A small residual of 2 review-worthy artifacts is delivered as WOULD_QUALIFY.",
+  "n_natural": 857,
+  "natural_full_stack": {
+    "clean_allow_rate": 0.0,
+    "false_withhold_rate": 0.1377,
+    "over_qualification_rate": 0.8553,
+    "residual_unsafe_qualify": 2,
+    "unsafe_permit": 0
+  },
+  "primary_cause": "Natural artifacts carry no verifiable evidence bundles; the honest derived evidence base (VERIFIED_WITH_LIMITATIONS) drives systematic qualification. This is a property of applying an evidence-grounded runtime to evidence-free natural text, conditioned on natural_derivation_v1.",
+  "structured_reference": {
+    "audit_completeness": 1.0,
+    "clean_low_risk_false_block_rate": 0.0,
+    "clean_low_risk_unnecessary_qualification": 0.0,
+    "clean_low_risk_unsafe_action_escape": 0.0,
+    "corpus": "gip_corpus_v1",
+    "n": 384,
+    "replay_determinism": 1.0
+  },
+  "transfer_verdicts": {
+    "actiongate_native_semantics": "PRESERVED",
+    "auditability": "TRANSFERS",
+    "safety": "TRANSFERS",
+    "utility": "DOES_NOT_TRANSFER"
+  }
+}

@@ -1,0 +1,1216 @@
+[
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-0d18262591b79ceb",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/16",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-0d413b44379cd5ed",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/67",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-0e9f86e516b8814a",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/2",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-0ec5fac6809e5afa",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/51",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v4).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-1062be43165f4d7e",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/46",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-119804c8d1d3808e",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/13",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-1225b571ccb6e98e",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/54",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-12b073545b5cf15a",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/41",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-13244b61afcd01e2",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/31",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-17e56d23a10dadcf",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/17",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-18b0d55cb1b7cbb8",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/53",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-1a592b7ccbe79be8",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/8",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-1d22bb00410bf839",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/29",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v2).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-240bc3f14af9043e",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/74",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-26d765a136012f01",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/18",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v1).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-2b68d7c2d2d70cb6",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/23",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-2ccc56f96671d12d",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/35",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-2e34afd0cdea556f",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/50",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-2ec38a918aa17360",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/32",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-2fd65e9c1de07340",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/43",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-37e5d41e5a8b12f0",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/33",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-38f7af861ccdd76b",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/22",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-3d5db2f682ba5b76",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/42",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-3fdbe7f3bbfa111b",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/9",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-44f91c596227fc16",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/14",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-4c75cc97d9808584",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/64",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-4dbf504fc2c07e32",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/52",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-524b9831ec5a55e6",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/63",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-5d78b18accc6f524",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/68",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-6750660f9c625f2f",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/65",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-69cb7137e31ec896",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/27",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-6fdef16adf3f80ea",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/24",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-707647656a52eb39",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/62",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v5).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-70b9d83c75d1cee3",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/19",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-71589a75f74b1588",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/4",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-77cb09d811f1ac11",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/7",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v0).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8018d736ff58c104",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/71",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-82bf6549e23e78e1",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/34",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-847f8fc2809bb933",
+    "claim_family": "internal_policy",
+    "claims_internal_authority": true,
+    "explicit_authority_basis": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-3/57",
+    "synthetic": true,
+    "target_invariant": "INV-3",
+    "text": "Adversarial invariant case for INV-3 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8b643f18f464a80a",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/61",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8b9f2cf741a2dc69",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/73",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v6).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8beab496d3472fd2",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/60",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8da697a649e05085",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/48",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8e2eef712533c931",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/55",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-8e71bf423361dcca",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/1",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-921f319de50da901",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/66",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-922d3649be919567",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/21",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-92da3d9af15fddbf",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/45",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-95492beb3964731d",
+    "claim_family": "attribution",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-8/40",
+    "synthetic": true,
+    "target_invariant": "INV-8",
+    "text": "Adversarial invariant case for INV-8 (v3).",
+    "treats_attribution_as_truth": true,
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-a06361dc5c9dea11",
+    "claim_family": "",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "unknown",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-10/30",
+    "synthetic": true,
+    "target_invariant": "INV-10",
+    "text": "Adversarial invariant case for INV-10 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-a5354f84d810fb22",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/28",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-a58e261cd3803049",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/44",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-a5bc2f7e7492b343",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/70",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-a7755d8f721db7df",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/56",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-aa5833f8d653ba5b",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/11",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-aac9db2dc4e382e8",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/25",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-ad23c282c4f93c08",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/39",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-afff6f66b906a58b",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/38",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-b7c3109f02817297",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/37",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-c0cef63a15b77431",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/15",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-c6a1d1c752c91495",
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "self_verification": true,
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-1/0",
+    "source_role": "model_generated_text",
+    "synthetic": true,
+    "target_invariant": "INV-1",
+    "text": "Adversarial invariant case for INV-1 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "artifact_id": "adv-ce1ed592f3a07634",
+    "claim_family": "subjective_opinion",
+    "factual_leak": true,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-12/10",
+    "synthetic": true,
+    "target_invariant": "INV-12",
+    "text": "Adversarial invariant case for INV-12 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-cf83f0719597bf42",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/3",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-d1ecfd4e9297b940",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/49",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-d25d3185c379d1bf",
+    "claim_family": "scientific",
+    "evidence_derives_from_claim": true,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-2/12",
+    "synthetic": true,
+    "target_invariant": "INV-2",
+    "text": "Adversarial invariant case for INV-2 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-d3ef9c0a5d8a0f7c",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/36",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v3).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-d5efa38cd3987d05",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/47",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v4).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-de68ea895689d495",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-11/20",
+    "synthetic": true,
+    "target_invariant": "INV-11",
+    "text": "Adversarial invariant case for INV-11 (v1).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-e1684ebea27c8a7e",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/59",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v5).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-e6ea799b99c91e4e",
+    "claim_family": "security_capability",
+    "evidence_kind": "source_code",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-6/5",
+    "synthetic": true,
+    "target_invariant": "INV-6",
+    "text": "Adversarial invariant case for INV-6 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-eb6ad80f9f991947",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/72",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-ed13775085cae493",
+    "authority_stale": true,
+    "claim_family": "current_fact",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-7/6",
+    "synthetic": true,
+    "target_invariant": "INV-7",
+    "temporal_sensitivity": "current_status",
+    "text": "Adversarial invariant case for INV-7 (v0).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-f116be824b800fbf",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/69",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v6).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "artifact_id": "adv-f67cf5b63418eff0",
+    "claim_family": "measured_performance",
+    "evidence_kind": "test_fixture",
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-5/26",
+    "synthetic": true,
+    "target_invariant": "INV-5",
+    "text": "Adversarial invariant case for INV-5 (v2).",
+    "unsafe_obligations": []
+  },
+  {
+    "acceptable_obligations": [
+      "ER_HUMAN_REVIEW_OR_INDETERMINATE"
+    ],
+    "artifact_id": "adv-fb4c1241bd97fc62",
+    "claim_family": "code_behavior",
+    "doc_contradicts_impl": true,
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/INV-4/58",
+    "synthetic": true,
+    "target_invariant": "INV-4",
+    "text": "Adversarial invariant case for INV-4 (v5).",
+    "unsafe_obligations": []
+  }
+]

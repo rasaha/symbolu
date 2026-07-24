@@ -1,0 +1,17 @@
+{
+  "caveat": "SIMULATED reviewers. Low reviewer agreement (H0-14 risk) reflects the two rubrics' different axes; a real review study is required before external-pilot readiness.",
+  "clean_allow_safety_agreement": 0.74,
+  "component_matches_a_reviewer_or_gold": 0.736,
+  "high_risk_agreement": 0.6471,
+  "method": "deterministic dual-rubric simulation (annotators A and B as two reviewers)",
+  "n": 250,
+  "override_direction": {
+    "toward_looser": 36,
+    "toward_stricter": 74
+  },
+  "override_rate": 0.44,
+  "review_sha256": "263d8a7ab62dabc265ada81e39bc4f8965885d5ca7a8608e422a5c52afb4bea7",
+  "reviewer_agreement": 0.316,
+  "simulated": true,
+  "simulated_review_time_units_per_item": 5
+}

@@ -1,0 +1,103 @@
+{
+  "activated": false,
+  "decision": "NOT ENOUGH COMPLETED HUMAN REVIEWS",
+  "eligibility": {
+    "activatable": false,
+    "adjudicator": {
+      "failures": [
+        "absent / not supplied"
+      ],
+      "is_adjudicator": true,
+      "is_real": false,
+      "passed": false,
+      "reviewer_id": null,
+      "role": null,
+      "slot": "A1"
+    },
+    "real_reviewer_count": 0,
+    "reason": "Activation blocked: not all required reviewers are real and eligible. R1: pseudonymous_id is missing / unfilled placeholder, real_reviewer asserted but not backed by a filled, non-placeholder ID, role is missing / unfilled placeholder, confidentiality acknowledgment not complete (YES required), conflict-of-interest declaration not complete (YES required), approved access scope is missing / unfilled placeholder; R2: pseudonymous_id is missing / unfilled placeholder, real_reviewer asserted but not backed by a filled, non-placeholder ID, role is missing / unfilled placeholder, confidentiality acknowledgment not complete (YES required), conflict-of-interest declaration not complete (YES required), approved access scope is missing / unfilled placeholder",
+    "reviewers": [
+      {
+        "failures": [
+          "pseudonymous_id is missing / unfilled placeholder",
+          "real_reviewer asserted but not backed by a filled, non-placeholder ID",
+          "role is missing / unfilled placeholder",
+          "confidentiality acknowledgment not complete (YES required)",
+          "conflict-of-interest declaration not complete (YES required)",
+          "approved access scope is missing / unfilled placeholder"
+        ],
+        "is_adjudicator": false,
+        "is_real": false,
+        "passed": false,
+        "reviewer_id": null,
+        "role": null,
+        "slot": "R1"
+      },
+      {
+        "failures": [
+          "pseudonymous_id is missing / unfilled placeholder",
+          "real_reviewer asserted but not backed by a filled, non-placeholder ID",
+          "role is missing / unfilled placeholder",
+          "confidentiality acknowledgment not complete (YES required)",
+          "conflict-of-interest declaration not complete (YES required)",
+          "approved access scope is missing / unfilled placeholder"
+        ],
+        "is_adjudicator": false,
+        "is_real": false,
+        "passed": false,
+        "reviewer_id": null,
+        "role": null,
+        "slot": "R2"
+      }
+    ]
+  },
+  "external_pilot": "BLOCKED",
+  "final_set_may_open": false,
+  "frozen_state": {
+    "checks": [
+      {
+        "check": "prior_artifact_guard_reviewer_ready",
+        "detail": "45 guarded",
+        "ok": true
+      },
+      {
+        "check": "prior_artifact_guard_reviewer_calibration",
+        "detail": "59 guarded",
+        "ok": true
+      },
+      {
+        "check": "frozen_minimal_policy_version",
+        "detail": "minimal_evidence_policy_v1",
+        "ok": true
+      },
+      {
+        "check": "reviewer_guide_and_interface_version",
+        "detail": "review_interface_v1",
+        "ok": true
+      },
+      {
+        "check": "evaluation_protocol_freeze",
+        "detail": "reviewer_ready future-eval freeze",
+        "ok": true
+      },
+      {
+        "check": "native_actiongate_vocabulary",
+        "detail": "6 outcomes",
+        "ok": true
+      },
+      {
+        "check": "no_threshold_drift",
+        "detail": "stop-condition thresholds == freeze",
+        "ok": true
+      }
+    ],
+    "ok": true
+  },
+  "human_validation": "NOT_EVALUATED",
+  "note": "Activation blocked at the eligibility gate: no real, eligible reviewer roster was supplied (fields are unfilled template placeholders). Per the frozen rules, reviewers are never inferred or fabricated. No training, qualification, calibration, or human metric was produced; all remain NOT EVALUATED.",
+  "production_readiness": "NOT_READY",
+  "stages_run": [
+    "phase1_frozen_state",
+    "phase2_eligibility"
+  ]
+}
