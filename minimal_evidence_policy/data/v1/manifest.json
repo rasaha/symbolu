@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "ADVERSARIAL_INVARIANTS": 75,
+    "DEVELOPMENT": 100,
+    "HELD_OUT_NATURAL": 250,
+    "HUMAN_REVIEW_SET": 50
+  },
+  "dataset_version": "minimal_evidence_policy_v1",
+  "evidence_status": "SUFFICIENT",
+  "natural_available": 676,
+  "partition_sha256": {
+    "ADVERSARIAL_INVARIANTS": "c75ed4db6296f500d4a4356a61f480d294f135f9d25e051f25c51e55e5cb6786",
+    "DEVELOPMENT": "6fc436e7a8f0455fa265ef85a12b03a05b2a6dd2934492ec1ef681ba4374f917",
+    "HELD_OUT_NATURAL": "a91e15373a0c0c3e7d0f04e21f4ef437d890b3caa774bdf6ad668a70e49ef85f",
+    "HUMAN_REVIEW_SET": "cf973c013b9c6811e768eb6276241dd1b04952f60940fb65c9797a2886c3f2d9"
+  }
+}

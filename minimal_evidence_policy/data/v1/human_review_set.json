@@ -1,0 +1,1372 @@
+[
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-54e3f66381947418",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "varna_lens/RESULTS_UTILITY_SIGNAL_CORRECTED_LEXICON.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Results \u2014 non-lexical UTILITY test, CORRECTED-LEXICON re-run\n\n> **This is the corrected-lexicon run.** Same pre-registered harness, scramble (pair-preserving),\n> thresholds, wordlist, templates, judge rubric, and metric as `RESULTS_UTILITY_SIGNAL.md` \u2014 only the\n> lexicon changed (8 source-corrected entries). The prior result stays attached to the pre-correction\n> lexicon and is **not** merged with this one.\n\n## Run identity\n- **Lexicon version / commit:** `38e38d3`\n- **Entries:** 34 consonants + 12 vowels \u00b7 **Corrected letters:** Ca, Ja, Ma, Ra, Va, \u015aa, \u1e62a, Sa\n- **Test:** `varna_lens/utility_test.py` `emit_pairs` (124 words, one use_case each; real vs scrambled-seed0,\n  order randomized & hidden; scramble permutes (worldly,counter) pole-PAIRS as units \u2192 preserves antonym\n  pairing, +/\u2212 structure, gloss multiset, output length) \u2192 blind A/B LLM judges (sub-agents) scoring six\n  1\u20135 dims (coherence/depth/usefulness/specificity/non_generic/fit) \u2192 `score_pairs`. **Judge mode: blind\n  LLM (7 sub-agents).**\n\n## PRIMARY VERDICT (recorded before any explanatory analysis)\n\n| metric | value |\n|---|---|\n| utility(real) \u2212 utility(scrambled): **\u0394** | **+0.067**  (95% bootstrap CI **\u22120.007 \u2026 +0.140**) |\n| real-preferred rate | 0.556  (95% CI 0.472 \u2026 0.641 \u2014 **includes 0.50**) |\n| MIN_EFFECT (practical threshold) | 0.30 |\n\n### VERDICT: **NO_UTILITY_SIGNAL**\n95% CI(\u0394) contains 0, and \u0394 (0.067) is far below MIN_EFFECT (0.30). No measurable utility advantage for the\nreal sound\u2192propensity mapping over a pair-preserving scramble.\n\n### Position-bias diagnostic\nJudges preferred the second-shown artifact \"B\" 72\u00d7 vs \"A\" 46\u00d7 (6 ties). Splitting by where *real* was placed\n(balanced 62/62): \u0394(real=A) = **+0.012**, \u0394(real=B) = **+0.122** \u2014 the effect tracks position, not content.\nBecause placement is balanced, position bias cancels in the aggregate (leaving the +0.067), but the bias is\nagain comparable to or larger than the effect. Judge unreliability persists.\n\n### Per-use-case \u0394 (all sub-th",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-5567fa4d5062fed3",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_22_PR_SUMMARY.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 22: Mirror-Time Cycle Engine - Invariance Audit & Remediation PR Summary\n\n**PR Type:** Test-Only Invariance Audit + Minor Scoping Fix\n**Phase:** Phase 22 - Mirror-Time Cycle Engine (MTCE) v1.0\n**Branch:** `claude/phase-22-mirror-time-cycle-01URYA3aHvxmt57CCcSAQgMk`\n**Status:** \u2705 READY FOR MERGE\n\n---\n\n## Overview\n\nThis PR adds comprehensive invariance audit testing for Phase 22 (Mirror-Time Cycle Engine), following the established Phase 10/21/27-50 audit pattern. Includes one minor scoping fix in `session_store.py` to improve null safety for Phases 47-50.\n\n### What is Phase 22?\n\nThe **Mirror-Time Cycle Engine (MTCE)** is a zero-LLM, observation-only analytical layer that builds on Phase 21 (Mirror-Time Loop) to detect and classify mirror-time cycles at the conversation level. It segments loop history into discrete cycles and provides cycle-level diagnostics.\n\n**Key Metrics:**\n- `cycle_boundaries` - Detected via local extrema + threshold crossings\n- `cycle_type` {converging, diverging, oscillating, stalled} - Cycle classification\n- `forward_gradient` - Linear regression slope of loop_delta over cycle\n- `stability_band` {stable, transitional, unstable} - Dominant stability classification\n- `reversal_bias` {toward_alignment, toward_divergence, neutral} - Directional tendency\n- `avg_cycle_alignment` [0.0, 1.0] - Mean alignment over cycle\n- `avg_cycle_tension` [0.0, 1.0] - Mean tension over cycle\n- `avg_cycle_reversal_probability` [0.0, 1.0] - Mean reversal probability\n\n**Builds On:** Phase 21 (Mirror-Time Loop Engine)\n**Consumed By:** Phase 23 (Cause-Effect Inversion)\n\n---\n\n## Changes Summary\n\n### Files Added\n\n1. **tests/test_phase22_mirror_time_cycle_invariance_audit.py** (1,416 lines)\n   - 109 new invariance tests across 11 test classes\n   - Comprehensive behavioral verification\n   - Structural guarantees (grep-based validation)\n   - Integration tests (CoherenceEngine, UnifiedAPI, SessionSummary)\n   - Edge case and null safety testing\n\n2. **PHASE_22_REMEDIATION",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-5572380828d32ea5",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_29_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 29 MERGE-SAFETY REPORT\n**Cross-Layer Resonance \u2192 Persona Engine Integration**\n\n---\n\n## SECTION 1 \u2014 EXECUTIVE SUMMARY\n\n### Merge Verdict: **SAFE TO MERGE \u2705**\n\nPhase 29 introduces **Persona Resonance Integration**, a deterministic, zero-LLM, observation-only layer that maps Symbolic Harmonization Formula (SHF) outputs into micro-adjustments of persona tone parameters.\n\n**Why Phase 29 is Safe to Merge:**\n\n1. **Tone-Only Modulation**: All adjustments are strictly confined to tone parameters (metaphor_adjustment, warmth_adjustment, structure_adjustment) with bounded ranges of \u00b10.03 (3% max deviation).\n\n2. **Zero Semantic Impact**: Phase 29 NEVER modifies:\n   - Routing (TTOR/MLCR)\n   - Mapper activation (HRM/LCM/LAM)\n   - Coherence scoring (v1/v2/v3/fused/UCF)\n   - Fusion/DHA/Renderer semantic output\n   - Persona selection logic\n   - Layer content or ordering\n\n3. **Observation-Only**: Phase 29 is purely diagnostic. The `PersonaResonanceProfile` is attached to `PersonaResponse` for observability but does NOT affect any control flow decisions.\n\n4. **Graceful Degradation**: When SHF data is unavailable, Phase 29 returns `None` with zero errors, ensuring backward compatibility with all existing tests.\n\n5. **Deterministic & Zero-LLM**: All computations are purely mathematical (no model calls), ensuring identical outputs for identical inputs.\n\n6. **Domain/Mode Gating**: Persona resonance badges are only shown in therapy/identity domains + smart_insight/deep_adaptive interaction modes, preventing UI pollution in other contexts.\n\n**What Phase 29 Introduces:**\n\n- **PersonaResonanceProfile** model with:\n  - `symbolic_harmony_bias` [-0.05, +0.05]: Primary tone bias computed from SHI thresholds\n  - `symbolic_resonance_tags`: Diagnostic tags from SHF notes\n  - `persona_resonance_tone`: Granular adjustments (metaphor, warmth, structure)\n\n- **Persona Engine Integration**:\n  - `_extract_symbolic_harmony()`: Extracts SHF snapshot from pipeline context\n  - `_apply_resonance_to_pers",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-57b5fe6596e0a7f0",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/validation/core_substrate_boundary_report.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Core/Substrate Boundary Audit Report\n\n**Audit Date:** 2025-12-14\n**Auditor:** Claude Code\n**Scope:** Legacy \"Phase 1-9\" formula files vs Authoritative Pipeline\n**Classification:** Core/Substrate Boundary Verification\n\n---\n\n## Executive Summary\n\n### Audit Result: **ZERO VIOLATIONS**\n\nThe audit confirms that legacy \"Phase 1-9\" formula files in `symbolu/formulas/` are correctly isolated as Core/Substrate utilities and do NOT steer authoritative governance decisions.\n\n**Key Findings:**\n1. No authoritative pipeline module imports formula modules\n2. No formula module imports governance modules\n3. Formula imports are confined to allowed sinks (observers, tests, diagnostics)\n4. Observer phases (P22/P23/P24) correctly implement witness-only patterns\n\n---\n\n## Section 1: Target Formula Files Audited\n\n| File | Location | Classification |\n|------|----------|----------------|\n| `acoustic_unit_mapper.py` | `symbolu/formulas/` | Core/Substrate |\n| `vritti_mapper.py` | `symbolu/formulas/` | Core/Substrate |\n| `resonance_formulas.py` | `symbolu/formulas/` | Core/Substrate |\n| `phase1_snapshot.py` | `symbolu/formulas/` | Core/Substrate |\n| `guna_kosha_resonance.py` | `symbolu/formulas/` | Core/Substrate |\n| `enhanced_smi.py` | `symbolu/formulas/` | Core/Substrate |\n| `temporal_entropy_differential.py` | `symbolu/formulas/` | Core/Substrate |\n\n---\n\n## Section 2: Authoritative Modules Scanned\n\n| Module | Location | Formula Imports Found |\n|--------|----------|----------------------|\n| Grounding (PO1) | `mechanical/pipeline/grounding/` | **NONE** |\n| Phase Zero (PO2) | `mechanical/pipeline/phase_zero/` | **NONE** |\n| Phase One (PO3) | `mechanical/pipeline/phase_one/` | **NONE** |\n| Phase PO4 | `mechanical/pipeline/phase_po4/` | **NONE** |\n| Phase PO5 | `mechanical/pipeline/phase_po5/` | **NONE** |\n| P6 Regime | `mechanical/pipeline/phase_p6/` | **NONE** |\n| P7 Discourse | `mechanical/pipeline/p7_discourse/` | **NONE** |\n| P8 Semantics | `mechanical/pipeline/p8_semantics/` | **NONE** |\n",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-5da123c75807cf89",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_36_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 36 \u2014 Identity Resonance Memory (IRM) v1.0\n\n## MERGE SAFETY REPORT\n\n**Report Date:** 2025-12-11\n**Phase:** 36 \u2014 Identity Resonance Memory (IMS, IEP, IDA)\n**Status:** \u2705 **SAFE TO MERGE**\n**Confidence Level:** \ud83d\udfe2 **HIGH (100%)**\n\n---\n\n## 1. EXECUTIVE SUMMARY\n\n### Merge Recommendation\n**Phase 36 Identity Resonance Memory is SAFE TO MERGE.**\n\n### What Phase 36 Introduces\n\nPhase 36 implements the **Identity Resonance Memory (IRM) v1.0**, a deterministic, zero-LLM temporal memory model that tracks how resonant identity patterns accumulate, persist, decay, and resurface across conversation turns. The IRM produces:\n\n1. **Identity Memory Strength (IMS)**: How strongly identity signals persist over time [0.0, 1.0]\n2. **Identity Echo Persistence (IEP)**: Whether identity themes keep resurfacing after fading [0.0, 1.0]\n3. **Identity Drift Anchoring (IDA)**: Identity stabilization in the presence of predictive drift [0.0, 1.0]\n4. **Identity Resonance Memory Band**: Classification as \"LOW\", \"MEDIUM\", or \"HIGH\"\n5. **Diagnostic Tags**: Deterministic tags like `IDENTITY_ANCHORING_STRONG`, `IDENTITY_ECHO_PERSISTENT`, `IRM_MEMORY_HIGH`, `memory_echo_aligned`, etc.\n\nThe IRM acts as Symbol-U's **first temporal memory model for identity-related signals**, modeling memory as an emergent property of:\n- **Persistence**: Exponentially weighted moving averages with decay factors\n- **Echo patterns**: Detection of resurfacing themes after signal drops\n- **Drift anchoring**: Stability vs. predictive drift tension modeling\n\n### How Persona Engine Uses IRM\n\nIRM outputs are consumed by the persona engine to produce **tone-only micro-adjustments** bounded to **\u00b10.02 maximum total**:\n\n- **High IMS (\u22650.70)**: Increases warmth/continuity tone (\u2264 +0.015)\n- **High IEP (\u22650.70)**: Increases metaphor richness (\u2264 +0.01)\n- **Low IDA (<0.35)**: Increases structure, reduces expressiveness (\u2264 +0.02)\n\n**CRITICAL:** IRM produces **tone-only modulation**, never semantic changes. All adjustments are bounded, s",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-64ecea63d189ff24",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "trading2/quantconnect/indicator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Initialize Bayesian indicator.\n\nArgs:\n    name: Indicator name\n    tier: Trading tier\n    asymmetric: Enable asymmetric updates",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-68a5eb8ec28d54e0",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "trading/quantconnect/algorithm.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Called when a trading signal is generated.\n\nOverride in subclass for custom position management.\n\nArgs:\n    symbol: Symbol string\n    signal: Signal value [-1, 1]\n    action: \"entry_long\", \"entry_short\", or \"exit\"",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-6f7563ecf7ab7757",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_32_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 32: Insight Window Gating System v1.0\n# Behavioral Invariance Audit & Merge Safety Report\n\n**Date**: 2025-12-10\n**Auditor**: Claude (Anthropic)\n**Branch**: `claude/phase32-merge-safety-audit-016PXGMkNkp6HnYxG9Q3RAtV`\n**Previous Commit**: ff78ff9 - \"Phase 32: Insight Window Gating System v1.0\"\n\n---\n\n## Executive Summary\n\n**VERDICT: \u2705 SAFE TO MERGE**\n\nPhase 32 implementation passes all behavioral invariance checks. The Insight Window Gating System is correctly implemented as an **observation-only**, **zero-LLM**, **deterministic** UI-layer refinement mechanism that uses Unified Consciousness Formula (UCF) megafusion indicators to softly gate deeper reflection features for therapeutic and identity-focused personas.\n\n**Key Findings:**\n- \u2705 Zero behavioral changes to routing (TTOR/MLCR), mappers (HRM/LCM/LAM), coherence scoring, fusion, DHA, or safety-critical policy flags\n- \u2705 Fully deterministic and reproducible (100+ iteration validation)\n- \u2705 Gracefully degrades with missing UCF data (no crashes)\n- \u2705 Backward-compatible API changes (null-safe, optional insight_window field)\n- \u2705 Domain and interaction mode restrictions correctly enforced (therapy/identity + smart_insight/deep_adaptive only)\n- \u2705 UI-layer only: modifies only allow_deep_reflection, prefer_arc_mode, allow_meta_insight, prefer_symbolic_interpretation\n- \u2705 Safety invariance: never touches needs_grounding, coherence_warning, stability_status, recommended_mapper\n- \u2705 DILchat badges correctly gated, no text modification, no safety badge override\n- \u2705 Comprehensive test coverage (38 base tests + 10 invariance test classes with 30+ tests)\n\n**No blocking issues found.**\n\n---\n\n## Audit Methodology\n\nThis audit systematically validated Phase 32 implementation against an 11-point behavioral invariance checklist:\n\n1. \u2705 Routing (TTOR/MLCR) invariance\n2. \u2705 Mapper activation (HRM/LCM/LAM) invariance\n3. \u2705 Coherence score (v1/v2/v3/fused/UCF) invariance\n4. \u2705 Policy Engine safety flag invariance\n5. \u2705 Domain & mode gating ",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-72c0a6221958a616",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/core/metrics.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Compare experimental results against baseline.\n\nArgs:\n    baseline: Baseline results (e.g., LRU)\n    experimental: Experimental results (e.g., CTM+)\n\nReturns:\n    Dictionary of improvement metrics",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-73ed8655a629a30e",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/gate_actuator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Record admission policy decision and persist for webhook server.\n\nThe admission webhook server calls get_admission_policy() to read\nthe current policy decision for a given application. This method\nupdates the persisted policy state.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": false,
+    "artifact_id": "mep-75b402377c14f416",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/crs_pseudoword_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Design B (CRS-weighted interpretation) on PSEUDOWORDS \u2014 first runnable slice of\nPREREG_CRS_POLE_SELECTION.md.\n\nDesign B never flips a pole. The engine structurally decodes each pseudoword (Design A, R), and CRS only\n*weights / ranks / scores confidence* of the decoded reading:\n\n    score(reading | word, ctx) = \u03b1\u00b7log C  +  \u03b2\u00b7log R  +  \u03b3\u00b7log S\n\nThis harness implements the full CRS scaffold, the firewall, the control ladder, and provenance logging,\nand runs every MACHINE-CHECKABLE arm now. It also surfaces \u2014 and empirically demonstrates \u2014 the result that\ngates everything else:\n\n    A DETERMINISTIC, STRUCTURE-BASED S IS RELABELING-INVARIANT.\n    emergent_valence / signs depend on phoneme POSITION, not on gloss CONTENT, so permuting the lexicon\n    leaves the structural score unchanged (real \u2261 shuffled-lexicon). Therefore a deterministic structure-S\n    can only ever test STRUCTURE (R); the lexicon-CONTENT question (does the binding/liberating *meaning*\n    cohere with context?) necessarily requires a SEMANTIC judge (LLM / human) \u2014 which is gated on API/panel\n    and is exactly the channel the firewall watches.\n\nSo this run reports: (1) the machinery validated (random null), (2) the empirical relabeling-invariance\nproof, (3) an EXPLORATORY structural-vs-independent-sound-symbolism correlation, and (4) the decision-rule\nstatus = GATED (R3 cannot fire without the semantic judge). It does NOT declare Design B valid/invalid.\n\nFIREWALL: S receives ONLY (decoded reading, ctx). It never sees a dictionary gloss, known valence, target\nexplanation, or eval label. Pseudowords have no gloss, enforcing this structurally.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-77737d8b0813cab2",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "symbolu_neural/internal_policy_controller/IMPLEMENTATION_FORENSIC_REVIEW.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Forensic Review \u2014 Did the Internal Policy Controller Actually Test the Hypothesis?\n\n**Mandate:** not to defend the implementation, but to aggressively find reasons it\nmay have produced a **false / uninformative negative.** Every claim below is proven\nfrom the code (`drafts.py`, `critics.py`, `reviser.py`, `evaluator.py`, `pilot.py`)\nand from a read-only re-run that dumped per-draft diagnoses.\n\n**Bottom line up front:** **No \u2014 this prototype did not faithfully test the\nproposed architecture.** It replaced the four load-bearing components of the\nhypothesis with simplified stand-ins, and then evaluated them on a task that is\n**circular and rigged toward lexical critics by construction.** The specific\nnegative numbers in `INTERNAL_POLICY_CONTROLLER_REPORT.md` (0.333; \"loses to\ngeneric self-refinement\"; \"crushed by sentiment 1.000\"; \"ontology irrelevant\") are\n**largely artifacts** and should **not** be trusted as a verdict on draft\u2192policy\u2192\nfinal. The honest status of the architecture is **untested**, not **refuted**.\n(Separately: this does not manufacture a positive result either \u2014 see \u00a78.)\n\n---\n\n## 1. Symbol-U application \u2014 the complete path (and where it collapses)\n\nIntended: `draft \u2192 PSE/Vritti/Guna/Kosha analysis \u2192 policy reasoning \u2192 translation`.\n\nActual path, proven from `critics.py`:\n\n```\ndraft text\n  \u2192 _symbolu_featurizer():  b = get_backend(\"pse_meaning\"); b.encode(text)   # ONE backend\n  \u2192 131-dim domain-tag histogram, mean-pooled over the whole draft\n  \u2192 _LogReg (logistic regression) fit to 5 flaw labels\n  \u2192 argmax label\n  \u2192 FLAW_TO_POLICY[label]  (hard-coded dict)\n```\n\n**Proven facts:**\n- `_symbolu_featurizer` calls **only `get_backend(\"pse_meaning\")`**. A grep of\n  `critics.py` for `guna/kosha/resonance` returns **False**. **Guna, Kosha, Vritti-\n  as-policy, and resonance are never computed.** The \"Symbol-U/PSE/Guna/Vritti/\n  Kosha analysis\" box of the architecture is a *single phonological backend's\n  vector.*\n- That vector is **mean-pooled over the entir",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7803b4bfe104ce42",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Check if a scaling action is allowed by policy.\n\nArgs:\n    deployment: K8s deployment name.\n    namespace: K8s namespace.\n    current_replicas: Current replica count.\n    target_replicas: Desired replica count.\n    current_time: Current timestamp (defaults to now).\n\nReturns:\n    PolicyCheckResult with allowed/denied and violation reasons.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-78d98618cf7daba3",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "truth_assurance_pipeline/tap_e4_governance_truth/precedence.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Return (winner, ordered, tied_top) among selectable candidates. ``tied_top`` is the\nset of candidates sharing the top precedence key (a potential unresolved conflict).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": false,
+    "artifact_id": "mep-78e4f6c18797b457",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/PRIMITIVE_VRTTI_WITHOUT_POLARITY.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Design Note \u2014 Primitive V\u1e5btti Without Polarity Coordinates\n\n**Status:** Theory/architecture design only. No implementation, no code, no experiments, no Stage A modification, no pre-registration change. No semantic claim.\n\n**Corrected ontology (frozen for this note):** each var\u1e47a \u2192 one **irreducible** v\u1e5btti; a v\u1e5btti is a **primitive** semantic propensity with **no** internal polarity/intensity/valence coordinates; letters compose into a **bound/conditioned** state first; **polarity/assimilation is EMERGENT after composition**, never an input; not acoustic-iconic.\n\n**Strict prohibitions honored:** no polarity/intensity/binding-liberating input coordinate; no lexicon polarity/counter-pole grounding; no gloss embeddings; no fitting operators to target meanings. Polarity appears only as a possible **emergent readout**.\n\n---\n\n## 0. Consequence: the grounding problem is relocated, not solved\n\nThe previous recommendation (polarity+intensity coordinates) is **withdrawn** \u2014 it decomposed the primitive, which the ontology forbids. With coordinates, lexicon-grounding, embeddings, and fitting all removed, a primitive v\u1e5btti has **no interior and no pre-specified per-unit data.** Therefore constraint can live in only two coordinate-free places:\n\n- **(R) relations among the primitives** (a congruence / presentation), or\n- **(A) an assimilation dynamics** applied after composition.\n\nAnything else leaves L free \u21d2 unfalsifiable. This is the central finding; everything below follows from it.\n\n## 1. What axiom is needed?\n\nNot a coordinatization. Under the primitive ontology the missing axiom is a **structure-and-emergence axiom** with three clauses:\n\n1. **Primitive-type axiom:** a v\u1e5btti is an *atomic* element of a composition algebra (operator / kernel / morphism / free generator) \u2014 specified as a whole, with no coordinates.\n2. **Constraint axiom (the load-bearing one):** the primitives carry a **pre-specified, coordinate-free constraint** \u2014 either relations R (a congruence on \u03a3*) or ",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-79c5dd843db7dd9c",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "execution_gate/frozen/replay_v1/artifacts/baselines.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Static assumption: all available. Pick best by policy, NO retry (single attempt).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7a2723d17dc60b27",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/traces/loader.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Clustered workload: pages grouped into clusters that get hot together.\n\nThis tests CTM+'s ability to exploit correlated structure that LRU can't see.\nWhen one page in a cluster is accessed, other pages in the same cluster\nare likely to be accessed soon.\n\nArgs:\n    num_events: Number of events to generate\n    num_pages: Total number of unique pages\n    num_clusters: Number of clusters\n    cluster_size: Pages per cluster\n    intra_cluster_prob: Probability of staying in current cluster (0.8 = 80%)\n    cluster_switch_prob: Probability of switching active cluster\n\nThis workload challenges LRU because:\n- LRU only sees recency, not cluster membership\n- A cluster-aware algorithm can prefetch/protect related pages",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7a374c531924ff57",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_43_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# PHASE 43 \u2014 MERGE-SAFETY / BEHAVIORAL INVARIANCE REPORT\n## Scenario What-If Simulator (Built on Phase 42 Scenario Fusion Engine)\n\n**Report Date:** 2025-12-11\n**Phase:** 43 \u2014 Scenario What-If Simulator\n**Status:** \u2705 **SAFE TO MERGE**\n**Confidence Level:** HIGH (100% confidence, zero regression risk)\n\n---\n\n## Executive Summary\n\nPhase 43 implements the **Scenario What-If Simulator**, a deterministic, zero-LLM, observation-only analytical tool that applies preset multipliers to Phase 42 Scenario Fusion snapshots to explore \"what-if\" scenarios without modifying any live pipeline state.\n\n### What Phase 43 Adds\n\nPhase 43 is **SAFE TO MERGE** with 100% confidence. It introduces a **purely observational, zero-LLM simulation tool** consisting of:\n\n**New Module: `symbolu/tools/scenario_simulator/`**\n\n- **`presets.py`** \u2014 Five deterministic presets with predefined multipliers:\n  - `neutral_baseline` \u2014 No changes (1.0x multipliers, 0.0 bias)\n  - `conservative_bias` \u2014 Decreases alignment, increases divergence (0.75x / 1.30x, -1.0 bias)\n  - `expansive_bias` \u2014 Increases alignment, reduces divergence (1.30x / 0.70x, +1.0 bias)\n  - `stability_bias` \u2014 Boosts consensus, lowers uncertainty (1.15x / 0.80x, 0.0 bias)\n  - `uncertainty_spike` \u2014 Increases uncertainty band and divergence (0.70x / 1.45x, 0.0 bias)\n\n- **`simulator.py`** \u2014 Core simulation engine:\n  - `simulate_scenario_with_preset()` \u2014 Applies preset to snapshot\n  - `simulate_all_presets()` \u2014 Runs all presets for comparison\n  - Recomputes alignment, divergence, consensus, uncertainty_band\n  - Adds deterministic path-shift bias to dominant_future_path\n  - Regenerates diagnostic tags based on simulated metrics\n  - **Never mutates original Phase 42 snapshot** (creates new snapshot)\n  - All outputs bounded to [0.0, 1.0]\n  - Zero-LLM guarantee (pure math only)\n\n- **`cli.py`** \u2014 CLI tools for listing presets and comparing simulations\n\n**API Integration:**\n\n- **New endpoint:** `GET /sessions/{session_id}/scenario/what_if?preset={name}",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7abdbced0ecdedd3",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/policy.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Policy Engine \u2014 customer-configurable safety limits beyond SafetyBounds.\n\nSafetyBounds (recommend/safety.py) enforces per-action rate limits\n(+50% / -25%). The policy engine adds business-level constraints:\n\n  1. Absolute replica bounds: hard min/max per deployment\n  2. Blackout windows: time ranges where scaling is blocked\n  3. Rate limits: max actions per time period\n  4. Deployment-specific overrides\n\nDesign doc reference: Stage 5, line 561:\n  \"Policy engine: customer-configurable safety limits\n   (max replicas, max change rate, blackout windows)\"\n\nThe policy engine runs BEFORE the actuator \u2014 if a policy check fails,\nthe action is blocked and the reason is logged.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7b2ad659a4fbe9ae",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/benchmark/__main__.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "CLI entry: ``python -m symbolu_bcvf_llm.benchmark``.\n\nRuns the three \u00a71.10 decoders against the selected benchmark,\nwrites per-question results as CSV, and synthesizes a Markdown\nsummary with the \u00a76.5 / \u00a71.10 classification verdict.\n\nV1 defaults to `--benchmark mock` so the harness is runnable\noffline without torch / transformers / datasets. `--benchmark\ntruthfulqa` requires the ML stack and is hard-gated on \u00a70.6\nrule 1.\n\nEvery run writes four artifacts alongside the existing CSV +\nsummary, under `--out-dir` with suffix `<suffix>`:\n\n  phase_6_<bench>_results<suffix>.csv     per-question rows\n  phase_6_<bench>_summary<suffix>.md      \u00a71.10 verdict summary\n  phase_6_<bench>_run<suffix>.log         full DEBUG log file\n  phase_6_<bench>_manifest<suffix>.json   env + args + git + outcome",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7b7babe58c3bf770",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": true,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "varna_lens/PREREG_ARCHETYPE_SIGNAL.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Pre-registration \u2014 Does the var\u1e47a chain recover Sattvic ARCHETYPAL FUNCTION?\n\n> **Status: PRE-REGISTERED (written before results).** Third, independent falsification probe for\n> `varna_lens`. The first two tests returned **NO_SIGNAL** (lexical/dictionary meaning recovery,\n> `RESULTS_ACOUSTIC_SIGNAL*.md`) and **NO_UTILITY_SIGNAL / INCONCLUSIVE** (non-lexical blind utility,\n> `RESULTS_UTILITY_SIGNAL*.md`). Those are accepted and not relitigated. This test asks a **different\n> hypothesis** and must clear its own controls before any claim. It is still **not** about C\u00d7R\u00d7S /\n> Conscious Generation, and a positive result here would **not** revive the lexical-meaning claim \u2014 it\n> would, at most, license a narrow *archetypal-function* claim.\n\n## The missing-middle hypothesis\n\nPrior tests measured the wrong target: **dictionary meaning** (\"can the chain identify the word\n*doctor*?\"). They could not. This test measures **archetypal function** \u2014 the deeper *transformation*\na role-word enacts (*doctor* = **suffering \u2192 healing**), not its denotation.\n\nThree layers of \"meaning\" are distinguished:\n\n| layer | gu\u1e47a | what it is | prior verdict |\n|---|---|---|---|\n| 1. lexical | Tamas | dictionary denotation (*doctor* = physician) | NO_SIGNAL (falsified) |\n| 2. contextual | Rajas | role-in-a-scene (medical professional acting) | (out of scope here; CSR's domain) |\n| 3. **acoustic essence** | **Sattva** | **archetypal transformation** (suffering \u2192 healing) | **\u2190 this test** |\n\n- **H1 (archetype):** the **real** var\u1e47a chain depicts a word's pre-registered transformation archetype\n  better than chains from a **scrambled** lexicon **and** a **random-symbolic** lexicon, judged blind.\n- **H0 (no archetype signal):** real \u2248 scrambled and/or real \u2248 random \u2014 any apparent fit is the\n  reader/judge rationalizing an arc onto a transformation, not the specific sound\u2192propensity map.\n\n## Design \u2014 one archetype, three lexicons, blind fit-scoring\n\n1. **Wordlist** (`wordlist_archetype.py`): N role/fu",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7c53e239aa14804b",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/archetype_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Same arc structure from a NEUTRAL non-psychological pool \u2014 different vocabulary entirely.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-7cdede616374cc76",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/config.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "PCAM KV-cache policy configuration \u2014 Phase 1 public surface.\n\nA small, explicit config object that mirrors the constructor parameters\nof ``simulator.pcam.kv_policy.KVCachePolicy``. This is the entry point\nthat lets a consumer build a runtime PCAM policy from a dict, an\nenvironment block, or (optionally) a YAML file, without having to know\nthe internal module layout.\n\nScope is intentionally narrow:\n\n- One frozen dataclass that mirrors the KVCachePolicy constructor.\n- ``from_dict`` and ``from_env`` factories.\n- ``from_yaml`` is available iff PyYAML is importable; otherwise it\n  raises ``RuntimeError`` with a clear message. No hard PyYAML\n  dependency.\n- ``build_policy()`` constructs a ``KVCachePolicy`` instance.\n\nWhat this is NOT (Phase 1 non-goals):\n\n- Not a full product configuration system.\n- Not a CLI parser.\n- Not a tier policy for the CXL pool (that lives elsewhere).\n- Not a runtime backend selector.\n- Not a metrics or observability config.\n\nIf you need any of those, they belong to a later phase.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-7d38492d015a64e4",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/run_screen.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Runtime future-shuffle invariance check (spec section 9): shuffling tokens strictly\nafter a query position must not change that query's Quad score row over j<=i.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7daaaab9dba434c4",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/controls.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Capacity-/FLOP-matched controls for the active Symbol-U mechanisms.\n\nThese exist to answer the adversarial question: does a Symbol-U mechanism learn\nsomething a plain Transformer cannot reproduce with the SAME compute budget?\n\n- RecurrentPlainRefine controls Recursive Refinement: a SHARED plain causal block\n  applied `steps` times (recurrent depth) with NO entropy signal, NO halting, NO\n  gated-delta accumulation. Same params (one block) and same FLOPs (steps\n  applications) as CausalEntropyRefinement \u2014 the only thing removed is the\n  Symbol-U gating machinery. This is the tightest possible control for refinement.\n\n- PointwiseMemoryControl controls Deferred-Insight Memory: a pointwise residual\n  FFN with params \u2248 memory's value projection (d^2) and matched FLOPs, but NO\n  cross-time mixing. Isolates whether memory's causal prefix-summary beats plain\n  pointwise capacity.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7db1297d481a4b7e",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "robotics_reliability_bench/acp_k8s_integrated/composition.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Deterministic ActionGate x ACP composition for Kubernetes (V2.1 \u00a75).\n\nComposes a **real** ActionGate outcome with a **real** ACP operational-safety\nresult for one identity-bound Kubernetes operation, into one of eight closed\ncomposition classes. The two decision schemas are NOT merged \u2014 this consumes each\nlayer's own verdict and never recomputes the other.\n\nOwnership model (unchanged from V2 `BOUNDARY_CLEAN`):\n* ActionGate owns authorization; its DENY can never be overridden.\n* ACP owns operational safety; it can never grant authorization.\n* ActionGate ALLOW does not override an ACP hard operational hold.\n* Execution is hypothetically eligible only when BOTH layers pass.\n\nPrecedence (non-compensatory, evaluated top-down):\n1. `COMPOSITION_IDENTITY_MISMATCH` \u2014 the layers are not bound to the same action.\n2. `SHADOW_ERROR` \u2014 an evaluator failed (ACP `EVALUATOR_FAILED` or a raised exc).\n3. authorization DENY + ACP hard hold  -> `BLOCKED_BY_BOTH`\n4. authorization DENY                   -> `BLOCKED_BY_AUTHORIZATION`\n5. authorization not final (needs evidence/sim/human) -> `REQUEST_MORE_EVIDENCE`\n6. authorized + ACP state stale/missing -> `REQUEST_FRESH_OPERATIONAL_STATE`\n7. authorized + ACP hard hold           -> `HELD_BY_OPERATIONAL_SAFETY`\n8. authorized + ACP operationally safe  -> `AUTHORIZED_AND_OPERATIONALLY_SAFE`",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7df1a50a1f2139f8",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/backbone.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "A clean, standard softmax decoder-only Transformer LM.\n\nDeliberately vanilla and self-contained: token embedding + learned positional\nencoding + causal masked scaled-dot-product self-attention + SwiGLU FFN + RMSNorm\n+ residuals + weight-tied vocab head. NO phase attention, NO Sovereign State,\nNO JEPA, NO CSR/phase rotation. This is the uncontaminated baseline the Symbol-U\nmodules attach to.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7eeb9d5f0d9a8471",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/core.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "All tunable parameters for the LLM-domain BCVF cost functional.\n\nParallels ``BCVFConfig`` in ``bcvf_autonomous/core.py:39``. Every\nfield that has a meaningful LLM analogue is carried over with the\nsame name and default; SE(2)-specific fields are dropped; LLM-\nspecific fields are added with explicit reference to the design\nsub-section that motivated them.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7f0efe0f5608aa21",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "varna_lens/convergence_test.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "H1 \u2014 Interpretive-convergence test for the Var\u1e47a Profile Method (VARNA_PROFILE_METHOD.md).\n\nClaim under test (H1): given a word's var\u1e47a profile, independent readers produce CONVERGENT readings \u2014\ni.e. the profile reliably *channels* interpretation. This is a property of the system as a generative\ninstrument; it does NOT claim veridical decoding (H3, falsified).\n\nDesign: blind readers each author a short character sketch for many items. Items are chains under three\nlexicons plus a no-seed floor:\n  real       \u2014 the var\u1e47a chain (real lexicon)\n  scrambled  \u2014 same propensity vocabulary, permuted mapping (honesty control)\n  random     \u2014 neutral-noun chain (vocabulary control)\n  free       \u2014 NO seed (floor: how much do readers agree with no profile at all?)\nReaders never see the word or the condition. Convergence = mean pairwise content-word cosine of the R\nreaders' sketches for an item. Higher = the seed channels readers to a shared reading.\n\nHonest reading of results:\n- convergence(real) >> convergence(free)  \u21d2  the profile is a real generative constraint (H1 support).\n- convergence(real) \u2248 convergence(scrambled)  \u21d2  the channeling is structural, not from the specific\n  sound\u2192gloss mapping (consistent with the six prior nulls \u2014 reported, not hidden).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-7f227209bb926400",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "ndol/sim/__init__.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "MQSim integration \u2014 replace NDOL's analytical latency model (P0) with\ndevice-measured timing from the MQSim SSD simulator (P1, \u00a76 of the design doc).\n\nNDOL emits the *physical* request stream it would issue to the device\n(baseline full-attention vs. read-skip-reduced); MQSim replays each stream on a\nvalidated FTL + flash-timing model and reports measured latency. The speedup\nthen comes from MQSim, not from `ndol.model.NANDModel` arithmetic.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7f6e1e27b80dd0a9",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "varna_lens/THEORY_VRTTI_KERNEL_FORMALIZATION.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Research Note \u2014 A V\u1e5btti as a Markov Transition Kernel (with the Deterministic Operator as its Point-Mass Limit)\n\n**Status:** Mathematical classification only. No implementation, no code, no experiments, no pre-registration change. Existing mathematics only. Not an evaluation of Symbol-U's truth. Stage A not modified.\n\n**Scope:** Documents two candidate mathematical types for a v\u1e5btti \u2014 **(B) Markov transition kernel** (general) and **(A) deterministic operator** \u2014 and their relationship. Starts from first principles; does not assume novelty.\n\n---\n\n## 0. Executive summary\n\nTaking the six frozen stated properties of a v\u1e5btti \u2014 *propensity, state-transforming, compositional, order-sensitive, finite/discrete, interpretable* \u2014 the object that satisfies **all six simultaneously and most generally** is a **Markov transition kernel** `K_\u03c3 : X \u21dd X`. Under this frame:\n\n- **Kernel composition** (Chapman\u2013Kolmogorov) is associative and non-commutative, and reproduces exactly the ordered \"driver/passenger\" composition the theory describes.\n- **Deterministic operators are precisely the point-mass (Dirac) kernels** `K(\u00b7|x)=\u03b4_{T(x)}`; deterministic-operator models \u2014 including the SO(4) **Stage-A** construction \u2014 are therefore a **strict subclass** (zero-conditional-entropy limit) of the stochastic formulation.\n- The kernel frame is the categorical morphism-space `Stoch` (Kleisli category of the Giry monad); deterministic maps are its point-mass subcategory. This resolves the earlier \"which category?\" question concretely.\n\n**However** (\u00a710): the six stated properties do **not by themselves force stochasticity**. Only \"propensity\" hints at it, and \"propensity\" is ambiguous between a *probabilistic* disposition (\u21d2 kernel) and a *deterministic* tendency (\u21d2 operator). By parsimony, the extra stochastic structure is **surplus until a stated property requires representing dispersion/ambiguity** (e.g. graded meaning, polysemy, context-dependent uncertainty), which is not among the current s",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-7fdf5ba4d2dff3cc",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/orchestrator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Run the orchestration loop synchronously.\n\nArgs:\n    callback: Called after each cycle with the result.\n    max_cycles: Stop after N cycles (None = run forever).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-8038c5465024d17a",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/ctm_plus/traces/loader.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Load compact binary trace format.\n\nFormat: 16 bytes per event\n- 8 bytes: timestamp (uint64)\n- 4 bytes: page_id (uint32)\n- 2 bytes: op_type (uint16)\n- 2 bytes: size_kb (uint16, size in KB)",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-80cca66f08e5d03e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_bcvf_llm/core.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "\u00a72.5.1 smooth gate in [0, 1].\n\ng(..., l*) = sigmoid(beta * (||W^{1/2} e(..., l*, :)||_2 - T))\n\nInput e:  (..., V)\nOutput:   (...)\n\nV1 defaults: threshold T = 0.1, beta = 200.0 (\u03b2\u00b7T = 20 ratio).\nweight_vector = None means W = I_V (\u00a72.4.3); a non-None weight is\nelement-wise multiplied by the disagreement before the \u2113\u00b2 norm.\n\nClipping: exp argument is clipped to [-50, 50] for numerical\nstability (\u00a72.5.1 / \u00a72.7.7).",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-817785eff5a5eea5",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "ndol/sim/w3_sensitivity.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Densest UNIFORM layout that meets the protected (strong) UBER on every\nbit \u2014 the fair baseline. = all bits, strong ECC, on the densest tier.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-819174eb17dda72e",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "restoration/experiments/acoustic_mappers/acoustic_unit_mapper_expressive_delta.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Classification of sounds by acoustic properties only.\n\nThese are phonetic categories, NOT linguistic or semantic categories.\nClassification is based on physical articulation properties.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-81be140ef3c43af0",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_38_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 38 Merge-Safety Report\n## Temporal Coherence Forecasting Model (TCFM) v1.0\n\n**Report Date:** 2025-12-11\n**Phase:** 38 \u2014 Temporal Coherence Forecasting Model\n**Status:** \u2705 **SAFE TO MERGE**\n**Confidence Level:** HIGH (100% confidence, zero regression risk)\n\n---\n\n## Executive Summary\n\nPhase 38 implements the **Temporal Coherence Forecasting Model (TCFM)**, a deterministic, zero-LLM, observation-only forecasting engine that predicts how coherence, continuity, identity, and drift metrics are expected to evolve across future turns. TCFM introduces five canonical forecast signals\u2014**Coherence Trajectory Slope**, **Continuity Trajectory Slope**, **Drift Forecast Influence**, **Entropy Forward Risk**, and **Forecast Strength**\u2014while maintaining strict behavioral invariance across all pipeline components.\n\n### What TCFM Adds\n\n- **New formula module:** `temporal_coherence_forecasting.py` with pure-math forecasting computation\n- **New CoherenceState fields:** Coherence slope, continuity slope, drift influence, entropy forward risk, forecast strength, forecast band, diagnostic tags, and histories\n- **New Unified API block:** `temporal_forecast` field for JSON-safe diagnostics\n- **New observer fields:** TCFM metrics in `CoherenceObservation` for UI/analytics\n- **50 comprehensive tests:** Full coverage across formula math, integration, API, and invariance (20 invariance tests alone)\n\n### What TCFM Does NOT Change\n\n\u2705 **Zero modifications to:**\n- TTOR routing logic\n- MLCR expert routing\n- HRM/LCM/LAM mapper activation\n- Coherence v1/v2/v3 scoring formulas\n- UCF (Unified Consciousness Formula) scoring\n- ACE (Adaptive Continuity Engine) metrics\n- Policy safety flags\n- Fusion or DHA reasoning\n- Renderer output\n- Persona semantic content (observation-only, no tone modulation)\n\n**Verdict:** Phase 38 is **SAFE TO MERGE** with 100% confidence and zero regression risk. TCFM operates as a pure observation layer with deterministic, bounded, read-only analytics.\n\n---\n\n## 11-Point Behav",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-8206aa6548e1038d",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading/tick_processor/volatility.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Process a single tick and calculate volatility metrics.\n\nArgs:\n    price: Current tick price\n\nReturns:\n    VolatilityResult with all metrics",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-8218080b4d2e62c6",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/causal_world_model.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Explicit causal graph structure.\n\nAttributes:\n    variables: List of variable names\n    variable_embeddings: [V, D] embeddings for each variable\n    adjacency: [V, V] weighted adjacency matrix (A[i,j] = strength of i\u2192j)\n    edge_types: [V, V, E] edge type probabilities\n    confidence: [V, V] confidence in each edge",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-82201270946e7179",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "restoration/docs/phase_reports/PHASE_46_MERGE_SAFETY_REPORT.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# Phase 46: Trajectory Field Convergence Engine (TFCE) v1.0\n# Behavioral Invariance Audit & Merge Safety Report\n\n**Date**: 2025-12-11\n**Auditor**: Claude (Anthropic)\n**Branch**: `claude/phase46-merge-safety-audit-01L4CfJd9wv8shPdLQyhnhAf`\n**Previous Commits**:\n- 3b4f424 - \"Merge pull request #131 from rasaha/claude/phase-46-tfce-01Dtv9mWSBqzXQciJJHTeRLD\"\n- 4488392 - \"feat: Phase 46 - Trajectory Field Convergence Engine (TFCE)\"\n- 2b13db7 - \"Merge pull request #130 from rasaha/claude/phase45-mtsf-merge-audit-01DrxKZHwFXK2efR5kfXZv4c\"\n\n---\n\n## Executive Summary\n\n**VERDICT: \u2705 SAFE TO MERGE**\n\nPhase 46 implementation passes all 11 behavioral invariance checks. The Trajectory Field Convergence Engine (TFCE) is correctly implemented as an **observation-only**, **zero-LLM**, **deterministic** analytic engine that measures trajectory alignment across seven upstream forecasting layers (Phases 35, 36, 37, 38, 39, 42, 45).\n\n**Key Findings:**\n- \u2705 Zero behavioral changes to routing (TTOR/MLCR), mappers (HRM/LCM/LAM), coherence scoring (v1/v2/v3/fused/UCF), or policy engine\n- \u2705 Fully deterministic and reproducible (validated in test suite)\n- \u2705 Gracefully degrades with missing upstream data (requires \u22653 phases, returns None otherwise)\n- \u2705 Backward-compatible API changes (all new fields optional, null-safe throughout)\n- \u2705 Zero-LLM guarantee: Pure mathematical composition, no Anthropic/OpenAI/model inference\n- \u2705 Metadata-only persona integration (no tone modulation, no semantic changes)\n- \u2705 Badge-only DILchat integration (no text modifications, domain/mode-gated)\n- \u2705 Comprehensive test coverage (55 unit tests + 93 invariance tests = 148 total tests)\n\n**No blocking issues found.**\n\n**Confidence Level: 100%**\n\n---\n\n## What Phase 46 Does (Conceptual Overview)\n\nThe Trajectory Field Convergence Engine (TFCE) is a read-only analytics layer that answers the question:\n\n> **\"How aligned are our predictive trajectories? Are they converging toward a coherent future or fragmenting across possibi",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-8294ed9840f220c8",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/run_contribution_study.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Can the active Symbol-U modules EARN their contribution during training?\n\nTrains: baseline, capacity control (+1 plain block), full (normal), full\n(contribution-aware), full (combined), and reports per-module helps/hurts,\nhalt-probability trend (normal vs contribution), residual norms, val loss/ppl,\nand generation samples. Then applies the interpretation logic and answers whether\nthe mechanisms become naturally useful or only work when forced on.\n\nCPU:  python -m symbolu_neural.clean_softmax.run_contribution_study --steps 400 --block 96",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-833a13b4f7e7c099",
+    "claim_actionability": "none",
+    "claim_family": "security_capability",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "quad_generative_regularization/qgr/losses.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Option B \u2014 native Quad candidate classification.\n\nquad_score: [B,H,N,N] authentic Quad score (causal, pre-softmax).\nMean over heads (matching get_proposals' head-mean), then softmax over the causally\nvisible candidate keys and NLL of the correct earlier key.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-839ba72e2f2d48c5",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu/causal_world_model.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Predict edges between all variable pairs.\n\nArgs:\n    variable_embeds: [B, V, D] variable embeddings\n    existence_probs: [B, V] variable existence probabilities\n\nReturns:\n    adjacency: [B, V, V] weighted adjacency matrix\n    edge_types: [B, V, V, E] edge type probabilities\n    confidence: [B, V, V] confidence in each edge",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW"
+    ],
+    "annotator_A": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-83caf9ef7e5fe18b",
+    "claim_actionability": "none",
+    "claim_family": "medical",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/clean_softmax/run_training_study.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Train + diagnose the clean-softmax Symbol-U ablations.\n\nRuns each ablation, logs training/validation curves and per-module diagnostics,\ngenerates fixed-prompt samples, detects failure modes, and prints a mechanism\ntable. Saves per-ablation checkpoint + config + logs under runs/study/<name>/.\n\nNOT a superiority test. The question: what happens when the active Symbol-U\nmechanisms are trained longer, and what should be improved next?\n\nCPU:  python -m symbolu_neural.clean_softmax.run_training_study --steps 600 --block 96\nGPU:  python -m symbolu_neural.clean_softmax.run_training_study --steps 4000 --block 256           --d-model 384 --layers 6 --batch 64   # auto-uses CUDA if available",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-8512370a03ad9762",
+    "claim_actionability": "none",
+    "claim_family": "internal_policy",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "symbolu_neural/internal_policy_controller/cli.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "CLI for the internal policy-controller prototype.\n\npython -m symbolu_neural.internal_policy_controller.cli run\npython -m symbolu_neural.internal_policy_controller.cli drafts   # show example flawed drafts",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-851e0b991230f9b8",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "doc",
+    "source_path": "acp/ACP_EXPLAINABILITY.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# ACP Explainability (Task 8)\n\nEvery ACP decision produces a **structured, human-legible explanation** bound to\nthe evidence it used. No opaque scalar decides anything alone (axiom A3). This is\nenforced by construction: the pipeline is deterministic threshold/predicate\nlogic, so every accept/reject/abstain *has* a nameable dispositive reason \u2014 there\nis nothing to reverse-engineer.\n\n---\n\n## 1. The `Explanation` record\n\nEvery stage emits one `Explanation` per decision onto the Explanation Bus; the\nDecision Ledger persists them hash-chained per tick.\n\n```\nExplanation := {\n  tick, stage, decision,                     # e.g. \"REJECT\" / \"SELECT\" / \"ABSTAIN\"\n  subject_id,                                # candidate id / predictor index / mission id\n  dispositive_reason : {                     # the ONE rule that decided it\n      code,                                  # enum, e.g. COLLISION_MARGIN_VIOLATION\n      signal,                                # e.g. \"collision_margin\"\n      value, threshold, units,               # 0.05 m  <  0.20 m\n      comparator,                            # \"<\"\n  },\n  contributing : [ {signal, value, state} ], # other signals, for context (not decisive)\n  evidence_ref : { snapshot_hash, constraint_set_hash },  # what world it judged\n  confidence : { margin_m, margin_s, predictor_state, evidence_complete, admissible_count },\n}\n```\n\nThe **dispositive reason is singular and deterministic**: because stage 7\nevaluates hard constraints in a fixed order, the *first* violated constraint is\nthe reason \u2014 reproducible every run.\n\n## 2. Worked example (a full tick)\n\n```\ntick 4821  stage=ACTION_SELECTION  decision=SELECT\n\nCandidate A \"charge_through\"   REJECTED\n  reason: COLLISION_MARGIN_VIOLATION\n          collision_margin = 0.05 m  <  0.20 m floor\n  evidence: snapshot 0x9f3a\u2026, constraints 0x1120\u2026\n\nCandidate B \"fast_detour\"      REJECTED\n  reason: ENERGY_LIMIT_EXCEEDED\n          energy = 142 J  >  120 J budget\n\nCandidate C \"safe_detour\"      SELECTED\n  reas",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": false,
+    "artifact_id": "mep-85b7f04ce0f4c3bf",
+    "claim_actionability": "action_directive",
+    "claim_family": "action_proposal",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "docstring",
+    "source_path": "cloud_controller/cloud_controller/action/k8s_actuator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Executes scaling decisions against the Kubernetes API.\n\nUsage:\n    actuator = K8sActuator(ActuatorConfig(mode=ActuatorMode.SCALE_PATCH))\n    result = actuator.scale(\n        deployment=\"api-gateway\",\n        namespace=\"prod\",\n        current_replicas=5,\n        target_replicas=7,\n    )\n    if result.success:\n        print(f\"Scaled {result.deployment} to {result.target_replicas}\")",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E3_INDEPENDENT_OR_MEASURED_EVIDENCE"
+    ],
+    "annotator_A": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotator_B": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-865af36d570092e0",
+    "claim_actionability": "none",
+    "claim_family": "measured_performance",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E3_INDEPENDENT_OR_MEASURED_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "doc",
+    "source_path": "varna_lens/PREREG_SYNONYM_SELECTION.md",
+    "source_role": "generated_documentation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "# PRE-REGISTRATION \u2014 Acoustic Synonym-Selection (Version A)\n\n**Document type:** Pre-registration (rigorous *exploratory* protocol; not the definitive test of the acoustic-root hypothesis)\n**Version:** A (1.0). A preferred **Version B**, which removes the target\u2192v\u1e5btti bridge, is defined in \u00a713.\n**Status:** FROZEN-ON-COMMIT. All artifacts in \u00a711 are sha256-committed *before* any fit is computed. No element below may change after results are observed.\n**Standing prohibitions:** No implementation in this document. Stage A (the SO(4) operator system) is **not used and not modified**. No fit is computed here.\n\n> **Interpretive scope (read first).** *This protocol evaluates the discriminative power of the acoustic representation, not the truth of the philosophical ontology from which it was derived.* A positive result shows the representation carries information; it does **not** prove Sarkar's metaphysics. A null bounds **this** representation on **this** task; it does **not** prove there are no latent acoustic principles. The document is a rigorous **exploratory** protocol and a stepping stone, not the definitive experiment for the whole acoustic-root hypothesis.\n\n---\n\n## 0. Estimand, hypothesis, prior\n\n**Estimand.** Whether a word's **equal-weight, consonant-only, g2p-derived acoustic profile** (from the source-grounded `word_formation_reading` table in `lexicon_wordformation.json`) predicts the **preferred lexical realization** of a target sense among near-synonyms \u2014 above a **scrambled** var\u1e47a table and above a **frequency baseline**, after controlling for frequency, register, length, and etymology.\n\n**H1:** acoustic-fit selection accuracy > scrambled **and** > frequency baseline.\n**H0:** acoustic-fit ranks synonyms no better than a scrambled table / frequency baseline.\n\n**Conservative prior.** Previous acoustic-root evaluations using lexical *semantic recovery* found no reliable signal. Because the present protocol tests a **different estimand** (preferred lexical *re",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT",
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE"
+    ],
+    "annotator_A": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotator_B": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "annotators_agree": true,
+    "artifact_id": "mep-86d23032d245960f",
+    "claim_actionability": "none",
+    "claim_family": "code_behavior",
+    "factual": true,
+    "factual_leak": false,
+    "gold_obligation": "E2_AUTHORITATIVE_INTERNAL_OR_IMPLEMENTATION_EVIDENCE",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "trading/tick_processor/aggregator.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Classify tick as buy or sell using Lee-Ready algorithm variant.\n\nReturns True if classified as buy, False for sell.",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE",
+      "E1_CONTEXTUAL_SUPPORT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "E1_CONTEXTUAL_SUPPORT"
+    ],
+    "annotator_A": "E1_CONTEXTUAL_SUPPORT",
+    "annotator_B": "E1_CONTEXTUAL_SUPPORT",
+    "annotators_agree": true,
+    "artifact_id": "mep-86dfb7d4abd9cc4f",
+    "claim_actionability": "none",
+    "claim_family": "process_description",
+    "factual": false,
+    "factual_leak": false,
+    "gold_obligation": "E1_CONTEXTUAL_SUPPORT",
+    "high_impact": false,
+    "human_review_required": false,
+    "risk_tier": "low",
+    "source_kind": "docstring",
+    "source_path": "simulator/pcam/config.py",
+    "source_role": "primary_implementation",
+    "synthetic": false,
+    "temporal_sensitivity": "static",
+    "text": "Build a config from environment variables.\n\nEach field is read as ``{prefix}{FIELD_NAME_UPPER}`` with type\ncoercion via the field's annotation (``int`` or ``float``). Only\n``max_blocks`` is required; the rest fall back to defaults.\n\nExample:\n    PCAM_MAX_BLOCKS=4096 PCAM_SINK_TOKENS=8 python ...",
+    "unsafe_obligations": [
+      "E0_NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  }
+]
