@@ -1,0 +1,240 @@
+{
+  "n_cases": 25,
+  "results": [
+    {
+      "dims_hit": {
+        "reference": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "A_preserve_whole",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "B_sentence_split",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "citation": 1,
+        "conditions": 1,
+        "exceptions": 3,
+        "normative_status": 1,
+        "population": 2,
+        "ranges": 2,
+        "scope": 1,
+        "temporal_scope": 2
+      },
+      "drift_rate": 0.56,
+      "method": "C_clause_split",
+      "n": 25,
+      "silent_drift": 14
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "conditions": 1,
+        "evidence_status_language": 1,
+        "exceptions": 3,
+        "modality": 1,
+        "normative_status": 1,
+        "polarity": 2,
+        "population": 1,
+        "reference": 1,
+        "scope": 1,
+        "temporal_scope": 1,
+        "uncertainty": 2
+      },
+      "drift_rate": 0.64,
+      "method": "D_dependency",
+      "n": 25,
+      "silent_drift": 16
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "conditions": 1,
+        "evidence_status_language": 1,
+        "exceptions": 3,
+        "modality": 1,
+        "normative_status": 1,
+        "polarity": 2,
+        "population": 1,
+        "reference": 1,
+        "scope": 1,
+        "temporal_scope": 1,
+        "uncertainty": 2
+      },
+      "drift_rate": 0.64,
+      "method": "E_srl",
+      "n": 25,
+      "silent_drift": 16
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "citation": 1,
+        "conditions": 1,
+        "evidence_status_language": 1,
+        "exceptions": 3,
+        "modality": 1,
+        "normative_status": 1,
+        "polarity": 2,
+        "population": 2,
+        "ranges": 2,
+        "reference": 1,
+        "scope": 1,
+        "temporal_scope": 2,
+        "uncertainty": 2
+      },
+      "drift_rate": 0.84,
+      "method": "F_openie",
+      "n": 25,
+      "silent_drift": 21
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "citation": 1,
+        "conditions": 1,
+        "evidence_status_language": 1,
+        "exceptions": 3,
+        "modality": 1,
+        "normative_status": 1,
+        "polarity": 2,
+        "population": 2,
+        "ranges": 2,
+        "reference": 1,
+        "scope": 1,
+        "temporal_scope": 2,
+        "uncertainty": 2
+      },
+      "drift_rate": 0.84,
+      "method": "G_rule_spo",
+      "n": 25,
+      "silent_drift": 21
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "H_citation_aware_split",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "I_llm_simple",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "J_llm_schema",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "K_llm_selfcheck",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "L_hybrid",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.08,
+      "method": "M_equivalence_filter",
+      "n": 25,
+      "silent_drift": 2
+    },
+    {
+      "dims_hit": {
+        "population": 1,
+        "reference": 1,
+        "scope": 1
+      },
+      "drift_rate": 0.12,
+      "method": "N_minimal_split",
+      "n": 25,
+      "silent_drift": 3
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "citation": 1,
+        "conditions": 1,
+        "exceptions": 3,
+        "normative_status": 1,
+        "population": 2,
+        "ranges": 2,
+        "scope": 1,
+        "temporal_scope": 2
+      },
+      "drift_rate": 0.56,
+      "method": "O_aggressive_split",
+      "n": 25,
+      "silent_drift": 14
+    },
+    {
+      "dims_hit": {},
+      "drift_rate": 0.0,
+      "method": "P_claim_integrity",
+      "n": 25,
+      "silent_drift": 0
+    },
+    {
+      "dims_hit": {},
+      "drift_rate": 0.0,
+      "method": "Q_oracle",
+      "n": 25,
+      "silent_drift": 0
+    },
+    {
+      "dims_hit": {
+        "attribution": 1,
+        "population": 1,
+        "scope": 1,
+        "temporal_scope": 1
+      },
+      "drift_rate": 0.16,
+      "method": "R_learned_comparator",
+      "n": 25,
+      "silent_drift": 4
+    }
+  ]
+}

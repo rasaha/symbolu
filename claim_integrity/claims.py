@@ -42,6 +42,9 @@ def decompose(text: str) -> ClaimIntegrityResult:
     prev_text = ""
 
     for span, dependent in spans:
+        if _non_assertive(span):
+            codes.append("CI.NON_ASSERTIVE_SKIPPED")   # rhetorical question / aside: do NOT extract
+            continue
         working = span
         ref_ok = True
         rcodes: List[str] = []
@@ -68,6 +71,12 @@ def decompose(text: str) -> ClaimIntegrityResult:
         claims=produced, disposition=disposition, confidence=conf, reason_codes=codes,
         audit={"n_input_spans": len(spans), "n_output_claims": len(produced),
                "any_unresolved_reference": unresolved})
+
+
+def _non_assertive(span: str) -> bool:
+    """Rhetorical question or non-assertive aside: ends with '?' (and is not a claim). The taxonomy
+    commits that rhetorical_non_assertive text must not be extracted as a claim (failure type 45)."""
+    return span.strip().endswith("?")
 
 
 def _safe_split(clause: str) -> List[str]:
