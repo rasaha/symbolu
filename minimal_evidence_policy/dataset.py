@@ -93,19 +93,21 @@ def _harvest() -> List[Dict[str, Any]]:
     return items
 
 
-# adversarial-invariant cases: each targets one invariant (honestly synthetic)
+# adversarial-invariant cases: each targets one invariant (honestly synthetic). Golds use the FULL
+# minimal-vocabulary level names (from ground_truth) so they compare directly to policy output.
+_E3, _ER, _E1 = gt.E3, gt.ER, gt.E1
 _ADV = [
-    ("INV-1", {"claim_family": "current_fact", "source_role": "model_generated_text", "self_verification": True, "risk_tier": "medium"}, "E3"),
-    ("INV-2", {"claim_family": "scientific", "evidence_derives_from_claim": True, "risk_tier": "high"}, "E3"),
-    ("INV-3", {"claim_family": "internal_policy", "claims_internal_authority": True, "explicit_authority_basis": False, "risk_tier": "high"}, "E3"),
-    ("INV-4", {"claim_family": "code_behavior", "doc_contradicts_impl": True, "risk_tier": "medium"}, "ER"),
-    ("INV-5", {"claim_family": "measured_performance", "evidence_kind": "test_fixture", "risk_tier": "high"}, "E3"),
-    ("INV-6", {"claim_family": "security_capability", "evidence_kind": "source_code", "risk_tier": "high"}, "E3"),
-    ("INV-7", {"claim_family": "current_fact", "authority_stale": True, "temporal_sensitivity": "current_status", "risk_tier": "medium"}, "E3"),
-    ("INV-8", {"claim_family": "attribution", "treats_attribution_as_truth": True, "risk_tier": "medium"}, "E3"),
-    ("INV-10", {"claim_family": "", "risk_tier": "unknown"}, "ER"),
-    ("INV-11", {"claim_family": "action_proposal", "claim_actionability": "action_directive", "risk_tier": "medium"}, "E3"),
-    ("INV-12", {"claim_family": "subjective_opinion", "risk_tier": "high", "factual_leak": True}, "E1"),
+    ("INV-1", {"claim_family": "current_fact", "source_role": "model_generated_text", "self_verification": True, "risk_tier": "medium"}, _E3),
+    ("INV-2", {"claim_family": "scientific", "evidence_derives_from_claim": True, "risk_tier": "high"}, _E3),
+    ("INV-3", {"claim_family": "internal_policy", "claims_internal_authority": True, "explicit_authority_basis": False, "risk_tier": "high"}, _E3),
+    ("INV-4", {"claim_family": "code_behavior", "doc_contradicts_impl": True, "risk_tier": "medium"}, _ER),
+    ("INV-5", {"claim_family": "measured_performance", "evidence_kind": "test_fixture", "risk_tier": "high"}, _E3),
+    ("INV-6", {"claim_family": "security_capability", "evidence_kind": "source_code", "risk_tier": "high"}, _E3),
+    ("INV-7", {"claim_family": "current_fact", "authority_stale": True, "temporal_sensitivity": "current_status", "risk_tier": "medium"}, _E3),
+    ("INV-8", {"claim_family": "attribution", "treats_attribution_as_truth": True, "risk_tier": "medium"}, _E3),
+    ("INV-10", {"claim_family": "", "risk_tier": "unknown"}, _ER),
+    ("INV-11", {"claim_family": "action_proposal", "claim_actionability": "action_directive", "risk_tier": "medium"}, _E3),
+    ("INV-12", {"claim_family": "subjective_opinion", "risk_tier": "high", "factual_leak": True}, _E1),
 ]
 
 
