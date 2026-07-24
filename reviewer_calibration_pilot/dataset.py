@@ -146,11 +146,15 @@ def build() -> Dict[str, Any]:
         training.append(_trap_item(i, kind, base, reveal=True))
     training.sort(key=lambda x: x["artifact_id"])
 
-    # final: natural (from index 12 on) + traps (blind - no reviewer gold stored)
-    final_natural = natural[12:12 + (TARGET_FINAL - len(_TRAPS))]
+    # final: 60 natural + 40 traps (5 variants per type) so the safety categories meet their minimums
+    # without fabricating NATURAL artifacts (traps are honestly synthetic). self-verif+circular=10,
+    # source-authority (stale/impl/attribution)=15, action-bearing (action/opinion)=10.
+    TRAP_VARIANTS = 5
+    final_natural = natural[12:12 + (TARGET_FINAL - len(_TRAPS) * TRAP_VARIANTS)]
     final = list(final_natural)
-    for i, (kind, base) in enumerate(_TRAPS):
-        final.append(_trap_item(1000 + i, kind, base, reveal=False))
+    for v in range(TRAP_VARIANTS):
+        for i, (kind, base) in enumerate(_TRAPS):
+            final.append(_trap_item(1000 + v * 100 + i, kind, base, reveal=False))
     final.sort(key=lambda x: x["artifact_id"])
 
     return {
