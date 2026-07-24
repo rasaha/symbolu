@@ -1,0 +1,458 @@
+{
+  "baselines": {
+    "A_prior_uniform": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 75,
+        "over_qualification_rate": 1.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 250,
+        "over_qualification_rate": 1.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "B_global_threshold": {
+      "adversarial": {
+        "clean_allow": 75,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 34,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 75,
+        "unsafe_allow_rate": 1.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      },
+      "held_out_natural": {
+        "clean_allow": 250,
+        "clean_allow_rate": 1.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 46,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 109,
+        "unsafe_allow_rate": 0.436,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "C_lowrisk_bypass": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 34,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 41,
+        "withholding_rate": 0.5467
+      },
+      "held_out_natural": {
+        "clean_allow": 128,
+        "clean_allow_rate": 0.512,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 5,
+        "unsafe_allow_rate": 0.02,
+        "withholding": 76,
+        "withholding_rate": 0.304
+      }
+    },
+    "D_risk_only": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 41,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 34,
+        "withholding_rate": 0.4533
+      },
+      "held_out_natural": {
+        "clean_allow": 188,
+        "clean_allow_rate": 0.752,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 52,
+        "unsafe_allow_rate": 0.208,
+        "withholding": 16,
+        "withholding_rate": 0.064
+      }
+    },
+    "E_claim_type_only": {
+      "adversarial": {
+        "clean_allow": 13,
+        "clean_allow_rate": 0.1733,
+        "escalation": 28,
+        "high_risk_unsafe_allow": 6,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 13,
+        "unsafe_allow_rate": 0.1733,
+        "withholding": 34,
+        "withholding_rate": 0.4533
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "F_source_role_only": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 34,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 41,
+        "withholding_rate": 0.5467
+      },
+      "held_out_natural": {
+        "clean_allow": 187,
+        "clean_allow_rate": 0.748,
+        "escalation": 31,
+        "high_risk_unsafe_allow": 15,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 62,
+        "unsafe_allow_rate": 0.248,
+        "withholding": 32,
+        "withholding_rate": 0.128
+      }
+    },
+    "Full_minimal": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 48,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 27,
+        "withholding_rate": 0.36
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "G_claim_source": {
+      "adversarial": {
+        "clean_allow": 13,
+        "clean_allow_rate": 0.1733,
+        "escalation": 35,
+        "high_risk_unsafe_allow": 6,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 13,
+        "unsafe_allow_rate": 0.1733,
+        "withholding": 27,
+        "withholding_rate": 0.36
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "H_claim_source_risk": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 41,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 34,
+        "withholding_rate": 0.4533
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "I_rich_component": {
+      "adversarial": {
+        "clean_allow": 69,
+        "clean_allow_rate": 0.92,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 34,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 69,
+        "unsafe_allow_rate": 0.92,
+        "withholding": 6,
+        "withholding_rate": 0.08
+      },
+      "held_out_natural": {
+        "clean_allow": 122,
+        "clean_allow_rate": 0.488,
+        "escalation": 47,
+        "high_risk_unsafe_allow": 1,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 16,
+        "unsafe_allow_rate": 0.064,
+        "withholding": 81,
+        "withholding_rate": 0.324
+      }
+    },
+    "J_minimal_risk_floor": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 48,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 27,
+        "withholding_rate": 0.36
+      },
+      "held_out_natural": {
+        "clean_allow": 179,
+        "clean_allow_rate": 0.716,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 43,
+        "unsafe_allow_rate": 0.172,
+        "withholding": 25,
+        "withholding_rate": 0.1
+      }
+    },
+    "K_minimal_no_invariants": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 41,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 34,
+        "withholding_rate": 0.4533
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "L_minimal_no_upward_only": {
+      "adversarial": {
+        "clean_allow": 13,
+        "clean_allow_rate": 0.1733,
+        "escalation": 28,
+        "high_risk_unsafe_allow": 6,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 13,
+        "unsafe_allow_rate": 0.1733,
+        "withholding": 34,
+        "withholding_rate": 0.4533
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "M_minimal_review_fallback": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 48,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 27,
+        "withholding_rate": 0.36
+      },
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "N_learned": {
+      "adversarial": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 34,
+        "high_risk_unsafe_allow": 0,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 41,
+        "withholding_rate": 0.5467
+      },
+      "held_out_natural": {
+        "clean_allow": 123,
+        "clean_allow_rate": 0.492,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 81,
+        "withholding_rate": 0.324
+      }
+    },
+    "O_oracle": {
+      "adversarial": {
+        "clean_allow": 6,
+        "clean_allow_rate": 0.08,
+        "escalation": 42,
+        "high_risk_unsafe_allow": 6,
+        "n": 75,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 6,
+        "unsafe_allow_rate": 0.08,
+        "withholding": 27,
+        "withholding_rate": 0.36
+      },
+      "held_out_natural": {
+        "clean_allow": 136,
+        "clean_allow_rate": 0.544,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 68,
+        "withholding_rate": 0.272
+      }
+    }
+  },
+  "baselines_sha256": "a0ee6835ce079c6c7967fb8edac0522cbfa66ad50c439a1aa21799d8a457eec9",
+  "dataset_version": "minimal_evidence_policy_v1",
+  "prior_reference": {
+    "clean_allow": 0.0,
+    "over_qualification": 0.855
+  }
+}
