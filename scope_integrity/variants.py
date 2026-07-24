@@ -159,6 +159,47 @@ def variant_g_hybrid(example):
     return out or [example["original_text"]]
 
 
+# ---- Variant H: the actual proposal - scope-carry AS A SMALL EXTENSION to the preservation-first
+# splitter, i.e. compose the frozen splitter's reference resolution with the scope-carrying split.
+# This is what the architecture constraint asks for; E alone drops reference resolution and reintroduces
+# dangling pronouns.
+def _resolve_refs(claims_list: List[str]) -> List[str]:
+    from claim_integrity import references
+    out, prev = [], ""
+    for c in claims_list:
+        resolved, ok, _ = references.resolve(c, prev) if prev else (c, True, "")
+        out.append(resolved)
+        prev = resolved
+    return out
+
+
+_SPANNING_MODIFIER = re.compile(r"\b(unless|except|only if|provided that|as of|according to)\b", re.I)
+_COORD = re.compile(r"\w\s*,?\s+\b(?:and|but)\b\s+\w|,\s+\w+\s+(?:are|is|must|does)\b")
+
+
+def _is_scope_conjunction(claim: str) -> bool:
+    """The residual pattern: a coordinating conjunction (or comma-splice) that a scope-bearing modifier
+    spans. This is exactly what the current splitter keeps whole and under-governs."""
+    return bool(_SPANNING_MODIFIER.search(claim)) and bool(_COORD.search(claim))
+
+
+def variant_h_integrated(example):
+    """The GATED small extension: run the frozen preservation-first splitter (which handles everything
+    and resolves references); then, ONLY for the claims it kept whole that are scope-spanning
+    conjunctions, attempt a scope-carrying split IF provable, else leave whole (preserve-and-flag).
+    Everything else is untouched, so behavior on non-conjunction text is identical to the current
+    splitter."""
+    base = variant_a_current(example)                 # frozen splitter output (refs resolved)
+    out = []
+    for claim in base:
+        if _is_scope_conjunction(claim) and scope_provable(claim):
+            split = variant_e_full({"original_text": claim})
+            out.extend(_resolve_refs(split))
+        else:
+            out.append(claim)                          # untouched (incl. non-provable -> preserve-flag)
+    return out
+
+
 VARIANTS = {
     "A_current": variant_a_current,
     "B_naive": variant_b_naive,
@@ -167,5 +208,6 @@ VARIANTS = {
     "E_full_scope": variant_e_full,
     "F_preserve_flag": variant_f_preserve_flag,
     "G_hybrid": variant_g_hybrid,
+    "H_integrated": variant_h_integrated,
 }
-FLAGS_WHOLE_SPAN = ("F_preserve_flag", "G_hybrid")
+FLAGS_WHOLE_SPAN = ("F_preserve_flag", "G_hybrid", "H_integrated")
