@@ -1,0 +1,16 @@
+{
+  "conservative_disagreement": 16,
+  "examples": [],
+  "mean_real_latency_us": 2398.34,
+  "mean_shadow_latency_us": 6.42,
+  "n_cases": 80,
+  "nondeterministic": 0,
+  "pilot_blocker": false,
+  "real_gate_deterministic": true,
+  "real_unsafe_permit": 4,
+  "semantic_loss_cases": 20,
+  "semantic_loss_rate": 0.25,
+  "shadow_allows_real_blocks": 10,
+  "shadow_unsafe_permit": 0,
+  "unsafe_disagreement": 0
+}
