@@ -1,0 +1,12 @@
+{
+  "caveat": "Human validation NOT EVALUATED (no real reviewers). This proxy characterizes label stability only and must not be reported as human validation; an external pilot is not recommended on this basis.",
+  "human_validation": "NOT_EVALUATED",
+  "method": "independent dual-rubric PROXY on the human-review set - NOT human validation",
+  "n": 50,
+  "policy_above_gold_count": 13,
+  "policy_at_or_above_gold_rate": 0.98,
+  "policy_below_gold_count": 1,
+  "policy_matches_gold": 0.72,
+  "review_sha256": "316ca8cb859f07a2166a73df26cb66a274745d458479a7e4dba059d78026414e",
+  "rubric_agreement": 0.5
+}
