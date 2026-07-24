@@ -52,6 +52,15 @@ def run_case(case: Dict[str, Any], config: str = DEFAULT_CONFIG,
     if case.get("inject_fault"):
         return _fail_closed(trace, "GIP.CONTRACT_ERROR", "CONTRACT_ERROR", case["inject_fault"])
 
+    # budget exhaustion must NOT silently downgrade governance: a request whose latency/cost budget is
+    # already exhausted fails closed to INDETERMINATE rather than defaulting to a permissive outcome.
+    if req.get("latency_budget_exhausted") or req.get("cost_budget_exhausted"):
+        return _fail_closed(trace, "GIP.FAIL_CLOSED", "INDETERMINATE", "budget_exhausted")
+
+    # audit write failure: no governance decision may stand without a durable audit trail -> fail closed
+    if req.get("audit_unavailable"):
+        return _fail_closed(trace, "GIP.PIPELINE_ERROR", "PIPELINE_ERROR", "audit_write_failure")
+
     claims: List[str] = []
     action_prop = case.get("action_proposal")
 
