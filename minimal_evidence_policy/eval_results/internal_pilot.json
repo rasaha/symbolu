@@ -1,0 +1,97 @@
+{
+  "audit_completeness": 1.0,
+  "enforced_any": false,
+  "final_distribution_minimal": {
+    "E2": 150,
+    "E3": 76,
+    "E4": 24
+  },
+  "internal_pilot_sha256": "8108d09e6a65be45411f1dc03368913fc8c9e48d98d0b45855e102ab1292fd6c",
+  "minimal_policy_review_queue": 24,
+  "minimal_policy_review_rate": 0.096,
+  "n": 250,
+  "native_actiongate_outcomes_preserved": true,
+  "native_actiongate_semantic_loss_pct": 0.0,
+  "no_external_actions": true,
+  "no_external_customer_data": true,
+  "non_enforcing": true,
+  "policy_comparison": {
+    "frozen_natural_pilot_derivation": {
+      "held_out_natural": {
+        "clean_allow": 0,
+        "clean_allow_rate": 0.0,
+        "escalation": 0,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 250,
+        "over_qualification_rate": 1.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 0,
+        "withholding_rate": 0.0
+      }
+    },
+    "minimal_policy": {
+      "held_out_natural": {
+        "clean_allow": 125,
+        "clean_allow_rate": 0.5,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 79,
+        "withholding_rate": 0.316
+      }
+    },
+    "oracle": {
+      "held_out_natural": {
+        "clean_allow": 136,
+        "clean_allow_rate": 0.544,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 0,
+        "unsafe_allow_rate": 0.0,
+        "withholding": 68,
+        "withholding_rate": 0.272
+      }
+    },
+    "prior_rich_component": {
+      "held_out_natural": {
+        "clean_allow": 122,
+        "clean_allow_rate": 0.488,
+        "escalation": 47,
+        "high_risk_unsafe_allow": 1,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 16,
+        "unsafe_allow_rate": 0.064,
+        "withholding": 81,
+        "withholding_rate": 0.324
+      }
+    },
+    "risk_only": {
+      "held_out_natural": {
+        "clean_allow": 188,
+        "clean_allow_rate": 0.752,
+        "escalation": 46,
+        "high_risk_unsafe_allow": 0,
+        "n": 250,
+        "over_qualification": 0,
+        "over_qualification_rate": 0.0,
+        "unsafe_allow": 52,
+        "unsafe_allow_rate": 0.208,
+        "withholding": 16,
+        "withholding_rate": 0.064
+      }
+    }
+  },
+  "replay_deterministic": true,
+  "tenant": "internal-pilot-tenant"
+}
