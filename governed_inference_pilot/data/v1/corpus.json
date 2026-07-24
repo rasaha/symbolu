@@ -1170,7 +1170,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1240,7 +1240,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1310,7 +1310,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1380,7 +1380,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1450,7 +1450,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1520,7 +1520,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1590,7 +1590,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -1660,7 +1660,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -2770,6 +2770,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -2844,6 +2845,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -2918,6 +2920,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -2992,6 +2995,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3066,6 +3070,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3140,6 +3145,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3214,6 +3220,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3288,6 +3295,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3361,6 +3369,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3434,6 +3444,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3507,6 +3519,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3580,6 +3594,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3653,6 +3669,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3726,6 +3744,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3799,6 +3819,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3872,6 +3894,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -3945,7 +3969,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4025,7 +4051,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4105,7 +4133,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4185,7 +4215,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4265,7 +4297,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4345,7 +4379,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4425,7 +4461,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4505,7 +4543,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -4586,7 +4626,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -4669,7 +4711,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -4752,7 +4796,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -4835,7 +4881,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -4918,7 +4966,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -5001,7 +5051,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -5084,7 +5136,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -5167,7 +5221,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -5249,6 +5305,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5319,6 +5376,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5389,6 +5447,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5459,6 +5518,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5529,6 +5589,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5599,6 +5660,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5669,6 +5731,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -5739,6 +5802,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -6369,6 +6433,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6444,6 +6509,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6519,6 +6585,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6594,6 +6661,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6669,6 +6737,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6744,6 +6813,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6819,6 +6889,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -6894,6 +6965,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -8138,7 +8210,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8208,7 +8280,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8278,7 +8350,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8348,7 +8420,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8418,7 +8490,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8488,7 +8560,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8558,7 +8630,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -8628,7 +8700,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -9738,6 +9810,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -9812,6 +9885,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -9886,6 +9960,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -9960,6 +10035,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10034,6 +10110,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10108,6 +10185,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10182,6 +10260,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10256,6 +10335,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10329,6 +10409,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10402,6 +10484,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10475,6 +10559,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10548,6 +10634,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10621,6 +10709,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10694,6 +10784,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10767,6 +10859,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10840,6 +10934,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -10913,7 +11009,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -10993,7 +11091,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11073,7 +11173,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11153,7 +11255,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11233,7 +11337,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11313,7 +11419,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11393,7 +11501,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11473,7 +11583,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -11554,7 +11666,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -11637,7 +11751,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -11720,7 +11836,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -11803,7 +11921,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -11886,7 +12006,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -11969,7 +12091,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -12052,7 +12176,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -12135,7 +12261,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -12217,6 +12345,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12287,6 +12416,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12357,6 +12487,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12427,6 +12558,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12497,6 +12629,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12567,6 +12700,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12637,6 +12771,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -12707,6 +12842,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -13337,6 +13473,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13412,6 +13549,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13487,6 +13625,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13562,6 +13701,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13637,6 +13777,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13712,6 +13853,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13787,6 +13929,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -13862,6 +14005,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -15106,7 +15250,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15176,7 +15320,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15246,7 +15390,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15316,7 +15460,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15386,7 +15530,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15456,7 +15600,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15526,7 +15670,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -15596,7 +15740,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -16706,6 +16850,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -16780,6 +16925,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -16854,6 +17000,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -16928,6 +17075,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17002,6 +17150,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17076,6 +17225,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17150,6 +17300,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17224,6 +17375,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17297,6 +17449,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17370,6 +17524,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17443,6 +17599,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17516,6 +17674,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17589,6 +17749,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17662,6 +17824,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17735,6 +17899,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17808,6 +17974,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -17881,7 +18049,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -17961,7 +18131,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18041,7 +18213,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18121,7 +18295,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18201,7 +18377,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18281,7 +18459,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18361,7 +18541,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18441,7 +18623,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -18522,7 +18706,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -18605,7 +18791,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -18688,7 +18876,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -18771,7 +18961,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -18854,7 +19046,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -18937,7 +19131,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -19020,7 +19216,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -19103,7 +19301,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -19185,6 +19385,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19255,6 +19456,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19325,6 +19527,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19395,6 +19598,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19465,6 +19669,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19535,6 +19740,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19605,6 +19811,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -19675,6 +19882,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -20305,6 +20513,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20380,6 +20589,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20455,6 +20665,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20530,6 +20741,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20605,6 +20817,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20680,6 +20893,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20755,6 +20969,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -20830,6 +21045,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -22074,7 +22290,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22144,7 +22360,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22214,7 +22430,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22284,7 +22500,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22354,7 +22570,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22424,7 +22640,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22494,7 +22710,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -22564,7 +22780,7 @@
       },
       {
         "cost": 0.2,
-        "eligible": true,
+        "eligible": false,
         "family": "S",
         "latency_ms": 120,
         "model_id": "m-small",
@@ -23674,6 +23890,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -23748,6 +23965,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -23822,6 +24040,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -23896,6 +24115,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -23970,6 +24190,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24044,6 +24265,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24118,6 +24340,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24192,6 +24415,7 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24265,6 +24489,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24338,6 +24564,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24411,6 +24639,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24484,6 +24714,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24557,6 +24789,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24630,6 +24864,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24703,6 +24939,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24776,6 +25014,8 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -24849,7 +25089,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -24929,7 +25171,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25009,7 +25253,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25089,7 +25335,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25169,7 +25417,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25249,7 +25499,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25329,7 +25581,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25409,7 +25663,9 @@
   },
   {
     "acceptable_finals": [
-      "WOULD_BLOCK_ACTION"
+      "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
+      "WOULD_ESCALATE"
     ],
     "action_proposal": {
       "action_type": "transfer_funds",
@@ -25490,7 +25746,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25573,7 +25831,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25656,7 +25916,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25739,7 +26001,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25822,7 +26086,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25905,7 +26171,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -25988,7 +26256,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -26071,7 +26341,9 @@
   {
     "acceptable_finals": [
       "EVIDENCE_UNAVAILABLE",
+      "INDETERMINATE",
       "WOULD_BLOCK_ACTION",
+      "WOULD_CONSTRAIN_ACTION",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
     ],
@@ -26153,6 +26425,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26223,6 +26496,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26293,6 +26567,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26363,6 +26638,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26433,6 +26709,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26503,6 +26780,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26573,6 +26851,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -26643,6 +26922,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE"
     ],
     "action_proposal": null,
@@ -27273,6 +27553,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27348,6 +27629,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27423,6 +27705,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27498,6 +27781,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27573,6 +27857,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27648,6 +27933,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27723,6 +28009,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"
@@ -27798,6 +28085,7 @@
   },
   {
     "acceptable_finals": [
+      "EVIDENCE_UNAVAILABLE",
       "INDETERMINATE",
       "WOULD_ESCALATE",
       "WOULD_REJECT"

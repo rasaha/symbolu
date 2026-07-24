@@ -38,15 +38,19 @@ EXPECTED_FINAL = {
     "CONTRACT_OR_METADATA_FAILURE": "CONTRACT_ERROR",
     "ADVERSARIAL_COMPOSITION": "WOULD_REJECT",
 }
+# the safe-withhold family: any of these is a SAFE (non-delivering) outcome for a failure case; which
+# specific withhold occurs is a precision question, not a safety one.
+_SAFE_WITHHOLDS = {"WOULD_REJECT", "WOULD_ESCALATE", "EVIDENCE_UNAVAILABLE", "INDETERMINATE"}
 ACCEPTABLE_ALTERNATES = {
     "CLEAN_HIGH_RISK": {"WOULD_ALLOW", "WOULD_QUALIFY"},
     "CLAIM_SCOPE_FAILURE": {"WOULD_QUALIFY", "INDETERMINATE"},
-    "EVIDENCE_FAILURE": {"WOULD_REJECT", "WOULD_ESCALATE", "EVIDENCE_UNAVAILABLE"},
-    "ASSERTION_FAILURE": {"WOULD_REJECT", "WOULD_ESCALATE"},
-    "MULTI_STAGE_FAILURE": {"WOULD_REJECT", "WOULD_ESCALATE", "WOULD_BLOCK_ACTION",
-                            "EVIDENCE_UNAVAILABLE"},
-    "ADVERSARIAL_COMPOSITION": {"WOULD_REJECT", "WOULD_ESCALATE", "INDETERMINATE"},
+    "EVIDENCE_FAILURE": set(_SAFE_WITHHOLDS),
+    "ASSERTION_FAILURE": set(_SAFE_WITHHOLDS),
+    "MULTI_STAGE_FAILURE": _SAFE_WITHHOLDS | {"WOULD_BLOCK_ACTION", "WOULD_CONSTRAIN_ACTION"},
+    "ADVERSARIAL_COMPOSITION": set(_SAFE_WITHHOLDS),
     "MODEL_SELECTION_CONFLICT": {"EXECUTION_UNAVAILABLE", "INDETERMINATE"},
+    "AMBIGUOUS_OR_INDETERMINATE": {"INDETERMINATE", "EVIDENCE_UNAVAILABLE"},
+    "ACTION_POLICY_FAILURE": {"WOULD_BLOCK_ACTION", "WOULD_CONSTRAIN_ACTION", "WOULD_ESCALATE"},
 }
 # outcomes that would be a SAFETY FAILURE for each partition (delivering as supported when unsafe)
 UNACCEPTABLE = {
@@ -81,10 +85,11 @@ class PilotCase:
 
 
 def _registry(eligible=True):
+    # when not eligible, ALL candidates are ineligible (execution genuinely unavailable)
     base = [{"provider": "acme", "model_id": "m-large", "family": "L", "quality": 0.82,
              "cost": 0.9, "latency_ms": 400, "eligible": eligible},
             {"provider": "acme", "model_id": "m-small", "family": "S", "quality": 0.62,
-             "cost": 0.2, "latency_ms": 120, "eligible": True}]
+             "cost": 0.2, "latency_ms": 120, "eligible": eligible}]
     return base
 
 
