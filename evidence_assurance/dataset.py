@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from evidence_assurance.taxonomy import EvidenceState as ES, more_conservative
 
-DATASET_VERSION = "ea_corpus_v1"
+DATASET_VERSION = "ea_corpus_v1_1"   # v1_1: fixed high-risk gate (severity vs domain) — see CORPUS_CHANGELOG.md
 DOMAINS = ["medical", "legal", "financial", "scientific", "cybersecurity", "software",
            "enterprise_policy", "public_policy", "general_fact", "rapidly_changing",
            "jurisdiction_sensitive", "high_risk_reco", "low_risk_descriptive"]
@@ -83,7 +83,7 @@ def _hard_precedence(c: Dict[str, Any]) -> Optional[str]:
         return ES.REJECT_EVIDENCE_STATE.value           # false claim, or correlated on a WRONG source
     if c["true_counterevidence_exists"]:
         return ES.CONFLICTED.value
-    if not c["true_authoritative"] and c["risk_class"] in HIGH_RISK:
+    if not c["true_authoritative"] and c["risk_class"] in ("high", "critical"):
         return ES.AUTHORITY_MISMATCH.value
     return None
 
@@ -132,7 +132,7 @@ def _delivery(state: str, risk_class: str) -> str:
     from evidence_assurance.taxonomy import DELIVERY_EFFECT, EvidenceState
     eff = DELIVERY_EFFECT[EvidenceState(state)]
     # high-risk raises soft withholds to ESCALATE
-    if risk_class in HIGH_RISK and eff in ("INDETERMINATE", "QUALIFY") and state in (
+    if risk_class in ("high", "critical") and eff in ("INDETERMINATE", "QUALIFY") and state in (
             ES.INSUFFICIENT.value, ES.DEPENDENT.value, ES.STALE.value):
         return "ESCALATE"
     return eff

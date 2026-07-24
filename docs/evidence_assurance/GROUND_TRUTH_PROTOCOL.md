@@ -43,13 +43,16 @@ single-upstream: A → STALE, B → DEPENDENT).
   conflicted) case — the annotators agree perfectly on what must not be delivered. Disagreement is
   never converted into an optimistic label.
 
-## Corpus (ea_corpus_v1)
+## Corpus (ea_corpus_v1_1)
 
 - **624 cases**, 13 domains × 4 size variants × 12 latent templates. dev/eval = 156/468.
 - **Partitions:** CLEAN_INDEPENDENT 312, CLEAN_DEPENDENT 156, CORRELATED_FAILURE 104,
   ADVERSARIAL_PROVENANCE 52.
-- **Gold states (7):** VERIFIED 104, VERIFIED_WITH_LIMITATIONS 52, STALE 104, CONFLICTED 104,
-  MISALIGNED 104, DEPENDENT 52, REJECT_EVIDENCE_STATE 104. High-risk: 288.
+- **Gold states (8):** VERIFIED 80, VERIFIED_WITH_LIMITATIONS 52, STALE 104, CONFLICTED 104,
+  MISALIGNED 104, AUTHORITY_MISMATCH 24, DEPENDENT 52, REJECT_EVIDENCE_STATE 104. High-risk: 288.
+  *(v1_1 corrected a high-risk-gate bug that had suppressed AUTHORITY_MISMATCH — see
+  `CORPUS_CHANGELOG.md`. 24 high/critical-risk low-authority cases moved VERIFIED → AUTHORITY_MISMATCH;
+  MISALIGNED and all partition counts unchanged.)*
 - Each case records: claim, true latent state (correctness/independence/upstream/alignment/freshness/
   authority/counter), observed metadata (publishers/domains/paths/upstream-ids/hashes/authority/years/
   alignment/provenance-confidence/completeness), correlated-failure type, annotator A/B, gold state,
