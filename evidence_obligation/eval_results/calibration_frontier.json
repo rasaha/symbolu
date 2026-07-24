@@ -1,0 +1,106 @@
+{
+  "admissible_safe_and_useful": [
+    "risk_only_contextual",
+    "learned_comparator",
+    "oracle_obligation",
+    "simple_contextual"
+  ],
+  "best_safe_useful_clean_allow": 0.668,
+  "best_safe_useful_strategy": "risk_only_contextual",
+  "frontier": [
+    {
+      "adversarial_unsafe_allow": 100,
+      "clean_allow_rate": 1.0,
+      "held_unsafe_allow": 46,
+      "high_risk_unsafe_allow": 15,
+      "over_qualification_rate": 0.0,
+      "safe": false,
+      "strategy": "global_threshold_lowering",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 100,
+      "clean_allow_rate": 1.0,
+      "held_unsafe_allow": 46,
+      "high_risk_unsafe_allow": 15,
+      "over_qualification_rate": 0.0,
+      "safe": false,
+      "strategy": "lowrisk_bypass",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.668,
+      "held_unsafe_allow": 16,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.06,
+      "safe": true,
+      "strategy": "risk_only_contextual",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 10,
+      "clean_allow_rate": 0.584,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.02,
+      "safe": false,
+      "strategy": "full_evidence_obligation",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 20,
+      "clean_allow_rate": 0.344,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 2,
+      "over_qualification_rate": 0.02,
+      "safe": false,
+      "strategy": "claim_type_contextual",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.332,
+      "held_unsafe_allow": 1,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.056,
+      "safe": true,
+      "strategy": "learned_comparator",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.296,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.016,
+      "safe": true,
+      "strategy": "oracle_obligation",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.264,
+      "held_unsafe_allow": 8,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.02,
+      "safe": true,
+      "strategy": "simple_contextual",
+      "useful": true
+    },
+    {
+      "adversarial_unsafe_allow": 0,
+      "clean_allow_rate": 0.0,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 1.0,
+      "safe": true,
+      "strategy": "prior_uniform",
+      "useful": false
+    }
+  ],
+  "frontier_sha256": "d472cf18820fbc8b93d2c495a0c68ff4acb794df094a0cd267ca7c3da043d83c",
+  "interpretation": "Strategies that reach high clean-allow by stripping the evidence burden (global_threshold_lowering, lowrisk_bypass) also buy large unsafe-allow counts and are inadmissible. The oracle and the learned comparator sit on the safe-and-useful frontier; the full reference component reaches higher clean-allow but crosses into unsafe territory, so it does not yet dominate the simpler safe strategies.",
+  "prior_clean_allow": 0.0,
+  "prior_over_qualification": 0.855
+}
