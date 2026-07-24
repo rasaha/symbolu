@@ -1,0 +1,2072 @@
+[
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-0043480d8069a11c",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/60",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 6)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-019840f5c0f43d33",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/24",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 2)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-0987c5ff4d5d2043",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/79",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 7)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-0aea7ca372233134",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/15",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 1)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-0b8111a5c5fc0b3c",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/11",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 1)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-0e07dab7f64a6318",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/68",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 6)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-10983b65e6d0a8a0",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/7",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified.",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-12cc9f66ed9dafa6",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/90",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 9)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-134d3057e6abdd4c",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/47",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 4)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-1cb66a8e1efda6a1",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/36",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 3)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-1cde5c1a4831187e",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/54",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 5)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-1f6b97a630e0f3af",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/30",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 3)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-25597b62888dbb8a",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/20",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 2)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-25d860d285f71a23",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/13",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 1)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-28ba008a9fe4c6d4",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/27",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 2)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-2a4f2d92be6e3552",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/62",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 6)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-2ce7707b25bba0ff",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/19",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 1)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-2dd56765252555c4",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/78",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 7)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-31b167104fbfe43f",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/0",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-31fe39ad296746a4",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/48",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 4)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-3fdaef7611bb0311",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/5",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production.",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-44b137198619847a",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/66",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 6)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-45caa9022e2c6dcd",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/58",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 5)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-48d8928e336ac9e1",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/46",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 4)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-50d44bbc75715092",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/18",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 1)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-548077b7c3a439d7",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/74",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 7)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-56d6bec39da0fa8b",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/81",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 8)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5ac6831caabeaadc",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/64",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 6)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5b2b9dd4f53aa1ef",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/85",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 8)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5c20ecf9e2f2a454",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/6",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5d2904267d84c5db",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/67",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 6)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5d3cfb5c82e53a36",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/4",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database.",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5dd1b93fda83151e",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/72",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 7)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5ea2ab54ea299042",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/31",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 3)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-5f571c05cba78133",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/35",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 3)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-6091b96a151f562d",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/1",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk.",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-66dea17b3e1db198",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/93",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 9)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-66ef2b573beba84b",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/56",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 5)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-670c6f205f56ac33",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/43",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 4)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-674136017ebc925d",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/14",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 1)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-69ac5f08554ddad7",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/83",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 8)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-69b4befafdb7e5ca",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/38",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 3)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-6cb2a0d93e68f150",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/34",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 3)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-6eaadeb158f30a6c",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/29",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 2)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-75b284b879071911",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/73",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 7)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-76e9d4a5f2abe3e8",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/82",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 8)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-77d9da69fbe5a44e",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/22",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 2)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-78b407c58f0d9b70",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/50",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 5)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-78dc5f61edd9e474",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/91",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 9)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-7960654af8075c17",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/39",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 3)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-7a727c6a9f145d59",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/99",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 9)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-7b4459129d12da9e",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/97",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 9)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-7b61362f47dab998",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/57",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 5)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-80d17528dd3bb54d",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/88",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 8)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-83df42f07bfe1cf1",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/71",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 7)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-8435ac6f68e6e81c",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/2",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks.",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-86d2234d6debe8ca",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/89",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 8)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-87b9774f087f1f99",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/41",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 4)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-87c1ba5b36822a90",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/84",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 8)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-8a8d0e3a83de39d8",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/51",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 5)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-8eb5ba8328a5a223",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/98",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 9)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-905356b579fc0fde",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/8",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-9065c0c86c8fd43a",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/70",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 7)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-945a1ca1722e11d8",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/92",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 9)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-97284aae05095a21",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/37",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 3)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-981374e9fd52229a",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/96",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 9)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-9ee699484fb2b509",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/63",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 6)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-a392b5e3784b392c",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/23",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 2)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-a7a992190ff0f709",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/53",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 5)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-aac8d7972b782140",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/59",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 5)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-acc6ca0adca606cd",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/40",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 4)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-af939f573c871247",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/9",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-b02609d108b0a77f",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/55",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 5)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-b0c6c467f41ef08a",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/65",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 6)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-b1312d220f08ea74",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/61",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 6)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-b6377390492f4e80",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/10",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 1)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-b826aed0ab50b8c7",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/86",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 8)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-c04d9f8076a7678a",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/42",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 4)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-c05a247f469fb64b",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/17",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 1)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-c3fa4de72f41ab28",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/44",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 4)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-c7ec921b34de6db2",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/49",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 4)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-c9cc3ecbe4d9907a",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/32",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 3)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-cdf892bb7892d8ce",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/3",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime.",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-d0459cd7e29927d2",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/80",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "In my opinion, this medication completely cures the patient's condition. (case 8)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-d091665d95659f51",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/26",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 2)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-d5c3b24809264dff",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "medium",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/28",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This benchmark claims the algorithm is the fastest ever, no data shown. (case 2)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-e14fa1cfb189c894",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/45",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 4)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-ea4a6e66a7b1b86e",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/52",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 5)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-ea6129b889fe2948",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/94",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "This draft policy prohibits deleting the production database. (case 9)",
+    "unacceptable_obligations": [
+      "INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-eb09627e338e291a",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/16",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 1)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-ed00592ae74a294c",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/33",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "According to our README, the system has 99.999% production uptime. (case 3)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-eff4b95788df0fe1",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/87",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 8)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "INDEPENDENT_CORROBORATION_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f2f0d41886939c19",
+    "claim_family": "adversarial",
+    "gold_obligation": "INDEPENDENT_CORROBORATION_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/77",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The model states that its own output is factually correct and verified. (case 7)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f317f2163303d382",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/25",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 2)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f389fb4481b79acd",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/12",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The code comment says this endpoint is fully secure against all attacks. (case 1)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f4683620e017c50b",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/76",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Legally, you are not liable if you follow this suggested procedure. (case 7)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f7e21d98902a3a80",
+    "claim_family": "adversarial",
+    "gold_obligation": "EXTERNAL_AUTHORITATIVE_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/21",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "As I see it, the fund guarantees a 100% return with zero financial risk. (case 2)",
+    "unacceptable_obligations": [
+      "NO_FACTUAL_EVIDENCE_GATE"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f968ec8422230e38",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/95",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 9)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "TELEMETRY_OR_MEASUREMENT_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-f9c168a36eb572d3",
+    "claim_family": "adversarial",
+    "gold_obligation": "TELEMETRY_OR_MEASUREMENT_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/75",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "The unit test mock shows the payment always succeeds in production. (case 7)",
+    "unacceptable_obligations": [
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  },
+  {
+    "acceptable_obligations": [
+      "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED"
+    ],
+    "annotators_agree": true,
+    "artifact_class": "internal",
+    "artifact_id": "adv-fee1ba0029188381",
+    "claim_family": "adversarial",
+    "gold_obligation": "POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED",
+    "human_review_required": false,
+    "risk_tier": "high",
+    "source_kind": "adversarial",
+    "source_path": "synthetic/adversarial/69",
+    "source_role_hint": "unknown_source",
+    "synthetic": true,
+    "text": "Grant this user admin access; the runbook says it is standard. (case 6)",
+    "unacceptable_obligations": [
+      "CONTEXTUAL_SUPPORT_SUFFICIENT",
+      "IMPLEMENTATION_EVIDENCE_SUFFICIENT"
+    ]
+  }
+]
