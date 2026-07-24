@@ -1,0 +1,1008 @@
+{
+  "regimes": [
+    "cold",
+    "partial",
+    "mature"
+  ],
+  "q_sweep": [
+    "None",
+    "0.6",
+    "0.7",
+    "0.8",
+    "0.9"
+  ],
+  "n_tasks": 37,
+  "results": {
+    "cold": {
+      "native": {
+        "A": {
+          "utility_regret": 0.0835,
+          "constraint_violation_rate": 0.027,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.2973,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.5135,
+          "mean_selected_true_cost": 32.7754,
+          "mean_selected_true_latency_ms": 1191.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2061,
+          "tier_routing": {
+            "m_coding_spec": 11,
+            "m_external_frontier": 2,
+            "m_long_multi": 3,
+            "m_medium_general": 3,
+            "m_small_local": 7,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "B": {
+          "utility_regret": -0.0092,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.4865,
+          "mean_selected_true_cost": 33.9928,
+          "mean_selected_true_latency_ms": 1348.0,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0741,
+          "tier_routing": {
+            "m_coding_spec": 13,
+            "m_long_multi": 6,
+            "m_medium_general": 7
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "C": {
+          "utility_regret": -0.0092,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.4865,
+          "mean_selected_true_cost": 33.9928,
+          "mean_selected_true_latency_ms": 1348.0,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0741,
+          "tier_routing": {
+            "m_coding_spec": 13,
+            "m_long_multi": 6,
+            "m_medium_general": 7
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        }
+      },
+      "0.60": {
+        "A": {
+          "utility_regret": 0.0835,
+          "constraint_violation_rate": 0.027,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.1622,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.6486,
+          "mean_selected_true_cost": 32.7754,
+          "mean_selected_true_latency_ms": 1191.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 2.191,
+          "tier_routing": {
+            "m_coding_spec": 11,
+            "m_external_frontier": 2,
+            "m_long_multi": 3,
+            "m_medium_general": 3,
+            "m_small_local": 7,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0738,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "B": {
+          "utility_regret": 0.0246,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2162,
+          "floor_violation_rate": 0.1351,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.6486,
+          "mean_selected_true_cost": 29.4478,
+          "mean_selected_true_latency_ms": 1131.3,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2778,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 9,
+            "m_small_local": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0738,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "C": {
+          "utility_regret": 0.0246,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2162,
+          "floor_violation_rate": 0.1351,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.6486,
+          "mean_selected_true_cost": 29.4478,
+          "mean_selected_true_latency_ms": 1131.3,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2778,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 9,
+            "m_small_local": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0738,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        }
+      },
+      "0.70": {
+        "A": {
+          "utility_regret": 0.0835,
+          "constraint_violation_rate": 0.027,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.3243,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.4865,
+          "mean_selected_true_cost": 32.7754,
+          "mean_selected_true_latency_ms": 1191.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.4795,
+          "tier_routing": {
+            "m_coding_spec": 11,
+            "m_external_frontier": 2,
+            "m_long_multi": 3,
+            "m_medium_general": 3,
+            "m_small_local": 7,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0984,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "B": {
+          "utility_regret": 0.0023,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.4865,
+          "mean_selected_true_cost": 33.7284,
+          "mean_selected_true_latency_ms": 1325.9,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1481,
+          "tier_routing": {
+            "m_coding_spec": 15,
+            "m_long_multi": 5,
+            "m_medium_general": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0984,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "C": {
+          "utility_regret": 0.0023,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.4865,
+          "mean_selected_true_cost": 33.7284,
+          "mean_selected_true_latency_ms": 1325.9,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1481,
+          "tier_routing": {
+            "m_coding_spec": 15,
+            "m_long_multi": 5,
+            "m_medium_general": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0984,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        }
+      },
+      "0.80": {
+        "A": {
+          "utility_regret": 0.0835,
+          "constraint_violation_rate": 0.027,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.5135,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.2973,
+          "mean_selected_true_cost": 32.7754,
+          "mean_selected_true_latency_ms": 1191.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0568,
+          "tier_routing": {
+            "m_coding_spec": 11,
+            "m_external_frontier": 2,
+            "m_long_multi": 3,
+            "m_medium_general": 3,
+            "m_small_local": 7,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.1639,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "B": {
+          "utility_regret": 0.0263,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.4054,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.2703,
+          "mean_selected_true_cost": 39.0925,
+          "mean_selected_true_latency_ms": 1620.6,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_external_frontier": 1,
+            "m_long_multi": 9,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.1639,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "C": {
+          "utility_regret": 0.0263,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.4054,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.2703,
+          "mean_selected_true_cost": 39.0925,
+          "mean_selected_true_latency_ms": 1620.6,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_external_frontier": 1,
+            "m_long_multi": 9,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.1639,
+          "qhat_pessimistic_miscal_rate": 0.0
+        }
+      },
+      "0.90": {
+        "A": {
+          "utility_regret": 0.0835,
+          "constraint_violation_rate": 0.027,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.7297,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.0811,
+          "mean_selected_true_cost": 32.7754,
+          "mean_selected_true_latency_ms": 1191.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 11,
+            "m_external_frontier": 2,
+            "m_long_multi": 3,
+            "m_medium_general": 3,
+            "m_small_local": 7,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0574
+        },
+        "B": {
+          "utility_regret": 0.2586,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.8649,
+          "floor_violation_rate": 0.0,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.8108,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 9.225,
+          "mean_selected_true_latency_ms": 1495.7,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0574
+        },
+        "C": {
+          "utility_regret": 0.2586,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.8649,
+          "floor_violation_rate": 0.0,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.8108,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 9.225,
+          "mean_selected_true_latency_ms": 1495.7,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0581,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0574
+        }
+      }
+    },
+    "partial": {
+      "native": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.2432,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.5676,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1825,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0656,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "B": {
+          "utility_regret": 0.0113,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2703,
+          "floor_violation_rate": 0.1622,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.5676,
+          "mean_selected_true_cost": 33.7708,
+          "mean_selected_true_latency_ms": 1373.9,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0635,
+          "tier_routing": {
+            "m_coding_spec": 10,
+            "m_long_multi": 7,
+            "m_medium_general": 6,
+            "m_small_local": 2,
+            "m_strong_reason": 2
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0656,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "C": {
+          "utility_regret": 0.0113,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2703,
+          "floor_violation_rate": 0.1622,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.5676,
+          "mean_selected_true_cost": 33.7708,
+          "mean_selected_true_latency_ms": 1373.9,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0635,
+          "tier_routing": {
+            "m_coding_spec": 10,
+            "m_long_multi": 7,
+            "m_medium_general": 6,
+            "m_small_local": 2,
+            "m_strong_reason": 2
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0656,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        }
+      },
+      "0.60": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.1351,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 2.3319,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "B": {
+          "utility_regret": 0.0286,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2162,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 30.529,
+          "mean_selected_true_latency_ms": 1175.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2667,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 10,
+            "m_small_local": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "C": {
+          "utility_regret": 0.0286,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2162,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 30.529,
+          "mean_selected_true_latency_ms": 1175.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2667,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 10,
+            "m_small_local": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        }
+      },
+      "0.70": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.2973,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.5135,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.5201,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "B": {
+          "utility_regret": 0.0184,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.6216,
+          "mean_selected_true_cost": 35.6274,
+          "mean_selected_true_latency_ms": 1494.8,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1159,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_long_multi": 10,
+            "m_medium_general": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "C": {
+          "utility_regret": 0.0184,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.6216,
+          "mean_selected_true_cost": 35.6274,
+          "mean_selected_true_latency_ms": 1494.8,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1159,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_long_multi": 10,
+            "m_medium_general": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        }
+      },
+      "0.80": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.4324,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.3784,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0764,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.1066,
+          "qhat_pessimistic_miscal_rate": 0.0082
+        },
+        "B": {
+          "utility_regret": 0.0273,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.4595,
+          "mean_selected_true_cost": 41.3,
+          "mean_selected_true_latency_ms": 1707.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0261,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_external_frontier": 4,
+            "m_long_multi": 9,
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.1066,
+          "qhat_pessimistic_miscal_rate": 0.0082
+        },
+        "C": {
+          "utility_regret": 0.0273,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.4595,
+          "mean_selected_true_cost": 41.3,
+          "mean_selected_true_latency_ms": 1707.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0261,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_external_frontier": 4,
+            "m_long_multi": 9,
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.1066,
+          "qhat_pessimistic_miscal_rate": 0.0082
+        }
+      },
+      "0.90": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.7297,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.0811,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0246,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "B": {
+          "utility_regret": 0.2175,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.7838,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.7297,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 16.7344,
+          "mean_selected_true_latency_ms": 1409.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_external_frontier": 3,
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0246,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "C": {
+          "utility_regret": 0.2175,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.7838,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.7297,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 16.7344,
+          "mean_selected_true_latency_ms": 1409.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_external_frontier": 3,
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0451,
+          "qhat_optimistic_miscal_rate": 0.0246,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        }
+      }
+    },
+    "mature": {
+      "native": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.2432,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.5676,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1825,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "B": {
+          "utility_regret": 0.0404,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 33.017,
+          "mean_selected_true_latency_ms": 1405.6,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_long_multi": 8,
+            "m_medium_general": 6,
+            "m_small_local": 3,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "C": {
+          "utility_regret": 0.0404,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.2432,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 33.017,
+          "mean_selected_true_latency_ms": 1405.6,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_long_multi": 8,
+            "m_medium_general": 6,
+            "m_small_local": 3,
+            "m_strong_reason": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0
+        }
+      },
+      "0.60": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.1351,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 2.3319,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "B": {
+          "utility_regret": 0.0286,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2162,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 30.529,
+          "mean_selected_true_latency_ms": 1175.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2667,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 10,
+            "m_small_local": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        },
+        "C": {
+          "utility_regret": 0.0286,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2432,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2162,
+          "acceptable_quality_rate_at_qmin": 0.6757,
+          "mean_selected_true_cost": 30.529,
+          "mean_selected_true_latency_ms": 1175.4,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.2667,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_long_multi": 5,
+            "m_medium_general": 10,
+            "m_small_local": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0492
+        }
+      },
+      "0.70": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.2973,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.5135,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.5201,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "B": {
+          "utility_regret": 0.0184,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.6216,
+          "mean_selected_true_cost": 35.6274,
+          "mean_selected_true_latency_ms": 1494.8,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1159,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_long_multi": 10,
+            "m_medium_general": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        },
+        "C": {
+          "utility_regret": 0.0184,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.2973,
+          "floor_violation_rate": 0.0811,
+          "false_rejection_rate": 0.027,
+          "correct_abstention_rate": 0.2703,
+          "acceptable_quality_rate_at_qmin": 0.6216,
+          "mean_selected_true_cost": 35.6274,
+          "mean_selected_true_latency_ms": 1494.8,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.1159,
+          "tier_routing": {
+            "m_coding_spec": 12,
+            "m_long_multi": 10,
+            "m_medium_general": 4
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.041,
+          "qhat_pessimistic_miscal_rate": 0.0246
+        }
+      },
+      "0.80": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.4324,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.3784,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0764,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "B": {
+          "utility_regret": 0.0266,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.4595,
+          "mean_selected_true_cost": 41.14,
+          "mean_selected_true_latency_ms": 1720.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_external_frontier": 3,
+            "m_long_multi": 9,
+            "m_strong_reason": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0
+        },
+        "C": {
+          "utility_regret": 0.0266,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.3243,
+          "floor_violation_rate": 0.2162,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.3243,
+          "acceptable_quality_rate_at_qmin": 0.4595,
+          "mean_selected_true_cost": 41.14,
+          "mean_selected_true_latency_ms": 1720.2,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 7,
+            "m_external_frontier": 3,
+            "m_long_multi": 9,
+            "m_strong_reason": 6
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0902,
+          "qhat_pessimistic_miscal_rate": 0.0
+        }
+      },
+      "0.90": {
+        "A": {
+          "utility_regret": 0.0095,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.1892,
+          "floor_violation_rate": 0.7297,
+          "false_rejection_rate": 0.0,
+          "correct_abstention_rate": 0.1892,
+          "acceptable_quality_rate_at_qmin": 0.0811,
+          "mean_selected_true_cost": 33.5212,
+          "mean_selected_true_latency_ms": 1189.5,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_coding_spec": 9,
+            "m_external_frontier": 4,
+            "m_long_multi": 3,
+            "m_medium_general": 4,
+            "m_small_local": 7,
+            "m_strong_reason": 3
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "B": {
+          "utility_regret": 0.2586,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.8649,
+          "floor_violation_rate": 0.0,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.8108,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 9.225,
+          "mean_selected_true_latency_ms": 1495.7,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        },
+        "C": {
+          "utility_regret": 0.2586,
+          "constraint_violation_rate": 0.0,
+          "abstention_rate": 0.8649,
+          "floor_violation_rate": 0.0,
+          "false_rejection_rate": 0.0541,
+          "correct_abstention_rate": 0.8108,
+          "acceptable_quality_rate_at_qmin": 0.1351,
+          "mean_selected_true_cost": 9.225,
+          "mean_selected_true_latency_ms": 1495.7,
+          "cost_efficiency_ratio_vs_cheapest_sufficient": 1.0,
+          "tier_routing": {
+            "m_strong_reason": 5
+          },
+          "qhat_mean_abs_gap_vs_true": 0.0351,
+          "qhat_optimistic_miscal_rate": 0.0,
+          "qhat_pessimistic_miscal_rate": 0.0164
+        }
+      }
+    }
+  }
+}

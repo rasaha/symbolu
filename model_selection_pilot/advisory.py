@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from common import clamp, det_signed, det_unit
+from model_selection_pilot.common import clamp, det_signed, det_unit
 
 ALLOWED_FIELDS = {"suggested_decomposition", "likely_tool_requirement",
                   "anticipated_reasoning_difficulty", "anticipated_execution_weakness",

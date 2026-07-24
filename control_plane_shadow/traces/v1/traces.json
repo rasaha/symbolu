@@ -1,0 +1,2828 @@
+[
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T01",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T01"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [
+      "EXEC",
+      "MODEL"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "real EG+MP+TAP, no action",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T01",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_only_safe",
+    "trace_id": "T01"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T02",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T02"
+    },
+    "expected_action": null,
+    "expected_assertion": "QUALIFY",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "TAP GOVERNING_WITH_EXCEPTION",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D12",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T02",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_qualified",
+    "trace_id": "T02"
+  },
+  {
+    "action_op": "notify_action",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T03",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T03"
+    },
+    "expected_action": null,
+    "expected_assertion": "REJECT",
+    "expected_reason_namespaces": [
+      "ASSERT"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_REJECTED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D14",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T03",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_rejected",
+    "trace_id": "T03"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T04",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T04"
+    },
+    "expected_action": null,
+    "expected_assertion": "ESCALATE",
+    "expected_reason_namespaces": [
+      "ASSERT"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_ESCALATED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D13",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T04",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_escalated",
+    "trace_id": "T04"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal",
+        "signals": {
+          "authenticated": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha",
+        "signals": {
+          "authenticated": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta",
+        "signals": {
+          "authenticated": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta",
+        "signals": {
+          "authenticated": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma",
+        "signals": {
+          "authenticated": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega",
+        "signals": {
+          "authenticated": false
+        }
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T05",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T05"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "EXEC"
+    ],
+    "expected_selection": "ABSTAIN",
+    "expected_terminal": "NO_ELIGIBLE_MODEL",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T05",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "no_eligible_model",
+    "trace_id": "T05"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal",
+        "signals": {
+          "model_available": false
+        }
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T06",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T06"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "EG excludes one; MP picks from rest",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T06",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "preferred_ineligible_fallback",
+    "trace_id": "T06"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER2",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T07",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T07"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "provider vanishes after selection; fallback re-enters and recovers",
+    "provider_outcome": "DISAPPEARED",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T07",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "provider_disappears",
+    "trace_id": "T07"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER2",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T08",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T08"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "fallback re-enters eligibility",
+    "provider_outcome": "FAILURE",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T08",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "fallback_succeeds",
+    "trace_id": "T08"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      }
+    ],
+    "component_tier_ceiling": "TIER2",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T09",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T09"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "RUNTIME"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "PROVIDER_FAILED",
+    "note": "single candidate, no fallback available",
+    "provider_outcome": "FAILURE",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T09",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "fallback_also_fails",
+    "trace_id": "T09"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T10",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T10"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T10",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_no_action",
+    "trace_id": "T10"
+  },
+  {
+    "action_op": "DB_DELETE",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T11",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T11"
+    },
+    "expected_action": "DENY",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [
+      "ACTION"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_DENIED",
+    "note": "hard safety block",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T11",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_ok_action_denied",
+    "trace_id": "T11"
+  },
+  {
+    "action_op": "SECRET_READ",
+    "action_with_approval": true,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T12",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T12"
+    },
+    "expected_action": "CONSTRAIN",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [
+      "ACTION"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_CONSTRAINED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T12",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_ok_action_constrained",
+    "trace_id": "T12"
+  },
+  {
+    "action_op": "SECRET_READ",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T13",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T13"
+    },
+    "expected_action": "APPROVE",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [
+      "ACTION"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_APPROVAL_REQUIRED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T13",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "assertion_ok_approval_required",
+    "trace_id": "T13"
+  },
+  {
+    "action_op": "KEY_ROTATE",
+    "action_with_approval": true,
+    "action_with_evidence": true,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T14",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T14"
+    },
+    "expected_action": "ALLOW",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "COMPLETED_SUPPRESSED",
+    "note": "ALLOW but ActionRuntime simulates only (shadow)",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T14",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "action_allowed_suppressed_shadow",
+    "trace_id": "T14"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal",
+        "region": "us"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha",
+        "region": "us"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta",
+        "region": "us"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta",
+        "region": "us"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma",
+        "region": "us"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega",
+        "region": "us"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T15",
+      "required_capabilities": [],
+      "residency_requirements": "eu",
+      "task_risk_class": "informational",
+      "trace_id": "T15"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "EXEC"
+    ],
+    "expected_selection": "ABSTAIN",
+    "expected_terminal": "NO_ELIGIBLE_MODEL",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T15",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "residency_prohibited",
+    "trace_id": "T15"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v0",
+      "request_id": "req_T16",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T16"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "POLICY"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "REJECTED",
+    "note": "registry version mismatch",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T16",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "stale_registry",
+    "trace_id": "T16"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v0",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T17",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T17"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "POLICY"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "REJECTED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T17",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "stale_policy_version",
+    "trace_id": "T17"
+  },
+  {
+    "action_op": "notify",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T18",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T18"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "RUNTIME"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "GOVERNANCE_UNAVAILABLE",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": true,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T18",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "tap_unavailable",
+    "trace_id": "T18"
+  },
+  {
+    "action_op": "SECRET_READ",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": true,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T19",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T19"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "RUNTIME"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "GOVERNANCE_UNAVAILABLE",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T19",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "actiongate_unavailable",
+    "trace_id": "T19"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T20",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T20"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "telemetry down degrades, not blocks",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T20",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": true,
+    "trace_class": "telemetry_unavailable",
+    "trace_id": "T20"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": true,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T21",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T21"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "AUDIT"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "AUDIT_FAILURE",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T21",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "audit_write_failure",
+    "trace_id": "T21"
+  },
+  {
+    "action_op": "SECRET_READ",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T22",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T22"
+    },
+    "expected_action": "APPROVE",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_APPROVAL_REQUIRED",
+    "note": "override attempted without rationale handled by orchestrator",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T22",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "unauthorized_override",
+    "trace_id": "T22"
+  },
+  {
+    "action_op": "SECRET_READ",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T23",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T23"
+    },
+    "expected_action": "APPROVE",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_APPROVAL_REQUIRED",
+    "note": "valid override at orchestrator",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T23",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "human_override_valid",
+    "trace_id": "T23"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "regulated",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T24",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T24"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "POLICY"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "REJECTED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T24",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "data_flow_not_approved",
+    "trace_id": "T24"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "99",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T25",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T25"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "POLICY"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "REJECTED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T25",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "version_incompatible",
+    "trace_id": "T25"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": true,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T26",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T26"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "one provider, no action: overhead may exceed benefit",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T26",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "single_provider_overhead",
+    "trace_id": "T26"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T27",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T27"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "deterministic tie-break by model id",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T27",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "equal_utility_tie",
+    "trace_id": "T27"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T28",
+      "required_capabilities": [
+        "tool_use"
+      ],
+      "task_risk_class": "informational",
+      "trace_id": "T28"
+    },
+    "expected_action": null,
+    "expected_assertion": null,
+    "expected_reason_namespaces": [
+      "EXEC"
+    ],
+    "expected_selection": "ABSTAIN",
+    "expected_terminal": "NO_ELIGIBLE_MODEL",
+    "note": "no candidate supports tool_use",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 0.4,
+        "tool_use": 1.0
+      },
+      "task_class": "tool_requiring",
+      "task_id": "T28",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "capability_mismatch",
+    "trace_id": "T28"
+  },
+  {
+    "action_op": "EXTERNAL_COMMS",
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": [
+        "internal",
+        "vendor_alpha",
+        "vendor_beta",
+        "vendor_delta",
+        "vendor_gamma",
+        "vendor_omega"
+      ],
+      "registry_version": "reg_v1",
+      "request_id": "req_T29",
+      "required_capabilities": [],
+      "task_risk_class": "irreversible",
+      "trace_id": "T29"
+    },
+    "expected_action": "DENY",
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [
+      "ACTION"
+    ],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ACTION_DENIED",
+    "note": "irreversible external comms hard-blocked",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "reasoning": 1.0
+      },
+      "task_class": "reasoning",
+      "task_id": "T29",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "high_risk_action",
+    "trace_id": "T29"
+  },
+  {
+    "action_op": null,
+    "action_with_approval": false,
+    "action_with_evidence": false,
+    "actiongate_unavailable": false,
+    "audit_unavailable": false,
+    "can_lose": false,
+    "candidate_specs": [
+      {
+        "family": "f",
+        "model_id": "m_coding_spec",
+        "provider": "internal"
+      },
+      {
+        "family": "f",
+        "model_id": "m_external_frontier",
+        "provider": "vendor_alpha"
+      },
+      {
+        "family": "f",
+        "model_id": "m_long_multi",
+        "provider": "vendor_beta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_medium_general",
+        "provider": "vendor_delta"
+      },
+      {
+        "family": "f",
+        "model_id": "m_small_local",
+        "provider": "vendor_gamma"
+      },
+      {
+        "family": "f",
+        "model_id": "m_strong_reason",
+        "provider": "vendor_omega"
+      }
+    ],
+    "component_tier_ceiling": "TIER1",
+    "envelope": {
+      "action_policy": {
+        "permitted": [
+          "notify"
+        ],
+        "require_approval": [
+          "payment"
+        ]
+      },
+      "context_tokens": 1000,
+      "data_sensitivity": "internal",
+      "envelope_version": "1",
+      "mode": "SHADOW",
+      "policy_versions": {
+        "action": "v1",
+        "assertion": "v1",
+        "enterprise": "v1"
+      },
+      "provider_allowlist": null,
+      "registry_version": "reg_v1",
+      "request_id": "req_T30",
+      "required_capabilities": [],
+      "task_risk_class": "informational",
+      "trace_id": "T30"
+    },
+    "expected_action": null,
+    "expected_assertion": "ALLOW",
+    "expected_reason_namespaces": [],
+    "expected_selection": "SELECTED",
+    "expected_terminal": "ASSERTION_DELIVERED",
+    "note": "",
+    "provider_outcome": "SUCCESS",
+    "tap_case_id": "E4D01",
+    "tap_unavailable": false,
+    "task": {
+      "acceptable_quality_threshold": 0.6,
+      "business_priority": "balanced",
+      "hard_constraints": {},
+      "input_tokens_k": 8,
+      "required_caps": {
+        "extraction": 1.0,
+        "summarization": 0.3
+      },
+      "task_class": "extraction",
+      "task_id": "T30",
+      "utility_weights": {
+        "cost": 0.45,
+        "latency": 0.35,
+        "quality": 1.0
+      }
+    },
+    "telemetry_unavailable": false,
+    "trace_class": "low_risk_informational",
+    "trace_id": "T30"
+  }
+]

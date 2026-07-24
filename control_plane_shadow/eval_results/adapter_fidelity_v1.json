@@ -1,0 +1,59 @@
+{
+  "adapters": [
+    {
+      "adapter": "ExecutionGate",
+      "n": 3,
+      "disposition_matches_map": 3,
+      "source_preserved": 3,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0,
+      "notes": []
+    },
+    {
+      "adapter": "TAP",
+      "n": 30,
+      "disposition_matches_map": 30,
+      "source_preserved": 30,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0,
+      "notes": [
+        "SEMANTIC GAP: authority-resolution mapped to assertion disposition (declared, lossy)"
+      ]
+    },
+    {
+      "adapter": "ActionGate",
+      "n": 40,
+      "disposition_matches_map": 40,
+      "source_preserved": 40,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0,
+      "notes": []
+    }
+  ],
+  "summary": {
+    "ExecutionGate": {
+      "disposition_fidelity": 1.0,
+      "source_preservation": 1.0,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0
+    },
+    "TAP": {
+      "disposition_fidelity": 1.0,
+      "source_preservation": 1.0,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0
+    },
+    "ActionGate": {
+      "disposition_fidelity": 1.0,
+      "source_preservation": 1.0,
+      "invented_fields": 0,
+      "lost_decision_relevant": 0,
+      "changed_authority": 0
+    }
+  }
+}

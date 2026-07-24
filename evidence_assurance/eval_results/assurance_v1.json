@@ -1,0 +1,47 @@
+{
+  "confusion": {
+    "AUTHORITY_MISMATCH": {
+      "AUTHORITY_MISMATCH": 19,
+      "MISALIGNED": 5
+    },
+    "CONFLICTED": {
+      "CONFLICTED": 83,
+      "MISALIGNED": 21
+    },
+    "DEPENDENT": {
+      "DEPENDENT": 52
+    },
+    "MISALIGNED": {
+      "MISALIGNED": 104
+    },
+    "REJECT_EVIDENCE_STATE": {
+      "CONFLICTED": 66,
+      "INDETERMINATE": 13,
+      "MISALIGNED": 25
+    },
+    "STALE": {
+      "STALE": 104
+    },
+    "VERIFIED": {
+      "MISALIGNED": 5,
+      "VERIFIED": 75
+    },
+    "VERIFIED_WITH_LIMITATIONS": {
+      "MISALIGNED": 10,
+      "VERIFIED_WITH_LIMITATIONS": 42
+    }
+  },
+  "corpus": "ea_corpus_v1_1",
+  "endpoints": {
+    "correlated_failure_escape": 0.0,
+    "disposition_exact_accuracy": 0.7676,
+    "false_block": 0.1136,
+    "overall_escape": 0.0
+  },
+  "n_cases": 624,
+  "trap_disposition_calls": {
+    "CONFLICTED": 66,
+    "INDETERMINATE": 13,
+    "MISALIGNED": 77
+  }
+}

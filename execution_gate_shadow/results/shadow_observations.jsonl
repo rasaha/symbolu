@@ -1,0 +1,8 @@
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 800.0, "model_id": "m_ok", "observed_at": 2000000.0, "outcome": "SUCCESS", "provider": "anthropic", "request_id": "r1", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 120.0, "model_id": "m_net", "observed_at": 2000000.0, "outcome": "NETWORK_FAILURE", "provider": "mistral", "request_id": "r2", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 120.0, "model_id": "m_quota", "observed_at": 2000000.0, "outcome": "QUOTA_FAILURE", "provider": "google", "request_id": "r3", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 1500.0, "model_id": "m_deg", "observed_at": 2000000.0, "outcome": "SUCCESS", "provider": "anthropic", "request_id": "r4", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 650.0, "model_id": "m_rec", "observed_at": 2000000.0, "outcome": "SUCCESS", "provider": "google", "request_id": "r5", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 400.0, "model_id": "m_bad", "observed_at": 2000000.0, "outcome": "POLICY_PROHIBITED", "provider": "unapproved_vendor", "request_id": "r6", "source": "mock"}
+{"attempted": true, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 120.0, "model_id": "m_stale", "observed_at": 2000000.0, "outcome": "QUOTA_FAILURE", "provider": "google", "request_id": "r7", "source": "mock"}
+{"attempted": false, "est_cost_usd": 0.0, "kind": "observation", "latency_ms": 0.0, "model_id": "m_none", "observed_at": 2000000.0, "outcome": "NOT_ATTEMPTED", "provider": "mistral", "request_id": "r8", "source": "mock"}

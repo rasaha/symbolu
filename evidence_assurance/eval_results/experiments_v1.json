@@ -1,0 +1,292 @@
+{
+  "corpus": "ea_corpus_v1_1",
+  "phase15_correlated_failure_scenarios": {
+    "S13_fake_publisher_diversity": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S14_fake_retrieval_diversity": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S15_fake_high_provenance_conf": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S16_fake_all_diversity": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S17_fake_distinct_hashes": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S18_fake_recent_years": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S19_fake_authority": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S20_fake_everything_no_upstream": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S21_fake_upstream_roots": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S22_fake_everything_incl_upstream": {
+      "dispositions": {
+        "CONFLICTED": 66,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 77
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0833,
+      "n": 156
+    },
+    "S23_no_tell_correlated_failure": {
+      "dispositions": {
+        "VERIFIED": 80
+      },
+      "escape": 1.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 80
+    },
+    "T11_wrong_passage_entailment": {
+      "dispositions": {
+        "MISALIGNED": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T12_claim_citation_misalignment": {
+      "dispositions": {
+        "MISALIGNED": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T13_scope_inflation": {
+      "dispositions": {
+        "MISALIGNED": 10,
+        "VERIFIED_WITH_LIMITATIONS": 42
+      },
+      "escape": 0.0,
+      "false_block": 0.1923,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T17_authority_mismatch": {
+      "dispositions": {
+        "AUTHORITY_MISMATCH": 19,
+        "MISALIGNED": 10,
+        "VERIFIED": 23
+      },
+      "escape": 0.0,
+      "false_block": 0.1786,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T1_shared_bad_retrieval": {
+      "dispositions": {
+        "CONFLICTED": 41,
+        "MISALIGNED": 11
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T20_missing_counterevidence": {
+      "dispositions": {
+        "CONFLICTED": 42,
+        "MISALIGNED": 10
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T25_synthetic_consensus": {
+      "dispositions": {
+        "CONFLICTED": 25,
+        "INDETERMINATE": 13,
+        "MISALIGNED": 14
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.25,
+      "n": 52
+    },
+    "T29_official_superseded": {
+      "dispositions": {
+        "STALE": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T4_summaries_of_one_source": {
+      "dispositions": {
+        "DEPENDENT": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T5_citation_circularity": {
+      "dispositions": {
+        "CONFLICTED": 41,
+        "MISALIGNED": 11
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "T8_stale_replicated": {
+      "dispositions": {
+        "STALE": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    },
+    "TNone_clean_control": {
+      "dispositions": {
+        "VERIFIED": 52
+      },
+      "escape": 0.0,
+      "false_block": 0.0,
+      "indeterminate_rate": 0.0,
+      "n": 52
+    }
+  },
+  "phase16_missing_metadata": {
+    "missingness_sweep": [
+      {
+        "escape": 0.0,
+        "false_block": 0.1136,
+        "indeterminate_rate": 0.0208,
+        "missingness": 0.0
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.2197,
+        "indeterminate_rate": 0.0737,
+        "missingness": 0.1
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.303,
+        "indeterminate_rate": 0.1122,
+        "missingness": 0.2
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.4167,
+        "indeterminate_rate": 0.1619,
+        "missingness": 0.3
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.4924,
+        "indeterminate_rate": 0.1987,
+        "missingness": 0.4
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.5909,
+        "indeterminate_rate": 0.25,
+        "missingness": 0.5
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.6515,
+        "indeterminate_rate": 0.2869,
+        "missingness": 0.6
+      },
+      {
+        "escape": 0.0,
+        "false_block": 0.7576,
+        "indeterminate_rate": 0.3349,
+        "missingness": 0.7
+      }
+    ]
+  }
+}

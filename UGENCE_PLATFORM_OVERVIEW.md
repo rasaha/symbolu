@@ -105,6 +105,13 @@ The boundaries are deliberate. Reasoning is separated from governance so that go
 can be **replaceable and dumb**. Each layer is independently valuable and independently adoptable —
 but together they close a loop no single vendor closes today.
 
+> **Note (non-normative) — Model Selection Policy.** *Policy-aware model selection* (deciding which
+> approved, eligible model may attempt a request) is a **cross-cutting platform policy service**,
+> provisionally affiliated with the AI Control Plane, at **research maturity** — **not** one of the ten
+> canonical components, and **not** an eleventh module. The ten-component taxonomy above is unchanged.
+> Placement, responsibility boundary, mechanism, and maturity are recorded in
+> `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`.
+
 ---
 
 ## Page 3 — Specialized AI Systems

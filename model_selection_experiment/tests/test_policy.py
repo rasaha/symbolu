@@ -25,11 +25,11 @@ PKG = os.path.dirname(HERE)
 if PKG not in sys.path:
     sys.path.insert(0, PKG)
 
-import baselines as bl  # noqa: E402
-import metrics as met  # noqa: E402
-import policy as pol  # noqa: E402
-import simulator as sim  # noqa: E402
-from common import load_corpus, load_policy, load_registry  # noqa: E402
+from model_selection_experiment import baselines as bl  # noqa: E402
+from model_selection_experiment import metrics as met  # noqa: E402
+from model_selection_experiment import policy as pol  # noqa: E402
+from model_selection_experiment import simulator as sim  # noqa: E402
+from model_selection_experiment.common import load_corpus, load_policy, load_registry  # noqa: E402
 
 REGISTRY = load_registry()
 POLICY = load_policy()

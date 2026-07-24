@@ -1,0 +1,213 @@
+{
+  "corpus": "ea_corpus_v1_1",
+  "endpoints": {
+    "co_primary": "false_block_rate (lower is better)",
+    "primary_safety": "correlated_failure_escape (lower is better)"
+  },
+  "n_cases": 624,
+  "n_gold_supported": 132,
+  "n_gold_unsupported": 492,
+  "n_trap_cases": 156,
+  "results": [
+    {
+      "baseline": "A_always_deliver",
+      "correlated_failure_escape": 1.0,
+      "escape_n": 492,
+      "escape_rate": 1.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 156
+    },
+    {
+      "baseline": "B_source_count",
+      "correlated_failure_escape": 1.0,
+      "escape_n": 492,
+      "escape_rate": 1.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 156
+    },
+    {
+      "baseline": "C_diversity",
+      "correlated_failure_escape": 1.0,
+      "escape_n": 492,
+      "escape_rate": 1.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 156
+    },
+    {
+      "baseline": "D_grounding",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 388,
+      "escape_rate": 0.7886,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "E_entailment",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 388,
+      "escape_rate": 0.7886,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "F_grounding_and_entail",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 388,
+      "escape_rate": 0.7886,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "G_passage_signal",
+      "correlated_failure_escape": 1.0,
+      "escape_n": 492,
+      "escape_rate": 1.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 156
+    },
+    {
+      "baseline": "H_always_block",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 0,
+      "escape_rate": 0.0,
+      "false_block_n": 132,
+      "false_block_rate": 1.0,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "I_majority_signal",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 388,
+      "escape_rate": 0.7886,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": true,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "J_provenance_conf",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 440,
+      "escape_rate": 0.8943,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "K_independence",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 180,
+      "escape_rate": 0.3659,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "L_alignment",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 154,
+      "escape_rate": 0.313,
+      "false_block_n": 57,
+      "false_block_rate": 0.4318,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "M_counterevidence",
+      "correlated_failure_escape": 0.4423,
+      "escape_n": 301,
+      "escape_rate": 0.6118,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 69
+    },
+    {
+      "baseline": "N_indep_align",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 61,
+      "escape_rate": 0.124,
+      "false_block_n": 57,
+      "false_block_rate": 0.4318,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "O_indep_align_counter",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 19,
+      "escape_rate": 0.0386,
+      "false_block_n": 57,
+      "false_block_rate": 0.4318,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "P_full_ea_rule",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 0,
+      "escape_rate": 0.0,
+      "false_block_n": 57,
+      "false_block_rate": 0.4318,
+      "signal_only": false,
+      "trap_escape_n": 0
+    },
+    {
+      "baseline": "Q_authority_grounding",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 364,
+      "escape_rate": 0.7398,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "R_fresh_grounding",
+      "correlated_failure_escape": 0.6667,
+      "escape_n": 284,
+      "escape_rate": 0.5772,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 104
+    },
+    {
+      "baseline": "S_learned_comparator",
+      "correlated_failure_escape": 1.0,
+      "escape_n": 492,
+      "escape_rate": 1.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 156
+    },
+    {
+      "baseline": "T_oracle",
+      "correlated_failure_escape": 0.0,
+      "escape_n": 0,
+      "escape_rate": 0.0,
+      "false_block_n": 0,
+      "false_block_rate": 0.0,
+      "signal_only": false,
+      "trap_escape_n": 0
+    }
+  ]
+}

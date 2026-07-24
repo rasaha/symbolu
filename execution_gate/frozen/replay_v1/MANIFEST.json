@@ -1,0 +1,148 @@
+{
+  "aggregate_manifest_hash": "8b05b2da798a6222c8f1d2fde17665219c08b93da3d8ad6fffda0f2fe26f963b",
+  "artifact_version": "replay_v1",
+  "baseline_count": 6,
+  "creation_timestamp": "2026-07-23T00:00:00Z",
+  "files": [
+    {
+      "frozen_name": "EVALUATION_REPORT.md",
+      "role": "evaluation_report",
+      "sha256": "a9ad7931c815447eaab50a72c542fb363ed7066e2df6cffcfb2a124a90d067f1",
+      "source_path": "docs/execution_eligibility/EVALUATION_REPORT.md"
+    },
+    {
+      "frozen_name": "EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md",
+      "role": "evaluation_protocol",
+      "sha256": "8bebf0a61e94099f812d70b9922a094c070aa80e78b856db4a2713f98ada55a0",
+      "source_path": "docs/execution_eligibility/EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md"
+    },
+    {
+      "frozen_name": "LIMITATIONS_AND_FALSIFICATION.md",
+      "role": "limitations_and_falsification",
+      "sha256": "78b8b57c8db5a6d8364e99345a766a1130e1bd5184a3062c9bc99e76c5f91ae7",
+      "source_path": "docs/execution_eligibility/LIMITATIONS_AND_FALSIFICATION.md"
+    },
+    {
+      "frozen_name": "baselines.py",
+      "role": "baseline_configuration",
+      "sha256": "d56d622dce764e73bb7c2ff99ed1f124b289749a28e1b4a40ba8d41915e5c13d",
+      "source_path": "execution_gate/baselines.py"
+    },
+    {
+      "frozen_name": "evaluation.json",
+      "role": "evaluation_output",
+      "sha256": "02cc14fab13e87c917e57ef8b6f725f37e0183ecd0d59a93a4a94bba1354792f",
+      "source_path": "execution_gate/results/evaluation.json"
+    },
+    {
+      "frozen_name": "gate.py",
+      "role": "eligibility_policy_engine",
+      "sha256": "75d604d0aced49623188cdbad42928ce8b19187396d5551d19538c0cb39448c4",
+      "source_path": "execution_gate/gate.py"
+    },
+    {
+      "frozen_name": "harness.py",
+      "role": "metric_definitions_and_simulator",
+      "sha256": "a370b7b8a5d478605212f06e7f37a6745ed36a9b2ab3857801f801b6ea52d3d1",
+      "source_path": "execution_gate/harness.py"
+    },
+    {
+      "frozen_name": "model.py",
+      "role": "eligibility_types_and_gate_config",
+      "sha256": "deaf3e6e6297bc2972cf6fa170d4b1c1ab74bc5afbcc63d5f5b70100c9362bf4",
+      "source_path": "execution_gate/model.py"
+    },
+    {
+      "frozen_name": "policy.py",
+      "role": "model_policy",
+      "sha256": "4251c21e3be40512731a793d6ecd8e029c764fca9abb1d8914afa18745c839ea",
+      "source_path": "execution_gate/policy.py"
+    },
+    {
+      "frozen_name": "reason_codes.py",
+      "role": "reason_code_version",
+      "sha256": "4040dda300e21a23a43bc84b7f07ec1ebfaf26251eaea0abaa58d01a6ac9df48",
+      "source_path": "execution_gate/reason_codes.py"
+    },
+    {
+      "frozen_name": "registry.py",
+      "role": "executable_registry",
+      "sha256": "47e798f6a05b4d0b68401ec3da648e60d6c51f0615507f4201d4f04672a2307b",
+      "source_path": "execution_gate/registry.py"
+    },
+    {
+      "frozen_name": "scenarios.py",
+      "role": "scenario_dataset_and_ground_truth",
+      "sha256": "3df684ccf694c1f9115e68571f2674bad9f4cdfc0727470efd91d56d665f981a",
+      "source_path": "execution_gate/scenarios.py"
+    },
+    {
+      "frozen_name": "states.py",
+      "role": "eligibility_state_semantics",
+      "sha256": "c7a9bee694304ba6142cdd9ddfc43536703c4fb56c6d85b2e68f6731a1b168f0",
+      "source_path": "execution_gate/states.py"
+    }
+  ],
+  "immutability_statement": "This version is OUTCOME-BEARING and is no longer tunable. Any change to design, thresholds, scenarios, or ground truth must be a new version (replay_v2), never an edit to replay_v1.",
+  "metric_names": [
+    "abstention_rate",
+    "eligibility_precision",
+    "eligibility_recall",
+    "execution_success_rate",
+    "fallback_rate",
+    "false_eligible_critical",
+    "false_ineligible",
+    "first_attempt_success_rate",
+    "mean_cost_per_success",
+    "mean_failed_calls",
+    "mean_latency_ms",
+    "mean_selection_regret",
+    "mean_wasted_cost",
+    "n_scenarios",
+    "policy_violation_rate"
+  ],
+  "package_version": "execution_gate@replay_v1",
+  "primary_endpoint": "invalid_selection_rate = policy_violation + (1 - first_attempt_success), vs retry_only",
+  "protocol_version": "execution_eligibility_evaluation_protocol_v1",
+  "reported_result_summary": {
+    "execution_gate_policy": {
+      "abstention_rate": 0.0909,
+      "eligibility_precision": 1.0,
+      "eligibility_recall": 0.8667,
+      "execution_success_rate": 0.9091,
+      "fallback_rate": 0.0,
+      "false_eligible_critical": 0,
+      "false_ineligible": 2,
+      "first_attempt_success_rate": 0.9091,
+      "mean_cost_per_success": 0.0995,
+      "mean_failed_calls": 0.0,
+      "mean_latency_ms": 939.8,
+      "mean_selection_regret": 0.0364,
+      "mean_wasted_cost": 0.0,
+      "n_scenarios": 11,
+      "policy_violation_rate": 0.0
+    },
+    "retry_only": {
+      "abstention_rate": 0.0,
+      "execution_success_rate": 0.7273,
+      "fallback_rate": 0.2727,
+      "first_attempt_success_rate": 0.5455,
+      "mean_cost_per_success": 0.1433,
+      "mean_failed_calls": 0.4545,
+      "mean_latency_ms": 1011.8,
+      "mean_selection_regret": 0.3273,
+      "mean_wasted_cost": 0.0,
+      "n_scenarios": 11,
+      "policy_violation_rate": 0.1818
+    }
+  },
+  "repository_commit_sha": "fb041663bb6af0a818fe84e258dfe6e40ebf8ce0",
+  "scenario_count": 11,
+  "success_criteria": [
+    "policy_violation_rate == 0",
+    "false_eligible_critical == 0",
+    "invalid_selection >= 30% below retry_only",
+    "selection_regret >= 30% below retry_only",
+    "added latency not exceeding latency saved from avoided failed calls"
+  ]
+}

@@ -13,10 +13,10 @@ from __future__ import annotations
 import os
 from typing import Any, Dict
 
-import baselines as bl
-import metrics as met
-import simulator as sim
-from common import (
+from model_selection_experiment import baselines as bl
+from model_selection_experiment import metrics as met
+from model_selection_experiment import simulator as sim
+from model_selection_experiment.common import (
     REGIMES,
     RESULTS_DIR,
     load_corpus,
@@ -24,7 +24,7 @@ from common import (
     load_registry,
     save_json,
 )
-from simulator import ADVISORY_PREFLIGHT_COST, ADVISORY_PREFLIGHT_LATENCY_MS
+from model_selection_experiment.simulator import ADVISORY_PREFLIGHT_COST, ADVISORY_PREFLIGHT_LATENCY_MS
 
 
 def _advisory_map(task: Dict[str, Any], adversarial: bool = False) -> Dict[str, Any]:

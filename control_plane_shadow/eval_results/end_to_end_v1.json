@@ -1,0 +1,120 @@
+{
+  "trace_count": 30,
+  "tier_note": "governance dispositions TIER3; provider/action-exec TIER1-2; reported separately, never blended",
+  "baselines": {
+    "1_glue": {
+      "baseline": "1_glue",
+      "traces": 30,
+      "expected_match_rate": 0.9,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "2_script": {
+      "baseline": "2_script",
+      "traces": 30,
+      "expected_match_rate": 0.9,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "3_contracts": {
+      "baseline": "3_contracts",
+      "traces": 30,
+      "expected_match_rate": 1.0,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "4_contracts_inv": {
+      "baseline": "4_contracts_inv",
+      "traces": 30,
+      "expected_match_rate": 1.0,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "5_unified": {
+      "baseline": "5_unified",
+      "traces": 30,
+      "expected_match_rate": 1.0,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "6_unified_tel": {
+      "baseline": "6_unified_tel",
+      "traces": 30,
+      "expected_match_rate": 1.0,
+      "unsafe_transition_rate": 0.0,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 0
+    },
+    "7_two_gate": {
+      "baseline": "7_two_gate",
+      "traces": 30,
+      "expected_match_rate": 0.4667,
+      "unsafe_transition_rate": 0.0667,
+      "selection_outside_eligible": 0,
+      "ungoverned_action_propagation": 0,
+      "governance_skipped_traces": 27
+    },
+    "8_router": {
+      "baseline": "8_router",
+      "traces": 30,
+      "expected_match_rate": 0.3667,
+      "unsafe_transition_rate": 0.3,
+      "selection_outside_eligible": 1,
+      "ungoverned_action_propagation": 8,
+      "governance_skipped_traces": 30
+    }
+  },
+  "load_bearing": {
+    "1_glue": {
+      "safe": true,
+      "correct": false,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "2_script": {
+      "safe": true,
+      "correct": false,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "3_contracts": {
+      "safe": true,
+      "correct": true,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "4_contracts_inv": {
+      "safe": true,
+      "correct": true,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "5_unified": {
+      "safe": true,
+      "correct": true,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "6_unified_tel": {
+      "safe": true,
+      "correct": true,
+      "delta_unsafe_vs_unified": 0.0
+    },
+    "7_two_gate": {
+      "safe": false,
+      "correct": false,
+      "delta_unsafe_vs_unified": 0.0667
+    },
+    "8_router": {
+      "safe": false,
+      "correct": false,
+      "delta_unsafe_vs_unified": 0.3
+    }
+  }
+}

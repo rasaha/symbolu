@@ -58,7 +58,7 @@ norecursedirs = [
     "tests/unit/renderer",
 ]
 # Individual test files to skip (require missing dependencies)
-addopts = "--ignore=tests/test_phase28_symbolic_harmonization_renderer.py"
+addopts = "--ignore=tests/test_phase28_symbolic_harmonization_renderer.py --import-mode=importlib"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",

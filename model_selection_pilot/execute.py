@@ -13,10 +13,10 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, List
 
-import costguard as cg
-import policy as pol
-import scoring
-from provider import ModelAdapter, StubAdapter
+from model_selection_pilot import costguard as cg
+from model_selection_pilot import policy as pol
+from model_selection_pilot import scoring as scoring
+from model_selection_pilot.provider import ModelAdapter, StubAdapter
 
 
 def technically_eligible(registry: Dict[str, Any], task: Dict[str, Any]) -> List[str]:

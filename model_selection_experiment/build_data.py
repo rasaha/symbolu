@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import os
 
-from common import (
+from model_selection_experiment.common import (
     CAPS,
     DATA_DIR,
     GROUND_TRUTH_VERSION,

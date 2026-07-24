@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from common import (
+from model_selection_experiment.common import (
     REGIME_SAMPLES,
     clamp,
     det_signed,
@@ -109,7 +109,7 @@ def telemetry_feed(regime: str) -> Dict[str, Dict[str, Dict[str, float]]]:
     feed: Dict[str, Dict[str, Dict[str, float]]] = {}
     if n == 0:
         return feed
-    from build_data import CLASS_CAP_WEIGHTS  # local import to avoid cycle at module load
+    from model_selection_experiment.build_data import CLASS_CAP_WEIGHTS  # local import to avoid cycle at module load
     for mid in MODEL_IDS:
         feed[mid] = {}
         for tclass, weights in CLASS_CAP_WEIGHTS.items():

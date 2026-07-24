@@ -20,14 +20,14 @@ PKG = os.path.dirname(HERE)
 if PKG not in sys.path:
     sys.path.insert(0, PKG)
 
-import advisory as adv  # noqa: E402
-import arms  # noqa: E402
-import costguard as cg  # noqa: E402
-import execute  # noqa: E402
-import metrics as met  # noqa: E402
-import policy as pol  # noqa: E402
-import registry as reg  # noqa: E402
-from build_corpus import build as build_corpus  # noqa: E402
+from model_selection_pilot import advisory as adv  # noqa: E402
+from model_selection_pilot import arms as arms  # noqa: E402
+from model_selection_pilot import costguard as cg  # noqa: E402
+from model_selection_pilot import execute as execute  # noqa: E402
+from model_selection_pilot import metrics as met  # noqa: E402
+from model_selection_pilot import policy as pol  # noqa: E402
+from model_selection_pilot import registry as reg  # noqa: E402
+from model_selection_pilot.build_corpus import build as build_corpus  # noqa: E402
 
 REGISTRY = reg.build()
 CORPUS = build_corpus()
@@ -37,7 +37,7 @@ MODELS = set(REGISTRY["models"])
 
 def _hi_conf_snapshot(quality: float):
     snap = {"_version": "test:hi"}
-    from common import TASK_CLASSES
+    from model_selection_pilot.common import TASK_CLASSES
     for mid in REGISTRY["models"]:
         snap[mid] = {tc: {"quality_mean": quality, "schema_valid_rate": 1.0, "n": 50}
                      for tc in TASK_CLASSES}
@@ -46,7 +46,7 @@ def _hi_conf_snapshot(quality: float):
 
 def _empty_snapshot():
     snap = {"_version": "test:cold"}
-    from common import TASK_CLASSES
+    from model_selection_pilot.common import TASK_CLASSES
     for mid in REGISTRY["models"]:
         snap[mid] = {tc: {"quality_mean": None, "schema_valid_rate": None, "n": 0} for tc in TASK_CLASSES}
     return snap
@@ -140,7 +140,7 @@ def test_every_provider_fact_has_provenance():
 
 # --- 6. telemetry versioning ------------------------------------------------
 def test_snapshots_versioned_and_regime_gated():
-    import telemetry as tele
+    from model_selection_pilot import telemetry as tele
     dev = CORPUS["dev"]
     fake = {t["task_id"]: {mid: {"quality": 0.7, "schema_valid": True}
                            for mid in REGISTRY["models"]} for t in dev}
