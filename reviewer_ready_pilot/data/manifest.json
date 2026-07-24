@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "final_min": 75,
+    "final_natural": 78,
+    "final_review": 102,
+    "training": 24,
+    "training_natural": 16,
+    "trap_variants": 3
+  },
+  "dataset_version": "reviewer_ready_v1",
+  "evidence_status": "SUFFICIENT",
+  "final_sha256": "eed0bffe10a1774d8797efa59a6bf5ba22b1f30bb87ac8ca4b554249d355bafa",
+  "natural_available": 531,
+  "training_sha256": "2977d9de1d0411fcbb5d06ea5826bde68007831da2645c904b183f38b13edb8e"
+}
