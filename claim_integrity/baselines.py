@@ -117,6 +117,12 @@ def o_aggressive_split(ex):
     return out
 
 
+def p_claim_integrity(ex):
+    # the reference component (Phase 9): preserves modifiers, resolves references, safe-splits
+    from . import claims
+    return [c.text for c in claims.decompose(ex["original_text"]).claims]
+
+
 def q_oracle(ex):
     # upper bound: return the gold claim texts directly
     return [g["text"] for g in ex["gold_claims"]]
@@ -150,6 +156,7 @@ BASELINES: Dict[str, Callable[[Dict[str, Any]], List[str]]] = {
     "M_equivalence_filter": m_equivalence_filter,
     "N_minimal_split": n_minimal_split,
     "O_aggressive_split": o_aggressive_split,
+    "P_claim_integrity": p_claim_integrity,
     "Q_oracle": q_oracle,
     "R_learned_comparator": r_learned_comparator,
 }

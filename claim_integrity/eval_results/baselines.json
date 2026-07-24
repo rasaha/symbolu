@@ -154,6 +154,16 @@
       "simulated": false
     },
     {
+      "avg_claims_per_output": 1.281,
+      "external_deps": "none (local approximation)",
+      "fragile_preservation_rate": 1.0,
+      "mean_claim_count_error": 0.094,
+      "method": "P_claim_integrity",
+      "model_calls": 0,
+      "rule_count": 0,
+      "simulated": false
+    },
+    {
       "avg_claims_per_output": 1.375,
       "external_deps": "none (local approximation)",
       "fragile_preservation_rate": 1.0,
