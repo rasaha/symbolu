@@ -229,15 +229,15 @@ build-validated; **TAP** is emerging; **ACP** is shadow-only with an explicit
 by the repository's own audit*, and its platform value is claimed only for the deterministic core.
 None of these is production- or third-party-validated (Section 11).
 
-**On model-selection policy — an explicit flag.** Section 5.1 lists *policy-aware model selection* as
-a required capability, and this paper includes it. However, **it is not one of the ten canonical
-platform components** enumerated in the authoritative Ugence architecture documents. It exists in the
-repository as **research-stage** work (an Execution-Eligibility gate and a Model-Selection Policy
-engine, with associated experiments and a unified control-plane study) that has not been promoted into
-the canonical platform taxonomy. This is a genuine positioning gap, not something to resolve by
-assertion; it is recorded as an unresolved inconsistency in Appendix D. Where this paper refers to
-model-selection as a platform capability, treat it as **required-but-not-yet-canonical**, at
-research maturity.
+**On model-selection policy — placement resolved by ADR.** Section 5.1 lists *policy-aware model
+selection* as a required capability, and this paper includes it. It is **not one of the ten canonical
+platform components** enumerated in the authoritative Ugence architecture documents, and it should not
+be. Its architectural status is resolved in `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`: model selection
+is a **cross-cutting platform policy service, provisionally owned by the AI Control Plane, and NOT an
+eleventh canonical product module.** It exists in the repository as **research-stage** work (an
+Execution-Eligibility gate and a Model-Selection Policy engine, with associated experiments and a
+credential-blocked shadow pilot). Where this paper refers to model-selection as a platform capability,
+treat it as a **cross-cutting service at research maturity**, per that ADR — not as a numbered module.
 
 ---
 
@@ -477,7 +477,7 @@ a structural/positioning statement this paper composes from sources (no new meas
 | 11 | Components compose into one governed execution loop | OVERVIEW Page 6 | n/a (architecture) | Direct |
 | 12 | Incremental adoption paths (governance/inference/assurance/operations-first) | COST_SAVINGS (adoption) + OVERVIEW (independent adoptability) | [NOT-QUANTIFIED] | Inferred (composed from source claims of independent adoptability) |
 | 13 | Existing approaches (prompting/agents/RAG/cloud/human review) are necessary-not-sufficient | This paper's analysis of layer boundaries | [NOT-QUANTIFIED] (reasoned) | Inferred |
-| 14 | Model-selection policy is a required capability | Task requirement; repo research components | Research-stage; **not canonical** | Inferred + **flagged** (Appendix D) |
+| 14 | Model-selection policy is a required capability, placed as a cross-cutting service (not an 11th module) | `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`; repo research components | Research-stage; **cross-cutting service, not canonical module** | Inferred + **resolved by ADR** |
 | 15 | Most evidence is internal/synthetic/simulated/subsystem-level | VALUE_PROPS portfolio read; COST_SAVINGS caveats | Direct | Direct |
 
 ## Appendix C — Terminology-consistency check
@@ -492,18 +492,19 @@ a structural/positioning statement this paper composes from sources (no new meas
 | CER = Canonical Execution Request | ✅ | ✅ | ✅ | ✅ |
 | Evidence labels [MEASURED]/[PROJECTED]/[ROADMAP]/[NOT-QUANTIFIED] | — | maturity labels | ✅ exact | ✅ (labels match COST_SAVINGS) |
 | "similar to an operating system for enterprise AI" (analogy, ≤2×) | analogy present | — | analogy present | ✅ (used once here, as an analogy) |
-| **Model Selection Policy** as a named platform module | ❌ absent | ❌ absent | ❌ absent | ⚠️ **inconsistent — see Appendix D** |
+| **Model Selection Policy** as a named platform module | ❌ absent | ❌ absent | ❌ absent | ✅ **resolved — cross-cutting service, not a module (see ADR)** |
 
-## Appendix D — Unresolved architecture / positioning inconsistencies (flagged, not resolved)
+## Appendix D — Architecture / positioning inconsistencies
 
-1. **Model-selection policy is required-but-not-canonical.** Section 5.1 and the Section 7 flow list
-   policy-aware model selection as a platform capability (and the task requires including it), but
-   **none** of the three authoritative platform documents enumerate a Model-Selection-Policy module —
-   the canonical taxonomy is fixed at ten components. The capability exists in the repository only as
-   **research-stage** work (Execution-Eligibility gate, Model-Selection Policy engine, control-plane
-   studies). *Unresolved question:* should model-selection be promoted to an eleventh canonical
-   component, folded into an existing one, or kept as pre-platform research? This paper does not
-   decide; it flags it. Every reference to model-selection here is marked research-stage.
+1. **Model-selection policy placement — RESOLVED by ADR.** Section 5.1 and the Section 7 flow list
+   policy-aware model selection as a platform capability, but **none** of the three authoritative
+   platform documents enumerate a Model-Selection-Policy module — the canonical taxonomy is fixed at
+   ten components. This is resolved in `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`: model selection is a
+   **cross-cutting platform policy service, provisionally owned by the AI Control Plane, and NOT an
+   eleventh canonical module** (the taxonomy stays at ten). It exists in the repository as
+   research-stage work (Execution-Eligibility gate, Model-Selection Policy engine, credential-blocked
+   shadow pilot); promotion to a numbered module would require the criteria set out in that ADR. Every
+   reference to model-selection here is a cross-cutting service at research maturity.
 2. **Two "control planes" share a name family.** "AI Control Plane" (the governance *layer* of four
    components) and "Autonomous Control Plane / ACP" (one *component* within it) are distinct but
    similarly named; a reader can conflate them. The source docs are internally consistent, but the
