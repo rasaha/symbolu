@@ -1,5 +1,76 @@
 [
   {
+    "artifact_id": "edge-497984178897dace",
+    "claim_actionability": "none",
+    "claim_family": "unknown",
+    "edge_type": "unknown_conflicting",
+    "gold_explanation": "FLOOR.unknown->ER_HUMAN_REVIEW_OR_INDETERMINATE; INV-10.UNKNOWN_TO_REVIEW",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "invariants_triggered": [
+      "INV-10.UNKNOWN_TO_REVIEW"
+    ],
+    "risk_tier": "unknown",
+    "source_kind": "edge_case",
+    "source_path": "synthetic/edge/unknown_conflicting/3",
+    "source_role": "unknown_source",
+    "synthetic": true,
+    "temporal_sensitivity": "static",
+    "text": "Two undated sources give opposite current values; neither can be resolved."
+  },
+  {
+    "artifact_id": "edge-b087f8e8ca134290",
+    "claim_actionability": "none",
+    "claim_family": "unknown",
+    "edge_type": "unknown_metadata",
+    "gold_explanation": "FLOOR.unknown->ER_HUMAN_REVIEW_OR_INDETERMINATE; INV-10.UNKNOWN_TO_REVIEW",
+    "gold_obligation": "ER_HUMAN_REVIEW_OR_INDETERMINATE",
+    "invariants_triggered": [
+      "INV-10.UNKNOWN_TO_REVIEW"
+    ],
+    "risk_tier": "unknown",
+    "source_kind": "edge_case",
+    "source_path": "synthetic/edge/unknown_metadata/2",
+    "source_role": "unknown_source",
+    "synthetic": true,
+    "temporal_sensitivity": "static",
+    "text": "An unattributed note asserts a state change with no discernible source, type, or authority."
+  },
+  {
+    "artifact_id": "edge-c256959cada3d8e6",
+    "claim_actionability": "action_directive",
+    "claim_family": "medical",
+    "edge_type": "critical_regulated_action",
+    "gold_explanation": "FLOOR.critical->E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW; MOD.REGULATED_MIN_E4; MOD.ACTION_MIN_E3; INV-11.ACTION_NEEDS_AUTHORITY; INV-11.APPROVAL_ABSENT",
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "invariants_triggered": [
+      "INV-11.ACTION_NEEDS_AUTHORITY",
+      "INV-11.APPROVAL_ABSENT"
+    ],
+    "risk_tier": "critical",
+    "source_kind": "edge_case",
+    "source_path": "synthetic/edge/critical_regulated_action/0",
+    "source_role": "unknown_source",
+    "synthetic": true,
+    "temporal_sensitivity": "static",
+    "text": "Administer the maximum dose to every patient without physician sign-off."
+  },
+  {
+    "artifact_id": "edge-e6f98953c2129329",
+    "claim_actionability": "none",
+    "claim_family": "financial",
+    "edge_type": "critical_financial_claim",
+    "gold_explanation": "FLOOR.critical->E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW; MOD.REGULATED_MIN_E4",
+    "gold_obligation": "E4_EXTERNAL_AUTHORITATIVE_EVIDENCE_AND_REVIEW",
+    "invariants_triggered": [],
+    "risk_tier": "critical",
+    "source_kind": "edge_case",
+    "source_path": "synthetic/edge/critical_financial_claim/1",
+    "source_role": "unknown_source",
+    "synthetic": true,
+    "temporal_sensitivity": "static",
+    "text": "This unaudited model guarantees a 40% return with zero downside for all investors."
+  },
+  {
     "artifact_id": "rrp-004207e01c2b3d78",
     "claim_actionability": "none",
     "claim_family": "process_description",

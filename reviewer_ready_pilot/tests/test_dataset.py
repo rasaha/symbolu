@@ -53,10 +53,12 @@ def test_excludes_all_prior_source_paths():
 
 def test_traps_flagged_synthetic_and_cover_all_families():
     m = dataset.build()
-    fam = {i.get("trap_type") for i in m["final_review"] if i.get("synthetic")}
+    fam = {i["trap_type"] for i in m["final_review"] if i.get("source_kind") == "trap"}
     assert fam == {t[0] for t in dataset._TRAPS}
+    edge = {i["edge_type"] for i in m["final_review"] if i.get("source_kind") == "edge_case"}
+    assert edge == {e[0] for e in dataset._EDGE}
     for it in m["training"] + m["final_review"]:
-        if it.get("source_kind") == "trap":
+        if it.get("source_kind") in ("trap", "edge_case"):
             assert it["synthetic"] is True
 
 
