@@ -1,0 +1,122 @@
+{
+  "ablation_sha256": "e3300d0a07d6285e1980d907a446cfdafcaedfc3e43c409234b1e812102d8c2d",
+  "ablations": {
+    "authority_guard": {
+      "adversarial_unsafe_allow": 10,
+      "adversarial_unsafe_delta": 0,
+      "clean_allow_delta": 0.0,
+      "clean_allow_rate": 0.584,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 0,
+      "load_bearing_for_safety": false,
+      "over_qualification_rate": 0.02
+    },
+    "risk": {
+      "adversarial_unsafe_allow": 20,
+      "adversarial_unsafe_delta": 10,
+      "clean_allow_delta": 0.04,
+      "clean_allow_rate": 0.624,
+      "held_unsafe_allow": 12,
+      "high_risk_unsafe_allow": 2,
+      "load_bearing_for_safety": true,
+      "over_qualification_rate": 0.02
+    },
+    "risk_escalation": {
+      "adversarial_unsafe_allow": 10,
+      "adversarial_unsafe_delta": 0,
+      "clean_allow_delta": 0.0,
+      "clean_allow_rate": 0.584,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 0,
+      "load_bearing_for_safety": false,
+      "over_qualification_rate": 0.02
+    },
+    "source_role": {
+      "adversarial_unsafe_allow": 10,
+      "adversarial_unsafe_delta": 0,
+      "clean_allow_delta": -0.268,
+      "clean_allow_rate": 0.316,
+      "held_unsafe_allow": 8,
+      "high_risk_unsafe_allow": 0,
+      "load_bearing_for_safety": false,
+      "over_qualification_rate": 0.02
+    },
+    "structural_floors": {
+      "adversarial_unsafe_allow": 10,
+      "adversarial_unsafe_delta": 0,
+      "clean_allow_delta": 0.0,
+      "clean_allow_rate": 0.584,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 0,
+      "load_bearing_for_safety": false,
+      "over_qualification_rate": 0.02
+    }
+  },
+  "complexity_comparators": {
+    "Full_Q": {
+      "adversarial_unsafe_allow": 10,
+      "approx_rule_count": 90,
+      "clean_allow_rate": 0.584,
+      "held_unsafe_allow": 10,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.02
+    },
+    "Learned_S": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rule_count": 0,
+      "clean_allow_rate": 0.332,
+      "held_unsafe_allow": 1,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.056
+    },
+    "Simple1_risk_only": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rule_count": 3,
+      "clean_allow_rate": 0.668,
+      "held_unsafe_allow": 16,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.06
+    },
+    "Simple2_claim_risk": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rule_count": 31,
+      "clean_allow_rate": 0.264,
+      "held_unsafe_allow": 8,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.02
+    },
+    "Simple3_source_authority": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rule_count": 15,
+      "clean_allow_rate": 0.0,
+      "held_unsafe_allow": 0,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.0
+    },
+    "Simple4_claim_source_risk": {
+      "adversarial_unsafe_allow": 0,
+      "approx_rule_count": 46,
+      "clean_allow_rate": 0.264,
+      "held_unsafe_allow": 8,
+      "high_risk_unsafe_allow": 0,
+      "over_qualification_rate": 0.02
+    }
+  },
+  "full_component": {
+    "adversarial_unsafe_allow": 10,
+    "clean_allow_rate": 0.584,
+    "held_unsafe_allow": 10,
+    "high_risk_unsafe_allow": 0,
+    "over_qualification_rate": 0.02
+  },
+  "load_bearing_for_safety": [
+    "risk"
+  ],
+  "note": "ablation removes one feature from the full component; a feature is load-bearing for safety if removing it increases unsafe allows. Comparators contrast utility/safety vs approx rule count.",
+  "redundant_for_safety": [
+    "authority_guard",
+    "risk_escalation",
+    "structural_floors",
+    "source_role"
+  ]
+}

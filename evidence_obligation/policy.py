@@ -58,7 +58,10 @@ _STANDARD = {
 _ARTIFACT_DEPENDENT = {s.IMPLEMENTATION_EVIDENCE_SUFFICIENT, s.INTERNAL_AUTHORITATIVE_ARTIFACT_SUFFICIENT}
 
 
-def assign(item: Dict[str, Any]) -> s.EvidenceObligation:
+def assign(item: Dict[str, Any], ablate: frozenset = frozenset()) -> s.EvidenceObligation:
+    """Assign an obligation. `ablate` disables named features for the Phase-18 ablation study; the
+    default (empty) is the full reference component. Recognized: 'authority_guard', 'risk_escalation',
+    'structural_floors', 'source_role', 'risk'."""
     text = item.get("text", "")
     path = item.get("source_path", "")
     kind = item.get("source_kind", "doc")
@@ -67,18 +70,19 @@ def assign(item: Dict[str, Any]) -> s.EvidenceObligation:
     claim_id = item.get("artifact_id", "claim")
 
     fam, ct_codes = claim_type.classify_claim_type(text)
-    role, role_codes = sr.classify_source_role(path, kind, text)
-    risk_tier, risk_codes = risk_mod.assess_risk(text, fam, intended_use, actionability)
+    role, role_codes = ("unknown_source", []) if "source_role" in ablate else \
+        sr.classify_source_role(path, kind, text)
+    risk_tier, risk_codes = ("low", ["RISK.ABLATED"]) if "risk" in ablate else \
+        risk_mod.assess_risk(text, fam, intended_use, actionability)
     codes = ct_codes + role_codes + risk_codes
 
     obligation = taxonomy.default_obligation(fam, risk_tier)
 
     # 4. AUTHORITY GUARD - artifact-dependent obligations require genuine authority
-    if obligation in _ARTIFACT_DEPENDENT:
+    if "authority_guard" not in ablate and obligation in _ARTIFACT_DEPENDENT:
         verdict, acodes = au.authority_for(role, fam)
         codes += acodes
         if verdict in (au.SELF_REFERENTIAL, au.NOT_AUTHORITATIVE):
-            # cannot self-verify: escalate to an independent standard
             obligation = s.INDEPENDENT_CORROBORATION_REQUIRED
             codes.append("POLICY.AUTHORITY_GUARD_ESCALATED")
         elif verdict == au.HISTORICAL_ONLY:
@@ -86,17 +90,19 @@ def assign(item: Dict[str, Any]) -> s.EvidenceObligation:
             codes.append("POLICY.HISTORICAL_ONLY_ESCALATED")
 
     # 5. RISK escalation (never lowers)
-    obligation, ecodes = risk_mod.escalate_obligation(obligation, risk_tier, fam)
-    codes += ecodes
+    if "risk_escalation" not in ablate:
+        obligation, ecodes = risk_mod.escalate_obligation(obligation, risk_tier, fam)
+        codes += ecodes
 
     # 6. STRUCTURAL safety floors
-    if obligation == s.NO_FACTUAL_EVIDENCE_GATE and risk_tier in ("high", "critical"):
-        obligation = s.CONTEXTUAL_SUPPORT_SUFFICIENT
-        codes.append("POLICY.NO_GATE_FLOOR_HIGH_RISK")
-    if actionability in ("action_proposal", "action_directive") and \
-            obligation in s.LOW_EXTERNAL_BURDEN:
-        obligation = s.POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED
-        codes.append("POLICY.ACTION_FLOOR")
+    if "structural_floors" not in ablate:
+        if obligation == s.NO_FACTUAL_EVIDENCE_GATE and risk_tier in ("high", "critical"):
+            obligation = s.CONTEXTUAL_SUPPORT_SUFFICIENT
+            codes.append("POLICY.NO_GATE_FLOOR_HIGH_RISK")
+        if actionability in ("action_proposal", "action_directive") and \
+                obligation in s.LOW_EXTERNAL_BURDEN:
+            obligation = s.POLICY_AND_AUTHORITY_EVIDENCE_REQUIRED
+            codes.append("POLICY.ACTION_FLOOR")
 
     std, flags = _STANDARD[obligation]
     allow_classes = taxonomy.rule_for(fam).get("allow_classes", [])
