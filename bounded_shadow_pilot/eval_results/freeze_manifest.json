@@ -1,0 +1,22 @@
+{
+  "artifact_sha256": {
+    "data/natural_pilot_v1/corpus.json": "dfa196d5d32ab562e69110415912f53312cb1e519d958760b2aaae8d2afc03aa",
+    "data/natural_pilot_v1/ground_truth.json": "2348962892160c97b10cc0ea3ad6b3e88abe9b00b867bb2722ba3dfdb9df309b",
+    "eval_results/baselines.json": "8539f6cb16866dcd00c635649d4593de333ffaefab2e86d80ed51ae6af3d48ff",
+    "eval_results/failure_taxonomy.json": "42e42a075d0508f8bc6f2ed9e1d6ea309b4faa4d8e20bc86fe359dd7eeadddd9",
+    "eval_results/falsification.json": "1b95c6a0d73dbc6e7d39b65616aa4c4c9119e61d5689faa37a0373f8c90ad3d6",
+    "eval_results/perf_cost_burden.json": "f0751356bcd5d074173cfcdbff0f53b4e8f66390888ae826bf89f3d5b394b718",
+    "eval_results/transfer_analysis.json": "98b59f4ace7a15cc5e67fe6051d1c46021c48770331cbca550b6a0d1ae5c705b"
+  },
+  "eval_config": {
+    "actiongate_contract_version": "native_actiongate_contract_v1",
+    "config": "FULL_STACK_HIGH_RISK",
+    "derivation_version": "natural_derivation_v1",
+    "evidence_base": "VERIFIED_WITH_LIMITATIONS",
+    "labeler_version": "blinded_gt_v1",
+    "score_once": true,
+    "threshold_tuning_on_final_set": false
+  },
+  "manifest_sha256": "6cb880995bb77b9715753f4998c3f6f0494ad01091175e21def318eda1dfe34b",
+  "n_artifacts": 7
+}

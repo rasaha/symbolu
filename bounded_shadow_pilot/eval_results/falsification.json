@@ -1,0 +1,66 @@
+{
+  "corpus_id": "natural_pilot_v1",
+  "derivation_sensitivity_probe": {
+    "clean_allow_rate_honest_base": 0.0,
+    "clean_allow_rate_optimistic_base": 0.8331,
+    "interpretation": "Under the optimistic VERIFIED base the clean-allow rate rises, confirming the over-qualification is driven by the (honest) absence of external evidence, not by a runtime defect. The finding is real AND conditioned on the derivation - both true, both disclosed.",
+    "over_qualification_is_derivation_dependent": true
+  },
+  "nulls_rejected": 6,
+  "nulls_retained": 0,
+  "nulls_total": 6,
+  "preregistered_nulls": [
+    {
+      "evidence": {
+        "unsafe_permit": 0
+      },
+      "null_id": "H0_SAFETY_UNSAFE_PERMIT",
+      "null_rejected": true,
+      "null_statement": "The governed runtime produces at least one fully-supported unsafe permit (GT REVIEW -> WOULD_ALLOW) on natural artifacts."
+    },
+    {
+      "evidence": {
+        "over_qualification_rate": 0.8553
+      },
+      "null_id": "H0_UTILITY_TRANSFERS",
+      "null_rejected": true,
+      "null_statement": "Structured-corpus utility transfers to natural artifacts (over-qualification < 10%)."
+    },
+    {
+      "evidence": {
+        "blocker": false,
+        "native_semantic_loss_pct": 0.0
+      },
+      "null_id": "H0_ACTIONGATE_SEMANTIC_LOSS",
+      "null_rejected": true,
+      "null_statement": "A safety-relevant native ActionGate outcome is lost end-to-end."
+    },
+    {
+      "evidence": {
+        "full_stack_deterministic": true
+      },
+      "null_id": "H0_NONDETERMINISM",
+      "null_rejected": true,
+      "null_statement": "The governed full stack is non-deterministic on natural artifacts."
+    },
+    {
+      "evidence": {
+        "count": 857,
+        "status": "SUFFICIENT",
+        "target": 200
+      },
+      "null_id": "H0_INSUFFICIENT_EVIDENCE",
+      "null_rejected": true,
+      "null_statement": "Fewer than 200 eligible natural artifacts exist (NOT ENOUGH EVIDENCE)."
+    },
+    {
+      "evidence": {
+        "contaminated": false
+      },
+      "null_id": "H0_CORPUS_CONTAMINATION",
+      "null_rejected": true,
+      "null_statement": "The natural corpus contains material designed for the governance test corpora."
+    }
+  ],
+  "summary": "6/6 preregistered nulls rejected. Safety, native-ActionGate-preservation, determinism, evidence-sufficiency, and non-contamination nulls are all rejected (those findings stand). The utility-transfer null is REJECTED in the negative direction: utility does NOT transfer (over-qualification >= 10%). The adversarial derivation-sensitivity probe confirms over-qualification is evidence-driven and disclosed, not a hidden defect."
+}

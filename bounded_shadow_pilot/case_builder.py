@@ -60,11 +60,15 @@ def _derive_risk(use_case: str, gt: Dict[str, Any]) -> str:
     return "medium"
 
 
-def _derive_evidence(gt: Dict[str, Any]) -> Dict[str, Any]:
+def _derive_evidence(gt: Dict[str, Any], evidence_base: str = "VERIFIED_WITH_LIMITATIONS") -> Dict[str, Any]:
     # Base: documentation is self-descriptive but UNVERIFIED against external ground truth - it has
     # limitations by nature, so the honest base state is VERIFIED_WITH_LIMITATIONS, not VERIFIED.
-    ev = {"evidence_state": "VERIFIED_WITH_LIMITATIONS", "grounding": 0.7, "entailment": "supports",
-          "adequacy": 0.7, "authority": "authorized", "conflict": "none", "provenance_present": True,
+    # `evidence_base` is overridable ONLY for the Phase-17 derivation-sensitivity falsification probe;
+    # the pilot's default is the honest VERIFIED_WITH_LIMITATIONS.
+    grounding = 0.9 if evidence_base == "VERIFIED" else 0.7
+    adequacy = 0.9 if evidence_base == "VERIFIED" else 0.7
+    ev = {"evidence_state": evidence_base, "grounding": grounding, "entailment": "supports",
+          "adequacy": adequacy, "authority": "authorized", "conflict": "none", "provenance_present": True,
           "age_days": 30.0}
     if gt.get("gt_needs_evidence"):        # unbacked absolute claims -> insufficient evidence
         ev.update({"evidence_state": "INSUFFICIENT", "grounding": 0.4, "entailment": "neutral",
@@ -92,9 +96,11 @@ def _registry() -> list:
              "cost": 0.2, "latency_ms": 120, "eligible": True}]
 
 
-def build_case(artifact: Dict[str, Any], gt: Dict[str, Any]) -> Dict[str, Any]:
+def build_case(artifact: Dict[str, Any], gt: Dict[str, Any],
+               evidence_base: str = "VERIFIED_WITH_LIMITATIONS") -> Dict[str, Any]:
     """Build a frozen-orchestrator-compatible case from a natural artifact and its blinded ground
-    truth. All governance inputs are derived deterministically from the text/signals."""
+    truth. All governance inputs are derived deterministically from the text/signals. `evidence_base`
+    is the honest default; it is overridden only by the Phase-17 derivation-sensitivity probe."""
     use_case = artifact["use_case"]
     domain = _USE_CASE_TO_DOMAIN.get(use_case, "enterprise_policy")
     risk = _derive_risk(use_case, gt)
@@ -122,7 +128,7 @@ def build_case(artifact: Dict[str, Any], gt: Dict[str, Any]) -> Dict[str, Any]:
         "registry": _registry(),
         "telemetry": {"regime": "balanced", "q_min": 0.6},
         "model_output": text,                       # the NATURAL text is the governed model output
-        "evidence_steer": _derive_evidence(gt),
+        "evidence_steer": _derive_evidence(gt, evidence_base),
         "assertion_signals": _derive_assertion(gt),
         "action_proposal": derive_action(text),
         "inject_fault": "",
