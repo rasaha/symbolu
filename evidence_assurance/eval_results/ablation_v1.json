@@ -90,8 +90,8 @@
       "counterevidence",
       "provenance",
       "alignment",
-      "authority",
-      "freshness"
+      "freshness",
+      "authority"
     ],
     "subset_cost": 2,
     "subset_result": {
