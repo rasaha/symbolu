@@ -103,20 +103,23 @@ def variant_d_subject_qualifier(example) -> List[str]:
 
 
 # ---- Variant E: full scope-carrying --------------------------------------------------------------
-def variant_e_full(example) -> List[str]:
+SCOPE_ELEMENTS = frozenset({"subject", "qualifier_prefix", "exception_prefix", "postfix_exception"})
+
+
+def variant_e_full(example, enabled: frozenset = SCOPE_ELEMENTS) -> List[str]:
     out = []
     for sent in _sentences(example["original_text"]):
         prefix, postfix, conjuncts = _parse(sent)
         subj = next((_subject_of(c) for c in conjuncts if _has_subject(c)), "")
         for c in conjuncts:
-            piece = c if _has_subject(c) else (f"{subj} {c}" if subj else c)
-            # carry temporal/attribution prefix
-            piece = _carry_qualifiers(prefix, piece)
-            # carry exception prefix (Except in E,) into every conjunct
-            if prefix and prefix.lower().startswith("except"):
+            piece = c
+            if "subject" in enabled and not _has_subject(c) and subj:
+                piece = f"{subj} {c}"
+            if "qualifier_prefix" in enabled:
+                piece = _carry_qualifiers(prefix, piece)
+            if "exception_prefix" in enabled and prefix and prefix.lower().startswith("except"):
                 piece = f"{prefix} {piece}"
-            # carry postposed exception/condition into every conjunct
-            if postfix:
+            if "postfix_exception" in enabled and postfix:
                 piece = piece.rstrip(".") + " " + postfix
             out.append(piece.rstrip(".") + ".")
     return out or [example["original_text"]]
@@ -183,18 +186,20 @@ def _is_scope_conjunction(claim: str) -> bool:
     return bool(_SPANNING_MODIFIER.search(claim)) and bool(_COORD.search(claim))
 
 
-def variant_h_integrated(example):
+def variant_h_integrated(example, enabled: frozenset = SCOPE_ELEMENTS, resolve_refs: bool = True,
+                         gated: bool = True):
     """The GATED small extension: run the frozen preservation-first splitter (which handles everything
     and resolves references); then, ONLY for the claims it kept whole that are scope-spanning
     conjunctions, attempt a scope-carrying split IF provable, else leave whole (preserve-and-flag).
     Everything else is untouched, so behavior on non-conjunction text is identical to the current
-    splitter."""
+    splitter. `enabled`/`resolve_refs`/`gated` support the ablation study (M5)."""
     base = variant_a_current(example)                 # frozen splitter output (refs resolved)
     out = []
     for claim in base:
-        if _is_scope_conjunction(claim) and scope_provable(claim):
-            split = variant_e_full({"original_text": claim})
-            out.extend(_resolve_refs(split))
+        is_scope = _is_scope_conjunction(claim) if gated else bool(_COORD.search(claim))
+        if is_scope and scope_provable(claim):
+            split = variant_e_full({"original_text": claim}, enabled=enabled)
+            out.extend(_resolve_refs(split) if resolve_refs else split)
         else:
             out.append(claim)                          # untouched (incl. non-provable -> preserve-flag)
     return out
