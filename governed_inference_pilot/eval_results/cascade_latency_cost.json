@@ -1,0 +1,40 @@
+{
+  "contradictory_cases": 256,
+  "cost_usd": {
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "final_driver_stage": {
+    "action_gate": 64,
+    "evidence_assurance": 160,
+    "execution_gate": 96,
+    "model_policy": 32,
+    "orchestrator": 32
+  },
+  "latency_units": {
+    "max": 7,
+    "median": 6,
+    "p90": 7,
+    "p95": 7
+  },
+  "n": 384,
+  "redundant_withhold_cases": 48,
+  "safety_driver_stage": {
+    "action_gate": 64,
+    "evidence_assurance": 128,
+    "execution_gate": 32,
+    "model_policy": 32,
+    "orchestrator": 32
+  },
+  "stage_latency_units_total": {
+    "action_gate": 64,
+    "assertion_gate": 288,
+    "claim_integrity": 288,
+    "evidence_assurance": 288,
+    "execution_gate": 352,
+    "model_policy": 320,
+    "orchestrator": 0,
+    "scope_integrity": 288
+  },
+  "storage_per_trace_events": 4.2
+}
