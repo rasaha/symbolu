@@ -1,0 +1,22 @@
+{
+  "all_non_enforcing": true,
+  "all_plumbing_ok": true,
+  "artifacts_processed": 20,
+  "checks": {
+    "adjudication": true,
+    "audit": true,
+    "blinded_review": true,
+    "deletion": true,
+    "export_prohibited": true,
+    "override_recording": true,
+    "policy_execution": true,
+    "post_reveal_display": true,
+    "replay": true,
+    "timing": true
+  },
+  "dry_run_sha256": "5655e08e30c7c68862a6ab4b4fba49734cfd19a3f4b044ed94e1850b1bfdde1f",
+  "metrics_status_on_mock": "NOT_ENOUGH_HUMAN_EVIDENCE",
+  "mode": "DRY_RUN_MOCK_REVIEWER",
+  "note": "MACHINERY TEST ONLY on non-final (training) artifacts; the mock reviewer is NEVER human validation and never touches the final set.",
+  "stop_machinery_ok": true
+}
