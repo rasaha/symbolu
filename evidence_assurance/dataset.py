@@ -65,6 +65,12 @@ class Case:
     annotator_disagreement: bool
     split: str
     rationale: str = ""
+    # observed downstream signals (grounding/entailment/alignment detectors report these).
+    # The trap: grounding+entailment look HIGH on correlated-failure cases (an aligned passage that
+    # restates a WRONG claim) — which is why signal-only baselines cannot catch correlated failure.
+    observed_grounding: float = 0.0
+    observed_entailment: str = "neutral"     # supports | neutral | contradicts
+    observed_alignment_signal: bool = True   # imperfect observation of true alignment
 
 
 # ---- independent annotators on the TRUE latent state ----------------------
@@ -140,6 +146,13 @@ def _mk(idx: int, partition: str, domain: str, latent: Dict[str, Any], observed:
     a = annotator_A(c); b = annotator_B(c)
     gold, disagree = _adjudicate(a, b)
     split = "dev" if idx % 4 == 0 else "eval"
+    # observed downstream signals (the trap: high on correlated-wrong claims that are textually aligned)
+    grounding = 0.90 if latent["true_aligned"] else 0.20
+    if latent["true_counterevidence_exists"]:
+        grounding -= 0.05
+    entail = ("supports" if latent["true_aligned"]
+              else ("contradicts" if not latent["true_claim_correct"] else "neutral"))
+    align_sig = latent["true_aligned"] if (idx % 10 != 0) else (not latent["true_aligned"])  # ~10% noisy
     return Case(
         case_id=f"EA{idx:04d}", partition=partition, domain=domain, risk_class=risk,
         claim=f"[{domain}] claim {idx}",
@@ -153,7 +166,8 @@ def _mk(idx: int, partition: str, domain: str, latent: Dict[str, Any], observed:
         annot_A=a, annot_B=b, gold_state=gold, gold_delivery=_delivery(gold, risk),
         annotator_disagreement=disagree, split=split,
         rationale=f"A(prov)={a}; B(claim)={b}; adjudicated={gold}",
-        **observed)
+        observed_grounding=round(grounding, 3), observed_entailment=entail,
+        observed_alignment_signal=align_sig, **observed)
 
 
 def _observed(n, pubs, doms, paths, upstream, hashes, auth, years, aligned, prov_conf, complete):
