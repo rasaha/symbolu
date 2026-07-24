@@ -1,0 +1,10 @@
+{
+  "human_records": 0,
+  "min_required": 2,
+  "note": "Fewer than 2 authorized real reviewers with completed qualification. Per the governing protocol, the outcome-bearing review does NOT run; no mock or rubric output is used as human validation. External-pilot progression is not recommended.",
+  "outcome_review_sha256": "31e6916180e8517b451849b9ae4d2ccdcef6d9f4c5054b2859ce98f01d405f85",
+  "reviewer_count": 0,
+  "reviews_run": 0,
+  "status": "NOT_ENOUGH_HUMAN_EVIDENCE",
+  "training_completed": false
+}
