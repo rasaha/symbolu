@@ -146,8 +146,11 @@ human-evaluation protocol. Readiness verdict: **REVIEWER-READY — WAITING FOR R
 ### Honest limitations (status, not marketing)
 
 - **Technical validation: completed.** **Reviewer workflow: ready.**
-- **Real human validation: NOT yet performed.** A calibration-round activation was correctly **blocked**
-  at the eligibility gate because no real reviewers were supplied — the system refuses to fabricate them.
+- **Real human validation: NOT yet performed.** Two calibration-round activations were correctly
+  **blocked** — the first because no real reviewers were supplied, the second because the eligibility gate
+  enforced reviewer independence and excluded a founder / stakeholder (a `COI = YES` checkbox does not
+  waive a structural stake), and because qualification requires real graded responses the system will not
+  fabricate.
 - **External customer pilot: still gated. Production readiness: not claimed.**
 - Evaluations run against authored/natural corpora and reference components; enforcement is never enabled
   and no external action is executed in this state.
