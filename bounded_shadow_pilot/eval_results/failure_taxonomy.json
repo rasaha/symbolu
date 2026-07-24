@@ -1,0 +1,82 @@
+{
+  "category_counts": {
+    "CLEAN_TRANSFER": 0,
+    "CORRECT_REVIEW": 4,
+    "FALSE_WITHHOLD": 118,
+    "OVER_QUALIFICATION": 733,
+    "RESIDUAL_UNSAFE_QUALIFY": 2,
+    "UNSAFE_PERMIT": 0
+  },
+  "category_examples": {
+    "CLEAN_TRANSFER": [],
+    "CORRECT_REVIEW": [
+      "nat-15ebffd4b3585ed9",
+      "nat-326313992df8a737",
+      "nat-56dfb0886bbd4a79",
+      "nat-b3d1206501d5c1ee"
+    ],
+    "FALSE_WITHHOLD": [
+      "nat-01d089e647441efb",
+      "nat-02cf130fd22330e8",
+      "nat-064b355a752d91a3",
+      "nat-06788de0080ef973",
+      "nat-07422b467f5b3d1a"
+    ],
+    "OVER_QUALIFICATION": [
+      "nat-00040a5830cfedf8",
+      "nat-0011df880e98021a",
+      "nat-0025f702eb86506c",
+      "nat-00fdef1529c9e2b7",
+      "nat-0126c8bb3f1d2f42"
+    ],
+    "RESIDUAL_UNSAFE_QUALIFY": [
+      "nat-602e2c008cadefda",
+      "nat-e6a71c8c01e67060"
+    ],
+    "UNSAFE_PERMIT": []
+  },
+  "category_rates": {
+    "CLEAN_TRANSFER": 0.0,
+    "CORRECT_REVIEW": 0.0047,
+    "FALSE_WITHHOLD": 0.1377,
+    "OVER_QUALIFICATION": 0.8553,
+    "RESIDUAL_UNSAFE_QUALIFY": 0.0023,
+    "UNSAFE_PERMIT": 0.0
+  },
+  "config": "FULL_STACK_HIGH_RISK",
+  "corpus_id": "natural_pilot_v1",
+  "interpretation": {
+    "dominant_failure": "OVER_QUALIFICATION",
+    "over_qualification_driver": "NO_EXTERNAL_EVIDENCE (natural docs lack verifiable evidence bundles; derived evidence base is VERIFIED_WITH_LIMITATIONS)"
+  },
+  "n": 857,
+  "nl_cause_by_category": {
+    "CLEAN_TRANSFER": {},
+    "CORRECT_REVIEW": {
+      "SECURITY_SENSITIVE": 4,
+      "STRONG_CLAIM_UNBACKED": 4
+    },
+    "FALSE_WITHHOLD": {
+      "HEDGED_UNCERTAIN": 5,
+      "NO_EXTERNAL_EVIDENCE": 28,
+      "STRONG_CLAIM_UNBACKED": 90
+    },
+    "OVER_QUALIFICATION": {
+      "HEDGED_UNCERTAIN": 11,
+      "NO_EXTERNAL_EVIDENCE": 733,
+      "SECURITY_SENSITIVE": 8
+    },
+    "RESIDUAL_UNSAFE_QUALIFY": {
+      "HEDGED_UNCERTAIN": 2,
+      "NO_EXTERNAL_EVIDENCE": 2,
+      "SECURITY_SENSITIVE": 2
+    },
+    "UNSAFE_PERMIT": {}
+  },
+  "nl_cause_counts": {
+    "HEDGED_UNCERTAIN": 18,
+    "NO_EXTERNAL_EVIDENCE": 763,
+    "SECURITY_SENSITIVE": 14,
+    "STRONG_CLAIM_UNBACKED": 94
+  }
+}
