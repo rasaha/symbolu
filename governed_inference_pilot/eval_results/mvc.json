@@ -1,0 +1,93 @@
+{
+  "classification": {
+    "action_gate": "mandatory_core",
+    "assertion_gate": "optional_or_redundant",
+    "claim_integrity": "optional_or_redundant",
+    "evidence_assurance": "mandatory_core",
+    "execution_gate": "optional_or_redundant",
+    "model_policy": "optional_or_redundant",
+    "scope_integrity": "optional_or_redundant"
+  },
+  "configs": {
+    "ACTION_GOVERNANCE": {
+      "false_block": 0.0,
+      "latency_units_total": 1024,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.3333
+    },
+    "ASSERTION_GOVERNANCE": {
+      "false_block": 0.0,
+      "latency_units_total": 1536,
+      "unsafe_action_escape": 0.0833,
+      "unsafe_assertion_escape": 0.0833
+    },
+    "FULL_STACK_HIGH_RISK": {
+      "false_block": 0.0,
+      "latency_units_total": 1888,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    },
+    "MINIMUM_VIABLE_CONTROL_PLANE": {
+      "false_block": 0.0,
+      "latency_units_total": 960,
+      "unsafe_action_escape": 0.0833,
+      "unsafe_assertion_escape": 0.25
+    }
+  },
+  "full": {
+    "false_block": 0.0,
+    "latency_units_total": 1888,
+    "unsafe_action_escape": 0.0,
+    "unsafe_assertion_escape": 0.0
+  },
+  "high_risk_full": {
+    "false_block": 0.0,
+    "latency_units_total": 1360,
+    "unsafe_action_escape": 0.0,
+    "unsafe_assertion_escape": 0.0
+  },
+  "leave_one_out": {
+    "action_gate": {
+      "false_block": 0.0,
+      "latency_units_total": 1824,
+      "unsafe_action_escape": 0.0833,
+      "unsafe_assertion_escape": 0.0833
+    },
+    "assertion_gate": {
+      "false_block": 0.0,
+      "latency_units_total": 1600,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    },
+    "claim_integrity": {
+      "false_block": 0.0,
+      "latency_units_total": 1600,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    },
+    "evidence_assurance": {
+      "false_block": 0.0,
+      "latency_units_total": 1600,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.1667
+    },
+    "execution_gate": {
+      "false_block": 0.0,
+      "latency_units_total": 1568,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    },
+    "model_policy": {
+      "false_block": 0.0,
+      "latency_units_total": 1696,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    },
+    "scope_integrity": {
+      "false_block": 0.0,
+      "latency_units_total": 1600,
+      "unsafe_action_escape": 0.0,
+      "unsafe_assertion_escape": 0.0
+    }
+  }
+}
