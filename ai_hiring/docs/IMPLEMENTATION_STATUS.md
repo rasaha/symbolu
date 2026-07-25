@@ -2,7 +2,9 @@
 
 **Phase 1 — Foundation:** complete; 51 tests.
 **Phase 2 — Evidence Ingestion & Normalization:** complete; 57 tests.
-**Total:** 108/108 module tests passing. No scoring logic exists anywhere.
+**Phase 2.5 — Evidence Boundary Hardening:** complete; 107 tests.
+**Total:** 215/215 module tests passing. No hiring evaluation or scoring logic
+was introduced (this module ingests and hardens evidence only).
 
 ## Implemented
 
@@ -159,9 +161,77 @@
   later-phase inference work, deliberately excluded).
 - **Audit `metadata`** mutability caveat from Phase 1 still applies.
 
+---
+
+# Phase 2.5 — Evidence Boundary Hardening
+
+**Status:** complete; 107 Phase-2.5 tests + 108 prior tests green (215 total).
+See `docs/EVIDENCE_BOUNDARY_HARDENING.md`.
+
+## Implemented
+
+- [x] Explicit extraction outcomes (`ExtractionStatus`/`ExtractionResult`);
+      success never inferred from a returned string.
+- [x] Fail-closed evaluation-eligibility policy with typed reason codes
+      (`normalization/eligibility.py`) + `EvidenceValidationService`.
+- [x] Configurable resource limits (`EvidenceLimits`) for input/text/archive/
+      JSON/CSV.
+- [x] DOCX/ZIP archive safety (bomb, ratio, traversal, absolute/deep path,
+      encrypted entry, XML ceiling) — in-memory, no filesystem extraction.
+- [x] JSON/CSV structured complexity limits; JSON duplicate-key rejection.
+- [x] Text/source limits + binary-as-text rejection + deterministic invalid-UTF
+      policy (replace + `SUCCEEDED_WITH_WARNINGS`).
+- [x] PDF accurately represented as LIMITED (native-text only; encrypted →
+      ENCRYPTED; empty → EMPTY blocked; ambiguous → MANUAL_REVIEW_REQUIRED).
+- [x] Context-aware duplicate classification (`DuplicatePolicy`), incl.
+      cross-tenant non-disclosure.
+- [x] Lineage-integrity policy (no self-parent/cycle, parent existence, context
+      match, monotonic version, conflicting predecessors) + typed errors.
+- [x] Tenant/candidate/application scope on submissions, provenance, evidence,
+      chunks, quarantine, index entries, lineage nodes.
+- [x] Authorization-aware, tenant-scoped `EvidenceAccessService` +
+      `EvidenceAccessPolicy` (permissions, grants, quarantine separate perm);
+      denials audited; counts do not leak.
+- [x] Quarantine non-leakage across normalized evidence/chunks/index/audit/
+      errors; values only via quarantine permission.
+- [x] Reconstruction integrity validator + hash checks (`hmac.compare_digest`).
+- [x] Atomic (fail-closed) ingestion: validate before persist; no completed/
+      indexed artifact on failure; deterministic retries; `IngestionState`.
+- [x] Additive audit events; complete success/failure audit sequences.
+- [x] Machine-readable format capability matrix + docs.
+
+## Frozen files touched (additive only — exact reason)
+
+- `domain/enums.py`: **added** Phase-2.5 `AuditEventType` members (safety audit
+  events). No existing member/value changed.
+- `domain/evidence.py`: **added** optional `tenant_id`/`application_id` to
+  `NormalizedEvidence` with safe defaults (tenant isolation). No existing field
+  changed; Phase-1 constructions remain valid.
+- `errors.py`: **added** Phase-2.5 typed error classes.
+- `normalization/models.py`, `normalization/parsers.py`,
+  `normalization/pipeline.py`, `normalization/provenance.py`,
+  `normalization/chunking.py`: **extended** additively for scope fields, limits,
+  extraction status, and safety routing — Phase-2 behavior preserved (all
+  Phase-2 tests green).
+- `index/interfaces.py`, `index/search.py`: **added** optional `tenant_id`/
+  `application_id` scope filters.
+- `services/evidence_ingestion_service.py`: **reworked** to fail-closed/atomic
+  while keeping the exact Phase-2 `evidence_id` 10-event success history
+  (hardening events routed to a separate `ingestion_id` stream).
+- `services/__init__.py`, `__init__.py`, `api/*`: additive wiring/endpoints.
+
+## Known limitations
+
+- PDF native-text only (no OCR/compressed/encrypted).
+- In-memory repositories/index; atomicity simulated (no DB transaction).
+- Quarantine classifies field identity, not free-text semantics.
+- Placeholder authorization (grant store + Phase-1 identity provider).
+- No cryptographic audit hash-chain yet.
+
 ## Next milestone
 
-**Phase 3 — AI Evaluation Engine.** Consume the immutable evidence substrate
-(extraction → rubric scoring → gaps → confidence → reason codes) behind the
-Phase-1 human-decision boundary. Do not begin until all Phase 1 and Phase 2
-tests remain green.
+**Phase 3A — Capability Ontology & Rubric Contracts** (contracts, not model
+inference): versioned capability ontology, job rubric contracts, permissible
+evidence references, scoring scales, missing-evidence/uncertainty/conflict
+representation, reason-code taxonomy, rubric approval/publication workflow. No
+LLM inference until those are implemented and validated.

@@ -11,7 +11,9 @@ from __future__ import annotations
 from .audit_service import AuditService
 from .decision_service import DecisionService
 from .evaluation_service import EvaluationService
+from .evidence_access_service import EvidenceAccessService
 from .evidence_ingestion_service import EvidenceIngestionService
+from .evidence_validation_service import EvidenceValidationService
 from .provenance_service import ProvenanceService
 from .recommendation_service import RecommendationService
 from .search_service import SearchService
@@ -27,4 +29,7 @@ __all__ = [
     "EvidenceIngestionService",
     "SearchService",
     "ProvenanceService",
+    # Phase 2.5: evidence boundary hardening
+    "EvidenceValidationService",
+    "EvidenceAccessService",
 ]

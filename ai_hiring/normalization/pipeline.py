@@ -27,8 +27,10 @@ from ..errors import IntegrityValidationError
 from . import parsers, provenance as prov
 from .chunking import ChunkConfig, chunk_text
 from .cleaners import NormalizationProfile, normalize_text
+from .extraction_status import ELIGIBLE_STATUSES, ExtractionResult, ExtractionStatus
 from .hashing import normalized_hash as hash_normalized
 from .hashing import raw_hash as hash_raw
+from .limits import DEFAULT_LIMITS, EvidenceLimits, check_input_size
 from .models import (
     WHITESPACE_SENSITIVE_FORMATS,
     EvidenceChunk,
@@ -65,6 +67,7 @@ class PipelineOutput:
     normalized_hash: str
     normalized_text: str
     stage_results: tuple[StageResult, ...]
+    extraction_result: ExtractionResult
 
 
 def run_pipeline(
@@ -78,6 +81,7 @@ def run_pipeline(
     quarantine_engine: Optional[QuarantineEngine] = None,
     chunk_config: ChunkConfig = ChunkConfig(),
     max_content_bytes: int = MAX_CONTENT_BYTES,
+    limits: EvidenceLimits = DEFAULT_LIMITS,
     id_factory: IdFactory = new_id,
     clock: Clock = utc_now,
     actor: str = "system:ingestion",
@@ -101,6 +105,7 @@ def run_pipeline(
         raise IntegrityValidationError(
             f"submission exceeds {max_content_bytes} byte integrity ceiling"
         )
+    check_input_size(len(submission.content), limits)
     if not submission.content and not submission.fields:
         raise IntegrityValidationError("empty submission")
     record(IngestionStage.INTEGRITY_VALIDATED, len(submission.content), "size + non-empty ok")
@@ -117,6 +122,7 @@ def run_pipeline(
         submission.declared_format,
         submission.content,
         dict(submission.fields) if submission.fields else None,
+        limits,
     )
     record(IngestionStage.CONTENT_EXTRACTED, extracted.is_structured,
            "structured" if extracted.is_structured else "unstructured")
@@ -164,7 +170,8 @@ def run_pipeline(
 
     # 8. Chunking.
     chunks = chunk_text(
-        normalized_text, evidence_id, version, config=chunk_config, id_factory=id_factory
+        normalized_text, evidence_id, version, config=chunk_config, id_factory=id_factory,
+        tenant_id=submission.tenant_id, candidate_id=submission.candidate_id,
     )
     record(IngestionStage.CHUNKED, len(chunks), f"{len(chunks)} chunk(s)")
     provenance = prov.append_step(
@@ -184,11 +191,33 @@ def run_pipeline(
         job_relevant=True,
         format=submission.declared_format.value,
         provenance=provenance.provenance_id,
+        tenant_id=submission.tenant_id,
+        application_id=submission.application_id,
         created_at=clock(),
         version=version,
     )
     record(IngestionStage.FINALIZED, normalized_evidence.evidence_id,
            f"version={version}")
+
+    # Explicit extraction outcome — success is never inferred from a string.
+    warnings = extracted.warnings
+    if not normalized_text:
+        status = ExtractionStatus.EMPTY
+    elif warnings:
+        status = ExtractionStatus.SUCCEEDED_WITH_WARNINGS
+    else:
+        status = ExtractionStatus.SUCCEEDED
+    extraction_result = ExtractionResult(
+        status=status,
+        format=submission.declared_format.value,
+        extractor_name=f"parser:{submission.declared_format.value}",
+        characters_extracted=len(normalized_text),
+        bytes_received=len(submission.content),
+        warnings=warnings,
+        failure_code=None if status in ELIGIBLE_STATUSES else "EXTRACTION_EMPTY",
+        failure_detail="" if normalized_text else "no content after normalization/quarantine",
+        evaluation_eligible=bool(normalized_text) and status in ELIGIBLE_STATUSES,
+    )
 
     return PipelineOutput(
         normalized_evidence=normalized_evidence,
@@ -199,4 +228,5 @@ def run_pipeline(
         normalized_hash=norm_h,
         normalized_text=normalized_text,
         stage_results=tuple(stages),
+        extraction_result=extraction_result,
     )

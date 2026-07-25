@@ -212,10 +212,36 @@ platform.provenance_service.lineage(ingested.evidence_id)
 platform.provenance_service.versions(ingested.evidence_id)
 ```
 
+## Phase 2.5 — Evidence Boundary Hardening (implemented)
+
+Hardens the evidence boundary before any scoring exists: explicit extraction
+outcomes, a fail-closed evaluation-eligibility policy, resource limits, DOCX/ZIP
+archive-safety, JSON/CSV complexity limits, context-aware duplicate semantics,
+lineage-DAG integrity, tenant/candidate/application isolation, authorization-aware
+tenant-scoped search, quarantine non-leakage, reconstruction + hash integrity,
+atomic (fail-closed) ingestion, and complete success/failure audit sequences.
+See [`docs/EVIDENCE_BOUNDARY_HARDENING.md`](docs/EVIDENCE_BOUNDARY_HARDENING.md)
+and the machine-readable capability matrix in
+`normalization/capability_matrix.py`.
+
+**Format support is not uniform.** In particular, **PDF support is LIMITED** —
+bounded native-text extraction from *uncompressed* streams only: **no OCR, no
+scanned/image-only pages, no encrypted PDFs, no compressed streams**. An empty
+PDF extraction is never accepted as evidence (it fails closed); ambiguous
+compressed/image-only PDFs are routed for manual review. DOCX is LIMITED
+(archive-safe text extraction; images/encrypted unsupported). See the capability
+matrix for every format.
+
+> Scope note: **No hiring evaluation or scoring logic was introduced in Phase
+> 2.5** (this phase hardens the evidence substrate only). This is not a claim
+> that no scoring logic exists anywhere in the wider repository.
+
 ## Next milestone
 
-**Phase 3 — AI Evaluation Engine**: consume the immutable evidence produced here
-(evidence extraction → rubric scoring → gap analysis → confidence → reason
-codes), still behind the Phase-1 human-decision boundary. Do not begin until all
-Phase 1 and Phase 2 tests pass. See
+**Phase 3A — Capability Ontology & Rubric Contracts** (not model inference):
+versioned capability ontology, job-specific rubric contracts, permissible
+evidence references, scoring scales, missing-evidence/uncertainty/conflict
+representation, reason-code taxonomy, and a rubric approval/publication workflow.
+No LLM inference until those contracts are implemented and validated. Do not
+begin until all Phase 1, Phase 2, and Phase 2.5 tests pass. See
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).

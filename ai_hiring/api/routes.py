@@ -27,7 +27,9 @@ from ..services import (
     AuditService,
     DecisionService,
     EvaluationService,
+    EvidenceAccessService,
     EvidenceIngestionService,
+    EvidenceValidationService,
     ProvenanceService,
     RecommendationService,
     SearchService,
@@ -62,6 +64,8 @@ class HiringAPI:
         evidence_ingestion_service: "EvidenceIngestionService | None" = None,
         search_service: "SearchService | None" = None,
         provenance_service: "ProvenanceService | None" = None,
+        evidence_access_service: "EvidenceAccessService | None" = None,
+        evidence_validation_service: "EvidenceValidationService | None" = None,
     ) -> None:
         self._evaluations = evaluation_service
         self._recommendations = recommendation_service
@@ -72,6 +76,8 @@ class HiringAPI:
         self._ingestion = evidence_ingestion_service
         self._search = search_service
         self._provenance = provenance_service
+        self._access = evidence_access_service
+        self._validation = evidence_validation_service
 
     # --- authorization hooks (placeholders for a real IdP) -----------------
     def _authorize(
@@ -222,7 +228,17 @@ class HiringAPI:
         return self._provenance.versions(evidence_id)
 
     def search_evidence(self, request: EvidenceSearchRequest) -> tuple[IndexEntry, ...]:
-        """GET /ai-hiring/evidence/search — deterministic retrieval."""
+        """GET /ai-hiring/evidence/search — authorization-aware, tenant-scoped.
+
+        Routes through the access service (authorization + tenant scoping) when
+        configured; results never include quarantined values or cross-tenant
+        matches.
+        """
+        if self._access is not None:
+            return self._access.search(
+                principal_id=request.principal_id, tenant_id=request.tenant_id,
+                candidate_id=request.candidate_id, query=request.to_query())
+        # Fallback (no access service): principal-authenticated deterministic search.
         self._authorize(request.principal_id, self._ANY)
         if self._search is None:
             raise BoundaryViolationError("search service is not configured on this API")

@@ -21,6 +21,7 @@ from ..common import utc_now
 from ..domain.base import DomainModel
 from ..domain.evidence import NormalizedEvidence
 from ..errors import DomainValidationError
+from .extraction_status import ExtractionResult
 
 
 class EvidenceFormat(str, Enum):
@@ -63,6 +64,21 @@ class QuarantineCategory(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class IngestionState(str, Enum):
+    """Terminal-capable ingestion lifecycle states (atomic behavior)."""
+
+    RECEIVED = "RECEIVED"
+    VALIDATING = "VALIDATING"
+    EXTRACTING = "EXTRACTING"
+    NORMALIZING = "NORMALIZING"
+    QUARANTINING = "QUARANTINING"
+    CHUNKING = "CHUNKING"
+    INDEXING = "INDEXING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
 class IngestionStage(str, Enum):
     """The ordered pipeline stages, each of which emits its own audit event."""
 
@@ -89,6 +105,8 @@ class RawSubmission(DomainModel):
     candidate_id: str
     role_id: str
     assessment_item_id: str = ""
+    tenant_id: str = ""
+    application_id: str = ""
     declared_format: EvidenceFormat
     filename: str = ""
     uploader: str
@@ -138,6 +156,8 @@ class Provenance(DomainModel):
     candidate_id: str
     role_id: str
     assessment_item_id: str = ""
+    tenant_id: str = ""
+    application_id: str = ""
     original_filename: str = ""
     uploader: str
     upload_timestamp: datetime
@@ -181,6 +201,8 @@ class EvidenceChunk(DomainModel):
     hash: str
     chunk_type: str
     text: str
+    tenant_id: str = ""
+    candidate_id: str = ""
 
     @model_validator(mode="after")
     def _validate(self) -> "EvidenceChunk":
@@ -206,6 +228,7 @@ class QuarantineRecord(DomainModel):
     record_id: str
     evidence_id: str
     version: int
+    tenant_id: str = ""
     fields: tuple[QuarantinedField, ...] = ()
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -228,6 +251,9 @@ class LineageNode(DomainModel):
     actor: str
     timestamp: datetime = Field(default_factory=utc_now)
     parent_ids: tuple[str, ...] = ()
+    tenant_id: str = ""
+    candidate_id: str = ""
+    application_id: str = ""
 
 
 class StageResult(DomainModel):
@@ -253,6 +279,10 @@ class IngestedEvidence(DomainModel):
     lineage_node_ids: tuple[str, ...] = ()
     stage_results: tuple[StageResult, ...] = ()
     duplicate_of: Optional[str] = None
+    extraction_result: Optional["ExtractionResult"] = None
+    ingestion_state: IngestionState = IngestionState.COMPLETED
+    duplicate_classification: Optional[str] = None
+    ingestion_id: str = ""
 
     @property
     def evidence_id(self) -> str:

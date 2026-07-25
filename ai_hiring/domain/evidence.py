@@ -48,6 +48,10 @@ class NormalizedEvidence(DomainModel):
     job_relevant: bool  # must be explicit — no default
     format: str = ""
     provenance: str = ""
+    # Phase 2.5 additive scope (safe defaults; tenant isolation). Optional so
+    # every Phase-1 construction remains valid; populated by the ingestion path.
+    tenant_id: str = ""
+    application_id: str = ""
     created_at: datetime = Field(default_factory=utc_now)
     version: int = 1
 

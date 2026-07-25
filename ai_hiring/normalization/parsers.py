@@ -1,58 +1,61 @@
 """Content extraction — raw submission -> text and/or named fields.
 
-Dependency-free (stdlib only). Text formats decode directly; DOCX is read via
-``zipfile`` + XML (real extraction, no third-party library); PDF uses a minimal
-extractor for uncompressed text streams. Structured formats (JSON/CSV/
-STRUCTURED_RESPONSE) yield a field mapping so downstream quarantine can operate
-per field.
+Dependency-free (stdlib only). Every parser routes through the Phase-2.5 safety
+modules: text formats through text limits (binary-mislabel + size), DOCX through
+archive-safety, JSON/CSV through structured limits. Extraction never *infers*
+success — it returns the content plus any warnings, and the pipeline assigns an
+explicit :class:`ExtractionStatus`.
 
-Explicitly out of scope (documented limitations):
-* PDF: only uncompressed ``(...) Tj`` / ``TJ`` text operators; no OCR, no
-  FlateDecode streams. Scanned/compressed PDFs extract empty text.
-* No video/audio decoding — transcripts are provided as text.
+Documented PDF limitations: only uncompressed ``(...) Tj`` / ``TJ`` text; no OCR,
+no FlateDecode. Encrypted PDFs raise; ambiguous image-only/compressed PDFs are
+routed for manual review; empty text is reported EMPTY by the pipeline.
 """
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 import re
-import zipfile
 from dataclasses import dataclass, field
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
-from ..errors import ContentExtractionError, UnsupportedFormatError
+from ..errors import (
+    ContentExtractionError,
+    EncryptedContentError,
+    ManualReviewRequiredError,
+    UnsupportedFormatError,
+)
+from .archive_safety import read_entry_bounded, inspect_archive
 from .cleaners import decode_bytes
+from .limits import DEFAULT_LIMITS, EvidenceLimits, check_text_limits
 from .models import STRUCTURED_FORMATS, EvidenceFormat
+from .structured_limits import check_csv_bounded, parse_json_bounded
 
 
 @dataclass(frozen=True)
 class ExtractedContent:
-    """Result of content extraction."""
-
     text: str = ""
     fields: Dict[str, str] = field(default_factory=dict)
     is_structured: bool = False
+    warnings: tuple[str, ...] = ()
+    manual_review: bool = False
 
 
 # --- text formats ----------------------------------------------------------
-def _parse_text(content: bytes, fields: Dict[str, str] | None) -> ExtractedContent:
-    return ExtractedContent(text=decode_bytes(content))
+def _parse_text(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
+    text = decode_bytes(content)
+    warnings = check_text_limits(content, text, limits)  # raises on hard limits
+    return ExtractedContent(text=text, warnings=warnings)
 
 
-# --- DOCX (stdlib zipfile + XML) ------------------------------------------
+# --- DOCX (archive-safe stdlib zip + XML) ---------------------------------
 _WT_RE = re.compile(r"<w:t[^>]*>(.*?)</w:t>", re.DOTALL)
 _PARA_RE = re.compile(r"</w:p>")
 
 
-def _parse_docx(content: bytes, fields: Dict[str, str] | None) -> ExtractedContent:
-    try:
-        with zipfile.ZipFile(io.BytesIO(content)) as zf:
-            xml = zf.read("word/document.xml").decode("utf-8", errors="replace")
-    except (zipfile.BadZipFile, KeyError) as exc:
-        raise ContentExtractionError(f"invalid DOCX submission: {exc}") from exc
-    # Split into paragraphs, join the w:t runs within each.
+def _parse_docx(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
+    inspect_archive(content, limits)  # raises on unsafe/malformed archive
+    xml = read_entry_bounded(content, "word/document.xml", limits).decode(
+        "utf-8", errors="replace"
+    )
     paragraphs = []
     for para in _PARA_RE.split(xml):
         runs = _WT_RE.findall(para)
@@ -68,14 +71,15 @@ def _unescape_xml(text: str) -> str:
     )
 
 
-# --- PDF (minimal, uncompressed text operators) ---------------------------
+# --- PDF (minimal, classified) --------------------------------------------
 _PDF_TEXT_RE = re.compile(r"\((?:\\.|[^\\()])*\)")
 
 
-def _parse_pdf(content: bytes, fields: Dict[str, str] | None) -> ExtractedContent:
+def _parse_pdf(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
+    if b"/Encrypt" in content:
+        raise EncryptedContentError("encrypted PDF cannot be extracted (no OCR/decrypt)")
     text_data = content.decode("latin-1", errors="replace")
     out: list[str] = []
-    # Extract text shown by BT..ET blocks via (string) Tj / TJ operators.
     for block in re.findall(r"BT(.*?)ET", text_data, re.DOTALL):
         for literal in _PDF_TEXT_RE.findall(block):
             inner = literal[1:-1]
@@ -85,7 +89,16 @@ def _parse_pdf(content: bytes, fields: Dict[str, str] | None) -> ExtractedConten
             )
             out.append(inner)
         out.append("\n")
-    return ExtractedContent(text="".join(out).strip())
+    text = "".join(out).strip()
+    if not text:
+        # Ambiguous: compressed/scanned/image-only vs. genuinely empty. If the
+        # PDF carries compressed streams or images we cannot decode, route for
+        # manual review rather than accept empty content.
+        if b"FlateDecode" in content or b"/Image" in content or b"/XObject" in content:
+            raise ManualReviewRequiredError(
+                "PDF has no extractable native text (compressed/scanned); manual review"
+            )
+    return ExtractedContent(text=text)
 
 
 # --- structured formats ----------------------------------------------------
@@ -103,43 +116,39 @@ def _flatten_json(obj: object, prefix: str = "") -> Dict[str, str]:
     return flat
 
 
-def _parse_json(content: bytes, fields: Dict[str, str] | None) -> ExtractedContent:
+def _parse_json(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
     if fields is not None:
         return ExtractedContent(fields=dict(fields), is_structured=True)
-    try:
-        obj = json.loads(decode_bytes(content))
-    except json.JSONDecodeError as exc:
-        raise ContentExtractionError(f"invalid JSON submission: {exc}") from exc
+    obj = parse_json_bounded(content, limits)  # raises on malformed / over-limit
     return ExtractedContent(fields=_flatten_json(obj), is_structured=True)
 
 
-def _parse_csv(content: bytes, fields: Dict[str, str] | None) -> ExtractedContent:
+def _parse_csv(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
     if fields is not None:
         return ExtractedContent(fields=dict(fields), is_structured=True)
+    check_csv_bounded(content, limits)  # raises on malformed / over-limit
+    import csv
+    import io
+
     text = decode_bytes(content)
     reader = csv.DictReader(io.StringIO(text))
     columns: Dict[str, list[str]] = {}
-    try:
-        for row in reader:
-            for col, val in row.items():
-                if col is None:
-                    continue
-                columns.setdefault(col, []).append(val or "")
-    except csv.Error as exc:
-        raise ContentExtractionError(f"invalid CSV submission: {exc}") from exc
+    for row in reader:
+        for col, val in row.items():
+            if col is None:
+                continue
+            columns.setdefault(col, []).append(val or "")
     flat = {col: "\n".join(vals) for col, vals in columns.items()}
     return ExtractedContent(fields=flat, is_structured=True)
 
 
-def _parse_structured_response(
-    content: bytes, fields: Dict[str, str] | None
-) -> ExtractedContent:
+def _parse_structured_response(content: bytes, fields, limits: EvidenceLimits) -> ExtractedContent:
     if fields is not None:
         return ExtractedContent(fields=dict(fields), is_structured=True)
-    return _parse_json(content, None)
+    return _parse_json(content, None, limits)
 
 
-_PARSERS: Dict[EvidenceFormat, Callable[[bytes, Dict[str, str] | None], ExtractedContent]] = {
+_PARSERS: Dict[EvidenceFormat, Callable[..., ExtractedContent]] = {
     EvidenceFormat.TEXT: _parse_text,
     EvidenceFormat.MARKDOWN: _parse_text,
     EvidenceFormat.SOURCE_CODE: _parse_text,
@@ -154,13 +163,17 @@ _PARSERS: Dict[EvidenceFormat, Callable[[bytes, Dict[str, str] | None], Extracte
 }
 
 
-def extract(fmt: EvidenceFormat, content: bytes, fields: Dict[str, str] | None = None) -> ExtractedContent:
-    """Extract content for a declared format. Raises for unsupported formats."""
+def extract(
+    fmt: EvidenceFormat,
+    content: bytes,
+    fields: Optional[Dict[str, str]] = None,
+    limits: EvidenceLimits = DEFAULT_LIMITS,
+) -> ExtractedContent:
+    """Extract content for a declared format. Raises typed errors for failures."""
     parser = _PARSERS.get(fmt)
     if parser is None:
         raise UnsupportedFormatError(f"no parser registered for format {fmt.value}")
-    result = parser(content, fields)
-    # A structured format with no parseable fields is a hard extraction error.
+    result = parser(content, fields, limits)
     if fmt in STRUCTURED_FORMATS and not result.fields:
         raise ContentExtractionError(f"no fields extracted for structured format {fmt.value}")
     return result

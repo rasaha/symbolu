@@ -28,6 +28,15 @@ class ProvenanceRepository(Protocol):
     def find_duplicate(
         self, candidate_id: str, assessment_item_id: str, raw_hash: str
     ) -> Optional[Provenance]: ...
+    def find_same_stage_raw(
+        self, tenant_id: str, candidate_id: str, assessment_item_id: str, raw_hash: str
+    ) -> Optional[Provenance]: ...
+    def find_same_stage_normalized(
+        self, tenant_id: str, candidate_id: str, assessment_item_id: str, normalized_hash: str
+    ) -> Optional[Provenance]: ...
+    def find_tenant_hash(
+        self, tenant_id: str, raw_hash: str, normalized_hash: str
+    ) -> Optional[Provenance]: ...
 
 
 @runtime_checkable
@@ -99,6 +108,38 @@ class InMemoryProvenanceRepository:
         if not matches:
             return None
         return sorted(matches, key=lambda p: (p.evidence_id, p.version))[0]
+
+    def _scan(self, predicate) -> Optional[Provenance]:
+        matches = [p for p in self._by_id.values() if predicate(p)]
+        if not matches:
+            return None
+        return sorted(matches, key=lambda p: (p.evidence_id, p.version))[0]
+
+    def find_same_stage_raw(
+        self, tenant_id: str, candidate_id: str, assessment_item_id: str, raw_hash: str
+    ) -> Optional[Provenance]:
+        return self._scan(
+            lambda p: p.tenant_id == tenant_id and p.candidate_id == candidate_id
+            and p.assessment_item_id == assessment_item_id and p.raw_hash == raw_hash
+        )
+
+    def find_same_stage_normalized(
+        self, tenant_id: str, candidate_id: str, assessment_item_id: str, normalized_hash: str
+    ) -> Optional[Provenance]:
+        return self._scan(
+            lambda p: p.tenant_id == tenant_id and p.candidate_id == candidate_id
+            and p.assessment_item_id == assessment_item_id
+            and p.normalized_hash == normalized_hash
+        )
+
+    def find_tenant_hash(
+        self, tenant_id: str, raw_hash: str, normalized_hash: str
+    ) -> Optional[Provenance]:
+        """Same-tenant match by raw or normalized hash (cross-candidate/context)."""
+        return self._scan(
+            lambda p: p.tenant_id == tenant_id
+            and (p.raw_hash == raw_hash or p.normalized_hash == normalized_hash)
+        )
 
 
 class InMemoryChunkRepository:

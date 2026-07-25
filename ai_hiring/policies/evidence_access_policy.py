@@ -1,0 +1,96 @@
+"""Evidence access-authorization policy.
+
+Placeholder, grant-based authorization consistent with the Phase-1 identity
+provider convention. Repositories never decide authorization; the access
+*service* authenticates the principal and consults this policy, which is
+tenant- and candidate-scoped and treats quarantine as a separate permission.
+
+Denials return a typed decision (audited by the caller), and cross-tenant or
+cross-candidate access is denied by default.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+
+class Permission(str, Enum):
+    EVIDENCE_READ = "EVIDENCE_READ"
+    EVIDENCE_SEARCH = "EVIDENCE_SEARCH"
+    EVIDENCE_LINEAGE_READ = "EVIDENCE_LINEAGE_READ"
+    EVIDENCE_VERSION_READ = "EVIDENCE_VERSION_READ"
+    QUARANTINE_READ = "QUARANTINE_READ"
+    QUARANTINE_ADMIN = "QUARANTINE_ADMIN"
+
+
+_QUARANTINE_PERMS = frozenset({Permission.QUARANTINE_READ, Permission.QUARANTINE_ADMIN})
+
+
+@dataclass(frozen=True)
+class AccessGrant:
+    """What one principal may do within one tenant.
+
+    Empty ``candidate_ids`` means all candidates within the tenant.
+    """
+
+    principal_id: str
+    tenant_id: str
+    permissions: frozenset[Permission]
+    candidate_ids: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class AccessRequest:
+    principal_id: str
+    tenant_id: str
+    operation: Permission
+    candidate_id: Optional[str] = None
+    application_id: Optional[str] = None
+    role_id: Optional[str] = None
+    assessment_id: Optional[str] = None
+    include_quarantine: bool = False
+
+
+@dataclass(frozen=True)
+class AccessDecision:
+    allowed: bool
+    reason: str = ""
+
+
+class GrantStore:
+    """In-memory grant registry (placeholder for a real policy store)."""
+
+    def __init__(self) -> None:
+        self._grants: dict[tuple[str, str], AccessGrant] = {}
+
+    def add(self, grant: AccessGrant) -> None:
+        self._grants[(grant.principal_id, grant.tenant_id)] = grant
+
+    def get(self, principal_id: str, tenant_id: str) -> Optional[AccessGrant]:
+        return self._grants.get((principal_id, tenant_id))
+
+
+class EvidenceAccessPolicy:
+    def __init__(self, grants: Optional[GrantStore] = None) -> None:
+        self._grants = grants or GrantStore()
+
+    @property
+    def grants(self) -> GrantStore:
+        return self._grants
+
+    def authorize(self, request: AccessRequest) -> AccessDecision:
+        grant = self._grants.get(request.principal_id, request.tenant_id)
+        if grant is None:
+            # No cross-tenant leakage: identical message whether the tenant
+            # exists or not.
+            return AccessDecision(False, "no grant for principal in tenant")
+        if request.operation not in grant.permissions:
+            return AccessDecision(False, f"missing permission {request.operation.value}")
+        if request.include_quarantine and not (grant.permissions & _QUARANTINE_PERMS):
+            return AccessDecision(False, "quarantine access requires a quarantine permission")
+        if (request.candidate_id is not None and grant.candidate_ids
+                and request.candidate_id not in grant.candidate_ids):
+            return AccessDecision(False, "principal not scoped to this candidate")
+        return AccessDecision(True, "authorized")

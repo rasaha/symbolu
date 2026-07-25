@@ -30,6 +30,8 @@ def matches(entry: IndexEntry, query: SearchQuery) -> bool:
         (query.evidence_id, entry.evidence_id),
         (query.chunk_id, entry.chunk_id),
         (query.filename, entry.filename),
+        (query.tenant_id, entry.tenant_id),
+        (query.application_id, entry.application_id),
     )
     for wanted, actual in checks:
         if wanted is not None and wanted != actual:

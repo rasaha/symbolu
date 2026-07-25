@@ -99,3 +99,77 @@ class DuplicateEvidenceError(IngestionError):
 
 class LineageError(HiringError):
     """A lineage graph could not be constructed or reconstructed."""
+
+
+# --- Phase 2.5: evidence boundary hardening --------------------------------
+class ResourceLimitError(IngestionError):
+    """A configured resource-consumption limit was exceeded."""
+
+
+class ArchiveSafetyError(IngestionError):
+    """An archive (e.g. DOCX/ZIP) failed a safety check (bomb, traversal, ...)."""
+
+
+class StructuredLimitError(ResourceLimitError):
+    """A structured document (JSON/CSV) exceeded a complexity limit."""
+
+
+class TextLimitError(ResourceLimitError):
+    """A text/source submission exceeded a size/shape limit."""
+
+
+class EmptyExtractionError(IngestionError):
+    """Extraction produced no usable content; evidence fails closed."""
+
+
+class EncryptedContentError(IngestionError):
+    """The submission appears encrypted and cannot be extracted."""
+
+
+class ManualReviewRequiredError(IngestionError):
+    """Extraction outcome is ambiguous and must be routed for human review."""
+
+
+class EvidenceIntegrityError(HiringError):
+    """Base class for integrity (hash / reconstruction) failures."""
+
+
+class HashMismatchError(EvidenceIntegrityError):
+    """A raw or normalized hash did not match its expected value."""
+
+
+class ReconstructionError(EvidenceIntegrityError):
+    """Chunks failed to reconstruct the normalized content exactly."""
+
+
+class EvidenceIneligibleError(HiringError):
+    """Evidence does not satisfy the fail-closed evaluation-eligibility policy."""
+
+
+class EvidenceAccessDeniedError(HiringError):
+    """An authorization check denied access to evidence or search."""
+
+
+class TenantMismatchError(HiringError):
+    """A cross-tenant (or cross-application) scope violation was detected."""
+
+
+# Lineage integrity (subclasses of LineageError)
+class LineageCycleError(LineageError):
+    """A lineage edge would introduce a cycle."""
+
+
+class LineageParentNotFoundError(LineageError):
+    """A referenced parent lineage node does not exist."""
+
+
+class LineageContextMismatchError(LineageError):
+    """A lineage edge crosses tenant/candidate/application context."""
+
+
+class LineageVersionRegressionError(LineageError):
+    """A lineage edge regresses or breaks monotonic version ancestry."""
+
+
+class LineageConflictingParentError(LineageError):
+    """A version node has conflicting immediate predecessors."""

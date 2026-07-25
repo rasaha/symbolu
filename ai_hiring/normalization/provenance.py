@@ -41,6 +41,8 @@ def build_provenance(
         candidate_id=submission.candidate_id,
         role_id=submission.role_id,
         assessment_item_id=submission.assessment_item_id,
+        tenant_id=submission.tenant_id,
+        application_id=submission.application_id,
         original_filename=submission.filename,
         uploader=submission.uploader,
         upload_timestamp=submission.submitted_at,

@@ -36,11 +36,14 @@ from .repositories.in_memory import (
     InMemoryRecommendationRepository,
     InMemoryWorkflowRepository,
 )
+from .policies.evidence_access_policy import EvidenceAccessPolicy, GrantStore
 from .services import (
     AuditService,
     DecisionService,
     EvaluationService,
+    EvidenceAccessService,
     EvidenceIngestionService,
+    EvidenceValidationService,
     ProvenanceService,
     RecommendationService,
     SearchService,
@@ -86,6 +89,11 @@ class HiringPlatform:
     evidence_ingestion_service: EvidenceIngestionService
     search_service: SearchService
     provenance_service: ProvenanceService
+    # --- Phase 2.5: evidence boundary hardening ---
+    access_grants: GrantStore
+    evidence_access_policy: EvidenceAccessPolicy
+    evidence_validation_service: EvidenceValidationService
+    evidence_access_service: EvidenceAccessService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -101,6 +109,8 @@ class HiringPlatform:
             evidence_ingestion_service=self.evidence_ingestion_service,
             search_service=self.search_service,
             provenance_service=self.provenance_service,
+            evidence_access_service=self.evidence_access_service,
+            evidence_validation_service=self.evidence_validation_service,
         )
 
 
@@ -156,6 +166,18 @@ def build_in_memory_platform(
     search_service = SearchService(evidence_index_repo)
     provenance_service = ProvenanceService(provenance_repo, lineage_repo)
 
+    # Phase 2.5: validation + authorization-aware access.
+    access_grants = GrantStore()
+    evidence_access_policy = EvidenceAccessPolicy(access_grants)
+    evidence_validation_service = EvidenceValidationService(
+        evidence_repo, provenance_repo, chunk_repo, quarantine_repo, lineage_repo,
+        audit_service,
+    )
+    evidence_access_service = EvidenceAccessService(
+        evidence_repo, provenance_repo, lineage_repo, quarantine_repo, evidence_index_repo,
+        identity, evidence_access_policy, audit_service,
+    )
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -177,4 +199,8 @@ def build_in_memory_platform(
         evidence_ingestion_service=evidence_ingestion_service,
         search_service=search_service,
         provenance_service=provenance_service,
+        access_grants=access_grants,
+        evidence_access_policy=evidence_access_policy,
+        evidence_validation_service=evidence_validation_service,
+        evidence_access_service=evidence_access_service,
     )

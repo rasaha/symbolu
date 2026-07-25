@@ -29,6 +29,8 @@ class IndexEntry:
     keywords: frozenset[str]
     metadata: Mapping[str, str]
     text: str
+    tenant_id: str = ""
+    application_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,8 @@ class SearchQuery:
     chunk_id: Optional[str] = None
     filename: Optional[str] = None
     keyword: Optional[str] = None
+    tenant_id: Optional[str] = None
+    application_id: Optional[str] = None
     metadata: Mapping[str, str] = field(default_factory=dict)
 
 

@@ -32,6 +32,8 @@ def chunk_text(
     *,
     config: ChunkConfig = ChunkConfig(),
     id_factory: IdFactory = new_id,
+    tenant_id: str = "",
+    candidate_id: str = "",
 ) -> tuple[EvidenceChunk, ...]:
     """Return contiguous chunks that reconstruct ``text`` exactly."""
     if config.size < 1:
@@ -53,6 +55,8 @@ def chunk_text(
                 hash=chunk_hash(piece),
                 chunk_type=config.chunk_type,
                 text=piece,
+                tenant_id=tenant_id,
+                candidate_id=candidate_id,
             )
         )
     return tuple(chunks)

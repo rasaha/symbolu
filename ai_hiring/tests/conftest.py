@@ -100,3 +100,58 @@ def identity_provider() -> StaticIdentityProvider:
 @pytest.fixture
 def platform(identity_provider: StaticIdentityProvider) -> HiringPlatform:
     return build_in_memory_platform(identity_provider)
+
+
+# --------------------------------------------------------------------------
+# Phase 2.5 evidence helpers
+# --------------------------------------------------------------------------
+import io as _io
+import zipfile as _zipfile
+
+from ai_hiring.normalization.models import EvidenceFormat, RawSubmission
+
+SVC = "svc-ats"
+
+
+def text_sub(text: str, **kw) -> RawSubmission:
+    base = dict(
+        candidate_id="c1", role_id="r1", assessment_item_id="a1",
+        declared_format=EvidenceFormat.TEXT, uploader=SVC, filename="f.txt",
+    )
+    base.update(kw)
+    return RawSubmission.from_text(text, **base)
+
+
+def struct_sub(fields: dict, **kw) -> RawSubmission:
+    base = dict(
+        candidate_id="c1", role_id="r1", assessment_item_id="a1",
+        declared_format=EvidenceFormat.STRUCTURED_RESPONSE, uploader=SVC,
+    )
+    base.update(kw)
+    return RawSubmission(fields=fields, **base)
+
+
+def docx_bytes(text: str) -> bytes:
+    doc = (
+        '<?xml version="1.0"?><w:document xmlns:w="x"><w:body>'
+        + "".join(f"<w:p><w:r><w:t>{ln}</w:t></w:r></w:p>" for ln in text.split("\n") if ln)
+        + "</w:body></w:document>"
+    )
+    buf = _io.BytesIO()
+    with _zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("word/document.xml", doc)
+    return buf.getvalue()
+
+
+def zip_bytes(entries: dict[str, bytes], compression=_zipfile.ZIP_DEFLATED) -> bytes:
+    buf = _io.BytesIO()
+    with _zipfile.ZipFile(buf, "w", compression) as zf:
+        for name, data in entries.items():
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+PDF_NATIVE = b"%PDF-1.4\nBT (Hello world native text) Tj ET\n%%EOF"
+PDF_EMPTY = b"%PDF-1.4\n%%EOF"
+PDF_FLATE = b"%PDF-1.4\n<< /Filter /FlateDecode >>\nstream\n\x78\x9c\nendstream\n%%EOF"
+PDF_ENCRYPTED = b"%PDF-1.4\n<< /Encrypt 1 0 R >>\nBT (secret) Tj ET\n%%EOF"

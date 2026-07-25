@@ -62,6 +62,7 @@ class IngestEvidenceRequest(_Request):
 
 class EvidenceSearchRequest(_Request):
     principal_id: str
+    tenant_id: str = ""
     candidate_id: Optional[str] = None
     role_id: Optional[str] = None
     assessment_item_id: Optional[str] = None
