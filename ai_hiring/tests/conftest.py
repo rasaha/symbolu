@@ -293,3 +293,62 @@ def ingest_evidence(
         declared_format=_EvidenceFormat.TEXT, uploader=uploader,
         tenant_id=tenant_id, filename="solution.py")
     return platform.evidence_ingestion_service.ingest(submission).normalized_evidence
+
+
+# --------------------------------------------------------------------------
+# Phase 4A DecisionCase helpers
+# --------------------------------------------------------------------------
+from ai_hiring.assessments.status import SupplierType as _SupplierType
+
+#: Phase-4A actors.
+REVIEWER = "reviewer-1"
+DECISION_MAKER = "approver-1"
+POLICY_ENGINE = "policy-engine"
+AI_ACTOR = "ai-observer"
+
+
+@pytest.fixture
+def case_identity_provider() -> StaticIdentityProvider:
+    """Identity provider carrying the Phase-4A governance actors."""
+    idp = StaticIdentityProvider()
+    idp.register_human(AUTHOR)
+    idp.register_human(APPROVER)
+    idp.register_human(PUBLISHER)
+    idp.register_human(ASSESSOR)
+    idp.register_human(REVIEWER)
+    idp.register_human(DECISION_MAKER)
+    idp.register_human("approver-2")
+    idp.register_ai(AI_ACTOR)
+    idp.register_service("svc-import")
+    idp.register_service(POLICY_ENGINE)
+    return idp
+
+
+@pytest.fixture
+def case_platform(case_identity_provider):
+    """A platform where the case actors hold every permission in TENANT."""
+    platform = build_in_memory_platform(case_identity_provider)
+    for actor in (ASSESSOR, REVIEWER, DECISION_MAKER, POLICY_ENGINE, AI_ACTOR,
+                  "approver-2"):
+        platform.access_grants.add(AccessGrant(actor, TENANT, frozenset(Permission)))
+    return platform
+
+
+def finalized_assessment(platform, *, subject_id: str = SUBJECT,
+                         tenant_id: str = TENANT):
+    """Run the Phase-3B flow and return a finalized advisory ``Assessment``."""
+    make_assessment_rubric(platform)
+    ws = platform.assessment_service.create_workspace(
+        tenant_id=tenant_id, subject_id=subject_id, decision_type="hire",
+        rubric_id="rub.assess", created_by=ASSESSOR)
+    evidence = ingest_evidence(platform, candidate_id=subject_id, tenant_id=tenant_id)
+    binding = platform.assessment_service.bind_evidence(
+        workspace_id=ws.workspace_id, criterion_id="cap.python",
+        evidence_id=evidence.evidence_id, evidence_type=EvidenceType.CODING_TEST,
+        bound_by=ASSESSOR).binding
+    platform.assessment_service.submit_observation(
+        workspace_id=ws.workspace_id, criterion_id="cap.python", value="4",
+        scale_type=ScaleType.ONE_TO_FIVE, supplier_type=_SupplierType.HUMAN_ASSESSOR,
+        supplied_by=ASSESSOR, evidence_binding_ids=(binding.binding_id,))
+    return platform.assessment_service.finalize_assessment(
+        workspace_id=ws.workspace_id, actor=ASSESSOR)

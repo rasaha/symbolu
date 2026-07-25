@@ -279,11 +279,34 @@ assessment records. See
 > conformance — never computed or inferred. `Assessment.advisory_only` is a
 > `Literal[True]`, and the runtime carries no score, rank, or decision field.
 
+## Phase 4A — DecisionCase Aggregate & Lifecycle Orchestration (implemented)
+
+The governed case container that links evidence, assessments, recommendations,
+human authority, and decisions **without collapsing them into one object**. New
+package `decision_cases/` (the immutable `DecisionCase` aggregate root,
+`RecommendationRecord`, `DecisionRecord`, `OverrideRecord`, `ReviewTask`,
+`AuthorityContext`, versioned references, lifecycle and validation), plus
+`services/{decision_case,case_recommendation,case_decision,case_validation}_service.py`,
+`repositories/decision_case_repository.py`, and the `api/decision_case_routes.py`
+facade. Assessment, recommendation, and decision stay distinct records; human and
+**bounded delegated-policy** authority are explicit; case history is append-only.
+See [`docs/DECISION_CASE_AGGREGATE.md`](docs/DECISION_CASE_AGGREGATE.md).
+
+> **Distinct records, distinct authority.** A recommendation *proposes* (advisory;
+> may be AI-assisted with model provenance); a decision is *recorded by an
+> authorized actor* (binding; an AI principal can never be the authority); an
+> override *preserves* the original recommendation rather than rewriting it. Phase
+> 4A stops at `DECIDED` — it does **not** execute enterprise actions, construct
+> production CERs, invoke the ActionGate, reconcile execution, generate
+> recommendations from evidence, reinterpret evidence, or rank candidates.
+
 ## Next milestone
 
-**Phase 3C — Interpretation under governance** (future): the first phase in which
-an AI system may interpret evidence, strictly under the constitution this runtime
-proved executable, and still behind the Phase-1 human-decision boundary and the
-governance middleware. It must not invent any contract. Do not begin until all
-Phase 1, 2, 2.5, 3A, and 3B tests pass. See
-[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+**Phase 4B — Action requests & CER binding** (future): turn a recorded decision
+into a bound, governed action request. It does not execute — execution
+reconciliation is Phase 4C. Do not begin until all Phase 1, 2, 2.5, 3A, 3B, and 4A
+tests pass. See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+
+*(Note: an interpretation-under-governance phase — earlier sketched as "Phase 3C"
+— remains future work; the assessment runtime and the decision aggregate are both
+designed to admit it without contract changes.)*

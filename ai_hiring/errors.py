@@ -311,3 +311,76 @@ class AssessmentAuthorizationError(AssessmentError):
 
 class CrossTenantAssessmentAccessError(AssessmentAuthorizationError):
     """A cross-tenant assessment access was attempted and denied."""
+
+
+# --- Phase 4A: DecisionCase aggregate & lifecycle (additive) ---------------
+class DecisionCaseError(HiringError):
+    """Base for DecisionCase aggregate and lifecycle failures."""
+
+
+class DecisionCaseNotFoundError(DecisionCaseError):
+    """No decision case exists for the given id."""
+
+
+class CaseVersionNotFoundError(DecisionCaseError):
+    """The requested case version does not exist."""
+
+
+class InvalidCaseTransitionError(DecisionCaseError):
+    """A requested lifecycle transition is not structurally legal."""
+
+
+class CaseFinalizedError(DecisionCaseError):
+    """The case snapshot is terminal (superseded/cancelled/closed) and immutable."""
+
+
+class AssessmentNotLinkableError(DecisionCaseError):
+    """An assessment cannot be linked (missing, cross-tenant, or not finalized)."""
+
+
+class RecommendationNotFoundError(DecisionCaseError):
+    """No recommendation exists for the given id on this case."""
+
+
+class RecommendationValidationError(DecisionCaseError):
+    """A recommendation failed provenance, reference, or policy validation."""
+
+
+class DecisionReadinessError(DecisionCaseError):
+    """The case is not structurally ready for a decision to be recorded."""
+
+
+class ReviewTaskNotFoundError(DecisionCaseError):
+    """No review task exists for the given id on this case."""
+
+
+class RequiredReviewIncompleteError(DecisionCaseError):
+    """A required review task is outstanding and blocks decision readiness."""
+
+
+class DecisionAuthorityError(DecisionCaseError):
+    """The recorded authority is invalid, out of scope, or unauthorized."""
+
+
+class AIDecisionAuthorityError(DecisionAuthorityError):
+    """An AI principal attempted to author a binding decision."""
+
+
+class DelegatedPolicyScopeError(DecisionAuthorityError):
+    """A delegated policy acted outside its explicit, published bounds."""
+
+
+class SegregationOfDutiesError(DecisionAuthorityError):
+    """The same actor attempted two roles that must be separated (e.g. self-approval)."""
+
+
+class UnauthorizedOverrideError(DecisionAuthorityError):
+    """An override was attempted without the authority permitting it."""
+
+
+class DecisionCaseAuthorizationError(DecisionCaseError):
+    """The actor is not authorized for the requested case operation."""
+
+
+class CrossTenantCaseAccessError(DecisionCaseAuthorizationError):
+    """A cross-tenant decision-case access was attempted and denied."""

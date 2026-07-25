@@ -43,11 +43,16 @@ from .repositories.assessment_repository import InMemoryAssessmentRepository
 from .repositories.assessment_workspace_repository import (
     InMemoryAssessmentWorkspaceRepository,
 )
+from .repositories.decision_case_repository import InMemoryDecisionCaseRepository
 from .services import (
     AssessmentCompletenessService,
     AssessmentService,
     AssessmentValidationService,
     AuditService,
+    CaseDecisionService,
+    CaseRecommendationService,
+    CaseValidationService,
+    DecisionCaseService,
     DecisionService,
     EvaluationService,
     EvidenceAccessService,
@@ -120,6 +125,12 @@ class HiringPlatform:
     assessment_validation_service: AssessmentValidationService
     assessment_completeness_service: AssessmentCompletenessService
     assessment_service: AssessmentService
+    # --- Phase 4A: DecisionCase aggregate & lifecycle ---
+    decision_case_repo: InMemoryDecisionCaseRepository
+    case_validation_service: CaseValidationService
+    decision_case_service: DecisionCaseService
+    case_recommendation_service: CaseRecommendationService
+    case_decision_service: CaseDecisionService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -156,6 +167,17 @@ class HiringPlatform:
         from .api.assessment_routes import AssessmentAPI
 
         return AssessmentAPI(self.assessment_service, self.identity_provider)
+
+    def build_decision_case_api(self):
+        """Construct the callable :class:`~ai_hiring.api.DecisionCaseAPI` facade."""
+        from .api.decision_case_routes import DecisionCaseAPI
+
+        return DecisionCaseAPI(
+            self.decision_case_service,
+            self.case_recommendation_service,
+            self.case_decision_service,
+            self.identity_provider,
+        )
 
 
 def build_in_memory_platform(
@@ -250,6 +272,19 @@ def build_in_memory_platform(
         evidence_access_policy,
     )
 
+    # Phase 4A: DecisionCase aggregate & lifecycle orchestration.
+    decision_case_repo = InMemoryDecisionCaseRepository()
+    case_validation_service = CaseValidationService(assessment_repo)
+    decision_case_service = DecisionCaseService(
+        decision_case_repo, case_validation_service, audit_service, identity,
+        evidence_access_policy)
+    case_recommendation_service = CaseRecommendationService(
+        decision_case_repo, case_validation_service, audit_service, identity,
+        evidence_access_policy)
+    case_decision_service = CaseDecisionService(
+        decision_case_repo, case_validation_service, audit_service, identity,
+        evidence_access_policy)
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -286,4 +321,9 @@ def build_in_memory_platform(
         assessment_validation_service=assessment_validation_service,
         assessment_completeness_service=assessment_completeness_service,
         assessment_service=assessment_service,
+        decision_case_repo=decision_case_repo,
+        case_validation_service=case_validation_service,
+        decision_case_service=decision_case_service,
+        case_recommendation_service=case_recommendation_service,
+        case_decision_service=case_decision_service,
     )

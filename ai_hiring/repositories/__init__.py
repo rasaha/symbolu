@@ -39,6 +39,9 @@ __all__ = [
     "InMemoryAssessmentWorkspaceRepository",
     "AssessmentRepository",
     "InMemoryAssessmentRepository",
+    # Phase 4A: DecisionCase aggregate & lifecycle
+    "DecisionCaseRepository",
+    "InMemoryDecisionCaseRepository",
 ]
 
 from .assessment_repository import (
@@ -48,4 +51,8 @@ from .assessment_repository import (
 from .assessment_workspace_repository import (
     AssessmentWorkspaceRepository,
     InMemoryAssessmentWorkspaceRepository,
+)
+from .decision_case_repository import (
+    DecisionCaseRepository,
+    InMemoryDecisionCaseRepository,
 )

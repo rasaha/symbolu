@@ -5,11 +5,12 @@
 **Phase 2.5 — Evidence Boundary Hardening:** complete; 107 tests.
 **Phase 3A — Capability Ontology & Rubric Contracts:** complete; 78 tests.
 **Phase 3B — Deterministic Assessment Runtime:** complete; 65 tests.
-**Total:** 358/358 module tests passing. No candidate evaluation, scoring
-algorithm, recommendation generation, ranking, or LLM inference has been
-introduced. Phase 3B executes the frozen constitution deterministically; it
-records externally supplied, non-AI observations and produces advisory-only
-assessment records.
+**Phase 4A — DecisionCase Aggregate & Lifecycle:** complete; 55 tests.
+**Total:** 413/413 module tests passing. No candidate evaluation, scoring
+algorithm, evidence-derived recommendation generation, ranking, action execution,
+CER construction, ActionGate invocation, or LLM inference has been introduced.
+Phase 4A links assessments, advisory recommendations, and binding decisions as
+distinct records and stops at `DECIDED`.
 
 ## Implemented
 
@@ -346,9 +347,90 @@ before any AI system is permitted to interpret evidence under it.
 - A criterion maps 1:1 to a capability (Phase-3A rubrics have no separate
   criterion concept); the contracts leave room for richer criteria later.
 
+## Next milestone (from Phase 3B)
+
+Phase 4A — DecisionCase Aggregate & Lifecycle — is now implemented (see below).
+An interpretation-under-governance phase (earlier sketched as "Phase 3C") remains
+future work and requires no contract changes to the runtime or the aggregate.
+
+---
+
+# Phase 4A — DecisionCase Aggregate & Lifecycle Orchestration
+
+The governed case container linking evidence, assessments, recommendations, human
+authority, and decisions as **distinct records with distinct authority**.
+
+## Implemented
+
+- [x] New `decision_cases/` package: immutable `DecisionCase` aggregate root
+      (versioned, append-only snapshots), `RecommendationRecord` (advisory,
+      `advisory_only: Literal[True]`), `DecisionRecord` (binding), `OverrideRecord`,
+      `ReviewTask`, `AuthorityContext`, `SubjectRef`/`VersionedRef`, lifecycle
+      transition table, and typed validation results.
+- [x] Deterministic vocabularies (`CaseStatus`, `OperatingMode`, `ProposedOutcome`,
+      `GeneratorType`, `RecommendationStatus`, `DecisionOutcome`, `AuthorityType`,
+      `EffectiveStatus`, `ReviewTaskType`, `ReviewTaskStatus`). `AuthorityType` has
+      no AI member.
+- [x] `DecisionCaseService` (create/version/link/assign-review/complete-review/
+      readiness/supersede/cancel/close), `CaseRecommendationService` (advisory
+      submit/reject — never converts to a decision), `CaseDecisionService`
+      (authority validation, binding decision, override — never executes),
+      `CaseValidationService` (typed structural validation).
+- [x] `InMemoryDecisionCaseRepository`: append-only case versions, immutable
+      recommendations/decisions/overrides, append-only review-task revisions,
+      supersession-chain retrieval.
+- [x] `api/decision_case_routes.py`: `DecisionCaseAPI` facade + optional FastAPI
+      router. **No** `execute_decision`/`send_to_actiongate`/`construct_cer`/
+      `rank_candidates`/`auto_hire`/`auto_reject` endpoint exists.
+- [x] Additive `AuditEventType` members (13); every material transition and denial
+      audited with the case correlation id.
+- [x] Docs: `docs/DECISION_CASE_AGGREGATE.md` with four Mermaid diagrams.
+- [x] 55 new tests across 6 files; full module suite 413/413 green.
+
+## Frozen files touched (additive only)
+
+- `domain/enums.py`: added 13 Phase-4A `AuditEventType` members.
+- `errors.py`: added the `DecisionCaseError` hierarchy (case/authority/readiness
+  typed errors).
+- `policies/evidence_access_policy.py`: added 11 case `Permission` members.
+- `services/__init__.py`, `repositories/__init__.py`, `__init__.py`: additive
+  exports + wiring + `build_decision_case_api`. No prior model, service, or test
+  changed; no existing contract semantics weakened.
+
+## Convention deviations from the prompt's file list
+
+- Phase 1 already ships `services/recommendation_service.py` and
+  `services/decision_service.py` (advisory `Recommendation` / binding `Decision`
+  tied to `CandidateWorkflow`). To avoid overwriting them, the Phase-4A services
+  are `case_recommendation_service.py` and `case_decision_service.py`, and the
+  Phase-4A records are `RecommendationRecord` / `DecisionRecord` in
+  `decision_cases/`. Nothing in Phase 1 was modified.
+
+## Baseline note
+
+- This module implements Phases 1, 2, 2.5, 3A, 3B, and 4A. The Phase-4A prompt
+  assumed a "Phase 3C" interpretation layer; that layer is not present in the
+  repository, so Phase 4A links the finalized advisory **Phase-3B** assessments
+  directly. This is recorded here rather than silently assumed.
+
+## Not implemented (explicitly out of scope for Phase 4A, by design)
+
+- [ ] Enterprise action execution; production CER construction; ActionGate
+      invocation; execution reconciliation; placeholder execution records.
+- [ ] Generating recommendations from evidence; reinterpreting evidence; ranking
+      or comparing candidates; replacing Phase 3B validation.
+- [ ] AI as a binding decision authority.
+
+## Known limitations
+
+- In-memory repositories; placeholder grant-based authorization.
+- Delegated-policy *bounds* are recorded and shape-validated (granting policy +
+  scope/limits) but not yet evaluated against a live policy engine.
+- Segregation of duties is enforced for the recommendation-author-vs-decider case;
+  richer multi-approval quorums are left for a later phase.
+
 ## Next milestone
 
-**Phase 3C — Interpretation under governance** (future): the first phase in which
-an AI system may interpret evidence, strictly under the constitution this runtime
-proved executable, behind the Phase-1 human-decision boundary and the governance
-middleware. Do not begin until all Phase 1, 2, 2.5, 3A, and 3B tests pass.
+**Phase 4B — Action requests & CER binding** (future): bind a recorded decision to
+a governed action request. Execution reconciliation is Phase 4C. Do not begin until
+all Phase 1, 2, 2.5, 3A, 3B, and 4A tests pass.

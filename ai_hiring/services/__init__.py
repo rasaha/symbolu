@@ -41,6 +41,11 @@ __all__ = [
     "AssessmentValidationService",
     "AssessmentCompletenessService",
     "AssessmentService",
+    # Phase 4A: DecisionCase aggregate & lifecycle
+    "DecisionCaseService",
+    "CaseRecommendationService",
+    "CaseDecisionService",
+    "CaseValidationService",
 ]
 
 from .ontology_service import OntologyService
@@ -50,3 +55,7 @@ from .assessment_completeness_service import AssessmentCompletenessService
 from .assessment_service import AssessmentService
 from .assessment_validation_service import AssessmentValidationService
 from .evidence_binding_service import EvidenceBindingService
+from .case_validation_service import CaseValidationService
+from .decision_case_service import DecisionCaseService
+from .case_recommendation_service import CaseRecommendationService
+from .case_decision_service import CaseDecisionService
