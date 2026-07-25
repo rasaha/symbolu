@@ -68,6 +68,11 @@ def _iter_py(*roots: str):
         for p in (REPO_ROOT / root).rglob("*.py"):
             if "__pycache__" in p.parts:
                 continue
+            # Boundary rules govern *implementation* code, not tests: test
+            # modules may legitimately import across layers (e.g. cross-domain
+            # conformance tests importing applications).
+            if "tests" in p.parts:
+                continue
             yield p
 
 
