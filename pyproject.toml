@@ -38,6 +38,8 @@ include = [
     "decision_governance*", "domains*", "applications*",
     # Phase 5F: application-layer governance-provider framework
     "governance_providers*",
+    # Phase 5G: ActionGate action-governance provider
+    "actiongate_provider*",
 ]
 
 [tool.pytest.ini_options]
