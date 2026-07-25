@@ -1,56 +1,9 @@
-"""Shared authorization + audit helpers for the Phase-4A case services.
+"""Extracted to the DGM kernel in Phase 5B.
 
-Repository access confers no authority: every case mutation authenticates the
-principal and consults the grant-based access policy. Denials are audited as
-``DECISION_CASE_ACCESS_DENIED`` and raise a typed error. Kept in one place so the
-three case services enforce it identically.
+Now lives in ``decision_governance.services._case_authz``; this shim aliases the historical
+``ai_hiring.services._case_authz`` path to the identical kernel module.
 """
-
 from __future__ import annotations
-
-from typing import Optional
-
-from ..domain.enums import ActorType, AuditEventType
-from ..errors import DecisionCaseAuthorizationError
-from ..policies.decision_boundary import IdentityProvider
-from ..policies.evidence_access_policy import (
-    AccessRequest,
-    EvidenceAccessPolicy,
-    Permission,
-)
-from .audit_service import AuditService
-
-
-def authorize_case_action(
-    identity_provider: IdentityProvider,
-    access_policy: EvidenceAccessPolicy,
-    audit_service: AuditService,
-    *,
-    actor: str,
-    permission: Permission,
-    tenant_id: str,
-    subject_id: Optional[str],
-    correlation_id: str,
-    entity_id: str,
-) -> ActorType:
-    """Authenticate + authorize a case action, auditing and raising on denial."""
-    identity = identity_provider.authenticate(actor)
-    denied: Optional[str] = None
-    if not identity.authenticated:
-        denied = "unauthenticated"
-    else:
-        decision = access_policy.authorize(AccessRequest(
-            principal_id=actor, tenant_id=tenant_id, operation=permission,
-            candidate_id=subject_id))
-        if not decision.allowed:
-            denied = decision.reason
-    if denied is not None:
-        audit_service.record(
-            event_type=AuditEventType.DECISION_CASE_ACCESS_DENIED,
-            entity_type="decision_case", entity_id=entity_id or (tenant_id or "unknown"),
-            actor_type=identity.actor_type, actor_id=actor,
-            correlation_id=correlation_id,
-            payload={"operation": permission.value, "reason": denied})
-        raise DecisionCaseAuthorizationError(
-            f"actor '{actor}' not authorized for {permission.value}: {denied}")
-    return identity.actor_type
+import sys as _sys
+from decision_governance.services import _case_authz as _kernel_module
+_sys.modules[__name__] = _kernel_module

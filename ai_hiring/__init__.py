@@ -46,6 +46,7 @@ from .repositories.assessment_workspace_repository import (
 from .repositories.decision_case_repository import InMemoryDecisionCaseRepository
 from .repositories.action_request_repository import InMemoryActionRequestRepository
 from .repositories.execution_repository import InMemoryExecutionRepository
+from .adapters.linked_records import HiringAssessmentLinkedRecordAdapter
 from .action_requests.control_plane import (
     ActionControlPlanePort,
     OfflineDeterministicControlPlane,
@@ -327,8 +328,11 @@ def build_in_memory_platform(
     )
 
     # Phase 4A: DecisionCase aggregate & lifecycle orchestration.
+    # Phase 5B: the kernel validator sees assessments only through the neutral
+    # LinkedRecordPort, supplied here by a hiring adapter.
     decision_case_repo = InMemoryDecisionCaseRepository()
-    case_validation_service = CaseValidationService(assessment_repo)
+    assessment_linked_record_adapter = HiringAssessmentLinkedRecordAdapter(assessment_repo)
+    case_validation_service = CaseValidationService(assessment_linked_record_adapter)
     decision_case_service = DecisionCaseService(
         decision_case_repo, case_validation_service, audit_service, identity,
         evidence_access_policy)

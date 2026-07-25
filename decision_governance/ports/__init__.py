@@ -15,8 +15,18 @@ from __future__ import annotations
 
 from ..actions.control_plane import ActionControlPlanePort
 from ..execution.external_system import ExternalExecutionPort
+from .linked_record import (
+    BLOCKED_METADATA_KEY,
+    FINALIZED_STATUS,
+    LinkedRecordPort,
+    LinkedRecordSnapshot,
+)
 
 __all__ = [
     "ActionControlPlanePort",
     "ExternalExecutionPort",
+    "LinkedRecordPort",
+    "LinkedRecordSnapshot",
+    "FINALIZED_STATUS",
+    "BLOCKED_METADATA_KEY",
 ]

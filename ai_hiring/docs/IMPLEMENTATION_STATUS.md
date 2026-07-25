@@ -9,11 +9,16 @@
 **Phase 4B — Governed Action Request & CER Binding:** complete; 52 tests.
 **Phase 4C — External Execution & Reconciliation:** complete; 52 tests.
 **Phase 5A — DGM Kernel Extraction:** complete; 11 extraction tests. The
-domain-neutral governance kernel was extracted to `decision_governance/`; AI
-Hiring now consumes it via identity-preserving shims (see
-`docs/Decision_Governance_Kernel.md` at the repo root). No runtime behavior,
-hash, serialization, or lifecycle changed.
-**Total:** 528/528 module tests passing. No candidate evaluation, scoring
+domain-neutral governance kernel (contracts, foundation, vocabulary, ports) was
+extracted to `decision_governance/`; AI Hiring consumes it via identity-preserving
+shims (see `docs/Decision_Governance_Kernel.md`).
+**Phase 5B — Operational DGM Kernel Extraction:** complete; 6 operational tests.
+Services, repositories, audit, identity, and policy moved into the kernel behind
+domain-neutral ports (`LinkedRecordPort` decouples assessment linkage); the full
+governance lifecycle runs with no hiring imports (see
+`docs/OPERATIONAL_DGM_KERNEL_EXTRACTION.md`). No behavior, hash, serialization,
+lifecycle, error, or audit change.
+**Total:** 534/534 module tests passing. No candidate evaluation, scoring
 algorithm, evidence-derived recommendation generation, ranking, or LLM inference
 has been introduced. Phase 4C dispatches through a provider-neutral port and
 records *observed* outcomes; it never conflates authorization, dispatch,
