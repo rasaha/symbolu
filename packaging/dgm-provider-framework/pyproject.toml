@@ -1,0 +1,33 @@
+# Independent PRIVATE distribution for the DGM Governance Provider Framework.
+#
+# ./governance_providers is a SYMLINK to the canonical ../../governance_providers
+# package — one source tree, packaged directly (no kernel or framework copy).
+# It DEPENDS ON the independent decision-governance distribution rather than
+# owning any kernel files.
+#
+# Build with:  python -m build packaging/dgm-provider-framework
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-provider-framework"
+dynamic = ["version"]
+description = "Governance Provider Framework for the Decision Governance Middleware."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+# Depends on the independent DGM distribution — never bundles a copy of it.
+dependencies = ["decision-governance==1.0.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "governance_providers.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["governance_providers*"]
+exclude = ["governance_providers.tests", "governance_providers.tests.*"]
