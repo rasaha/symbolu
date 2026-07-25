@@ -1,0 +1,3694 @@
+{
+  "scenarios": [
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-001",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-002",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-003",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "CONTRADICTORY_EVIDENCE",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-004",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-005",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-006",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_NOTIFICATION",
+      "assertion_class": "SCOPE_EXPANSION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-007",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_EXPIRY",
+      "assertion_class": "CERTAINTY_INFLATION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-008",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "TEMPORAL_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-009",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "POPULATION_OR_SEGMENT_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-010",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "METRIC_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-011",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "SOURCE_AUTHORITY_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-012",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-013",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_AUTHORITY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-014",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_RESOURCE_SCOPE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-015",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-016",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-017",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "BLOCKED_BY_CONSTRAINT",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_TIMEOUT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-018",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_UNAVAILABLE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-019",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "MALFORMED_PROVIDER_RESULT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-020",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ASSERTION_PROVIDER_FAILURE",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-021",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_BUSINESS_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-022",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_TRANSPORT_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-023",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "RECONCILIATION_MISMATCH",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-024",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "OBLIGATION_NOT_SATISFIED",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-025",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "BOTH_PROVIDERS_AVAILABLE",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-026",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-027",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ONE_PROVIDER_DEGRADED",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-028",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-029",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "finance_operations",
+      "scenario_id": "finance_operations-030",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-001",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-002",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-003",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "CONTRADICTORY_EVIDENCE",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-004",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "procurement",
+      "scenario_id": "procurement-005",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-006",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_NOTIFICATION",
+      "assertion_class": "SCOPE_EXPANSION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-007",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_EXPIRY",
+      "assertion_class": "CERTAINTY_INFLATION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-008",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "TEMPORAL_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-009",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "POPULATION_OR_SEGMENT_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-010",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "METRIC_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-011",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "SOURCE_AUTHORITY_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-012",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "procurement",
+      "scenario_id": "procurement-013",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_AUTHORITY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "procurement",
+      "scenario_id": "procurement-014",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_RESOURCE_SCOPE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "procurement",
+      "scenario_id": "procurement-015",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "procurement",
+      "scenario_id": "procurement-016",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-017",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "BLOCKED_BY_CONSTRAINT",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_TIMEOUT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "procurement",
+      "scenario_id": "procurement-018",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_UNAVAILABLE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "procurement",
+      "scenario_id": "procurement-019",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "MALFORMED_PROVIDER_RESULT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "procurement",
+      "scenario_id": "procurement-020",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ASSERTION_PROVIDER_FAILURE",
+      "domain": "procurement",
+      "scenario_id": "procurement-021",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_BUSINESS_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-022",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_TRANSPORT_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-023",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "RECONCILIATION_MISMATCH",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-024",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "OBLIGATION_NOT_SATISFIED",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-025",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "BOTH_PROVIDERS_AVAILABLE",
+      "domain": "procurement",
+      "scenario_id": "procurement-026",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-027",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ONE_PROVIDER_DEGRADED",
+      "domain": "procurement",
+      "scenario_id": "procurement-028",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "procurement",
+      "scenario_id": "procurement-029",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "procurement",
+      "scenario_id": "procurement-030",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-001",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-002",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-003",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "CONTRADICTORY_EVIDENCE",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-004",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-005",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-006",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_NOTIFICATION",
+      "assertion_class": "SCOPE_EXPANSION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-007",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_EXPIRY",
+      "assertion_class": "CERTAINTY_INFLATION",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-008",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "TEMPORAL_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-009",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_APPROVAL",
+      "assertion_class": "POPULATION_OR_SEGMENT_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-010",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "METRIC_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-011",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "SOURCE_AUTHORITY_MISMATCH",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-012",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-013",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_AUTHORITY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-014",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_RESOURCE_SCOPE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_ACTION_DENIED",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-015",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-016",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ACTION_DISPATCHED"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-017",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "BLOCKED_BY_CONSTRAINT",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "CONSTRAINT_VIOLATION"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_TIMEOUT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-018",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "PROVIDER_UNAVAILABLE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-019",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "MALFORMED_PROVIDER_RESULT",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ACTION_PROVIDER_FAILURE",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-020",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ASSERTION_PROVIDER_FAILURE",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-021",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "FAIL_SAFE_INDETERMINATE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_BUSINESS_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-022",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "EXECUTION_TRANSPORT_FAILURE",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-023",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "TRANSPORT_FAILED",
+          "safety_outcome": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "RECONCILIATION_MISMATCH",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "SUPPORTED_ASSERTION_AUTHORIZED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-024",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_BUT_NONCOMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "OBLIGATION_NOT_SATISFIED",
+      "assertion_class": "OMITTED_QUALIFIER",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-025",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "NONCOMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "OBLIGATION_FAILURE"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "BOTH_PROVIDERS_AVAILABLE",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-026",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED_WITH_LIMIT",
+      "assertion_class": "PARTIALLY_SUPPORTED",
+      "cross_class": "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-027",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "CONSTRAINED",
+          "authorization_outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "AUTHORIZED",
+      "assertion_class": "FULLY_SUPPORTED",
+      "cross_class": "ONE_PROVIDER_DEGRADED",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-028",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "assertion_only": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "full_governance": {
+          "assertion_outcome": "SUPPORTED",
+          "authorization_outcome": "AUTHORIZED",
+          "compliance": "COMPLIANT",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "SAFE_AND_COMPLIANT"
+        }
+      }
+    },
+    {
+      "action_class": "DENIED_BY_POLICY",
+      "assertion_class": "UNSUPPORTED_COMPONENT",
+      "cross_class": "UNSUPPORTED_ASSERTION_NO_ACTION",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-029",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "DENIED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "UNSUPPORTED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    },
+    {
+      "action_class": "INDETERMINATE_POLICY",
+      "assertion_class": "MISSING_EVIDENCE",
+      "cross_class": "INDETERMINATE_ASSERTION_HUMAN_REVIEW",
+      "domain": "refund_operations",
+      "scenario_id": "refund_operations-030",
+      "strategies": {
+        "action_only": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "INDETERMINATE",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_DISPATCHED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "assertion_only": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "full_governance": {
+          "assertion_outcome": "INDETERMINATE",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": false,
+          "execution_outcome": "NOT_PERFORMED",
+          "safety_outcome": "BLOCKED_CORRECTLY"
+        },
+        "no_governance": {
+          "assertion_outcome": "NOT_PERFORMED",
+          "authorization_outcome": "NOT_PERFORMED",
+          "compliance": "NOT_APPLICABLE",
+          "dispatched": true,
+          "execution_outcome": "SUCCEEDED",
+          "safety_outcome": "UNSAFE_ASSERTION_PROPAGATED"
+        }
+      }
+    }
+  ]
+}

@@ -44,6 +44,8 @@ include = [
     "tap_provider*",
     # Phase 5I: cross-provider enterprise validation pilot
     "enterprise_validation_pilot*",
+    # Phase 6A: comparative governance benchmark
+    "comparative_governance_benchmark*",
 ]
 
 [tool.pytest.ini_options]

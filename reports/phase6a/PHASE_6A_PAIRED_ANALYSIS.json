@@ -1,0 +1,79 @@
+{
+  "paired": {
+    "action_only_vs_no_governance": {
+      "action_only_unsafe": 6,
+      "bootstrap_ci_mean_unsafe_reduction": {
+        "ci95_high": 0.3222,
+        "ci95_low": 0.1444,
+        "iters": 1000,
+        "mean": 0.2333,
+        "seed": 12345
+      },
+      "net_unsafe_reduction": 21,
+      "no_governance_unsafe": 27,
+      "scenarios": 90,
+      "unsafe_introduced_by_first": 0,
+      "unsafe_prevented_by_first": 21
+    },
+    "assertion_only_vs_no_governance": {
+      "assertion_only_unsafe": 15,
+      "bootstrap_ci_mean_unsafe_reduction": {
+        "ci95_high": 0.2111,
+        "ci95_low": 0.0667,
+        "iters": 1000,
+        "mean": 0.1333,
+        "seed": 12345
+      },
+      "net_unsafe_reduction": 12,
+      "no_governance_unsafe": 27,
+      "scenarios": 90,
+      "unsafe_introduced_by_first": 0,
+      "unsafe_prevented_by_first": 12
+    },
+    "full_governance_vs_action_only": {
+      "action_only_unsafe": 6,
+      "bootstrap_ci_mean_unsafe_reduction": {
+        "ci95_high": 0.1222,
+        "ci95_low": 0.0222,
+        "iters": 1000,
+        "mean": 0.0667,
+        "seed": 12345
+      },
+      "full_governance_unsafe": 0,
+      "net_unsafe_reduction": 6,
+      "scenarios": 90,
+      "unsafe_introduced_by_first": 0,
+      "unsafe_prevented_by_first": 6
+    },
+    "full_governance_vs_assertion_only": {
+      "assertion_only_unsafe": 15,
+      "bootstrap_ci_mean_unsafe_reduction": {
+        "ci95_high": 0.2444,
+        "ci95_low": 0.0889,
+        "iters": 1000,
+        "mean": 0.1667,
+        "seed": 12345
+      },
+      "full_governance_unsafe": 0,
+      "net_unsafe_reduction": 15,
+      "scenarios": 90,
+      "unsafe_introduced_by_first": 0,
+      "unsafe_prevented_by_first": 15
+    },
+    "full_governance_vs_no_governance": {
+      "bootstrap_ci_mean_unsafe_reduction": {
+        "ci95_high": 0.3889,
+        "ci95_low": 0.2111,
+        "iters": 1000,
+        "mean": 0.3,
+        "seed": 12345
+      },
+      "full_governance_unsafe": 0,
+      "net_unsafe_reduction": 27,
+      "no_governance_unsafe": 27,
+      "scenarios": 90,
+      "unsafe_introduced_by_first": 0,
+      "unsafe_prevented_by_first": 27
+    }
+  }
+}

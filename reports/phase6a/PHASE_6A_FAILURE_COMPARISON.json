@@ -1,0 +1,604 @@
+{
+  "failure_matrix": {
+    "ACTIONGATE_MALFORMED_RESULT": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 12.0,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 90,
+        "unsafe": 3
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 12.4,
+        "avg_trace_links": 5.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_TIMEOUT": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 12.0,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 90,
+        "unsafe": 3
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 12.4,
+        "avg_trace_links": 5.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_UNAVAILABLE": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 12.0,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 90,
+        "unsafe": 3
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 12.4,
+        "avg_trace_links": 5.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "EXECUTION_BUSINESS_REJECTION": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 17.85,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 60,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 60,
+        "unsafe": 6
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.4,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 15
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 18.4118,
+        "avg_trace_links": 5.9412,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 51,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 12,
+        "scenarios": 51,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": true,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 0,
+        "scenarios": 90,
+        "unsafe": 27
+      }
+    },
+    "EXECUTION_TIMEOUT": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 15.0,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 60,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 60,
+        "unsafe": 6
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.4,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 15
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 15.5882,
+        "avg_trace_links": 5.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 51,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 12,
+        "scenarios": 51,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": true,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 0,
+        "scenarios": 90,
+        "unsafe": 27
+      }
+    },
+    "EXECUTION_UNAVAILABLE": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 15.0,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 60,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 60,
+        "unsafe": 6
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.4,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 75,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 75,
+        "unsafe": 15
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 15.5882,
+        "avg_trace_links": 5.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 51,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 12,
+        "scenarios": 51,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": true,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 0,
+        "scenarios": 90,
+        "unsafe": 27
+      }
+    },
+    "MISSING_OBLIGATION_EVIDENCE": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 14.3333,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 9,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 9,
+        "unsafe": 6
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 15.3333,
+        "avg_trace_links": 5.3333,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 9,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 9,
+        "unsafe": 6
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "RECONCILIATION_MISMATCH": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 18.8,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 60,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 9,
+        "scenarios": 60,
+        "unsafe": 6
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 19.3529,
+        "avg_trace_links": 5.9412,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 51,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 12,
+        "scenarios": 51,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "REGISTRY_RESOLUTION_FAILURE": {
+      "action_only": {
+        "applicable": true,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 0,
+        "scenarios": 90,
+        "unsafe": 54
+      },
+      "assertion_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 14.9,
+        "avg_trace_links": 6.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 12,
+        "scenarios": 90,
+        "unsafe": 51
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "TAP_MALFORMED_RESULT": {
+      "action_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.9667,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 5.4667,
+        "avg_trace_links": 4.0667,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "TAP_TIMEOUT": {
+      "action_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.9667,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 5.4667,
+        "avg_trace_links": 4.0667,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    },
+    "TAP_UNAVAILABLE": {
+      "action_only": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      },
+      "assertion_only": {
+        "applicable": true,
+        "avg_audit_events": 4.9667,
+        "avg_trace_links": 4.0,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "full_governance": {
+        "applicable": true,
+        "avg_audit_events": 5.4667,
+        "avg_trace_links": 4.0667,
+        "fail_open": 0,
+        "fail_open_rate": 0.0,
+        "fail_safe": 90,
+        "fail_safe_rate": 1.0,
+        "human_reviews": 3,
+        "scenarios": 90,
+        "unsafe": 0
+      },
+      "no_governance": {
+        "applicable": false,
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "fail_open": 0,
+        "fail_open_rate": null,
+        "fail_safe": 0,
+        "fail_safe_rate": null,
+        "human_reviews": 0,
+        "scenarios": 0,
+        "unsafe": 0
+      }
+    }
+  }
+}
