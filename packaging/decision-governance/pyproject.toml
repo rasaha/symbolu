@@ -1,0 +1,31 @@
+# Independent distribution for the Decision Governance Middleware kernel.
+#
+# The ./decision_governance entry is a SYMLINK to the canonical
+# ../../decision_governance package — there is exactly one source tree; this
+# distribution packages it directly (no copy is maintained).
+#
+# Build with:  python -m build packaging/decision-governance
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "decision-governance"
+dynamic = ["version"]
+description = "Decision Governance Middleware (DGM) — domain-neutral governance kernel."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = ["pydantic>=2.0.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "decision_governance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["decision_governance*"]
+exclude = ["decision_governance.tests", "decision_governance.tests.*"]

@@ -1,0 +1,16 @@
+# A minimal THIRD-PARTY consumer of the decision-governance distribution.
+# It lives outside the kernel and depends only on the published distribution,
+# proving DGM is consumable as a real dependency (not via the monorepo tree).
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "external-consumer"
+version = "0.0.1"
+description = "Proof-of-consumption fixture for the decision-governance kernel."
+requires-python = ">=3.10"
+dependencies = ["decision-governance==1.0.0"]
+
+[tool.setuptools]
+py-modules = ["consumer"]
