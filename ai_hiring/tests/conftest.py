@@ -352,3 +352,88 @@ def finalized_assessment(platform, *, subject_id: str = SUBJECT,
         supplied_by=ASSESSOR, evidence_binding_ids=(binding.binding_id,))
     return platform.assessment_service.finalize_assessment(
         workspace_id=ws.workspace_id, actor=ASSESSOR)
+
+
+# --------------------------------------------------------------------------
+# Phase 4B action-request helpers
+# --------------------------------------------------------------------------
+from ai_hiring.action_requests import ActionMapping, ActionMappingStatus, ParameterSchema
+from ai_hiring.decision_cases import (
+    AuthorityContext as _AuthorityContext,
+    AuthorityType as _AuthorityType,
+    DecisionOutcome as _DecisionOutcome,
+)
+from ai_hiring.ontology.taxonomy import ReasonCode as _ReasonCode
+
+#: Phase-4B actors.
+OPS = "ops-1"
+MAPPING_ADMIN = "mapping-admin"
+
+
+@pytest.fixture
+def action_identity_provider() -> StaticIdentityProvider:
+    idp = StaticIdentityProvider()
+    for human in (AUTHOR, APPROVER, PUBLISHER, ASSESSOR, REVIEWER, DECISION_MAKER,
+                  OPS, MAPPING_ADMIN, "approver-2"):
+        idp.register_human(human)
+    idp.register_ai(AI_ACTOR)
+    idp.register_service("svc-import")
+    idp.register_service(POLICY_ENGINE)
+    return idp
+
+
+@pytest.fixture
+def action_platform(action_identity_provider):
+    """A platform where the action actors hold every permission in TENANT."""
+    platform = build_in_memory_platform(action_identity_provider)
+    for actor in (ASSESSOR, REVIEWER, DECISION_MAKER, POLICY_ENGINE, OPS,
+                  MAPPING_ADMIN, "approver-2"):
+        platform.access_grants.add(AccessGrant(actor, TENANT, frozenset(Permission)))
+    return platform
+
+
+def make_action_mapping(
+    *,
+    mapping_id: str = "map.advance",
+    version: int = 1,
+    decision_type: str = "hire",
+    decision_outcome=_DecisionOutcome.ADVANCE,
+    action_type: str = "ADVANCE_WORKFLOW_STAGE",
+    target_system_type: str = "ATS",
+    required_fields=("stage",),
+    optional_fields=("note",),
+    prohibited_fields=("salary",),
+    required_context_fields=("subject", "authority"),
+) -> ActionMapping:
+    return ActionMapping(
+        mapping_id=mapping_id, version=version, domain_id="hiring",
+        decision_type=decision_type, decision_outcome=decision_outcome,
+        permitted_action_type=action_type, target_system_type=target_system_type,
+        parameter_schema=ParameterSchema(required_fields=required_fields,
+                                         optional_fields=optional_fields),
+        required_context_fields=required_context_fields,
+        prohibited_fields=prohibited_fields)
+
+
+def decided_case(platform, *, outcome=_DecisionOutcome.ADVANCE, subject_id: str = SUBJECT,
+                 tenant_id: str = TENANT):
+    """Build a finalized assessment + a DECIDED DecisionCase; return its DecisionRecord."""
+    assessment = finalized_assessment(platform, subject_id=subject_id, tenant_id=tenant_id)
+    case = platform.decision_case_service.create_case(
+        tenant_id=tenant_id, decision_type="hire", subject_ids=(subject_id,),
+        created_by=ASSESSOR)
+    platform.decision_case_service.link_assessment(
+        case_id=case.decision_case_id, assessment_id=assessment.assessment_id,
+        version=assessment.version, actor=ASSESSOR)
+    authority = _AuthorityContext(
+        authority_id=DECISION_MAKER, authority_type=_AuthorityType.HUMAN_APPROVER,
+        decision_scope="hire")
+    decision = platform.case_decision_service.record_decision(
+        case_id=case.decision_case_id, outcome=outcome, authority=authority,
+        decided_by=DECISION_MAKER, reason_codes=(_ReasonCode.NOT_APPLICABLE,))
+    return case, decision
+
+
+def published_mapping(platform, **kw) -> ActionMapping:
+    return platform.action_request_service.publish_action_mapping(
+        make_action_mapping(**kw), actor=MAPPING_ADMIN, tenant_id=TENANT)

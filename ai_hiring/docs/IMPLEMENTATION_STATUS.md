@@ -6,11 +6,12 @@
 **Phase 3A — Capability Ontology & Rubric Contracts:** complete; 78 tests.
 **Phase 3B — Deterministic Assessment Runtime:** complete; 65 tests.
 **Phase 4A — DecisionCase Aggregate & Lifecycle:** complete; 55 tests.
-**Total:** 413/413 module tests passing. No candidate evaluation, scoring
-algorithm, evidence-derived recommendation generation, ranking, action execution,
-CER construction, ActionGate invocation, or LLM inference has been introduced.
-Phase 4A links assessments, advisory recommendations, and binding decisions as
-distinct records and stops at `DECIDED`.
+**Phase 4B — Governed Action Request & CER Binding:** complete; 52 tests.
+**Total:** 465/465 module tests passing. No candidate evaluation, scoring
+algorithm, evidence-derived recommendation generation, ranking, LLM inference,
+action execution, execution records, downstream system calls, or ActionGate
+invocation has been introduced. Phase 4B prepares and authorizes governed action
+requests and stops at an authorization outcome — authorized is not executed.
 
 ## Implemented
 
@@ -429,8 +430,89 @@ authority, and decisions as **distinct records with distinct authority**.
 - Segregation of duties is enforced for the recommendation-author-vs-decider case;
   richer multi-approval quorums are left for a later phase.
 
+## Next milestone (from Phase 4A)
+
+Phase 4B — Governed Action Request & CER Binding — is now implemented (see below).
+
+---
+
+# Phase 4B — Governed Action Request & CER Binding
+
+Converts an authorized ``DecisionRecord`` into a governed action request, binds the
+minimum runtime context as a CER, and submits it through a provider-neutral
+control-plane port for authorization. It prepares and authorizes; it never executes.
+
+## Implemented
+
+- [x] New `action_requests/` package: immutable `ActionRequest` (append-only
+      version chain; pins mapping + decision-case versions), versioned/immutable
+      `ActionMapping` (+ `ParameterSchema`), `ContextEnvelopeRecord` (+ typed
+      sub-contexts), immutable `ActionAuthorizationResponse`, the
+      `ActionControlPlanePort` protocol + `OfflineDeterministicControlPlane`
+      adapter, lifecycle transition table, and typed validation results.
+- [x] Deterministic vocabularies (`ActionRequestStatus`, `AuthorizationOutcome`,
+      `ActionMappingStatus`). There is **no** `EXECUTED`/`SUCCEEDED` status.
+- [x] `ActionRequestService` (create from effective decision, select + pin the
+      published mapping, validate parameters, lifecycle, cancellation,
+      supersession, idempotency), `CERBindingService` (minimum-necessary CER,
+      prohibited-field exclusion, hashing/versioning), `ActionAuthorizationService`
+      (submit via the port, record attempts + responses, apply outcome),
+      `ActionRequestValidationService` (typed structural readiness).
+- [x] `InMemoryActionRequestRepository`: append-only request versions, immutable
+      CERs and authorization responses (stored separately), idempotency-key
+      lookup, deterministic history.
+- [x] `api/action_request_routes.py`: `ActionRequestAPI` facade + optional FastAPI
+      router. **No** `execute_action`/`apply_action`/`send_offer`/`update_ats`/
+      `create_purchase_order`/`invoke_actiongate_directly`/`record_execution_success`
+      endpoint exists.
+- [x] Additive `AuditEventType` members (15); every material transition and denial
+      audited (hashes/references only, never credentials or raw evidence).
+- [x] Docs: `docs/GOVERNED_ACTION_REQUEST_AND_CER.md` with four Mermaid diagrams.
+- [x] 52 new tests across 5 files (all offline, deterministic control plane); full
+      module suite 465/465 green.
+
+## Frozen files touched (additive only)
+
+- `domain/enums.py`: added 15 Phase-4B `AuditEventType` members.
+- `errors.py`: added the `ActionRequestError` hierarchy (~20 typed errors).
+- `policies/evidence_access_policy.py`: added 9 action-request `Permission` members.
+- `services/__init__.py`, `repositories/__init__.py`, `__init__.py`: additive
+  exports + wiring + `build_action_request_api`. No prior model, service, or test
+  changed; Phase 4A authority/lifecycle validation was not weakened.
+
+## Control-plane boundary
+
+- The domain depends only on `ActionControlPlanePort`; no concrete ActionGate SDK
+  is imported anywhere. The offline deterministic adapter classifies by action
+  type / CER expiry with no randomness or network, so the whole suite runs offline.
+- Provider errors and malformed/mismatched responses are rejected, never coerced
+  into an approval. `DENIED`, `INDETERMINATE`, and `EXPIRED` are strictly distinct
+  from an approval, and no response mutates the underlying decision.
+
+## Not implemented (explicitly out of scope for Phase 4B, by design)
+
+- [ ] Executing enterprise actions or calling downstream business systems.
+- [ ] Creating an `ExecutionRecord` or reconciling downstream outcomes.
+- [ ] Invoking a concrete ActionGate implementation from the domain layer.
+- [ ] Treating decision creation as execution permission, or authorization as a
+      successful execution.
+- [ ] Reinterpreting evidence, generating assessments/recommendations, ranking
+      candidates, or mutating the decision.
+
+## Known limitations
+
+- In-memory repositories; a single offline deterministic control-plane adapter.
+- Mapping selection is by explicit `mapping_id` (version pinned at creation); a
+  registry keyed purely on `(decision_type, outcome)` is left for later.
+- CER `required_controls` are carried from the mapping's declared context fields
+  but not yet evaluated against a live control catalog; delegated-policy and
+  jurisdiction fields are preserved but not evaluated against a policy engine.
+
 ## Next milestone
 
-**Phase 4B — Action requests & CER binding** (future): bind a recorded decision to
-a governed action request. Execution reconciliation is Phase 4C. Do not begin until
-all Phase 1, 2, 2.5, 3A, 3B, and 4A tests pass.
+**Phase 4C — Execution & reconciliation** (future): take an authorized
+`ActionRequest` to an external execution adapter, record an `ExecutionRecord`, and
+reconcile the outcome. It preserves the distinction among *decision recorded →
+action requested → action authorized → execution attempted → execution
+succeeded/failed → outcome reconciled*. Do not begin until all Phase 1–4B tests
+pass.

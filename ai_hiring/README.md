@@ -300,13 +300,37 @@ See [`docs/DECISION_CASE_AGGREGATE.md`](docs/DECISION_CASE_AGGREGATE.md).
 > production CERs, invoke the ActionGate, reconcile execution, generate
 > recommendations from evidence, reinterpret evidence, or rank candidates.
 
+## Phase 4B — Governed Action Request & CER Binding (implemented)
+
+Converts an authorized ``DecisionRecord`` into a **governed action request**, binds
+the minimum runtime context as a **Context Envelope Record (CER)**, and submits it
+through a provider-neutral control-plane port for authorization. New package
+`action_requests/` (immutable `ActionRequest`, versioned `ActionMapping`,
+`ContextEnvelopeRecord`, `ActionAuthorizationResponse`, `ActionControlPlanePort` +
+an offline deterministic adapter, lifecycle, validation), plus
+`services/{action_request,cer_binding,action_authorization,action_request_validation}_service.py`,
+`repositories/action_request_repository.py`, and the `api/action_request_routes.py`
+facade. See
+[`docs/GOVERNED_ACTION_REQUEST_AND_CER.md`](docs/GOVERNED_ACTION_REQUEST_AND_CER.md).
+
+> **Prepares and authorizes — never executes.** Decision Governance establishes
+> *why* an action is authorized by an enterprise decision; the AI Control Plane
+> determines *whether* it may execute under runtime controls. Phase 4B binds the
+> two and stops at an authorization outcome (`AUTHORIZED` / `…_WITH_CONSTRAINTS` /
+> `DENIED` / `INDETERMINATE` / `EXPIRED`). It does **not** execute enterprise
+> actions, call downstream systems, create execution records, reconcile outcomes,
+> invoke a concrete ActionGate, rank candidates, or reinterpret evidence. There is
+> no `EXECUTED`/`SUCCEEDED` status and no execution endpoint.
+
 ## Next milestone
 
-**Phase 4B — Action requests & CER binding** (future): turn a recorded decision
-into a bound, governed action request. It does not execute — execution
-reconciliation is Phase 4C. Do not begin until all Phase 1, 2, 2.5, 3A, 3B, and 4A
-tests pass. See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+**Phase 4C — Execution & reconciliation** (future): take an authorized
+`ActionRequest` to an external execution adapter, record an `ExecutionRecord`, and
+reconcile the outcome (mismatch, failure, compensation, or closure). It preserves
+the distinction among *decision recorded → action requested → action authorized →
+execution attempted → execution succeeded/failed → outcome reconciled*. Do not
+begin until all Phase 1–4B tests pass. See
+[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
-*(Note: an interpretation-under-governance phase — earlier sketched as "Phase 3C"
-— remains future work; the assessment runtime and the decision aggregate are both
-designed to admit it without contract changes.)*
+*(An interpretation-under-governance phase — earlier sketched as "Phase 3C" —
+remains future work and requires no contract changes to the phases below it.)*

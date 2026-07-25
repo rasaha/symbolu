@@ -42,6 +42,9 @@ __all__ = [
     # Phase 4A: DecisionCase aggregate & lifecycle
     "DecisionCaseRepository",
     "InMemoryDecisionCaseRepository",
+    # Phase 4B: governed action request & CER binding
+    "ActionRequestRepository",
+    "InMemoryActionRequestRepository",
 ]
 
 from .assessment_repository import (
@@ -55,4 +58,8 @@ from .assessment_workspace_repository import (
 from .decision_case_repository import (
     DecisionCaseRepository,
     InMemoryDecisionCaseRepository,
+)
+from .action_request_repository import (
+    ActionRequestRepository,
+    InMemoryActionRequestRepository,
 )

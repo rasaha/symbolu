@@ -44,7 +44,15 @@ from .repositories.assessment_workspace_repository import (
     InMemoryAssessmentWorkspaceRepository,
 )
 from .repositories.decision_case_repository import InMemoryDecisionCaseRepository
+from .repositories.action_request_repository import InMemoryActionRequestRepository
+from .action_requests.control_plane import (
+    ActionControlPlanePort,
+    OfflineDeterministicControlPlane,
+)
 from .services import (
+    ActionAuthorizationService,
+    ActionRequestService,
+    ActionRequestValidationService,
     AssessmentCompletenessService,
     AssessmentService,
     AssessmentValidationService,
@@ -52,6 +60,7 @@ from .services import (
     CaseDecisionService,
     CaseRecommendationService,
     CaseValidationService,
+    CERBindingService,
     DecisionCaseService,
     DecisionService,
     EvaluationService,
@@ -131,6 +140,13 @@ class HiringPlatform:
     decision_case_service: DecisionCaseService
     case_recommendation_service: CaseRecommendationService
     case_decision_service: CaseDecisionService
+    # --- Phase 4B: governed action request & CER binding ---
+    action_request_repo: InMemoryActionRequestRepository
+    control_plane: ActionControlPlanePort
+    action_request_validation_service: ActionRequestValidationService
+    action_request_service: ActionRequestService
+    cer_binding_service: CERBindingService
+    action_authorization_service: ActionAuthorizationService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -176,6 +192,17 @@ class HiringPlatform:
             self.decision_case_service,
             self.case_recommendation_service,
             self.case_decision_service,
+            self.identity_provider,
+        )
+
+    def build_action_request_api(self):
+        """Construct the callable :class:`~ai_hiring.api.ActionRequestAPI` facade."""
+        from .api.action_request_routes import ActionRequestAPI
+
+        return ActionRequestAPI(
+            self.action_request_service,
+            self.cer_binding_service,
+            self.action_authorization_service,
             self.identity_provider,
         )
 
@@ -285,6 +312,21 @@ def build_in_memory_platform(
         decision_case_repo, case_validation_service, audit_service, identity,
         evidence_access_policy)
 
+    # Phase 4B: governed action request & CER binding.
+    action_request_repo = InMemoryActionRequestRepository()
+    control_plane = OfflineDeterministicControlPlane()
+    action_request_validation_service = ActionRequestValidationService(
+        action_request_repo, decision_case_repo)
+    action_request_service = ActionRequestService(
+        action_request_repo, decision_case_repo, action_request_validation_service,
+        audit_service, identity, evidence_access_policy)
+    cer_binding_service = CERBindingService(
+        action_request_repo, decision_case_repo, audit_service, identity,
+        evidence_access_policy)
+    action_authorization_service = ActionAuthorizationService(
+        action_request_repo, control_plane, audit_service, identity,
+        evidence_access_policy)
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -326,4 +368,10 @@ def build_in_memory_platform(
         decision_case_service=decision_case_service,
         case_recommendation_service=case_recommendation_service,
         case_decision_service=case_decision_service,
+        action_request_repo=action_request_repo,
+        control_plane=control_plane,
+        action_request_validation_service=action_request_validation_service,
+        action_request_service=action_request_service,
+        cer_binding_service=cer_binding_service,
+        action_authorization_service=action_authorization_service,
     )

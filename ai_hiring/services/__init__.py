@@ -46,6 +46,11 @@ __all__ = [
     "CaseRecommendationService",
     "CaseDecisionService",
     "CaseValidationService",
+    # Phase 4B: governed action request & CER binding
+    "ActionRequestService",
+    "CERBindingService",
+    "ActionAuthorizationService",
+    "ActionRequestValidationService",
 ]
 
 from .ontology_service import OntologyService
@@ -59,3 +64,7 @@ from .case_validation_service import CaseValidationService
 from .decision_case_service import DecisionCaseService
 from .case_recommendation_service import CaseRecommendationService
 from .case_decision_service import CaseDecisionService
+from .action_request_validation_service import ActionRequestValidationService
+from .action_request_service import ActionRequestService
+from .cer_binding_service import CERBindingService
+from .action_authorization_service import ActionAuthorizationService

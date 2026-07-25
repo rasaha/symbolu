@@ -384,3 +384,88 @@ class DecisionCaseAuthorizationError(DecisionCaseError):
 
 class CrossTenantCaseAccessError(DecisionCaseAuthorizationError):
     """A cross-tenant decision-case access was attempted and denied."""
+
+
+# --- Phase 4B: governed action request & CER binding (additive) ------------
+class ActionRequestError(HiringError):
+    """Base for governed action-request and CER-binding failures."""
+
+
+class ActionRequestNotFoundError(ActionRequestError):
+    """No action request exists for the given id."""
+
+
+class InvalidActionRequestTransitionError(ActionRequestError):
+    """A requested action-request lifecycle transition is not structurally legal."""
+
+
+class DecisionNotActionableError(ActionRequestError):
+    """The decision outcome does not produce an action (no published mapping)."""
+
+
+class DecisionSupersededError(ActionRequestError):
+    """The referenced decision is superseded or void and cannot produce an action."""
+
+
+class ActionMappingNotFoundError(ActionRequestError):
+    """No action mapping exists for the given id/selector."""
+
+
+class ActionMappingNotPublishedError(ActionRequestError):
+    """The selected action mapping is not in PUBLISHED status."""
+
+
+class ActionTypeMismatchError(ActionRequestError):
+    """The action type is not permitted for the decision outcome/mapping."""
+
+
+class ActionParameterValidationError(ActionRequestError):
+    """Requested parameters violate the mapping's parameter schema."""
+
+
+class ProhibitedActionParameterError(ActionParameterValidationError):
+    """A requested parameter is explicitly prohibited (or credential-like)."""
+
+
+class TargetSystemNotPermittedError(ActionRequestError):
+    """The declared target system is not permitted for the mapping."""
+
+
+class CERBindingError(ActionRequestError):
+    """The Context Envelope Record could not be constructed or is incomplete."""
+
+
+class CERExpiredError(ActionRequestError):
+    """The bound CER has expired and cannot be used for authorization."""
+
+
+class ActionRequestNotReadyError(ActionRequestError):
+    """The action request is not structurally ready for the requested step."""
+
+
+class AuthorizationSubmissionError(ActionRequestError):
+    """Submitting the request to the control plane failed (provider error)."""
+
+
+class AuthorizationResponseMismatchError(ActionRequestError):
+    """A control-plane response does not match the submitted request/CER."""
+
+
+class DuplicateActionRequestError(ActionRequestError):
+    """A different request already exists for the same idempotency key."""
+
+
+class ActionRequestAlreadyAuthorizedError(ActionRequestError):
+    """The request already carries a terminal authorization outcome."""
+
+
+class ActionRequestSupersededError(ActionRequestError):
+    """The action request snapshot has been superseded."""
+
+
+class ActionRequestAuthorizationError(ActionRequestError):
+    """The actor is not authorized for the requested action-request operation."""
+
+
+class CrossTenantActionRequestError(ActionRequestAuthorizationError):
+    """A cross-tenant action-request access was attempted and denied."""
