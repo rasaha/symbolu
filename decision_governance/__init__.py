@@ -12,6 +12,7 @@ kernel; the reverse is forbidden.
 
 from __future__ import annotations
 
+from .version import __version__
 from .base import DomainModel
 from .common import Clock, IdFactory, canonical_hash, new_id, utc_now
 from .errors import DomainValidationError, GovernanceError
@@ -43,5 +44,3 @@ __all__ = [
     "UncertaintyRule",
     "__version__",
 ]
-
-__version__ = "1.0.0"

@@ -10,7 +10,7 @@ services.
 
 from __future__ import annotations
 
-from decision_governance.policy import (
+from decision_governance.api.policy import (
     AccessGrant,
     EvidenceAccessPolicy,
     GrantStore,

@@ -9,8 +9,7 @@ procurement-specific execution lifecycle — each becomes a standard
 
 from __future__ import annotations
 
-from decision_governance.actions import ActionMapping, ParameterSchema
-from decision_governance.decisions import DecisionOutcome
+from decision_governance.api.contracts import ActionMapping, DecisionOutcome, ParameterSchema
 
 #: The decision type procurement cases carry.
 PROCUREMENT_DECISION_TYPE = "purchase_approval"

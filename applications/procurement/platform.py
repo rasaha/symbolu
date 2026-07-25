@@ -17,14 +17,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from decision_governance.audit import AuditService, InMemoryAuditRepository
-from decision_governance.identity import IdentityProvider, StaticIdentityProvider
-from decision_governance.repositories import (
+from decision_governance.api.audit import AuditService, InMemoryAuditRepository
+from decision_governance.api.identity import IdentityProvider, StaticIdentityProvider
+from decision_governance.api.repositories import (
     InMemoryActionRequestRepository,
     InMemoryDecisionCaseRepository,
     InMemoryExecutionRepository,
 )
-from decision_governance.services import (
+from decision_governance.api.services import (
     ActionAuthorizationService,
     ActionRequestService,
     ActionRequestValidationService,

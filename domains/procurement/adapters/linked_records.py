@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from decision_governance.ports.linked_record import (
+from decision_governance.api.ports import (
     BLOCKED_METADATA_KEY,
     FINALIZED_STATUS,
     LinkedRecordSnapshot,

@@ -18,8 +18,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from decision_governance.base import DomainModel
-from decision_governance.common import Clock, IdFactory, new_id, utc_now
+from decision_governance.api.common import Clock, DomainModel, IdFactory, new_id, utc_now
 
 from ..requests.contracts import PurchaseRequest
 

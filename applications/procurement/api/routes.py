@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from decision_governance.decisions import (
+from decision_governance.api.contracts import (
     AuthorityContext,
     AuthorityType,
     DecisionOutcome,
@@ -23,7 +23,7 @@ from decision_governance.decisions import (
     GeneratorType,
     RecommendationRecord,
 )
-from decision_governance.vocabulary import ReasonCode
+from decision_governance.api.vocabulary import ReasonCode
 
 from domains.procurement.actions import (
     CANCEL_REQUEST,

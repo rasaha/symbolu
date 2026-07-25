@@ -15,14 +15,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from decision_governance.common import Clock, IdFactory, new_id, utc_now
-from decision_governance.execution import (
-    ExternalDispatchResponse,
-    ExternalStatusResponse,
-    Finality,
-    RetryClassification,
-    TransportStatus,
-)
+from decision_governance.api.common import Clock, IdFactory, new_id, utc_now
+from decision_governance.api.contracts import Finality, RetryClassification, TransportStatus
+from decision_governance.api.ports import ExternalDispatchResponse, ExternalStatusResponse
 
 from .outcomes import SupplierOutcome, business_outcome_for
 

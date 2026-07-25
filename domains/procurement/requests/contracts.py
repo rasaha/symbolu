@@ -17,9 +17,8 @@ from enum import Enum
 
 from pydantic import Field, model_validator
 
-from decision_governance.base import DomainModel
-from decision_governance.common import utc_now
-from decision_governance.errors import DomainValidationError
+from decision_governance.api.common import DomainModel, utc_now
+from decision_governance.api.errors import DomainValidationError
 
 
 class Urgency(str, Enum):

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from decision_governance.execution import BusinessOutcome, TransportStatus
+from decision_governance.api.contracts import BusinessOutcome, TransportStatus
 
 
 class SupplierOutcome(str, Enum):

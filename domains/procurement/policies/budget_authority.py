@@ -16,9 +16,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Optional
 
-from decision_governance.actions import ActionAuthorizationResponse
-from decision_governance.actions.status import AuthorizationOutcome
-from decision_governance.common import Clock, IdFactory, new_id, utc_now
+from decision_governance.api.common import Clock, IdFactory, new_id, utc_now
+from decision_governance.api.contracts import ActionAuthorizationResponse, AuthorizationOutcome
 
 
 class BudgetAuthorityAdapter:

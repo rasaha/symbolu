@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from decision_governance.decisions import DecisionOutcome, ProposedOutcome
+from decision_governance.api.contracts import DecisionOutcome, ProposedOutcome
 
 
 class PurchaseRecommendation(str, Enum):
