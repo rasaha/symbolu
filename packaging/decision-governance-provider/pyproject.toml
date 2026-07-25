@@ -1,0 +1,31 @@
+# Independent distribution for the DGM Provider Framework.
+#
+# ./decision_governance_provider is a SYMLINK to the canonical
+# ../../decision_governance_provider package — one source tree, packaged directly.
+#
+# Build with:  python -m build packaging/decision-governance-provider
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "decision-governance-provider"
+dynamic = ["version"]
+description = "Provider Framework for the Decision Governance Middleware kernel."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+# The framework consumes only the kernel's public API.
+dependencies = ["decision-governance==1.0.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "decision_governance_provider.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["decision_governance_provider*"]
+exclude = ["decision_governance_provider.tests", "decision_governance_provider.tests.*"]

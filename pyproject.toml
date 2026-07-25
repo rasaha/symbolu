@@ -36,6 +36,8 @@ include = [
     "symbolu*", "agentic*", "ai_hiring*",
     # Phase 5A: extracted Decision Governance kernel + domain/application layers
     "decision_governance*", "domains*", "applications*",
+    # Phase 5F: application-layer provider framework
+    "decision_governance_provider*",
 ]
 
 [tool.pytest.ini_options]
