@@ -1,19 +1,10 @@
-"""Shared base for immutable, validated domain models."""
+"""Shared base for immutable, validated models — re-exported from the DGM kernel.
+
+Extracted in Phase 5A. ``DomainModel`` now lives in ``decision_governance.base``;
+this module keeps the historical ``ai_hiring.domain.base`` path pointing at the
+identical class object, so every model across the codebase shares one base.
+"""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
-
-
-class DomainModel(BaseModel):
-    """Frozen, strictly-typed base for every domain record.
-
-    * ``frozen=True`` — records are immutable after construction; revisions
-      create new versions rather than mutating in place.
-    * ``extra="forbid"`` — unknown fields are rejected, so typos and untyped
-      dictionaries never leak into a contract.
-    * ``use_enum_values=False`` — enum members are preserved as enums, not
-      coerced to bare strings, keeping type checks meaningful in service code.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
+from decision_governance.base import DomainModel  # noqa: F401

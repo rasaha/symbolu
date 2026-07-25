@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from pydantic import model_validator
 
-from ..domain.base import DomainModel
+from ..base import DomainModel
 from ..errors import DomainValidationError
 
 
 class SubjectRef(DomainModel):
-    """A reference to the subject of a case (e.g. a candidate)."""
+    """A reference to the subject of a case (e.g. a person or entity)."""
 
     subject_id: str
-    subject_type: str = "candidate"
+    subject_type: str = "subject"
 
     @model_validator(mode="after")
     def _validate(self) -> "SubjectRef":

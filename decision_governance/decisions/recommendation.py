@@ -16,10 +16,10 @@ from typing import Literal, Optional
 from pydantic import Field, model_validator
 
 from ..common import utc_now
-from ..domain.base import DomainModel
+from ..base import DomainModel
 from ..errors import DomainValidationError
-from ..ontology.taxonomy import ReasonCode
-from ..rubrics.uncertainty import UncertaintyLevel
+from ..vocabulary import ReasonCode
+from ..vocabulary import UncertaintyLevel
 from .status import GeneratorType, ProposedOutcome, RecommendationStatus
 from .subject import VersionedRef
 

@@ -14,7 +14,7 @@ from typing import Optional
 
 from pydantic import model_validator
 
-from ..domain.base import DomainModel
+from ..base import DomainModel
 from ..errors import DomainValidationError
 from .status import AuthorityType
 from .subject import VersionedRef

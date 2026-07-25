@@ -1,69 +1,22 @@
-"""DecisionCase aggregate and lifecycle contracts (Phase 4A).
+"""Phase-4A DecisionCase contracts — extracted to the DGM kernel in Phase 5A.
 
-The governed case container that links evidence, assessments, recommendations,
-human authority, and decisions **without collapsing them into one object**.
-Assessment, recommendation, decision, authorization, and execution are distinct
-records with distinct authority; Phase 4A implements the first three relationships
-and never executes an action.
+These contracts now live in ``decision_governance.decisions``. This shim re-exports
+them and aliases every submodule into ``sys.modules`` so historical import paths
+(``ai_hiring.decision_cases`` and ``ai_hiring.decision_cases.<sub>``) resolve to the
+identical kernel objects — preserving hashes, serialization, and ``isinstance``.
 """
 
 from __future__ import annotations
 
-from .authority import AuthorityContext
-from .case import DecisionCase
-from .decision import DecisionRecord
-from .lifecycle import ALLOWED_TRANSITIONS, is_legal_transition
-from .override import OverrideRecord
-from .recommendation import RecommendationRecord
-from .review import ReviewTask
-from .status import (
-    AuthorityType,
-    CaseStatus,
-    DecisionOutcome,
-    EffectiveStatus,
-    GeneratorType,
-    HUMAN_AUTHORITIES,
-    OperatingMode,
-    ProposedOutcome,
-    RecommendationStatus,
-    ReviewTaskStatus,
-    ReviewTaskType,
-    TERMINAL_CASE_STATUSES,
-)
-from .subject import SubjectRef, VersionedRef
-from .validation import (
-    CaseValidationIssue,
-    CaseValidationResult,
-    DecisionReadinessResult,
-)
+import sys as _sys
 
-__all__ = [
-    # contracts
-    "DecisionCase",
-    "RecommendationRecord",
-    "DecisionRecord",
-    "OverrideRecord",
-    "ReviewTask",
-    "AuthorityContext",
-    "SubjectRef",
-    "VersionedRef",
-    # vocabularies
-    "CaseStatus",
-    "OperatingMode",
-    "ProposedOutcome",
-    "GeneratorType",
-    "RecommendationStatus",
-    "DecisionOutcome",
-    "AuthorityType",
-    "EffectiveStatus",
-    "ReviewTaskType",
-    "ReviewTaskStatus",
-    "HUMAN_AUTHORITIES",
-    "TERMINAL_CASE_STATUSES",
-    # lifecycle + validation
-    "ALLOWED_TRANSITIONS",
-    "is_legal_transition",
-    "CaseValidationIssue",
-    "CaseValidationResult",
-    "DecisionReadinessResult",
-]
+from decision_governance import decisions as _kernel
+from decision_governance.decisions import *  # noqa: F401,F403
+from decision_governance.decisions import __all__  # noqa: F401
+
+_SUBMODULES = (
+    "status", "subject", "authority", "recommendation", "decision",
+    "review", "override", "case", "lifecycle", "validation",
+)
+for _name in _SUBMODULES:
+    _sys.modules[f"{__name__}.{_name}"] = getattr(_kernel, _name)

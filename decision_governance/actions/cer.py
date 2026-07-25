@@ -3,8 +3,8 @@
 The CER is a **governance context record, not an execution command**. It carries
 only the minimum context a runtime authorizer needs: who, under what authority and
 policy, for what approved action, on what target, with what parameter bounds and
-required controls. It deliberately excludes raw evidence, résumé/interview text,
-credentials, model secrets, access tokens, hidden candidate comparisons, and
+required controls. It deliberately excludes raw evidence, free-form subject text,
+credentials, model secrets, access tokens, hidden subject comparisons, and
 unapproved parameters — those cannot even be represented in its typed fields.
 """
 
@@ -16,11 +16,11 @@ from typing import Optional
 from pydantic import Field, model_validator
 
 from ..common import canonical_hash, utc_now
-from ..decision_cases.status import AuthorityType, DecisionOutcome
-from ..decision_cases.subject import SubjectRef, VersionedRef
-from ..domain.base import DomainModel
+from ..decisions.status import AuthorityType, DecisionOutcome
+from ..decisions.subject import SubjectRef, VersionedRef
+from ..base import DomainModel
 from ..errors import DomainValidationError
-from ..ontology.taxonomy import ReasonCode
+from ..vocabulary import ReasonCode
 
 
 class SubjectContext(DomainModel):

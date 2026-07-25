@@ -1,7 +1,7 @@
 """Provider-neutral external-system port + an offline deterministic adapter.
 
 The domain depends only on :class:`ExternalExecutionPort` — never on a concrete
-ATS/ERP/payment/ActionGate SDK. The port has two seams: ``dispatch`` (attempt the
+external business-system or ActionGate SDK. The port has two seams: ``dispatch`` (attempt the
 action) and ``query_status`` (observe what actually happened). A transport
 acknowledgement from ``dispatch`` is **not** a business outcome; business outcomes
 come only from an observed ``query_status`` (or an external callback).
@@ -18,7 +18,7 @@ from typing import Optional, Protocol, runtime_checkable
 from pydantic import Field, model_validator
 
 from ..common import Clock, IdFactory, new_id, utc_now
-from ..domain.base import DomainModel
+from ..base import DomainModel
 from ..errors import DomainValidationError
 from .status import BusinessOutcome, Finality, RetryClassification, TransportStatus
 

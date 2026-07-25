@@ -32,7 +32,11 @@ all = [
 # Top-level packages containing all modules
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["symbolu*", "agentic*", "ai_hiring*"]
+include = [
+    "symbolu*", "agentic*", "ai_hiring*",
+    # Phase 5A: extracted Decision Governance kernel + domain/application layers
+    "decision_governance*", "domains*", "applications*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,74 +1,21 @@
-"""External execution, immutable execution records, and outcome reconciliation
-(Phase 4C).
+"""Phase-4C execution contracts — extracted to the DGM kernel in Phase 5A.
 
-Takes a valid, unexpired, control-plane-authorized ``ActionRequest``, dispatches it
-through a provider-neutral external-execution port, records every attempt
-immutably, and reconciles the *observed* external result against the authorized
-intent.
-
-Phase 4C records what was attempted and what the external system actually did.
-**Dispatch, acknowledgement, authorization, and business success are distinct
-states.**
+Now live in ``decision_governance.execution``; this shim re-exports them and aliases
+every submodule so historical ``ai_hiring.executions[.<sub>]`` paths resolve to the
+identical kernel objects.
 """
 
 from __future__ import annotations
 
-from .compensation import CompensationRequirement
-from .execution_attempt import ExecutionAttempt
-from .execution_intent import ExecutionIntent
-from .execution_record import ExecutionRecord
-from .external_system import (
-    ExternalDispatchResponse,
-    ExternalExecutionPort,
-    ExternalStatusResponse,
-    OfflineDeterministicExecutionAdapter,
-)
-from .lifecycle import ALLOWED_TRANSITIONS, is_legal_transition
-from .reconciliation import ReconciliationResult
-from .status import (
-    BUSINESS_OUTCOME_TO_STATUS,
-    BusinessOutcome,
-    CompensationApprovalStatus,
-    CompensationType,
-    EXECUTABLE_AUTHORIZATION_OUTCOMES,
-    ExecutionStatus,
-    Finality,
-    OutcomeSource,
-    ReconciliationStatus,
-    RetryClassification,
-    TERMINAL_EXECUTION_STATUSES,
-    TransportStatus,
-)
-from .validation import ExecutionValidationIssue, ExecutionValidationResult
+import sys as _sys
 
-__all__ = [
-    # contracts
-    "ExecutionIntent",
-    "ExecutionAttempt",
-    "ExecutionRecord",
-    "ReconciliationResult",
-    "CompensationRequirement",
-    # external system
-    "ExternalExecutionPort",
-    "ExternalDispatchResponse",
-    "ExternalStatusResponse",
-    "OfflineDeterministicExecutionAdapter",
-    # vocabularies
-    "ExecutionStatus",
-    "TransportStatus",
-    "BusinessOutcome",
-    "ReconciliationStatus",
-    "RetryClassification",
-    "CompensationType",
-    "CompensationApprovalStatus",
-    "Finality",
-    "OutcomeSource",
-    "BUSINESS_OUTCOME_TO_STATUS",
-    "EXECUTABLE_AUTHORIZATION_OUTCOMES",
-    "TERMINAL_EXECUTION_STATUSES",
-    # lifecycle + validation
-    "ALLOWED_TRANSITIONS",
-    "is_legal_transition",
-    "ExecutionValidationIssue",
-    "ExecutionValidationResult",
-]
+from decision_governance import execution as _kernel
+from decision_governance.execution import *  # noqa: F401,F403
+from decision_governance.execution import __all__  # noqa: F401
+
+_SUBMODULES = (
+    "status", "execution_intent", "execution_attempt", "execution_record",
+    "reconciliation", "compensation", "external_system", "lifecycle", "validation",
+)
+for _name in _SUBMODULES:
+    _sys.modules[f"{__name__}.{_name}"] = getattr(_kernel, _name)

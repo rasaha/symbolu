@@ -1,7 +1,7 @@
 """Provider-neutral control-plane port + an offline deterministic adapter.
 
 The domain depends only on :class:`ActionControlPlanePort` — never on a concrete
-ActionGate SDK. Authorization is the AI Control Plane's job: given a prepared
+ActionGate SDK. Authorization is the AI Control Plane's responsibility: given a prepared
 request and its CER, decide *whether the proposed action may execute under current
 runtime controls*. It returns an authorization decision; it never executes.
 

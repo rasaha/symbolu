@@ -15,8 +15,8 @@ from typing import Optional
 from pydantic import Field, model_validator
 
 from ..common import canonical_hash, utc_now
-from ..decision_cases.subject import SubjectRef, VersionedRef
-from ..domain.base import DomainModel
+from ..decisions.subject import SubjectRef, VersionedRef
+from ..base import DomainModel
 from ..errors import DomainValidationError
 from .status import ActionRequestStatus
 

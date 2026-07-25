@@ -8,7 +8,12 @@
 **Phase 4A — DecisionCase Aggregate & Lifecycle:** complete; 55 tests.
 **Phase 4B — Governed Action Request & CER Binding:** complete; 52 tests.
 **Phase 4C — External Execution & Reconciliation:** complete; 52 tests.
-**Total:** 517/517 module tests passing. No candidate evaluation, scoring
+**Phase 5A — DGM Kernel Extraction:** complete; 11 extraction tests. The
+domain-neutral governance kernel was extracted to `decision_governance/`; AI
+Hiring now consumes it via identity-preserving shims (see
+`docs/Decision_Governance_Kernel.md` at the repo root). No runtime behavior,
+hash, serialization, or lifecycle changed.
+**Total:** 528/528 module tests passing. No candidate evaluation, scoring
 algorithm, evidence-derived recommendation generation, ranking, or LLM inference
 has been introduced. Phase 4C dispatches through a provider-neutral port and
 records *observed* outcomes; it never conflates authorization, dispatch,

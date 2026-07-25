@@ -14,14 +14,15 @@ below.
 
 from __future__ import annotations
 
+from decision_governance.errors import DomainValidationError, GovernanceError
 
-class HiringError(Exception):
-    """Base class for every AI-hiring domain error."""
+# Phase 5A: the error base is now the kernel's ``GovernanceError``. ``HiringError``
+# is kept as an alias so every existing ``class X(HiringError)`` and every
+# ``isinstance(e, HiringError)`` continues to behave identically, while the neutral
+# ``DomainValidationError`` raised by kernel contracts shares the same root.
+HiringError = GovernanceError
 
-
-# --- Validation ------------------------------------------------------------
-class DomainValidationError(HiringError):
-    """A domain contract invariant was violated."""
+__all__ = ["HiringError", "GovernanceError", "DomainValidationError"]
 
 
 # --- Boundary / authorization ---------------------------------------------

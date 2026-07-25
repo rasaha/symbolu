@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from ..action_requests.status import AuthorizationOutcome
+from ..actions.status import AuthorizationOutcome
 
 #: Only these control-plane outcomes may permit an execution intent.
 EXECUTABLE_AUTHORIZATION_OUTCOMES = frozenset({

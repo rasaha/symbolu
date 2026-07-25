@@ -15,9 +15,9 @@ from typing import Optional
 from pydantic import Field, model_validator
 
 from ..common import utc_now
-from ..domain.base import DomainModel
+from ..base import DomainModel
 from ..errors import DomainValidationError
-from ..ontology.taxonomy import ReasonCode
+from ..vocabulary import ReasonCode
 from .status import DecisionOutcome, ProposedOutcome
 from .subject import VersionedRef
 

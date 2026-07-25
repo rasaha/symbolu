@@ -1,66 +1,21 @@
-"""Governed action requests and CER binding (Phase 4B).
+"""Phase-4B action-request contracts — extracted to the DGM kernel in Phase 5A.
 
-Converts an authorized ``DecisionRecord`` into a governed ``ActionRequest``, binds
-the minimum runtime context as a ``ContextEnvelopeRecord`` (CER), and submits it
-through a provider-neutral control-plane port for authorization.
-
-Phase 4B prepares and authorizes a proposed action. **It does not execute the
-action** and does not claim that authorization produced an external-world result.
+Now live in ``decision_governance.actions``; this shim re-exports them and aliases
+every submodule so historical ``ai_hiring.action_requests[.<sub>]`` paths resolve to
+the identical kernel objects.
 """
 
 from __future__ import annotations
 
-from .action_mapping import ActionMapping, ParameterSchema
-from .action_request import ActionRequest
-from .authorization import ActionAuthorizationResponse
-from .cer import (
-    AuthoritySummary,
-    ContextEnvelopeRecord,
-    DecisionContext,
-    PolicyContext,
-    SubjectContext,
-)
-from .control_plane import ActionControlPlanePort, OfflineDeterministicControlPlane
-from .lifecycle import ALLOWED_TRANSITIONS, is_legal_transition
-from .status import (
-    ActionMappingStatus,
-    ActionRequestStatus,
-    AUTHORIZED_STATUSES,
-    AuthorizationOutcome,
-    OUTCOME_TO_STATUS,
-    RETRYABLE_STATUSES,
-    TERMINAL_REQUEST_STATUSES,
-)
-from .validation import (
-    ActionRequestValidationIssue,
-    ActionRequestValidationResult,
-)
+import sys as _sys
 
-__all__ = [
-    # contracts
-    "ActionRequest",
-    "ActionMapping",
-    "ParameterSchema",
-    "ContextEnvelopeRecord",
-    "SubjectContext",
-    "AuthoritySummary",
-    "PolicyContext",
-    "DecisionContext",
-    "ActionAuthorizationResponse",
-    # control plane
-    "ActionControlPlanePort",
-    "OfflineDeterministicControlPlane",
-    # vocabularies
-    "ActionRequestStatus",
-    "AuthorizationOutcome",
-    "ActionMappingStatus",
-    "OUTCOME_TO_STATUS",
-    "TERMINAL_REQUEST_STATUSES",
-    "AUTHORIZED_STATUSES",
-    "RETRYABLE_STATUSES",
-    # lifecycle + validation
-    "ALLOWED_TRANSITIONS",
-    "is_legal_transition",
-    "ActionRequestValidationIssue",
-    "ActionRequestValidationResult",
-]
+from decision_governance import actions as _kernel
+from decision_governance.actions import *  # noqa: F401,F403
+from decision_governance.actions import __all__  # noqa: F401
+
+_SUBMODULES = (
+    "status", "action_mapping", "action_request", "cer", "authorization",
+    "control_plane", "lifecycle", "validation",
+)
+for _name in _SUBMODULES:
+    _sys.modules[f"{__name__}.{_name}"] = getattr(_kernel, _name)

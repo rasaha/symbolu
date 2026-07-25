@@ -3,7 +3,7 @@
 Every validator returns a *typed result* (issues with codes), never a bare
 boolean. Validation is structural and deterministic — it checks references,
 versions, authority, required reviews, and lifecycle shape. It never reinterprets
-assessment content or judges candidate quality.
+assessment content or judges subject quality.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class CaseValidationResult:
 class DecisionReadinessResult:
     """Whether a case is structurally ready for a decision to be recorded.
 
-    ``ready`` is *structural readiness only* — it never means the candidate is
+    ``ready`` is *structural readiness only* — it never means the subject is
     good or that a particular outcome is correct.
     """
 
