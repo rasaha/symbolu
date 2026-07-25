@@ -226,3 +226,88 @@ class UnknownScoringScaleError(RubricError):
 
 class UnknownEvidenceTypeError(RubricError):
     """A rubric or capability referenced an unknown evidence type."""
+
+
+# --- Phase 3B: deterministic assessment runtime ----------------------------
+class AssessmentError(HiringError):
+    """Base class for deterministic-assessment-runtime errors."""
+
+
+class AssessmentWorkspaceNotFoundError(AssessmentError):
+    """A referenced assessment workspace does not exist."""
+
+
+class AssessmentNotFoundError(AssessmentError):
+    """A referenced assessment does not exist."""
+
+
+class AssessmentAlreadyFinalizedError(AssessmentError):
+    """An operation was attempted on a finalized (immutable) assessment."""
+
+
+class AssessmentSupersededError(AssessmentError):
+    """An operation was attempted on a superseded assessment/workspace."""
+
+
+class PublishedRubricRequiredError(AssessmentError):
+    """A workspace requires a PUBLISHED rubric; none was found."""
+
+
+class CapabilityVersionMismatchError(AssessmentError):
+    """A rubric-referenced capability version does not match the ontology."""
+
+
+class EvidenceBindingNotFoundError(AssessmentError):
+    """A referenced evidence binding does not exist."""
+
+
+class EvidenceNotEligibleForAssessmentError(AssessmentError):
+    """Evidence failed the fail-closed eligibility check for assessment use."""
+
+
+class QuarantinedEvidenceBindingError(AssessmentError):
+    """An attempt was made to bind quarantined / non-job-relevant evidence."""
+
+
+class ObservationValidationError(AssessmentError):
+    """A supplied observation failed deterministic validation."""
+
+
+class ObservationScaleMismatchError(ObservationValidationError):
+    """A supplied observation's declared scale does not match the rubric."""
+
+
+class ObservationValueOutOfRangeError(ObservationValidationError):
+    """A supplied observation value is not a member of its declared scale."""
+
+
+class ObservationSupplierNotAuthorizedError(ObservationValidationError):
+    """The observation supplier is not authorized for this criterion."""
+
+
+class AIObservationNotAllowedError(ObservationValidationError):
+    """An AI-supplied observation was rejected — Phase 3B forbids inference."""
+
+
+class ReasonCodeNotPermittedError(AssessmentError):
+    """A reason code is unknown or not permitted for this criterion/rubric."""
+
+
+class RequiredUncertaintyMissingError(AssessmentError):
+    """The published contract requires uncertainty that was not supplied."""
+
+
+class BlockingConflictError(AssessmentError):
+    """An unresolved conflict blocks assessment finalization per contract."""
+
+
+class AssessmentIncompleteError(AssessmentError):
+    """Assessment cannot be finalized because it is structurally incomplete."""
+
+
+class AssessmentAuthorizationError(AssessmentError):
+    """The actor is not authorized for the requested assessment operation."""
+
+
+class CrossTenantAssessmentAccessError(AssessmentAuthorizationError):
+    """A cross-tenant assessment access was attempted and denied."""

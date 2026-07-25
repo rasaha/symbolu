@@ -36,8 +36,17 @@ __all__ = [
     "OntologyService",
     "RubricService",
     "RubricValidationService",
+    # Phase 3B: deterministic assessment runtime
+    "EvidenceBindingService",
+    "AssessmentValidationService",
+    "AssessmentCompletenessService",
+    "AssessmentService",
 ]
 
 from .ontology_service import OntologyService
 from .rubric_service import RubricService
 from .rubric_validation_service import RubricValidationService
+from .assessment_completeness_service import AssessmentCompletenessService
+from .assessment_service import AssessmentService
+from .assessment_validation_service import AssessmentValidationService
+from .evidence_binding_service import EvidenceBindingService

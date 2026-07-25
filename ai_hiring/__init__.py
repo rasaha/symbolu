@@ -39,11 +39,19 @@ from .repositories.in_memory import (
 from .policies.evidence_access_policy import EvidenceAccessPolicy, GrantStore
 from .repositories.ontology_repository import InMemoryOntologyRepository
 from .repositories.rubric_repository import InMemoryRubricRepository
+from .repositories.assessment_repository import InMemoryAssessmentRepository
+from .repositories.assessment_workspace_repository import (
+    InMemoryAssessmentWorkspaceRepository,
+)
 from .services import (
+    AssessmentCompletenessService,
+    AssessmentService,
+    AssessmentValidationService,
     AuditService,
     DecisionService,
     EvaluationService,
     EvidenceAccessService,
+    EvidenceBindingService,
     EvidenceIngestionService,
     EvidenceValidationService,
     OntologyService,
@@ -105,6 +113,13 @@ class HiringPlatform:
     ontology_service: OntologyService
     rubric_validation_service: RubricValidationService
     rubric_service: RubricService
+    # --- Phase 3B: deterministic assessment runtime ---
+    assessment_workspace_repo: InMemoryAssessmentWorkspaceRepository
+    assessment_repo: InMemoryAssessmentRepository
+    evidence_binding_service: EvidenceBindingService
+    assessment_validation_service: AssessmentValidationService
+    assessment_completeness_service: AssessmentCompletenessService
+    assessment_service: AssessmentService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -135,6 +150,12 @@ class HiringPlatform:
         from .api.rubric_routes import RubricAPI
 
         return RubricAPI(self.rubric_service, self.identity_provider)
+
+    def build_assessment_api(self):
+        """Construct the callable :class:`~ai_hiring.api.AssessmentAPI` facade."""
+        from .api.assessment_routes import AssessmentAPI
+
+        return AssessmentAPI(self.assessment_service, self.identity_provider)
 
 
 def build_in_memory_platform(
@@ -208,6 +229,27 @@ def build_in_memory_platform(
     rubric_validation_service = RubricValidationService(ontology_repo)
     rubric_service = RubricService(rubric_repo, rubric_validation_service, audit_service)
 
+    # Phase 3B: deterministic assessment runtime.
+    assessment_workspace_repo = InMemoryAssessmentWorkspaceRepository()
+    assessment_repo = InMemoryAssessmentRepository()
+    evidence_binding_service = EvidenceBindingService(
+        evidence_repo, evidence_validation_service
+    )
+    assessment_validation_service = AssessmentValidationService()
+    assessment_completeness_service = AssessmentCompletenessService()
+    assessment_service = AssessmentService(
+        assessment_workspace_repo,
+        assessment_repo,
+        rubric_repo,
+        ontology_repo,
+        evidence_binding_service,
+        assessment_validation_service,
+        assessment_completeness_service,
+        audit_service,
+        identity,
+        evidence_access_policy,
+    )
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -238,4 +280,10 @@ def build_in_memory_platform(
         ontology_service=ontology_service,
         rubric_validation_service=rubric_validation_service,
         rubric_service=rubric_service,
+        assessment_workspace_repo=assessment_workspace_repo,
+        assessment_repo=assessment_repo,
+        evidence_binding_service=evidence_binding_service,
+        assessment_validation_service=assessment_validation_service,
+        assessment_completeness_service=assessment_completeness_service,
+        assessment_service=assessment_service,
     )

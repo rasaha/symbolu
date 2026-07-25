@@ -254,11 +254,36 @@ evaluation. See [`docs/CAPABILITY_ONTOLOGY.md`](docs/CAPABILITY_ONTOLOGY.md).
 > evaluation, scoring algorithm, recommendation generation, or LLM inference was
 > introduced in Phase 3A.
 
+## Phase 3B — Deterministic Assessment Runtime (implemented)
+
+The runtime that **executes** the Phase-3A constitution deterministically, with
+**no AI inference of any kind**. New package `assessments/` (workspaces, evidence
+bindings, excluded-evidence and missing-evidence records, observations,
+structural completeness, advisory `Assessment`), plus
+`services/{evidence_binding,assessment_validation,assessment_completeness,assessment}_service.py`
+and `repositories/{assessment_workspace,assessment}_repository.py`, and the
+`api/assessment_routes.py` facade. It resolves published rubric/capability
+versions, binds *authorized-declared* evidence under the published admissibility
+policy, accepts externally supplied **non-AI** observations and validates them by
+pure scale membership, records missing evidence, uncertainty, and conflicts,
+computes *structural* completeness, and produces immutable, append-only advisory
+assessment records. See
+[`docs/DETERMINISTIC_ASSESSMENT_RUNTIME.md`](docs/DETERMINISTIC_ASSESSMENT_RUNTIME.md).
+
+> **No LLM inference in Phase 3B.** The runtime binds, validates, records, and
+> assembles. It contains no model call, no text interpretation, no embedding, no
+> similarity scoring. It never scores from free-form evidence, ranks or compares
+> candidates, generates recommendations, makes or authorizes decisions,
+> constructs CERs, invokes the ActionGate, or mutates any published contract.
+> Every stored value is supplied by an authorized non-AI source and checked for
+> conformance — never computed or inferred. `Assessment.advisory_only` is a
+> `Literal[True]`, and the runtime carries no score, rank, or decision field.
+
 ## Next milestone
 
-**Phase 3B — Evaluation Engine** (future): consume *only* the immutable Phase-3A
-contracts (capabilities, scales, admissibility rules, uncertainty semantics,
-reason codes) to produce advisory, per-capability assessments — still behind the
-Phase-1 human-decision boundary. It must not invent any contract. Do not begin
-until all Phase 1, 2, 2.5, and 3A tests pass. See
+**Phase 3C — Interpretation under governance** (future): the first phase in which
+an AI system may interpret evidence, strictly under the constitution this runtime
+proved executable, and still behind the Phase-1 human-decision boundary and the
+governance middleware. It must not invent any contract. Do not begin until all
+Phase 1, 2, 2.5, 3A, and 3B tests pass. See
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).

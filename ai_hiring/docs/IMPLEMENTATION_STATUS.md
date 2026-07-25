@@ -4,8 +4,12 @@
 **Phase 2 — Evidence Ingestion & Normalization:** complete; 57 tests.
 **Phase 2.5 — Evidence Boundary Hardening:** complete; 107 tests.
 **Phase 3A — Capability Ontology & Rubric Contracts:** complete; 78 tests.
-**Total:** 293/293 module tests passing. No candidate evaluation, scoring
-algorithm, recommendation generation, or LLM inference has been introduced.
+**Phase 3B — Deterministic Assessment Runtime:** complete; 65 tests.
+**Total:** 358/358 module tests passing. No candidate evaluation, scoring
+algorithm, recommendation generation, ranking, or LLM inference has been
+introduced. Phase 3B executes the frozen constitution deterministically; it
+records externally supplied, non-AI observations and produces advisory-only
+assessment records.
 
 ## Implemented
 
@@ -273,9 +277,78 @@ See `docs/CAPABILITY_ONTOLOGY.md`.
 - Weight-total validation fixed at sum = 1.0 (tolerance 1e-6).
 - No cryptographic signing of published contracts yet.
 
+## Next milestone (from Phase 3A)
+
+Phase 3B — Deterministic Assessment Runtime — is now implemented (see below).
+
+---
+
+# Phase 3B — Deterministic Assessment Runtime
+
+Executes the immutable Phase-3A constitution deterministically, with **no AI
+inference of any kind**. Phase 3B proves the evaluation constitution can execute
+before any AI system is permitted to interpret evidence under it.
+
+## Implemented
+
+- [x] New `assessments/` package: `AssessmentWorkspace` + `CapabilityBinding`,
+      `EvidenceBinding`, `ExcludedEvidenceRecord`, `MissingEvidenceRecord`,
+      `Observation`, `CompletenessResult`, `CapabilityAssessment`, and the
+      advisory-only `Assessment` (all frozen; `advisory_only: Literal[True]`).
+- [x] Deterministic status vocabularies (`WorkspaceStatus`, `AssessmentStatus`,
+      `CompletenessStatus`, `BindingProvenance`, `SupplierType`,
+      `ObservationValidationStatus`); `PERMITTED_SUPPLIERS` excludes `AI_MODEL`.
+- [x] `EvidenceBindingService`: fail-closed, criterion-specific binding under the
+      Phase-3A `AdmissibilityPolicy`; declared evidence type from an authorized
+      caller (never inferred); tenant/subject/quarantine/eligibility gates.
+- [x] `AssessmentValidationService`: pure, deterministic observation validation —
+      scale membership, declared-scale match, authorized non-AI supplier,
+      evidence sufficiency, required uncertainty, permitted reason codes.
+- [x] `AssessmentCompletenessService`: structural completeness only; HIGH/CRITICAL
+      conflicts block finalization; never judges value quality.
+- [x] `AssessmentService`: authorized, audited orchestration of create → bind →
+      record-missing → observe → record-conflict → validate → finalize →
+      supersede → cancel, plus reads.
+- [x] `AssessmentWorkspaceRepository` + `AssessmentRepository` (append-only,
+      versioned, supersession chains) + in-memory adapters.
+- [x] `api/assessment_routes.py`: `AssessmentAPI` facade + optional FastAPI
+      router. No score/rank/recommend/approve/reject/hire operation exists.
+- [x] Additive `AuditEventType` members; every state change audited with the
+      workspace correlation id.
+- [x] Docs: `docs/DETERMINISTIC_ASSESSMENT_RUNTIME.md` with four Mermaid diagrams
+      and the "No LLM inference in Phase 3B" label.
+- [x] 65 new tests across 11 files; full module suite 358/358 green.
+
+## Frozen files touched (additive only)
+
+- `domain/enums.py`: added 13 Phase-3B `AuditEventType` members.
+- `errors.py`: added the `AssessmentError` hierarchy (workspace/observation/
+  authorization typed errors).
+- `policies/evidence_access_policy.py`: added 8 assessment `Permission` members.
+- `services/__init__.py`, `repositories/__init__.py`, `__init__.py`: additive
+  exports + wiring + `build_assessment_api`. No prior model, service, or test
+  changed; no existing contract semantics weakened.
+
+## Not implemented (explicitly out of scope for Phase 3B, by design)
+
+- [ ] Any LLM call, text interpretation, embedding, or similarity scoring.
+- [ ] Scoring from free-form evidence, ranking, or candidate comparison.
+- [ ] Recommendation generation, decisions, CER construction, ActionGate.
+- [ ] Creating/modifying capabilities, rubrics, scales, or reason codes.
+- [ ] Autonomous conflict resolution; mutating published contracts; the full
+      DecisionCase aggregate.
+
+## Known limitations
+
+- In-memory repositories; placeholder grant-based authorization.
+- Conflict *disposition* (resolving a HIGH/CRITICAL conflict) is deferred to a
+  later authorized phase; the runtime only records and blocks on it.
+- A criterion maps 1:1 to a capability (Phase-3A rubrics have no separate
+  criterion concept); the contracts leave room for richer criteria later.
+
 ## Next milestone
 
-**Phase 3B — Evaluation Engine** (future): consume only the immutable Phase-3A
-contracts to produce advisory, per-capability assessments behind the Phase-1
-human-decision boundary. It must not invent capabilities, scales, admissibility
-rules, uncertainty semantics, or reason codes.
+**Phase 3C — Interpretation under governance** (future): the first phase in which
+an AI system may interpret evidence, strictly under the constitution this runtime
+proved executable, behind the Phase-1 human-decision boundary and the governance
+middleware. Do not begin until all Phase 1, 2, 2.5, 3A, and 3B tests pass.

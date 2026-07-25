@@ -202,3 +202,94 @@ def publish_rubric(platform, rubric: Rubric) -> Rubric:
     platform.rubric_service.submit(rubric.rubric_id, author_id=AUTHOR)
     platform.rubric_service.approve(rubric.rubric_id, approver_id=APPROVER)
     return platform.rubric_service.publish(rubric.rubric_id, publisher_id=PUBLISHER)
+
+
+# --------------------------------------------------------------------------
+# Phase 3B deterministic-assessment helpers
+# --------------------------------------------------------------------------
+from ai_hiring.normalization.models import EvidenceFormat as _EvidenceFormat
+from ai_hiring.normalization.models import RawSubmission as _RawSubmission
+from ai_hiring.policies.evidence_access_policy import AccessGrant, Permission
+from ai_hiring.rubrics.scoring_scale import ScaleType
+
+TENANT = "t1"
+SUBJECT = "cand-1"
+ASSESSOR = "assessor-1"
+
+_ALL_ASSESSMENT_PERMS = frozenset(Permission)
+
+
+@pytest.fixture
+def assessment_identity_provider() -> StaticIdentityProvider:
+    """Identity provider carrying the Phase-3B governance actors."""
+    idp = StaticIdentityProvider()
+    idp.register_human(AUTHOR)
+    idp.register_human(APPROVER)
+    idp.register_human(PUBLISHER)
+    idp.register_human(ASSESSOR)
+    idp.register_human("assessor-2")
+    idp.register_ai("ai-observer")
+    idp.register_service("svc-import")
+    return idp
+
+
+@pytest.fixture
+def assessment_platform(assessment_identity_provider):
+    """A platform whose assessor holds every assessment permission in TENANT."""
+    platform = build_in_memory_platform(assessment_identity_provider)
+    platform.access_grants.add(AccessGrant(ASSESSOR, TENANT, _ALL_ASSESSMENT_PERMS))
+    return platform
+
+
+def make_assessment_rubric(
+    platform,
+    *,
+    cap_id: str = "cap.python",
+    rubric_id: str = "rub.assess",
+    scale: str = "scale.1_5",
+    minimum_count: int = 1,
+    required_types=(EvidenceType.CODING_TEST,),
+    allowed_types=(EvidenceType.CODING_TEST,),
+    prohibited_types=(),
+    uncertainty_rule=None,
+    allowed_reason_codes=(),
+    freshness_days: int = 365,
+) -> Rubric:
+    """Publish a capability + a rubric that references it, returning the rubric."""
+    cap = Capability(
+        capability_id=cap_id, name=cap_id, category="Programming",
+        allowed_evidence_types=allowed_types,
+        required_evidence_types=required_types,
+        minimum_evidence_count=minimum_count)
+    published_cap = platform.ontology_service.publish(cap, actor_id=AUTHOR)
+    rule = EvidenceRule(
+        capability_id=cap_id, allowed_types=allowed_types,
+        required_types=required_types, prohibited_types=prohibited_types,
+        minimum_count=minimum_count, freshness_days=freshness_days)
+    rc = RubricCapability(
+        capability_id=cap_id, capability_version=published_cap.version, weight=1.0,
+        scoring_scale_id=scale, evidence_rule=rule,
+        uncertainty_rule=uncertainty_rule, allowed_reason_codes=allowed_reason_codes)
+    rubric = Rubric(
+        rubric_id=rubric_id, role="Backend Engineer", version=1, capabilities=(rc,),
+        default_scoring_scale_id=scale)
+    return publish_rubric(platform, rubric)
+
+
+def ingest_evidence(
+    platform,
+    *,
+    text: str = "def add(a, b):\n    return a + b\nassert add(1, 2) == 3\n",
+    candidate_id: str = SUBJECT,
+    tenant_id: str = TENANT,
+    role_id: str = "role-1",
+    assessment_item_id: str = "item-1",
+    uploader: str = "svc-import",
+):
+    """Ingest a text submission and return the eligible ``NormalizedEvidence``."""
+    submission = _RawSubmission.from_text(
+        text, candidate_id=candidate_id, role_id=role_id,
+        assessment_item_id=assessment_item_id,
+        declared_format=_EvidenceFormat.TEXT, uploader=uploader,
+        tenant_id=tenant_id, filename="solution.py")
+    return platform.evidence_ingestion_service.ingest(submission).normalized_evidence

@@ -34,4 +34,18 @@ __all__ = [
     "InMemoryDecisionRepository",
     "InMemoryWorkflowRepository",
     "InMemoryAuditRepository",
+    # Phase 3B: deterministic assessment runtime
+    "AssessmentWorkspaceRepository",
+    "InMemoryAssessmentWorkspaceRepository",
+    "AssessmentRepository",
+    "InMemoryAssessmentRepository",
 ]
+
+from .assessment_repository import (
+    AssessmentRepository,
+    InMemoryAssessmentRepository,
+)
+from .assessment_workspace_repository import (
+    AssessmentWorkspaceRepository,
+    InMemoryAssessmentWorkspaceRepository,
+)
