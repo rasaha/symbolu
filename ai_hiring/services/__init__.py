@@ -51,6 +51,11 @@ __all__ = [
     "CERBindingService",
     "ActionAuthorizationService",
     "ActionRequestValidationService",
+    # Phase 4C: external execution & reconciliation
+    "ExecutionService",
+    "ExecutionValidationService",
+    "ReconciliationService",
+    "CompensationService",
 ]
 
 from .ontology_service import OntologyService
@@ -68,3 +73,7 @@ from .action_request_validation_service import ActionRequestValidationService
 from .action_request_service import ActionRequestService
 from .cer_binding_service import CERBindingService
 from .action_authorization_service import ActionAuthorizationService
+from .execution_validation_service import ExecutionValidationService
+from .execution_service import ExecutionService
+from .reconciliation_service import ReconciliationService
+from .compensation_service import CompensationService

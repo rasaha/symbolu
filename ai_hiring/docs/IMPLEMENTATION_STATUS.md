@@ -7,11 +7,13 @@
 **Phase 3B — Deterministic Assessment Runtime:** complete; 65 tests.
 **Phase 4A — DecisionCase Aggregate & Lifecycle:** complete; 55 tests.
 **Phase 4B — Governed Action Request & CER Binding:** complete; 52 tests.
-**Total:** 465/465 module tests passing. No candidate evaluation, scoring
-algorithm, evidence-derived recommendation generation, ranking, LLM inference,
-action execution, execution records, downstream system calls, or ActionGate
-invocation has been introduced. Phase 4B prepares and authorizes governed action
-requests and stops at an authorization outcome — authorized is not executed.
+**Phase 4C — External Execution & Reconciliation:** complete; 52 tests.
+**Total:** 517/517 module tests passing. No candidate evaluation, scoring
+algorithm, evidence-derived recommendation generation, ranking, or LLM inference
+has been introduced. Phase 4C dispatches through a provider-neutral port and
+records *observed* outcomes; it never conflates authorization, dispatch,
+acknowledgement, and business success, never calls a concrete vendor SDK, and
+never mutates a prior record.
 
 ## Implemented
 
@@ -508,11 +510,91 @@ control-plane port for authorization. It prepares and authorizes; it never execu
   but not yet evaluated against a live control catalog; delegated-policy and
   jurisdiction fields are preserved but not evaluated against a policy engine.
 
-## Next milestone
+## Next milestone (from Phase 4B)
 
-**Phase 4C — Execution & reconciliation** (future): take an authorized
-`ActionRequest` to an external execution adapter, record an `ExecutionRecord`, and
-reconcile the outcome. It preserves the distinction among *decision recorded →
-action requested → action authorized → execution attempted → execution
-succeeded/failed → outcome reconciled*. Do not begin until all Phase 1–4B tests
-pass.
+Phase 4C — External Execution & Reconciliation — is now implemented (see below).
+
+---
+
+# Phase 4C — External Execution, Immutable Execution Records & Reconciliation
+
+Dispatches a control-plane-authorized ``ActionRequest`` through a provider-neutral
+external port, records every attempt immutably, and reconciles the *observed*
+external result against the authorized intent. Authorization permits an attempt; it
+does not prove execution occurred or succeeded.
+
+## Implemented
+
+- [x] New `executions/` package: immutable `ExecutionIntent` (append-only lifecycle
+      projection; content hash over authorized content only), `ExecutionAttempt`
+      (transport only, monotonic), `ExecutionRecord` (observed business outcome),
+      `ReconciliationResult`, `CompensationRequirement`, the `ExternalExecutionPort`
+      protocol + `OfflineDeterministicExecutionAdapter`, lifecycle table, and typed
+      validation.
+- [x] Deterministic vocabularies (`ExecutionStatus`, `TransportStatus`,
+      `BusinessOutcome`, `ReconciliationStatus`, `RetryClassification`,
+      `CompensationType`/`Status`, `Finality`, `OutcomeSource`). Transport and
+      business outcomes are separate enums; there is no state that means "dispatch
+      == success".
+- [x] `ExecutionService` (create intent from an authorized request, validate,
+      dispatch, controlled retry), `ExecutionValidationService` (typed readiness +
+      retry classification), `ReconciliationService` (record observed outcomes /
+      query status, reconcile authorized vs observed), `CompensationService`
+      (governed compensation requirements).
+- [x] `InMemoryExecutionRepository`: append-only intents/attempts/records/
+      reconciliations/compensation revisions; attempts stored separately from
+      observed records; idempotency-key and external-request-id indexes.
+- [x] `api/execution_routes.py`: `ExecutionAPI` facade + optional FastAPI router.
+      Exposes unknown/partial outcomes explicitly, requires explicit retry, and has
+      no history-rewriting or vendor-execution endpoint.
+- [x] Additive `AuditEventType` members (19); every material transition and denial
+      audited (hashes/references only).
+- [x] Docs: `docs/EXTERNAL_EXECUTION_AND_RECONCILIATION.md` with four Mermaid
+      diagrams.
+- [x] 52 new tests across 5 files (all offline, deterministic adapter); full module
+      suite 517/517 green.
+
+## Frozen files touched (additive only)
+
+- `domain/enums.py`: added 19 Phase-4C `AuditEventType` members.
+- `errors.py`: added the `ExecutionError` hierarchy (~22 typed errors).
+- `policies/evidence_access_policy.py`: added 10 execution `Permission` members.
+- `services/__init__.py`, `repositories/__init__.py`, `__init__.py`: additive
+  exports + wiring + `build_execution_api`. No prior model, service, or test
+  changed; Phase 4A/4B validation was not weakened.
+
+## External-system boundary
+
+- The domain depends only on `ExternalExecutionPort`; no concrete
+  ATS/ERP/payment/ActionGate/vendor SDK is imported anywhere. The offline adapter
+  classifies transport by action type with no randomness or network.
+- Provider errors become `ExternalDispatchError` (never success); malformed
+  responses are rejected; a timeout becomes `OUTCOME_UNKNOWN`, never failure; an
+  acknowledgement is never a business outcome; duplicate effects remain visible.
+
+## Not implemented (explicitly out of scope for Phase 4C, by design)
+
+- [ ] Reinterpreting evidence; changing assessments, recommendations, decisions,
+      the action request, CER, or authorization response.
+- [ ] Ranking candidates; autonomous AI decision authority.
+- [ ] Treating dispatch/ack/authorization as business completion; silent retries;
+      fabricated outcomes; overwriting history.
+- [ ] Concrete vendor SDK calls from the domain layer; Phase 3C; policy discovery
+      or generation.
+
+## Known limitations
+
+- In-memory repositories; a single offline deterministic execution adapter.
+- Reconciliation compares action type, target, parameters, finality, and duplicate
+  effects; richer quantity/amount arithmetic and obligation-fulfilment checks are
+  left for later.
+- Compensation routing to a new governed action request is represented as an
+  obligation type; the hand-off into Phase 4B is intentionally manual.
+
+## Recommended next step (not Phase 3C)
+
+After Phase 4C, **do not begin Phase 3C automatically.** Extract the proven
+domain-neutral governance kernel (decision case → action request → CER →
+authorization → execution → reconciliation), migrate AI Hiring onto it, validate
+the kernel with a second domain, and only then add contract-bound AI interpretation
+as an optional upstream producer.

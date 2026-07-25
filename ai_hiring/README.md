@@ -322,15 +322,33 @@ facade. See
 > invoke a concrete ActionGate, rank candidates, or reinterpret evidence. There is
 > no `EXECUTED`/`SUCCEEDED` status and no execution endpoint.
 
+## Phase 4C — External Execution, Immutable Execution Records & Reconciliation (implemented)
+
+Takes a valid, unexpired, control-plane-authorized ``ActionRequest``, dispatches it
+through a provider-neutral external-execution port, records every attempt
+immutably, and reconciles the *observed* external result against the authorized
+intent. New package `executions/` (immutable `ExecutionIntent`, `ExecutionAttempt`,
+`ExecutionRecord`, `ReconciliationResult`, `CompensationRequirement`, the
+`ExternalExecutionPort` + an offline deterministic adapter, lifecycle, validation),
+plus `services/{execution,execution_validation,reconciliation,compensation}_service.py`,
+`repositories/execution_repository.py`, and the `api/execution_routes.py` facade.
+See [`docs/EXTERNAL_EXECUTION_AND_RECONCILIATION.md`](docs/EXTERNAL_EXECUTION_AND_RECONCILIATION.md).
+
+> **Records what was attempted and what actually happened — never conflates them.**
+> Authorization permits an execution *attempt*; it does not prove execution
+> occurred or succeeded. Transport acknowledgement is not business completion; a
+> timeout yields `OUTCOME_UNKNOWN`, not failure; retries are explicit and
+> append-only; compensation is a governed proposal, never an automatic rollback.
+> Phase 4C does **not** reinterpret evidence, alter assessments/decisions/requests,
+> rank candidates, introduce autonomous AI authority, call a concrete vendor SDK,
+> overwrite history, or implement policy discovery.
+
 ## Next milestone
 
-**Phase 4C — Execution & reconciliation** (future): take an authorized
-`ActionRequest` to an external execution adapter, record an `ExecutionRecord`, and
-reconcile the outcome (mismatch, failure, compensation, or closure). It preserves
-the distinction among *decision recorded → action requested → action authorized →
-execution attempted → execution succeeded/failed → outcome reconciled*. Do not
-begin until all Phase 1–4B tests pass. See
+The AI-Hiring vertical is complete through external execution and reconciliation.
+The recommended next step is **not** Phase 3C but to *extract the proven
+domain-neutral governance kernel* (decision case → action request → CER →
+authorization → execution → reconciliation), migrate AI Hiring onto it, validate it
+with a second domain, and only then add contract-bound AI interpretation as an
+optional upstream producer. See
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
-
-*(An interpretation-under-governance phase — earlier sketched as "Phase 3C" —
-remains future work and requires no contract changes to the phases below it.)*

@@ -437,3 +437,51 @@ def decided_case(platform, *, outcome=_DecisionOutcome.ADVANCE, subject_id: str 
 def published_mapping(platform, **kw) -> ActionMapping:
     return platform.action_request_service.publish_action_mapping(
         make_action_mapping(**kw), actor=MAPPING_ADMIN, tenant_id=TENANT)
+
+
+# --------------------------------------------------------------------------
+# Phase 4C execution helpers
+# --------------------------------------------------------------------------
+#: Phase-4C actors.
+EXECUTOR = "exec-1"
+RECONCILER = "recon-1"
+
+
+@pytest.fixture
+def execution_identity_provider() -> StaticIdentityProvider:
+    idp = StaticIdentityProvider()
+    for human in (AUTHOR, APPROVER, PUBLISHER, ASSESSOR, REVIEWER, DECISION_MAKER,
+                  OPS, MAPPING_ADMIN, EXECUTOR, RECONCILER, "exec-2", "approver-2"):
+        idp.register_human(human)
+    idp.register_ai(AI_ACTOR)
+    idp.register_service("svc-import")
+    idp.register_service(POLICY_ENGINE)
+    return idp
+
+
+@pytest.fixture
+def execution_platform(execution_identity_provider):
+    """A platform where the execution actors hold every permission in TENANT."""
+    platform = build_in_memory_platform(execution_identity_provider)
+    # NB: "exec-2" is registered but deliberately NOT granted, for SoD tests.
+    for actor in (ASSESSOR, DECISION_MAKER, OPS, MAPPING_ADMIN, EXECUTOR, RECONCILER):
+        platform.access_grants.add(AccessGrant(actor, TENANT, frozenset(Permission)))
+    return platform
+
+
+def authorized_request(platform, *, action_type="ADVANCE_WORKFLOW_STAGE",
+                       mapping_action="ADVANCE_WORKFLOW_STAGE",
+                       params=None, outcome=_DecisionOutcome.ADVANCE):
+    """Run 4A→4B to a control-plane-AUTHORIZED action request; return it."""
+    _, decision = decided_case(platform, outcome=outcome)
+    published_mapping(platform, action_type=mapping_action, decision_outcome=outcome)
+    req = platform.action_request_service.create_action_request(
+        decision_id=decision.decision_id, mapping_id="map.advance",
+        target_system="ATS", created_by=OPS,
+        requested_parameters=params or {"stage": "interview"})
+    platform.action_request_service.validate_action_request(
+        request_id=req.action_request_id, actor=OPS)
+    platform.cer_binding_service.bind_cer(request_id=req.action_request_id, actor=OPS)
+    platform.action_authorization_service.submit_for_authorization(
+        request_id=req.action_request_id, actor=OPS)
+    return platform.action_request_service.get_action_request(req.action_request_id)

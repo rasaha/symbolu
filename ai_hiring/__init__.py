@@ -45,14 +45,23 @@ from .repositories.assessment_workspace_repository import (
 )
 from .repositories.decision_case_repository import InMemoryDecisionCaseRepository
 from .repositories.action_request_repository import InMemoryActionRequestRepository
+from .repositories.execution_repository import InMemoryExecutionRepository
 from .action_requests.control_plane import (
     ActionControlPlanePort,
     OfflineDeterministicControlPlane,
+)
+from .executions.external_system import (
+    ExternalExecutionPort,
+    OfflineDeterministicExecutionAdapter,
 )
 from .services import (
     ActionAuthorizationService,
     ActionRequestService,
     ActionRequestValidationService,
+    CompensationService,
+    ExecutionService,
+    ExecutionValidationService,
+    ReconciliationService,
     AssessmentCompletenessService,
     AssessmentService,
     AssessmentValidationService,
@@ -147,6 +156,13 @@ class HiringPlatform:
     action_request_service: ActionRequestService
     cer_binding_service: CERBindingService
     action_authorization_service: ActionAuthorizationService
+    # --- Phase 4C: external execution & reconciliation ---
+    execution_repo: InMemoryExecutionRepository
+    external_execution_adapter: ExternalExecutionPort
+    execution_validation_service: ExecutionValidationService
+    execution_service: ExecutionService
+    reconciliation_service: ReconciliationService
+    compensation_service: CompensationService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -203,6 +219,17 @@ class HiringPlatform:
             self.action_request_service,
             self.cer_binding_service,
             self.action_authorization_service,
+            self.identity_provider,
+        )
+
+    def build_execution_api(self):
+        """Construct the callable :class:`~ai_hiring.api.ExecutionAPI` facade."""
+        from .api.execution_routes import ExecutionAPI
+
+        return ExecutionAPI(
+            self.execution_service,
+            self.reconciliation_service,
+            self.compensation_service,
             self.identity_provider,
         )
 
@@ -327,6 +354,20 @@ def build_in_memory_platform(
         action_request_repo, control_plane, audit_service, identity,
         evidence_access_policy)
 
+    # Phase 4C: external execution & reconciliation.
+    execution_repo = InMemoryExecutionRepository()
+    external_execution_adapter = OfflineDeterministicExecutionAdapter()
+    execution_validation_service = ExecutionValidationService(
+        execution_repo, action_request_repo)
+    execution_service = ExecutionService(
+        execution_repo, action_request_repo, execution_validation_service,
+        external_execution_adapter, audit_service, identity, evidence_access_policy)
+    reconciliation_service = ReconciliationService(
+        execution_repo, external_execution_adapter, audit_service, identity,
+        evidence_access_policy)
+    compensation_service = CompensationService(
+        execution_repo, audit_service, identity, evidence_access_policy)
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -374,4 +415,10 @@ def build_in_memory_platform(
         action_request_service=action_request_service,
         cer_binding_service=cer_binding_service,
         action_authorization_service=action_authorization_service,
+        execution_repo=execution_repo,
+        external_execution_adapter=external_execution_adapter,
+        execution_validation_service=execution_validation_service,
+        execution_service=execution_service,
+        reconciliation_service=reconciliation_service,
+        compensation_service=compensation_service,
     )

@@ -45,6 +45,9 @@ __all__ = [
     # Phase 4B: governed action request & CER binding
     "ActionRequestRepository",
     "InMemoryActionRequestRepository",
+    # Phase 4C: external execution & reconciliation
+    "ExecutionRepository",
+    "InMemoryExecutionRepository",
 ]
 
 from .assessment_repository import (
@@ -62,4 +65,8 @@ from .decision_case_repository import (
 from .action_request_repository import (
     ActionRequestRepository,
     InMemoryActionRequestRepository,
+)
+from .execution_repository import (
+    ExecutionRepository,
+    InMemoryExecutionRepository,
 )

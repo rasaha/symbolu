@@ -469,3 +469,100 @@ class ActionRequestAuthorizationError(ActionRequestError):
 
 class CrossTenantActionRequestError(ActionRequestAuthorizationError):
     """A cross-tenant action-request access was attempted and denied."""
+
+
+# --- Phase 4C: external execution & reconciliation (additive) --------------
+class ExecutionError(HiringError):
+    """Base for external-execution, execution-record, and reconciliation failures."""
+
+
+class ExecutionIntentNotFoundError(ExecutionError):
+    """No execution intent exists for the given id."""
+
+
+class ExecutionAttemptNotFoundError(ExecutionError):
+    """No execution attempt exists for the given id."""
+
+
+class ExecutionRecordNotFoundError(ExecutionError):
+    """No execution record exists for the given id."""
+
+
+class ActionRequestNotExecutableError(ExecutionError):
+    """The action request is not in an executable (authorized) state."""
+
+
+class AuthorizationNotExecutableError(ExecutionError):
+    """The authorization outcome does not permit an execution attempt."""
+
+
+class AuthorizationExpiredError(ExecutionError):
+    """The control-plane authorization has expired; execution is blocked."""
+
+
+class CERExpiredForExecutionError(ExecutionError):
+    """The bound CER has expired; execution is blocked."""
+
+
+class ExecutionParameterMismatchError(ExecutionError):
+    """Execution parameters are not a subset of what was authorized."""
+
+
+class ExecutionTargetMismatchError(ExecutionError):
+    """The execution target system or action type does not match the authorization."""
+
+
+class ExecutionIdempotencyConflictError(ExecutionError):
+    """A different intent already exists for the same execution idempotency key."""
+
+
+class UnsafeRetryError(ExecutionError):
+    """A retry was requested without a safe/approved retry classification."""
+
+
+class DuplicateExternalExecutionError(ExecutionError):
+    """A duplicate external effect was detected for the same intent."""
+
+
+class InvalidExecutionTransitionError(ExecutionError):
+    """A requested execution lifecycle transition is not structurally legal."""
+
+
+class ExternalDispatchError(ExecutionError):
+    """The external adapter failed to dispatch (provider/transport error)."""
+
+
+class MalformedExternalResponseError(ExecutionError):
+    """An external response was malformed and is rejected (fail closed)."""
+
+
+class ExternalRequestMismatchError(ExecutionError):
+    """An observed outcome references a different external request than expected."""
+
+
+class ExecutionOutcomeUnknownError(ExecutionError):
+    """The business outcome is unknown and must not be treated as success/failure."""
+
+
+class ReconciliationIncompleteError(ExecutionError):
+    """Reconciliation cannot complete without the required observations."""
+
+
+class ExecutionMismatchError(ExecutionError):
+    """Observed effects materially differ from the authorized intent."""
+
+
+class CompensationRequiredError(ExecutionError):
+    """A compensation requirement must be created/resolved before proceeding."""
+
+
+class CompensationNotFoundError(ExecutionError):
+    """No compensation requirement exists for the given id."""
+
+
+class ExecutionAuthorizationError(ExecutionError):
+    """The actor is not authorized for the requested execution operation."""
+
+
+class CrossTenantExecutionError(ExecutionAuthorizationError):
+    """A cross-tenant execution access was attempted and denied."""
