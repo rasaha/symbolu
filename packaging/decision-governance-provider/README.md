@@ -1,1 +1,0 @@
-DGM Provider Framework distribution
