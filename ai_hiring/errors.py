@@ -173,3 +173,56 @@ class LineageVersionRegressionError(LineageError):
 
 class LineageConflictingParentError(LineageError):
     """A version node has conflicting immediate predecessors."""
+
+
+# --- Phase 3A: capability ontology & rubric contracts ----------------------
+class OntologyError(HiringError):
+    """Base class for capability-ontology errors."""
+
+
+class CapabilityNotFoundError(OntologyError):
+    """A referenced capability (or version) does not exist."""
+
+
+class ImmutableCapabilityError(OntologyError):
+    """An attempt was made to overwrite a published, immutable capability."""
+
+
+class CapabilityCycleError(OntologyError):
+    """The capability hierarchy would contain a cycle."""
+
+
+class RubricError(HiringError):
+    """Base class for rubric-contract errors."""
+
+
+class RubricNotFoundError(RubricError):
+    """A referenced rubric (or version) does not exist."""
+
+
+class RubricValidationError(RubricError):
+    """A rubric failed contract validation."""
+
+
+class InvalidLifecycleTransitionError(RubricError):
+    """An illegal rubric (or capability) lifecycle transition was requested."""
+
+
+class ImmutableRubricError(RubricError):
+    """An attempt was made to mutate a published, immutable rubric."""
+
+
+class ApprovalError(RubricError):
+    """An approval-workflow rule was violated (e.g. segregation of duties)."""
+
+
+class UnknownReasonCodeError(RubricError):
+    """A rubric referenced a reason code outside the frozen taxonomy."""
+
+
+class UnknownScoringScaleError(RubricError):
+    """A rubric referenced an unknown scoring scale."""
+
+
+class UnknownEvidenceTypeError(RubricError):
+    """A rubric or capability referenced an unknown evidence type."""

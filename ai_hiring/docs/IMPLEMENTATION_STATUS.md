@@ -3,8 +3,9 @@
 **Phase 1 — Foundation:** complete; 51 tests.
 **Phase 2 — Evidence Ingestion & Normalization:** complete; 57 tests.
 **Phase 2.5 — Evidence Boundary Hardening:** complete; 107 tests.
-**Total:** 215/215 module tests passing. No hiring evaluation or scoring logic
-was introduced (this module ingests and hardens evidence only).
+**Phase 3A — Capability Ontology & Rubric Contracts:** complete; 78 tests.
+**Total:** 293/293 module tests passing. No candidate evaluation, scoring
+algorithm, recommendation generation, or LLM inference has been introduced.
 
 ## Implemented
 
@@ -228,10 +229,53 @@ See `docs/EVIDENCE_BOUNDARY_HARDENING.md`.
 - Placeholder authorization (grant store + Phase-1 identity provider).
 - No cryptographic audit hash-chain yet.
 
+---
+
+# Phase 3A — Capability Ontology & Rubric Contracts
+
+**Status:** complete; 78 Phase-3A tests + 215 prior tests green (293 total).
+See `docs/CAPABILITY_ONTOLOGY.md`.
+
+## Implemented
+
+- [x] `ontology/`: immutable `Capability` + hierarchy (`CapabilityGraph`),
+      evidence-type + reason-code vocabularies (`taxonomy`), versioning helpers.
+- [x] `rubrics/`: `Rubric` contract, `RubricCapability` mapping, scoring scales,
+      evidence-admissibility rules + missing-evidence semantics, uncertainty
+      contracts, conflict representation, approval lifecycle.
+- [x] `repositories/`: immutable versioned `ontology_repository`; append-only
+      snapshot `rubric_repository`.
+- [x] `services/`: `OntologyService` (publish/retire/supersede/lookup/list/
+      history + hierarchy validation), `RubricValidationService` (deterministic
+      contract checks), `RubricService` (Author→Reviewer→Approver→Publisher,
+      segregation of duties, publish-requires-valid).
+- [x] `api/`: `OntologyAPI` + `RubricAPI` callable facades with human-governance
+      authorization hooks + optional FastAPI routers.
+- [x] Additive `AuditEventType` members; every governance action audited.
+- [x] Docs: `docs/CAPABILITY_ONTOLOGY.md` with Mermaid diagrams.
+
+## Frozen files touched (additive only)
+
+- `domain/enums.py`: added Phase-3A `AuditEventType` members.
+- `errors.py`: added ontology/rubric typed error classes.
+- `services/__init__.py`, `__init__.py`: additive wiring + `build_ontology_api`/
+  `build_rubric_api`. No prior model, service, or test changed.
+
+## Not implemented (explicitly out of scope)
+
+- [ ] Candidate evaluation / scoring / ranking / recommendation.
+- [ ] LLM inference, embeddings, prompt engineering, confidence prediction,
+      fairness algorithms, ATS integrations.
+
+## Known limitations
+
+- In-memory repositories; placeholder human-governance authorization.
+- Weight-total validation fixed at sum = 1.0 (tolerance 1e-6).
+- No cryptographic signing of published contracts yet.
+
 ## Next milestone
 
-**Phase 3A — Capability Ontology & Rubric Contracts** (contracts, not model
-inference): versioned capability ontology, job rubric contracts, permissible
-evidence references, scoring scales, missing-evidence/uncertainty/conflict
-representation, reason-code taxonomy, rubric approval/publication workflow. No
-LLM inference until those are implemented and validated.
+**Phase 3B — Evaluation Engine** (future): consume only the immutable Phase-3A
+contracts to produce advisory, per-capability assessments behind the Phase-1
+human-decision boundary. It must not invent capabilities, scales, admissibility
+rules, uncertainty semantics, or reason codes.

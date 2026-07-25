@@ -236,12 +236,29 @@ matrix for every format.
 > 2.5** (this phase hardens the evidence substrate only). This is not a claim
 > that no scoring logic exists anywhere in the wider repository.
 
+## Phase 3A — Capability Ontology & Rubric Contracts (implemented)
+
+The **constitution of evaluation** — immutable contracts that define what
+evaluation *means*, frozen before any evaluator exists. New packages `ontology/`
+(capabilities, hierarchy, evidence-type + reason-code vocabularies, versioning)
+and `rubrics/` (rubric contracts, capability mappings, scoring scales, evidence
+admissibility rules, uncertainty contracts, conflict representation, approval
+lifecycle), plus `services/{ontology,rubric,rubric_validation}_service.py` and
+`repositories/{ontology,rubric}_repository.py`. Capabilities are immutable and
+versioned; rubrics move through Author → Reviewer → Approver → Publisher and are
+immutable after publication; only PUBLISHED rubrics may later be used for
+evaluation. See [`docs/CAPABILITY_ONTOLOGY.md`](docs/CAPABILITY_ONTOLOGY.md).
+
+> **This phase defines the constitution of evaluation, not the evaluator.** It
+> does not evaluate candidates, score, rank, or run any model. No candidate
+> evaluation, scoring algorithm, recommendation generation, or LLM inference was
+> introduced in Phase 3A.
+
 ## Next milestone
 
-**Phase 3A — Capability Ontology & Rubric Contracts** (not model inference):
-versioned capability ontology, job-specific rubric contracts, permissible
-evidence references, scoring scales, missing-evidence/uncertainty/conflict
-representation, reason-code taxonomy, and a rubric approval/publication workflow.
-No LLM inference until those contracts are implemented and validated. Do not
-begin until all Phase 1, Phase 2, and Phase 2.5 tests pass. See
+**Phase 3B — Evaluation Engine** (future): consume *only* the immutable Phase-3A
+contracts (capabilities, scales, admissibility rules, uncertainty semantics,
+reason codes) to produce advisory, per-capability assessments — still behind the
+Phase-1 human-decision boundary. It must not invent any contract. Do not begin
+until all Phase 1, 2, 2.5, and 3A tests pass. See
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).

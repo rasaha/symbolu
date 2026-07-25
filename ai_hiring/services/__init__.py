@@ -32,4 +32,12 @@ __all__ = [
     # Phase 2.5: evidence boundary hardening
     "EvidenceValidationService",
     "EvidenceAccessService",
+    # Phase 3A: capability ontology & rubric contracts
+    "OntologyService",
+    "RubricService",
+    "RubricValidationService",
 ]
+
+from .ontology_service import OntologyService
+from .rubric_service import RubricService
+from .rubric_validation_service import RubricValidationService

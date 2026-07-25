@@ -37,6 +37,8 @@ from .repositories.in_memory import (
     InMemoryWorkflowRepository,
 )
 from .policies.evidence_access_policy import EvidenceAccessPolicy, GrantStore
+from .repositories.ontology_repository import InMemoryOntologyRepository
+from .repositories.rubric_repository import InMemoryRubricRepository
 from .services import (
     AuditService,
     DecisionService,
@@ -44,8 +46,11 @@ from .services import (
     EvidenceAccessService,
     EvidenceIngestionService,
     EvidenceValidationService,
+    OntologyService,
     ProvenanceService,
     RecommendationService,
+    RubricService,
+    RubricValidationService,
     SearchService,
     WorkflowService,
 )
@@ -94,6 +99,12 @@ class HiringPlatform:
     evidence_access_policy: EvidenceAccessPolicy
     evidence_validation_service: EvidenceValidationService
     evidence_access_service: EvidenceAccessService
+    # --- Phase 3A: capability ontology & rubric contracts ---
+    ontology_repo: InMemoryOntologyRepository
+    rubric_repo: InMemoryRubricRepository
+    ontology_service: OntologyService
+    rubric_validation_service: RubricValidationService
+    rubric_service: RubricService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -112,6 +123,18 @@ class HiringPlatform:
             evidence_access_service=self.evidence_access_service,
             evidence_validation_service=self.evidence_validation_service,
         )
+
+    def build_ontology_api(self):
+        """Construct the callable :class:`~ai_hiring.api.OntologyAPI` facade."""
+        from .api.ontology_routes import OntologyAPI
+
+        return OntologyAPI(self.ontology_service, self.identity_provider)
+
+    def build_rubric_api(self):
+        """Construct the callable :class:`~ai_hiring.api.RubricAPI` facade."""
+        from .api.rubric_routes import RubricAPI
+
+        return RubricAPI(self.rubric_service, self.identity_provider)
 
 
 def build_in_memory_platform(
@@ -178,6 +201,13 @@ def build_in_memory_platform(
         identity, evidence_access_policy, audit_service,
     )
 
+    # Phase 3A: capability ontology & rubric contracts.
+    ontology_repo = InMemoryOntologyRepository()
+    rubric_repo = InMemoryRubricRepository()
+    ontology_service = OntologyService(ontology_repo, audit_service)
+    rubric_validation_service = RubricValidationService(ontology_repo)
+    rubric_service = RubricService(rubric_repo, rubric_validation_service, audit_service)
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -203,4 +233,9 @@ def build_in_memory_platform(
         evidence_access_policy=evidence_access_policy,
         evidence_validation_service=evidence_validation_service,
         evidence_access_service=evidence_access_service,
+        ontology_repo=ontology_repo,
+        rubric_repo=rubric_repo,
+        ontology_service=ontology_service,
+        rubric_validation_service=rubric_validation_service,
+        rubric_service=rubric_service,
     )

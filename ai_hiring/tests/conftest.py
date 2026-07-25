@@ -155,3 +155,50 @@ PDF_NATIVE = b"%PDF-1.4\nBT (Hello world native text) Tj ET\n%%EOF"
 PDF_EMPTY = b"%PDF-1.4\n%%EOF"
 PDF_FLATE = b"%PDF-1.4\n<< /Filter /FlateDecode >>\nstream\n\x78\x9c\nendstream\n%%EOF"
 PDF_ENCRYPTED = b"%PDF-1.4\n<< /Encrypt 1 0 R >>\nBT (secret) Tj ET\n%%EOF"
+
+
+# --------------------------------------------------------------------------
+# Phase 3A ontology / rubric helpers
+# --------------------------------------------------------------------------
+from ai_hiring.ontology import Capability, EvidenceType
+from ai_hiring.rubrics import EvidenceRule, Rubric, RubricCapability
+
+AUTHOR = "hm-alex"
+APPROVER = "domain-expert-1"
+PUBLISHER = "hr-partner-1"
+
+
+def make_capability(cap_id="cap.python", name="Python", parent_id=None, **kw) -> Capability:
+    base = dict(
+        capability_id=cap_id, name=name, category="Programming", parent_id=parent_id,
+        allowed_evidence_types=(EvidenceType.CODING_TEST, EvidenceType.GITHUB),
+        required_evidence_types=(EvidenceType.CODING_TEST,), minimum_evidence_count=1,
+    )
+    base.update(kw)
+    return Capability(**base)
+
+
+def publish_capability(platform, cap_id="cap.python", **kw) -> Capability:
+    return platform.ontology_service.publish(
+        make_capability(cap_id=cap_id, **kw), actor_id=AUTHOR)
+
+
+def make_rubric(cap_id="cap.python", cap_version=1, weight=1.0, rubric_id="rub.be",
+                scale="scale.1_5", **kw) -> Rubric:
+    rule = EvidenceRule(
+        capability_id=cap_id, allowed_types=(EvidenceType.CODING_TEST,),
+        required_types=(EvidenceType.CODING_TEST,), prohibited_types=(EvidenceType.PHOTO,),
+        minimum_count=1, freshness_days=365)
+    rc = RubricCapability(capability_id=cap_id, capability_version=cap_version,
+                          weight=weight, scoring_scale_id=scale, evidence_rule=rule)
+    base = dict(rubric_id=rubric_id, role="Backend Engineer", version=1,
+                capabilities=(rc,), default_scoring_scale_id=scale)
+    base.update(kw)
+    return Rubric(**base)
+
+
+def publish_rubric(platform, rubric: Rubric) -> Rubric:
+    platform.rubric_service.create(rubric, author_id=AUTHOR)
+    platform.rubric_service.submit(rubric.rubric_id, author_id=AUTHOR)
+    platform.rubric_service.approve(rubric.rubric_id, approver_id=APPROVER)
+    return platform.rubric_service.publish(rubric.rubric_id, publisher_id=PUBLISHER)
