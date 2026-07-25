@@ -32,7 +32,7 @@ all = [
 # Top-level packages containing all modules
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["symbolu*", "agentic*"]
+include = ["symbolu*", "agentic*", "ai_hiring*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

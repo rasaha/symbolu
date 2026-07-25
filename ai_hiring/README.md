@@ -89,7 +89,40 @@ python -m pytest ai_hiring/tests -q
 ```
 
 The module is isolated: it is not in the repository's default `testpaths`, is
-not imported by any existing code, and modifies no files outside `ai_hiring/`.
+not imported by any existing code.
+
+## Packaging / installation verification
+
+`ai_hiring` is registered for package discovery in `pyproject.toml`
+(`[tool.setuptools.packages.find]` → `include = [..., "ai_hiring*"]`), so it and
+all its subpackages are included in editable installs and built distributions.
+To verify install, out-of-root import, tests, and wheel contents:
+
+```bash
+# from the repository root
+pip install -e .                                    # editable install succeeds
+(cd /tmp && python -c "import ai_hiring; print(ai_hiring.__version__)")
+python -m pytest ai_hiring/tests -q                 # 51 tests pass
+
+# built wheel contains ai_hiring/ and every subpackage
+python -m build --wheel --outdir dist
+python - <<'PY'
+import glob, zipfile
+whl = sorted(glob.glob("dist/*.whl"))[-1]
+pkgs = sorted({
+    n.split("/", 2)[1] if n.count("/") >= 2 else "ai_hiring"
+    for n in zipfile.ZipFile(whl).namelist()
+    if n.startswith("ai_hiring/") and n.endswith("__init__.py")
+})
+print("wheel:", whl)
+print("ai_hiring subpackages in wheel:", pkgs)
+PY
+```
+
+Expected subpackages: `api`, `domain`, `policies`, `repositories`, `services`
+(plus the top-level `ai_hiring` package). As with the existing `symbolu*` /
+`agentic*` packages, the build also bundles the module's `tests/` files — this
+matches the repository's established packaging behavior.
 
 ## Example service flow
 
