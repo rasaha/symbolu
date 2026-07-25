@@ -2,10 +2,19 @@
 
 ### Governing How Evidence and Policy Become Authorized Enterprise Decisions
 
-**Author:** Rakesh Mohan
-**Organization:** Ugence Labs
-**Document Version:** 0.3 — Working Draft (architecture review revision)
-**Status:** Architecture whitepaper with a partial, tested reference implementation
+| Field | Value |
+|-------|-------|
+| **Document** | Ugence Decision Governance Middleware |
+| **Version** | **1.0 — Architecture Freeze** |
+| **Author** | Rakesh Mohan |
+| **Organization** | Ugence Labs |
+| **Freeze date** | 2026-07-25 |
+| **Reference implementation** | `ai_hiring` |
+| **Reference implementation status** | Phases 1–3A implemented |
+| **Next implementation phase** | Phase 3B — Deterministic Assessment Runtime |
+| **Verified against commit** | `35c0d7f` |
+| **Verified test count** | 293 passing (`ai_hiring`) |
+| **Word count** | ~11,600 |
 
 > *"Models generate possibilities. Enterprises remain accountable for decisions.
 > Ugence governs the space between them."*
@@ -38,8 +47,38 @@
 
 ---
 
+## How to read this whitepaper
+
+This document contains two classes of content, and the distinction is
+authoritative.
+
+**Normative** statements define architectural requirements that a conforming
+implementation *must* satisfy. They use the keywords **MUST**, **MUST NOT**,
+**SHALL**, **SHALL NOT**, **REQUIRED**, and **PROHIBITED**. The normative core is
+**§0 (Architecture Invariants)**; individual normative obligations also appear in
+the phase-boundary text (§14) and are consolidated for review in **Appendix I
+(Conformance Checklist)**.
+
+**Explanatory** material provides rationale, examples, diagrams, implementation
+options, comparisons, adoption guidance, and non-binding recommendations. The
+bulk of this paper — the argument, the tables, the walkthroughs, the operating
+modes, the competitive analysis — is explanatory. It illustrates the architecture;
+it does not, by itself, add obligations.
+
+> Where an explanatory example conflicts with a normative architectural
+> invariant, the invariant governs.
+
+The keywords are used **only where an architectural obligation is actually
+intended**. Prose that merely explains is not made normative by proximity to a
+MUST. Implementation status (what is built versus specified) is governed by the
+**Claim and Maturity Register (Appendix H)**, not by prose.
+
+---
+
 ## Table of contents
 
+- How to read this whitepaper (normative vs. explanatory)
+0. Architecture invariants *(normative)*
 1. Executive summary
 2. The enterprise decision problem
 3. Falsifying the thesis
@@ -62,6 +101,7 @@
 20. Limitations and open research questions
 21. Product strategy and domain expansion
 22. Conclusion
+23. Version 1.0 architecture freeze *(normative)*
 - Appendix A — Canonical decision schema
 - Appendix B — Decision lifecycle state model
 - Appendix C — Audit event model
@@ -69,6 +109,98 @@
 - Appendix E — Capability maturity matrix
 - Appendix F — Competitive comparison
 - Appendix G — Glossary
+- Appendix H — Claim and maturity register *(authoritative)*
+- Appendix I — Implementation conformance checklist
+
+---
+
+## 0. Architecture invariants
+
+**This section is normative.** It defines the rules a conforming implementation
+MUST satisfy in every phase. The remainder of the paper explains, illustrates, and
+sequences these invariants; it does not weaken them. An implementation that
+violates any invariant below is non-conforming even if it preserves API
+compatibility (§23).
+
+**Invariant 1 — Recommendation is not decision.** A recommendation is advisory. A
+recommendation MUST NOT become a binding enterprise decision merely because it was
+produced by a model, agent, rules engine, or automated service. A binding decision
+REQUIRES valid direct, delegated, escalated, or emergency authority (§10).
+
+**Invariant 2 — Assessment is not recommendation.** An assessment records what
+admitted evidence supports under a published contract; a recommendation proposes
+an outcome. The architecture MUST preserve these as separate records (§9).
+
+**Invariant 3 — Decision is not execution.** A binding decision does not prove
+that the requested action was authorized or executed. Decision, action request,
+action authorization, and execution result MUST remain independently represented
+(§9, §11).
+
+**Invariant 4 — DGM does not execute enterprise actions.** Decision Governance
+Middleware governs the decision lifecycle and constructs governed action requests.
+It MUST NOT claim that the enterprise operation has occurred merely because a
+decision has been recorded (§11).
+
+**Invariant 5 — ActionGate governs action authorization.** ActionGate is a
+component within the AI Control Plane that determines whether and under what
+constraints a proposed action may execute. DGM MUST NOT duplicate or silently
+bypass this enforcement responsibility (§4, §11).
+
+**Invariant 6 — External systems execute.** The system of record, operational
+application, agent tool, or other external execution system performs the
+authorized operation. Execution status MUST be returned separately to the decision
+case (§9, §11).
+
+**Invariant 7 — Published contracts are immutable.** Published capabilities,
+ontology versions, rubric versions, policy bindings, semantic mappings, and
+delegated-authority definitions MUST NOT be modified in place. A semantic or policy
+change REQUIRES a new version (§6, §8).
+
+**Invariant 8 — Historical records are append-only.** New evidence, corrections,
+appeals, reversals, overrides, or execution outcomes MUST create new records or
+events. Historical decision meaning MUST NOT be overwritten. *New facts create new
+records; they do not rewrite historical meaning* (§6, Appendix A).
+
+**Invariant 9 — Available information is not automatically admissible evidence.**
+Evidence MUST pass the applicable admissibility policy before it influences an
+assessment or recommendation. Technically accessible information MUST NOT be
+treated as permissible evidence by default (§7).
+
+**Invariant 10 — Evaluators cannot amend their constitution.** An evaluator,
+including an LLM-based evaluator, MUST consume published ontology, rubric,
+admissibility, scale, uncertainty, and reason-code contracts. It MUST NOT invent or
+alter those contracts during evaluation (§8, §14).
+
+**Invariant 11 — Missing evidence is not negative evidence.** Missing, quarantined,
+redacted, unavailable, stale, prohibited, or insufficient evidence MUST NOT
+automatically be converted into an adverse capability finding unless the published
+contract explicitly permits that interpretation (§7, §9).
+
+**Invariant 12 — Uncertainty must remain explicit.** An evaluator MUST NOT suppress
+uncertainty, conflicts, missing evidence, or unresolved ambiguity merely to produce
+a complete-looking output (§9, §14).
+
+**Invariant 13 — Semantic mappings require accountable approval.** Consequential
+semantic mappings MUST NOT be autonomously deployed solely on the basis of model
+confidence. They REQUIRE versioned validation and accountable human approval
+(§12).
+
+**Invariant 14 — Auditability does not depend on chain-of-thought.** The
+architecture MUST NOT depend on private chain-of-thought or hidden model reasoning
+as the authoritative audit artifact. Auditability MUST derive from admitted
+evidence, policy bindings, structured assessments, recommendations, authority
+records, decisions, action authorizations, execution results, and append-only
+events (§2, §16, §19).
+
+**Invariant 15 — Human oversight includes delegated authority.** The architecture
+MUST support both direct human decisions and bounded policy-delegated authority. It
+MUST NOT equate human accountability with a mandatory human click on every
+transaction (§10).
+
+**Invariant 16 — Enforcement must fail closed where required.** Where policy,
+authority, identity, contract validity, evidence eligibility, or action
+authorization cannot be established, the applicable governed operation MUST fail
+closed or escalate according to the published contract (§13, §19).
 
 ---
 
@@ -290,6 +422,25 @@ claimed object — the decision case — is not one of the four boundary objects
 (context, assertion, action, execution-safety); it is the organizational decision
 that produces them.
 
+**Boundary discipline (normative restatement of §0 Invariants 4–6).** To keep the
+portfolio coherent, conforming descriptions and implementations MUST NOT:
+
+- describe **ActionGate** as a peer of the AI Control Plane, as a synonym for the
+  entire AI Control Plane, as an execution engine, or as the system that performs
+  the business operation;
+- describe **DGM** as an enforcement gate, as a new name for the AI Control Plane,
+  or as the executor of enterprise actions;
+- collapse **DGM, ActionGate, the AI Control Plane, TAP, or the external system of
+  record** into a single responsibility.
+
+The seven roles are fixed: **TAP** governs consequential assertions; **DGM**
+governs consequential decision cases; the **Agent Runtime** plans and proposes
+work; the **CER** carries the proposed action and control context; the **AI Control
+Plane** governs the AI-interaction and execution-safety boundary; **ActionGate** is
+the action-authorization and enforcement component *within* the AI Control Plane;
+and the **external enterprise system** performs the operation and returns execution
+status.
+
 ---
 
 ## 5. Decision governance as a distinct control layer
@@ -378,6 +529,14 @@ API permissions — a `Decision` with `actor_type = AI` is *unrepresentable*, an
 AI or service principal attempting to author one is rejected and audited as a
 security violation. **[IMPLEMENTED]** That enforcement is what turns
 "human-in-the-loop" from a slogan into a checkable property.
+
+**DecisionCase status.** The DecisionCase *aggregate* — a single object binding the
+records above into one versioned, orchestrated lifecycle — is **[SPECIFIED]**, not
+implemented. The reference module today provides several *constituent* contracts and
+services (evidence, evaluation/assessment, recommendation, decision, audit) but not
+the aggregate lifecycle. The existence of the component records MUST NOT be read as
+the existence of the aggregate. Implementation of the DecisionCase aggregate and its
+lifecycle orchestration is **Phase 4A** (§14).
 
 ---
 
@@ -468,21 +627,34 @@ record. DGM keeps them as **distinct records**, because they routinely diverge.
   **[IMPLEMENTED]**
 - **Execution record** — what the *external system actually did*. **[SPECIFIED]**
 
-A concrete divergence (all three records coexist; none overwrites another):
+These are **four distinct records** (§0 Invariants 2 and 3). Assessment and
+recommendation may be grouped conceptually as the *advisory layer* (neither is
+binding), but they MUST remain semantically distinguishable: an assessment states
+what the evidence supports; a recommendation proposes an outcome. A concrete
+divergence, all four records coexisting, none overwriting another:
 
 ```yaml
-assessment:
-  recommendation_support: ADVANCE      # what the evidence supported
+assessment:                            # what the admitted evidence supports
+  evidence_supports: ADVANCE
   uncertainty: MEDIUM
-decision:
-  outcome: DO_NOT_ADVANCE              # what the human decided
+recommendation:                        # what an advisory source proposes
+  proposed_outcome: ADVANCE
+  source: ai_evaluator                 # actor_type = AI
+decision:                              # what authorized authority formally adopts
+  outcome: DO_NOT_ADVANCE
   authority: hiring_manager
   override_reason: ROLE_REQUIREMENT_CHANGED
-execution:
-  requested_action: REJECT_APPLICATION # what was sent to the ATS
+execution:                             # what the operational system attempts/completes
+  requested_action: REJECT_APPLICATION # sent to the ATS
   authorization: GRANTED               # ActionGate/ACP
   external_status: COMPLETED           # what actually happened
 ```
+
+The recommendation is **not** a mandatory field inside the assessment. A decision
+case may legitimately contain: an assessment *without* a recommendation; a
+recommendation *without* a formal rubric assessment; *multiple competing*
+recommendations; or a human decision that *rejects all* recommendations. The
+records are independently present and independently versioned.
 
 The separation is necessary for: **human overrides** (decision ≠ recommendation);
 **failed execution** (execution ≠ decision — the ATS rejected the write);
@@ -660,9 +832,17 @@ described as operational.
   requirement/evaluation-contract layer with the author→approve→publish lifecycle
   and segregation of duties; it defines *what evaluation means before any
   evaluator exists*. **[IMPLEMENTED]** — 78 tests.
-- **Phase 3B and beyond** — the deterministic assessment runtime, contract-bound AI
-  interpretation, the CER/ActionGate binding, multi-domain packs, and semantic
-  mapping. **[ROADMAP]/[RESEARCH]**.
+- **Phase 3B — Deterministic Assessment Runtime.** Executes the Phase-3A
+  constitution *without model inference*. **[NEXT]** (§14.3).
+- **Phase 3C — Contract-Bound Evidence Interpretation.** AI-assisted interpretation
+  *within* the immutable contracts. **[ROADMAP]** (§14.4).
+- **Phase 4A — DecisionCase aggregate & lifecycle orchestration.** **[ROADMAP]**.
+- **Phase 4B — Action-request construction & CER binding.** **[ROADMAP]**.
+- **Phase 4C — Action-authorization linkage, execution reconciliation, appeals &
+  reversals.** **[ROADMAP]**.
+- **Later research & productization** — human-approved semantic mapping and drift
+  controls, additional domain packs, proxy detection, cross-domain validation, and
+  enterprise connectors. **[ROADMAP]/[RESEARCH]**.
 
 **Verified test totals (this repository):** 51 + 57 + 107 + 78 = **293 tests,
 all passing.** See `ai_hiring/README.md`,
@@ -677,7 +857,7 @@ Capability maturity (full matrix in Appendix E):
 | Evidence normalization | Implemented | Phase 2 |
 | Evidence-boundary hardening | Implemented | Phase 2.5 |
 | Ontology and rubric constitution | Implemented | Phase 3A |
-| Deterministic assessment runtime | Roadmap | Phase 3B |
+| Deterministic assessment runtime | Next | Phase 3B |
 | Contract-bound AI interpretation | Roadmap | Phase 3C |
 | Automated semantic mapping | Research/Roadmap | Not production-proven |
 | Cross-domain deployment | Roadmap | Hiring is the reference implementation |
@@ -741,6 +921,70 @@ step is labeled with its real status so the happy path is not overstated.
 The point of the walkthrough: the *decision* (step 8) is governed and
 reconstructable today for hiring; the *action* (steps 9–12) is governed by the
 composition with ActionGate/ACP that is designed but not yet built.
+
+### 14.2 Implementation sequence (aligned)
+
+The whitepaper roadmap and the AI-hiring phase plan are one and the same. Each
+phase states its architectural responsibility, what it consumes, what it produces,
+what it explicitly does not do, and its status.
+
+| Phase | Responsibility | Consumes | Produces | Does **not** do | Status |
+|-------|----------------|----------|----------|-----------------|--------|
+| 1 | Human decision boundary, immutable contracts, repositories, services, APIs, audit foundation | — | recommendation/decision contracts, workflow, audit | evaluate evidence | Implemented |
+| 2 | Evidence ingestion, normalization, provenance, quarantine, chunking, lineage, reconstruction | raw submissions | normalized, provenance-linked evidence | score or interpret | Implemented |
+| 2.5 | Evidence-boundary hardening, fail-closed eligibility, duplicate semantics, authorization-aware search, atomic ingestion | evidence | hardened, admissible evidence | score or interpret | Implemented |
+| 3A | Capability ontology & rubric constitution | domain expertise | published, versioned contracts | evaluate | Implemented |
+| **3B** | **Deterministic Assessment Runtime** | published contracts + authorized evidence refs | structured advisory assessments (no inference) | infer, rank, recommend, decide | **Next** |
+| 3C | Contract-Bound Evidence Interpretation | 3A contracts + 3B runtime | AI-proposed, contract-bound observations | invent contracts, rank, decide | Roadmap |
+| 4A | DecisionCase aggregate & lifecycle orchestration | all component records | the DecisionCase lifecycle | execute actions | Roadmap |
+| 4B | Action-request construction & CER binding | binding decisions | action requests / CERs | authorize or execute | Roadmap |
+| 4C | Action-authorization linkage, execution reconciliation, appeals & reversals | CERs + ActionGate/ACP + execution results | authorized/executed cases, appeals | perform the business operation | Roadmap |
+| Later | Human-approved semantic mapping, drift controls, domain packs, proxy detection, cross-domain validation, connectors | — | new packs/controls | autonomous mapping | Roadmap / Research |
+
+### 14.3 Phase 3B — Deterministic Assessment Runtime
+
+**Purpose:** execute the Phase-3A constitution *without model inference*, proving
+the evaluation constitution can run before any AI is permitted to interpret
+evidence under it.
+
+It **consumes**: published rubric versions; published capability versions;
+admissibility rules; authorized evidence references; missing-evidence semantics;
+scoring-scale shapes; uncertainty contracts; conflict contracts; reason-code
+vocabularies.
+
+It **produces**: assessment workspaces; evidence-to-capability bindings;
+admissibility outcomes; missing-evidence records; conflict records; externally
+supplied observations; observation-validation results; uncertainty records;
+reason-code bindings; structured advisory assessments; reconstructable audit
+events.
+
+It **MUST NOT**: infer scores from free-form evidence; interpret résumés or
+interview content using an LLM; rank candidates; compare candidates; generate a
+hiring recommendation; make a binding hiring decision; resolve conflicts
+autonomously; create new capabilities, scales, or reason codes; or alter published
+contracts (§0 Invariants 10, 11, 12).
+
+> Phase 3B proves that the evaluation constitution can execute before any AI system
+> is permitted to interpret evidence under it.
+
+### 14.4 Phase 3C — Contract-Bound Evidence Interpretation
+
+Phase 3C **may** introduce AI-assisted interpretation, but **only** within the
+immutable contracts established in Phase 3A and executed by Phase 3B.
+
+The AI **may propose**: evidence-grounded observations; capability-specific
+findings; structured explanations; uncertainty levels; approved reason codes.
+
+The AI **MUST NOT**: introduce new evaluation criteria; change rubric weights;
+alter scoring scales; use prohibited evidence; hide missing evidence; invent reason
+codes; convert uncertainty into certainty; resolve conflicts without an approved
+disposition path; rank candidates unless a later published contract explicitly
+authorizes it; or issue a binding employment decision (§0 Invariants 1, 10, 11, 12).
+
+Every proposed observation MUST remain linked to: evidence identifiers; evidence
+spans or references where applicable; capability version; rubric version; model and
+prompt version; uncertainty; reason codes; and validation outcome. An observation
+that cannot be so linked is not admissible into the assessment.
 
 ---
 
@@ -830,6 +1074,15 @@ evidence handling vs. the covered entity's program); MiFID II/SEC (pre-trade
 authority records, composing with pre-trade ActionGate, vs. the firm's supervision
 obligations). Jurisdictional variation is the rule, not the exception; DGM
 supplies controls and evidence, not legal conclusions.
+
+Conforming descriptions of DGM MUST NOT state that it *ensures compliance*,
+*guarantees fairness*, *eliminates bias*, *makes a decision legally defensible by
+itself*, or *satisfies a regulation automatically*. Legal and regulatory outcomes
+depend on factors outside the software: **jurisdiction; organizational procedures;
+legal interpretation; policy validity; human behavior; operational controls;
+external documentation; and system configuration.** DGM's contribution is technical
+controls and reconstructable evidence that *may support* — never replace — an
+organization's compliance program.
 
 ---
 
@@ -991,6 +1244,59 @@ authorized *decision* in between.
 
 > *"Models generate possibilities. Enterprises remain accountable for decisions.
 > Ugence governs the space between them."*
+
+---
+
+## 23. Version 1.0 architecture freeze
+
+**This section is normative.**
+
+Version 1.0 freezes the *architectural thesis*, the *governed-object boundaries*,
+the *terminology*, the *canonical decision lifecycle*, and the *invariants* (§0)
+defined in this whitepaper. It establishes the stable reference that subsequent
+implementation phases must conform to.
+
+**The freeze does not mean every specified capability is implemented.** It means:
+
+- future implementations MUST conform to the invariants in §0;
+- implementation status remains governed by the Claim and Maturity Register
+  (Appendix H), not by prose;
+- roadmap *sequencing* (§14.2) may be refined without violating the architecture;
+- explanatory examples, diagrams, and non-binding guidance may evolve;
+- domain-specific extensions and additional packs may be added;
+- no implementation may silently collapse **DGM, ActionGate, the AI Control Plane,
+  TAP, or the external system of record** into one responsibility.
+
+### 23.1 Change control
+
+| Category | Version | Permitted / required for |
+|----------|---------|--------------------------|
+| **Patch** | 1.0.x | typographical corrections; clarification without semantic change; corrected repository references; improved diagrams; non-normative examples |
+| **Minor** | 1.x | additive domain patterns; additional operating modes; new non-breaking contract concepts; expanded security or deployment guidance; new appendices that do not alter invariants |
+| **Major** | 2.0 | changing the governed-object boundaries; changing the meaning of assessment, recommendation, decision, authorization, or execution; permitting evaluators to alter published contracts; collapsing DGM into ActionGate or the AI Control Plane; changing the canonical authority model; abandoning append-only history; permitting autonomous deployment of consequential semantic mappings; changing any normative architecture invariant |
+
+Any change in the **Major** column REQUIRES a new whitepaper version (2.0) and MUST
+NOT be introduced under a patch or minor revision.
+
+> Any implementation that violates a Version 1.0 invariant is non-conforming even
+> if it preserves API compatibility.
+
+### 23.2 Freeze metadata
+
+| Field | Value |
+|-------|-------|
+| Version | 1.0 — Architecture Freeze |
+| Freeze date | 2026-07-25 |
+| Reference implementation | `ai_hiring` (Phases 1–3A implemented) |
+| Verified against commit | `35c0d7f` |
+| Verified test count | 293 passing |
+| Word count | see the header table |
+| Next conforming phase | Phase 3B — Deterministic Assessment Runtime *(status: NEXT)* |
+
+**The Version 1.0 architecture is frozen. This freeze establishes required
+boundaries and invariants; it does not represent completion of all specified
+capabilities. The next conforming implementation phase is Phase 3B — Deterministic
+Assessment Runtime.**
 
 ---
 
@@ -1159,8 +1465,104 @@ ActionGate (decision not action). It *composes* with each rather than replacing 
 - **Audit (reconstructable)** — an append-only record from which a decision's full
   lifecycle can be replayed; not a chain-of-thought transcript.
 
+## Appendix H — Claim and maturity register
+
+**This appendix is authoritative** for implementation status; where prose and this
+register disagree, the register governs. Statuses: **IMPLEMENTED** (verified in the
+current repository), **SPECIFIED** (architecturally defined, not implemented),
+**NEXT** (the immediately planned phase), **ROADMAP** (intended later),
+**RESEARCH** (unresolved / not production-proven). Every IMPLEMENTED row was
+verified against `ai_hiring` at commit `35c0d7f` (293 tests passing).
+
+| Claim or capability | Status | Repository evidence | Whitepaper section | Next validation point |
+|---------------------|--------|---------------------|--------------------|-----------------------|
+| Recommendation/decision separation | IMPLEMENTED | Phase 1 contracts/services | §5, §6, §9 | maintained through 4A |
+| Actor-type enforcement (no AI binding decision) | IMPLEMENTED | `domain/decision.py`, `recommendation.py` | §6, §0-Inv1 | maintained |
+| Immutable domain contracts | IMPLEMENTED | Phases 1, 3A | §6, §8 | maintained |
+| Evidence ingestion & normalization | IMPLEMENTED | Phase 2 | §7 | maintained |
+| Provenance | IMPLEMENTED | Phase 2 | §7, §19 | maintained |
+| Prohibited-field quarantine (non-leakage) | IMPLEMENTED | Phase 2 / 2.5 | §7, §19 | maintained |
+| Extraction outcomes | IMPLEMENTED | Phase 2.5 (`ExtractionStatus`) | §7 | 3B consumes |
+| Evidence eligibility (fail-closed) | IMPLEMENTED | Phase 2.5 | §7, §0-Inv16 | maintained |
+| Authorization-aware search | IMPLEMENTED | Phase 2.5 | §19 | maintained |
+| Lineage & reconstruction | IMPLEMENTED | Phase 2.5 | §11, §19 | maintained |
+| Capability ontology | IMPLEMENTED | Phase 3A | §8 | 3B consumes |
+| Capability versioning | IMPLEMENTED | Phase 3A | §8, §0-Inv7 | maintained |
+| Rubric contracts | IMPLEMENTED | Phase 3A | §8 | 3B consumes |
+| Rubric versioning | IMPLEMENTED | Phase 3A | §8, §0-Inv7 | maintained |
+| Rubric approval workflow | IMPLEMENTED | Phase 3A | §8 | maintained |
+| Segregation of duties (author≠approver) | IMPLEMENTED | Phase 3A | §8 | maintained |
+| Admissibility outcomes | IMPLEMENTED | Phase 3A (`EvidenceAdmissibility`) | §7 | 3B consumes |
+| Scoring-scale definitions (no scoring) | IMPLEMENTED | Phase 3A (`ScoringScale`) | §8 | 3B consumes |
+| Missing-evidence semantics | IMPLEMENTED | Phase 3A (`MissingEvidenceStatus`) | §7, §0-Inv11 | 3B consumes |
+| Uncertainty contracts | IMPLEMENTED | Phase 3A (`UncertaintyLevel`) | §9, §0-Inv12 | 3B consumes |
+| Conflict representation (no resolution) | IMPLEMENTED | Phase 3A (`Conflict`) | §9 | 3B consumes |
+| Append-only audit events | IMPLEMENTED | Phases 1–3A | §11, §19, App. C | maintained |
+| Deterministic assessment runtime | NEXT | — | §14.3 | Phase 3B |
+| Contract-bound AI interpretation | ROADMAP | — | §14.4 | Phase 3C |
+| DecisionCase aggregate | SPECIFIED | component records only | §6 | Phase 4A |
+| Semantic mapping | RESEARCH | — | §12 | not production-proven |
+| Action-request construction | SPECIFIED | — | §11 | Phase 4B |
+| CER binding | SPECIFIED | portfolio CER contract | §11 | Phase 4B |
+| ActionGate authorization linkage | SPECIFIED | portfolio ActionGate | §11 | Phase 4C |
+| Execution-result reconciliation | SPECIFIED | — | §9, §11 | Phase 4C |
+| Appeals & reversals | SPECIFIED | append-only primitive exists | §9, App. A | Phase 4C |
+| Cross-domain domain packs | ROADMAP | hiring is reference | §13, §21 | per-pack build |
+| Cryptographic audit integrity | SPECIFIED | reserved `previous_event_hash` | §19 | hash-chain build |
+| Proxy detection | RESEARCH | — | §7, §20 | unresolved |
+
+## Appendix I — Implementation conformance checklist
+
+A future phase review uses this checklist to determine whether an implementation
+conforms to the frozen Version 1.0 architecture. A "no" to any question below
+indicates non-conformance with the referenced invariant.
+
+**Contract conformance**
+- Does the implementation consume *published versions* rather than mutable drafts? *(Inv 7, 10)*
+- Is a runtime *unable* to alter capability or rubric meaning? *(Inv 10)*
+- Are version identifiers preserved in outputs? *(Inv 7, 8)*
+- Are historical contracts retrievable? *(Inv 8)*
+
+**Evidence conformance**
+- Is evidence eligibility checked *before* evaluation? *(Inv 9, 16)*
+- Are prohibited and quarantined evidence isolated? *(Inv 9)*
+- Is missing evidence distinguished from *adverse* evidence? *(Inv 11)*
+- Is every assessment traceable to admissible evidence? *(Inv 9, 14)*
+
+**Decision conformance**
+- Are assessment, recommendation, and binding decision *separate*? *(Inv 1, 2)*
+- Is authority explicit? *(Inv 1, 15)*
+- Is it *impossible* for a recommendation to become binding without authority? *(Inv 1)*
+- Are overrides and reversals append-only? *(Inv 8)*
+
+**Action conformance**
+- Is the action request *separate* from the decision? *(Inv 3, 4)*
+- Is ActionGate / the applicable AI Control Plane component responsible for runtime authorization? *(Inv 5)*
+- Is execution status obtained from the external executing system? *(Inv 6)*
+- Can an execution failure be represented *without* changing the original decision? *(Inv 3, 8)*
+
+**AI conformance**
+- Is the model *unable* to invent capabilities, scales, or reason codes? *(Inv 10)*
+- Are outputs schema-validated? *(Inv 10, 12)*
+- Are uncertainty and conflicts retained (not suppressed)? *(Inv 12)*
+- Is chain-of-thought *excluded* as the authoritative audit record? *(Inv 14)*
+
+**Mapping conformance**
+- Are semantic mappings versioned? *(Inv 7, 13)*
+- Were they tested against representative records? *(Inv 13)*
+- Were they approved by accountable reviewers? *(Inv 13)*
+- Can mapping drift be detected? *(Inv 13)*
+
+**Audit conformance**
+- Are events append-only? *(Inv 8)*
+- Are actor, timestamp, version, and correlation identifiers present? *(Inv 14)*
+- Can the decision lifecycle be reconstructed? *(Inv 14)*
+- Does the implementation distinguish *audit completeness* from *cryptographic tamper evidence*? *(§19)*
+
 ---
 
-*Document status: working architectural whitepaper. Implementation claims are
-grounded in the `ai_hiring` module (293 tests passing); roadmap and research items
-are labeled as such and not presented as operational.*
+*Document status: Version 1.0 — Architecture Freeze. Normative content is §0 and
+§23 (plus the phase-boundary obligations in §14 and Appendix I); all other content
+is explanatory. Implementation status is governed by Appendix H, verified against
+`ai_hiring` at commit `35c0d7f` (293 tests passing). Roadmap and research items are
+labeled as such and are not presented as operational.*
