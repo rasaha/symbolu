@@ -42,6 +42,8 @@ include = [
     "actiongate_provider*",
     # Phase 5H: TAP assertion-governance provider
     "tap_provider*",
+    # Phase 5I: cross-provider enterprise validation pilot
+    "enterprise_validation_pilot*",
 ]
 
 [tool.pytest.ini_options]

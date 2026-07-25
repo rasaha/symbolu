@@ -1,0 +1,70 @@
+{
+  "all_fail_safe": true,
+  "injections": [
+    {
+      "detail": "tap_outcome=INDETERMINATE failsafe=True dispatched=False",
+      "fail_safe": true,
+      "injection": "tap_timeout"
+    },
+    {
+      "detail": "tap_outcome=INDETERMINATE failsafe=True dispatched=False",
+      "fail_safe": true,
+      "injection": "tap_unavailable"
+    },
+    {
+      "detail": "tap_outcome=INDETERMINATE failsafe=True dispatched=False",
+      "fail_safe": true,
+      "injection": "tap_malformed"
+    },
+    {
+      "detail": "auth=INDETERMINATE dispatched=False",
+      "fail_safe": true,
+      "injection": "actiongate_timeout"
+    },
+    {
+      "detail": "auth=INDETERMINATE dispatched=False",
+      "fail_safe": true,
+      "injection": "actiongate_unavailable"
+    },
+    {
+      "detail": "auth=INDETERMINATE dispatched=False",
+      "fail_safe": true,
+      "injection": "actiongate_malformed"
+    },
+    {
+      "detail": "dispatched=True recon=FAILED",
+      "fail_safe": true,
+      "injection": "execution_timeout"
+    },
+    {
+      "detail": "recon=FAILED compliance=NONCOMPLIANT",
+      "fail_safe": true,
+      "injection": "execution_business_rejection"
+    },
+    {
+      "detail": "recon=FAILED",
+      "fail_safe": true,
+      "injection": "execution_transport_failure"
+    },
+    {
+      "detail": "recon=MISMATCHED compliance=NONCOMPLIANT",
+      "fail_safe": true,
+      "injection": "reconciliation_mismatch"
+    },
+    {
+      "detail": "compliance=NONCOMPLIANT",
+      "fail_safe": true,
+      "injection": "missing_obligation_evidence"
+    },
+    {
+      "detail": "empty registry raises ProviderResolutionError (no silent selection)",
+      "fail_safe": true,
+      "injection": "registry_resolution_failure"
+    },
+    {
+      "detail": "registry rejects an incompatible contract version",
+      "fail_safe": true,
+      "injection": "incompatible_provider_version"
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "all_passed": true,
+  "invariants": [
+    {
+      "description": "TAP UNSUPPORTED never becomes supported downstream",
+      "detail": "",
+      "id": "I1",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "TAP INDETERMINATE never proceeds without new evidence/authority",
+      "detail": "",
+      "id": "I2",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "ActionGate DENIED never dispatches",
+      "detail": "",
+      "id": "I3",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "ActionGate INDETERMINATE never dispatches",
+      "detail": "",
+      "id": "I4",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Provider timeout never authorizes or supports",
+      "detail": "",
+      "id": "I5",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Unknown provider outcome never authorizes or supports",
+      "detail": "",
+      "id": "I6",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Constraints survive authorization into enforcement",
+      "detail": "",
+      "id": "I7",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Obligations survive authorization into reconciliation",
+      "detail": "",
+      "id": "I8",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Execution success does not imply governance compliance",
+      "detail": "distinction demonstrated by >=1 executed-but-noncompliant scenario",
+      "id": "I9",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "TAP never invokes ActionGate",
+      "detail": "",
+      "id": "I10",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "ActionGate never invokes TAP",
+      "detail": "",
+      "id": "I11",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "ExternalExecutionProvider never decides authorization",
+      "detail": "",
+      "id": "I12",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Provider selection is deterministic and auditable",
+      "detail": "",
+      "id": "I13",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Human approval is never fabricated by a provider",
+      "detail": "",
+      "id": "I14",
+      "offenders": [],
+      "passed": true
+    },
+    {
+      "description": "Audit records contain no plaintext secrets",
+      "detail": "",
+      "id": "I15",
+      "offenders": [],
+      "passed": true
+    }
+  ]
+}
