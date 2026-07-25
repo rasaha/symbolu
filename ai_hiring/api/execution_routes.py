@@ -12,24 +12,26 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from ..executions.compensation import CompensationRequirement
-from ..executions.execution_attempt import ExecutionAttempt
-from ..executions.execution_intent import ExecutionIntent
-from ..executions.execution_record import ExecutionRecord
-from ..executions.reconciliation import ReconciliationResult
-from ..executions.status import (
+from decision_governance.execution import (
     BusinessOutcome,
     CompensationApprovalStatus,
+    CompensationRequirement,
     CompensationType,
+    ExecutionAttempt,
+    ExecutionIntent,
+    ExecutionRecord,
+    ExecutionValidationResult,
     Finality,
     OutcomeSource,
+    ReconciliationResult,
     RetryClassification,
 )
-from ..executions.validation import ExecutionValidationResult
-from ..policies.decision_boundary import IdentityProvider
-from ..services.compensation_service import CompensationService
-from ..services.execution_service import ExecutionService
-from ..services.reconciliation_service import ReconciliationService
+from decision_governance.identity import IdentityProvider
+from decision_governance.services import (
+    CompensationService,
+    ExecutionService,
+    ReconciliationService,
+)
 
 
 class CreateExecutionIntentRequest(BaseModel):

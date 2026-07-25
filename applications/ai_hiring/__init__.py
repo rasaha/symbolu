@@ -1,14 +1,18 @@
 """AI Hiring application — composes the hiring domain and the DGM kernel.
 
-The application wires kernel governance services with hiring-domain adapters
-(evidence ingestion, rubrics, ATS-style actions) into an end-to-end workflow.
-The concrete wiring currently lives in the historical ``ai_hiring`` package
-(retained for import stability); this module re-exposes its composition entry
-points so callers can depend on ``applications.ai_hiring``.
+The application wires the domain-neutral governance kernel
+(``decision_governance``) with the hiring domain (``domains.hiring``) into an
+end-to-end, in-memory platform. The canonical composition root lives in
+:mod:`applications.ai_hiring.platform` and imports the kernel directly (no
+``ai_hiring.*`` compatibility shims). The legacy ``ai_hiring`` package re-exports
+these entry points for backward compatibility.
+
+Dependency direction: ``applications.ai_hiring`` → {``domains.hiring``,
+``decision_governance``}. The reverse never holds.
 """
 
 from __future__ import annotations
 
-from ai_hiring import HiringPlatform, build_in_memory_platform
+from applications.ai_hiring.platform import HiringPlatform, build_in_memory_platform
 
 __all__ = ["HiringPlatform", "build_in_memory_platform"]

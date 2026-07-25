@@ -13,26 +13,28 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from ..decision_cases.authority import AuthorityContext
-from ..decision_cases.case import DecisionCase
-from ..decision_cases.decision import DecisionRecord
-from ..decision_cases.recommendation import RecommendationRecord
-from ..decision_cases.review import ReviewTask
-from ..decision_cases.status import (
+from decision_governance.decisions import (
+    AuthorityContext,
+    DecisionCase,
     DecisionOutcome,
+    DecisionReadinessResult,
+    DecisionRecord,
     GeneratorType,
     OperatingMode,
     ProposedOutcome,
+    RecommendationRecord,
+    ReviewTask,
     ReviewTaskType,
+    VersionedRef,
 )
-from ..decision_cases.subject import VersionedRef
-from ..decision_cases.validation import DecisionReadinessResult
+from decision_governance.identity import IdentityProvider
+from decision_governance.services import (
+    CaseDecisionService,
+    CaseRecommendationService,
+    DecisionCaseService,
+)
 from ..ontology.taxonomy import ReasonCode
-from ..policies.decision_boundary import IdentityProvider
 from ..rubrics.uncertainty import UncertaintyLevel
-from ..services.case_decision_service import CaseDecisionService
-from ..services.case_recommendation_service import CaseRecommendationService
-from ..services.decision_case_service import DecisionCaseService
 
 
 class CreateCaseRequest(BaseModel):

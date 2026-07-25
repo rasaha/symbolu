@@ -11,9 +11,11 @@ cross-subject access is denied by default.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass
 from enum import Enum
 from typing import Optional
+
+from ..errors import DomainValidationError
 
 
 class Permission(str, Enum):
@@ -75,16 +77,40 @@ class AccessGrant:
     """What one principal may do within one tenant.
 
     Empty ``subject_ids`` means all subjects within the tenant.
+
+    Subject scope is stored on the historical ``candidate_ids`` field
+    (compatibility-first serialization: the persisted/serialized shape is
+    unchanged). ``subject_ids`` is the domain-neutral canonical spelling — it may
+    be supplied at construction and is always readable as a property. Supplying
+    both with different values is a conflict and fails.
     """
 
     principal_id: str
     tenant_id: str
     permissions: frozenset[Permission]
     candidate_ids: frozenset[str] = frozenset()
+    subject_ids: InitVar[Optional[frozenset[str]]] = None
+
+    def __post_init__(self, subject_ids: Optional[frozenset[str]]) -> None:
+        if subject_ids is not None:
+            canonical = frozenset(subject_ids)
+            if self.candidate_ids and frozenset(self.candidate_ids) != canonical:
+                raise DomainValidationError(
+                    "conflicting subject scope: candidate_ids and subject_ids differ"
+                )
+            object.__setattr__(self, "candidate_ids", canonical)
 
 
 @dataclass(frozen=True)
 class AccessRequest:
+    """A single authorization question.
+
+    Subject scope is stored on the historical ``candidate_id`` field
+    (compatibility-first). ``subject_id`` is the canonical, domain-neutral alias:
+    accepted at construction and readable as a property. Supplying both with
+    different values is a conflict and fails.
+    """
+
     principal_id: str
     tenant_id: str
     operation: Permission
@@ -93,6 +119,15 @@ class AccessRequest:
     role_id: Optional[str] = None
     assessment_id: Optional[str] = None
     include_quarantine: bool = False
+    subject_id: InitVar[Optional[str]] = None
+
+    def __post_init__(self, subject_id: Optional[str]) -> None:
+        if subject_id is not None:
+            if self.candidate_id is not None and self.candidate_id != subject_id:
+                raise DomainValidationError(
+                    "conflicting subject scope: candidate_id and subject_id differ"
+                )
+            object.__setattr__(self, "candidate_id", subject_id)
 
 
 @dataclass(frozen=True)
@@ -136,3 +171,12 @@ class EvidenceAccessPolicy:
                 and request.candidate_id not in grant.candidate_ids):
             return AccessDecision(False, "principal not scoped to this subject")
         return AccessDecision(True, "authorized")
+
+
+# --- Canonical subject-scope read accessors --------------------------------
+# The stored fields keep their historical ``candidate_*`` names for
+# compatibility-first serialization; these properties expose the same values
+# under the domain-neutral canonical spelling. Assigned after class creation so
+# they cleanly override the InitVar defaults without becoming dataclass fields.
+AccessGrant.subject_ids = property(lambda self: self.candidate_ids)
+AccessRequest.subject_id = property(lambda self: self.candidate_id)

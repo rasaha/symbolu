@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict
 from ..common import new_id
 from ..domain.enums import ActorType
 from ..errors import EvidenceAccessDeniedError, UnauthenticatedActorError
-from ..policies.decision_boundary import IdentityProvider
+from decision_governance.identity import IdentityProvider
 from ..rubrics.rubric import Rubric
 from ..services.rubric_service import RubricService
 from ..services.rubric_validation_service import RubricValidationResult

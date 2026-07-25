@@ -14,15 +14,19 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from ..action_requests.action_mapping import ActionMapping
-from ..action_requests.action_request import ActionRequest
-from ..action_requests.authorization import ActionAuthorizationResponse
-from ..action_requests.cer import ContextEnvelopeRecord
-from ..action_requests.validation import ActionRequestValidationResult
-from ..policies.decision_boundary import IdentityProvider
-from ..services.action_authorization_service import ActionAuthorizationService
-from ..services.action_request_service import ActionRequestService
-from ..services.cer_binding_service import CERBindingService
+from decision_governance.actions import (
+    ActionAuthorizationResponse,
+    ActionMapping,
+    ActionRequest,
+    ActionRequestValidationResult,
+    ContextEnvelopeRecord,
+)
+from decision_governance.identity import IdentityProvider
+from decision_governance.services import (
+    ActionAuthorizationService,
+    ActionRequestService,
+    CERBindingService,
+)
 
 
 class PublishMappingRequest(BaseModel):
