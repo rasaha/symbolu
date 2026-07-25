@@ -40,6 +40,8 @@ include = [
     "governance_providers*",
     # Phase 5G: ActionGate action-governance provider
     "actiongate_provider*",
+    # Phase 5H: TAP assertion-governance provider
+    "tap_provider*",
 ]
 
 [tool.pytest.ini_options]

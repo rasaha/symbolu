@@ -1,0 +1,35 @@
+# Independent PRIVATE distribution for the TAP assertion-governance provider.
+#
+# ./tap_provider is a SYMLINK to the canonical ../../tap_provider package. It
+# DEPENDS ON the DGM kernel and provider-framework distributions and owns no
+# kernel or framework files. It does NOT depend on ActionGate — TAP and
+# ActionGate are independent peer providers.
+#
+# Build with:  python -m build packaging/dgm-tap-provider
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-tap-provider"
+dynamic = ["version"]
+description = "TAP assertion-governance provider for the Decision Governance Middleware."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "tap_provider.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tap_provider*"]
+exclude = ["tap_provider.tests", "tap_provider.tests.*"]
