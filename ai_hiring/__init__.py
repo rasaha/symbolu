@@ -21,6 +21,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .policies.decision_boundary import IdentityProvider, StaticIdentityProvider
+from .repositories.evidence_artifacts import (
+    InMemoryChunkRepository,
+    InMemoryLineageRepository,
+    InMemoryProvenanceRepository,
+    InMemoryQuarantineRepository,
+)
+from .repositories.evidence_index_repository import InMemoryEvidenceIndexRepository
 from .repositories.in_memory import (
     InMemoryAuditRepository,
     InMemoryDecisionRepository,
@@ -33,7 +40,10 @@ from .services import (
     AuditService,
     DecisionService,
     EvaluationService,
+    EvidenceIngestionService,
+    ProvenanceService,
     RecommendationService,
+    SearchService,
     WorkflowService,
 )
 
@@ -67,6 +77,15 @@ class HiringPlatform:
     workflow_service: WorkflowService
     recommendation_service: RecommendationService
     decision_service: DecisionService
+    # --- Phase 2: evidence ingestion & normalization ---
+    provenance_repo: InMemoryProvenanceRepository
+    chunk_repo: InMemoryChunkRepository
+    quarantine_repo: InMemoryQuarantineRepository
+    lineage_repo: InMemoryLineageRepository
+    evidence_index_repo: InMemoryEvidenceIndexRepository
+    evidence_ingestion_service: EvidenceIngestionService
+    search_service: SearchService
+    provenance_service: ProvenanceService
 
     def build_api(self):
         """Construct the callable :class:`~ai_hiring.api.HiringAPI` facade."""
@@ -79,6 +98,9 @@ class HiringPlatform:
             workflow_service=self.workflow_service,
             audit_service=self.audit_service,
             identity_provider=self.identity_provider,
+            evidence_ingestion_service=self.evidence_ingestion_service,
+            search_service=self.search_service,
+            provenance_service=self.provenance_service,
         )
 
 
@@ -115,6 +137,25 @@ def build_in_memory_platform(
         identity,
     )
 
+    # Phase 2: evidence ingestion & normalization.
+    provenance_repo = InMemoryProvenanceRepository()
+    chunk_repo = InMemoryChunkRepository()
+    quarantine_repo = InMemoryQuarantineRepository()
+    lineage_repo = InMemoryLineageRepository()
+    evidence_index_repo = InMemoryEvidenceIndexRepository()
+
+    evidence_ingestion_service = EvidenceIngestionService(
+        evidence_repo,
+        provenance_repo,
+        chunk_repo,
+        quarantine_repo,
+        lineage_repo,
+        evidence_index_repo,
+        audit_service,
+    )
+    search_service = SearchService(evidence_index_repo)
+    provenance_service = ProvenanceService(provenance_repo, lineage_repo)
+
     return HiringPlatform(
         identity_provider=identity,
         evidence_repo=evidence_repo,
@@ -128,4 +169,12 @@ def build_in_memory_platform(
         workflow_service=workflow_service,
         recommendation_service=recommendation_service,
         decision_service=decision_service,
+        provenance_repo=provenance_repo,
+        chunk_repo=chunk_repo,
+        quarantine_repo=quarantine_repo,
+        lineage_repo=lineage_repo,
+        evidence_index_repo=evidence_index_repo,
+        evidence_ingestion_service=evidence_ingestion_service,
+        search_service=search_service,
+        provenance_service=provenance_service,
     )

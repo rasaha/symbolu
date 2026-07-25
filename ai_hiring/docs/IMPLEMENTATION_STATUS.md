@@ -1,7 +1,8 @@
 # Implementation Status — AI-Hiring Module
 
-**Phase:** 1 — Foundation
-**Status:** complete; 51/51 module tests passing.
+**Phase 1 — Foundation:** complete; 51 tests.
+**Phase 2 — Evidence Ingestion & Normalization:** complete; 57 tests.
+**Total:** 108/108 module tests passing. No scoring logic exists anywhere.
 
 ## Implemented
 
@@ -99,9 +100,68 @@
   evaluation intake and the explicit unblock action are not smuggled into route
   handlers or the workflow service. The four required services all exist.
 
+---
+
+# Phase 2 — Evidence Ingestion & Normalization
+
+**Status:** complete; 57 Phase-2 tests + 51 Phase-1 tests green (108 total).
+
+## Implemented
+
+- [x] New `normalization/` package: `pipeline`, `parsers`, `cleaners`,
+      `quarantine`, `hashing`, `provenance`, `chunking`, `lineage`, `models`.
+- [x] New `index/` package: deterministic `interfaces`, `in_memory`, `search`.
+- [x] New services: `EvidenceIngestionService`, `SearchService`,
+      `ProvenanceService`.
+- [x] New repositories: `evidence_artifacts` (provenance, chunk, quarantine,
+      lineage) + `evidence_index_repository`; all in-memory, immutable.
+- [x] Exact specified pipeline order, one audit event per stage.
+- [x] Multi-format ingestion: TEXT, MARKDOWN, SOURCE_CODE, INTERVIEW_TRANSCRIPT,
+      WORK_SAMPLE, PORTFOLIO_ARTIFACT, JSON, CSV, STRUCTURED_RESPONSE, DOCX
+      (stdlib zip+XML), PDF (uncompressed text operators).
+- [x] Immutable, versioned evidence with parent/ancestor linkage; no overwrite.
+- [x] Full provenance (filename, uploader, timestamps, hashes, content length,
+      source URI, version chain, transformation history) — never destroyed.
+- [x] Deterministic SHA-256 `raw_hash` + `normalized_hash`; duplicate detection.
+- [x] Profile-aware normalization (Unicode NFC, whitespace, line endings, tabs,
+      repeated spaces, invalid-UTF repair, transport-artifact stripping) that
+      preserves code/structured semantics.
+- [x] Job-relevance + prohibited-field quarantine (configurable policy); values
+      preserved separately, never exposed downstream, fully audited.
+- [x] Exact-reconstruction chunking with offset/length/hash/type.
+- [x] Deterministic search by candidate, role, assessment, evidence id, chunk
+      id, assessment type, document type, filename, keyword, metadata.
+- [x] Reconstructable evidence lineage DAG (parents/children/topological).
+- [x] Phase-2 API endpoints on the callable facade + optional FastAPI adapter.
+- [x] Docs: `docs/EVIDENCE_PIPELINE.md`.
+
+## Additive touches to Phase-1 files (non-breaking)
+
+- `domain/enums.py`: added Phase-2 `AuditEventType` members (existing members and
+  values unchanged; all Phase-1 tests green).
+- `errors.py`: added `IngestionError` family.
+- `__init__.py`, `services/__init__.py`, `api/*`: additive wiring of the new
+  repositories/services/endpoints. No Phase-1 domain invariant, workflow rule,
+  decision-boundary check, audit semantic, or existing test was modified.
+
+## Not implemented (out of scope for Phase 2, by design)
+
+- [ ] Scoring, embeddings, LLM extraction, capability mapping, confidence,
+      ranking, fairness, protected-attribute *inference*, ATS integrations,
+      vector/semantic search, production database adapters, frontend.
+
+## Known limitations
+
+- **PDF**: only uncompressed text operators (no OCR / FlateDecode).
+- **In-memory** repositories and index; single-process, non-durable.
+- **Quarantine** classifies field *identity* (names/aliases), not free-text
+  semantics — a prohibited attribute embedded in prose is not detected (that is
+  later-phase inference work, deliberately excluded).
+- **Audit `metadata`** mutability caveat from Phase 1 still applies.
+
 ## Next milestone
 
-**Phase 2 — Evidence Ingestion & Normalization.** Produce `NormalizedEvidence`
-from multi-format submissions, with the job-relevance quarantine and secure
-indexing, behind the contracts and boundary established here. Do not begin AI
-evaluation or fairness work until this foundation remains green.
+**Phase 3 — AI Evaluation Engine.** Consume the immutable evidence substrate
+(extraction → rubric scoring → gaps → confidence → reason codes) behind the
+Phase-1 human-decision boundary. Do not begin until all Phase 1 and Phase 2
+tests remain green.

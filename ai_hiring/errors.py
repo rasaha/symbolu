@@ -74,3 +74,28 @@ class DuplicateDecisionError(RepositoryError):
 
 class AppendOnlyViolationError(RepositoryError):
     """An attempt was made to mutate an append-only store."""
+
+
+# --- Phase 2: evidence ingestion & normalization ---------------------------
+class IngestionError(HiringError):
+    """Base class for evidence-ingestion errors."""
+
+
+class IntegrityValidationError(IngestionError):
+    """A raw submission failed integrity validation (empty, oversized, corrupt)."""
+
+
+class UnsupportedFormatError(IngestionError):
+    """No parser is registered for the declared evidence format."""
+
+
+class ContentExtractionError(IngestionError):
+    """Content could not be extracted from a submission (e.g. undecodable bytes)."""
+
+
+class DuplicateEvidenceError(IngestionError):
+    """Identical raw content already exists for this candidate/assessment stage."""
+
+
+class LineageError(HiringError):
+    """A lineage graph could not be constructed or reconstructed."""

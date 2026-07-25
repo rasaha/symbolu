@@ -27,13 +27,22 @@ from ..services import (
     AuditService,
     DecisionService,
     EvaluationService,
+    EvidenceIngestionService,
+    ProvenanceService,
     RecommendationService,
+    SearchService,
     WorkflowService,
 )
+from ..errors import IngestionError
+from ..index.interfaces import IndexEntry
+from ..normalization.lineage import LineageGraph
+from ..normalization.models import IngestedEvidence, Provenance
 from .schemas import (
     CreateDecisionRequest,
     CreateEvaluationRequest,
     CreateRecommendationRequest,
+    EvidenceSearchRequest,
+    IngestEvidenceRequest,
     TransitionRequest,
 )
 
@@ -50,6 +59,9 @@ class HiringAPI:
         workflow_service: WorkflowService,
         audit_service: AuditService,
         identity_provider: boundary.IdentityProvider,
+        evidence_ingestion_service: "EvidenceIngestionService | None" = None,
+        search_service: "SearchService | None" = None,
+        provenance_service: "ProvenanceService | None" = None,
     ) -> None:
         self._evaluations = evaluation_service
         self._recommendations = recommendation_service
@@ -57,6 +69,9 @@ class HiringAPI:
         self._workflow = workflow_service
         self._audit = audit_service
         self._identity = identity_provider
+        self._ingestion = evidence_ingestion_service
+        self._search = search_service
+        self._provenance = provenance_service
 
     # --- authorization hooks (placeholders for a real IdP) -----------------
     def _authorize(
@@ -167,6 +182,52 @@ class HiringAPI:
         self._authorize(principal_id, self._ANY)
         return self._audit.history(candidate_id)
 
+    # --- Phase 2: evidence endpoints ---------------------------------------
+    def _require_ingestion(self) -> EvidenceIngestionService:
+        if self._ingestion is None:
+            raise BoundaryViolationError("evidence ingestion is not configured on this API")
+        return self._ingestion
+
+    def create_evidence(
+        self, request: IngestEvidenceRequest, *, correlation_id: Optional[str] = None
+    ) -> IngestedEvidence:
+        """POST /ai-hiring/evidence — AI/service principals ingest evidence."""
+        self._authorize(request.principal_id, self._AI_OR_SERVICE)
+        return self._require_ingestion().ingest(
+            request.submission,
+            correlation_id=correlation_id,
+            parent_evidence_id=request.parent_evidence_id,
+            allow_duplicate=request.allow_duplicate,
+        )
+
+    def get_evidence(self, evidence_id: str, *, principal_id: str):
+        """GET /ai-hiring/evidence/{id} — the immutable NormalizedEvidence."""
+        self._authorize(principal_id, self._ANY)
+        return self._require_ingestion().get_evidence(evidence_id)
+
+    def get_evidence_lineage(self, evidence_id: str, *, principal_id: str) -> LineageGraph:
+        """GET /ai-hiring/evidence/{id}/lineage — the reconstructable lineage DAG."""
+        self._authorize(principal_id, self._ANY)
+        if self._provenance is None:
+            raise BoundaryViolationError("provenance service is not configured on this API")
+        return self._provenance.lineage(evidence_id)
+
+    def get_evidence_versions(
+        self, evidence_id: str, *, principal_id: str
+    ) -> tuple[Provenance, ...]:
+        """GET /ai-hiring/evidence/{id}/versions — the version/provenance chain."""
+        self._authorize(principal_id, self._ANY)
+        if self._provenance is None:
+            raise BoundaryViolationError("provenance service is not configured on this API")
+        return self._provenance.versions(evidence_id)
+
+    def search_evidence(self, request: EvidenceSearchRequest) -> tuple[IndexEntry, ...]:
+        """GET /ai-hiring/evidence/search — deterministic retrieval."""
+        self._authorize(request.principal_id, self._ANY)
+        if self._search is None:
+            raise BoundaryViolationError("search service is not configured on this API")
+        return self._search.search(request.to_query())
+
 
 def build_fastapi_router(api: HiringAPI):  # pragma: no cover - optional adapter
     """Build a FastAPI ``APIRouter`` over a :class:`HiringAPI`.
@@ -209,5 +270,25 @@ def build_fastapi_router(api: HiringAPI):  # pragma: no cover - optional adapter
     @router.get("/candidates/{candidate_id}/audit")
     def _get_audit(candidate_id: str, principal_id: str):
         return _guard(lambda: api.get_candidate_audit(candidate_id, principal_id=principal_id))
+
+    @router.post("/evidence")
+    def _create_evidence(request: IngestEvidenceRequest):
+        return _guard(lambda: api.create_evidence(request))
+
+    @router.get("/evidence/search")
+    def _search_evidence(request: EvidenceSearchRequest):
+        return _guard(lambda: api.search_evidence(request))
+
+    @router.get("/evidence/{evidence_id}")
+    def _get_evidence(evidence_id: str, principal_id: str):
+        return _guard(lambda: api.get_evidence(evidence_id, principal_id=principal_id))
+
+    @router.get("/evidence/{evidence_id}/lineage")
+    def _get_lineage(evidence_id: str, principal_id: str):
+        return _guard(lambda: api.get_evidence_lineage(evidence_id, principal_id=principal_id))
+
+    @router.get("/evidence/{evidence_id}/versions")
+    def _get_versions(evidence_id: str, principal_id: str):
+        return _guard(lambda: api.get_evidence_versions(evidence_id, principal_id=principal_id))
 
     return router

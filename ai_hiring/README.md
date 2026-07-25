@@ -175,10 +175,47 @@ See `tests/test_end_to_end_foundation.py` for the complete runnable scenario.
 * No legal-compliance claims are made anywhere in code or docs — only
   enforceable controls are described.
 
+## Phase 2 — Evidence Ingestion & Normalization (implemented)
+
+Phase 2 builds the immutable evidence substrate that later AI modules consume:
+multi-format ingestion, deterministic normalization, raw/normalized hashing,
+job-relevance + prohibited-field quarantine, immutable versioning with full
+provenance, contiguous chunking, a deterministic search index, an evidence
+lineage DAG, and one append-only audit event per pipeline stage. It adds **no**
+scoring, ranking, embeddings, fairness, or LLM inference.
+
+New packages: `normalization/` (pipeline, parsers, cleaners, quarantine,
+hashing, provenance, chunking, lineage), `index/` (deterministic search),
+plus `services/{evidence_ingestion,search,provenance}_service.py` and
+`repositories/{evidence_artifacts,evidence_index_repository}.py`. See
+[`docs/EVIDENCE_PIPELINE.md`](docs/EVIDENCE_PIPELINE.md).
+
+Quick example:
+
+```python
+from ai_hiring import build_in_memory_platform
+from ai_hiring.normalization import RawSubmission, EvidenceFormat
+
+platform = build_in_memory_platform()
+sub = RawSubmission.from_text(
+    "def solution(): return 42",
+    candidate_id="cand-1", role_id="role-backend", assessment_item_id="a1",
+    declared_format=EvidenceFormat.SOURCE_CODE, uploader="svc-ats",
+    filename="solution.py", assessment_type="WORK_SAMPLE",
+)
+ingested = platform.evidence_ingestion_service.ingest(sub, correlation_id="corr-1")
+print(ingested.evidence_id, ingested.version, len(ingested.chunks))
+
+# deterministic retrieval + lineage + version history
+platform.search_service.keyword("solution")
+platform.provenance_service.lineage(ingested.evidence_id)
+platform.provenance_service.versions(ingested.evidence_id)
+```
+
 ## Next milestone
 
-**Phase 2 — Evidence Ingestion & Normalization**: implement
-`NormalizedEvidence` production (multi-format intake, job-relevance quarantine,
-indexing) behind the boundary and contracts established here. AI evaluation and
-fairness follow in later phases and must not begin until this foundation passes
-all tests. See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+**Phase 3 — AI Evaluation Engine**: consume the immutable evidence produced here
+(evidence extraction → rubric scoring → gap analysis → confidence → reason
+codes), still behind the Phase-1 human-decision boundary. Do not begin until all
+Phase 1 and Phase 2 tests pass. See
+[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).

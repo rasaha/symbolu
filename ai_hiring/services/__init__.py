@@ -11,7 +11,10 @@ from __future__ import annotations
 from .audit_service import AuditService
 from .decision_service import DecisionService
 from .evaluation_service import EvaluationService
+from .evidence_ingestion_service import EvidenceIngestionService
+from .provenance_service import ProvenanceService
 from .recommendation_service import RecommendationService
+from .search_service import SearchService
 from .workflow_service import WorkflowService
 
 __all__ = [
@@ -20,4 +23,8 @@ __all__ = [
     "RecommendationService",
     "DecisionService",
     "WorkflowService",
+    # Phase 2: evidence ingestion & normalization
+    "EvidenceIngestionService",
+    "SearchService",
+    "ProvenanceService",
 ]

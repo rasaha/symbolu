@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict
 from ..domain.decision import Approval, Override
 from ..domain.enums import ActorType, CapabilityLayer, Disposition, WorkflowState
 from ..domain.evaluation import CandidateEvaluation, Limitation
+from ..normalization.models import RawSubmission
 
 
 class _Request(BaseModel):
@@ -49,3 +50,41 @@ class TransitionRequest(_Request):
     principal_id: str
     target: WorkflowState
     actor_type: ActorType = ActorType.HUMAN
+
+
+# --- Phase 2: evidence ingestion & search ---------------------------------
+class IngestEvidenceRequest(_Request):
+    principal_id: str
+    submission: "RawSubmission"
+    parent_evidence_id: Optional[str] = None
+    allow_duplicate: bool = False
+
+
+class EvidenceSearchRequest(_Request):
+    principal_id: str
+    candidate_id: Optional[str] = None
+    role_id: Optional[str] = None
+    assessment_item_id: Optional[str] = None
+    assessment_type: Optional[str] = None
+    document_type: Optional[str] = None
+    evidence_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    filename: Optional[str] = None
+    keyword: Optional[str] = None
+    metadata: dict[str, str] = {}
+
+    def to_query(self) -> "SearchQuery":
+        from ..index.interfaces import SearchQuery
+
+        return SearchQuery(
+            candidate_id=self.candidate_id,
+            role_id=self.role_id,
+            assessment_item_id=self.assessment_item_id,
+            assessment_type=self.assessment_type,
+            document_type=self.document_type,
+            evidence_id=self.evidence_id,
+            chunk_id=self.chunk_id,
+            filename=self.filename,
+            keyword=self.keyword,
+            metadata=dict(self.metadata),
+        )

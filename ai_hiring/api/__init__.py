@@ -7,6 +7,8 @@ from .schemas import (
     CreateDecisionRequest,
     CreateEvaluationRequest,
     CreateRecommendationRequest,
+    EvidenceSearchRequest,
+    IngestEvidenceRequest,
     TransitionRequest,
 )
 
@@ -17,4 +19,6 @@ __all__ = [
     "CreateRecommendationRequest",
     "CreateDecisionRequest",
     "TransitionRequest",
+    "IngestEvidenceRequest",
+    "EvidenceSearchRequest",
 ]
