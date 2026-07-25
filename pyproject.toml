@@ -46,6 +46,9 @@ include = [
     "enterprise_validation_pilot*",
     # Phase 6A: comparative governance benchmark
     "comparative_governance_benchmark*",
+    # Phase 6B: alternative providers + heterogeneity validation
+    "baseline_assertion_provider*", "baseline_action_provider*",
+    "provider_heterogeneity_validation*",
 ]
 
 [tool.pytest.ini_options]

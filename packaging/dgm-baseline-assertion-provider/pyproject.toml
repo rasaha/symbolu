@@ -1,0 +1,25 @@
+# Independent PRIVATE distribution for the baseline assertion provider (validation impl).
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-baseline-assertion-provider"
+dynamic = ["version"]
+description = "Capability-limited baseline assertion-governance provider (validation)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = ["decision-governance==1.0.0", "dgm-provider-framework==0.1.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "baseline_assertion_provider.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["baseline_assertion_provider*"]
+exclude = ["baseline_assertion_provider.tests", "baseline_assertion_provider.tests.*"]

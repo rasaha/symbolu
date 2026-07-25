@@ -1,0 +1,125 @@
+{
+  "all_passed": true,
+  "invariants": [
+    {
+      "description": "Selection is deterministic for identical registry state and request",
+      "detail": "",
+      "id": "H1",
+      "passed": true
+    },
+    {
+      "description": "Disabled providers are never selected",
+      "detail": "",
+      "id": "H2",
+      "passed": true
+    },
+    {
+      "description": "Incompatible providers are never selected",
+      "detail": "",
+      "id": "H3",
+      "passed": true
+    },
+    {
+      "description": "Providers missing mandatory capabilities are never selected",
+      "detail": "",
+      "id": "H4",
+      "passed": true
+    },
+    {
+      "description": "Assertion fallback never converts UNSUPPORTED into SUPPORTED",
+      "detail": "",
+      "id": "H5",
+      "passed": true
+    },
+    {
+      "description": "Assertion fallback never converts INDETERMINATE into SUPPORTED without new evidence",
+      "detail": "",
+      "id": "H6",
+      "passed": true
+    },
+    {
+      "description": "Action fallback never converts DENIED into AUTHORIZED",
+      "detail": "",
+      "id": "H7",
+      "passed": true
+    },
+    {
+      "description": "Action fallback never converts substantive INDETERMINATE into AUTHORIZED",
+      "detail": "",
+      "id": "H8",
+      "passed": true
+    },
+    {
+      "description": "Infrastructure failure may trigger fallback only when policy permits",
+      "detail": "",
+      "id": "H9",
+      "passed": true
+    },
+    {
+      "description": "No valid assertion provider results in INDETERMINATE",
+      "detail": "",
+      "id": "H10",
+      "passed": true
+    },
+    {
+      "description": "No valid action provider results in INDETERMINATE and no dispatch",
+      "detail": "",
+      "id": "H11",
+      "passed": true
+    },
+    {
+      "description": "Fallback provider constraints and obligations are fully enforced",
+      "detail": "",
+      "id": "H12",
+      "passed": true
+    },
+    {
+      "description": "Fallback use is visible in audit and trace records",
+      "detail": "",
+      "id": "H13",
+      "passed": true
+    },
+    {
+      "description": "Providers of the same family never import one another",
+      "detail": "",
+      "id": "H14",
+      "passed": true
+    },
+    {
+      "description": "Assertion providers never import action providers",
+      "detail": "",
+      "id": "H15",
+      "passed": true
+    },
+    {
+      "description": "Action providers never import assertion providers",
+      "detail": "",
+      "id": "H16",
+      "passed": true
+    },
+    {
+      "description": "Registry selection never depends on native provider result types",
+      "detail": "",
+      "id": "H17",
+      "passed": true
+    },
+    {
+      "description": "Provider result types do not leak across provider boundaries",
+      "detail": "",
+      "id": "H18",
+      "passed": true
+    },
+    {
+      "description": "Health degradation alone does not bypass capability requirements",
+      "detail": "",
+      "id": "H19",
+      "passed": true
+    },
+    {
+      "description": "No fallback policy authorizes fail-open behavior",
+      "detail": "",
+      "id": "H20",
+      "passed": true
+    }
+  ]
+}

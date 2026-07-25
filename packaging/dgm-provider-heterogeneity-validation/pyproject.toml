@@ -1,0 +1,34 @@
+# Independent PRIVATE distribution for the provider heterogeneity validation package.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-provider-heterogeneity-validation"
+dynamic = ["version"]
+description = "Provider heterogeneity, resolution, and failover validation for DGM."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0",
+    "dgm-actiongate-provider==0.1.0",
+    "dgm-tap-provider==0.1.0",
+    "dgm-baseline-assertion-provider==0.1.0",
+    "dgm-baseline-action-provider==0.1.0",
+    "dgm-enterprise-validation-pilot==0.1.0",
+    "dgm-comparative-governance-benchmark==0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "provider_heterogeneity_validation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["provider_heterogeneity_validation*"]
+exclude = ["provider_heterogeneity_validation.tests", "provider_heterogeneity_validation.tests.*"]

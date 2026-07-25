@@ -1,0 +1,40 @@
+{
+  "provider_metrics": {
+    "actiongate-primary": {
+      "eligible_requests": 270,
+      "fallbacks_from": 0,
+      "fallbacks_to": 0,
+      "infrastructure_failures": 0,
+      "selected_requests": 210,
+      "substantive_indeterminate": 36,
+      "successful_invocations": 210
+    },
+    "baseline-action": {
+      "eligible_requests": 255,
+      "fallbacks_from": 0,
+      "fallbacks_to": 0,
+      "infrastructure_failures": 0,
+      "selected_requests": 180,
+      "substantive_indeterminate": 24,
+      "successful_invocations": 180
+    },
+    "baseline-assertion": {
+      "eligible_requests": 330,
+      "fallbacks_from": 0,
+      "fallbacks_to": 0,
+      "infrastructure_failures": 0,
+      "selected_requests": 240,
+      "substantive_indeterminate": 78,
+      "successful_invocations": 240
+    },
+    "tap-primary": {
+      "eligible_requests": 360,
+      "fallbacks_from": 0,
+      "fallbacks_to": 0,
+      "infrastructure_failures": 0,
+      "selected_requests": 300,
+      "substantive_indeterminate": 18,
+      "successful_invocations": 300
+    }
+  }
+}
