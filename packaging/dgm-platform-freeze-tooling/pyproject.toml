@@ -1,0 +1,35 @@
+# Independent distribution for the platform freeze/release TOOLING.
+# This is repository & release tooling, NOT a runtime platform dependency; the
+# frozen platform packages never import it.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-platform-freeze-tooling"
+dynamic = ["version"]
+description = "Freeze/verification/compatibility tooling for Decision Governance Platform v1.0."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0",
+    "dgm-actiongate-provider==0.1.0",
+    "dgm-tap-provider==0.1.0",
+    "dgm-enterprise-validation-pilot==0.1.0",
+    "dgm-comparative-governance-benchmark==0.1.0",
+    "dgm-provider-heterogeneity-validation==0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "platform_freeze.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["platform_freeze*"]
+exclude = ["platform_freeze.tests", "platform_freeze.tests.*"]

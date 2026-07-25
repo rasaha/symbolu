@@ -1,0 +1,203 @@
+{
+  "approved_change_classes": [
+    "PATCH",
+    "MINOR",
+    "MAJOR",
+    "APPLICATION_LOCAL"
+  ],
+  "baseline_tests": 1006,
+  "behaviour_tree_hashes": {
+    "comparative_governance_benchmark": "827ed95f7ae21abe8500a8b66d14de9a44a12b7048806a29094619c52da1e662",
+    "enterprise_validation_pilot": "9241f73c57fa5b9ba5186046caf714e93a3131b1384a7a06f69a5c9bbdf978af",
+    "provider_heterogeneity_validation": "85c35cba7ee55dce6e4fd73fd396e172bbdcbd257d8d7f5e5b8bd3a741e49c49"
+  },
+  "behaviour_trees": [
+    "enterprise_validation_pilot",
+    "comparative_governance_benchmark",
+    "provider_heterogeneity_validation"
+  ],
+  "compatibility_rules": {
+    "APPLICATION_LOCAL": "AI Hiring workflows/ontology/evidence/policies/composition/UI/APIs",
+    "MAJOR": "breaking API, provider-contract redesign, authority/lifecycle/dependency-direction/fail-safe changes, new provider families, execution-boundary changes",
+    "MINOR": "additive optional fields, additive public APIs, new capabilities, new conformance assertions, backward-compatible observability",
+    "PATCH": "correctness/security/docs/tests/packaging/perf; no API or semantic change"
+  },
+  "components": {
+    "decision-governance": "1.0.0",
+    "dgm-actiongate-provider": "0.1.0",
+    "dgm-provider-framework": "0.1.0",
+    "dgm-tap-provider": "0.1.0"
+  },
+  "conformance_hashes": {
+    "actiongate_provider": "8d4a5d3545da2b20c27bf1d0f67bf98d090ac5cd9e4b8606c59b054a6c559a42",
+    "tap_provider": "c3ecf91b2520e23ae6afe23b3930e9ecbb9d87deb314dbc7c8d3f3a5e09e8736"
+  },
+  "core_tree_hashes": {
+    "actiongate_provider": "f40f0cf3c390486026d50a53e6bbe14f0d499e57147bd8a736c32d107e12f8dc",
+    "decision_governance": "f38a615970c332c46e6bf3e908ed823729dbdcfc26137871436e853f3120f81c",
+    "governance_providers": "34bea18316db4801b6c5c9b879f5c742e6f6c464f196bbd8929c5e7cac58c57a",
+    "tap_provider": "4209eb875af9e2f9b7a703f37c8c884313cfcf3d1e3387406cd010bc1c66d074"
+  },
+  "core_trees": [
+    "decision_governance",
+    "governance_providers",
+    "actiongate_provider",
+    "tap_provider"
+  ],
+  "dependency_rules": {
+    "actiongate_provider": [
+      "ai_hiring",
+      "applications",
+      "baseline_action_provider",
+      "baseline_assertion_provider",
+      "domains",
+      "platform_freeze",
+      "tap_provider"
+    ],
+    "decision_governance": [
+      "actiongate_provider",
+      "ai_hiring",
+      "applications",
+      "baseline_action_provider",
+      "baseline_assertion_provider",
+      "comparative_governance_benchmark",
+      "domains",
+      "enterprise_validation_pilot",
+      "governance_providers",
+      "platform_freeze",
+      "provider_heterogeneity_validation",
+      "tap_provider"
+    ],
+    "governance_providers": [
+      "actiongate_provider",
+      "ai_hiring",
+      "applications",
+      "baseline_action_provider",
+      "baseline_assertion_provider",
+      "domains",
+      "platform_freeze",
+      "tap_provider"
+    ],
+    "tap_provider": [
+      "actiongate_provider",
+      "ai_hiring",
+      "applications",
+      "baseline_action_provider",
+      "baseline_assertion_provider",
+      "domains",
+      "platform_freeze"
+    ]
+  },
+  "freeze_commit": "5ae4f70",
+  "frozen_invariants": [
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests/test_scenarios_and_invariants.py",
+      "id": "F1",
+      "statement": "DGM owns governance lifecycle records."
+    },
+    {
+      "authoritative_test": "ai_hiring/tests (decision boundary)",
+      "id": "F2",
+      "statement": "AI recommendations are advisory and non-binding."
+    },
+    {
+      "authoritative_test": "ai_hiring/tests (decision boundary)",
+      "id": "F3",
+      "statement": "AI is never recorded as human decision authority."
+    },
+    {
+      "authoritative_test": "tap_provider/tests/test_conformance.py",
+      "id": "F4",
+      "statement": "Assertion governance evaluates claims and evidence."
+    },
+    {
+      "authoritative_test": "actiongate_provider/tests/test_conformance.py",
+      "id": "F5",
+      "statement": "Action governance authorizes proposed actions."
+    },
+    {
+      "authoritative_test": "tap_provider/tests/test_dependency_boundaries.py",
+      "id": "F6",
+      "statement": "Assertion governance does not authorize execution."
+    },
+    {
+      "authoritative_test": "actiongate_provider/tests/test_dependency_boundaries.py",
+      "id": "F7",
+      "statement": "Action governance does not determine assertion truth."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests/test_scenarios_and_invariants.py",
+      "id": "F8",
+      "statement": "External execution remains separate from authorization."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests (I3)",
+      "id": "F9",
+      "statement": "DENIED actions never dispatch."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests (I4)",
+      "id": "F10",
+      "statement": "INDETERMINATE authorization never dispatches."
+    },
+    {
+      "authoritative_test": "comparative_governance_benchmark/tests (I1)",
+      "id": "F11",
+      "statement": "UNSUPPORTED assertions never become supported downstream without new evidence or authority."
+    },
+    {
+      "authoritative_test": "tap_provider/tests/test_mapping_and_errors.py",
+      "id": "F12",
+      "statement": "Provider infrastructure failure never produces support or authorization."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests (Task 107)",
+      "id": "F13",
+      "statement": "Constraints are enforced before dispatch."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests (I9)",
+      "id": "F14",
+      "statement": "Obligations are verified separately from execution success."
+    },
+    {
+      "authoritative_test": "enterprise_validation_pilot/tests (I14)",
+      "id": "F15",
+      "statement": "Human approval cannot be fabricated by a provider."
+    },
+    {
+      "authoritative_test": "*/tests/test_dependency_boundaries.py",
+      "id": "F16",
+      "statement": "Providers interact through neutral framework contracts."
+    },
+    {
+      "authoritative_test": "provider_heterogeneity_validation/tests (H14-H16)",
+      "id": "F17",
+      "statement": "Providers of the same or different families do not invoke one another."
+    },
+    {
+      "authoritative_test": "provider_heterogeneity_validation/tests (H1)",
+      "id": "F18",
+      "statement": "Provider resolution is deterministic and auditable."
+    },
+    {
+      "authoritative_test": "provider_heterogeneity_validation/tests (H5-H8)",
+      "id": "F19",
+      "statement": "Fallback cannot be used for governance shopping."
+    },
+    {
+      "authoritative_test": "platform_freeze dependency check",
+      "id": "F20",
+      "statement": "Frozen package dependency direction remains acyclic."
+    }
+  ],
+  "manifest_digest": "e91a2b081490bc6199c79e2e619ba90680c64e61c14ccc7119bc8b2bd78a09dd",
+  "platform_name": "Decision Governance Platform",
+  "platform_version": "1.0.0",
+  "public_api_manifests": {
+    "actiongate_provider.api": "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300",
+    "decision_governance.api": "1b89386992bb9572b82eca40fb36760ab9451c85db76e6ce43d3339c13ad5543",
+    "governance_providers.api": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
+    "tap_provider.api": "68763307437994a94397b51f6ae9eff305f7e27fd03ac716085a35a74d51300a"
+  }
+}

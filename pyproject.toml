@@ -49,6 +49,8 @@ include = [
     # Phase 6B: alternative providers + heterogeneity validation
     "baseline_assertion_provider*", "baseline_action_provider*",
     "provider_heterogeneity_validation*",
+    # Phase 6C: platform freeze/release tooling (out-of-band)
+    "platform_freeze*",
 ]
 
 [tool.pytest.ini_options]
