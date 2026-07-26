@@ -6,7 +6,7 @@ failure-injection, and shadow-pilot conditions. **No new platform or product
 architecture was added; no frozen platform file was modified; no production external
 effect occurred.** All tooling is application-local under `ai_hiring/validation/`, tests,
 and documentation, and reaches the platform only through `decision_governance.api` and
-`governance_providers.api` (plus the framework's reference providers/contracts for
+`governance_providers.api` (plus deterministic provider implementations used only for validation, and framework contracts, for
 deterministic simulation).
 
 > **Readiness classification: `READY_WITH_DOCUMENTED_LIMITATIONS`** — none of the
@@ -31,7 +31,7 @@ baseline is scoped to the platform-relevant packages.
 ## Scope compliance (§1–§2)
 
 - **Added (permitted):** test harnesses, a lifecycle driver, synthetic cohort fixtures,
-  deterministic shadow-pilot/failure adapters (reference providers), validators, metrics
+  deterministic shadow-pilot/failure adapters (deterministic provider implementations used only for validation), validators, metrics
   collectors, read-only analysis utilities, and reports — all under
   `ai_hiring/validation/` and `ai_hiring/tests/`.
 - **Not added (prohibited):** no new governance primitives, provider types, lifecycle

@@ -3,7 +3,7 @@
 ## Harness & guarantees
 `ai_hiring/validation/pilot.py` replays a synthetic cohort through the full lifecycle in a
 single in-memory `ValidationEnv`. **All external effects go through deterministic
-in-memory adapters** (`DeterministicHiringExecutionAdapter`, reference ActionGate/TAP
+in-memory adapters** (`DeterministicHiringExecutionAdapter`, and deterministic ActionGate/TAP provider implementations used only for validation
 providers). The pilot prohibits — and structurally cannot perform — production HRIS
 writes, real candidate emails, calendar invites, payroll changes, identity provisioning,
 employment-contract issuance, or any external irreversible action (`test_h5_boundary.py`

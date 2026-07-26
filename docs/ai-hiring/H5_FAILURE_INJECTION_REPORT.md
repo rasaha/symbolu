@@ -1,7 +1,7 @@
 # H5 — Failure-Injection Report
 
-Deterministic failure injection via `CaseSpec` flags and reference-provider/adapter
-behaviors (`test_h5_failure_injection.py`, plus H2/H4 failure tests). For every injected
+Deterministic failure injection via `CaseSpec` flags and deterministic provider
+implementations used only for validation (provider/adapter behaviors) (`test_h5_failure_injection.py`, plus H2/H4 failure tests). For every injected
 failure we verify a fail-safe state, no unauthorized progression, no silent data loss, no
 false execution success, a visible unresolved status where applicable, and preserved
 diagnostic/reconstruction evidence.
