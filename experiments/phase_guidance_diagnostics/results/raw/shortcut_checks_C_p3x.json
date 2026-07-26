@@ -1,0 +1,13 @@
+{
+  "arm": "C",
+  "pressure": "3x",
+  "n": 150,
+  "modes": {
+    "intact": 1.0,
+    "shuffle_slot_values": 0.05999999865889549,
+    "shuffle_slot_keys": 0.9733333587646484,
+    "random_slot_values": 0.03333333507180214,
+    "zero_readout_memory": 0.03999999910593033,
+    "mask_query_entity": 1.0
+  }
+}

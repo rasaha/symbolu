@@ -1,0 +1,19 @@
+{
+  "arm": "D-no-guid",
+  "pressure": "1x",
+  "seed": 0,
+  "steps": 350,
+  "train": {
+    "final_ans": 0.02329169400036335,
+    "final_write": 0.6931471228599548,
+    "best_val": 0.9833333333333333
+  },
+  "metrics": {
+    "answer_acc": 0.97,
+    "write_precision": 0.1111111111111111,
+    "write_recall": 1.0,
+    "write_f1": 0.19999999999999998,
+    "false_write_rate": 1.0,
+    "n": 100
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "arm": "D-write-only",
+  "pressure": "1x",
+  "seed": 0,
+  "steps": 350,
+  "train": {
+    "final_ans": 0.16866473853588104,
+    "final_write": 0.30589279532432556,
+    "best_val": 0.75
+  },
+  "metrics": {
+    "answer_acc": 0.76,
+    "write_precision": 0.0,
+    "write_recall": 0.0,
+    "write_f1": 0.0,
+    "false_write_rate": 0.0,
+    "n": 100
+  }
+}

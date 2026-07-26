@@ -13,11 +13,12 @@
     "PYTHONPATH=. python3 -m experiments.phase_guidance_diagnostics.run_all"
   ],
   "layers": {
-    "L1_tokens_to_phase_state": ["topic_probe", "distance_probe", "dilution_probe", "decay_probe"],
+    "L1_tokens_to_phase_state": ["topic_probe", "distance_probe", "dilution_probe", "decay_probe", "masking_probe"],
     "L2_phase_state_to_guidance": ["topic_probe", "guidance_probe", "head_analysis"],
     "L3_guidance_to_slot_decisions": ["score_decomposition", "slot_chain_trace", "multitask_interference"],
     "L4_slots_to_answer": ["shortcut_checks", "slot_chain_trace"]
   },
+  "extra_scripts": ["masking_probe.py (Q M)", "label_alignment.py (Q G)", "assemble.py (build aggregate/tables from raw)"],
   "questions_to_scripts": {
     "A_topic_retained": "topic_probe.py",
     "B_signal_decays_with_distance": "distance_probe.py",
@@ -25,13 +26,13 @@
     "D_learned_decay_removes_topic": "decay_probe.py",
     "E_head_specialization": "head_analysis.py",
     "F_guidance_head_extraction": "guidance_probe.py",
-    "G_write_label_alignment": "PHASE_GUIDANCE_ROOT_CAUSE_REPORT.md (analytic + dataset stats)",
+    "G_write_label_alignment": "label_alignment.py",
     "H_phase_overpowers_content_addressing": "score_decomposition.py",
     "I_write_vs_retention_vs_eviction_vs_read": "slot_chain_trace.py + arm ablations (D-write-only/D-query-only)",
     "J_task_slot_pressure_validity": "slot_chain_trace.py",
     "K_query_time_shortcut": "shortcut_checks.py",
     "L_multitask_interference": "multitask_interference.py",
-    "M_broad_write_dilution": "dilution_probe.py + decay_probe.py (masking interpretation)"
+    "M_broad_write_dilution": "masking_probe.py"
   },
   "arms": {
     "A": "local only (no slots)",

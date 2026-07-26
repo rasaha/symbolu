@@ -1,0 +1,57 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "n": 600,
+  "chance": 0.05,
+  "answer_acc_of_model": 0.85,
+  "local_only": {
+    "top1": 0.36666667461395264,
+    "topk": 0.5833333134651184,
+    "k": 3,
+    "mean_conf": 0.39796239137649536,
+    "conf_gap": 0.031295716762542725,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "phase_only": {
+    "top1": 0.11666666716337204,
+    "topk": 0.28333333134651184,
+    "k": 3,
+    "mean_conf": 0.469076544046402,
+    "conf_gap": 0.35240987688302994,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "local_plus_phase": {
+    "top1": 0.2611111104488373,
+    "topk": 0.5,
+    "k": 3,
+    "mean_conf": 0.5904043316841125,
+    "conf_gap": 0.32929322123527527,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "random_state_control": {
+    "top1": 0.07777778059244156,
+    "topk": 0.24444444477558136,
+    "k": 3,
+    "mean_conf": 0.7971426248550415,
+    "conf_gap": 0.7193648442626,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "shuffled_phase_control": {
+    "top1": 0.07222222536802292,
+    "topk": 0.21111111342906952,
+    "k": 3,
+    "mean_conf": 0.4289405345916748,
+    "conf_gap": 0.3567183092236519,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  }
+}

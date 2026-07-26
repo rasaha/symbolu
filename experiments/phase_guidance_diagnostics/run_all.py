@@ -14,8 +14,16 @@ from experiments.phase_guidance_diagnostics import _common as C
 from experiments.phase_guidance_diagnostics import (
     topic_probe, distance_probe, dilution_probe, decay_probe, head_analysis,
     guidance_probe, score_decomposition, slot_chain_trace, shortcut_checks,
-    multitask_interference,
+    multitask_interference, masking_probe, label_alignment, assemble,
 )
+
+
+def _safe(label, fn):
+    try:
+        return fn()
+    except Exception as e:  # keep going so one probe failure never blocks the rest
+        print(f"[WARN] {label} failed: {e}")
+        return {"error": str(e)}
 
 HERE = Path(__file__).resolve().parent
 RES = HERE / "results"
@@ -64,11 +72,18 @@ def main():
     agg["probes"]["shortcut_checks"] = {a: shortcut_checks.run(a, "3x") for a in ("C", "D")}
 
     print("\n===== Question L: multitask interference =====")
-    agg["probes"]["multitask_interference"] = {"D": multitask_interference.run("D", "3x")}
+    agg["probes"]["multitask_interference"] = {"D": _safe("multitask", lambda: multitask_interference.run("D", "3x"))}
+
+    print("\n===== Question M: filler masking (dilution vs invalid recurrence) =====")
+    agg["probes"]["masking_probe"] = {"D": _safe("masking", lambda: masking_probe.run("D", "3x"))}
+
+    print("\n===== Question G: write-label alignment =====")
+    agg["probes"]["label_alignment"] = {p: _safe("label", lambda p=p: label_alignment.run(p))
+                                        for p in ("3x", "1x")}
 
     (RES / "aggregate.json").write_text(json.dumps(agg, indent=2, default=float))
     print("\nwrote results/aggregate.json")
-    write_tables(agg)
+    assemble.main()   # canonical aggregate.json + tables.md from results/raw/
 
 
 def write_tables(agg):

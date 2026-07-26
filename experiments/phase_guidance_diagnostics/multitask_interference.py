@@ -19,8 +19,11 @@ from experiments.phase_guided_slots.train_eval import _collate
 
 
 def _grad_vec(loss, params):
+    """Flattened gradient aligned to `params`; zero-fill params this loss doesn't
+    touch so the two loss gradient vectors are the same length (for cosine)."""
     grads = torch.autograd.grad(loss, params, retain_graph=True, allow_unused=True)
-    flat = [g.reshape(-1) for g in grads if g is not None]
+    flat = [(g if g is not None else torch.zeros_like(p)).reshape(-1)
+            for g, p in zip(grads, params)]
     return torch.cat(flat) if flat else torch.zeros(1)
 
 
