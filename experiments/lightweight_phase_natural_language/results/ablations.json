@@ -1,0 +1,299 @@
+{
+  "phase_B": {
+    "baseline": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 0.06666666666666667,
+        "next_token_acc": 0.6280260707635009,
+        "ppl": 22.53313859047119
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.5673166202414113,
+        "ppl": 22.481439403693518,
+        "swap_rate": 0.1
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.5738661876964526,
+        "ppl": 26.269151106504854,
+        "source_acc": 0.03333333333333333
+      }
+    },
+    "phase_disabled": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 0.06666666666666667,
+        "next_token_acc": 0.63268156424581,
+        "ppl": 22.506953707578088
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.5724233983286908,
+        "ppl": 22.65450227004504,
+        "swap_rate": 0.1
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.5770094297260889,
+        "ppl": 26.304164275378394,
+        "source_acc": 0.03333333333333333
+      }
+    },
+    "phase_weights_randomized": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 0.06666666666666667,
+        "next_token_acc": 0.6238361266294227,
+        "ppl": 23.0838101857818
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.5677808727948004,
+        "ppl": 23.28835148031784,
+        "swap_rate": 0.13333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.5657835653345308,
+        "ppl": 26.929272104048618,
+        "source_acc": 0.03333333333333333
+      }
+    },
+    "phase_capacity_reduced": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 0.06666666666666667,
+        "next_token_acc": 0.6317504655493482,
+        "ppl": 22.523080813542112
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.5710306406685237,
+        "ppl": 22.539918050145666,
+        "swap_rate": 0.1
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.5734171531207903,
+        "ppl": 26.330337869563646,
+        "source_acc": 0.03333333333333333
+      }
+    }
+  },
+  "phase_C": {
+    "baseline": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 1.0,
+        "next_token_acc": 0.8440409683426443,
+        "ppl": 2.008671285343715
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.3,
+        "next_token_acc": 0.7307335190343547,
+        "ppl": 4.288380497282345,
+        "swap_rate": 0.6333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.8172429277054333,
+        "ppl": 2.2292338062071972,
+        "source_acc": 0.7
+      }
+    },
+    "phase_disabled": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 1.0,
+        "next_token_acc": 0.845903165735568,
+        "ppl": 1.992184835166074
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.3,
+        "next_token_acc": 0.724233983286908,
+        "ppl": 4.5650442020459705,
+        "swap_rate": 0.6333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.816793893129771,
+        "ppl": 2.2340858545932543,
+        "source_acc": 0.7
+      }
+    },
+    "phase_weights_randomized": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 1.0,
+        "next_token_acc": 0.8463687150837989,
+        "ppl": 1.997770432760855
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.26666666666666666,
+        "next_token_acc": 0.723769730733519,
+        "ppl": 4.5672717011476065,
+        "swap_rate": 0.6666666666666666
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.8172429277054333,
+        "ppl": 2.2544106245657267,
+        "source_acc": 0.7
+      }
+    },
+    "phase_capacity_reduced": {
+      "distant_fact": {
+        "n": 30,
+        "accuracy": 0.9666666666666667,
+        "next_token_acc": 0.8449720670391061,
+        "ppl": 2.0009368716500955
+      },
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.3,
+        "next_token_acc": 0.7288765088207985,
+        "ppl": 4.477443456902168,
+        "swap_rate": 0.6333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.8176919622810956,
+        "ppl": 2.220774485567956,
+        "source_acc": 0.7
+      }
+    }
+  },
+  "slot_C": {
+    "baseline": {
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.3,
+        "next_token_acc": 0.7307335190343547,
+        "ppl": 4.288380497282345,
+        "swap_rate": 0.6333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.8172429277054333,
+        "ppl": 2.2292338062071972,
+        "source_acc": 0.7
+      },
+      "supersession": {
+        "n": 30,
+        "accuracy": 0.9333333333333333,
+        "next_token_acc": 0.8277330809275911,
+        "ppl": 2.1123280071844612,
+        "stale_rate": 0.06666666666666667
+      }
+    },
+    "slots_disabled": {
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.669452181987001,
+        "ppl": 5.3736808155611175,
+        "swap_rate": 0.13333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.7467444993264482,
+        "ppl": 3.153864672126304,
+        "source_acc": 0.0
+      },
+      "supersession": {
+        "n": 30,
+        "accuracy": 0.1,
+        "next_token_acc": 0.7203028868906768,
+        "ppl": 3.2018050152338144,
+        "stale_rate": 0.1
+      }
+    },
+    "slot_keys_randomized": {
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.16666666666666666,
+        "next_token_acc": 0.3565459610027855,
+        "ppl": 28.17923024205495,
+        "swap_rate": 0.23333333333333334
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.1,
+        "next_token_acc": 0.46789402784014367,
+        "ppl": 13.297114438245519,
+        "source_acc": 0.1
+      },
+      "supersession": {
+        "n": 30,
+        "accuracy": 0.23333333333333334,
+        "next_token_acc": 0.42830099384761006,
+        "ppl": 19.42123505862995,
+        "stale_rate": 0.13333333333333333
+      }
+    },
+    "slot_values_shuffled": {
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.06666666666666667,
+        "next_token_acc": 0.6392757660167131,
+        "ppl": 6.150866948463254,
+        "swap_rate": 0.13333333333333333
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.0,
+        "next_token_acc": 0.7269869779973058,
+        "ppl": 3.561499132346938,
+        "source_acc": 0.0
+      },
+      "supersession": {
+        "n": 30,
+        "accuracy": 0.03333333333333333,
+        "next_token_acc": 0.706578324656886,
+        "ppl": 3.5922667342759524,
+        "stale_rate": 0.1
+      }
+    },
+    "slot_top_k_1": {
+      "entity_binding": {
+        "n": 30,
+        "accuracy": 0.26666666666666666,
+        "next_token_acc": 0.7219127205199629,
+        "ppl": 4.461405734404778,
+        "swap_rate": 0.6666666666666666
+      },
+      "source_attr": {
+        "n": 30,
+        "accuracy": 0.7,
+        "next_token_acc": 0.8109564436461607,
+        "ppl": 2.3437433190958843,
+        "source_acc": 0.7
+      },
+      "supersession": {
+        "n": 30,
+        "accuracy": 0.9333333333333333,
+        "next_token_acc": 0.8225272124940842,
+        "ppl": 2.207452025592887,
+        "stale_rate": 0.06666666666666667
+      }
+    }
+  }
+}
