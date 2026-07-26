@@ -131,13 +131,18 @@ def evaluate_oracle(model, data, pad_id, device="cpu"):
         ids, wl, ent, apos, aid, qent = collate_oracle(b, pad_id, device)
         out = model(ids, apos, entity_at_pos=ent, query_entity=qent)
         pred = out["answer_logits"].argmax(-1)
-        found = out["found"]; state = out["state"]
-        occ_sum += state.active.sum(dim=1).sum().item()
-        evict_sum += state.n_evict.sum().item()
+        has_mem = "found" in out
+        found = out.get("found")
+        if has_mem:
+            state = out["state"]
+            occ_sum += state.active.sum(dim=1).sum().item()
+            evict_sum += state.n_evict.sum().item()
         for j, e in enumerate(b):
             ok = int(pred[j].item() == aid[j].item())
             correct += ok; total += 1
             by_pos[e.target_position][0] += ok; by_pos[e.target_position][1] += 1
+            if not has_mem:
+                continue
             if found[j].item():
                 surv_c += ok; surv_t += 1; tgt_surv += 1
                 tgt_surv_pos[e.target_position][0] += 1

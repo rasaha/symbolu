@@ -45,7 +45,7 @@ SPECIAL = [
     "what", "which", "is", "the", "latest", "valid", "of", "for", "current",
     "before", "amendment", "superseded", "authorized", "by", "approved", "with",
     "above", "below", "and", "unresolved", "supplier", "in", "record", "amended",
-    "revoked", "than", "greater", "flagged",
+    "revoked", "than", "greater", "flagged", "focus",
 ]
 
 

@@ -173,12 +173,79 @@ class PressureV2Generator:
         )
 
 
+    def make_focus(self, n_live: int, M: int, target_position: str = "early") -> Example:
+        """Focus-retention variant (for testing Phase as a retention signal under
+        oracle addressing). A FOCUS vendor is declared in an early header. R relevant
+        contracts (that vendor's, R<=M-1) are the only ones ever queried; the rest are
+        distractors of other vendors. The queried target is a random relevant contract
+        placed at `target_position`, flooded by distractors. To keep the target, a model
+        must give high RETENTION to focus-vendor facts — which requires the DISTANT
+        header (global context) a local window cannot see when a far fact arrives. So a
+        local-only arm cannot prioritize; a global (Phase) retention signal could.
+        Oracle addressing means acc = survival of the queried relevant fact."""
+        r = self.rng; v = self.v
+        focus_vendor = r.choice(self.vendors)
+        R = max(2, min(M - 1, r.randint(2, max(2, M // 2))))
+        pool = r.sample(self.contracts, min(n_live, len(self.contracts)))
+        need = n_live - len(pool)
+        if need > 0:
+            extra = [c for c in CONTRACTS if c not in pool]; r.shuffle(extra); pool += extra[:need]
+        pool = pool[:n_live]
+        relevant = pool[:R]; distractors = pool[R:]
+        other_vendors = [x for x in self.vendors if x != focus_vendor] or self.vendors
+        vend = {c: focus_vendor for c in relevant}
+        for c in distractors:
+            vend[c] = r.choice(other_vendors)
+        eid = {c: i for i, c in enumerate(pool)}
+        target = r.choice(relevant)
+        others = [c for c in pool if c != target]; r.shuffle(others)
+        total = len(pool)
+        if target_position == "early":
+            tpos = r.randint(0, max(0, int(0.15 * total)))
+        elif target_position == "late":
+            tpos = r.randint(int(0.85 * total), total - 1)
+        else:
+            tpos = r.randint(int(0.40 * total), int(0.60 * total))
+        order = others[:]; order.insert(min(tpos, len(order)), target)
+        stream = [self._mk_fact(c, vend[c], VERSIONS[0], arrival=i, entity_id=eid[c])
+                  for i, c in enumerate(order)]
+        tfact = [f for f in stream if f.contract == target][-1]
+        q = ["what", "is", "the", "latest", "valid", "value", "for", "contract", target]
+        ans = tfact.value
+
+        words = ["focus", "vendor", focus_vendor, "<sep>"]
+        wl = [-100, -100, -100, -100]
+        for f in stream:
+            for w in f.render():
+                words.append(w); wl.append(1 if w == "<sep>" else 0)
+        toks = v.encode(words) + [v.id("<Q>")] + v.encode(q) + [v.id("<A>")]
+        wl = wl + [-100] * (len(toks) - len(wl))
+        ans_pos = len(toks) - 1; ans_id = v.id(ans)
+        toks.append(ans_id); wl.append(-100)
+        return Example(tokens=toks, answer_pos=ans_pos, answer_id=ans_id, write_labels=wl,
+                       facts=stream, gold_support_entity_ids=[eid[target]],
+                       query_type="focus_latest_value", target_position=target_position,
+                       meta={"n_live_contracts": n_live, "M": M, "focus_vendor": focus_vendor,
+                             "target_contract": target, "n_relevant": R, "n_facts": len(stream),
+                             "seq_len": len(toks), "target_entity_id": eid[target],
+                             "distinct_entity_ids": len(set(f.entity_id for f in stream))})
+
+
 def generate(vocab: Vocab, split: str, seed: int, n: int, n_live: int, M: int,
              target_mix: Optional[Dict[str, float]] = None,
-             query_type: str = "latest_value") -> List[Example]:
+             query_type: str = "latest_value", focus_retention: bool = False) -> List[Example]:
     gen = PressureV2Generator(vocab, split, seed)
     target_mix = target_mix or {"early": 0.5, "middle": 0.25, "late": 0.25}
     out = []
+    if focus_retention:
+        for i in range(n):
+            rp = gen.rng.random(); cum = 0.0; tp = "early"
+            for pos, w in target_mix.items():
+                cum += w
+                if rp <= cum:
+                    tp = pos; break
+            out.append(gen.make_focus(n_live=n_live, M=M, target_position=tp))
+        return out
     for i in range(n):
         rp = gen.rng.random()
         cum = 0.0; tp = "early"
