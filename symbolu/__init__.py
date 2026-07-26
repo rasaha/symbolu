@@ -92,6 +92,30 @@ class _SymboluFinder:
         return None
 
     @classmethod
+    def find_spec(cls, fullname, path=None, target=None):
+        # Modern import machinery (and pytest) call find_spec directly on
+        # meta_path finders. Only claim modules that are actually routed;
+        # returning None lets the normal path-based finder resolve real
+        # subpackages such as ``symbolu.lightweight_phase``.
+        if fullname.startswith("symbolu."):
+            parts = fullname.split(".", 2)
+            submod = parts[1] if len(parts) > 1 else None
+            if submod in _ROUTING:
+                import importlib.util
+
+                return importlib.util.spec_from_loader(fullname, cls)
+        return None
+
+    @classmethod
+    def create_module(cls, spec):
+        # load_module caches under the symbolu.* name and returns the real module.
+        return cls.load_module(spec.name)
+
+    @classmethod
+    def exec_module(cls, module):  # module already fully initialized by load_module
+        return None
+
+    @classmethod
     def load_module(cls, fullname):
         if fullname in sys.modules:
             return sys.modules[fullname]
