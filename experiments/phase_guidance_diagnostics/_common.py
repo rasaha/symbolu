@@ -222,10 +222,11 @@ def fit_linear_probe(X: torch.Tensor, y: torch.Tensor, num_classes: int,
     # standardize
     mu, sd = X.mean(0, keepdim=True), X.std(0, keepdim=True) + 1e-6
     Xn, Xten = (X - mu) / sd, (Xte - mu) / sd
-    for _ in range(steps):
-        opt.zero_grad()
-        loss = F.cross_entropy(W(Xn), y)
-        loss.backward(); opt.step()
+    with torch.enable_grad():
+        for _ in range(steps):
+            opt.zero_grad()
+            loss = F.cross_entropy(W(Xn), y)
+            loss.backward(); opt.step()
     with torch.no_grad():
         logits = W(Xten)
         prob = logits.softmax(-1)

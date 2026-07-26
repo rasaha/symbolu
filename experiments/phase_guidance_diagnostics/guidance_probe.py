@@ -22,8 +22,9 @@ def _mlp_probe(X, y, ncls, Xte, yte, steps=300, hidden=64):
     Xn, Xten = (X - mu) / sd, (Xte - mu) / sd
     net = nn.Sequential(nn.Linear(X.shape[1], hidden), nn.GELU(), nn.Linear(hidden, ncls))
     opt = torch.optim.Adam(net.parameters(), lr=0.02, weight_decay=1e-3)
-    for _ in range(steps):
-        opt.zero_grad(); F.cross_entropy(net(Xn), y).backward(); opt.step()
+    with torch.enable_grad():
+        for _ in range(steps):
+            opt.zero_grad(); F.cross_entropy(net(Xn), y).backward(); opt.step()
     with torch.no_grad():
         pred = net(Xten).argmax(-1)
         return (pred == yte).float().mean().item()
@@ -34,10 +35,11 @@ def _binary_f1(X, y, Xte, yte, steps=300):
     Xn, Xten = (X - mu) / sd, (Xte - mu) / sd
     lin = nn.Linear(X.shape[1], 1)
     opt = torch.optim.Adam(lin.parameters(), lr=0.03, weight_decay=1e-3)
-    for _ in range(steps):
-        opt.zero_grad()
-        F.binary_cross_entropy_with_logits(lin(Xn).squeeze(-1), y.float()).backward()
-        opt.step()
+    with torch.enable_grad():
+        for _ in range(steps):
+            opt.zero_grad()
+            F.binary_cross_entropy_with_logits(lin(Xn).squeeze(-1), y.float()).backward()
+            opt.step()
     with torch.no_grad():
         p = (lin(Xten).squeeze(-1) > 0)
         tp = ((p) & (yte == 1)).sum().item(); fp = ((p) & (yte == 0)).sum().item()
