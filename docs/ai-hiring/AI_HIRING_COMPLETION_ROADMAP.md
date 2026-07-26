@@ -121,7 +121,8 @@ Phase list:
 
 ### H3 — Governance Integration (human decision on the DGM kernel)  ✅ COMPLETE
 - **Objective:** integrate the H1/H2 hiring domain with the frozen DGM kernel so every
-  recommendation can become a fully governed **human** decision — while remaining
+  **eligible, review-ready** recommendation can be bound to a governed `DecisionCase` and
+  resolved through an authorized **human** decision process — while remaining
   non-executable until H4. **No ActionGate wiring or execution.**
 - **Permitted:** `ai_hiring` + `decision_governance.api` (kernel via public API only).
 - **Frozen:** platform (kernel, framework, TAP, ActionGate) — untouched.

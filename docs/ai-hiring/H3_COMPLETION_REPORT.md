@@ -1,9 +1,11 @@
 # H3 — Governance Integration — Completion Report
 
 Application-local, additive integration of the completed H1/H2 hiring domain with
-the **frozen Decision Governance kernel**. Every hiring recommendation can now become
-a **fully governed human decision** inside the Decision Governance Platform, while
-remaining **non-executable until H4**. **No frozen platform file was modified; no
+the **frozen Decision Governance kernel**. Every **eligible, review-ready** hiring
+recommendation can now be **bound to a governed `DecisionCase` and resolved through an
+authorized human decision process** inside the Decision Governance Platform, while the
+resulting decision remains **non-executable until H4**. (Incomplete, rejected, or
+superseded recommendations are not required to become decisions.) **No frozen platform file was modified; no
 frozen API changed; no ActionGate wiring or execution behavior was added.** All new
 code is under `ai_hiring/` and reaches the kernel only through `decision_governance.api`.
 
@@ -123,8 +125,8 @@ baseline is scoped to the platform-relevant packages, **not** the whole reposito
 
 ## Completion criteria — met
 
-- Every recommendation can become a fully governed **human** decision inside the
-  Decision Governance Platform ✓.
+- Every **eligible, review-ready** recommendation can be bound to a governed
+  `DecisionCase` and resolved through an authorized **human** decision process ✓.
 - The decision remains **non-executable** until H4 — no action authorization,
   ActionGate wiring, or execution exists ✓.
 - Human authority enforced (H3 + kernel + grants); AI cannot decide/override ✓.
