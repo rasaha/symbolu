@@ -177,7 +177,7 @@ def make_eval_set(kind, N, vocab, seed, n=200, **kw):
     return torch.stack(xs), torch.tensor(poss), torch.tensor(tgts)
 
 
-def train_batch(stream, B, N, vocab, rng, mix=(('lm', .3), ('needle', .3), ('binding', .25), ('multihop', .15))):
+def train_batch(stream, B, N, vocab, rng, mix=(('lm', .15), ('needle', .4), ('binding', .3), ('multihop', .15))):
     """Returns (x, y, mask). mask=None -> full-sequence LM loss. For task batches, mask
     selects ONLY the answer position (index pos-1) so the retrieval signal is not drowned
     by filler/LM tokens. This is answer-token supervision (a form of L_retrieval), applied

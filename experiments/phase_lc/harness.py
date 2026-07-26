@@ -72,11 +72,14 @@ def eval_perturb(model, vocab, N, seed=0, n=150):
     return follow / n
 
 
-def train_one(arm, vocab, stream, steps, N, target_params, seed, lr=3e-3, B=16, log=None):
+def train_one(arm, vocab, stream, steps, N, target_params, seed, lr=2e-3, B=24, log=None):
     set_seed(seed)
     model, nparams = M.build_matched(arm, len(vocab), target_params, d=128, h=4, layers=4, max_len=1200, window=64)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, total_steps=steps, pct_start=0.1)
+    # Constant LR with short linear warmup (OneCycle's decay-to-0 undertrained the
+    # induction/retrieval circuit at this scale; calibration showed constant LR learns).
+    warm = max(20, steps // 20)
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, s / warm))
     rng = random.Random(seed * 991 + 7)
     model.train(); t0 = time.time()
     for step in range(steps):
