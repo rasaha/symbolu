@@ -64,7 +64,7 @@ def run():
                        "shuffled_top1": pr["shuffled"]["top1"], "random_top1": pr["random"]["top1"],
                        "local_top1": prl["main"]["top1"], "chance": pr["chance"],
                        "distance": run_distance(m, vocab, seed=200 + seed)}
-                if variant == "V2-M":
+                if variant in ("V2-S", "V2-M"):
                     rec["dilution"] = run_dilution(m, vocab, seed=300 + seed)
                     rec["ablations"] = run_ablations(m, vocab, seed=400 + seed)
                 per_seed.append(rec)
