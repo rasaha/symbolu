@@ -25,11 +25,11 @@ RAW = HERE / "results" / "raw"
 
 STUDY = dict(
     embed_dim=96, num_heads=4, local_window=16, num_slots=8, top_k=4,
-    target_len=128,
-    pressures={"1x": 8, "2x": 16, "4x": 32},   # n_candidate facts (slots=8)
-    n_train=600, n_val=80, n_test=120,
-    steps=500, batch_size=16, lr=1e-3,
-    arms=("A", "C", "D", "D-no-guid", "D-random", "D-write-only", "D-query-only"),
+    target_len=180,
+    pressures={"1x": 8, "3x": 24},   # n_candidate facts (slots=8): no-pressure vs pressure
+    n_train=400, n_val=60, n_test=100,
+    steps=350, batch_size=16, lr=1e-3,
+    arms=("A", "C", "D", "D-no-guid", "D-random"),   # decisive core set
     seeds=(0, 1, 2),
 )
 
