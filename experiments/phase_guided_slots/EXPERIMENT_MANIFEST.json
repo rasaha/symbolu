@@ -1,0 +1,31 @@
+{
+  "frozen_baseline": {
+    "git_commit": "7345394 (HEAD at phase start)",
+    "branch": "claude/lightweight-phase-transformer-tt9f27",
+    "lightweight_phase_tests": "98 pass",
+    "freeze_result": "FREEZE OK",
+    "phase_core_version": "v1.0",
+    "local_phase_version": "v1.4",
+    "binding_version": "v1.5",
+    "working_tree": "clean at baseline"
+  },
+  "environment": {
+    "python": "3.11.15", "torch": "2.13.0+cu130", "cuda": false,
+    "platform": "Linux-6.18.5-x86_64", "cpus": 4, "ram_gib": 15
+  },
+  "architecture": {
+    "stage1_phase_relevance": "frozen LightweightPhaseAttention -> g_t; guidance head [h;g] -> (r_write, k_guide, p_retain)",
+    "stage2_bounded_memory": "GuidedBoundedSlots (new module; frozen BoundedBindingSlots NOT modified) streaming writes with guided gate/key/retention + capacity-pressured eviction; bounded Top-K read; relational readout over selected slots",
+    "no_quadratic": "verified via frozen shape_audit on all arms; slots O(N*M*D) compute, O(M*D) state; no [B,N,M,D] or N*N",
+    "arms": {
+      "A": "local only (no slots)",
+      "C": "local + slots, guidance from h only (no Phase)",
+      "D": "local + slots, guidance from [h; Phase g]",
+      "D-no-guid": "Phase computed but guidance zeroed",
+      "D-random": "guidance replaced by random of same scale",
+      "D-write-only": "Phase guidance on writes only",
+      "D-query-only": "Phase guidance on reads only"
+    },
+    "decisive_comparison": "D - C (Phase-guidance value beyond ordinary slots); causal: D - D-no-guid"
+  }
+}
