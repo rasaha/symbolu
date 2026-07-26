@@ -1,0 +1,44 @@
+{
+  "name": "phase_guided_slots_v2",
+  "purpose": "Redesign the phase_guided_slots task so it creates GENUINE bounded-memory pressure (distinct slots, saturation, eviction, multi-fact retrieval) and validate that plain slots C fail through real eviction BEFORE Phase is tested again.",
+  "frozen_contract": {
+    "modifies_frozen_lightweight_phase": false,
+    "modifies_frozen_BoundedBindingSlots": false,
+    "adds_quadratic_attention": false,
+    "changes": "dataset, task protocol, instrumentation, and experiment harness only",
+    "match_threshold": "set as an INSTANCE attribute on GuidedBoundedSlots (module source unchanged)"
+  },
+  "gating_rule": "Phase arms (D / D-no-guid) may not be evaluated until Stage A PASSES: plain slots C must be capacity-limited and losing relevant evidence through real eviction.",
+  "stageA_gate": {
+    "capacity_saturation": ">= 0.80",
+    "frac_time_full": "> 0.25",
+    "evictions_per_example": "> 1",
+    "early_target_eviction": "> 0.20",
+    "target_survival": "in [0.30, 0.80]",
+    "topk_support_recall": "< 0.80",
+    "C_answer_acc": "in [0.30, 0.70]",
+    "distinct_slots": "merge_of_distinct_rate < 2 (distinct facts occupy distinct slots)",
+    "shortcut_controls": "value/target corruption collapses accuracy; key/query corruption materially harms"
+  },
+  "arms": {
+    "A": "local window only (no slots)",
+    "C": "local + bounded slots (local-only guidance)",
+    "D": "local + Phase-guided bounded slots (Stage B only)",
+    "D-no-guid": "D architecture, Phase guidance zeroed (Stage B only)"
+  },
+  "files": {
+    "task_schema.py": "composite-identity Fact schema + closed vocab",
+    "datasets_pressure_v2.py": "focus-conditioned, distinct-identity, versioned, capacity-pressured generator",
+    "memory_trace.py": "read-only faithful GuidedBoundedSlots trace with oracle identities",
+    "train_eval.py": "answer CE + per-fact-anchor write BCE (balanced) + metrics",
+    "task_validator.py": "PCfg + train_arm + Stage A validity gate",
+    "run_task_validation.py": "Stage A driver (A, C only) across pressure configs + seeds",
+    "run_phase_comparison.py": "Stage B driver (D vs C) — gated on Stage A PASS",
+    "shortcut_checks.py": "bounded-memory dependence controls",
+    "configs/pressure_configs.json": "candidate pressure configs"
+  },
+  "reproduce": [
+    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_task_validation",
+    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_phase_comparison  # only runs if Stage A passed"
+  ]
+}
