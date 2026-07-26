@@ -1,0 +1,71 @@
+{
+  "generation_seed": 0,
+  "per_task": 120,
+  "target_lens": [
+    48,
+    64,
+    96
+  ],
+  "task_families": [
+    "lm",
+    "distant_fact",
+    "multi_candidate",
+    "entity_binding",
+    "source_attr",
+    "supersession",
+    "insufficient"
+  ],
+  "vocab_size": 242,
+  "entity_pool": {
+    "train": 84,
+    "val": 18,
+    "test": 18
+  },
+  "value_pool": {
+    "train": 20,
+    "val": 20,
+    "test": 20
+  },
+  "source_pool": {
+    "train": 40,
+    "val": 40,
+    "test": 40
+  },
+  "value_range": [
+    "$1.1M",
+    "$3.0M"
+  ],
+  "vocab_hash": "0493f254b99a7f16",
+  "split_entity_hash": {
+    "train": "bd92fdbedb30755b",
+    "val": "36a55efa9da05bf3",
+    "test": "ab8c31d639509ce8"
+  },
+  "tl_train": 64,
+  "study": {
+    "embed_dim": 96,
+    "num_heads": 4,
+    "num_layers": 2,
+    "local_window": 16,
+    "num_slots": 16,
+    "slot_top_k": 4,
+    "tl_train": 64,
+    "eval_lens": [
+      48,
+      64,
+      96
+    ],
+    "per_task_train": 120,
+    "per_task_test": 30,
+    "per_task_val": 8,
+    "steps": 600,
+    "iso_steps": 800,
+    "batch_size": 16,
+    "lr": 0.001,
+    "seeds": [
+      0,
+      1,
+      2
+    ]
+  }
+}

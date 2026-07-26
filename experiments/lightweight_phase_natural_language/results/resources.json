@@ -1,0 +1,134 @@
+{
+  "A": {
+    "params": 258626,
+    "state_sizes": {
+      "phase_state_numel_per_layer_per_seq": 0,
+      "slot_state_numel_per_layer_per_seq": 0,
+      "num_layers": 2,
+      "phase_state_total_per_seq": 0,
+      "slot_state_total_per_seq": 0
+    },
+    "no_quadratic_peak_numel": {
+      "48": 3072,
+      "64": 4096,
+      "96": 6144
+    },
+    "runtime_scaling": {
+      "latency_ms_by_N": {
+        "48": 1.7698605855305989,
+        "64": 1.902182896931966,
+        "96": 1.8578370412190754
+      },
+      "scaling_exponent": 0.06998824074193734
+    },
+    "latency_256": {
+      "seq_len": 256,
+      "batch": 1,
+      "forward_latency_ms": 2.8669357299804688,
+      "tokens_per_sec": 89293.94451466968
+    },
+    "peak_mem_256": {
+      "seq_len": 256,
+      "peak_python_mem_mb": 0.004008
+    }
+  },
+  "B": {
+    "params": 369604,
+    "state_sizes": {
+      "phase_state_numel_per_layer_per_seq": 192,
+      "slot_state_numel_per_layer_per_seq": 0,
+      "num_layers": 2,
+      "phase_state_total_per_seq": 384,
+      "slot_state_total_per_seq": 0
+    },
+    "no_quadratic_peak_numel": {
+      "48": 4608,
+      "64": 6144,
+      "96": 9216
+    },
+    "runtime_scaling": {
+      "latency_ms_by_N": {
+        "48": 2.600987752278646,
+        "64": 3.681659698486328,
+        "96": 3.6472479502360025
+      },
+      "scaling_exponent": 0.487748675670192
+    },
+    "latency_256": {
+      "seq_len": 256,
+      "batch": 1,
+      "forward_latency_ms": 6.4090728759765625,
+      "tokens_per_sec": 39943.374799119105
+    },
+    "peak_mem_256": {
+      "seq_len": 256,
+      "peak_python_mem_mb": 0.006098
+    }
+  },
+  "C": {
+    "params": 443912,
+    "state_sizes": {
+      "phase_state_numel_per_layer_per_seq": 192,
+      "slot_state_numel_per_layer_per_seq": 3136,
+      "num_layers": 2,
+      "phase_state_total_per_seq": 384,
+      "slot_state_total_per_seq": 6272
+    },
+    "no_quadratic_peak_numel": {
+      "48": 4608,
+      "64": 6144,
+      "96": 9216
+    },
+    "runtime_scaling": {
+      "latency_ms_by_N": {
+        "48": 40.0992234547933,
+        "64": 52.89467175801595,
+        "96": 81.01264635721843
+      },
+      "scaling_exponent": 1.0145728370079357
+    },
+    "latency_256": {
+      "seq_len": 256,
+      "batch": 1,
+      "forward_latency_ms": 248.10476303100586,
+      "tokens_per_sec": 1031.8221902414966
+    },
+    "peak_mem_256": {
+      "seq_len": 256,
+      "peak_python_mem_mb": 0.03954
+    }
+  },
+  "C-no-Phase": {
+    "params": 332934,
+    "state_sizes": {
+      "phase_state_numel_per_layer_per_seq": 0,
+      "slot_state_numel_per_layer_per_seq": 3136,
+      "num_layers": 2,
+      "phase_state_total_per_seq": 0,
+      "slot_state_total_per_seq": 6272
+    },
+    "no_quadratic_peak_numel": {
+      "48": 3072,
+      "64": 4096,
+      "96": 6144
+    },
+    "runtime_scaling": {
+      "latency_ms_by_N": {
+        "48": 43.28139623006185,
+        "64": 51.35011672973633,
+        "96": 87.69885698954265
+      },
+      "scaling_exponent": 1.0188109993024852
+    },
+    "latency_256": {
+      "seq_len": 256,
+      "batch": 1,
+      "forward_latency_ms": 244.13247108459473,
+      "tokens_per_sec": 1048.611021969679
+    },
+    "peak_mem_256": {
+      "seq_len": 256,
+      "peak_python_mem_mb": 0.037813
+    }
+  }
+}

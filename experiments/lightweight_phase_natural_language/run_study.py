@@ -31,11 +31,11 @@ RAW = HERE / "results" / "raw"
 
 # --- study configuration (micro-scale, CPU) --------------------------------
 STUDY = dict(
-    embed_dim=128, num_heads=4, num_layers=2, local_window=16,
+    embed_dim=96, num_heads=4, num_layers=2, local_window=16,
     num_slots=16, slot_top_k=4,
-    tl_train=72, eval_lens=(48, 72, 128),
-    per_task_train=180, per_task_test=40, per_task_val=20,
-    steps=800, iso_steps=800, batch_size=16, lr=1e-3,
+    tl_train=64, eval_lens=(48, 64, 96),   # 96 > tl_train (one length beyond training)
+    per_task_train=120, per_task_test=30, per_task_val=8,
+    steps=600, iso_steps=800, batch_size=16, lr=1e-3,
     seeds=(0, 1, 2),
 )
 
