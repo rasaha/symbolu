@@ -1,0 +1,936 @@
+{
+  "config": {
+    "arms": "Q,L,R,P,PL",
+    "seeds": "0,1,2",
+    "steps": 1500,
+    "N": 160,
+    "target_params": 2000000,
+    "tag": "main"
+  },
+  "vocab": 1278,
+  "corpus_tokens": 55547,
+  "results": {
+    "Q": [
+      {
+        "arm": "Q",
+        "seed": 0,
+        "params": 1999756,
+        "train_s": 305.1,
+        "eval": {
+          "ppl": {
+            "256": 151.19897684942237,
+            "512": 158.5640562900288
+          },
+          "needle_by_dist": {
+            "16": 0.7133333333333334,
+            "96": 0.5666666666666667,
+            "220": 0.7133333333333334
+          },
+          "binding_by_k": {
+            "2": 0.22666666666666666,
+            "4": 0.12666666666666668,
+            "6": 0.05333333333333334
+          },
+          "multihop": 0.24,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.675,
+              "binding_k4": 0.0625
+            },
+            "512": {
+              "needle_mid": 0.7375,
+              "binding_k4": 0.075
+            },
+            "1024": {
+              "needle_mid": 0.7,
+              "binding_k4": 0.0375
+            }
+          },
+          "perturb_follow": 0.7533333333333333
+        },
+        "ablation": null
+      },
+      {
+        "arm": "Q",
+        "seed": 1,
+        "params": 1999756,
+        "train_s": 306.6,
+        "eval": {
+          "ppl": {
+            "256": 159.55139096665252,
+            "512": 164.8142226634176
+          },
+          "needle_by_dist": {
+            "16": 0.04,
+            "96": 0.05333333333333334,
+            "220": 0.05333333333333334
+          },
+          "binding_by_k": {
+            "2": 0.013333333333333334,
+            "4": 0.006666666666666667,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.125,
+              "binding_k4": 0.025
+            },
+            "512": {
+              "needle_mid": 0.0375,
+              "binding_k4": 0.0125
+            },
+            "1024": {
+              "needle_mid": 0.0875,
+              "binding_k4": 0.025
+            }
+          },
+          "perturb_follow": 0.13333333333333333
+        },
+        "ablation": null
+      },
+      {
+        "arm": "Q",
+        "seed": 2,
+        "params": 1999756,
+        "train_s": 436.7,
+        "eval": {
+          "ppl": {
+            "256": 139.45306528150718,
+            "512": 144.52779014926057
+          },
+          "needle_by_dist": {
+            "16": 1.0,
+            "96": 0.98,
+            "220": 0.9933333333333333
+          },
+          "binding_by_k": {
+            "2": 0.32666666666666666,
+            "4": 0.18,
+            "6": 0.11333333333333333
+          },
+          "multihop": 0.18666666666666668,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 1.0,
+              "binding_k4": 0.1625
+            },
+            "512": {
+              "needle_mid": 1.0,
+              "binding_k4": 0.1375
+            },
+            "1024": {
+              "needle_mid": 0.9875,
+              "binding_k4": 0.125
+            }
+          },
+          "perturb_follow": 0.9933333333333333
+        },
+        "ablation": null
+      }
+    ],
+    "L": [
+      {
+        "arm": "L",
+        "seed": 0,
+        "params": 1999756,
+        "train_s": 288.0,
+        "eval": {
+          "ppl": {
+            "256": 149.01947548938315,
+            "512": 152.38640011329082
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.0,
+            "4": 0.0,
+            "6": 0.006666666666666667
+          },
+          "multihop": 0.0,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "1024": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            }
+          },
+          "perturb_follow": 0.0
+        },
+        "ablation": null
+      },
+      {
+        "arm": "L",
+        "seed": 1,
+        "params": 1999756,
+        "train_s": 304.8,
+        "eval": {
+          "ppl": {
+            "256": 153.32161443114154,
+            "512": 157.5160937483068
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.0,
+            "4": 0.0,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.0,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "1024": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            }
+          },
+          "perturb_follow": 0.0
+        },
+        "ablation": null
+      },
+      {
+        "arm": "L",
+        "seed": 2,
+        "params": 1999756,
+        "train_s": 326.0,
+        "eval": {
+          "ppl": {
+            "256": 161.36861578818855,
+            "512": 164.18235890146212
+          },
+          "needle_by_dist": {
+            "16": 0.02,
+            "96": 0.013333333333333334,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.013333333333333334,
+            "4": 0.006666666666666667,
+            "6": 0.02
+          },
+          "multihop": 0.006666666666666667,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0125
+            },
+            "512": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0
+            },
+            "1024": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.025
+            }
+          },
+          "perturb_follow": 0.03333333333333333
+        },
+        "ablation": null
+      }
+    ],
+    "R": [
+      {
+        "arm": "R",
+        "seed": 0,
+        "params": 1999772,
+        "train_s": 224.7,
+        "eval": {
+          "ppl": {
+            "256": 63.81808507909814,
+            "512": 69.26089879825207
+          },
+          "needle_by_dist": {
+            "16": 0.006666666666666667,
+            "96": 0.006666666666666667,
+            "220": 0.006666666666666667
+          },
+          "binding_by_k": {
+            "2": 0.02666666666666667,
+            "4": 0.04,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.02,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.025
+            },
+            "512": {
+              "needle_mid": 0.0375,
+              "binding_k4": 0.0125
+            },
+            "1024": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.0375
+            }
+          },
+          "perturb_follow": 0.02666666666666667
+        },
+        "ablation": null
+      },
+      {
+        "arm": "R",
+        "seed": 1,
+        "params": 1999772,
+        "train_s": 219.3,
+        "eval": {
+          "ppl": {
+            "256": 62.26092034459692,
+            "512": 66.78891796323884
+          },
+          "needle_by_dist": {
+            "16": 0.04,
+            "96": 0.03333333333333333,
+            "220": 0.03333333333333333
+          },
+          "binding_by_k": {
+            "2": 0.02,
+            "4": 0.0,
+            "6": 0.02666666666666667
+          },
+          "multihop": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0125
+            },
+            "512": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.025
+            },
+            "1024": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0125
+            }
+          },
+          "perturb_follow": 0.04
+        },
+        "ablation": null
+      },
+      {
+        "arm": "R",
+        "seed": 2,
+        "params": 1999772,
+        "train_s": 222.5,
+        "eval": {
+          "ppl": {
+            "256": 68.98446309102435,
+            "512": 72.65618638759263
+          },
+          "needle_by_dist": {
+            "16": 0.03333333333333333,
+            "96": 0.03333333333333333,
+            "220": 0.03333333333333333
+          },
+          "binding_by_k": {
+            "2": 0.013333333333333334,
+            "4": 0.02666666666666667,
+            "6": 0.02666666666666667
+          },
+          "multihop": 0.02,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.05
+            },
+            "1024": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0125
+            }
+          },
+          "perturb_follow": 0.02666666666666667
+        },
+        "ablation": null
+      }
+    ],
+    "P": [
+      {
+        "arm": "P",
+        "seed": 0,
+        "params": 2000288,
+        "train_s": 297.5,
+        "eval": {
+          "ppl": {
+            "256": 152.13303716319146,
+            "512": 172.05411142164675
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.02666666666666667,
+            "4": 0.04,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.0,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.025
+            },
+            "512": {
+              "needle_mid": 0.0375,
+              "binding_k4": 0.0125
+            },
+            "1024": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.0375
+            }
+          },
+          "perturb_follow": 0.006666666666666667
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.02
+          },
+          "no_phase": {
+            "needle_d96": 0.01,
+            "binding_k4": 0.035
+          },
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.035
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 21.39529800415039,
+              "phase_angle_std": 2.2015740871429443,
+              "amp_k_mean": 0.48441648483276367
+            },
+            {
+              "state_norm_mean": 21.986125946044922,
+              "phase_angle_std": 2.2618210315704346,
+              "amp_k_mean": 0.4678020477294922
+            },
+            {
+              "state_norm_mean": 25.936809539794922,
+              "phase_angle_std": 2.1555449962615967,
+              "amp_k_mean": 0.48033255338668823
+            },
+            {
+              "state_norm_mean": 30.351272583007812,
+              "phase_angle_std": 2.3570163249969482,
+              "amp_k_mean": 0.37904495000839233
+            }
+          ]
+        }
+      },
+      {
+        "arm": "P",
+        "seed": 1,
+        "params": 2000288,
+        "train_s": 303.5,
+        "eval": {
+          "ppl": {
+            "256": 163.19271728493635,
+            "512": 168.7934648598267
+          },
+          "needle_by_dist": {
+            "16": 0.013333333333333334,
+            "96": 0.013333333333333334,
+            "220": 0.013333333333333334
+          },
+          "binding_by_k": {
+            "2": 0.03333333333333333,
+            "4": 0.006666666666666667,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.013333333333333334,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0625
+            },
+            "512": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.025
+            },
+            "1024": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.025
+            }
+          },
+          "perturb_follow": 0.04666666666666667
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.02,
+            "binding_k4": 0.005
+          },
+          "no_phase": {
+            "needle_d96": 0.04,
+            "binding_k4": 0.01
+          },
+          "baseline": {
+            "needle_d96": 0.015,
+            "binding_k4": 0.005
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 14.015495300292969,
+              "phase_angle_std": 2.180377960205078,
+              "amp_k_mean": 0.42329469323158264
+            },
+            {
+              "state_norm_mean": 15.617069244384766,
+              "phase_angle_std": 2.1043238639831543,
+              "amp_k_mean": 0.48090386390686035
+            },
+            {
+              "state_norm_mean": 20.532520294189453,
+              "phase_angle_std": 2.114163875579834,
+              "amp_k_mean": 0.48382583260536194
+            },
+            {
+              "state_norm_mean": 57.88897705078125,
+              "phase_angle_std": 2.2917532920837402,
+              "amp_k_mean": 0.508508563041687
+            }
+          ]
+        }
+      },
+      {
+        "arm": "P",
+        "seed": 2,
+        "params": 2000288,
+        "train_s": 298.2,
+        "eval": {
+          "ppl": {
+            "256": 102.7527190166599,
+            "512": 108.86171699715212
+          },
+          "needle_by_dist": {
+            "16": 0.02,
+            "96": 0.02,
+            "220": 0.02
+          },
+          "binding_by_k": {
+            "2": 0.04,
+            "4": 0.013333333333333334,
+            "6": 0.013333333333333334
+          },
+          "multihop": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0125
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "1024": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.0
+            }
+          },
+          "perturb_follow": 0.02666666666666667
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.015,
+            "binding_k4": 0.0
+          },
+          "no_phase": {
+            "needle_d96": 0.025,
+            "binding_k4": 0.015
+          },
+          "baseline": {
+            "needle_d96": 0.015,
+            "binding_k4": 0.015
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 32.9378662109375,
+              "phase_angle_std": 2.2755353450775146,
+              "amp_k_mean": 0.526759922504425
+            },
+            {
+              "state_norm_mean": 9.113089561462402,
+              "phase_angle_std": 2.1320197582244873,
+              "amp_k_mean": 0.3708726167678833
+            },
+            {
+              "state_norm_mean": 16.22362518310547,
+              "phase_angle_std": 2.0692014694213867,
+              "amp_k_mean": 0.4212599992752075
+            },
+            {
+              "state_norm_mean": 30.010181427001953,
+              "phase_angle_std": 2.1904053688049316,
+              "amp_k_mean": 0.406362384557724
+            }
+          ]
+        }
+      }
+    ],
+    "PL": [
+      {
+        "arm": "PL",
+        "seed": 0,
+        "params": 2000292,
+        "train_s": 425.0,
+        "eval": {
+          "ppl": {
+            "256": 132.27718934041533,
+            "512": 144.61792275531215
+          },
+          "needle_by_dist": {
+            "16": 0.02666666666666667,
+            "96": 0.02666666666666667,
+            "220": 0.013333333333333334
+          },
+          "binding_by_k": {
+            "2": 0.0,
+            "4": 0.0,
+            "6": 0.0
+          },
+          "multihop": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0125
+            },
+            "1024": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.025
+            }
+          },
+          "perturb_follow": 0.04666666666666667
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.015,
+            "binding_k4": 0.0
+          },
+          "no_phase": {
+            "needle_d96": 0.025,
+            "binding_k4": 0.035
+          },
+          "baseline": {
+            "needle_d96": 0.025,
+            "binding_k4": 0.0
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 20.52401351928711,
+              "phase_angle_std": 2.177820920944214,
+              "amp_k_mean": 0.4975196123123169
+            },
+            {
+              "state_norm_mean": 12.44901180267334,
+              "phase_angle_std": 2.179996967315674,
+              "amp_k_mean": 0.4833377003669739
+            },
+            {
+              "state_norm_mean": 10.578338623046875,
+              "phase_angle_std": 2.1234753131866455,
+              "amp_k_mean": 0.45341116189956665
+            },
+            {
+              "state_norm_mean": 21.50483512878418,
+              "phase_angle_std": 2.213188648223877,
+              "amp_k_mean": 0.420329749584198
+            }
+          ]
+        }
+      },
+      {
+        "arm": "PL",
+        "seed": 1,
+        "params": 2000292,
+        "train_s": 397.7,
+        "eval": {
+          "ppl": {
+            "256": 112.02708560691421,
+            "512": 118.24680745936072
+          },
+          "needle_by_dist": {
+            "16": 0.04,
+            "96": 0.04,
+            "220": 0.04
+          },
+          "binding_by_k": {
+            "2": 0.03333333333333333,
+            "4": 0.013333333333333334,
+            "6": 0.02
+          },
+          "multihop": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0625
+            },
+            "512": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.025
+            },
+            "1024": {
+              "needle_mid": 0.025,
+              "binding_k4": 0.025
+            }
+          },
+          "perturb_follow": 0.04
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.04,
+            "binding_k4": 0.01
+          },
+          "no_phase": {
+            "needle_d96": 0.04,
+            "binding_k4": 0.01
+          },
+          "baseline": {
+            "needle_d96": 0.04,
+            "binding_k4": 0.01
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 12.627514839172363,
+              "phase_angle_std": 2.1181957721710205,
+              "amp_k_mean": 0.4579046368598938
+            },
+            {
+              "state_norm_mean": 19.293365478515625,
+              "phase_angle_std": 2.237729787826538,
+              "amp_k_mean": 0.5043412446975708
+            },
+            {
+              "state_norm_mean": 28.202974319458008,
+              "phase_angle_std": 2.1575493812561035,
+              "amp_k_mean": 0.49383750557899475
+            },
+            {
+              "state_norm_mean": 52.1912841796875,
+              "phase_angle_std": 2.3193297386169434,
+              "amp_k_mean": 0.5458191633224487
+            }
+          ]
+        }
+      },
+      {
+        "arm": "PL",
+        "seed": 2,
+        "params": 2000292,
+        "train_s": 419.0,
+        "eval": {
+          "ppl": {
+            "256": 145.4824000743996,
+            "512": 150.44388313352073
+          },
+          "needle_by_dist": {
+            "16": 0.02666666666666667,
+            "96": 0.03333333333333333,
+            "220": 0.02
+          },
+          "binding_by_k": {
+            "2": 0.02666666666666667,
+            "4": 0.04666666666666667,
+            "6": 0.02
+          },
+          "multihop": 0.06,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0125
+            },
+            "1024": {
+              "needle_mid": 0.0125,
+              "binding_k4": 0.0
+            }
+          },
+          "perturb_follow": 0.02666666666666667
+        },
+        "ablation": {
+          "zero": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0
+          },
+          "shuffle_pos": {
+            "needle_d96": 0.015,
+            "binding_k4": 0.025
+          },
+          "no_phase": {
+            "needle_d96": 0.01,
+            "binding_k4": 0.035
+          },
+          "baseline": {
+            "needle_d96": 0.035,
+            "binding_k4": 0.055
+          },
+          "diagnostics": [
+            {
+              "state_norm_mean": 14.96623420715332,
+              "phase_angle_std": 2.1863291263580322,
+              "amp_k_mean": 0.46440139412879944
+            },
+            {
+              "state_norm_mean": 17.35506248474121,
+              "phase_angle_std": 2.223043203353882,
+              "amp_k_mean": 0.5154178142547607
+            },
+            {
+              "state_norm_mean": 20.9642333984375,
+              "phase_angle_std": 2.1682116985321045,
+              "amp_k_mean": 0.513954758644104
+            },
+            {
+              "state_norm_mean": 43.07036590576172,
+              "phase_angle_std": 2.2947580814361572,
+              "amp_k_mean": 0.521187424659729
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "log": [
+    "vocab=1278 corpus_tokens=55547 steps=1500 N=160",
+    "    [Q s0] step 0/1500 loss 7.098 gnorm 6.65",
+    "    [Q s0] step 300/1500 loss 4.035 gnorm 2.44",
+    "    [Q s0] step 600/1500 loss 3.663 gnorm 4.19",
+    "    [Q s0] step 900/1500 loss 4.974 gnorm 0.50",
+    "    [Q s0] step 1200/1500 loss 3.658 gnorm 4.64",
+    "  [Q s0] params=1999756 ppl256=151.2 needle96=0.57 bind4=0.13 mhop=0.24 follow=0.75 (338s)",
+    "    [Q s1] step 0/1500 loss 7.209 gnorm 7.41",
+    "    [Q s1] step 300/1500 loss 3.945 gnorm 2.52",
+    "    [Q s1] step 600/1500 loss 4.055 gnorm 2.19",
+    "    [Q s1] step 900/1500 loss 3.846 gnorm 2.05",
+    "    [Q s1] step 1200/1500 loss 3.767 gnorm 3.64",
+    "  [Q s1] params=1999756 ppl256=159.6 needle96=0.05 bind4=0.01 mhop=0.03 follow=0.13 (341s)",
+    "    [Q s2] step 0/1500 loss 7.233 gnorm 7.79",
+    "    [Q s2] step 300/1500 loss 3.754 gnorm 2.97",
+    "    [Q s2] step 600/1500 loss 4.061 gnorm 4.19",
+    "    [Q s2] step 900/1500 loss 5.028 gnorm 0.26",
+    "    [Q s2] step 1200/1500 loss 3.024 gnorm 6.82",
+    "  [Q s2] params=1999756 ppl256=139.5 needle96=0.98 bind4=0.18 mhop=0.19 follow=0.99 (469s)",
+    "    [L s0] step 0/1500 loss 7.102 gnorm 6.76",
+    "    [L s0] step 300/1500 loss 4.013 gnorm 2.41",
+    "    [L s0] step 600/1500 loss 3.947 gnorm 1.73",
+    "    [L s0] step 900/1500 loss 4.834 gnorm 0.30",
+    "    [L s0] step 1200/1500 loss 3.880 gnorm 3.98",
+    "  [L s0] params=1999756 ppl256=149.0 needle96=0.00 bind4=0.00 mhop=0.00 follow=0.00 (316s)",
+    "    [L s1] step 0/1500 loss 7.208 gnorm 7.12",
+    "    [L s1] step 300/1500 loss 4.219 gnorm 38.41",
+    "    [L s1] step 600/1500 loss 3.918 gnorm 4.26",
+    "    [L s1] step 900/1500 loss 3.787 gnorm 57.95",
+    "    [L s1] step 1200/1500 loss 3.973 gnorm 13.21",
+    "  [L s1] params=1999756 ppl256=153.3 needle96=0.00 bind4=0.00 mhop=0.00 follow=0.00 (334s)",
+    "    [L s2] step 0/1500 loss 7.247 gnorm 7.49",
+    "    [L s2] step 300/1500 loss 3.879 gnorm 2.53",
+    "    [L s2] step 600/1500 loss 3.939 gnorm 2.41",
+    "    [L s2] step 900/1500 loss 5.052 gnorm 0.41",
+    "    [L s2] step 1200/1500 loss 3.816 gnorm 2.26",
+    "  [L s2] params=1999756 ppl256=161.4 needle96=0.01 bind4=0.01 mhop=0.01 follow=0.03 (353s)",
+    "    [R s0] step 0/1500 loss 7.180 gnorm 10.81",
+    "    [R s0] step 300/1500 loss 4.022 gnorm 2.57",
+    "    [R s0] step 600/1500 loss 3.950 gnorm 1.86",
+    "    [R s0] step 900/1500 loss 4.113 gnorm 0.63",
+    "    [R s0] step 1200/1500 loss 3.954 gnorm 1.67",
+    "  [R s0] params=1999772 ppl256=63.8 needle96=0.01 bind4=0.04 mhop=0.02 follow=0.03 (237s)",
+    "    [R s1] step 0/1500 loss 7.148 gnorm 11.04",
+    "    [R s1] step 300/1500 loss 3.945 gnorm 2.63",
+    "    [R s1] step 600/1500 loss 4.045 gnorm 2.36",
+    "    [R s1] step 900/1500 loss 3.925 gnorm 2.18",
+    "    [R s1] step 1200/1500 loss 3.901 gnorm 1.82",
+    "  [R s1] params=1999772 ppl256=62.3 needle96=0.03 bind4=0.00 mhop=0.03 follow=0.04 (231s)",
+    "    [R s2] step 0/1500 loss 7.234 gnorm 11.09",
+    "    [R s2] step 300/1500 loss 3.865 gnorm 2.58",
+    "    [R s2] step 600/1500 loss 3.930 gnorm 2.52",
+    "    [R s2] step 900/1500 loss 4.390 gnorm 0.31",
+    "    [R s2] step 1200/1500 loss 3.927 gnorm 1.86",
+    "  [R s2] params=1999772 ppl256=69.0 needle96=0.03 bind4=0.03 mhop=0.02 follow=0.03 (235s)",
+    "    [P s0] step 0/1500 loss 7.220 gnorm 10.33",
+    "    [P s0] step 300/1500 loss 4.027 gnorm 2.76",
+    "    [P s0] step 600/1500 loss 3.961 gnorm 1.95",
+    "    [P s0] step 900/1500 loss 4.900 gnorm 1.18",
+    "    [P s0] step 1200/1500 loss 3.977 gnorm 2.01",
+    "  [P s0] params=2000288 ppl256=152.1 needle96=0.00 bind4=0.04 mhop=0.00 follow=0.01 (322s)",
+    "    [P s1] step 0/1500 loss 7.211 gnorm 10.83",
+    "    [P s1] step 300/1500 loss 4.027 gnorm 2.82",
+    "    [P s1] step 600/1500 loss 4.076 gnorm 2.50",
+    "    [P s1] step 900/1500 loss 3.904 gnorm 3.61",
+    "    [P s1] step 1200/1500 loss 3.955 gnorm 4.39",
+    "  [P s1] params=2000288 ppl256=163.2 needle96=0.01 bind4=0.01 mhop=0.01 follow=0.05 (328s)",
+    "    [P s2] step 0/1500 loss 7.167 gnorm 10.29",
+    "    [P s2] step 300/1500 loss 3.877 gnorm 2.66",
+    "    [P s2] step 600/1500 loss 3.910 gnorm 2.53",
+    "    [P s2] step 900/1500 loss 4.943 gnorm 0.53",
+    "    [P s2] step 1200/1500 loss 3.929 gnorm 1.92",
+    "  [P s2] params=2000288 ppl256=102.8 needle96=0.02 bind4=0.01 mhop=0.03 follow=0.03 (322s)",
+    "    [PL s0] step 0/1500 loss 7.244 gnorm 10.24",
+    "    [PL s0] step 300/1500 loss 3.993 gnorm 2.61",
+    "    [PL s0] step 600/1500 loss 3.865 gnorm 10.21",
+    "    [PL s0] step 900/1500 loss 4.880 gnorm 1.35",
+    "    [PL s0] step 1200/1500 loss 3.865 gnorm 11.42",
+    "  [PL s0] params=2000292 ppl256=132.3 needle96=0.03 bind4=0.00 mhop=0.03 follow=0.05 (479s)",
+    "    [PL s1] step 0/1500 loss 7.268 gnorm 8.74",
+    "    [PL s1] step 300/1500 loss 3.964 gnorm 3.84",
+    "    [PL s1] step 600/1500 loss 3.986 gnorm 4.98",
+    "    [PL s1] step 900/1500 loss 3.946 gnorm 4.30",
+    "    [PL s1] step 1200/1500 loss 3.892 gnorm 2.61",
+    "  [PL s1] params=2000292 ppl256=112.0 needle96=0.04 bind4=0.01 mhop=0.03 follow=0.04 (450s)",
+    "    [PL s2] step 0/1500 loss 7.114 gnorm 10.18",
+    "    [PL s2] step 300/1500 loss 3.901 gnorm 2.80",
+    "    [PL s2] step 600/1500 loss 3.925 gnorm 3.00",
+    "    [PL s2] step 900/1500 loss 4.984 gnorm 0.59",
+    "    [PL s2] step 1200/1500 loss 3.874 gnorm 10.74",
+    "  [PL s2] params=2000292 ppl256=145.5 needle96=0.03 bind4=0.05 mhop=0.06 follow=0.03 (476s)"
+  ]
+}
