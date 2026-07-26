@@ -68,6 +68,11 @@ class PhaseV2Variant(nn.Module):
         d = self.core(x, return_diagnostics=True).diagnostics
         return d["write_rate_mean"].item(), d["write_rate_per_pos"]
 
+    def gate_values(self, x):
+        """Cheap per-token write gate [B,N,H] from a single projection pass (no scan)."""
+        xn = self.core.norm(x)
+        return self.core._gate(xn)
+
     def state_bytes(self, B=1):
         return self.core.state_bytes(B)
 

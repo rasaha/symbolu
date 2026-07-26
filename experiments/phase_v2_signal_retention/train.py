@@ -129,19 +129,12 @@ def train_focus(variant_name, gen_fn, pad_id, cfg: TrainCfg, vocab_size,
             loss = F.cross_entropy(lg, torch.tensor(yi, device=device))
         else:
             loss = torch.zeros((), device=device)
-        # write-budget regularizer + optional gate supervision
+        # write-budget regularizer + optional gate supervision — single cheap gate pass
         if variant_name != "V1":
-            d = model.write_rates(ids)
-            wr = d["write_rate_mean"]
-            loss = loss + cfg.lambda_budget * (wr - cfg.rho) ** 2
+            w_hn = model.phase.gate_values(h)          # [B,N,H] (reuses local rep h)
+            w = w_hn.mean(-1)                            # [B,N]
+            loss = loss + cfg.lambda_budget * (w.mean() - cfg.rho) ** 2
             if cfg.mode == "gate_sup":
-                # recompute per-token gate and supervise
-                Npos = ids.shape[1]
-                posv = torch.arange(Npos, device=device).clamp(max=8191)
-                x = model.embed(ids) + model.pos(posv).unsqueeze(0)
-                hh = model.local(x, return_residual_add=True)
-                xn = model.phase.core.norm(hh)
-                w = torch.sigmoid(model.phase.core.W_w(xn)).mean(-1)   # [B,N] avg over heads
                 tgt = _gate_target(model, ids, batch, device)
                 m = tgt >= 0
                 if m.any():
