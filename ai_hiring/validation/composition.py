@@ -1,7 +1,8 @@
 """Validation composition root (H5) — application-local, validation-only.
 
 Wires the full H1–H4 hiring lifecycle (hiring services + the frozen kernel decision
-services + reference providers) into a single in-memory environment for end-to-end
+services + deterministic provider implementations used only for validation) into a
+single in-memory environment for end-to-end
 validation. No production adapters, no new architecture — this only *assembles* the
 already-shipped, frozen-API-consuming services for testing and the shadow pilot.
 """

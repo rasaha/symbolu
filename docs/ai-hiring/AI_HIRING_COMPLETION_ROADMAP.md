@@ -47,7 +47,7 @@ Phase list:
 - **H3 — Governance Integration (human decision on the DGM kernel)** ✅ *complete*
 - **H4 — Hiring Actions, Execution & Reconciliation** ✅ *complete*
 - **H5 — Validation, Fairness Analysis & Shadow Pilot** ✅ *complete (READY_WITH_DOCUMENTED_LIMITATIONS)*
-- H6 — Packaging, Documentation & Product Wrap-up
+- **H6 — Packaging, Documentation & Product Wrap-up** ✅ *complete (PACKAGE_READY_FOR_CONTROLLED_PILOT)*
 
 ### H0 — Public API Migration & Re-entry Stabilization  ✅ COMPLETE
 - **Objective:** make AI Hiring a clean consumer of the frozen Platform v1.0 public API —
@@ -193,16 +193,34 @@ Phase list:
   **READY_WITH_DOCUMENTED_LIMITATIONS** (no correctness/governance-boundary defect).
 - **Exclusions:** fairness/compliance certification; production integrations & scale claims.
 
-### H6 — Packaging, Documentation & Product Wrap-up
-- **Objective:** package the hiring application independently; complete docs; close
-  the workstream.
-- **Permitted:** app/domain + packaging.
-- **Frozen:** platform.
-- **Required:** `dgm-ai-hiring` distribution(s) depending on frozen platform wheels;
-  isolated-install verification; product docs; completion report.
-- **Invariants:** dependency direction (F20); platform never imports hiring.
-- **Tests:** packaging + isolated install; full suite green.
-- **Exclusions:** public publishing; production certification.
+### H6 — Packaging, Documentation & Product Wrap-up  ✅ COMPLETE (PACKAGE_READY_FOR_CONTROLLED_PILOT)
+- **Objective:** turn the validated H0–H5 implementation into a coherent, installable,
+  demonstrable, and maintainable product package on the frozen platform — **no new
+  governance architecture, hiring semantics, authorization semantics, or production
+  integrations.**
+- **Permitted:** app-local packaging under `ai_hiring/product/`, tests, and docs.
+- **Frozen:** platform — untouched (freeze substantive digest identical to H5 baseline).
+- **Delivered:** curated public API (`ai_hiring.product`); typed **fail-closed** config
+  (production modes rejected); deterministic composition roots (`build_dev_platform` /
+  `build_demo_platform`); safe canonical demo (`run_demo`); human- + machine-readable
+  accountability report with deterministic PII redaction; CLI
+  (`python -m ai_hiring.product {version|demo|report|verify}`); full product doc set
+  (install, quickstart, config/API refs, architecture + diagram, deployment, ops
+  runbook, security review, dependency review, packaging, versioning, known
+  limitations, product-claims audit, changelog); sdist+wheel; **clean-env install
+  verification** (editable + wheel, from a non-repo cwd).
+- **Invariants:** dependency direction (F20) preserved; platform never imports hiring;
+  no new lifecycle states/authorities; deterministic simulation only; never
+  production-certified.
+- **Tests:** **30 new H6 tests** (product + boundary); full suite **778 passed**
+  (748 + 30); kernel+framework+TAP+ActionGate+AI-Hiring **917 passed**; freeze PASS;
+  0 dependency violations; no platform diff.
+- **Evidence:** `H6_COMPLETION_REPORT.md`, `H6_READINESS_ASSESSMENT.md`, and the
+  `docs/ai-hiring/product/` doc set; readiness **PACKAGE_READY_FOR_CONTROLLED_PILOT**
+  (limitations are scope boundaries, not defects).
+- **Exclusions:** public publishing; production certification; production adapters,
+  durable persistence, enterprise identity, scale/compliance — all prerequisite to a
+  future 1.0.
 
 ## 3. Guardrails
 
