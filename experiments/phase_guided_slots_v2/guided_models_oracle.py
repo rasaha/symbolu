@@ -111,12 +111,40 @@ class OracleSlotLM(nn.Module):
             feat = self.readout(torch.cat([hA, gA, torch.zeros_like(hA)], dim=-1))
             return {"answer_logits": self.lm_head(self.norm_f(feat)), "r_write": r_write}
 
-        state = self.slots.write_stream(entity_at_pos, self.w_val(h), r_write, p_retain,
-                                        target_entity=query_entity)
+        # Writes only ever happen at fact anchors (entity_at_pos >= 0); compress the
+        # sequence to those positions so the streaming write loop runs O(#facts) instead
+        # of O(N). Identical result: non-anchor tokens never write (entity < 0).
+        values = self.w_val(h)
+        e_c, v_c, g_c, r_c = _compress_to_anchors(entity_at_pos, values, r_write, p_retain)
+        state = self.slots.write_stream(e_c, v_c, g_c, r_c, target_entity=query_entity)
         val, found = self.slots.read(query_entity, state)
         feat = self.readout(torch.cat([hA, gA, val], dim=-1))
         return {"answer_logits": self.lm_head(self.norm_f(feat)), "r_write": r_write,
                 "found": found, "state": state}
+
+
+def _compress_to_anchors(entity_at_pos, values, gate, retain):
+    """Keep only fact-anchor positions (entity_at_pos >= 0), preserving order, padded
+    with entity=-1 (a no-write). Compresses the write stream from N to #facts."""
+    B, N = entity_at_pos.shape
+    mask = entity_at_pos >= 0                         # [B,N]
+    counts = mask.sum(dim=1)                          # [B]
+    Amax = int(counts.max().item()) if counts.numel() else 0
+    if Amax == 0:
+        Amax = 1
+    # anchors first (stable), then non-anchors as padding
+    order = torch.argsort(mask.to(torch.int64), dim=1, descending=True, stable=True)
+    sel = order[:, :Amax]                             # [B,Amax] source positions
+    ar = torch.arange(B, device=entity_at_pos.device).unsqueeze(1)
+    e_c = entity_at_pos[ar, sel]
+    v_c = values[ar, sel]
+    g_c = gate[ar, sel]
+    r_c = retain[ar, sel]
+    # positions beyond each row's anchor count are padding → mark as no-write
+    col = torch.arange(Amax, device=entity_at_pos.device).unsqueeze(0)
+    pad = col >= counts.unsqueeze(1)
+    e_c = e_c.masked_fill(pad, -1)
+    return e_c, v_c, g_c, r_c
 
 
 def build_oracle(cfg: OCfg, arm: str, seed: int) -> OracleSlotLM:
