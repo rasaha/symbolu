@@ -117,18 +117,18 @@ def train_focus(variant_name, gen_fn, pad_id, cfg: TrainCfg, vocab_size,
         b = [data[i] for i in idx]
         ids, focus, batch = collate(b, pad_id, device)
         h, g = model.encode(ids)
-        # decode focus from g at each anchor (all past the local window); average CE
-        loss = torch.zeros((), device=device); cnt = 0
-        logits_acc = []
+        # decode focus from g at each anchor (all past the local window); batched CE
+        bi, pi, yi = [], [], []
         for i, e in enumerate(batch):
-            aps = [p for p in e.anchor_pos if p < ids.shape[1]]
-            if not aps:
-                continue
-            gp = g[i, torch.tensor(aps, device=device)]        # [A, D]
-            lg = model.decoder(gp)                              # [A, N_VENDOR]
-            loss = loss + F.cross_entropy(lg, focus[i].expand(len(aps)))
-            cnt += 1
-        loss = loss / max(1, cnt)
+            for p in e.anchor_pos:
+                if p < ids.shape[1]:
+                    bi.append(i); pi.append(p); yi.append(focus[i].item())
+        if bi:
+            gp = g[torch.tensor(bi, device=device), torch.tensor(pi, device=device)]  # [K,D]
+            lg = model.decoder(gp)                                                     # [K,N_VENDOR]
+            loss = F.cross_entropy(lg, torch.tensor(yi, device=device))
+        else:
+            loss = torch.zeros((), device=device)
         # write-budget regularizer + optional gate supervision
         if variant_name != "V1":
             d = model.write_rates(ids)
