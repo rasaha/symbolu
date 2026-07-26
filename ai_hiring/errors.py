@@ -366,3 +366,192 @@ class CrossTenantAssessmentAccessError(AssessmentAuthorizationError):
     """A cross-tenant assessment access was attempted and denied."""
 
 
+# --- H1 hiring product entities (requisition / job def / candidate / application
+#     / evidence intake). Application-local, additive. -----------------------
+class HiringProductError(HiringError):
+    """Base for H1 candidate-facing hiring product errors."""
+
+
+class RequisitionNotFoundError(HiringProductError):
+    """No requisition exists for the given id (or not in the caller's tenant)."""
+
+
+class JobDefinitionNotFoundError(HiringProductError):
+    """No job definition exists for the given id (or not in the caller's tenant)."""
+
+
+class CandidateNotFoundError(HiringProductError):
+    """No candidate exists for the given id (or not in the caller's tenant)."""
+
+
+class ApplicationNotFoundError(HiringProductError):
+    """No application exists for the given id (or not in the caller's tenant)."""
+
+
+class EvidenceIntakeNotFoundError(HiringProductError):
+    """No evidence-intake item exists for the given id (or not in tenant)."""
+
+
+class IllegalRequisitionTransitionError(InvalidTransitionError):
+    """An illegal requisition lifecycle transition was requested."""
+
+
+class IllegalJobDefinitionTransitionError(InvalidTransitionError):
+    """An illegal job-definition lifecycle transition was requested."""
+
+
+class IllegalCandidateTransitionError(InvalidTransitionError):
+    """An illegal candidate lifecycle transition was requested."""
+
+
+class IllegalApplicationTransitionError(InvalidTransitionError):
+    """An illegal application lifecycle transition was requested."""
+
+
+class DuplicateApplicationError(HiringProductError):
+    """An active application already exists for this candidate + requisition."""
+
+
+class IneligibleApplicationError(HiringProductError):
+    """The structural eligibility preconditions for the application do not hold."""
+
+
+class NotReadyForAssessmentError(HiringProductError):
+    """Required evidence is incomplete; the application cannot advance to ASSESSMENT."""
+
+
+class CrossTenantHiringAccessError(TenantMismatchError):
+    """A cross-tenant hiring product access was attempted and denied."""
+
+
+# --- H2 recommendation & evidence synthesis. Application-local, additive. ---
+class RecommendationNotFoundError(HiringProductError):
+    """No recommendation exists for the given id (or not in the caller's tenant)."""
+
+
+class ClaimNotFoundError(HiringProductError):
+    """No claim exists for the given id (or not in the caller's tenant)."""
+
+
+class SynthesisPackageNotFoundError(HiringProductError):
+    """No evidence-synthesis package exists for the given id (or not in tenant)."""
+
+
+class IllegalRecommendationTransitionError(InvalidTransitionError):
+    """An illegal recommendation lifecycle transition was requested."""
+
+
+class RecommendationNotReadyError(HiringProductError):
+    """A recommendation cannot become review-ready under the H2 readiness gate."""
+
+
+class EvidenceSynthesisError(HiringProductError):
+    """Evidence synthesis failed (missing / quarantined / mismatched inputs)."""
+
+
+class StaleRubricVersionError(EvidenceSynthesisError):
+    """Synthesis rubric version does not match the application's job definition."""
+
+
+class ProhibitedAttributeError(HiringProductError):
+    """A prohibited / protected attribute was supplied to the recommendation pipeline."""
+
+
+class RecommendationGenerationError(HiringProductError):
+    """Recommendation generation failed (generator error / malformed output)."""
+
+
+class GeneratorOutputInvalidError(RecommendationGenerationError):
+    """The recommendation generator returned malformed or schema-invalid output."""
+
+
+class AssertionEvaluationUnavailableError(HiringProductError):
+    """The assertion-governance provider could not evaluate a claim (fail-safe)."""
+
+
+class ReviewerAuthorityError(BoundaryViolationError):
+    """A non-human actor attempted a human-only recommendation review action."""
+
+
+# --- H4 action authorization, execution, reconciliation. App-local, additive. --
+class ActionProposalNotFoundError(HiringProductError):
+    """No hiring-action proposal exists for the given id (or not in tenant)."""
+
+
+class ActionAuthorizationNotFoundError(HiringProductError):
+    """No authorization record exists for the given id (or not in tenant)."""
+
+
+class HiringExecutionAttemptNotFoundError(HiringProductError):
+    """No hiring execution-attempt record exists for the given id (or not in tenant).
+
+    Named with a ``Hiring`` prefix to avoid shadowing the kernel's re-exported
+    ``ExecutionAttemptNotFoundError``.
+    """
+
+
+class IllegalActionTransitionError(InvalidTransitionError):
+    """An illegal hiring-action lifecycle transition was requested."""
+
+
+class IneligibleActionSourceError(HiringProductError):
+    """The source decision is not an eligible basis for a hiring action."""
+
+
+class DecisionActionMismatchError(HiringProductError):
+    """The requested action type is not permitted for the decision outcome."""
+
+
+class ActionNotAuthorizedError(HiringProductError):
+    """Execution was attempted without a valid, current authorization."""
+
+
+class AuthorizationDeniedError(HiringProductError):
+    """The action-governance provider denied authorization."""
+
+
+class HiringAuthorizationExpiredError(ActionNotAuthorizedError):
+    """The hiring-action authorization has expired; execution is not permitted.
+
+    Named with a ``Hiring`` prefix to avoid shadowing the kernel's re-exported
+    ``AuthorizationExpiredError``.
+    """
+
+
+class ActionConstraintViolationError(HiringProductError):
+    """A requested action violates an authorization constraint."""
+
+
+class ObligationUnmetError(HiringProductError):
+    """A pre-execution obligation is unmet; the action remains non-executable."""
+
+
+class ActionExecutionError(HiringProductError):
+    """External execution failed or produced an invalid result."""
+
+
+class MalformedReceiptError(ActionExecutionError):
+    """The execution adapter returned a malformed or unusable receipt."""
+
+
+class TargetMismatchError(ActionExecutionError):
+    """The execution receipt describes a different target than authorized."""
+
+
+class DuplicateExecutionError(ActionExecutionError):
+    """A duplicate external execution was detected for the idempotency key."""
+
+
+class ReconciliationError(HiringProductError):
+    """Reconciliation could not be completed or detected a mismatch."""
+
+
+class CompensationError(HiringProductError):
+    """Compensation could not be proposed or is not permitted."""
+
+
+class ActionAuthorityError(BoundaryViolationError):
+    """A non-human actor attempted a human-only action-authority operation, or an
+    actor attempted to expand/waive an authorization or execute outside the path."""
+
+

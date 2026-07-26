@@ -42,12 +42,12 @@ exclusions.
 Phase list:
 
 - **H0 — Public API Migration & Re-entry Stabilization** ✅ *complete*
-- H1 — Hiring Domain Completion
-- H2 — AI Recommendation & Evidence Synthesis (TAP)
-- H3 — Governance Integration (TAP + ActionGate Providers)
-- H4 — Hiring Actions, Execution & Reconciliation
-- H5 — Validation, Fairness Analysis & Shadow Pilot
-- H6 — Packaging, Documentation & Product Wrap-up
+- **H1 — Hiring Domain Completion** ✅ *complete*
+- **H2 — AI Recommendation & Evidence Synthesis (TAP)** ✅ *complete*
+- **H3 — Governance Integration (human decision on the DGM kernel)** ✅ *complete*
+- **H4 — Hiring Actions, Execution & Reconciliation** ✅ *complete*
+- **H5 — Validation, Fairness Analysis & Shadow Pilot** ✅ *complete (READY_WITH_DOCUMENTED_LIMITATIONS)*
+- **H6 — Packaging, Documentation & Product Wrap-up** ✅ *complete (PACKAGE_READY_FOR_CONTROLLED_PILOT)*
 
 ### H0 — Public API Migration & Re-entry Stabilization  ✅ COMPLETE
 - **Objective:** make AI Hiring a clean consumer of the frozen Platform v1.0 public API —
@@ -55,85 +55,172 @@ Phase list:
   `decision_governance.api`, without changing platform behavior or adding hiring features.
 - **Permitted:** `ai_hiring`, `domains.hiring`, `applications.ai_hiring` (import surface only).
 - **Frozen:** all platform trees; providers.
-- **Delivered:** 22 consumer files migrated to `decision_governance.api`; two `platform.py`
-  port imports consolidated into `api.ports`; 23 backward-compat shims left as a tested
-  exemption (see `H0_API_GAP_REPORT.md`).
+- **Delivered:** all active application/domain/service/adapter/repository/policy/API/
+  composition-root code (22 files) migrated to `decision_governance.api`; two `platform.py`
+  port imports consolidated into `api.ports`; 23 backward-compat shims left as an explicit,
+  test-enforced exemption — **not** active application code (see `H0_API_GAP_REPORT.md`).
 - **Invariants:** dependency direction (F20); object identity preserved.
 - **Tests:** `pytest ai_hiring` → **553 passed** (unchanged); freeze verification **PASS**;
-  dependency-direction **0 violations**; no frozen file modified.
+  dependency-direction **0 violations**; no frozen file modified. Green baseline is scoped to
+  platform-relevant packages — two pre-existing, unrelated failures (`classify_change`
+  freeze-tooling self-test; whole-repo `_SymboluFinder` collection errors) are carried forward
+  as documented baseline limitations, so the whole repository is **not** claimed green.
 - **Evidence:** `H0_MIGRATION_REPORT.md`, `H0_API_GAP_REPORT.md`, `H0_REENTRY_STATUS.md`.
 - **Exclusions:** provider wiring; new features; any platform change.
 
-### H1 — Hiring Domain Completion
-- **Objective:** complete the hiring product entities (requisition, job definition,
-  candidate, application, evidence intake, assessment workspace, structured
-  observations, case-closure states) in `domains.hiring` / `applications.ai_hiring`.
-- **Permitted:** `domains.hiring`, `applications.ai_hiring`, `ai_hiring`.
+### H1 — Hiring Domain Completion  ✅ COMPLETE
+- **Objective:** complete the candidate-facing hiring product entities (requisition,
+  job definition, candidate, application, evidence intake) with lifecycles, eligibility
+  & readiness rules, repositories, application services, a hiring-owned domain audit
+  trail, and reconstruction support.
+- **Permitted:** `ai_hiring`, `domains.hiring`, `applications.ai_hiring` (app-local, additive).
 - **Frozen:** all platform trees; providers.
-- **Required:** entity contracts + lifecycle; migrate consumer imports to
-  `decision_governance.api`.
-- **Invariants:** F1–F3 (kernel owns records; AI advisory; human-only decisions).
-- **Tests:** entity validation, lifecycle, boundary; keep 553 green.
-- **Evidence:** new hiring-domain tests; no platform diff.
-- **Exclusions:** AI generation; provider wiring; external I/O.
+- **Delivered:** entities + guarded lifecycles; deterministic eligibility/readiness;
+  in-memory repositories (immutable, versioned, history); requisition/candidate/
+  application/evidence-intake services with tenant isolation; hash-chained hiring-owned
+  domain audit trail (`ai_hiring/domain_audit/`, per the audit-model decision below);
+  `HiringReconstructionService`; API-facing request/view contracts.
+- **Invariants:** F1–F3 (kernel owns governance records; AI advisory; **human-only
+  binding decisions** — H1 encodes no accept/reject/hire outcome and grants no actor
+  decision authority); dependency direction (F20).
+- **Audit-model decision:** the frozen kernel `AuditEventType` has no members for the
+  new product entities and must not be modified, so H1 uses a **hiring-owned domain
+  audit trail** (additive, boundary-correct). See `H1_COMPLETION_REPORT.md`.
+- **Tests:** **41 new H1 tests** — valid flows, invalid transitions, duplicate
+  prevention, access isolation, incomplete evidence, reconstruction, boundary. Full
+  suite **594 passed** (553 + 41).
+- **Evidence:** `H1_COMPLETION_REPORT.md`; freeze verification PASS; 0 dependency
+  violations; no platform diff.
+- **Exclusions (deferred H2–H6):** AI recommendation generation; TAP/ActionGate
+  integration; offer/rejection execution; fairness evaluation; binding decisions.
 
-### H2 — AI Recommendation & Evidence Synthesis
-- **Objective:** synthesize hiring assertions from evidence and evaluate them with
-  **TAP** (support, unsupported components, qualifiers, provenance).
-- **Permitted:** app/domain + `tap_provider`, `governance_providers.api`.
-- **Frozen:** kernel, framework, TAP, ActionGate contracts.
-- **Required:** hiring-claim builder → `AssertionGovernanceRequest`; assessment via
-  `AssertionAssessmentIntegration`; recommendation cites the assessment.
-- **Invariants:** F4, F6, F11, F12; AI stays advisory (F2).
-- **Tests:** unsupported/indeterminate hiring claims never advance as supported;
-  provider failure fail-safe.
-- **Exclusions:** action authorization; execution; fairness conclusions.
+### H2 — AI Recommendation & Evidence Synthesis (TAP)  ✅ COMPLETE
+- **Objective:** synthesize hiring evidence and generate an advisory, evidence-grounded
+  recommendation package for human review, with every material claim evaluated through
+  the **Assertion Governance Provider** (TAP).
+- **Permitted:** `ai_hiring` + `governance_providers.api` (provider contract only).
+- **Frozen:** kernel, framework, TAP, ActionGate contracts (untouched).
+- **Delivered:** `EvidenceSynthesisService` (bounded, deterministic, provenance-
+  preserving, minimization + protected-attribute controls); structured `HiringClaim`s;
+  `ClaimAssertionEvaluator` via `AssertionAssessmentIntegration` (no TAP internals);
+  advisory `HiringRecommendation` (statuses DRAFT / EVIDENCE_INCOMPLETE /
+  ASSERTION_REVIEW_REQUIRED / READY_FOR_HUMAN_REVIEW / REJECTED_BY_REVIEW / SUPERSEDED —
+  **no binding decision status**); replaceable `RecommendationGeneratorPort` +
+  deterministic reference generator (no vendor SDKs in core); `RecommendationReviewPackage`
+  + human-only reviewer dispositions; `RecommendationReconstructionService`; hiring-owned
+  H2 audit events; API-facing contracts.
+- **Invariants:** F2 (AI advisory; **human-only binding decisions** — reviewer actions
+  human-only, no decide/execute path), F4/F6/F11/F12 (unsupported/indeterminate claims
+  never review-ready; provider failure fail-safe; no governance shopping).
+- **Tests:** **38 new H2 tests**; full suite **632 passed** (594 + 38); freeze PASS;
+  0 dependency violations; no platform diff.
+- **Evidence:** `H2_COMPLETION_REPORT.md`.
+- **Exclusions (deferred H3–H6):** action authorization; ActionGate integration;
+  offer/rejection execution; final hiring decisions; fairness certification; production
+  model integrations.
 
-### H3 — Governance Integration (TAP + ActionGate Providers)
-- **Objective:** run the full DGM case→recommendation→decision→review flow for
-  hiring, with human authority and overrides through DGM review tasks.
-- **Permitted:** app/domain + `decision_governance.api`, `governance_providers.api`.
-- **Frozen:** platform.
-- **Required:** review tasks, overrides, decision provenance; deterministic,
-  auditable provider resolution for TAP.
-- **Invariants:** F1–F3, F15, F18.
-- **Tests:** human-only binding decisions; override audit; resolution determinism.
-- **Exclusions:** offer/rejection execution.
+### H3 — Governance Integration (human decision on the DGM kernel)  ✅ COMPLETE
+- **Objective:** integrate the H1/H2 hiring domain with the frozen DGM kernel so every
+  **eligible, review-ready** recommendation can be bound to a governed `DecisionCase` and
+  resolved through an authorized **human** decision process — while remaining
+  non-executable until H4. **No ActionGate wiring or execution.**
+- **Permitted:** `ai_hiring` + `decision_governance.api` (kernel via public API only).
+- **Frozen:** platform (kernel, framework, TAP, ActionGate) — untouched.
+- **Delivered:** recommendation→DecisionCase binding (`GovernanceCaseBinding`); kernel
+  recommendation submission (AI_ASSISTED, advisory); review-task lifecycle; **human**
+  decisions via `CaseDecisionService` (human authority enforced by the kernel + H3 guard +
+  access grants); acceptance/rejection; rationale + overrides; governance-case
+  reconstruction with **cross-linked hiring↔DGM audit** (by correlation id); recommendation
+  supersession; review workspace, governance dashboards, recommendation history; API contracts.
+- **Invariants:** **Recommendation → Human Decision → (H4) Authorized Action** (never
+  Recommendation → Action); F1–F3 (human-only binding decisions), F15, F18. Hiring audit
+  events stay disjoint from the frozen kernel `AuditEventType`.
+- **Tests:** **26 new H3 tests**; full suite **658 passed** (632 + 26); freeze PASS; 0
+  dependency violations; no platform diff.
+- **Evidence:** `H3_COMPLETION_REPORT.md`.
+- **Exclusions (exclusively H4):** ActionGate authorization; external execution; offer/
+  rejection execution; email/HRIS; compensation; execution reconciliation.
 
-### H4 — Hiring Actions, Execution & Reconciliation
-- **Objective:** authorize hiring actions (offer, rejection) via **ActionGate**,
-  enforce constraints before dispatch, execute through an external port, reconcile.
-- **Permitted:** app/domain + `actiongate_provider`, `governance_providers.api`,
-  external adapters.
-- **Frozen:** platform.
-- **Required:** proposed hiring actions; ActionGate authorization; constraint
-  enforcement; offer-document/HRIS/email via external execution port; reconciliation.
-- **Invariants:** F5, F7–F10, F13, F14, F16, F17.
-- **Tests:** denied/indeterminate offers never dispatch; constraints enforced;
-  obligations verified separately; execution separate from authorization.
-- **Exclusions:** live ATS/HRIS connectors; UI.
+### H4 — Hiring Actions, Execution & Reconciliation  ✅ COMPLETE
+- **Objective:** convert a governed human decision into a **separately authorized**
+  hiring action, execute it through a **replaceable external port**, and **reconcile**
+  authorized intent against what actually occurred.
+- **Permitted:** `ai_hiring` + `governance_providers.api` (Action Governance Provider
+  contract) + application-local execution adapters.
+- **Frozen:** platform (kernel, framework, TAP, ActionGate) — untouched; ActionGate used
+  only via the provider contract, never its internals.
+- **Delivered:** eligible-source gating (`Recommendation → Human Decision → Action`, never
+  `Recommendation → Action`); `HiringActionProposal` (13-state lifecycle); ActionGate
+  authorization via `ActionAuthorizationIntegration` (exact binding: actor/target/params/
+  expiry/obligations); obligation & constraint enforcement; replaceable
+  `ExternalExecutionProvider` port + deterministic test adapter; immutable execution
+  attempts + normalized receipts (transport ≠ business outcome); bounded idempotent
+  retries; reconciliation (MATCHED/PARTIAL/MISMATCH/NOT_EXECUTED/DUPLICATE/UNVERIFIABLE);
+  separately-governed compensation (irreversible → human remediation, never
+  auto-compensated); end-to-end reconstruction + read models; cross-linked hiring/DGM/
+  provider audit.
+- **Invariants:** F5, F7–F10, F13, F14, F16, F17; human-only decisions (F2/F3) upstream;
+  no `Recommendation → Action` / `Decision → direct execution`. Hiring audit events
+  disjoint from the frozen kernel `AuditEventType`.
+- **Tests:** **43 new H4 tests**; full suite **701 passed** (658 + 43);
+  kernel+framework+TAP+ActionGate+AI-Hiring **840 passed**; freeze PASS; 0 dependency
+  violations; no platform diff.
+- **Evidence:** `H4_COMPLETION_REPORT.md`.
+- **Exclusions (deferred H5/H6):** production HRIS/payroll/email/identity integrations
+  (only ports + deterministic adapters ship); the contractual `ISSUE_OFFER`/
+  `SEND_REJECTION` consequential steps; fairness certification; UI.
 
-### H5 — Validation, Fairness Analysis & Shadow Pilot
-- **Objective:** end-to-end hiring scenario validation + a bounded shadow pilot;
-  audit-reconstruction reporting.
-- **Permitted:** app/domain + validation harnesses (patterned on the pilot/benchmark).
-- **Frozen:** platform.
-- **Required:** hiring scenario matrix; safety-invariant checks; audit trail report.
-- **Invariants:** all F1–F20 as applied to hiring.
-- **Tests:** hiring-specific invariant suite; reproducible digest.
-- **Exclusions:** **fairness conclusions** and regulatory claims (analysis only,
-  clearly caveated); production deployment.
+### H5 — Validation, Fairness Analysis & Shadow Pilot  ✅ COMPLETE (READY_WITH_DOCUMENTED_LIMITATIONS)
+- **Objective:** validate the complete H1–H4 lifecycle under representative, adversarial,
+  failure-injection, and bounded shadow-pilot conditions — **validation only**, no new
+  architecture, no production effects.
+- **Permitted:** `ai_hiring/validation/` harnesses, fixtures, deterministic adapters,
+  validators, metrics, read-only analysis, and reports.
+- **Frozen:** platform — untouched.
+- **Delivered:** validation composition + end-to-end lifecycle driver; versioned scenario
+  matrix (normal/review/human-authority/authorization/execution/reconciliation/security);
+  bounded synthetic shadow-pilot cohort (12 cases, deterministic in-memory adapters, no
+  production effects); read-only fairness analysis (counterfactual/leakage checks,
+  protected-attribute exclusion, small-sample discipline, no enforcement); audit-completeness
+  scoring; failure-injection suite (all fail-safe); end-to-end reconstruction verification;
+  determinism + local performance characterization; nine H5 reports.
+- **Invariants:** F1–F20 as applied to hiring; **no fairness conclusions/enforcement**;
+  no new platform capability; analysis-only attributes never enter the pipeline.
+- **Tests:** **47 new H5 tests**; full suite **748 passed** (701 + 47);
+  kernel+framework+TAP+ActionGate+AI-Hiring **887 passed**; freeze PASS; 0 dependency
+  violations; no platform diff.
+- **Evidence:** `H5_COMPLETION_REPORT.md` + 8 companion reports; readiness
+  **READY_WITH_DOCUMENTED_LIMITATIONS** (no correctness/governance-boundary defect).
+- **Exclusions:** fairness/compliance certification; production integrations & scale claims.
 
-### H6 — Packaging, Documentation & Product Wrap-up
-- **Objective:** package the hiring application independently; complete docs; close
-  the workstream.
-- **Permitted:** app/domain + packaging.
-- **Frozen:** platform.
-- **Required:** `dgm-ai-hiring` distribution(s) depending on frozen platform wheels;
-  isolated-install verification; product docs; completion report.
-- **Invariants:** dependency direction (F20); platform never imports hiring.
-- **Tests:** packaging + isolated install; full suite green.
-- **Exclusions:** public publishing; production certification.
+### H6 — Packaging, Documentation & Product Wrap-up  ✅ COMPLETE (PACKAGE_READY_FOR_CONTROLLED_PILOT)
+- **Objective:** turn the validated H0–H5 implementation into a coherent, installable,
+  demonstrable, and maintainable product package on the frozen platform — **no new
+  governance architecture, hiring semantics, authorization semantics, or production
+  integrations.**
+- **Permitted:** app-local packaging under `ai_hiring/product/`, tests, and docs.
+- **Frozen:** platform — untouched (freeze substantive digest identical to H5 baseline).
+- **Delivered:** curated public API (`ai_hiring.product`); typed **fail-closed** config
+  (production modes rejected); deterministic composition roots (`build_dev_platform` /
+  `build_demo_platform`); safe canonical demo (`run_demo`); human- + machine-readable
+  accountability report with deterministic PII redaction; CLI
+  (`python -m ai_hiring.product {version|demo|report|verify}`); full product doc set
+  (install, quickstart, config/API refs, architecture + diagram, deployment, ops
+  runbook, security review, dependency review, packaging, versioning, known
+  limitations, product-claims audit, changelog); sdist+wheel; **clean-env install
+  verification** (editable + wheel, from a non-repo cwd).
+- **Invariants:** dependency direction (F20) preserved; platform never imports hiring;
+  no new lifecycle states/authorities; deterministic simulation only; never
+  production-certified.
+- **Tests:** **30 new H6 tests** (product + boundary); full suite **778 passed**
+  (748 + 30); kernel+framework+TAP+ActionGate+AI-Hiring **917 passed**; freeze PASS;
+  0 dependency violations; no platform diff.
+- **Evidence:** `H6_COMPLETION_REPORT.md`, `H6_READINESS_ASSESSMENT.md`, and the
+  `docs/ai-hiring/product/` doc set; readiness **PACKAGE_READY_FOR_CONTROLLED_PILOT**
+  (limitations are scope boundaries, not defects).
+- **Exclusions:** public publishing; production certification; production adapters,
+  durable persistence, enterprise identity, scale/compliance — all prerequisite to a
+  future 1.0.
 
 ## 3. Guardrails
 

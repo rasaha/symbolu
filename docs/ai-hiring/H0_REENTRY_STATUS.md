@@ -38,9 +38,14 @@ Platform v1.0 public API and is ready to begin H1.
 - **Direction:** `applications.ai_hiring → domains.hiring → decision_governance.api → (frozen kernel internals)`.
 - The frozen platform never imports hiring (F20 / dependency-direction check: **0 violations**).
 
-## Confirmation: AI Hiring consumes only the frozen public API
+## Confirmation: active AI Hiring code consumes only the frozen public API
 
-- **Consumer code:** 0 imports of `decision_governance` internals remain (all 22 files migrated).
+> **Authoritative status.** All active AI Hiring application, domain, service, adapter,
+> repository, policy, API, and composition-root code now consumes the frozen
+> `decision_governance.api` surface exclusively. Historical compatibility shims remain as an
+> explicit, test-enforced exemption and are not used by active application code.
+
+- **Active code:** 0 imports of `decision_governance` internals remain (all 22 active files migrated).
 - **Object identity preserved:** governed record/service types still resolve to
   `decision_governance.*` (public API re-exports the same objects) —
   `test_direct_kernel_adoption` green.
@@ -48,6 +53,16 @@ Platform v1.0 public API and is ready to begin H1.
 - **Frozen platform untouched:** freeze verification **PASS** (core-tree hashes + API snapshots).
 - **Exemption:** 23 backward-compat shim modules intentionally mirror kernel internals
   (documented, test-enforced) — not consumer code.
+
+### Baseline limitations (carried forward — not a clean whole-repo baseline)
+
+The green results above are scoped to the platform-relevant packages. Two pre-existing,
+unrelated conditions remain and must stay visible so later phases do not claim a clean
+whole-repository baseline (detail in `H0_MIGRATION_REPORT.md` §7):
+
+1. `classify_change` freeze-tooling self-test failure (out-of-band tooling; pre-existing).
+2. Full-repository `_SymboluFinder` collection errors in unrelated experimental modules
+   (temporal / trading2 / voice / tools; pre-existing).
 
 ## Readiness to begin H1
 
