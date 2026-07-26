@@ -1,15 +1,22 @@
 # H0 — Public API Migration & Re-entry Stabilization — Migration Report
 
-Bounded stabilization phase completed against **Platform v1.0** (frozen). AI Hiring's
-active/consumer code now imports governance concepts exclusively from the frozen
-public API (`decision_governance.api`). **No platform behavior was changed, no new
-hiring functionality was added, and no frozen platform file was modified.**
+Bounded stabilization phase completed against **Platform v1.0** (frozen).
+
+> **Authoritative completion status.** All active AI Hiring application, domain, service,
+> adapter, repository, policy, API, and composition-root code now consumes the frozen
+> `decision_governance.api` surface exclusively. Historical compatibility shims remain as an
+> explicit, test-enforced exemption and are not used by active application code.
+
+The package as a whole is **not** literally free of internal imports — 23 compatibility-shim
+modules reference kernel internals **by design** (see §6 and `H0_API_GAP_REPORT.md`). **No
+platform behavior was changed, no new hiring functionality was added, and no frozen platform
+file was modified.**
 
 ## 1. Objective & result
 
 | Objective | Result |
 |---|---|
-| Active AI Hiring code consumes only `decision_governance.api` | **Done** — all 22 consumer files migrated; 0 remaining internal imports in consumer code |
+| Active AI Hiring code (app/domain/service/adapter/repository/policy/API/composition-root) consumes only `decision_governance.api` | **Done** — all 22 active files migrated; 0 remaining internal imports in active code (compat shims exempt, §6) |
 | Preserve all behavior, contracts, schemas, tests | **Done** — 553/553 AI Hiring tests pass, unchanged |
 | No modification to kernel / framework / TAP / ActionGate / any frozen package | **Done** — `git diff` touches only `ai_hiring/`, `domains/hiring/`, `applications/ai_hiring/` |
 | No new hiring features | **Done** — imports only; zero logic changes |
@@ -103,4 +110,24 @@ and recommendation: `H0_API_GAP_REPORT.md`.
 | Dependency-direction verification | **PASS** — 0 violations; `applications.ai_hiring → domains.hiring → decision_governance` holds; platform never imports hiring |
 | Frozen platform files modified | **None** — diff limited to `ai_hiring/`, `domains/hiring/`, `applications/ai_hiring/` |
 
-**Pre-existing failure (not H0):** `platform_freeze/tests/test_freeze.py::test_classify_change_reports_evidence` fails on the clean tree with edits stashed. It is an artifact of the out-of-band `classify_change` self-test spanning post-freeze commits (returns `UNCLASSIFIED`); it does not touch the frozen platform or AI Hiring and is out of H0 scope.
+### Documented baseline limitations (carry forward — NOT a clean whole-repo baseline)
+
+The validations above are scoped to the platform-relevant packages. The repository as a whole
+is **not** green, and later phases must not claim a clean whole-repository test baseline. Two
+pre-existing, unrelated conditions are recorded here so they stay visible:
+
+1. **`classify_change` freeze-tooling self-test failure.**
+   `platform_freeze/tests/test_freeze.py::test_classify_change_reports_evidence` fails on the
+   clean tree (verified with H0 edits stashed). It is an artifact of the out-of-band
+   `classify_change` self-test spanning post-freeze commits (returns `UNCLASSIFIED`). It does
+   not touch the frozen platform or AI Hiring and is out of H0 scope. **Pre-existing.**
+
+2. **Full-repository collection failures involving `_SymboluFinder`.**
+   `python -m pytest` (whole repo) reports ~482 *collection* errors —
+   `AttributeError: type object '_SymboluFinder' has no attribute …` — in unrelated
+   experimental modules (`tests/unit/temporal`, `tests/unit/trading2`, `tests/voice`,
+   `tests/unit/tools/*`, etc.). Verified pre-existing (present on the clean tree with H0 edits
+   stashed). Unrelated to AI Hiring / DGM; out of H0 scope. **Pre-existing.**
+
+Neither blocks H1. Both must remain in the validation record; H1 and later phases scope their
+green baseline to the relevant packages, not the whole repository.

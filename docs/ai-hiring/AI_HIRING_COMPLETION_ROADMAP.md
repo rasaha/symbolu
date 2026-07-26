@@ -55,12 +55,16 @@ Phase list:
   `decision_governance.api`, without changing platform behavior or adding hiring features.
 - **Permitted:** `ai_hiring`, `domains.hiring`, `applications.ai_hiring` (import surface only).
 - **Frozen:** all platform trees; providers.
-- **Delivered:** 22 consumer files migrated to `decision_governance.api`; two `platform.py`
-  port imports consolidated into `api.ports`; 23 backward-compat shims left as a tested
-  exemption (see `H0_API_GAP_REPORT.md`).
+- **Delivered:** all active application/domain/service/adapter/repository/policy/API/
+  composition-root code (22 files) migrated to `decision_governance.api`; two `platform.py`
+  port imports consolidated into `api.ports`; 23 backward-compat shims left as an explicit,
+  test-enforced exemption — **not** active application code (see `H0_API_GAP_REPORT.md`).
 - **Invariants:** dependency direction (F20); object identity preserved.
 - **Tests:** `pytest ai_hiring` → **553 passed** (unchanged); freeze verification **PASS**;
-  dependency-direction **0 violations**; no frozen file modified.
+  dependency-direction **0 violations**; no frozen file modified. Green baseline is scoped to
+  platform-relevant packages — two pre-existing, unrelated failures (`classify_change`
+  freeze-tooling self-test; whole-repo `_SymboluFinder` collection errors) are carried forward
+  as documented baseline limitations, so the whole repository is **not** claimed green.
 - **Evidence:** `H0_MIGRATION_REPORT.md`, `H0_API_GAP_REPORT.md`, `H0_REENTRY_STATUS.md`.
 - **Exclusions:** provider wiring; new features; any platform change.
 

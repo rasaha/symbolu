@@ -83,7 +83,10 @@ Until then, the compat shims remain the correct, tested home for these internal 
 - **Consumer-code API gap: none.** Migration is complete and clean.
 - **Shim-layer internal references: expected, tested, and out of H0 scope.** No frozen-
   architecture workaround was introduced.
-- **Completion criterion interpretation:** "AI Hiring imports exclusively from
-  `decision_governance.api`" is satisfied for all **active/consumer** code. The 23
-  compatibility shims are a documented, test-enforced exemption, consistent with the
-  platform's own `test_direct_kernel_adoption` boundary.
+- **Completion status (authoritative wording):** *All active AI Hiring application, domain,
+  service, adapter, repository, policy, API, and composition-root code now consumes the frozen
+  `decision_governance.api` surface exclusively. Historical compatibility shims remain as an
+  explicit, test-enforced exemption and are not used by active application code.* This is
+  consistent with the platform's own `test_direct_kernel_adoption` boundary. The package as a
+  whole is **not** literally free of internal imports — the 23 shims reference internals by
+  design.
