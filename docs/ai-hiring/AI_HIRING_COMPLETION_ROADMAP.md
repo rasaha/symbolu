@@ -45,7 +45,7 @@ Phase list:
 - **H1 — Hiring Domain Completion** ✅ *complete*
 - **H2 — AI Recommendation & Evidence Synthesis (TAP)** ✅ *complete*
 - **H3 — Governance Integration (human decision on the DGM kernel)** ✅ *complete*
-- H4 — Hiring Actions, Execution & Reconciliation
+- **H4 — Hiring Actions, Execution & Reconciliation** ✅ *complete*
 - H5 — Validation, Fairness Analysis & Shadow Pilot
 - H6 — Packaging, Documentation & Product Wrap-up
 
@@ -141,18 +141,34 @@ Phase list:
 - **Exclusions (exclusively H4):** ActionGate authorization; external execution; offer/
   rejection execution; email/HRIS; compensation; execution reconciliation.
 
-### H4 — Hiring Actions, Execution & Reconciliation
-- **Objective:** authorize hiring actions (offer, rejection) via **ActionGate**,
-  enforce constraints before dispatch, execute through an external port, reconcile.
-- **Permitted:** app/domain + `actiongate_provider`, `governance_providers.api`,
-  external adapters.
-- **Frozen:** platform.
-- **Required:** proposed hiring actions; ActionGate authorization; constraint
-  enforcement; offer-document/HRIS/email via external execution port; reconciliation.
-- **Invariants:** F5, F7–F10, F13, F14, F16, F17.
-- **Tests:** denied/indeterminate offers never dispatch; constraints enforced;
-  obligations verified separately; execution separate from authorization.
-- **Exclusions:** live ATS/HRIS connectors; UI.
+### H4 — Hiring Actions, Execution & Reconciliation  ✅ COMPLETE
+- **Objective:** convert a governed human decision into a **separately authorized**
+  hiring action, execute it through a **replaceable external port**, and **reconcile**
+  authorized intent against what actually occurred.
+- **Permitted:** `ai_hiring` + `governance_providers.api` (Action Governance Provider
+  contract) + application-local execution adapters.
+- **Frozen:** platform (kernel, framework, TAP, ActionGate) — untouched; ActionGate used
+  only via the provider contract, never its internals.
+- **Delivered:** eligible-source gating (`Recommendation → Human Decision → Action`, never
+  `Recommendation → Action`); `HiringActionProposal` (13-state lifecycle); ActionGate
+  authorization via `ActionAuthorizationIntegration` (exact binding: actor/target/params/
+  expiry/obligations); obligation & constraint enforcement; replaceable
+  `ExternalExecutionProvider` port + deterministic test adapter; immutable execution
+  attempts + normalized receipts (transport ≠ business outcome); bounded idempotent
+  retries; reconciliation (MATCHED/PARTIAL/MISMATCH/NOT_EXECUTED/DUPLICATE/UNVERIFIABLE);
+  separately-governed compensation (irreversible → human remediation, never
+  auto-compensated); end-to-end reconstruction + read models; cross-linked hiring/DGM/
+  provider audit.
+- **Invariants:** F5, F7–F10, F13, F14, F16, F17; human-only decisions (F2/F3) upstream;
+  no `Recommendation → Action` / `Decision → direct execution`. Hiring audit events
+  disjoint from the frozen kernel `AuditEventType`.
+- **Tests:** **43 new H4 tests**; full suite **701 passed** (658 + 43);
+  kernel+framework+TAP+ActionGate+AI-Hiring **840 passed**; freeze PASS; 0 dependency
+  violations; no platform diff.
+- **Evidence:** `H4_COMPLETION_REPORT.md`.
+- **Exclusions (deferred H5/H6):** production HRIS/payroll/email/identity integrations
+  (only ports + deterministic adapters ship); the contractual `ISSUE_OFFER`/
+  `SEND_REJECTION` consequential steps; fairness certification; UI.
 
 ### H5 — Validation, Fairness Analysis & Shadow Pilot
 - **Objective:** end-to-end hiring scenario validation + a bounded shadow pilot;

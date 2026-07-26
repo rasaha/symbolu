@@ -473,3 +473,85 @@ class ReviewerAuthorityError(BoundaryViolationError):
     """A non-human actor attempted a human-only recommendation review action."""
 
 
+# --- H4 action authorization, execution, reconciliation. App-local, additive. --
+class ActionProposalNotFoundError(HiringProductError):
+    """No hiring-action proposal exists for the given id (or not in tenant)."""
+
+
+class ActionAuthorizationNotFoundError(HiringProductError):
+    """No authorization record exists for the given id (or not in tenant)."""
+
+
+class HiringExecutionAttemptNotFoundError(HiringProductError):
+    """No hiring execution-attempt record exists for the given id (or not in tenant).
+
+    Named with a ``Hiring`` prefix to avoid shadowing the kernel's re-exported
+    ``ExecutionAttemptNotFoundError``.
+    """
+
+
+class IllegalActionTransitionError(InvalidTransitionError):
+    """An illegal hiring-action lifecycle transition was requested."""
+
+
+class IneligibleActionSourceError(HiringProductError):
+    """The source decision is not an eligible basis for a hiring action."""
+
+
+class DecisionActionMismatchError(HiringProductError):
+    """The requested action type is not permitted for the decision outcome."""
+
+
+class ActionNotAuthorizedError(HiringProductError):
+    """Execution was attempted without a valid, current authorization."""
+
+
+class AuthorizationDeniedError(HiringProductError):
+    """The action-governance provider denied authorization."""
+
+
+class HiringAuthorizationExpiredError(ActionNotAuthorizedError):
+    """The hiring-action authorization has expired; execution is not permitted.
+
+    Named with a ``Hiring`` prefix to avoid shadowing the kernel's re-exported
+    ``AuthorizationExpiredError``.
+    """
+
+
+class ActionConstraintViolationError(HiringProductError):
+    """A requested action violates an authorization constraint."""
+
+
+class ObligationUnmetError(HiringProductError):
+    """A pre-execution obligation is unmet; the action remains non-executable."""
+
+
+class ActionExecutionError(HiringProductError):
+    """External execution failed or produced an invalid result."""
+
+
+class MalformedReceiptError(ActionExecutionError):
+    """The execution adapter returned a malformed or unusable receipt."""
+
+
+class TargetMismatchError(ActionExecutionError):
+    """The execution receipt describes a different target than authorized."""
+
+
+class DuplicateExecutionError(ActionExecutionError):
+    """A duplicate external execution was detected for the idempotency key."""
+
+
+class ReconciliationError(HiringProductError):
+    """Reconciliation could not be completed or detected a mismatch."""
+
+
+class CompensationError(HiringProductError):
+    """Compensation could not be proposed or is not permitted."""
+
+
+class ActionAuthorityError(BoundaryViolationError):
+    """A non-human actor attempted a human-only action-authority operation, or an
+    actor attempted to expand/waive an authorization or execute outside the path."""
+
+
