@@ -67,6 +67,16 @@
       "D-shuffled": {"survival": 0.717, "early_survival": 0.734, "acc": 0.665, "acc_given_survived": 0.911, "acc_given_evicted": 0.045}
     }
   },
+  "lambda_ablation": {
+    "note": "seed 0 only, n_live=12; seed 0 is the seed on which D-v2 also beat C in the main study, so this mild positive trend is within the 3-seed noise band and does not rescue the endpoint",
+    "sweep": {
+      "0.0": {"survival": 0.820, "early_survival": 0.852, "acc": 0.827},
+      "0.01": {"survival": 0.833, "early_survival": 0.852, "acc": 0.813},
+      "0.05": {"survival": 0.873, "early_survival": 0.926, "acc": 0.847},
+      "0.1": {"survival": 0.853, "early_survival": 0.877, "acc": 0.840},
+      "0.25": {"survival": 0.867, "early_survival": 0.926, "acc": 0.840}
+    }
+  },
   "causal_diagnostics": {
     "decision_trace_frac_eviction_decisions_changed_by_phase": {"range": [0.0, 0.025], "interpretation": "Phase term almost never changes the eviction victim at lambda=0.25; causally inert at the boundary"},
     "shortcut_remove_focus_header_survival_vs_intact": "unchanged in every seed (e.g. 0.883->0.883, 0.858->0.858); learned retention does not key off the focus cue",

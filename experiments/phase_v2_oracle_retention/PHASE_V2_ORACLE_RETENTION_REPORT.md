@@ -157,12 +157,27 @@ the *Phase retention signal*, not a broken task.
 
 ## 6. λ ablation (§7/§13)
 
-*(Populated from `results/lambda_sweep.json` — λ ∈ {0, 0.01, 0.05, 0.10, 0.25}, seed 0,
-n_live = 12. See §"λ sweep" table below; the study caps λ at 0.25 because Phase must not
-dominate eviction, and the decision trace shows the term is already near-inert at that
-ceiling.)*
+`results/lambda_sweep.json` — D-v2 trained at fixed λ ∈ {0, 0.01, 0.05, 0.10, 0.25},
+**seed 0**, n_live = 12 (curriculum `[(2,120),(4,150),(8,180),(12,200)]`):
 
-<!-- LAMBDA_SWEEP_TABLE -->
+| λ | survival | early-target survival | acc |
+|---:|---:|---:|---:|
+| 0.00 | 0.820 | 0.852 | 0.827 |
+| 0.01 | 0.833 | 0.852 | 0.813 |
+| 0.05 | 0.873 | 0.926 | 0.847 |
+| 0.10 | 0.853 | 0.877 | 0.840 |
+| 0.25 | 0.867 | 0.926 | 0.840 |
+
+At **seed 0** a mild positive trend appears (survival +0.05, early-survival +0.07 from
+λ=0 to λ=0.25), consistent with "a nonzero λ helps a little; larger λ does not hurt"
+(Phase does not dominate — as required). **But this is the single seed on which D-v2 also
+beat C in the main study** (D-v2 L12 s0 survival 0.885 vs C 0.805, +0.08). Across all
+three seeds the paired D-v2 − C survival is −0.018 ± 0.076 — i.e. the λ-trend seen here
+is within the per-seed noise (D-v2 L12 survival ranged 0.745–0.885 by seed) and does not
+survive averaging. The sweep therefore does **not** rescue the endpoint: it shows the
+best case Phase can offer on a favorable seed, and even that best case is inside the noise
+band of the three-seed study. The decision trace confirms *why* larger λ doesn't help
+more: even at λ = 0.25 the term flips ≤ 2.5 % of eviction decisions.
 
 ## 7. Supervised vs end-to-end gate
 
