@@ -46,7 +46,7 @@ Phase list:
 - **H2 — AI Recommendation & Evidence Synthesis (TAP)** ✅ *complete*
 - **H3 — Governance Integration (human decision on the DGM kernel)** ✅ *complete*
 - **H4 — Hiring Actions, Execution & Reconciliation** ✅ *complete*
-- H5 — Validation, Fairness Analysis & Shadow Pilot
+- **H5 — Validation, Fairness Analysis & Shadow Pilot** ✅ *complete (READY_WITH_DOCUMENTED_LIMITATIONS)*
 - H6 — Packaging, Documentation & Product Wrap-up
 
 ### H0 — Public API Migration & Re-entry Stabilization  ✅ COMPLETE
@@ -170,16 +170,28 @@ Phase list:
   (only ports + deterministic adapters ship); the contractual `ISSUE_OFFER`/
   `SEND_REJECTION` consequential steps; fairness certification; UI.
 
-### H5 — Validation, Fairness Analysis & Shadow Pilot
-- **Objective:** end-to-end hiring scenario validation + a bounded shadow pilot;
-  audit-reconstruction reporting.
-- **Permitted:** app/domain + validation harnesses (patterned on the pilot/benchmark).
-- **Frozen:** platform.
-- **Required:** hiring scenario matrix; safety-invariant checks; audit trail report.
-- **Invariants:** all F1–F20 as applied to hiring.
-- **Tests:** hiring-specific invariant suite; reproducible digest.
-- **Exclusions:** **fairness conclusions** and regulatory claims (analysis only,
-  clearly caveated); production deployment.
+### H5 — Validation, Fairness Analysis & Shadow Pilot  ✅ COMPLETE (READY_WITH_DOCUMENTED_LIMITATIONS)
+- **Objective:** validate the complete H1–H4 lifecycle under representative, adversarial,
+  failure-injection, and bounded shadow-pilot conditions — **validation only**, no new
+  architecture, no production effects.
+- **Permitted:** `ai_hiring/validation/` harnesses, fixtures, deterministic adapters,
+  validators, metrics, read-only analysis, and reports.
+- **Frozen:** platform — untouched.
+- **Delivered:** validation composition + end-to-end lifecycle driver; versioned scenario
+  matrix (normal/review/human-authority/authorization/execution/reconciliation/security);
+  bounded synthetic shadow-pilot cohort (12 cases, deterministic in-memory adapters, no
+  production effects); read-only fairness analysis (counterfactual/leakage checks,
+  protected-attribute exclusion, small-sample discipline, no enforcement); audit-completeness
+  scoring; failure-injection suite (all fail-safe); end-to-end reconstruction verification;
+  determinism + local performance characterization; nine H5 reports.
+- **Invariants:** F1–F20 as applied to hiring; **no fairness conclusions/enforcement**;
+  no new platform capability; analysis-only attributes never enter the pipeline.
+- **Tests:** **47 new H5 tests**; full suite **748 passed** (701 + 47);
+  kernel+framework+TAP+ActionGate+AI-Hiring **887 passed**; freeze PASS; 0 dependency
+  violations; no platform diff.
+- **Evidence:** `H5_COMPLETION_REPORT.md` + 8 companion reports; readiness
+  **READY_WITH_DOCUMENTED_LIMITATIONS** (no correctness/governance-boundary defect).
+- **Exclusions:** fairness/compliance certification; production integrations & scale claims.
 
 ### H6 — Packaging, Documentation & Product Wrap-up
 - **Objective:** package the hiring application independently; complete docs; close
