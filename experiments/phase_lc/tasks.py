@@ -18,6 +18,7 @@ import torch
 
 N_ENT = 24
 N_VAL = 48
+N_SRC = 12
 
 
 def load_corpus_words(paths, max_words=400000):
@@ -47,12 +48,14 @@ class Vocab:
         common = [w for w, _ in c.most_common(top_k)]
         specials = ['<pad>', '<unk>']
         struct = ['the', 'code', 'for', 'is', 'vendor', 'limit', 'value', 'of',
-                  'links', 'to', 'reachable', 'from', 'question', 'answer', '.', ',']
+                  'links', 'to', 'reachable', 'from', 'question', 'answer', '.', ',',
+                  'now', 'current', 'amendment', 'source', 'per']
         ents = [f'ENT{i}' for i in range(N_ENT)]
         vals = [f'VAL{i}' for i in range(N_VAL)]
+        srcs = [f'SRC{i}' for i in range(N_SRC)]
         words = []
         seen = set()
-        for w in specials + struct + ents + vals + common:
+        for w in specials + struct + ents + vals + srcs + common:
             if w not in seen:
                 seen.add(w); words.append(w)
         self.itos = words
@@ -61,6 +64,7 @@ class Vocab:
         self.filler = [self.stoi[w] for w in common if w not in ('ENT', 'VAL')][:top_k]
         self.ent = [self.stoi[f'ENT{i}'] for i in range(N_ENT)]
         self.val = [self.stoi[f'VAL{i}'] for i in range(N_VAL)]
+        self.src = [self.stoi[f'SRC{i}'] for i in range(N_SRC)]
 
     def __len__(self):
         return len(self.itos)
@@ -163,25 +167,67 @@ def multihop(N, vocab, rng, distractors=2):
     return ids, pos, tgt
 
 
+def supersession(N, vocab, rng, distractors=2):
+    """Original value then a later amendment supersedes it; query the CURRENT value.
+    Stale-version error = predicting the original value."""
+    S = vocab.stoi
+    e = rng.choice(vocab.ent); v_old, v_new = rng.sample(vocab.val, 2)
+    original = [S['the'], S['limit'], S['for'], e, S['is'], v_old, S['.']]
+    amend = [S['amendment'], S['the'], S['limit'], S['for'], e, S['is'], S['now'], v_new, S['.']]
+    facts = [original, amend]  # keep order-independent via placement; amend is controlling
+    for _ in range(distractors):
+        e2 = rng.choice([x for x in vocab.ent if x != e]); vv = rng.choice(vocab.val)
+        facts.append([S['the'], S['limit'], S['for'], e2, S['is'], vv, S['.']])
+    rng.shuffle(facts)
+    tail = [S['the'], S['current'], S['limit'], S['for'], e, S['is'], v_new]
+    return _place(facts, N, vocab, rng, tail) + (v_old,)  # extra: stale target
+
+
+def source(N, vocab, rng, distractors=3):
+    """Each fact tagged with a source id; query which SOURCE stated a given entity's code."""
+    S = vocab.stoi
+    e = rng.choice(vocab.ent); v = rng.choice(vocab.val); s = rng.choice(vocab.src)
+    fact = [S['per'], s, S['the'], S['code'], S['for'], e, S['is'], v, S['.']]
+    facts = [fact]
+    for _ in range(distractors):
+        e2 = rng.choice([x for x in vocab.ent if x != e]); v2 = rng.choice(vocab.val)
+        s2 = rng.choice([x for x in vocab.src if x != s])
+        facts.append([S['per'], s2, S['the'], S['code'], S['for'], e2, S['is'], v2, S['.']])
+    rng.shuffle(facts)
+    tail = [S['the'], S['code'], S['for'], e, S['is'], S['per'], S['source'], s]
+    return _place(facts, N, vocab, rng, tail)
+
+
 def make_eval_set(kind, N, vocab, seed, n=200, **kw):
+    """Returns (X, pos, target[, stale]) — stale only for supersession (else None)."""
     rng = random.Random(seed)
-    xs, poss, tgts = [], [], []
+    xs, poss, tgts, stales = [], [], [], []
     for _ in range(n):
+        stale = None
         if kind == 'needle':
             x, p, t = needle(N, vocab, rng, **kw)
         elif kind == 'binding':
             x, p, t = binding(N, vocab, rng, **kw)
         elif kind == 'multihop':
             x, p, t = multihop(N, vocab, rng, **kw)
-        xs.append(x); poss.append(p); tgts.append(t)
-    return torch.stack(xs), torch.tensor(poss), torch.tensor(tgts)
+        elif kind == 'source':
+            x, p, t = source(N, vocab, rng, **kw)
+        elif kind == 'supersession':
+            x, p, t, stale = supersession(N, vocab, rng, **kw)
+        xs.append(x); poss.append(p); tgts.append(t); stales.append(stale if stale is not None else -1)
+    st = torch.tensor(stales)
+    return torch.stack(xs), torch.tensor(poss), torch.tensor(tgts), (st if kind == 'supersession' else None)
 
 
-def train_batch(stream, B, N, vocab, rng, mix=(('lm', .15), ('needle', .4), ('binding', .3), ('multihop', .15))):
+ABC_MIX = (('lm', .2), ('needle', .2), ('binding', .2), ('supersession', .15),
+           ('source', .15), ('multihop', .1))
+
+
+def train_batch(stream, B, N, vocab, rng, mix=ABC_MIX):
     """Returns (x, y, mask). mask=None -> full-sequence LM loss. For task batches, mask
     selects ONLY the answer position (index pos-1) so the retrieval signal is not drowned
-    by filler/LM tokens. This is answer-token supervision (a form of L_retrieval), applied
-    identically to every arm."""
+    by filler/LM tokens. This is answer-token supervision (a form of L_retrieval/L_binding/
+    L_source/L_version), applied identically to every arm."""
     r = rng.random(); acc = 0; kind = 'lm'
     for k, p in mix:
         acc += p
@@ -195,6 +241,10 @@ def train_batch(stream, B, N, vocab, rng, mix=(('lm', .15), ('needle', .4), ('bi
             x, pos, tgt = needle(N, vocab, rng)
         elif kind == 'binding':
             x, pos, tgt = binding(N, vocab, rng, k=rng.choice([2, 3, 4]))
+        elif kind == 'supersession':
+            x, pos, tgt, _ = supersession(N, vocab, rng)
+        elif kind == 'source':
+            x, pos, tgt = source(N, vocab, rng)
         else:
             x, pos, tgt = multihop(N, vocab, rng)
         y = x.clone()
