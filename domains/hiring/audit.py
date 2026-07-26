@@ -14,8 +14,8 @@ a hiring-domain event name.
 
 from __future__ import annotations
 
-from decision_governance.audit import AuditEventType
-from decision_governance.audit.namespace import (
+from decision_governance.api.audit import AuditEventType
+from decision_governance.api.audit import (
     DOMAIN_EVENTS,
     KERNEL_EVENTS,
     LEGACY_EVENTS,

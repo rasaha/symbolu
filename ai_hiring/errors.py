@@ -14,7 +14,7 @@ below.
 
 from __future__ import annotations
 
-from decision_governance.errors import DomainValidationError, GovernanceError
+from decision_governance.api.errors import DomainValidationError, GovernanceError
 
 # Phase 5A: the error base is now the kernel's ``GovernanceError``. ``HiringError``
 # is kept as an alias so every existing ``class X(HiringError)`` and every
@@ -58,7 +58,7 @@ class BlockedEvaluationError(HiringError):
 
 # --- Repository + Phase-4A/4B/4C error families: extracted to the DGM kernel
 # in Phase 5B; re-exported here so ai_hiring.errors keeps the same objects.
-from decision_governance.errors import (  # noqa: F401,E402
+from decision_governance.api.errors import (  # noqa: F401,E402
     AIDecisionAuthorityError,
     ActionMappingNotFoundError,
     ActionMappingNotPublishedError,

@@ -39,6 +39,31 @@ Each phase: objective · permitted packages · frozen packages · required
 functionality · safety invariants · test expectations · completion evidence ·
 exclusions.
 
+Phase list:
+
+- **H0 — Public API Migration & Re-entry Stabilization** ✅ *complete*
+- H1 — Hiring Domain Completion
+- H2 — AI Recommendation & Evidence Synthesis (TAP)
+- H3 — Governance Integration (TAP + ActionGate Providers)
+- H4 — Hiring Actions, Execution & Reconciliation
+- H5 — Validation, Fairness Analysis & Shadow Pilot
+- H6 — Packaging, Documentation & Product Wrap-up
+
+### H0 — Public API Migration & Re-entry Stabilization  ✅ COMPLETE
+- **Objective:** make AI Hiring a clean consumer of the frozen Platform v1.0 public API —
+  replace every direct kernel-internal import in active/consumer code with
+  `decision_governance.api`, without changing platform behavior or adding hiring features.
+- **Permitted:** `ai_hiring`, `domains.hiring`, `applications.ai_hiring` (import surface only).
+- **Frozen:** all platform trees; providers.
+- **Delivered:** 22 consumer files migrated to `decision_governance.api`; two `platform.py`
+  port imports consolidated into `api.ports`; 23 backward-compat shims left as a tested
+  exemption (see `H0_API_GAP_REPORT.md`).
+- **Invariants:** dependency direction (F20); object identity preserved.
+- **Tests:** `pytest ai_hiring` → **553 passed** (unchanged); freeze verification **PASS**;
+  dependency-direction **0 violations**; no frozen file modified.
+- **Evidence:** `H0_MIGRATION_REPORT.md`, `H0_API_GAP_REPORT.md`, `H0_REENTRY_STATUS.md`.
+- **Exclusions:** provider wiring; new features; any platform change.
+
 ### H1 — Hiring Domain Completion
 - **Objective:** complete the hiring product entities (requisition, job definition,
   candidate, application, evidence intake, assessment workspace, structured
@@ -64,7 +89,7 @@ exclusions.
   provider failure fail-safe.
 - **Exclusions:** action authorization; execution; fairness conclusions.
 
-### H3 — Governance Integration
+### H3 — Governance Integration (TAP + ActionGate Providers)
 - **Objective:** run the full DGM case→recommendation→decision→review flow for
   hiring, with human authority and overrides through DGM review tasks.
 - **Permitted:** app/domain + `decision_governance.api`, `governance_providers.api`.
@@ -75,7 +100,7 @@ exclusions.
 - **Tests:** human-only binding decisions; override audit; resolution determinism.
 - **Exclusions:** offer/rejection execution.
 
-### H4 — Hiring Action & Execution Workflows
+### H4 — Hiring Actions, Execution & Reconciliation
 - **Objective:** authorize hiring actions (offer, rejection) via **ActionGate**,
   enforce constraints before dispatch, execute through an external port, reconcile.
 - **Permitted:** app/domain + `actiongate_provider`, `governance_providers.api`,
@@ -88,7 +113,7 @@ exclusions.
   obligations verified separately; execution separate from authorization.
 - **Exclusions:** live ATS/HRIS connectors; UI.
 
-### H5 — Validation, Fairness, and Shadow Pilot
+### H5 — Validation, Fairness Analysis & Shadow Pilot
 - **Objective:** end-to-end hiring scenario validation + a bounded shadow pilot;
   audit-reconstruction reporting.
 - **Permitted:** app/domain + validation harnesses (patterned on the pilot/benchmark).
@@ -99,7 +124,7 @@ exclusions.
 - **Exclusions:** **fairness conclusions** and regulatory claims (analysis only,
   clearly caveated); production deployment.
 
-### H6 — Packaging, Documentation, and Product Wrap-up
+### H6 — Packaging, Documentation & Product Wrap-up
 - **Objective:** package the hiring application independently; complete docs; close
   the workstream.
 - **Permitted:** app/domain + packaging.

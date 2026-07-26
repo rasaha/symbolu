@@ -7,7 +7,7 @@ callers and tests are unaffected.
 
 from __future__ import annotations
 
-from decision_governance.common import (  # noqa: F401
+from decision_governance.api.common import (  # noqa: F401
     Clock,
     IdFactory,
     canonical_hash,

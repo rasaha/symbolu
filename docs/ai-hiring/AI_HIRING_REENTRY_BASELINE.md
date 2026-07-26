@@ -35,11 +35,13 @@ phase.** Paths were resolved from the repository.
   recommendation → decision → action request → CER → authorization → execution →
   reconciliation) runs on the DGM kernel. `applications/ai_hiring/platform.py`
   composes it end-to-end in memory.
-- **Surface note:** the consumer currently imports several kernel *internal*
-  modules directly (`decision_governance.identity`, `.audit`, `.policy`,
+- **Surface note (RESOLVED in H0):** the consumer previously imported several kernel
+  *internal* modules directly (`decision_governance.identity`, `.audit`, `.policy`,
   `.repositories`, `.actions`, `.execution`, `.services`) rather than the frozen
-  `decision_governance.api` surface. Migrating to `decision_governance.api` is
-  APPLICATION_LOCAL work (see MIGRATION_POLICY) and is a recommended H1/H3 item.
+  `decision_governance.api` surface. **H0 migrated all consumer code to
+  `decision_governance.api`** (see `H0_MIGRATION_REPORT.md` / `H0_REENTRY_STATUS.md`); only
+  the tested backward-compat shims still reference internals by design
+  (`H0_API_GAP_REPORT.md`).
 
 ## Existing provider integration
 

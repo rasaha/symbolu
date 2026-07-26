@@ -15,7 +15,7 @@ from ..common import new_id
 from ..domain.enums import ActorType
 from ..errors import EvidenceAccessDeniedError, UnauthenticatedActorError
 from ..ontology.capability import Capability, CapabilityStatus
-from decision_governance.identity import IdentityProvider
+from decision_governance.api.identity import IdentityProvider
 from ..services.ontology_service import OntologyService
 
 

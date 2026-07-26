@@ -21,23 +21,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # --- Decision Governance kernel (domain-neutral) ---------------------------
-from decision_governance.identity import IdentityProvider, StaticIdentityProvider
-from decision_governance.audit import AuditService, InMemoryAuditRepository
-from decision_governance.policy import EvidenceAccessPolicy, GrantStore
-from decision_governance.repositories import (
+from decision_governance.api.identity import IdentityProvider, StaticIdentityProvider
+from decision_governance.api.audit import AuditService, InMemoryAuditRepository
+from decision_governance.api.policy import EvidenceAccessPolicy, GrantStore
+from decision_governance.api.repositories import (
     InMemoryActionRequestRepository,
     InMemoryDecisionCaseRepository,
     InMemoryExecutionRepository,
 )
-from decision_governance.actions import (
+from decision_governance.api.ports import (
     ActionControlPlanePort,
-    OfflineDeterministicControlPlane,
-)
-from decision_governance.execution import (
     ExternalExecutionPort,
+    OfflineDeterministicControlPlane,
     OfflineDeterministicExecutionAdapter,
 )
-from decision_governance.services import (
+from decision_governance.api.services import (
     ActionAuthorizationService,
     ActionRequestService,
     ActionRequestValidationService,

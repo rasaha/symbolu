@@ -14,15 +14,15 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from decision_governance.actions import (
+from decision_governance.api.contracts import (
     ActionAuthorizationResponse,
     ActionMapping,
     ActionRequest,
     ActionRequestValidationResult,
     ContextEnvelopeRecord,
 )
-from decision_governance.identity import IdentityProvider
-from decision_governance.services import (
+from decision_governance.api.identity import IdentityProvider
+from decision_governance.api.services import (
     ActionAuthorizationService,
     ActionRequestService,
     CERBindingService,

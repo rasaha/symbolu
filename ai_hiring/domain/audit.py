@@ -6,4 +6,4 @@ historical ``ai_hiring.domain.audit`` import path pointing at the identical clas
 
 from __future__ import annotations
 
-from decision_governance.audit.event import AuditEvent  # noqa: F401
+from decision_governance.api.audit import AuditEvent  # noqa: F401

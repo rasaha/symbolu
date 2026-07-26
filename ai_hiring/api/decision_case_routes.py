@@ -13,7 +13,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from decision_governance.decisions import (
+from decision_governance.api.contracts import (
     AuthorityContext,
     DecisionCase,
     DecisionOutcome,
@@ -27,8 +27,8 @@ from decision_governance.decisions import (
     ReviewTaskType,
     VersionedRef,
 )
-from decision_governance.identity import IdentityProvider
-from decision_governance.services import (
+from decision_governance.api.identity import IdentityProvider
+from decision_governance.api.services import (
     CaseDecisionService,
     CaseRecommendationService,
     DecisionCaseService,
