@@ -36,7 +36,8 @@ class OCfg:
     vocab_size: int
     embed_dim: int = 96
     num_heads: int = 4
-    local_window: int = 8
+    local_window: int = 16   # must cover a full record so the value is in-window; the
+                             # distant focus header stays OUTSIDE (records arrive far past it)
     num_slots: int = 8
     lambda_max: float = 0.25
     lambda_fixed: Optional[float] = None   # if None, learn λ (bounded); else fix it
