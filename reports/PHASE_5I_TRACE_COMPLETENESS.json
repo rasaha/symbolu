@@ -1,0 +1,907 @@
+{
+  "complete": 90,
+  "completeness_rate": 1.0,
+  "total": 90,
+  "traces": [
+    {
+      "authorization_id": "authz_c2b859a9d98440089338860bcca1410a",
+      "case_id": "case_778b8aa93316",
+      "complete": true,
+      "correlation_id": "finance_operations-001",
+      "decision_id": "dec_48bf32688b09",
+      "missing": [],
+      "recommendation_id": "rec_e1a2d885f3b4",
+      "scenario_id": "finance_operations-001"
+    },
+    {
+      "authorization_id": "authz_9ef6c2ce44d0432eb7e0c49227156a7a",
+      "case_id": "case_f32778b48eee",
+      "complete": true,
+      "correlation_id": "finance_operations-002",
+      "decision_id": "dec_fe53cefa44a2",
+      "missing": [],
+      "recommendation_id": "rec_ee0768dac3bf",
+      "scenario_id": "finance_operations-002"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_ef4b387db942",
+      "complete": true,
+      "correlation_id": "finance_operations-003",
+      "decision_id": "dec_e814856928ca",
+      "missing": [],
+      "recommendation_id": "rec_027f54cb5693",
+      "scenario_id": "finance_operations-003"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_509bf99777c7",
+      "complete": true,
+      "correlation_id": "finance_operations-004",
+      "decision_id": "dec_02a3903ada51",
+      "missing": [],
+      "recommendation_id": "rec_ee2de855ed08",
+      "scenario_id": "finance_operations-004"
+    },
+    {
+      "authorization_id": "authz_d85ce246adec47cf91be13d8afce10b2",
+      "case_id": "case_8f6751e7c0b2",
+      "complete": true,
+      "correlation_id": "finance_operations-005",
+      "decision_id": "dec_bc8b73fa09c6",
+      "missing": [],
+      "recommendation_id": "rec_4b6d127d4f1f",
+      "scenario_id": "finance_operations-005"
+    },
+    {
+      "authorization_id": "authz_38b72edcd8244c6d8eb00e8da1bfddc6",
+      "case_id": "case_1fd6f47259c2",
+      "complete": true,
+      "correlation_id": "finance_operations-006",
+      "decision_id": "dec_284b5f26a688",
+      "missing": [],
+      "recommendation_id": "rec_35f83d039e2d",
+      "scenario_id": "finance_operations-006"
+    },
+    {
+      "authorization_id": "authz_45beeaba44e54e33bd13ee5ab73b73f2",
+      "case_id": "case_36e3378a244e",
+      "complete": true,
+      "correlation_id": "finance_operations-007",
+      "decision_id": "dec_b5517916cdb1",
+      "missing": [],
+      "recommendation_id": "rec_627a62e5b23e",
+      "scenario_id": "finance_operations-007"
+    },
+    {
+      "authorization_id": "authz_1833c1c08bf44022ac7b6513bcffa003",
+      "case_id": "case_ae224d458340",
+      "complete": true,
+      "correlation_id": "finance_operations-008",
+      "decision_id": "dec_a92bb678c79f",
+      "missing": [],
+      "recommendation_id": "rec_280ad8efd4a7",
+      "scenario_id": "finance_operations-008"
+    },
+    {
+      "authorization_id": "authz_5d45a24e5864438982d04fd57048e9c3",
+      "case_id": "case_ffd5b9caeee7",
+      "complete": true,
+      "correlation_id": "finance_operations-009",
+      "decision_id": "dec_71673801bcea",
+      "missing": [],
+      "recommendation_id": "rec_c3a255f385ec",
+      "scenario_id": "finance_operations-009"
+    },
+    {
+      "authorization_id": "authz_f89616d1054b4558b55937940f5e6f34",
+      "case_id": "case_4cc1972b3371",
+      "complete": true,
+      "correlation_id": "finance_operations-010",
+      "decision_id": "dec_32573f8eac06",
+      "missing": [],
+      "recommendation_id": "rec_4beafd98db58",
+      "scenario_id": "finance_operations-010"
+    },
+    {
+      "authorization_id": "authz_039ed3c91dcd4f0c8520327898d9fc83",
+      "case_id": "case_018dc489a194",
+      "complete": true,
+      "correlation_id": "finance_operations-011",
+      "decision_id": "dec_6c131dfda794",
+      "missing": [],
+      "recommendation_id": "rec_4e5f50a653db",
+      "scenario_id": "finance_operations-011"
+    },
+    {
+      "authorization_id": "authz_1e1596f89bd146528d89ec968ec997a1",
+      "case_id": "case_78e8e209e279",
+      "complete": true,
+      "correlation_id": "finance_operations-012",
+      "decision_id": "dec_ad7d64259221",
+      "missing": [],
+      "recommendation_id": "rec_a6e66bcfdeec",
+      "scenario_id": "finance_operations-012"
+    },
+    {
+      "authorization_id": "authz_f4618eb8256044b9ab3d0c5044edf1f1",
+      "case_id": "case_5caa423ecb41",
+      "complete": true,
+      "correlation_id": "finance_operations-013",
+      "decision_id": "dec_da74118283ba",
+      "missing": [],
+      "recommendation_id": "rec_bcf8a846a5bb",
+      "scenario_id": "finance_operations-013"
+    },
+    {
+      "authorization_id": "authz_d521512054444d82a4666ea96219bdb6",
+      "case_id": "case_abb0241452cb",
+      "complete": true,
+      "correlation_id": "finance_operations-014",
+      "decision_id": "dec_9cf83cdd8f05",
+      "missing": [],
+      "recommendation_id": "rec_1c0533a0d741",
+      "scenario_id": "finance_operations-014"
+    },
+    {
+      "authorization_id": "authz_780875f6f59d46a6a4a9cfc374ef4c79",
+      "case_id": "case_4dec021229cb",
+      "complete": true,
+      "correlation_id": "finance_operations-015",
+      "decision_id": "dec_2058e4740075",
+      "missing": [],
+      "recommendation_id": "rec_3799fb960485",
+      "scenario_id": "finance_operations-015"
+    },
+    {
+      "authorization_id": "authz_d3e8bc363a4b4d5a9d3809f458370cb1",
+      "case_id": "case_4a1d4352d4ff",
+      "complete": true,
+      "correlation_id": "finance_operations-016",
+      "decision_id": "dec_d38e618f5990",
+      "missing": [],
+      "recommendation_id": "rec_4c6b486db5a9",
+      "scenario_id": "finance_operations-016"
+    },
+    {
+      "authorization_id": "authz_301443e1d8584428aef2dbaa294560f8",
+      "case_id": "case_e66670ac877f",
+      "complete": true,
+      "correlation_id": "finance_operations-017",
+      "decision_id": "dec_4f0d88c06206",
+      "missing": [],
+      "recommendation_id": "rec_4946b413474c",
+      "scenario_id": "finance_operations-017"
+    },
+    {
+      "authorization_id": "authz_2243c780c37b4398a92d5f7d385a8ceb",
+      "case_id": "case_3338dc1057eb",
+      "complete": true,
+      "correlation_id": "finance_operations-018",
+      "decision_id": "dec_75b9e195293f",
+      "missing": [],
+      "recommendation_id": "rec_5e5ec89975e4",
+      "scenario_id": "finance_operations-018"
+    },
+    {
+      "authorization_id": "authz_af8e51d439ab4a0ea708ef153fda7371",
+      "case_id": "case_92ec9e13b45a",
+      "complete": true,
+      "correlation_id": "finance_operations-019",
+      "decision_id": "dec_5ef70be7df80",
+      "missing": [],
+      "recommendation_id": "rec_c8e11cacde31",
+      "scenario_id": "finance_operations-019"
+    },
+    {
+      "authorization_id": "authz_ed2905ccb98e405c987eb3007c131068",
+      "case_id": "case_b2aad95d332d",
+      "complete": true,
+      "correlation_id": "finance_operations-020",
+      "decision_id": "dec_bdc1511070be",
+      "missing": [],
+      "recommendation_id": "rec_cc9bae64c5ee",
+      "scenario_id": "finance_operations-020"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_c06779a2a6cc",
+      "complete": true,
+      "correlation_id": "finance_operations-021",
+      "decision_id": "dec_f78a70b60486",
+      "missing": [],
+      "recommendation_id": "rec_499b4e7ab16b",
+      "scenario_id": "finance_operations-021"
+    },
+    {
+      "authorization_id": "authz_356ebf65e9d04b77bfc883f49a061eae",
+      "case_id": "case_4d8c9ffc1c09",
+      "complete": true,
+      "correlation_id": "finance_operations-022",
+      "decision_id": "dec_68c8068b9b40",
+      "missing": [],
+      "recommendation_id": "rec_3006b535bd98",
+      "scenario_id": "finance_operations-022"
+    },
+    {
+      "authorization_id": "authz_9837147f91844fc38f2c0e569b85116f",
+      "case_id": "case_f6a3d3e03e19",
+      "complete": true,
+      "correlation_id": "finance_operations-023",
+      "decision_id": "dec_2863dd95fabe",
+      "missing": [],
+      "recommendation_id": "rec_4dfe5789e544",
+      "scenario_id": "finance_operations-023"
+    },
+    {
+      "authorization_id": "authz_85a8e02c356540d1941a65f01a1cbf27",
+      "case_id": "case_fed91698c000",
+      "complete": true,
+      "correlation_id": "finance_operations-024",
+      "decision_id": "dec_cf70ce2262a8",
+      "missing": [],
+      "recommendation_id": "rec_a508c126ae28",
+      "scenario_id": "finance_operations-024"
+    },
+    {
+      "authorization_id": "authz_203cf4166cbd467ea5179033a9018edd",
+      "case_id": "case_63975af15fa5",
+      "complete": true,
+      "correlation_id": "finance_operations-025",
+      "decision_id": "dec_8908f913c504",
+      "missing": [],
+      "recommendation_id": "rec_81617c992ded",
+      "scenario_id": "finance_operations-025"
+    },
+    {
+      "authorization_id": "authz_6b093288515d465f89ead6077a43bb51",
+      "case_id": "case_1dfe8df57f7e",
+      "complete": true,
+      "correlation_id": "finance_operations-026",
+      "decision_id": "dec_9bdc31603a15",
+      "missing": [],
+      "recommendation_id": "rec_fdd6391b354e",
+      "scenario_id": "finance_operations-026"
+    },
+    {
+      "authorization_id": "authz_dc1c97ddd23745a2a9479588bebccc1e",
+      "case_id": "case_51b930b7e828",
+      "complete": true,
+      "correlation_id": "finance_operations-027",
+      "decision_id": "dec_52eaa6cb08f9",
+      "missing": [],
+      "recommendation_id": "rec_f204a2c661c5",
+      "scenario_id": "finance_operations-027"
+    },
+    {
+      "authorization_id": "authz_772de3ff9dd94902bc9680c24bbfc24f",
+      "case_id": "case_0b81b6c58812",
+      "complete": true,
+      "correlation_id": "finance_operations-028",
+      "decision_id": "dec_29e374a8750e",
+      "missing": [],
+      "recommendation_id": "rec_a7057211fd58",
+      "scenario_id": "finance_operations-028"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_58579ef901ba",
+      "complete": true,
+      "correlation_id": "finance_operations-029",
+      "decision_id": "dec_b4e9fac0bb2c",
+      "missing": [],
+      "recommendation_id": "rec_7a83b0742f5e",
+      "scenario_id": "finance_operations-029"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_fd3c7af79588",
+      "complete": true,
+      "correlation_id": "finance_operations-030",
+      "decision_id": "dec_9473d608193c",
+      "missing": [],
+      "recommendation_id": "rec_5ac959e86f1c",
+      "scenario_id": "finance_operations-030"
+    },
+    {
+      "authorization_id": "authz_4544cdae5c494440b90df81e606b246f",
+      "case_id": "case_5c16fb4c6da2",
+      "complete": true,
+      "correlation_id": "procurement-001",
+      "decision_id": "dec_9cd076a4f2a1",
+      "missing": [],
+      "recommendation_id": "rec_ade56ad19e76",
+      "scenario_id": "procurement-001"
+    },
+    {
+      "authorization_id": "authz_ea52a69d4cc24009b7fab9248a9d99a6",
+      "case_id": "case_af8e96d0f81e",
+      "complete": true,
+      "correlation_id": "procurement-002",
+      "decision_id": "dec_81b629bf0ba6",
+      "missing": [],
+      "recommendation_id": "rec_b8ec067f9b3c",
+      "scenario_id": "procurement-002"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_4fd491172b8d",
+      "complete": true,
+      "correlation_id": "procurement-003",
+      "decision_id": "dec_a2015421cc85",
+      "missing": [],
+      "recommendation_id": "rec_0b8d3e3ed627",
+      "scenario_id": "procurement-003"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_e7ace7831409",
+      "complete": true,
+      "correlation_id": "procurement-004",
+      "decision_id": "dec_90fd134da9a5",
+      "missing": [],
+      "recommendation_id": "rec_be7860a5e829",
+      "scenario_id": "procurement-004"
+    },
+    {
+      "authorization_id": "authz_8b9d1e8beee54c1c953d23d037a59d80",
+      "case_id": "case_de7b92d91a6b",
+      "complete": true,
+      "correlation_id": "procurement-005",
+      "decision_id": "dec_86005b79ac32",
+      "missing": [],
+      "recommendation_id": "rec_48cbf66d3923",
+      "scenario_id": "procurement-005"
+    },
+    {
+      "authorization_id": "authz_9d41e5a297af4382bd8d132fbe194393",
+      "case_id": "case_67f9edc5270d",
+      "complete": true,
+      "correlation_id": "procurement-006",
+      "decision_id": "dec_bdfc65e7f51e",
+      "missing": [],
+      "recommendation_id": "rec_d2228ccc2279",
+      "scenario_id": "procurement-006"
+    },
+    {
+      "authorization_id": "authz_d5d422bac9034f42b1b0fcd726c7e0a7",
+      "case_id": "case_b850cb2ab0a4",
+      "complete": true,
+      "correlation_id": "procurement-007",
+      "decision_id": "dec_9e98199aa0a4",
+      "missing": [],
+      "recommendation_id": "rec_105112f1de74",
+      "scenario_id": "procurement-007"
+    },
+    {
+      "authorization_id": "authz_a4eb8083ff324e1990e30ccb95f06383",
+      "case_id": "case_7bfa2e83fdf0",
+      "complete": true,
+      "correlation_id": "procurement-008",
+      "decision_id": "dec_b7b9c86afcc3",
+      "missing": [],
+      "recommendation_id": "rec_c9ed139e396e",
+      "scenario_id": "procurement-008"
+    },
+    {
+      "authorization_id": "authz_b1f74c664a0d44a4a96a7028eb7013d7",
+      "case_id": "case_71bebb14f4c2",
+      "complete": true,
+      "correlation_id": "procurement-009",
+      "decision_id": "dec_6726e1fb4234",
+      "missing": [],
+      "recommendation_id": "rec_c3a4134192d0",
+      "scenario_id": "procurement-009"
+    },
+    {
+      "authorization_id": "authz_42c1325a8590433cb17b8ea35df75817",
+      "case_id": "case_0719491f85c6",
+      "complete": true,
+      "correlation_id": "procurement-010",
+      "decision_id": "dec_a79689dfc7bd",
+      "missing": [],
+      "recommendation_id": "rec_a98372c8431b",
+      "scenario_id": "procurement-010"
+    },
+    {
+      "authorization_id": "authz_260b68436bb54d6c87feb6234683be21",
+      "case_id": "case_acf8a4d78e6f",
+      "complete": true,
+      "correlation_id": "procurement-011",
+      "decision_id": "dec_050d9da8b0ed",
+      "missing": [],
+      "recommendation_id": "rec_3f7ebdd9b166",
+      "scenario_id": "procurement-011"
+    },
+    {
+      "authorization_id": "authz_1216d60b33d0456a8065d8c0253f4dea",
+      "case_id": "case_87573e991d23",
+      "complete": true,
+      "correlation_id": "procurement-012",
+      "decision_id": "dec_da2fd2ca34e4",
+      "missing": [],
+      "recommendation_id": "rec_bcf5818d90f1",
+      "scenario_id": "procurement-012"
+    },
+    {
+      "authorization_id": "authz_ec0b8f6a645f47ec91854310e4c1919c",
+      "case_id": "case_e410df3d89f0",
+      "complete": true,
+      "correlation_id": "procurement-013",
+      "decision_id": "dec_80dd08f00f2c",
+      "missing": [],
+      "recommendation_id": "rec_6e4997ad2370",
+      "scenario_id": "procurement-013"
+    },
+    {
+      "authorization_id": "authz_f6c45c391a80476aa40011ef49715621",
+      "case_id": "case_731ae40547ed",
+      "complete": true,
+      "correlation_id": "procurement-014",
+      "decision_id": "dec_7e378fe0ee4f",
+      "missing": [],
+      "recommendation_id": "rec_f7e8bae8e16f",
+      "scenario_id": "procurement-014"
+    },
+    {
+      "authorization_id": "authz_6e6c94a0c64240a4827b72b5c15b37ab",
+      "case_id": "case_f6e015c1e1de",
+      "complete": true,
+      "correlation_id": "procurement-015",
+      "decision_id": "dec_7812607a6e29",
+      "missing": [],
+      "recommendation_id": "rec_b921c3de4875",
+      "scenario_id": "procurement-015"
+    },
+    {
+      "authorization_id": "authz_73d77084cd954643a36337b1b1fd9c20",
+      "case_id": "case_c38f0cbd4564",
+      "complete": true,
+      "correlation_id": "procurement-016",
+      "decision_id": "dec_f42cdb3939e3",
+      "missing": [],
+      "recommendation_id": "rec_b6245d257571",
+      "scenario_id": "procurement-016"
+    },
+    {
+      "authorization_id": "authz_ea36259ee53742c196dc98d8c0c9f8e1",
+      "case_id": "case_20cdec9211e3",
+      "complete": true,
+      "correlation_id": "procurement-017",
+      "decision_id": "dec_6283d99af789",
+      "missing": [],
+      "recommendation_id": "rec_89d12c1df81e",
+      "scenario_id": "procurement-017"
+    },
+    {
+      "authorization_id": "authz_44c91ae361804f00ba696bc8fe16ffd5",
+      "case_id": "case_cc8508216f0f",
+      "complete": true,
+      "correlation_id": "procurement-018",
+      "decision_id": "dec_c9b4735b938b",
+      "missing": [],
+      "recommendation_id": "rec_517778f9a291",
+      "scenario_id": "procurement-018"
+    },
+    {
+      "authorization_id": "authz_2025c528bbb741039813d057fc0ee7f3",
+      "case_id": "case_b9e52689a09a",
+      "complete": true,
+      "correlation_id": "procurement-019",
+      "decision_id": "dec_b47cb354113e",
+      "missing": [],
+      "recommendation_id": "rec_4a4f2caaea85",
+      "scenario_id": "procurement-019"
+    },
+    {
+      "authorization_id": "authz_2aca8b59248e431491411f5a6a09054b",
+      "case_id": "case_00cc1021e9bd",
+      "complete": true,
+      "correlation_id": "procurement-020",
+      "decision_id": "dec_15f8d287ca90",
+      "missing": [],
+      "recommendation_id": "rec_8a4cfa64c9fb",
+      "scenario_id": "procurement-020"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_ef7b3ebd954d",
+      "complete": true,
+      "correlation_id": "procurement-021",
+      "decision_id": "dec_8c53a60da049",
+      "missing": [],
+      "recommendation_id": "rec_90defe286a6b",
+      "scenario_id": "procurement-021"
+    },
+    {
+      "authorization_id": "authz_e6e8dea6748b4465b8ce1b4c8c865fc5",
+      "case_id": "case_5ab723dcfa66",
+      "complete": true,
+      "correlation_id": "procurement-022",
+      "decision_id": "dec_3f638e0369d9",
+      "missing": [],
+      "recommendation_id": "rec_8217b0f969b3",
+      "scenario_id": "procurement-022"
+    },
+    {
+      "authorization_id": "authz_005b18c621684d38b0bacccfb319170c",
+      "case_id": "case_3a7931c04aad",
+      "complete": true,
+      "correlation_id": "procurement-023",
+      "decision_id": "dec_b9c57651aa28",
+      "missing": [],
+      "recommendation_id": "rec_1dc87d3f5dc2",
+      "scenario_id": "procurement-023"
+    },
+    {
+      "authorization_id": "authz_937d0870ddd34b74979c2c310e82b7b0",
+      "case_id": "case_5cd335f31e51",
+      "complete": true,
+      "correlation_id": "procurement-024",
+      "decision_id": "dec_a266f76e43c3",
+      "missing": [],
+      "recommendation_id": "rec_fc0aa0a2f592",
+      "scenario_id": "procurement-024"
+    },
+    {
+      "authorization_id": "authz_364fa950b50f41c097d17c01b0e2d118",
+      "case_id": "case_45b1583f0022",
+      "complete": true,
+      "correlation_id": "procurement-025",
+      "decision_id": "dec_c324b03e9e89",
+      "missing": [],
+      "recommendation_id": "rec_6dad219eb4ee",
+      "scenario_id": "procurement-025"
+    },
+    {
+      "authorization_id": "authz_35c919cf9b5b44cebe21fdd39b82daec",
+      "case_id": "case_82c844b18cde",
+      "complete": true,
+      "correlation_id": "procurement-026",
+      "decision_id": "dec_3ce0807b3162",
+      "missing": [],
+      "recommendation_id": "rec_deba93d3af3f",
+      "scenario_id": "procurement-026"
+    },
+    {
+      "authorization_id": "authz_8a13e3da7d5744c68037767938065318",
+      "case_id": "case_7f9a79298874",
+      "complete": true,
+      "correlation_id": "procurement-027",
+      "decision_id": "dec_9d840139639f",
+      "missing": [],
+      "recommendation_id": "rec_f429e18e320b",
+      "scenario_id": "procurement-027"
+    },
+    {
+      "authorization_id": "authz_bcff7d0696e546e9b3d391c211e9b185",
+      "case_id": "case_d6cb40148efe",
+      "complete": true,
+      "correlation_id": "procurement-028",
+      "decision_id": "dec_92342849da93",
+      "missing": [],
+      "recommendation_id": "rec_2ffb506fe365",
+      "scenario_id": "procurement-028"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_0a641e9a8f90",
+      "complete": true,
+      "correlation_id": "procurement-029",
+      "decision_id": "dec_afa20b5784b0",
+      "missing": [],
+      "recommendation_id": "rec_ef71baf87fa1",
+      "scenario_id": "procurement-029"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_8ca5f6bebcf5",
+      "complete": true,
+      "correlation_id": "procurement-030",
+      "decision_id": "dec_53834c1e4b98",
+      "missing": [],
+      "recommendation_id": "rec_ab6a9975fd60",
+      "scenario_id": "procurement-030"
+    },
+    {
+      "authorization_id": "authz_c4fcd9ff3ef948768fa1b324bd3736ea",
+      "case_id": "case_ab53cdcfa1b9",
+      "complete": true,
+      "correlation_id": "refund_operations-001",
+      "decision_id": "dec_e8c55aedd297",
+      "missing": [],
+      "recommendation_id": "rec_998aa51e5e58",
+      "scenario_id": "refund_operations-001"
+    },
+    {
+      "authorization_id": "authz_b57c3b9c14f44e50bcdfde39dfde9aee",
+      "case_id": "case_54f2b759d360",
+      "complete": true,
+      "correlation_id": "refund_operations-002",
+      "decision_id": "dec_a0703a59c0fe",
+      "missing": [],
+      "recommendation_id": "rec_4d6865a4efa7",
+      "scenario_id": "refund_operations-002"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_553810521c6f",
+      "complete": true,
+      "correlation_id": "refund_operations-003",
+      "decision_id": "dec_58c698ae0332",
+      "missing": [],
+      "recommendation_id": "rec_ad901b519fe1",
+      "scenario_id": "refund_operations-003"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_a7493a035046",
+      "complete": true,
+      "correlation_id": "refund_operations-004",
+      "decision_id": "dec_7f59c9d0cd2e",
+      "missing": [],
+      "recommendation_id": "rec_2ae2180e2839",
+      "scenario_id": "refund_operations-004"
+    },
+    {
+      "authorization_id": "authz_d17995d178974d38b20219ac6ee5b9e9",
+      "case_id": "case_afa5347b3847",
+      "complete": true,
+      "correlation_id": "refund_operations-005",
+      "decision_id": "dec_6f3c5018059a",
+      "missing": [],
+      "recommendation_id": "rec_20746248d021",
+      "scenario_id": "refund_operations-005"
+    },
+    {
+      "authorization_id": "authz_5b685f2c0bf14f7195f8b4e90247809c",
+      "case_id": "case_f477bbd95b0b",
+      "complete": true,
+      "correlation_id": "refund_operations-006",
+      "decision_id": "dec_e6d61bf50082",
+      "missing": [],
+      "recommendation_id": "rec_d352edda75ea",
+      "scenario_id": "refund_operations-006"
+    },
+    {
+      "authorization_id": "authz_b7ee9e6c71bd4434b5337562fd2cc0e6",
+      "case_id": "case_165fcd5dbd78",
+      "complete": true,
+      "correlation_id": "refund_operations-007",
+      "decision_id": "dec_687e8a2a3c27",
+      "missing": [],
+      "recommendation_id": "rec_f6272c5de3b9",
+      "scenario_id": "refund_operations-007"
+    },
+    {
+      "authorization_id": "authz_31d59f5f1d01482c8caecd4f9866b3a1",
+      "case_id": "case_493a40f4ec83",
+      "complete": true,
+      "correlation_id": "refund_operations-008",
+      "decision_id": "dec_1f3adcb19a6f",
+      "missing": [],
+      "recommendation_id": "rec_99ca8972a2b6",
+      "scenario_id": "refund_operations-008"
+    },
+    {
+      "authorization_id": "authz_456a17e7aee649e78fce16e00ae0a77d",
+      "case_id": "case_eafb3a9a9f23",
+      "complete": true,
+      "correlation_id": "refund_operations-009",
+      "decision_id": "dec_847576a2a4d2",
+      "missing": [],
+      "recommendation_id": "rec_6ef947723a5c",
+      "scenario_id": "refund_operations-009"
+    },
+    {
+      "authorization_id": "authz_5ca72c49214e4aae9032828fdf0bc902",
+      "case_id": "case_cd49568c8903",
+      "complete": true,
+      "correlation_id": "refund_operations-010",
+      "decision_id": "dec_f264d6e84933",
+      "missing": [],
+      "recommendation_id": "rec_d65bd1b1288f",
+      "scenario_id": "refund_operations-010"
+    },
+    {
+      "authorization_id": "authz_8bed2b095cf84ef3963e1c94ecc7cf1e",
+      "case_id": "case_f35e5a747781",
+      "complete": true,
+      "correlation_id": "refund_operations-011",
+      "decision_id": "dec_1b212f9462cf",
+      "missing": [],
+      "recommendation_id": "rec_eff364689fc1",
+      "scenario_id": "refund_operations-011"
+    },
+    {
+      "authorization_id": "authz_d936699f73cf4b9e8a3b5cfd63b78d0a",
+      "case_id": "case_6e9310fd1b17",
+      "complete": true,
+      "correlation_id": "refund_operations-012",
+      "decision_id": "dec_671237ed027a",
+      "missing": [],
+      "recommendation_id": "rec_62a60212d7f6",
+      "scenario_id": "refund_operations-012"
+    },
+    {
+      "authorization_id": "authz_576aed73564f449fbb36c5477d0d0e88",
+      "case_id": "case_6070b2cb97b4",
+      "complete": true,
+      "correlation_id": "refund_operations-013",
+      "decision_id": "dec_764ff215380a",
+      "missing": [],
+      "recommendation_id": "rec_502e67a80f36",
+      "scenario_id": "refund_operations-013"
+    },
+    {
+      "authorization_id": "authz_83f21bf76b98464ba0503d2cd06cbb1f",
+      "case_id": "case_599f435927f6",
+      "complete": true,
+      "correlation_id": "refund_operations-014",
+      "decision_id": "dec_25acbb3cef9e",
+      "missing": [],
+      "recommendation_id": "rec_d2068b42f637",
+      "scenario_id": "refund_operations-014"
+    },
+    {
+      "authorization_id": "authz_ca36c6bb96cb4f4fb28b1221054679ba",
+      "case_id": "case_aa62e76ce9e2",
+      "complete": true,
+      "correlation_id": "refund_operations-015",
+      "decision_id": "dec_df3e14b98996",
+      "missing": [],
+      "recommendation_id": "rec_9fba2dabb823",
+      "scenario_id": "refund_operations-015"
+    },
+    {
+      "authorization_id": "authz_aa83addda6e44ba3bb62f3d68f28c7c0",
+      "case_id": "case_e515a3655b0e",
+      "complete": true,
+      "correlation_id": "refund_operations-016",
+      "decision_id": "dec_d5760ea08fd2",
+      "missing": [],
+      "recommendation_id": "rec_31d02007018d",
+      "scenario_id": "refund_operations-016"
+    },
+    {
+      "authorization_id": "authz_1e9549f770f1467eb295f4a0b8eca62f",
+      "case_id": "case_76b0d09bb1e7",
+      "complete": true,
+      "correlation_id": "refund_operations-017",
+      "decision_id": "dec_d99885419a33",
+      "missing": [],
+      "recommendation_id": "rec_f305640a0368",
+      "scenario_id": "refund_operations-017"
+    },
+    {
+      "authorization_id": "authz_6eb06847dc8744b782a1dbdcb4a514fd",
+      "case_id": "case_5ca80993e707",
+      "complete": true,
+      "correlation_id": "refund_operations-018",
+      "decision_id": "dec_8e1b14db6a70",
+      "missing": [],
+      "recommendation_id": "rec_df6b94856a5d",
+      "scenario_id": "refund_operations-018"
+    },
+    {
+      "authorization_id": "authz_a36fc9528f40418abcf6340d902c05f4",
+      "case_id": "case_c4188a74a734",
+      "complete": true,
+      "correlation_id": "refund_operations-019",
+      "decision_id": "dec_634e9964ab8e",
+      "missing": [],
+      "recommendation_id": "rec_fa42c98b324b",
+      "scenario_id": "refund_operations-019"
+    },
+    {
+      "authorization_id": "authz_24c8976e24a6401c90cedbba0760ea09",
+      "case_id": "case_9e2140cc0dc4",
+      "complete": true,
+      "correlation_id": "refund_operations-020",
+      "decision_id": "dec_5f373c398413",
+      "missing": [],
+      "recommendation_id": "rec_e7d4f15b7b80",
+      "scenario_id": "refund_operations-020"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_bc21c57b06fb",
+      "complete": true,
+      "correlation_id": "refund_operations-021",
+      "decision_id": "dec_7ab029756abf",
+      "missing": [],
+      "recommendation_id": "rec_2592c5568234",
+      "scenario_id": "refund_operations-021"
+    },
+    {
+      "authorization_id": "authz_2312e9cf0faa4c51b03fa6c3b43fb86c",
+      "case_id": "case_4f7366b08321",
+      "complete": true,
+      "correlation_id": "refund_operations-022",
+      "decision_id": "dec_1e7510ef2dfa",
+      "missing": [],
+      "recommendation_id": "rec_01a3b7649fc9",
+      "scenario_id": "refund_operations-022"
+    },
+    {
+      "authorization_id": "authz_a9a10c556b5942f7bbe85d1723f4711b",
+      "case_id": "case_b918b1ba15f9",
+      "complete": true,
+      "correlation_id": "refund_operations-023",
+      "decision_id": "dec_eecfc13c709b",
+      "missing": [],
+      "recommendation_id": "rec_8f0d831edd8c",
+      "scenario_id": "refund_operations-023"
+    },
+    {
+      "authorization_id": "authz_93ddf93480b342a88a09305baa7de38b",
+      "case_id": "case_777127b6e04b",
+      "complete": true,
+      "correlation_id": "refund_operations-024",
+      "decision_id": "dec_d806be6bc244",
+      "missing": [],
+      "recommendation_id": "rec_ac91c7e0b38f",
+      "scenario_id": "refund_operations-024"
+    },
+    {
+      "authorization_id": "authz_c1264c22d172462193247c201c2c43c5",
+      "case_id": "case_b6f8268539b9",
+      "complete": true,
+      "correlation_id": "refund_operations-025",
+      "decision_id": "dec_86030d65b0a3",
+      "missing": [],
+      "recommendation_id": "rec_d16b8d218063",
+      "scenario_id": "refund_operations-025"
+    },
+    {
+      "authorization_id": "authz_9fc7c20f2c3f4b84b3f2b50a6dcfbcf5",
+      "case_id": "case_31041ce0c634",
+      "complete": true,
+      "correlation_id": "refund_operations-026",
+      "decision_id": "dec_a8df750d2393",
+      "missing": [],
+      "recommendation_id": "rec_85a4f7e1c431",
+      "scenario_id": "refund_operations-026"
+    },
+    {
+      "authorization_id": "authz_8c1abe8d0bfa44b9923b4b901ff0cb19",
+      "case_id": "case_6d620ac7aac5",
+      "complete": true,
+      "correlation_id": "refund_operations-027",
+      "decision_id": "dec_661e74a5e7dd",
+      "missing": [],
+      "recommendation_id": "rec_c7483556e0a5",
+      "scenario_id": "refund_operations-027"
+    },
+    {
+      "authorization_id": "authz_1c593cf6797d4724953fb71b29e2054c",
+      "case_id": "case_9c1bd9f2fc81",
+      "complete": true,
+      "correlation_id": "refund_operations-028",
+      "decision_id": "dec_7376d001a2de",
+      "missing": [],
+      "recommendation_id": "rec_a58d420d48c3",
+      "scenario_id": "refund_operations-028"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_69fc6f57d9da",
+      "complete": true,
+      "correlation_id": "refund_operations-029",
+      "decision_id": "dec_2ee0f3882648",
+      "missing": [],
+      "recommendation_id": "rec_23fdbb847696",
+      "scenario_id": "refund_operations-029"
+    },
+    {
+      "authorization_id": "",
+      "case_id": "case_0c616d0f1d7c",
+      "complete": true,
+      "correlation_id": "refund_operations-030",
+      "decision_id": "dec_6151d4c94c82",
+      "missing": [],
+      "recommendation_id": "rec_4576f0db5b9a",
+      "scenario_id": "refund_operations-030"
+    }
+  ]
+}

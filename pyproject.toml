@@ -40,6 +40,17 @@ include = [
     "governance_providers*",
     # Phase 5G: ActionGate action-governance provider
     "actiongate_provider*",
+    # Phase 5H: TAP assertion-governance provider
+    "tap_provider*",
+    # Phase 5I: cross-provider enterprise validation pilot
+    "enterprise_validation_pilot*",
+    # Phase 6A: comparative governance benchmark
+    "comparative_governance_benchmark*",
+    # Phase 6B: alternative providers + heterogeneity validation
+    "baseline_assertion_provider*", "baseline_action_provider*",
+    "provider_heterogeneity_validation*",
+    # Phase 6C: platform freeze/release tooling (out-of-band)
+    "platform_freeze*",
 ]
 
 [tool.pytest.ini_options]

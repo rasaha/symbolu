@@ -1,0 +1,122 @@
+{
+  "all_passed": true,
+  "fairness": [
+    {
+      "detail": "all strategies run the same scenarios in the same order",
+      "name": "identical_scenario_ordering",
+      "passed": true
+    },
+    {
+      "detail": "disagreements: []",
+      "name": "identical_execution_behavior_for_same_dispatch",
+      "passed": true
+    },
+    {
+      "detail": "no-governance never evaluates assertions or authorizes",
+      "name": "no_governance_has_no_assertion_or_authorization",
+      "passed": true
+    },
+    {
+      "detail": "action-only never evaluates assertions",
+      "name": "action_only_has_no_assertion_evaluation",
+      "passed": true
+    },
+    {
+      "detail": "assertion-only never authorizes actions",
+      "name": "assertion_only_has_no_authorization",
+      "passed": true
+    }
+  ],
+  "invariants": [
+    {
+      "description": "All strategies receive identical scenario inputs",
+      "detail": "",
+      "id": "B1",
+      "passed": true
+    },
+    {
+      "description": "Expected labels are never passed into a strategy",
+      "detail": "modules reading .expected: []",
+      "id": "B2",
+      "passed": true
+    },
+    {
+      "description": "Dataset hash remains unchanged",
+      "detail": "4d6de4294324",
+      "id": "B3",
+      "passed": true
+    },
+    {
+      "description": "Strategy D reproduces the relevant Phase 5I results",
+      "detail": "",
+      "id": "B4",
+      "passed": true
+    },
+    {
+      "description": "No-governance strategy does not invoke TAP or ActionGate",
+      "detail": "",
+      "id": "B5",
+      "passed": true
+    },
+    {
+      "description": "Action-only strategy does not invoke TAP",
+      "detail": "",
+      "id": "B6",
+      "passed": true
+    },
+    {
+      "description": "Assertion-only strategy does not invoke ActionGate",
+      "detail": "",
+      "id": "B7",
+      "passed": true
+    },
+    {
+      "description": "Full strategy uses both providers through public registry contracts",
+      "detail": "",
+      "id": "B8",
+      "passed": true
+    },
+    {
+      "description": "Frozen components remain byte-identical (benchmark owns no frozen source)",
+      "detail": "vendored: []",
+      "id": "B9",
+      "passed": true
+    },
+    {
+      "description": "Failure profiles are deterministic",
+      "detail": "",
+      "id": "B10",
+      "passed": true
+    },
+    {
+      "description": "Non-applicable failures are not scored as successes",
+      "detail": "",
+      "id": "B11",
+      "passed": true
+    },
+    {
+      "description": "Execution behavior is identical across strategies for the same dispatch",
+      "detail": "",
+      "id": "B12",
+      "passed": true
+    },
+    {
+      "description": "Human review is explicitly attributed to human authority",
+      "detail": "",
+      "id": "B13",
+      "passed": true
+    },
+    {
+      "description": "No strategy receives another strategy's intermediate output",
+      "detail": "strategies are independent; each builds its own composition",
+      "id": "B14",
+      "passed": true
+    },
+    {
+      "description": "Reports are reproducible from machine-readable results",
+      "detail": "",
+      "id": "B15",
+      "passed": true
+    }
+  ]
+}

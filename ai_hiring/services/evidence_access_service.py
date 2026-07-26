@@ -18,8 +18,8 @@ from ..errors import EvidenceAccessDeniedError, TenantMismatchError
 from ..index.interfaces import IndexEntry, SearchQuery
 from ..normalization.lineage import LineageGraph
 from ..normalization.models import Provenance, QuarantineRecord
-from decision_governance.identity import IdentityProvider
-from decision_governance.policy import (
+from decision_governance.api.identity import IdentityProvider
+from decision_governance.api.policy import (
     AccessRequest,
     EvidenceAccessPolicy,
     Permission,

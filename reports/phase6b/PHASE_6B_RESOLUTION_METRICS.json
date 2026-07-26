@@ -1,0 +1,120 @@
+{
+  "governance_metrics": {
+    "C1": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    },
+    "C2": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    },
+    "C3": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    },
+    "C4": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    },
+    "C5": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    },
+    "C6": {
+      "constraint_preservation_rate": 1.0,
+      "fail_safe_rate": 1.0,
+      "governance_shopping_violations": 0,
+      "unsafe_authorization_rate": 0.0,
+      "unsafe_dispatch_rate": 0.0,
+      "unsupported_promotion_rate": 0.0
+    }
+  },
+  "resolution_metrics": {
+    "C1": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    },
+    "C2": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    },
+    "C3": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    },
+    "C4": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    },
+    "C5": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    },
+    "C6": {
+      "capability_match_rate": 1.0,
+      "compatibility_rejection_count": 0,
+      "fallback_rate": 0.0,
+      "health_rejection_count": 0,
+      "no_valid_provider_rate": 0.0,
+      "preferred_provider_selection_rate": 1.0,
+      "resolution_trace_completeness": 1.0,
+      "safe_fallback_success_rate": null,
+      "selection_determinism_rate": 1.0
+    }
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "frontier_by_scenario_class": {
+    "ACTION_PROVIDER_FAILURE": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": true,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C3",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 9,
+      "sufficient_configs": [
+        "C1",
+        "C3"
+      ]
+    },
+    "ASSERTION_PROVIDER_FAILURE": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 3,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "BOTH_PROVIDERS_AVAILABLE": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 3,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": true,
+      "full_pair_required": true,
+      "lowest_workload_sufficient": "C1",
+      "required_action_capabilities": [
+        "expiry",
+        "region_limits",
+        "required_approval",
+        "single_use"
+      ],
+      "required_assertion_capabilities": [
+        "qualifier_detection"
+      ],
+      "scenarios": 30,
+      "sufficient_configs": [
+        "C1"
+      ]
+    },
+    "INDETERMINATE_ASSERTION_HUMAN_REVIEW": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 9,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "ONE_PROVIDER_DEGRADED": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 3,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "SUPPORTED_ASSERTION_ACTION_DENIED": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 9,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "SUPPORTED_ASSERTION_AUTHORIZED_ACTION": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 15,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    },
+    "UNSUPPORTED_ASSERTION_NO_ACTION": {
+      "fallback_acceptable": true,
+      "full_pair_changes_outcome": false,
+      "full_pair_required": false,
+      "lowest_workload_sufficient": "C4",
+      "required_action_capabilities": [],
+      "required_assertion_capabilities": [],
+      "scenarios": 9,
+      "sufficient_configs": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ]
+    }
+  }
+}

@@ -12,7 +12,7 @@ from enum import Enum
 
 
 # ActorType extracted to the DGM kernel in Phase 5B; re-exported here.
-from decision_governance.identity.actor import ActorType  # noqa: F401,E402
+from decision_governance.api.identity import ActorType  # noqa: F401,E402
 
 class WorkflowState(str, Enum):
     """Canonical end-to-end hiring workflow states."""
@@ -86,5 +86,5 @@ class CapabilityLayer(str, Enum):
 
 
 # AuditEventType extracted to the DGM kernel in Phase 5B; re-exported here.
-from decision_governance.audit.events import AuditEventType  # noqa: F401,E402
+from decision_governance.api.audit import AuditEventType  # noqa: F401,E402
 

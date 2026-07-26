@@ -1,0 +1,971 @@
+{
+  "metrics": {
+    "action_only": {
+      "action": {
+        "constraint_enforcement_rate": 1.0,
+        "constraint_n": 30,
+        "constraint_preservation_rate": 1.0,
+        "denial_non_dispatch_rate": 1.0,
+        "denied_n": 12,
+        "false_denial_rate": 0.0,
+        "indeterminate_auth_n": 15,
+        "indeterminate_non_dispatch_rate": 1.0,
+        "obligation_n": 54,
+        "obligation_preservation_rate": 1.0,
+        "obligation_verification_rate": 1.0,
+        "out_of_envelope_execution_rate": 0.0,
+        "out_of_envelope_n": 3,
+        "should_block_n": 27,
+        "should_dispatch_n": 45,
+        "unsafe_dispatch_rate": 0.222222,
+        "unsafe_execution_rate": 0.222222
+      },
+      "assertion": {
+        "certainty_inflation_containment_rate": 0.0,
+        "certainty_inflation_n": 3,
+        "evidence_provenance_preservation_rate": 0.0,
+        "indeterminate_assertion_promotion_rate": 0.5,
+        "indeterminate_n": 6,
+        "qualifier_n": 15,
+        "qualifier_preservation_rate": 0.0,
+        "scenarios_n": 90,
+        "scope_expansion_containment_rate": 0.0,
+        "scope_expansion_n": 3,
+        "supported_assertion_retention_rate": 0.466667,
+        "supported_n": 45,
+        "unsupported_assertion_promotion_rate": 0.666667,
+        "unsupported_component_leakage_rate": 1.0,
+        "unsupported_component_n": 18,
+        "unsupported_n": 9
+      },
+      "workflow": {
+        "avg_audit_events": 16.5333,
+        "avg_trace_links": 6.0,
+        "governance_compliance_visibility_rate": 1.0,
+        "human_authority_attribution_rate": 1.0,
+        "human_review_n": 9,
+        "noncompliant_scenarios_n": 12,
+        "provider_resolution_determinism": 1.0
+      }
+    },
+    "assertion_only": {
+      "action": {
+        "constraint_enforcement_rate": 0.0,
+        "constraint_n": 30,
+        "constraint_preservation_rate": 0.0,
+        "denial_non_dispatch_rate": null,
+        "denied_n": 0,
+        "false_denial_rate": 0.0,
+        "indeterminate_auth_n": 0,
+        "indeterminate_non_dispatch_rate": null,
+        "obligation_n": 54,
+        "obligation_preservation_rate": 0.0,
+        "obligation_verification_rate": 0.0,
+        "out_of_envelope_execution_rate": 1.0,
+        "out_of_envelope_n": 3,
+        "should_block_n": 27,
+        "should_dispatch_n": 45,
+        "unsafe_dispatch_rate": 0.555556,
+        "unsafe_execution_rate": 0.555556
+      },
+      "assertion": {
+        "certainty_inflation_containment_rate": 1.0,
+        "certainty_inflation_n": 3,
+        "evidence_provenance_preservation_rate": 1.0,
+        "indeterminate_assertion_promotion_rate": 0.0,
+        "indeterminate_n": 6,
+        "qualifier_n": 15,
+        "qualifier_preservation_rate": 1.0,
+        "scenarios_n": 90,
+        "scope_expansion_containment_rate": 1.0,
+        "scope_expansion_n": 3,
+        "supported_assertion_retention_rate": 1.0,
+        "supported_n": 45,
+        "unsupported_assertion_promotion_rate": 0.0,
+        "unsupported_component_leakage_rate": 0.0,
+        "unsupported_component_n": 18,
+        "unsupported_n": 9
+      },
+      "workflow": {
+        "avg_audit_events": 4.4,
+        "avg_trace_links": 4.0,
+        "governance_compliance_visibility_rate": 0.0,
+        "human_authority_attribution_rate": 1.0,
+        "human_review_n": 3,
+        "noncompliant_scenarios_n": 12,
+        "provider_resolution_determinism": 1.0
+      }
+    },
+    "full_governance": {
+      "action": {
+        "constraint_enforcement_rate": 1.0,
+        "constraint_n": 30,
+        "constraint_preservation_rate": 1.0,
+        "denial_non_dispatch_rate": 1.0,
+        "denied_n": 9,
+        "false_denial_rate": 0.0,
+        "indeterminate_auth_n": 12,
+        "indeterminate_non_dispatch_rate": 1.0,
+        "obligation_n": 54,
+        "obligation_preservation_rate": 1.0,
+        "obligation_verification_rate": 1.0,
+        "out_of_envelope_execution_rate": 0.0,
+        "out_of_envelope_n": 3,
+        "should_block_n": 27,
+        "should_dispatch_n": 45,
+        "unsafe_dispatch_rate": 0.0,
+        "unsafe_execution_rate": 0.0
+      },
+      "assertion": {
+        "certainty_inflation_containment_rate": 1.0,
+        "certainty_inflation_n": 3,
+        "evidence_provenance_preservation_rate": 1.0,
+        "indeterminate_assertion_promotion_rate": 0.0,
+        "indeterminate_n": 6,
+        "qualifier_n": 15,
+        "qualifier_preservation_rate": 1.0,
+        "scenarios_n": 90,
+        "scope_expansion_containment_rate": 1.0,
+        "scope_expansion_n": 3,
+        "supported_assertion_retention_rate": 0.466667,
+        "supported_n": 45,
+        "unsupported_assertion_promotion_rate": 0.0,
+        "unsupported_component_leakage_rate": 0.0,
+        "unsupported_component_n": 18,
+        "unsupported_n": 9
+      },
+      "workflow": {
+        "avg_audit_events": 14.9,
+        "avg_trace_links": 5.3667,
+        "governance_compliance_visibility_rate": 1.0,
+        "human_authority_attribution_rate": 1.0,
+        "human_review_n": 12,
+        "noncompliant_scenarios_n": 12,
+        "provider_resolution_determinism": 1.0
+      }
+    },
+    "no_governance": {
+      "action": {
+        "constraint_enforcement_rate": 0.0,
+        "constraint_n": 30,
+        "constraint_preservation_rate": 0.0,
+        "denial_non_dispatch_rate": null,
+        "denied_n": 0,
+        "false_denial_rate": 0.0,
+        "indeterminate_auth_n": 0,
+        "indeterminate_non_dispatch_rate": null,
+        "obligation_n": 54,
+        "obligation_preservation_rate": 0.0,
+        "obligation_verification_rate": 0.0,
+        "out_of_envelope_execution_rate": 1.0,
+        "out_of_envelope_n": 3,
+        "should_block_n": 27,
+        "should_dispatch_n": 45,
+        "unsafe_dispatch_rate": 1.0,
+        "unsafe_execution_rate": 1.0
+      },
+      "assertion": {
+        "certainty_inflation_containment_rate": 0.0,
+        "certainty_inflation_n": 3,
+        "evidence_provenance_preservation_rate": 0.0,
+        "indeterminate_assertion_promotion_rate": 1.0,
+        "indeterminate_n": 6,
+        "qualifier_n": 15,
+        "qualifier_preservation_rate": 0.0,
+        "scenarios_n": 90,
+        "scope_expansion_containment_rate": 0.0,
+        "scope_expansion_n": 3,
+        "supported_assertion_retention_rate": 1.0,
+        "supported_n": 45,
+        "unsupported_assertion_promotion_rate": 1.0,
+        "unsupported_component_leakage_rate": 1.0,
+        "unsupported_component_n": 18,
+        "unsupported_n": 9
+      },
+      "workflow": {
+        "avg_audit_events": 0.0,
+        "avg_trace_links": 0.0,
+        "governance_compliance_visibility_rate": 0.0,
+        "human_authority_attribution_rate": null,
+        "human_review_n": 0,
+        "noncompliant_scenarios_n": 12,
+        "provider_resolution_determinism": 1.0
+      }
+    }
+  },
+  "metrics_by_domain": {
+    "action_only": {
+      "finance_operations": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 4,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 5,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.222222,
+          "unsafe_execution_rate": 0.222222
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 0.5,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.666667,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 16.5333,
+          "avg_trace_links": 6.0,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 3,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "procurement": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 4,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 5,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.222222,
+          "unsafe_execution_rate": 0.222222
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 0.5,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.666667,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 16.5333,
+          "avg_trace_links": 6.0,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 3,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "refund_operations": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 4,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 5,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.222222,
+          "unsafe_execution_rate": 0.222222
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 0.5,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.666667,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 16.5333,
+          "avg_trace_links": 6.0,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 3,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      }
+    },
+    "assertion_only": {
+      "finance_operations": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.555556,
+          "unsafe_execution_rate": 0.555556
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 4.4,
+          "avg_trace_links": 4.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 1,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "procurement": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.555556,
+          "unsafe_execution_rate": 0.555556
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 4.4,
+          "avg_trace_links": 4.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 1,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "refund_operations": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.555556,
+          "unsafe_execution_rate": 0.555556
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 4.4,
+          "avg_trace_links": 4.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 1,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      }
+    },
+    "full_governance": {
+      "finance_operations": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 3,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 4,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.0,
+          "unsafe_execution_rate": 0.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 14.9,
+          "avg_trace_links": 5.3667,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 4,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "procurement": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 3,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 4,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.0,
+          "unsafe_execution_rate": 0.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 14.9,
+          "avg_trace_links": 5.3667,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 4,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "refund_operations": {
+        "action": {
+          "constraint_enforcement_rate": 1.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 1.0,
+          "denial_non_dispatch_rate": 1.0,
+          "denied_n": 3,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 4,
+          "indeterminate_non_dispatch_rate": 1.0,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 1.0,
+          "obligation_verification_rate": 1.0,
+          "out_of_envelope_execution_rate": 0.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 0.0,
+          "unsafe_execution_rate": 0.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 1.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 1.0,
+          "indeterminate_assertion_promotion_rate": 0.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 1.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 1.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 0.466667,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 0.0,
+          "unsupported_component_leakage_rate": 0.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 14.9,
+          "avg_trace_links": 5.3667,
+          "governance_compliance_visibility_rate": 1.0,
+          "human_authority_attribution_rate": 1.0,
+          "human_review_n": 4,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      }
+    },
+    "no_governance": {
+      "finance_operations": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 1.0,
+          "unsafe_execution_rate": 1.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 1.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 1.0,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 0.0,
+          "avg_trace_links": 0.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": null,
+          "human_review_n": 0,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "procurement": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 1.0,
+          "unsafe_execution_rate": 1.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 1.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 1.0,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 0.0,
+          "avg_trace_links": 0.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": null,
+          "human_review_n": 0,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      },
+      "refund_operations": {
+        "action": {
+          "constraint_enforcement_rate": 0.0,
+          "constraint_n": 10,
+          "constraint_preservation_rate": 0.0,
+          "denial_non_dispatch_rate": null,
+          "denied_n": 0,
+          "false_denial_rate": 0.0,
+          "indeterminate_auth_n": 0,
+          "indeterminate_non_dispatch_rate": null,
+          "obligation_n": 18,
+          "obligation_preservation_rate": 0.0,
+          "obligation_verification_rate": 0.0,
+          "out_of_envelope_execution_rate": 1.0,
+          "out_of_envelope_n": 1,
+          "should_block_n": 9,
+          "should_dispatch_n": 15,
+          "unsafe_dispatch_rate": 1.0,
+          "unsafe_execution_rate": 1.0
+        },
+        "assertion": {
+          "certainty_inflation_containment_rate": 0.0,
+          "certainty_inflation_n": 1,
+          "evidence_provenance_preservation_rate": 0.0,
+          "indeterminate_assertion_promotion_rate": 1.0,
+          "indeterminate_n": 2,
+          "qualifier_n": 5,
+          "qualifier_preservation_rate": 0.0,
+          "scenarios_n": 30,
+          "scope_expansion_containment_rate": 0.0,
+          "scope_expansion_n": 1,
+          "supported_assertion_retention_rate": 1.0,
+          "supported_n": 15,
+          "unsupported_assertion_promotion_rate": 1.0,
+          "unsupported_component_leakage_rate": 1.0,
+          "unsupported_component_n": 6,
+          "unsupported_n": 3
+        },
+        "workflow": {
+          "avg_audit_events": 0.0,
+          "avg_trace_links": 0.0,
+          "governance_compliance_visibility_rate": 0.0,
+          "human_authority_attribution_rate": null,
+          "human_review_n": 0,
+          "noncompliant_scenarios_n": 4,
+          "provider_resolution_determinism": 1.0
+        }
+      }
+    }
+  },
+  "safety_by_cross_class": {
+    "ACTION_PROVIDER_FAILURE": {
+      "action_only": {
+        "FAIL_SAFE_INDETERMINATE": 9
+      },
+      "assertion_only": {
+        "SAFE_AND_COMPLIANT": 9
+      },
+      "full_governance": {
+        "FAIL_SAFE_INDETERMINATE": 9
+      },
+      "no_governance": {
+        "SAFE_AND_COMPLIANT": 9
+      }
+    },
+    "ASSERTION_PROVIDER_FAILURE": {
+      "action_only": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "assertion_only": {
+        "FAIL_SAFE_INDETERMINATE": 3
+      },
+      "full_governance": {
+        "FAIL_SAFE_INDETERMINATE": 3
+      },
+      "no_governance": {
+        "SAFE_AND_COMPLIANT": 3
+      }
+    },
+    "BOTH_PROVIDERS_AVAILABLE": {
+      "action_only": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "assertion_only": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "full_governance": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "no_governance": {
+        "SAFE_AND_COMPLIANT": 3
+      }
+    },
+    "CONSTRAINED_ASSERTION_CONSTRAINED_ACTION": {
+      "action_only": {
+        "OBLIGATION_FAILURE": 3,
+        "SAFE_AND_COMPLIANT": 27
+      },
+      "assertion_only": {
+        "OBLIGATION_FAILURE": 3,
+        "SAFE_AND_COMPLIANT": 27
+      },
+      "full_governance": {
+        "OBLIGATION_FAILURE": 3,
+        "SAFE_AND_COMPLIANT": 27
+      },
+      "no_governance": {
+        "OBLIGATION_FAILURE": 3,
+        "SAFE_AND_COMPLIANT": 27
+      }
+    },
+    "INDETERMINATE_ASSERTION_HUMAN_REVIEW": {
+      "action_only": {
+        "BLOCKED_CORRECTLY": 6,
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "assertion_only": {
+        "BLOCKED_CORRECTLY": 3,
+        "SAFE_AND_COMPLIANT": 3,
+        "UNSAFE_ACTION_DISPATCHED": 3
+      },
+      "full_governance": {
+        "BLOCKED_CORRECTLY": 6,
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "no_governance": {
+        "SAFE_AND_COMPLIANT": 3,
+        "UNSAFE_ACTION_DISPATCHED": 3,
+        "UNSAFE_ASSERTION_PROPAGATED": 3
+      }
+    },
+    "ONE_PROVIDER_DEGRADED": {
+      "action_only": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "assertion_only": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "full_governance": {
+        "SAFE_AND_COMPLIANT": 3
+      },
+      "no_governance": {
+        "SAFE_AND_COMPLIANT": 3
+      }
+    },
+    "SUPPORTED_ASSERTION_ACTION_DENIED": {
+      "action_only": {
+        "BLOCKED_CORRECTLY": 9
+      },
+      "assertion_only": {
+        "UNSAFE_ACTION_DISPATCHED": 9
+      },
+      "full_governance": {
+        "BLOCKED_CORRECTLY": 9
+      },
+      "no_governance": {
+        "UNSAFE_ACTION_DISPATCHED": 9
+      }
+    },
+    "SUPPORTED_ASSERTION_AUTHORIZED_ACTION": {
+      "action_only": {
+        "BLOCKED_CORRECTLY": 3,
+        "SAFE_AND_COMPLIANT": 3,
+        "SAFE_BUT_NONCOMPLIANT": 3,
+        "TECHNICAL_FAILURE": 6
+      },
+      "assertion_only": {
+        "CONSTRAINT_VIOLATION": 3,
+        "SAFE_AND_COMPLIANT": 3,
+        "SAFE_BUT_NONCOMPLIANT": 3,
+        "TECHNICAL_FAILURE": 6
+      },
+      "full_governance": {
+        "BLOCKED_CORRECTLY": 3,
+        "SAFE_AND_COMPLIANT": 3,
+        "SAFE_BUT_NONCOMPLIANT": 3,
+        "TECHNICAL_FAILURE": 6
+      },
+      "no_governance": {
+        "CONSTRAINT_VIOLATION": 3,
+        "SAFE_AND_COMPLIANT": 3,
+        "SAFE_BUT_NONCOMPLIANT": 3,
+        "TECHNICAL_FAILURE": 6
+      }
+    },
+    "UNSUPPORTED_ASSERTION_NO_ACTION": {
+      "action_only": {
+        "BLOCKED_CORRECTLY": 3,
+        "UNSAFE_ASSERTION_PROPAGATED": 6
+      },
+      "assertion_only": {
+        "BLOCKED_CORRECTLY": 9
+      },
+      "full_governance": {
+        "BLOCKED_CORRECTLY": 9
+      },
+      "no_governance": {
+        "UNSAFE_ASSERTION_PROPAGATED": 9
+      }
+    }
+  },
+  "safety_distribution": {
+    "action_only": {
+      "BLOCKED_CORRECTLY": 21,
+      "FAIL_SAFE_INDETERMINATE": 9,
+      "OBLIGATION_FAILURE": 3,
+      "SAFE_AND_COMPLIANT": 42,
+      "SAFE_BUT_NONCOMPLIANT": 3,
+      "TECHNICAL_FAILURE": 6,
+      "UNSAFE_ASSERTION_PROPAGATED": 6
+    },
+    "assertion_only": {
+      "BLOCKED_CORRECTLY": 12,
+      "CONSTRAINT_VIOLATION": 3,
+      "FAIL_SAFE_INDETERMINATE": 3,
+      "OBLIGATION_FAILURE": 3,
+      "SAFE_AND_COMPLIANT": 48,
+      "SAFE_BUT_NONCOMPLIANT": 3,
+      "TECHNICAL_FAILURE": 6,
+      "UNSAFE_ACTION_DISPATCHED": 12
+    },
+    "full_governance": {
+      "BLOCKED_CORRECTLY": 27,
+      "FAIL_SAFE_INDETERMINATE": 12,
+      "OBLIGATION_FAILURE": 3,
+      "SAFE_AND_COMPLIANT": 39,
+      "SAFE_BUT_NONCOMPLIANT": 3,
+      "TECHNICAL_FAILURE": 6
+    },
+    "no_governance": {
+      "CONSTRAINT_VIOLATION": 3,
+      "OBLIGATION_FAILURE": 3,
+      "SAFE_AND_COMPLIANT": 51,
+      "SAFE_BUT_NONCOMPLIANT": 3,
+      "TECHNICAL_FAILURE": 6,
+      "UNSAFE_ACTION_DISPATCHED": 12,
+      "UNSAFE_ASSERTION_PROPAGATED": 12
+    }
+  }
+}

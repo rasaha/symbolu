@@ -22,7 +22,7 @@ from ..assessments.assessment import Assessment
 from ..assessments.status import BindingProvenance, SupplierType
 from ..assessments.workspace import AssessmentWorkspace
 from ..ontology.taxonomy import EvidenceType, ReasonCode
-from decision_governance.identity import IdentityProvider
+from decision_governance.api.identity import IdentityProvider
 from ..rubrics.conflicts import ConflictSeverity, ConflictSource
 from ..rubrics.evidence_rules import MissingEvidenceStatus
 from ..rubrics.scoring_scale import ScaleType

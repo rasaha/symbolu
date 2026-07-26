@@ -1,0 +1,58 @@
+{
+  "configuration_comparison": {
+    "C1": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "TAP + ActionGate (fixed)",
+      "dispatched": 51,
+      "false_blocks": 0,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    },
+    "C2": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "TAP + Baseline Action (fixed)",
+      "dispatched": 45,
+      "false_blocks": 15,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    },
+    "C3": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "Baseline Assertion + ActionGate (fixed)",
+      "dispatched": 21,
+      "false_blocks": 30,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    },
+    "C4": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "Baseline Assertion + Baseline Action (fixed)",
+      "dispatched": 30,
+      "false_blocks": 30,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    },
+    "C5": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "Preferred TAP/ActionGate with bounded fallback",
+      "dispatched": 51,
+      "false_blocks": 0,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    },
+    "C6": {
+      "action_fallbacks": 0,
+      "assertion_fallbacks": 0,
+      "description": "Capability-driven selection",
+      "dispatched": 60,
+      "false_blocks": 0,
+      "no_valid_provider": 0,
+      "unsafe_outcomes": 0
+    }
+  }
+}

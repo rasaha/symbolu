@@ -1,0 +1,37 @@
+# Independent PRIVATE distribution for the DGM comparative governance benchmark.
+#
+# ./comparative_governance_benchmark is a SYMLINK to the canonical
+# ../../comparative_governance_benchmark package. It DEPENDS ON all five frozen
+# distributions and owns no kernel/framework/provider/pilot source.
+#
+# Build with:  python -m build packaging/dgm-comparative-governance-benchmark
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-comparative-governance-benchmark"
+dynamic = ["version"]
+description = "Comparative governance benchmark for the Decision Governance Middleware."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0",
+    "dgm-actiongate-provider==0.1.0",
+    "dgm-tap-provider==0.1.0",
+    "dgm-enterprise-validation-pilot==0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "comparative_governance_benchmark.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["comparative_governance_benchmark*"]
+exclude = ["comparative_governance_benchmark.tests", "comparative_governance_benchmark.tests.*"]

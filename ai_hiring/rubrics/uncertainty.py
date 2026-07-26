@@ -7,7 +7,7 @@ here so the historical ``ai_hiring.rubrics.uncertainty`` import path is unchange
 
 from __future__ import annotations
 
-from decision_governance.vocabulary import (  # noqa: F401
+from decision_governance.api.vocabulary import (  # noqa: F401
     UncertaintyLevel,
     UncertaintyRule,
 )

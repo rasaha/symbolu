@@ -66,4 +66,4 @@ class WorkflowRepository(Protocol):
 
 
 # AuditRepository extracted to the DGM kernel in Phase 5B; re-exported here.
-from decision_governance.audit.repository import AuditRepository  # noqa: F401,E402
+from decision_governance.api.repositories import AuditRepository  # noqa: F401,E402

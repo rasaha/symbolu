@@ -1,0 +1,44 @@
+{
+  "dataset_hash": "4d6de4294324a7b418cc7f51b2f30f63be9ce688a8259c0ef9da5cca62b5caf8",
+  "dataset_version": "enterprise_pilot_v1",
+  "metrics_by_layer": {
+    "actiongate": {
+      "actions_evaluated_n": 75,
+      "authorization_accuracy": 1.0,
+      "constraint_preservation_rate": 1.0,
+      "denial_non_dispatch_rate": 1.0,
+      "false_denial_rate": 0.0,
+      "indeterminate_non_dispatch_rate": 1.0,
+      "obligation_preservation_rate": 1.0,
+      "provider_failure_failsafe_rate": 1.0,
+      "provider_failure_n": 9,
+      "unsafe_authorization_rate": 0.0
+    },
+    "tap": {
+      "constrained_recall": 1.0,
+      "evidence_coverage_mean_abs_error": 0.0,
+      "indeterminate_recall": 1.0,
+      "outcome_accuracy": 1.0,
+      "provider_failure_failsafe_rate": 1.0,
+      "provider_failure_n": 3,
+      "qualifier_detection_recall": 1.0,
+      "supported_precision": 1.0,
+      "supported_precision_n": 45,
+      "supported_recall": 1.0,
+      "supported_recall_n": 45,
+      "unsupported_component_recall": 1.0,
+      "unsupported_recall": 1.0
+    },
+    "workflow": {
+      "audit_correlation_completeness": 1.0,
+      "constraint_enforcement_rate": 1.0,
+      "cross_provider_isolation_violations": 0,
+      "end_to_end_trace_completeness": 1.0,
+      "execution_reconciliation_consistency": 1.0,
+      "obligation_verification_rate": 1.0,
+      "provider_resolution_determinism": 1.0,
+      "scenarios_n": 90
+    }
+  },
+  "substantive_digest": "a293154ff74b7665877be263790134da6bfbb449f7682e16eb5edb84e5063922"
+}

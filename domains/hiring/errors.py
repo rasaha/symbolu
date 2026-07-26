@@ -19,7 +19,7 @@ from __future__ import annotations
 
 # Domain-neutral base, owned by the kernel. ``HiringError`` is an alias of the
 # kernel base, so hiring errors and neutral kernel errors share one root.
-from decision_governance.errors import DomainValidationError, GovernanceError
+from decision_governance.api.errors import DomainValidationError, GovernanceError
 
 from ai_hiring.errors import HiringError
 

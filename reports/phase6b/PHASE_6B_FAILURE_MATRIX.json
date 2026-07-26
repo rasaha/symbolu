@@ -1,0 +1,1054 @@
+{
+  "failure_matrix": {
+    "ACTIONGATE_DEGRADED": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 12,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 9,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_INCOMPATIBLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 12,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 9,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 12,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_MALFORMED_RESULT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_TIMEOUT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "ACTIONGATE_UNAVAILABLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 12,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 9,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 12,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ACTION_INCOMPATIBLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 12,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 9,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ACTION_MALFORMED_RESULT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ACTION_TIMEOUT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ACTION_UNAVAILABLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 12,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 9,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ASSERTION_INCOMPATIBLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ASSERTION_MALFORMED_RESULT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ASSERTION_TIMEOUT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "BASELINE_ASSERTION_UNAVAILABLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "NO_CAPABILITY_MATCH": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "NO_COMPATIBLE_PROVIDER": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "REGISTRY_DUPLICATE_ID": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "TAP_DEGRADED": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "TAP_INCOMPATIBLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 15,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "TAP_MALFORMED_RESULT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "TAP_TIMEOUT": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    },
+    "TAP_UNAVAILABLE": {
+      "C1": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C2": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 15,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C3": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C4": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C5": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 15,
+        "no_valid_provider": 0,
+        "scenarios": 15,
+        "unsafe": 0
+      },
+      "C6": {
+        "applicable": true,
+        "fail_safe": 15,
+        "fallbacks": 0,
+        "no_valid_provider": 3,
+        "scenarios": 15,
+        "unsafe": 0
+      }
+    }
+  }
+}

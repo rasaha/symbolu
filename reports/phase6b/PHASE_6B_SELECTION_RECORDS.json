@@ -1,0 +1,308 @@
+{
+  "selection_records": [
+    {
+      "candidate_compatibility": {
+        "tap-primary": true
+      },
+      "candidate_health": {
+        "tap-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "tap-primary"
+      ],
+      "candidate_versions": {
+        "tap-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C1:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "32a467acd6ffb2ee96ac7291c095f05915f740ebe77da28dd094d1b0b9fe7fdd",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "tap-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "actiongate-primary": true
+      },
+      "candidate_health": {
+        "actiongate-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "actiongate-primary"
+      ],
+      "candidate_versions": {
+        "actiongate-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C1:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "60be50bbc10ef6a06aaa1792d4f984ca27c03af4201cfae48b5fe4fad01004e5",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "actiongate-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "tap-primary": true
+      },
+      "candidate_health": {
+        "tap-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "tap-primary"
+      ],
+      "candidate_versions": {
+        "tap-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C2:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "32a467acd6ffb2ee96ac7291c095f05915f740ebe77da28dd094d1b0b9fe7fdd",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "tap-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-action": true
+      },
+      "candidate_health": {
+        "baseline-action": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-action"
+      ],
+      "candidate_versions": {
+        "baseline-action": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C2:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "0e48274b965e55d0df28abe8ddde58d998f88274301b4b9b14d47001ee968cc7",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "baseline-action",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-assertion": true
+      },
+      "candidate_health": {
+        "baseline-assertion": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-assertion"
+      ],
+      "candidate_versions": {
+        "baseline-assertion": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C3:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "0ee37681708101f8e480b03f5f9f3ba386a977c835cd3f3acfcf2f7c14c79daf",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "baseline-assertion",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "actiongate-primary": true
+      },
+      "candidate_health": {
+        "actiongate-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "actiongate-primary"
+      ],
+      "candidate_versions": {
+        "actiongate-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C3:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "60be50bbc10ef6a06aaa1792d4f984ca27c03af4201cfae48b5fe4fad01004e5",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "actiongate-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-assertion": true
+      },
+      "candidate_health": {
+        "baseline-assertion": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-assertion"
+      ],
+      "candidate_versions": {
+        "baseline-assertion": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C4:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "0ee37681708101f8e480b03f5f9f3ba386a977c835cd3f3acfcf2f7c14c79daf",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "baseline-assertion",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-action": true
+      },
+      "candidate_health": {
+        "baseline-action": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-action"
+      ],
+      "candidate_versions": {
+        "baseline-action": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C4:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "0e48274b965e55d0df28abe8ddde58d998f88274301b4b9b14d47001ee968cc7",
+      "resolution_policy": "FIXED",
+      "selected_provider_id": "baseline-action",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-assertion": true,
+        "tap-primary": true
+      },
+      "candidate_health": {
+        "baseline-assertion": "AVAILABLE",
+        "tap-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "tap-primary",
+        "baseline-assertion"
+      ],
+      "candidate_versions": {
+        "baseline-assertion": "0.1.0",
+        "tap-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C5:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "c5679863d8a7c8f6dc50e3469ea8ec04a346c4205062e88ab231c74a4a913bc8",
+      "resolution_policy": "BOUNDED_FALLBACK",
+      "selected_provider_id": "tap-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "actiongate-primary": true,
+        "baseline-action": true
+      },
+      "candidate_health": {
+        "actiongate-primary": "AVAILABLE",
+        "baseline-action": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "actiongate-primary",
+        "baseline-action"
+      ],
+      "candidate_versions": {
+        "actiongate-primary": "0.1.0",
+        "baseline-action": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C5:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "e9ff171cf0abe46253729be6b0e1924d646c23063cfab81cd8870fa0b59beaa4",
+      "resolution_policy": "BOUNDED_FALLBACK",
+      "selected_provider_id": "actiongate-primary",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "baseline-assertion": true,
+        "tap-primary": true
+      },
+      "candidate_health": {
+        "baseline-assertion": "AVAILABLE",
+        "tap-primary": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-assertion",
+        "tap-primary"
+      ],
+      "candidate_versions": {
+        "baseline-assertion": "0.1.0",
+        "tap-primary": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ASSERTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C6:assert",
+      "required_capabilities": [],
+      "resolution_fingerprint": "e3afbd9deca51023b7bd49ce928d038c63620d9b3fb4ed76b3e9a4ce50badc00",
+      "resolution_policy": "CAPABILITY_REQUIRED",
+      "selected_provider_id": "baseline-assertion",
+      "selected_provider_version": "0.1.0"
+    },
+    {
+      "candidate_compatibility": {
+        "actiongate-primary": true,
+        "baseline-action": true
+      },
+      "candidate_health": {
+        "actiongate-primary": "AVAILABLE",
+        "baseline-action": "AVAILABLE"
+      },
+      "candidate_provider_ids": [
+        "baseline-action",
+        "actiongate-primary"
+      ],
+      "candidate_versions": {
+        "actiongate-primary": "0.1.0",
+        "baseline-action": "0.1.0"
+      },
+      "fallback_reason": "",
+      "fallback_used": false,
+      "provider_kind": "ACTION_GOVERNANCE",
+      "rejection_reasons": {},
+      "request_id": "finance_operations-001:C6:action",
+      "required_capabilities": [],
+      "resolution_fingerprint": "8856abc1ab9392f1988cb58d87322fdfe2e5434c722c94ed8562c6c1f3244aeb",
+      "resolution_policy": "CAPABILITY_REQUIRED",
+      "selected_provider_id": "baseline-action",
+      "selected_provider_version": "0.1.0"
+    }
+  ]
+}

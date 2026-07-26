@@ -29,7 +29,7 @@ from ..errors import (
 )
 
 
-from decision_governance.identity import (  # noqa: F401
+from decision_governance.api.identity import (  # noqa: F401
     ActorIdentity,
     IdentityProvider,
     StaticIdentityProvider,

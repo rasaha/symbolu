@@ -41,7 +41,7 @@ def is_known_evidence_type(value: str) -> bool:
 # ``ReasonCode`` and its catalog are domain-neutral governance vocabulary; they
 # now live in ``decision_governance.vocabulary`` and are re-exported here so the
 # historical ``ai_hiring.ontology.taxonomy`` import path is unchanged.
-from decision_governance.vocabulary import (  # noqa: E402,F401
+from decision_governance.api.vocabulary import (  # noqa: E402,F401
     REASON_CODE_CATALOG,
     ReasonCode,
     ReasonCodeSpec,

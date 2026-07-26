@@ -1,0 +1,39 @@
+# Independent PRIVATE distribution for the DGM enterprise validation pilot.
+#
+# ./enterprise_validation_pilot is a SYMLINK to the canonical
+# ../../enterprise_validation_pilot package. It DEPENDS ON all four frozen
+# distributions and owns no kernel/framework/provider source.
+#
+# Build with:  python -m build packaging/dgm-enterprise-validation-pilot
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgm-enterprise-validation-pilot"
+dynamic = ["version"]
+description = "Cross-provider enterprise validation pilot for the Decision Governance Middleware."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+dependencies = [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0",
+    "dgm-actiongate-provider==0.1.0",
+    "dgm-tap-provider==0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "enterprise_validation_pilot.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["enterprise_validation_pilot*"]
+exclude = ["enterprise_validation_pilot.tests", "enterprise_validation_pilot.tests.*"]
+
+[tool.setuptools.package-data]
+"enterprise_validation_pilot.datasets" = ["*.json"]

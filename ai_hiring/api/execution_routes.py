@@ -12,7 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from decision_governance.execution import (
+from decision_governance.api.contracts import (
     BusinessOutcome,
     CompensationApprovalStatus,
     CompensationRequirement,
@@ -26,8 +26,8 @@ from decision_governance.execution import (
     ReconciliationResult,
     RetryClassification,
 )
-from decision_governance.identity import IdentityProvider
-from decision_governance.services import (
+from decision_governance.api.identity import IdentityProvider
+from decision_governance.api.services import (
     CompensationService,
     ExecutionService,
     ReconciliationService,

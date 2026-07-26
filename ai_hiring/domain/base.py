@@ -7,4 +7,4 @@ identical class object, so every model across the codebase shares one base.
 
 from __future__ import annotations
 
-from decision_governance.base import DomainModel  # noqa: F401
+from decision_governance.api.contracts import DomainModel  # noqa: F401

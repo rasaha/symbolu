@@ -201,4 +201,4 @@ class InMemoryWorkflowRepository:
 
 
 # InMemoryAuditRepository extracted to the DGM kernel in Phase 5B; re-exported.
-from decision_governance.audit.repository import InMemoryAuditRepository  # noqa: F401,E402
+from decision_governance.api.repositories import InMemoryAuditRepository  # noqa: F401,E402

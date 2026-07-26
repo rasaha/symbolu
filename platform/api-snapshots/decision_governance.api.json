@@ -1,0 +1,49 @@
+{
+  "module": "decision_governance.api",
+  "symbols": {
+    "__version__": {
+      "kind": "constant",
+      "value": "1.0.0"
+    },
+    "audit": {
+      "kind": "object",
+      "type": "module"
+    },
+    "common": {
+      "kind": "object",
+      "type": "module"
+    },
+    "contracts": {
+      "kind": "object",
+      "type": "module"
+    },
+    "errors": {
+      "kind": "object",
+      "type": "module"
+    },
+    "identity": {
+      "kind": "object",
+      "type": "module"
+    },
+    "policy": {
+      "kind": "object",
+      "type": "module"
+    },
+    "ports": {
+      "kind": "object",
+      "type": "module"
+    },
+    "repositories": {
+      "kind": "object",
+      "type": "module"
+    },
+    "services": {
+      "kind": "object",
+      "type": "module"
+    },
+    "vocabulary": {
+      "kind": "object",
+      "type": "module"
+    }
+  }
+}

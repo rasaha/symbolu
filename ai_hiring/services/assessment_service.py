@@ -45,8 +45,8 @@ from ..errors import (
 )
 from ..ontology.capability import CapabilityStatus
 from ..ontology.taxonomy import EvidenceType, ReasonCode
-from decision_governance.policy import AccessRequest, EvidenceAccessPolicy, Permission
-from decision_governance.identity import IdentityProvider
+from decision_governance.api.policy import AccessRequest, EvidenceAccessPolicy, Permission
+from decision_governance.api.identity import IdentityProvider
 from ..repositories.assessment_repository import AssessmentRepository
 from ..repositories.assessment_workspace_repository import AssessmentWorkspaceRepository
 from ..repositories.ontology_repository import OntologyRepository
