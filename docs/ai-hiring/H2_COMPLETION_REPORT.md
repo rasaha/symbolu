@@ -1,12 +1,15 @@
 # H2 — AI Recommendation & Evidence Synthesis — Completion Report
 
 Application-local, additive completion on top of the H1 baseline (`2dc80d4`). AI
-Hiring can now produce a **governed, evidence-grounded recommendation package for
-human review** — but cannot make or execute the hiring decision. **No frozen
-platform file was modified; no frozen API changed; no ActionGate/execution behavior
-added.** All new code is under `ai_hiring/` and imports the platform only through
-`decision_governance.api` and `governance_providers.api`; TAP is reached solely
-through the Assertion Governance Provider contract (never TAP internals).
+Hiring can now produce an **evidence-grounded recommendation package whose material
+claims are evaluated through the Assertion Governance Provider before human review**.
+Human decisions, governance-case progression, action authorization, execution, and
+reconciliation remain **H3/H4** work — a recommendation cannot make or execute the
+hiring decision. **No frozen platform file was modified; no frozen API changed; no
+ActionGate/execution behavior added.** All new code is under `ai_hiring/` and imports
+the platform only through `decision_governance.api` and `governance_providers.api`;
+TAP is reached solely through the Assertion Governance Provider contract (never TAP
+internals).
 
 ## Status
 
