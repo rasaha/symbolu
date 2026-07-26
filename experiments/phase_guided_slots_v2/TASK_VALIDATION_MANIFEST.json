@@ -33,12 +33,26 @@
     "train_eval.py": "answer CE + per-fact-anchor write BCE (balanced) + metrics",
     "task_validator.py": "PCfg + train_arm + Stage A validity gate",
     "run_task_validation.py": "Stage A driver (A, C only) across pressure configs + seeds",
-    "run_phase_comparison.py": "Stage B driver (D vs C) — gated on Stage A PASS",
+    "run_phase_comparison.py": "Stage B driver (D vs C) \u2014 gated on Stage A PASS",
     "shortcut_checks.py": "bounded-memory dependence controls",
-    "configs/pressure_configs.json": "candidate pressure configs"
+    "configs/pressure_configs.json": "candidate pressure configs",
+    "oracle_slots.py": "oracle-addressed bounded memory (learned value/retention/decode)",
+    "guided_models_oracle.py": "arms A/C/D/D-no-guid over oracle memory; Phase only as retention signal; compressed write",
+    "oracle_eval.py": "oracle training/curriculum/eval; accuracy split by target survival",
+    "run_oracle_stageA.py": "oracle Stage A validity driver",
+    "run_oracle_stageB.py": "oracle Stage B \u2014 Phase as retention (gated on Stage A PASS)"
   },
   "reproduce": [
-    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_task_validation",
-    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_phase_comparison  # only runs if Stage A passed"
-  ]
+    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_oracle_stageA",
+    "PYTHONPATH=. python3 -m experiments.phase_guided_slots_v2.run_oracle_stageB"
+  ],
+  "approach": {
+    "negative_result": "Neural identity-key addressing (key-diversity + curriculum) collapses or shortcuts and cannot isolate capacity \u2014 documented in the report \u00a72a.",
+    "adopted": "ORACLE composite-identity addressing (oracle_slots.OracleSlots): allocation + query lookup are structurally correct by entity id; value encoding, retention, eviction, and decode stay learned.",
+    "memory_dependence_proof": "acc|evicted ~= chance (structural: evicted identity -> empty read)."
+  },
+  "result": {
+    "stageA": "PASS on redesign criteria (survives->high, evicted->chance ~0.02-0.04, overall acc~=survival) across 3 seeds; C acc 0.50/0.31/0.24 at 1.5x/2x/3x.",
+    "stageB": "Phase-as-retention gives NO benefit: D-C survival = -0.025; relevance probe Phase +0.06 F1 over local (near chance). Corroborates v1 dilution finding under a valid capacity test."
+  }
 }
