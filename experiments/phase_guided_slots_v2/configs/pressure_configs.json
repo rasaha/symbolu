@@ -1,0 +1,12 @@
+{
+  "note": "Pressure = distinct live contracts (n_live) / M. Repeated versions of one contract are supersession, not extra pressure.",
+  "candidate_configs": [
+    {"name": "2x", "M": 8, "top_k": 2, "n_live": 16},
+    {"name": "4x", "M": 8, "top_k": 2, "n_live": 32},
+    {"name": "8x", "M": 8, "top_k": 2, "n_live": 64},
+    {"name": "4x_M4", "M": 4, "top_k": 2, "n_live": 16}
+  ],
+  "match_threshold": 0.7,
+  "top_k_rule": "top_k < occupied slots so retrieval cannot read the whole active set",
+  "write_supervision": "gate=1 at each fact anchor (terminal <sep>), gate=0 at other body tokens (balanced BCE) so writes concentrate at fact boundaries instead of flooding every token"
+}
