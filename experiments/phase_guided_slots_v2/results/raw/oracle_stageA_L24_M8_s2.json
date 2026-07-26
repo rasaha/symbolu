@@ -1,0 +1,36 @@
+{
+  "A_acc": 0.03333333333333333,
+  "C_eval": {
+    "answer_acc": 0.16,
+    "n": 200,
+    "mean_occupancy": 8.0,
+    "evictions": 16.0,
+    "target_survival_rate": 0.39,
+    "acc_given_survived": 0.3974358974358974,
+    "acc_given_evicted": 0.00819672131147541,
+    "acc_by_target_position": {
+      "early": 0.14035087719298245,
+      "middle": 0.18181818181818182,
+      "late": 0.19047619047619047
+    },
+    "survival_by_target_position": {
+      "early": 0.2719298245614035,
+      "middle": 0.5,
+      "late": 0.5952380952380952
+    },
+    "_M": 8
+  },
+  "gate": {
+    "conditions": {
+      "capacity_saturation (occ>=M)": true,
+      "evictions>1": true,
+      "early_target_eviction>0.20": true,
+      "target_survival_in_0.30_0.80": true,
+      "C_acc_in_0.30_0.70": false,
+      "acc|evicted~chance (<0.10)": true,
+      "acc|survived_high (>0.60)": false,
+      "acc_tracks_survival (|acc-surv|<0.20)": false
+    },
+    "PASS": false
+  }
+}

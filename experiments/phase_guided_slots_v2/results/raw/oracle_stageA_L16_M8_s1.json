@@ -1,22 +1,22 @@
 {
-  "A_acc": 0.03333333333333333,
+  "A_acc": 0.02666666666666667,
   "C_eval": {
-    "answer_acc": 0.6,
+    "answer_acc": 0.37,
     "n": 200,
     "mean_occupancy": 8.0,
-    "evictions": 4.0,
-    "target_survival_rate": 0.58,
-    "acc_given_survived": 1.0,
-    "acc_given_evicted": 0.047619047619047616,
+    "evictions": 8.0,
+    "target_survival_rate": 0.375,
+    "acc_given_survived": 0.9866666666666667,
+    "acc_given_evicted": 0.0,
     "acc_by_target_position": {
-      "early": 0.5283018867924528,
-      "middle": 0.4444444444444444,
-      "late": 1.0
+      "early": 0.14444444444444443,
+      "middle": 0.42,
+      "late": 0.6666666666666666
     },
     "survival_by_target_position": {
-      "early": 0.49056603773584906,
-      "middle": 0.4444444444444444,
-      "late": 1.0
+      "early": 0.14444444444444443,
+      "middle": 0.42,
+      "late": 0.6833333333333333
     },
     "_M": 8
   },
