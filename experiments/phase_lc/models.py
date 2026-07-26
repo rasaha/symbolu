@@ -24,9 +24,39 @@ PL : Local+Phase -- the P mixer PLUS a sliding-window softmax path (disclosed hy
      the strongest honest "Phase" arm per the investigation's arm definitions).
 """
 import math
+import os
+import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+# Use the repository's ACTUAL Phase implementation, not a reimplementation.
+_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if _REPO not in sys.path:
+    sys.path.insert(0, _REPO)
+from symbolu.phase_transformer import PhaseAttentionLayer as RealPhaseAttentionLayer  # noqa: E402
+
+
+class RealPhase(nn.Module):
+    """Thin wrapper around the repo's canonical PhaseAttentionLayer.
+
+    Faithful: includes the amplitude-normalisation denominator (Re(q·Σkv)/Σa_k), bounded
+    phase, and per-head learned decay exactly as shipped in symbolu/phase_transformer.py.
+    Structural ablation via `.enabled = False` (protected additive fusion, so zeroing the
+    phase term is the clean 'phase-off' ablation)."""
+    def __init__(self, d, h):
+        super().__init__()
+        self.phase = RealPhaseAttentionLayer(embed_dim=d, num_heads=h,
+                                             bounded_phase=True, learned_decay=True)
+        self.enabled = True
+
+    def forward(self, x):
+        if not self.enabled:
+            return torch.zeros_like(x)
+        out = self.phase(x)
+        if isinstance(out, dict):
+            out = out.get('output', out.get('attn_output', out.get('memory_state')))
+        return out
 
 
 class SoftmaxAttn(nn.Module):
@@ -167,6 +197,102 @@ class PhaseLocal(nn.Module):
         return self.phase(x) + self.local(x)
 
 
+class BindingSlots(nn.Module):
+    """Bounded, causal, content-addressed key-value slot memory. O(N*M*d) — NO N x N.
+
+    M fixed slots with learnable address keys. Each token is content-routed to slots via
+    softmax over the M keys, gated by a novelty gate, and its value is accumulated into the
+    causal running slot state (parallel prefix-sum for training; the DEPLOYED state is M*d,
+    the [N,M,d] tensor is a training-time scan artifact, exactly like Phase's [N,H,Dh]).
+    Reads route the query through the SAME address space and gather slot content, so an
+    entity written to slot m is retrieved from slot m. No full sequence score matrix exists.
+
+        addr_t   = softmax( (W_wk x_t) . SlotKeys^T )          # [.,M]  content routing
+        w_t      = sigmoid(gate(x_t)) * addr_t                 # [.,M]  gated write mass
+        slot_t   = cumsum_{s<=t}(w_s v_s) / cumsum_{s<=t}(w_s) # [.,M,d] bounded state
+        radd_t   = softmax( (W_rq x_t) . SlotKeys^T )          # [.,M]  read routing
+        out_t    = W_o ( sum_m radd_{t,m} slot_{t,m} )
+    """
+    def __init__(self, d, num_slots=32, key_dim=None, top_k=None):
+        super().__init__()
+        self.d = d
+        self.M = num_slots
+        kd = key_dim or (d // 2)
+        self.kd = kd
+        self.top_k = top_k
+        keys = torch.randn(num_slots, kd)
+        if num_slots <= kd:
+            nn.init.orthogonal_(keys)
+        self.slot_keys = nn.Parameter(F.normalize(keys, dim=-1))
+        self.W_wk = nn.Linear(d, kd, bias=False)
+        self.W_rq = nn.Linear(d, kd, bias=False)
+        self.W_wv = nn.Linear(d, d, bias=False)
+        self.gate = nn.Linear(d, 1)
+        self.W_o = nn.Linear(d, d, bias=False)
+        self.norm = nn.LayerNorm(d)
+        nn.init.constant_(self.gate.bias, 1.0)
+        self.scale = kd ** -0.5
+        self.diag = {}
+        self.ablate = None  # None | 'zero' | 'shuffle_val' | 'rand_keys'
+
+    def _route(self, proj_x):
+        s = (proj_x @ self.slot_keys.t()) * self.scale   # [B,N,M]
+        if self.top_k is not None and self.top_k < self.M:
+            v, i = s.topk(self.top_k, dim=-1)
+            s = torch.full_like(s, float('-inf')).scatter(-1, i, v)
+        return s.softmax(-1)
+
+    def forward(self, x):
+        B, N, D = x.shape
+        xn = self.norm(x)
+        waddr = self._route(self.W_wk(xn))               # [B,N,M]
+        g = torch.sigmoid(self.gate(xn))                 # [B,N,1]
+        v = self.W_wv(xn)                                # [B,N,D]
+        w = (g * waddr)                                  # [B,N,M]
+        weighted = w.unsqueeze(-1) * v.unsqueeze(2)      # [B,N,M,D]
+        num = torch.cumsum(weighted, dim=1)              # [B,N,M,D] causal
+        den = torch.cumsum(w, dim=1).unsqueeze(-1) + 1e-6
+        slots = num / den                                # [B,N,M,D] slot content @ t
+        if self.ablate == 'zero':
+            slots = torch.zeros_like(slots)
+        elif self.ablate == 'shuffle_val':
+            slots = slots[:, :, torch.randperm(self.M, device=x.device)]
+        raddr = self._route(self.W_rq(xn))               # [B,N,M]
+        if self.ablate == 'rand_keys':
+            raddr = torch.rand_like(raddr).softmax(-1)
+        read = torch.einsum('bnm,bnmd->bnd', raddr, slots)   # [B,N,D]
+        with torch.no_grad():
+            util = waddr.mean(dim=(0, 1))                # [M] mean write mass per slot
+            self.diag = {
+                'slot_write_gate_mean': g.mean().item(),
+                'slot_util_entropy': float(-(util * (util + 1e-9).log()).sum().item()),
+                'slot_util_max': util.max().item(),
+                'read_addr_max_mean': raddr.max(-1).values.mean().item(),
+                'num_slots': self.M,
+            }
+        return self.W_o(read)
+
+
+class ABCMixer(nn.Module):
+    """Unified A/B/C token mixer: window (always) + optional Phase + optional bounded slots,
+    protected additive fusion. A=window; B=window+phase; C=window+phase+slots.
+    Phase is the repo's REAL PhaseAttentionLayer (via RealPhase wrapper)."""
+    def __init__(self, d, h, window, use_phase, use_slots, num_slots=32):
+        super().__init__()
+        self.local = SoftmaxAttn(d, h, window=window)
+        self.phase = RealPhase(d, h) if use_phase else None
+        self.slots = BindingSlots(d, num_slots=num_slots) if use_slots else None
+        self.ablate_phase = False   # structural phase-off ablation
+
+    def forward(self, x):
+        o = self.local(x)
+        if self.phase is not None and not self.ablate_phase:
+            o = o + self.phase(x)
+        if self.slots is not None:
+            o = o + self.slots(x)
+        return o
+
+
 class Block(nn.Module):
     def __init__(self, d, h, ff, mixer):
         super().__init__()
@@ -181,7 +307,7 @@ class Block(nn.Module):
         return x
 
 
-def make_mixer(arm, d, h, window):
+def make_mixer(arm, d, h, window, num_slots=32):
     if arm == 'Q':
         return SoftmaxAttn(d, h)
     if arm == 'L':
@@ -192,16 +318,23 @@ def make_mixer(arm, d, h, window):
         return PhaseAttn(d, h)
     if arm == 'PL':
         return PhaseLocal(d, h, window=window)
+    # A/B/C ladder (no quadratic attention anywhere)
+    if arm == 'A':
+        return ABCMixer(d, h, window, use_phase=False, use_slots=False)
+    if arm == 'B':
+        return ABCMixer(d, h, window, use_phase=True, use_slots=False)
+    if arm == 'C':
+        return ABCMixer(d, h, window, use_phase=True, use_slots=True, num_slots=num_slots)
     raise ValueError(arm)
 
 
 class LM(nn.Module):
-    def __init__(self, vocab, d=128, h=4, layers=4, ff=384, arm='Q', max_len=2048, window=64):
+    def __init__(self, vocab, d=128, h=4, layers=4, ff=384, arm='Q', max_len=2048, window=64, num_slots=32):
         super().__init__()
         self.arm = arm
         self.tok = nn.Embedding(vocab, d)
         self.pos = nn.Embedding(max_len, d)
-        self.blocks = nn.ModuleList([Block(d, h, ff, make_mixer(arm, d, h, window)) for _ in range(layers)])
+        self.blocks = nn.ModuleList([Block(d, h, ff, make_mixer(arm, d, h, window, num_slots)) for _ in range(layers)])
         self.norm = nn.LayerNorm(d)
         self.head = nn.Linear(d, vocab, bias=False)
         self.head.weight = self.tok.weight
@@ -232,18 +365,28 @@ class LM(nn.Module):
                 out.append(b.mix.phase)
         return out
 
+    def abc_mixers(self):
+        return [b.mix for b in self.blocks if isinstance(b.mix, ABCMixer)]
+
+    def slot_mixers(self):
+        out = []
+        for b in self.blocks:
+            if isinstance(b.mix, ABCMixer) and b.mix.slots is not None:
+                out.append(b.mix.slots)
+        return out
+
 
 def count_params(m):
     return sum(p.numel() for p in m.parameters())
 
 
-def build_matched(arm, vocab, target_params, d=128, h=4, layers=4, max_len=2048, window=64):
+def build_matched(arm, vocab, target_params, d=128, h=4, layers=4, max_len=2048, window=64, num_slots=32):
     """Auto-tune ff width so total (non-embedding-dominated) param count matches target."""
     lo, hi = 32, 4096
     best = None
     for _ in range(20):
         ff = (lo + hi) // 2
-        m = LM(vocab, d=d, h=h, layers=layers, ff=ff, arm=arm, max_len=max_len, window=window)
+        m = LM(vocab, d=d, h=h, layers=layers, ff=ff, arm=arm, max_len=max_len, window=window, num_slots=num_slots)
         n = count_params(m)
         if best is None or abs(n - target_params) < abs(best[1] - target_params):
             best = (ff, n)
@@ -254,4 +397,4 @@ def build_matched(arm, vocab, target_params, d=128, h=4, layers=4, max_len=2048,
         if lo > hi:
             break
     ff = best[0]
-    return LM(vocab, d=d, h=h, layers=layers, ff=ff, arm=arm, max_len=max_len, window=window), best[1]
+    return LM(vocab, d=d, h=h, layers=layers, ff=ff, arm=arm, max_len=max_len, window=window, num_slots=num_slots), best[1]
