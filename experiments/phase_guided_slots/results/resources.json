@@ -1,0 +1,92 @@
+{
+  "state_sizes": {
+    "phase_state_numel": 192,
+    "slot_state_numel": 1176
+  },
+  "arms": {
+    "A": {
+      "params": 306386,
+      "no_quadratic_peak_numel": {
+        "64": 4096,
+        "128": 8192,
+        "256": 16384
+      },
+      "latency_128": {
+        "latency_ms": 1.0139942169189453,
+        "tokens_per_sec": 126233.46155654833
+      }
+    },
+    "C": {
+      "params": 306386,
+      "no_quadratic_peak_numel": {
+        "64": 4096,
+        "128": 8192,
+        "256": 16384
+      },
+      "latency_128": {
+        "latency_ms": 18.847147623697918,
+        "tokens_per_sec": 6791.4786128727565
+      }
+    },
+    "D": {
+      "params": 361874,
+      "no_quadratic_peak_numel": {
+        "64": 6144,
+        "128": 12288,
+        "256": 24576
+      },
+      "latency_128": {
+        "latency_ms": 21.702925364176433,
+        "tokens_per_sec": 5897.822429564313
+      }
+    },
+    "D-no-guid": {
+      "params": 361874,
+      "no_quadratic_peak_numel": {
+        "64": 6144,
+        "128": 12288,
+        "256": 24576
+      },
+      "latency_128": {
+        "latency_ms": 25.467077891031902,
+        "tokens_per_sec": 5026.096851302855
+      }
+    },
+    "D-random": {
+      "params": 361874,
+      "no_quadratic_peak_numel": {
+        "64": 6144,
+        "128": 12288,
+        "256": 24576
+      },
+      "latency_128": {
+        "latency_ms": 31.737804412841797,
+        "tokens_per_sec": 4033.0452080109376
+      }
+    },
+    "D-write-only": {
+      "params": 361874,
+      "no_quadratic_peak_numel": {
+        "64": 6144,
+        "128": 12288,
+        "256": 24576
+      },
+      "latency_128": {
+        "latency_ms": 22.72645632425944,
+        "tokens_per_sec": 5632.202318465546
+      }
+    },
+    "D-query-only": {
+      "params": 361874,
+      "no_quadratic_peak_numel": {
+        "64": 6144,
+        "128": 12288,
+        "256": 24576
+      },
+      "latency_128": {
+        "latency_ms": 30.11949857076009,
+        "tokens_per_sec": 4249.73874313638
+      }
+    }
+  }
+}

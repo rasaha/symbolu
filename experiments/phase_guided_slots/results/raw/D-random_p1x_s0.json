@@ -1,0 +1,20 @@
+{
+  "seed": 0,
+  "arm": "D-random",
+  "pressure": "1x",
+  "n_candidates": 8,
+  "train": {
+    "final_ans": 0.27008694410324097,
+    "final_write": 0.9731391072273254,
+    "best_val": 0.5166666666666667
+  },
+  "metrics": {
+    "answer_acc": 0.53,
+    "write_precision": 0.10329670329670329,
+    "write_recall": 0.47,
+    "write_f1": 0.16936936936936936,
+    "false_write_rate": 0.51,
+    "n": 100
+  },
+  "seconds": 75.4
+}
