@@ -128,6 +128,32 @@ def train(model, data: List[Example], pad_id: int, cfg: TCfg,
     return {"final_ans": al.item(), "final_write": wlo.item(), "best_val": best}
 
 
+def train_curriculum(model, gen_fn, pad_id: int, stages, cfg: TCfg, device="cpu") -> dict:
+    """Staged-difficulty training (redesign §17). `gen_fn(n_live, n)` returns a fresh
+    train set at a given distinct-live-fact count. `stages` = [(n_live, steps), ...],
+    increasing n_live to teach store→retrieve→decode first, then add capacity pressure.
+    A single optimizer/model persists across stages (skills carry over)."""
+    torch.manual_seed(cfg.seed)
+    rng = torch.Generator().manual_seed(cfg.seed + 3)
+    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
+    model.train()
+    log = []
+    for si, (n_live, steps) in enumerate(stages):
+        data = gen_fn(n_live, 400)
+        n = len(data)
+        for step in range(steps):
+            idx = torch.randint(0, n, (cfg.batch_size,), generator=rng).tolist()
+            b = [data[i] for i in idx]
+            ids, wl, apos, aid = collate(b, pad_id, device)
+            loss, al, wlo = _losses(model, ids, wl, apos, aid, cfg.lambda_write, cfg.lambda_keydiv)
+            opt.zero_grad(); loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+        log.append({"stage": si, "n_live": n_live, "steps": steps,
+                    "final_ans": al.item(), "final_write": wlo.item()})
+    return {"curriculum": log}
+
+
 @torch.no_grad()
 def evaluate(model, data: List[Example], pad_id: int, device="cpu") -> dict:
     model.eval()
