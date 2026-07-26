@@ -76,68 +76,48 @@ class PressureV2Generator:
 
     def make(self, n_live: int, M: int, target_position: str = "early",
              query_type: str = "latest_value", versions_per_relevant: int = 1) -> Example:
-        """Build one example with `n_live` distinct live contracts and one queried
-        relevant contract placed at `target_position`."""
+        """Build one example: `n_live` DISTINCT live contracts (one distinct slot
+        each), a randomly queried target contract placed at `target_position`. The
+        answer requires retrieving THAT specific contract's value — so the query and
+        the bounded memory are both essential, and failure is purely capacity (the
+        target is lost only if evicted). No exploitable focus/relevance structure."""
         r = self.rng
         v = self.v
-        focus_vendor = r.choice(self.vendors)
 
-        # relevant contracts belong to the focus vendor (count small, <= M-1)
-        n_relevant = max(2, min(M - 1, r.randint(2, max(2, M // 2))))
         contracts_pool = r.sample(self.contracts, min(n_live, len(self.contracts)))
-        relevant_contracts = contracts_pool[:n_relevant]
-        distractor_contracts = contracts_pool[n_relevant:]
-        # if pool too small, pad distractors by reusing distinct contract ids from the
-        # full set not already used
         need = n_live - len(contracts_pool)
         if need > 0:
             extra = [c for c in CONTRACTS if c not in contracts_pool]
             r.shuffle(extra)
-            distractor_contracts += extra[:need]
+            contracts_pool += extra[:need]
+        all_contracts = contracts_pool[:n_live]
 
-        # Query a RANDOM relevant contract (not a fixed one) so the query is essential:
-        # the model must (a) retain the focus-relevant facts under distractor flood and
-        # (b) use the query to pick WHICH relevant contract is asked. Collapsing distinct
-        # facts into one slot then loses (cannot disambiguate among the retained facts).
-        target_contract = r.choice(relevant_contracts)
-
-        # Build the ordered fact stream. Each contract contributes 1..k versioned
-        # facts (same entity_id → supersession). Distinct contracts → distinct slots.
-        all_contracts = relevant_contracts + distractor_contracts
+        # each distinct contract gets a distinct vendor cue (varied, non-diagnostic)
+        vend = {c: r.choice(self.vendors) for c in all_contracts}
         eid = {c: i for i, c in enumerate(all_contracts)}
-        stream: List[Fact] = []
 
-        def emit_contract(contract, vendor, is_relevant):
-            nv = versions_per_relevant if is_relevant else 1
-            for k in range(nv):
-                stream.append(self._mk_fact(contract, vendor, VERSIONS[min(k, 3)],
-                                            arrival=len(stream), entity_id=eid[contract]))
+        # query a RANDOM contract (any of the live ones) — the only way to answer is to
+        # have retained it and address it by the query. Nothing about the target is
+        # predictable from structure, so no query-free shortcut exists.
+        target_contract = r.choice(all_contracts)
+        others = [c for c in all_contracts if c != target_contract]
+        r.shuffle(others)
 
-        # distractor vendors (distinct from focus)
-        other_vendors = [x for x in self.vendors if x != focus_vendor] or self.vendors
-
-        # place the target relevant contract at the requested position; scatter the
-        # remaining relevant + distractor contracts around it.
-        distractor_facts_units = [(c, r.choice(other_vendors)) for c in distractor_contracts]
-        # all relevant contracts EXCEPT the target are scattered as competing focus facts
-        rel_units = [(c, focus_vendor) for c in relevant_contracts if c != target_contract]
-        r.shuffle(distractor_facts_units)
-        r.shuffle(rel_units)
-
-        # decide index where the target block goes
-        total_units = len(distractor_facts_units) + len(rel_units) + 1  # +1 target
+        total_units = len(all_contracts)
         if target_position == "early":
             tpos = r.randint(0, max(0, int(0.15 * total_units)))
         elif target_position == "late":
             tpos = r.randint(int(0.85 * total_units), total_units - 1)
         else:
             tpos = r.randint(int(0.40 * total_units), int(0.60 * total_units))
+        order = others[:]
+        order.insert(min(tpos, len(order)), target_contract)
 
-        units = distractor_facts_units + rel_units
-        r.shuffle(units)
-        units.insert(min(tpos, len(units)), (target_contract, focus_vendor))
-        for c, ven in units:
-            emit_contract(c, ven, is_relevant=(ven == focus_vendor))
+        stream: List[Fact] = []
+        for c in order:
+            stream.append(self._mk_fact(c, vend[c], VERSIONS[0],
+                                        arrival=len(stream), entity_id=eid[c]))
+        focus_vendor = vend[target_contract]  # kept only for meta/query rendering
 
         # answer per query type (deterministic from the target contract's facts)
         tfacts = [f for f in stream if f.contract == target_contract]
@@ -160,12 +140,12 @@ class PressureV2Generator:
         else:
             raise ValueError(query_type)
 
-        # render tokens: focus header + fact stream + query + answer.
+        # render tokens: fact stream + query + answer (no leaky header).
         # write labels: 1 at each fact's terminal <sep> (the write anchor), 0 at other
         # BODY tokens (so the gate learns to write ONCE per fact, not flood every
         # token — the flood was what collapsed v1's slots), -100 outside the body.
-        words: List[str] = ["focus", "vendor", focus_vendor, "<sep>"]
-        wl: List[int] = [-100, -100, -100, -100]
+        words: List[str] = []
+        wl: List[int] = []
         anchor_positions = []
         for f in stream:
             fw = f.render()
@@ -185,8 +165,8 @@ class PressureV2Generator:
             tokens=toks, answer_pos=ans_pos, answer_id=ans_id, write_labels=wl,
             facts=stream, gold_support_entity_ids=[eid[target_contract]],
             query_type=query_type, target_position=target_position,
-            meta={"n_live_contracts": n_live, "M": M, "focus_vendor": focus_vendor,
-                  "target_contract": target_contract, "n_relevant": n_relevant,
+            meta={"n_live_contracts": n_live, "M": M,
+                  "target_contract": target_contract,
                   "n_facts": len(stream), "seq_len": len(toks),
                   "target_entity_id": eid[target_contract],
                   "distinct_entity_ids": len(set(f.entity_id for f in stream))},
