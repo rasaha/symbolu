@@ -42,7 +42,7 @@ exclusions.
 Phase list:
 
 - **H0 — Public API Migration & Re-entry Stabilization** ✅ *complete*
-- H1 — Hiring Domain Completion
+- **H1 — Hiring Domain Completion** ✅ *complete*
 - H2 — AI Recommendation & Evidence Synthesis (TAP)
 - H3 — Governance Integration (TAP + ActionGate Providers)
 - H4 — Hiring Actions, Execution & Reconciliation
@@ -68,18 +68,31 @@ Phase list:
 - **Evidence:** `H0_MIGRATION_REPORT.md`, `H0_API_GAP_REPORT.md`, `H0_REENTRY_STATUS.md`.
 - **Exclusions:** provider wiring; new features; any platform change.
 
-### H1 — Hiring Domain Completion
-- **Objective:** complete the hiring product entities (requisition, job definition,
-  candidate, application, evidence intake, assessment workspace, structured
-  observations, case-closure states) in `domains.hiring` / `applications.ai_hiring`.
-- **Permitted:** `domains.hiring`, `applications.ai_hiring`, `ai_hiring`.
+### H1 — Hiring Domain Completion  ✅ COMPLETE
+- **Objective:** complete the candidate-facing hiring product entities (requisition,
+  job definition, candidate, application, evidence intake) with lifecycles, eligibility
+  & readiness rules, repositories, application services, a hiring-owned domain audit
+  trail, and reconstruction support.
+- **Permitted:** `ai_hiring`, `domains.hiring`, `applications.ai_hiring` (app-local, additive).
 - **Frozen:** all platform trees; providers.
-- **Required:** entity contracts + lifecycle; migrate consumer imports to
-  `decision_governance.api`.
-- **Invariants:** F1–F3 (kernel owns records; AI advisory; human-only decisions).
-- **Tests:** entity validation, lifecycle, boundary; keep 553 green.
-- **Evidence:** new hiring-domain tests; no platform diff.
-- **Exclusions:** AI generation; provider wiring; external I/O.
+- **Delivered:** entities + guarded lifecycles; deterministic eligibility/readiness;
+  in-memory repositories (immutable, versioned, history); requisition/candidate/
+  application/evidence-intake services with tenant isolation; hash-chained hiring-owned
+  domain audit trail (`ai_hiring/domain_audit/`, per the audit-model decision below);
+  `HiringReconstructionService`; API-facing request/view contracts.
+- **Invariants:** F1–F3 (kernel owns governance records; AI advisory; **human-only
+  binding decisions** — H1 encodes no accept/reject/hire outcome and grants no actor
+  decision authority); dependency direction (F20).
+- **Audit-model decision:** the frozen kernel `AuditEventType` has no members for the
+  new product entities and must not be modified, so H1 uses a **hiring-owned domain
+  audit trail** (additive, boundary-correct). See `H1_COMPLETION_REPORT.md`.
+- **Tests:** **41 new H1 tests** — valid flows, invalid transitions, duplicate
+  prevention, access isolation, incomplete evidence, reconstruction, boundary. Full
+  suite **594 passed** (553 + 41).
+- **Evidence:** `H1_COMPLETION_REPORT.md`; freeze verification PASS; 0 dependency
+  violations; no platform diff.
+- **Exclusions (deferred H2–H6):** AI recommendation generation; TAP/ActionGate
+  integration; offer/rejection execution; fairness evaluation; binding decisions.
 
 ### H2 — AI Recommendation & Evidence Synthesis
 - **Objective:** synthesize hiring assertions from evidence and evaluate them with

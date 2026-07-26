@@ -1,0 +1,61 @@
+"""Hiring-owned domain audit event taxonomy (H1).
+
+These event types cover the **candidate-facing hiring product entities** —
+requisitions, job definitions, candidates, applications, and evidence intake —
+whose lifecycles are owned by AI Hiring (see
+``docs/ai-hiring/PLATFORM_BOUNDARY.md``). They are *deliberately* a hiring-owned
+enum, not members of the frozen kernel ``decision_governance`` ``AuditEventType``:
+Platform v1.0 is frozen and does not (and must not) enumerate hiring product
+events. This taxonomy is additive, application-local, and never crosses the
+platform boundary.
+
+The kernel ``AuditService`` / ``AuditEventType`` remain reserved for the governance
+chain (case → recommendation → decision → action → execution), wired in later
+phases. Nothing here scores, ranks, recommends, or decides.
+"""
+
+from __future__ import annotations
+
+from enum import Enum
+
+
+class HiringDomainEventType(str, Enum):
+    """Append-only lifecycle events for H1 hiring product entities."""
+
+    # --- Requisition ---
+    REQUISITION_CREATED = "REQUISITION_CREATED"
+    REQUISITION_OPENED = "REQUISITION_OPENED"
+    REQUISITION_PUT_ON_HOLD = "REQUISITION_PUT_ON_HOLD"
+    REQUISITION_RESUMED = "REQUISITION_RESUMED"
+    REQUISITION_FILLED = "REQUISITION_FILLED"
+    REQUISITION_CLOSED = "REQUISITION_CLOSED"
+    REQUISITION_CANCELLED = "REQUISITION_CANCELLED"
+
+    # --- Job definition ---
+    JOB_DEFINITION_DRAFTED = "JOB_DEFINITION_DRAFTED"
+    JOB_DEFINITION_PUBLISHED = "JOB_DEFINITION_PUBLISHED"
+    JOB_DEFINITION_RETIRED = "JOB_DEFINITION_RETIRED"
+
+    # --- Candidate ---
+    CANDIDATE_REGISTERED = "CANDIDATE_REGISTERED"
+    CANDIDATE_PROFILE_REVISED = "CANDIDATE_PROFILE_REVISED"
+    CANDIDATE_WITHDRAWN = "CANDIDATE_WITHDRAWN"
+
+    # --- Application ---
+    APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED"
+    APPLICATION_SCREENING_STARTED = "APPLICATION_SCREENING_STARTED"
+    APPLICATION_ADVANCED_TO_ASSESSMENT = "APPLICATION_ADVANCED_TO_ASSESSMENT"
+    APPLICATION_ADVANCED_TO_REVIEW = "APPLICATION_ADVANCED_TO_REVIEW"
+    APPLICATION_CLOSED = "APPLICATION_CLOSED"
+    APPLICATION_WITHDRAWN = "APPLICATION_WITHDRAWN"
+
+    # --- Evidence intake (collection + provenance binding) ---
+    EVIDENCE_INTAKE_RECEIVED = "EVIDENCE_INTAKE_RECEIVED"
+    EVIDENCE_INTAKE_PROVENANCE_BOUND = "EVIDENCE_INTAKE_PROVENANCE_BOUND"
+
+    # --- Access / boundary (denials) ---
+    DOMAIN_ACCESS_DENIED = "DOMAIN_ACCESS_DENIED"
+
+
+# Events that record a denial / boundary rejection rather than a state change.
+DENIAL_EVENTS = frozenset({HiringDomainEventType.DOMAIN_ACCESS_DENIED})

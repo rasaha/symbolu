@@ -366,3 +366,61 @@ class CrossTenantAssessmentAccessError(AssessmentAuthorizationError):
     """A cross-tenant assessment access was attempted and denied."""
 
 
+# --- H1 hiring product entities (requisition / job def / candidate / application
+#     / evidence intake). Application-local, additive. -----------------------
+class HiringProductError(HiringError):
+    """Base for H1 candidate-facing hiring product errors."""
+
+
+class RequisitionNotFoundError(HiringProductError):
+    """No requisition exists for the given id (or not in the caller's tenant)."""
+
+
+class JobDefinitionNotFoundError(HiringProductError):
+    """No job definition exists for the given id (or not in the caller's tenant)."""
+
+
+class CandidateNotFoundError(HiringProductError):
+    """No candidate exists for the given id (or not in the caller's tenant)."""
+
+
+class ApplicationNotFoundError(HiringProductError):
+    """No application exists for the given id (or not in the caller's tenant)."""
+
+
+class EvidenceIntakeNotFoundError(HiringProductError):
+    """No evidence-intake item exists for the given id (or not in tenant)."""
+
+
+class IllegalRequisitionTransitionError(InvalidTransitionError):
+    """An illegal requisition lifecycle transition was requested."""
+
+
+class IllegalJobDefinitionTransitionError(InvalidTransitionError):
+    """An illegal job-definition lifecycle transition was requested."""
+
+
+class IllegalCandidateTransitionError(InvalidTransitionError):
+    """An illegal candidate lifecycle transition was requested."""
+
+
+class IllegalApplicationTransitionError(InvalidTransitionError):
+    """An illegal application lifecycle transition was requested."""
+
+
+class DuplicateApplicationError(HiringProductError):
+    """An active application already exists for this candidate + requisition."""
+
+
+class IneligibleApplicationError(HiringProductError):
+    """The structural eligibility preconditions for the application do not hold."""
+
+
+class NotReadyForAssessmentError(HiringProductError):
+    """Required evidence is incomplete; the application cannot advance to ASSESSMENT."""
+
+
+class CrossTenantHiringAccessError(TenantMismatchError):
+    """A cross-tenant hiring product access was attempted and denied."""
+
+
