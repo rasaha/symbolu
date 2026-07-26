@@ -44,7 +44,7 @@ Phase list:
 - **H0 — Public API Migration & Re-entry Stabilization** ✅ *complete*
 - **H1 — Hiring Domain Completion** ✅ *complete*
 - **H2 — AI Recommendation & Evidence Synthesis (TAP)** ✅ *complete*
-- H3 — Governance Integration (TAP + ActionGate Providers)
+- **H3 — Governance Integration (human decision on the DGM kernel)** ✅ *complete*
 - H4 — Hiring Actions, Execution & Reconciliation
 - H5 — Validation, Fairness Analysis & Shadow Pilot
 - H6 — Packaging, Documentation & Product Wrap-up
@@ -119,16 +119,26 @@ Phase list:
   offer/rejection execution; final hiring decisions; fairness certification; production
   model integrations.
 
-### H3 — Governance Integration (TAP + ActionGate Providers)
-- **Objective:** run the full DGM case→recommendation→decision→review flow for
-  hiring, with human authority and overrides through DGM review tasks.
-- **Permitted:** app/domain + `decision_governance.api`, `governance_providers.api`.
-- **Frozen:** platform.
-- **Required:** review tasks, overrides, decision provenance; deterministic,
-  auditable provider resolution for TAP.
-- **Invariants:** F1–F3, F15, F18.
-- **Tests:** human-only binding decisions; override audit; resolution determinism.
-- **Exclusions:** offer/rejection execution.
+### H3 — Governance Integration (human decision on the DGM kernel)  ✅ COMPLETE
+- **Objective:** integrate the H1/H2 hiring domain with the frozen DGM kernel so every
+  recommendation can become a fully governed **human** decision — while remaining
+  non-executable until H4. **No ActionGate wiring or execution.**
+- **Permitted:** `ai_hiring` + `decision_governance.api` (kernel via public API only).
+- **Frozen:** platform (kernel, framework, TAP, ActionGate) — untouched.
+- **Delivered:** recommendation→DecisionCase binding (`GovernanceCaseBinding`); kernel
+  recommendation submission (AI_ASSISTED, advisory); review-task lifecycle; **human**
+  decisions via `CaseDecisionService` (human authority enforced by the kernel + H3 guard +
+  access grants); acceptance/rejection; rationale + overrides; governance-case
+  reconstruction with **cross-linked hiring↔DGM audit** (by correlation id); recommendation
+  supersession; review workspace, governance dashboards, recommendation history; API contracts.
+- **Invariants:** **Recommendation → Human Decision → (H4) Authorized Action** (never
+  Recommendation → Action); F1–F3 (human-only binding decisions), F15, F18. Hiring audit
+  events stay disjoint from the frozen kernel `AuditEventType`.
+- **Tests:** **26 new H3 tests**; full suite **658 passed** (632 + 26); freeze PASS; 0
+  dependency violations; no platform diff.
+- **Evidence:** `H3_COMPLETION_REPORT.md`.
+- **Exclusions (exclusively H4):** ActionGate authorization; external execution; offer/
+  rejection execution; email/HRIS; compensation; execution reconciliation.
 
 ### H4 — Hiring Actions, Execution & Reconciliation
 - **Objective:** authorize hiring actions (offer, rejection) via **ActionGate**,
