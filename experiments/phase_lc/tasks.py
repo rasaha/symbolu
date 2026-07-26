@@ -177,7 +177,11 @@ def make_eval_set(kind, N, vocab, seed, n=200, **kw):
     return torch.stack(xs), torch.tensor(poss), torch.tensor(tgts)
 
 
-def train_batch(stream, B, N, vocab, rng, mix=(('lm', .5), ('needle', .2), ('binding', .15), ('multihop', .15))):
+def train_batch(stream, B, N, vocab, rng, mix=(('lm', .3), ('needle', .3), ('binding', .25), ('multihop', .15))):
+    """Returns (x, y, mask). mask=None -> full-sequence LM loss. For task batches, mask
+    selects ONLY the answer position (index pos-1) so the retrieval signal is not drowned
+    by filler/LM tokens. This is answer-token supervision (a form of L_retrieval), applied
+    identically to every arm."""
     r = rng.random(); acc = 0; kind = 'lm'
     for k, p in mix:
         acc += p
@@ -185,7 +189,7 @@ def train_batch(stream, B, N, vocab, rng, mix=(('lm', .5), ('needle', .2), ('bin
             kind = k; break
     if kind == 'lm':
         return lm_batch(stream, B, N, rng)
-    xs, ys = [], []
+    xs, ys, ms = [], [], []
     for _ in range(B):
         if kind == 'needle':
             x, pos, tgt = needle(N, vocab, rng)
@@ -194,6 +198,8 @@ def train_batch(stream, B, N, vocab, rng, mix=(('lm', .5), ('needle', .2), ('bin
         else:
             x, pos, tgt = multihop(N, vocab, rng)
         y = x.clone()
-        y[:-1] = x[1:]; y[-1] = vocab.pad  # standard shift; answer token is x[-1], learned at pos-2
-        xs.append(x); ys.append(y)
-    return torch.stack(xs), torch.stack(ys), None
+        y[:-1] = x[1:]; y[-1] = vocab.pad
+        m = torch.zeros(N, dtype=torch.bool)
+        m[pos - 1] = True   # supervise the token that predicts the answer value
+        xs.append(x); ys.append(y); ms.append(m)
+    return torch.stack(xs), torch.stack(ys), torch.stack(ms)

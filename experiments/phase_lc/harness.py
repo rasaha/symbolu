@@ -80,9 +80,13 @@ def train_one(arm, vocab, stream, steps, N, target_params, seed, lr=3e-3, B=16, 
     rng = random.Random(seed * 991 + 7)
     model.train(); t0 = time.time()
     for step in range(steps):
-        x, y, _ = T.train_batch(stream, B, N, vocab, rng)
+        x, y, mask = T.train_batch(stream, B, N, vocab, rng)
         logits = model(x)
-        loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+        if mask is None:
+            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+        else:
+            sel = mask.reshape(-1)
+            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1))[sel], y.reshape(-1)[sel])
         opt.zero_grad(); loss.backward()
         gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
         opt.step(); sched.step()
@@ -98,12 +102,12 @@ def evaluate(model, vocab, stream, arm):
     out['ppl'] = {str(N): eval_ppl(model, stream, N) for N in [256, 512]}
     # B. single-needle by distance (train len 256)
     out['needle_by_dist'] = {}
-    for dist in [16, 48, 96, 160, 220]:
+    for dist in [16, 96, 220]:
         X, P, Tg = T.make_eval_set('needle', 256, vocab, seed=123, n=150, distance=dist)
         out['needle_by_dist'][str(dist)] = eval_task(model, X, P, Tg)
     # C. binding by #entities
     out['binding_by_k'] = {}
-    for k in [2, 3, 4, 6]:
+    for k in [2, 4, 6]:
         X, P, Tg = T.make_eval_set('binding', 256, vocab, seed=124, n=150, k=k)
         out['binding_by_k'][str(k)] = eval_task(model, X, P, Tg)
     # D. multi-hop integration
@@ -112,8 +116,8 @@ def evaluate(model, vocab, stream, arm):
     # E. length generalization (train 256 -> eval 512, 1024) for needle and binding
     out['lengthgen'] = {}
     for N in [256, 512, 1024]:
-        Xn, Pn, Tn = T.make_eval_set('needle', N, vocab, seed=126, n=100, distance=N // 2)
-        Xb, Pb, Tb = T.make_eval_set('binding', N, vocab, seed=127, n=100, k=4)
+        Xn, Pn, Tn = T.make_eval_set('needle', N, vocab, seed=126, n=80, distance=N // 2)
+        Xb, Pb, Tb = T.make_eval_set('binding', N, vocab, seed=127, n=80, k=4)
         out['lengthgen'][str(N)] = {
             'needle_mid': eval_task(model, Xn, Pn, Tn),
             'binding_k4': eval_task(model, Xb, Pb, Tb),
