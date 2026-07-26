@@ -98,11 +98,12 @@ def ablations(model, vocab, arm):
         return {'needle_d96': acc(model, Xn, Pn, Tn), 'binding_k4': acc(model, Xb, Pb, Tb),
                 'source': acc(model, Xs, Ps, Ts)}
     res['baseline'] = probe()
-    phases = model.phase_mixers(); slots = model.slot_mixers()
-    if phases:
-        for pm in phases: pm.ablate = 'no_phase'
+    abc = model.abc_mixers(); slots = model.slot_mixers()
+    has_phase = any(m.phase is not None for m in abc)
+    if has_phase:
+        for m in abc: m.ablate_phase = True
         res['phase_off'] = probe()
-        for pm in phases: pm.ablate = None
+        for m in abc: m.ablate_phase = False
     if slots:
         for sm in slots: sm.ablate = 'zero'
         res['slots_off'] = probe()
@@ -143,7 +144,7 @@ def assert_no_nxn(model, N=48):
     (Window softmax uses [N,N] scores but is masked to a band; we exclude A's window from
     the ban because the ladder's *no-quadratic* rule targets global token-pair attention,
     and the window score is O(N*w) in effect. We assert Phase and Slots never build N x N.)"""
-    from models import PhaseAttn, BindingSlots
+    from models import BindingSlots, RealPhase
     flags = {'phase_builds_NN': False, 'slots_builds_NN': False}
     hooks = []
     def mk(mod_name):
@@ -154,12 +155,15 @@ def assert_no_nxn(model, N=48):
         return hook
     for b in model.blocks:
         mix = b.mix
-        ph = getattr(mix, 'phase', None) or (mix if isinstance(mix, PhaseAttn) else None)
+        ph = getattr(mix, 'phase', None)
         sl = getattr(mix, 'slots', None)
-        if isinstance(ph, PhaseAttn):
-            hooks.append(ph.register_forward_hook(mk('phase_builds_NN')))
+        if isinstance(ph, RealPhase):
+            # hook every submodule of the real Phase layer (verify none build N x N)
+            for sub in ph.phase.modules():
+                hooks.append(sub.register_forward_hook(mk('phase_builds_NN')))
         if isinstance(sl, BindingSlots):
-            hooks.append(sl.register_forward_hook(mk('slots_builds_NN')))
+            for sub in sl.modules():
+                hooks.append(sub.register_forward_hook(mk('slots_builds_NN')))
     model(torch.randint(0, 100, (1, N)))
     for h in hooks: h.remove()
     return flags

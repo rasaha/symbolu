@@ -24,9 +24,39 @@ PL : Local+Phase -- the P mixer PLUS a sliding-window softmax path (disclosed hy
      the strongest honest "Phase" arm per the investigation's arm definitions).
 """
 import math
+import os
+import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+# Use the repository's ACTUAL Phase implementation, not a reimplementation.
+_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if _REPO not in sys.path:
+    sys.path.insert(0, _REPO)
+from symbolu.phase_transformer import PhaseAttentionLayer as RealPhaseAttentionLayer  # noqa: E402
+
+
+class RealPhase(nn.Module):
+    """Thin wrapper around the repo's canonical PhaseAttentionLayer.
+
+    Faithful: includes the amplitude-normalisation denominator (Re(q·Σkv)/Σa_k), bounded
+    phase, and per-head learned decay exactly as shipped in symbolu/phase_transformer.py.
+    Structural ablation via `.enabled = False` (protected additive fusion, so zeroing the
+    phase term is the clean 'phase-off' ablation)."""
+    def __init__(self, d, h):
+        super().__init__()
+        self.phase = RealPhaseAttentionLayer(embed_dim=d, num_heads=h,
+                                             bounded_phase=True, learned_decay=True)
+        self.enabled = True
+
+    def forward(self, x):
+        if not self.enabled:
+            return torch.zeros_like(x)
+        out = self.phase(x)
+        if isinstance(out, dict):
+            out = out.get('output', out.get('attn_output', out.get('memory_state')))
+        return out
 
 
 class SoftmaxAttn(nn.Module):
@@ -245,16 +275,18 @@ class BindingSlots(nn.Module):
 
 class ABCMixer(nn.Module):
     """Unified A/B/C token mixer: window (always) + optional Phase + optional bounded slots,
-    protected additive fusion. A=window; B=window+phase; C=window+phase+slots."""
+    protected additive fusion. A=window; B=window+phase; C=window+phase+slots.
+    Phase is the repo's REAL PhaseAttentionLayer (via RealPhase wrapper)."""
     def __init__(self, d, h, window, use_phase, use_slots, num_slots=32):
         super().__init__()
         self.local = SoftmaxAttn(d, h, window=window)
-        self.phase = PhaseAttn(d, h) if use_phase else None
+        self.phase = RealPhase(d, h) if use_phase else None
         self.slots = BindingSlots(d, num_slots=num_slots) if use_slots else None
+        self.ablate_phase = False   # structural phase-off ablation
 
     def forward(self, x):
         o = self.local(x)
-        if self.phase is not None:
+        if self.phase is not None and not self.ablate_phase:
             o = o + self.phase(x)
         if self.slots is not None:
             o = o + self.slots(x)
@@ -331,9 +363,10 @@ class LM(nn.Module):
                 out.append(b.mix)
             elif isinstance(b.mix, PhaseLocal):
                 out.append(b.mix.phase)
-            elif isinstance(b.mix, ABCMixer) and b.mix.phase is not None:
-                out.append(b.mix.phase)
         return out
+
+    def abc_mixers(self):
+        return [b.mix for b in self.blocks if isinstance(b.mix, ABCMixer)]
 
     def slot_mixers(self):
         out = []
