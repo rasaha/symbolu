@@ -48,21 +48,45 @@ class PhaseV2Output:
     diagnostics: Optional[Dict[str, Tensor]] = None
 
 
-def _scan(g: Tensor, gamma: Optional[Tensor], prev: Optional[Tensor]) -> Tensor:
-    """S_t = gamma * S_{t-1} + g_t over dim=1. g:[B,N,H,Dh]. gamma: scalar float or
-    None (=1). prev:[B,H,Dh] or None."""
+def _scan(g: Tensor, gamma, prev: Optional[Tensor], chunk: int = 64) -> Tensor:
+    """S_t = gamma * S_{t-1} + g_t over dim=1. g:[B,N,H,Dh]. gamma: None (=1, cumsum),
+    a python float, or a per-head [H] tensor. prev:[B,H,Dh] or None.
+
+    Vectorized chunked scan: within a chunk of size C an exact [C,C] lower-triangular
+    decay matrix is applied (O(N·C), never O(N²)); a short loop over N/C chunks carries
+    the state. Exact and bounded; no per-token python loop. gamma==1 uses cumsum.
+    """
     B, N, H, Dh = g.shape
-    if gamma is None:
+    dev = g.device
+    if gamma is None or (isinstance(gamma, float) and gamma >= 1.0):
         S = torch.cumsum(g, dim=1)
         if prev is not None:
             S = S + prev.unsqueeze(1)
         return S
-    out = torch.empty_like(g)
-    s = prev if prev is not None else torch.zeros(B, H, Dh, dtype=g.dtype, device=g.device)
-    for t in range(N):
-        s = gamma * s + g[:, t]
-        out[:, t] = s
-    return out
+    gvec = gamma if torch.is_tensor(gamma) else torch.full((H,), float(gamma), device=dev)
+    gvec = gvec.to(dev).float()
+    C = min(chunk, N)
+    pad = (C - N % C) % C
+    if pad:
+        g = torch.nn.functional.pad(g, (0, 0, 0, 0, 0, pad))
+    NC = g.shape[1] // C
+    gc = g.view(B, NC, C, H, Dh)
+    idx = torch.arange(C, device=dev)
+    dexp = (idx.view(C, 1) - idx.view(1, C)).clamp(min=0).float()   # (c-j)
+    lower = (idx.view(C, 1) >= idx.view(1, C)).float()
+    gpow = (gvec.view(H, 1, 1) ** dexp.view(1, C, C)) * lower.view(1, C, C)   # [H,C,C]
+    S_local = torch.einsum("hcj,bnjhd->bnchd", gpow.to(gc.dtype), gc)          # [B,NC,C,H,Dh]
+    chunk_end = S_local[:, :, -1]                                              # [B,NC,H,Dh]
+    gC = (gvec ** C).view(1, H, 1)
+    e_prev = prev if prev is not None else torch.zeros(B, H, Dh, dtype=g.dtype, device=dev)
+    carry = []
+    for nc in range(NC):
+        carry.append(e_prev)
+        e_prev = gC * e_prev + chunk_end[:, nc]
+    carry = torch.stack(carry, dim=1)                                         # [B,NC,H,Dh] carry-in
+    gcp1 = (gvec.view(H, 1) ** (idx + 1).view(1, C).float()).to(gc.dtype)      # [H,C]
+    S = S_local + torch.einsum("hc,bnhd->bnchd", gcp1, carry)
+    return S.reshape(B, NC * C, H, Dh)[:, :N]
 
 
 class SelectivePhaseV2(nn.Module):
@@ -169,13 +193,12 @@ class SelectivePhaseV2(nn.Module):
         o_banks = []
         S_last, A_last = [], []
         for b in range(self.num_banks):
-            gamma = self.bank_gamma(b, x.device)
-            gamma_t = gamma.view(1, 1, self.num_heads, 1) if torch.is_tensor(gamma) else gamma
+            gamma = self.bank_gamma(b, x.device)     # [H] tensor or python float
             prevS = None if initial_state is None else initial_state.complex_memory[:, b]
             prevA = None if initial_state is None else torch.complex(
                 initial_state.amplitude_sum[:, b], torch.zeros_like(initial_state.amplitude_sum[:, b]))
-            S = _scan(gated_kv, gamma_t, prevS)
-            A = _scan(gated_ak, gamma_t, prevA).real
+            S = _scan(gated_kv, gamma, prevS)
+            A = _scan(gated_ak, gamma, prevA).real
             n_t = (q_phasor * S).real
             Z = (a_q * A).clamp(min=self.config.denom_eps)
             if self.config.detach_denominator:
