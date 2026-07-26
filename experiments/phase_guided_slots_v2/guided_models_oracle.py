@@ -107,8 +107,13 @@ class OracleSlotLM(nn.Module):
         self.write_head_out = r_write
         hA = h[ar, answer_pos]; gA = g[ar, answer_pos]
 
+        # The answer/readout path is IDENTICAL across arms (no Phase gA in the decode)
+        # so that C vs D differ ONLY in the retention signal — a clean isolation of
+        # "Phase as retention priority". (Feeding gA into the decode was found to
+        # corrupt retrieval; that is a readout-coupling effect, not a retention test.)
+        gslot = torch.zeros_like(hA)
         if not self.use_slots:
-            feat = self.readout(torch.cat([hA, gA, torch.zeros_like(hA)], dim=-1))
+            feat = self.readout(torch.cat([hA, gslot, torch.zeros_like(hA)], dim=-1))
             return {"answer_logits": self.lm_head(self.norm_f(feat)), "r_write": r_write}
 
         # Writes only ever happen at fact anchors (entity_at_pos >= 0); compress the
@@ -118,7 +123,7 @@ class OracleSlotLM(nn.Module):
         e_c, v_c, g_c, r_c = _compress_to_anchors(entity_at_pos, values, r_write, p_retain)
         state = self.slots.write_stream(e_c, v_c, g_c, r_c, target_entity=query_entity)
         val, found = self.slots.read(query_entity, state)
-        feat = self.readout(torch.cat([hA, gA, val], dim=-1))
+        feat = self.readout(torch.cat([hA, gslot, val], dim=-1))
         return {"answer_logits": self.lm_head(self.norm_f(feat)), "r_write": r_write,
                 "found": found, "state": state}
 
