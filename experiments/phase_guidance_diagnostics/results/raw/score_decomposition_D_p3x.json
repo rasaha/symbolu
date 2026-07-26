@@ -1,0 +1,42 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "R_ratio_phase_over_content": {
+    "mean": 0.05635048449039459,
+    "p50": 0.04524172842502594,
+    "p90": 0.10675691813230515,
+    "p99": 0.28098347783088684
+  },
+  "beta_sweep": {
+    "0.0": {
+      "answer_acc": 0.8999999761581421,
+      "frac_read_changed_vs_content": 0.0
+    },
+    "0.01": {
+      "answer_acc": 0.8999999761581421,
+      "frac_read_changed_vs_content": 0.0
+    },
+    "0.05": {
+      "answer_acc": 0.9100000262260437,
+      "frac_read_changed_vs_content": 0.0
+    },
+    "0.1": {
+      "answer_acc": 0.9100000262260437,
+      "frac_read_changed_vs_content": 0.0
+    },
+    "0.25": {
+      "answer_acc": 0.8999999761581421,
+      "frac_read_changed_vs_content": 0.019999999552965164
+    },
+    "0.5": {
+      "answer_acc": 0.9100000262260437,
+      "frac_read_changed_vs_content": 0.019999999552965164
+    },
+    "1.0": {
+      "answer_acc": 0.9100000262260437,
+      "frac_read_changed_vs_content": 0.029999999329447746
+    }
+  },
+  "trained_acc_beta1": 0.9100000262260437,
+  "content_only_acc_beta0": 0.8999999761581421
+}

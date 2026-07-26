@@ -1,0 +1,31 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "chance_topic": 0.05,
+  "realized_write_f1": 0.0,
+  "topic_identity": {
+    "local_only": {
+      "linear_top1": 0.30666667222976685,
+      "mlp_top1": 0.2266666740179062
+    },
+    "phase_only": {
+      "linear_top1": 0.08666666597127914,
+      "mlp_top1": 0.1133333370089531
+    },
+    "local_plus_phase": {
+      "linear_top1": 0.18666666746139526,
+      "mlp_top1": 0.14000000059604645
+    }
+  },
+  "write_worthiness": {
+    "local_only": {
+      "probe_f1": 0.0
+    },
+    "phase_only": {
+      "probe_f1": 0.0
+    },
+    "local_plus_phase": {
+      "probe_f1": 0.0
+    }
+  }
+}

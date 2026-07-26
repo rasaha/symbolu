@@ -1,0 +1,16 @@
+{
+  "final_occupancy_mean": 1.8287557363510132,
+  "M": 8,
+  "frac_saturated_end": 0.0,
+  "full_capacity_steps_mean": 0.0,
+  "hard_writes_mean": 7.574999809265137,
+  "matches_mean": 6.833333492279053,
+  "allocations_mean": 0.7416666746139526,
+  "evictions_mean": 0.0,
+  "target_survival_rate": 0.0,
+  "read_hits_target_rate": 0.0,
+  "arm": "D",
+  "pressure": "3x",
+  "n_candidates": 24,
+  "answer_acc": 0.85
+}

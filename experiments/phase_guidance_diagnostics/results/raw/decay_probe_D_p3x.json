@@ -1,0 +1,34 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "decay_mode_in_config": "none",
+  "note": "config has NO decay (gamma=1); rows are read-only imposed-gamma interventions",
+  "chance": 0.05,
+  "gammas": {
+    "1.0": {
+      "phase_top1": 0.12666666507720947,
+      "phase_top3": 0.2800000011920929,
+      "horizon_tokens": null
+    },
+    "0.999": {
+      "phase_top1": 0.11999999731779099,
+      "phase_top3": 0.273333340883255,
+      "horizon_tokens": 1000.0
+    },
+    "0.99": {
+      "phase_top1": 0.12666666507720947,
+      "phase_top3": 0.30000001192092896,
+      "horizon_tokens": 100.0
+    },
+    "0.95": {
+      "phase_top1": 0.14000000059604645,
+      "phase_top3": 0.35333332419395447,
+      "horizon_tokens": 20.0
+    },
+    "0.9": {
+      "phase_top1": 0.12666666507720947,
+      "phase_top3": 0.3400000035762787,
+      "horizon_tokens": 10.0
+    }
+  }
+}

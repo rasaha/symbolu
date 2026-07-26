@@ -1,0 +1,20 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "realized_write_f1": 0.0,
+  "answer_acc": 0.85,
+  "groups": {
+    "guidance_head": {
+      "answer_grad_norm": 0.02764950506389141,
+      "write_grad_norm": 0.05163019523024559,
+      "grad_cosine": 0.3886661231517792,
+      "write_to_answer_norm_ratio": 1.8673098575772213
+    },
+    "phase": {
+      "answer_grad_norm": 0.11857470870018005,
+      "write_grad_norm": 0.04963483661413193,
+      "grad_cosine": -0.18171408772468567,
+      "write_to_answer_norm_ratio": 0.41859547233668293
+    }
+  }
+}

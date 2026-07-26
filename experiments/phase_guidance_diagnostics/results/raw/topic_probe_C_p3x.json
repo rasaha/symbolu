@@ -1,0 +1,57 @@
+{
+  "arm": "C",
+  "pressure": "3x",
+  "n": 600,
+  "chance": 0.05,
+  "answer_acc_of_model": 0.98,
+  "local_only": {
+    "top1": 0.6777777671813965,
+    "topk": 0.8166666626930237,
+    "k": 3,
+    "mean_conf": 0.5453017950057983,
+    "conf_gap": -0.13247597217559814,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "phase_only": {
+    "top1": 0.05000000074505806,
+    "topk": 0.17777778208255768,
+    "k": 3,
+    "mean_conf": 0.09161220490932465,
+    "conf_gap": 0.041612204164266586,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "local_plus_phase": {
+    "top1": 0.6777777671813965,
+    "topk": 0.8166666626930237,
+    "k": 3,
+    "mean_conf": 0.5448504686355591,
+    "conf_gap": -0.1329272985458374,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "random_state_control": {
+    "top1": 0.07777778059244156,
+    "topk": 0.25,
+    "k": 3,
+    "mean_conf": 0.7974259853363037,
+    "conf_gap": 0.7196482047438622,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  },
+  "shuffled_phase_control": {
+    "top1": 0.05000000074505806,
+    "topk": 0.17777778208255768,
+    "k": 3,
+    "mean_conf": 0.09159818291664124,
+    "conf_gap": 0.041598182171583176,
+    "n_train": 420,
+    "n_test": 180,
+    "num_classes": 20
+  }
+}

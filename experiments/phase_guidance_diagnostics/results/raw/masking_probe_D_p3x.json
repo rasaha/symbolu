@@ -1,0 +1,15 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "chance": 0.05,
+  "keep_density": {
+    "all": 1.0,
+    "no_filler": 0.07083333283662796,
+    "topic_fact_only": 0.05416666716337204
+  },
+  "phase_topic_top1": {
+    "all_tokens": 0.12666666507720947,
+    "filler_zeroed": 0.09333333373069763,
+    "topic_fact_only": 0.2933333218097687
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "arm": "D",
+  "pressure": "3x",
+  "chance": 0.05,
+  "long_filler": {
+    "64": {
+      "phase_top1": 0.015625,
+      "phase_top3": 0.125,
+      "state_norm_mean": 162.60621643066406,
+      "cos_to_decl_mean": 0.8255794644355774,
+      "topic_snr_mean": 0.010276537388563156
+    },
+    "128": {
+      "phase_top1": 0.046875,
+      "phase_top3": 0.140625,
+      "state_norm_mean": 336.36175537109375,
+      "cos_to_decl_mean": 0.8224776983261108,
+      "topic_snr_mean": 0.005605257116258144
+    },
+    "256": {
+      "phase_top1": 0.03125,
+      "phase_top3": 0.0625,
+      "state_norm_mean": 697.88720703125,
+      "cos_to_decl_mean": 0.801470935344696,
+      "topic_snr_mean": 0.002293950878083706
+    },
+    "512": {
+      "phase_top1": 0.09375,
+      "phase_top3": 0.1875,
+      "state_norm_mean": 1279.427490234375,
+      "cos_to_decl_mean": 0.8114328384399414,
+      "topic_snr_mean": 0.0016191670438274741
+    },
+    "1024": {
+      "phase_top1": 0.0625,
+      "phase_top3": 0.125,
+      "state_norm_mean": 2261.3056640625,
+      "cos_to_decl_mean": 0.8869619369506836,
+      "topic_snr_mean": 0.0007629032479599118
+    },
+    "2048": {
+      "phase_top1": 0.046875,
+      "phase_top3": 0.125,
+      "state_norm_mean": 4571.76025390625,
+      "cos_to_decl_mean": 0.8806463479995728,
+      "topic_snr_mean": 0.00035649765050038695
+    },
+    "4096": {
+      "phase_top1": 0.046875,
+      "phase_top3": 0.109375,
+      "state_norm_mean": 9430.349609375,
+      "cos_to_decl_mean": 0.8700059652328491,
+      "topic_snr_mean": 0.00018500196165405214
+    },
+    "8192": {
+      "phase_top1": 0.078125,
+      "phase_top3": 0.140625,
+      "state_norm_mean": 19188.49609375,
+      "cos_to_decl_mean": 0.8632310032844543,
+      "topic_snr_mean": 9.884815517580137e-05
+    },
+    "16384": {
+      "phase_top1": 0.0625,
+      "phase_top3": 0.125,
+      "state_norm_mean": 38764.0625,
+      "cos_to_decl_mean": 0.8595266342163086,
+      "topic_snr_mean": 4.746193371829577e-05
+    },
+    "32768": {
+      "phase_top1": 0.03125,
+      "phase_top3": 0.125,
+      "state_norm_mean": 78004.375,
+      "cos_to_decl_mean": 0.8579791784286499,
+      "topic_snr_mean": 1.9094650269835256e-05
+    }
+  },
+  "natural": {
+    "answer_pos_phase_top1": 0.07500000298023224,
+    "median_distance": 467,
+    "distance_range": [
+      457,
+      475
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "arm": "C",
+  "pressure": "3x",
+  "seed": 0,
+  "steps": 350,
+  "train": {
+    "final_ans": 0.01655971258878708,
+    "final_write": 0.09318817406892776,
+    "best_val": 1.0
+  },
+  "metrics": {
+    "answer_acc": 0.98,
+    "write_precision": 0.0,
+    "write_recall": 0.0,
+    "write_f1": 0.0,
+    "false_write_rate": 0.00125,
+    "n": 100
+  }
+}
