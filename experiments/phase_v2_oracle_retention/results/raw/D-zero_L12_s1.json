@@ -1,0 +1,12 @@
+{
+  "arm": "D-zero",
+  "n_live": 12,
+  "seed": 1,
+  "survival": 0.805,
+  "acc": 0.8,
+  "acc_given_survived": 0.9875776397515528,
+  "acc_given_evicted": 0.02564102564102564,
+  "early_survival": 0.7708333333333334,
+  "middle_survival": 0.7241379310344828,
+  "evictions": 3.99
+}

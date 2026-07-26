@@ -1,0 +1,12 @@
+{
+  "arm": "C-oracle",
+  "n_live": 16,
+  "seed": 2,
+  "survival": 0.7,
+  "acc": 0.695,
+  "acc_given_survived": 0.9785714285714285,
+  "acc_given_evicted": 0.03333333333333333,
+  "early_survival": 0.7009345794392523,
+  "middle_survival": 0.45454545454545453,
+  "evictions": 8.0
+}

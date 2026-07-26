@@ -1,0 +1,12 @@
+{
+  "arm": "D-shuffled",
+  "n_live": 12,
+  "seed": 1,
+  "survival": 0.705,
+  "acc": 0.67,
+  "acc_given_survived": 0.9361702127659575,
+  "acc_given_evicted": 0.03389830508474576,
+  "early_survival": 0.6770833333333334,
+  "middle_survival": 0.5172413793103449,
+  "evictions": 4.0
+}
