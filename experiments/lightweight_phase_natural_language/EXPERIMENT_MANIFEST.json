@@ -1,0 +1,45 @@
+{
+  "frozen_baseline": {
+    "git_commit": "6e2942927f930cdfd789cd10b555d72669a55ba3",
+    "branch": "claude/lightweight-phase-transformer-tt9f27",
+    "test_count": 98,
+    "test_result": "all pass (98)",
+    "freeze_result": "FREEZE OK",
+    "manifest_stages": [
+      "v1.0-phase-core",
+      "v1.1-streaming",
+      "v1.2-decay",
+      "v1.3-transformer",
+      "v1.4-local-phase",
+      "v1.5-binding"
+    ],
+    "phase_core_version": "v1.0",
+    "local_phase_version": "v1.4",
+    "binding_version": "v1.5",
+    "working_tree": "clean at baseline"
+  },
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "cuda_available": false,
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "cpus": 4,
+    "ram_gib": 15
+  },
+  "frozen_phase_constructor_config": {
+    "note": "B and C use symbolu.lightweight_phase.phase_core.LightweightPhaseAttention(PhaseConfig(embed_dim=D, num_heads=H)) UNMODIFIED",
+    "hidden_dimension": 128,
+    "head_count": 4,
+    "head_dimension": 32,
+    "bounded_phase": true,
+    "amplitude": "amp_floor=0.0, amp_scale=1.0 (a=sigmoid)",
+    "normalizer_clamp": 0.1,
+    "normalizer_detached": true,
+    "decay_mode": "none",
+    "gamma_range": "n/a (no decay)",
+    "initial_gamma": "n/a",
+    "residual_scale (aux_scale)": 1.0,
+    "state_dtype": "complex64 / float32",
+    "fusion": "protected additive: y = x + a_local*local + a_phase*phase(+a_slot*slot); alphas init 1.0"
+  }
+}

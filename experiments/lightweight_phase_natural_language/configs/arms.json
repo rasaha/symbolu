@@ -1,0 +1,37 @@
+{
+  "backbone_shared": {
+    "embed_dim": 128,
+    "num_heads": 4,
+    "head_dim": 32,
+    "num_layers": 2,
+    "ffn_ratio": 4,
+    "local_window": 16,
+    "num_slots": 16,
+    "slot_top_k": 4,
+    "dropout": 0.0,
+    "tie_embeddings": true,
+    "fusion": "protected additive (learnable per-path alpha, init 1.0; no competitive gate)"
+  },
+  "arms": {
+    "A": {"local": true, "phase": false, "slots": false,
+          "desc": "sliding-window attention only"},
+    "B": {"local": true, "phase": true, "slots": false,
+          "desc": "sliding window + FROZEN lightweight Phase recurrent state"},
+    "C": {"local": true, "phase": true, "slots": true,
+          "desc": "sliding window + FROZEN Phase + bounded binding slots"},
+    "C-no-Phase": {"local": true, "phase": false, "slots": true,
+          "desc": "sliding window + bounded binding slots (Phase removed)"}
+  },
+  "decisive_comparisons": {
+    "B_minus_A": "Phase contribution on natural-language long-context evidence",
+    "C_minus_B": "binding-slot contribution when Phase is present",
+    "C_minus_C-no-Phase": "Phase contribution when binding slots are present"
+  },
+  "frozen_components_used_unmodified": [
+    "symbolu.lightweight_phase.phase_core.LightweightPhaseAttention",
+    "symbolu.lightweight_phase.local_window.LocalWindowAttention",
+    "symbolu.lightweight_phase.binding_slots.BoundedBindingSlots",
+    "symbolu.lightweight_phase.phase_block.FeedForward"
+  ],
+  "no_quadratic": "verified via frozen shape_audit on every arm (raises on any two-sequence-axis tensor); local O(N*W), phase O(N*D) with O(D) state, slots O(N*M*D) with O(M*D) streaming state"
+}
