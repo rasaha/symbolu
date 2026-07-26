@@ -3,3 +3,4 @@ results/*.log
 results/*_partial.json
 results/waiter.flag
 results/*.DONE
+results/*.flag
