@@ -17,6 +17,10 @@ execution imports **no** HRIS/email/calendar/payroll/vendor SDKs.
 >
 > Never `Recommendation → Action`; never `Human decision → Direct execution`.
 
+**Outcome statement.** *The AI may recommend. A human decides. ActionGate authorizes.
+External systems execute. Ugence verifies, reconciles, and preserves the accountable
+record of what actually happened.*
+
 Enforced by: a proposal requires a **DECIDED** H3 governance binding with a **human**
 decision authority (`IneligibleActionSourceError`); execution requires a provider
 authorization (`ActionNotAuthorizedError`) that is current, unexpired, parameter-bound,
