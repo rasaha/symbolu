@@ -75,7 +75,7 @@ class PressureV2Generator:
         )
 
     def make(self, n_live: int, M: int, target_position: str = "early",
-             query_type: str = "latest_value", versions_per_relevant: int = 2) -> Example:
+             query_type: str = "latest_value", versions_per_relevant: int = 1) -> Example:
         """Build one example with `n_live` distinct live contracts and one queried
         relevant contract placed at `target_position`."""
         r = self.rng
@@ -95,12 +95,16 @@ class PressureV2Generator:
             r.shuffle(extra)
             distractor_contracts += extra[:need]
 
-        target_contract = relevant_contracts[0]
+        # Query a RANDOM relevant contract (not a fixed one) so the query is essential:
+        # the model must (a) retain the focus-relevant facts under distractor flood and
+        # (b) use the query to pick WHICH relevant contract is asked. Collapsing distinct
+        # facts into one slot then loses (cannot disambiguate among the retained facts).
+        target_contract = r.choice(relevant_contracts)
 
         # Build the ordered fact stream. Each contract contributes 1..k versioned
         # facts (same entity_id → supersession). Distinct contracts → distinct slots.
-        eid = {c: i for i, c in enumerate([target_contract] + relevant_contracts[1:]
-                                          + distractor_contracts)}
+        all_contracts = relevant_contracts + distractor_contracts
+        eid = {c: i for i, c in enumerate(all_contracts)}
         stream: List[Fact] = []
 
         def emit_contract(contract, vendor, is_relevant):
@@ -115,7 +119,8 @@ class PressureV2Generator:
         # place the target relevant contract at the requested position; scatter the
         # remaining relevant + distractor contracts around it.
         distractor_facts_units = [(c, r.choice(other_vendors)) for c in distractor_contracts]
-        rel_units = [(c, focus_vendor) for c in relevant_contracts[1:]]
+        # all relevant contracts EXCEPT the target are scattered as competing focus facts
+        rel_units = [(c, focus_vendor) for c in relevant_contracts if c != target_contract]
         r.shuffle(distractor_facts_units)
         r.shuffle(rel_units)
 
