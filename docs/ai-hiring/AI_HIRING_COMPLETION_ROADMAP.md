@@ -43,7 +43,7 @@ Phase list:
 
 - **H0 — Public API Migration & Re-entry Stabilization** ✅ *complete*
 - **H1 — Hiring Domain Completion** ✅ *complete*
-- H2 — AI Recommendation & Evidence Synthesis (TAP)
+- **H2 — AI Recommendation & Evidence Synthesis (TAP)** ✅ *complete*
 - H3 — Governance Integration (TAP + ActionGate Providers)
 - H4 — Hiring Actions, Execution & Reconciliation
 - H5 — Validation, Fairness Analysis & Shadow Pilot
@@ -94,17 +94,30 @@ Phase list:
 - **Exclusions (deferred H2–H6):** AI recommendation generation; TAP/ActionGate
   integration; offer/rejection execution; fairness evaluation; binding decisions.
 
-### H2 — AI Recommendation & Evidence Synthesis
-- **Objective:** synthesize hiring assertions from evidence and evaluate them with
-  **TAP** (support, unsupported components, qualifiers, provenance).
-- **Permitted:** app/domain + `tap_provider`, `governance_providers.api`.
-- **Frozen:** kernel, framework, TAP, ActionGate contracts.
-- **Required:** hiring-claim builder → `AssertionGovernanceRequest`; assessment via
-  `AssertionAssessmentIntegration`; recommendation cites the assessment.
-- **Invariants:** F4, F6, F11, F12; AI stays advisory (F2).
-- **Tests:** unsupported/indeterminate hiring claims never advance as supported;
-  provider failure fail-safe.
-- **Exclusions:** action authorization; execution; fairness conclusions.
+### H2 — AI Recommendation & Evidence Synthesis (TAP)  ✅ COMPLETE
+- **Objective:** synthesize hiring evidence and generate an advisory, evidence-grounded
+  recommendation package for human review, with every material claim evaluated through
+  the **Assertion Governance Provider** (TAP).
+- **Permitted:** `ai_hiring` + `governance_providers.api` (provider contract only).
+- **Frozen:** kernel, framework, TAP, ActionGate contracts (untouched).
+- **Delivered:** `EvidenceSynthesisService` (bounded, deterministic, provenance-
+  preserving, minimization + protected-attribute controls); structured `HiringClaim`s;
+  `ClaimAssertionEvaluator` via `AssertionAssessmentIntegration` (no TAP internals);
+  advisory `HiringRecommendation` (statuses DRAFT / EVIDENCE_INCOMPLETE /
+  ASSERTION_REVIEW_REQUIRED / READY_FOR_HUMAN_REVIEW / REJECTED_BY_REVIEW / SUPERSEDED —
+  **no binding decision status**); replaceable `RecommendationGeneratorPort` +
+  deterministic reference generator (no vendor SDKs in core); `RecommendationReviewPackage`
+  + human-only reviewer dispositions; `RecommendationReconstructionService`; hiring-owned
+  H2 audit events; API-facing contracts.
+- **Invariants:** F2 (AI advisory; **human-only binding decisions** — reviewer actions
+  human-only, no decide/execute path), F4/F6/F11/F12 (unsupported/indeterminate claims
+  never review-ready; provider failure fail-safe; no governance shopping).
+- **Tests:** **38 new H2 tests**; full suite **632 passed** (594 + 38); freeze PASS;
+  0 dependency violations; no platform diff.
+- **Evidence:** `H2_COMPLETION_REPORT.md`.
+- **Exclusions (deferred H3–H6):** action authorization; ActionGate integration;
+  offer/rejection execution; final hiring decisions; fairness certification; production
+  model integrations.
 
 ### H3 — Governance Integration (TAP + ActionGate Providers)
 - **Objective:** run the full DGM case→recommendation→decision→review flow for

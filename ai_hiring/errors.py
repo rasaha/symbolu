@@ -424,3 +424,52 @@ class CrossTenantHiringAccessError(TenantMismatchError):
     """A cross-tenant hiring product access was attempted and denied."""
 
 
+# --- H2 recommendation & evidence synthesis. Application-local, additive. ---
+class RecommendationNotFoundError(HiringProductError):
+    """No recommendation exists for the given id (or not in the caller's tenant)."""
+
+
+class ClaimNotFoundError(HiringProductError):
+    """No claim exists for the given id (or not in the caller's tenant)."""
+
+
+class SynthesisPackageNotFoundError(HiringProductError):
+    """No evidence-synthesis package exists for the given id (or not in tenant)."""
+
+
+class IllegalRecommendationTransitionError(InvalidTransitionError):
+    """An illegal recommendation lifecycle transition was requested."""
+
+
+class RecommendationNotReadyError(HiringProductError):
+    """A recommendation cannot become review-ready under the H2 readiness gate."""
+
+
+class EvidenceSynthesisError(HiringProductError):
+    """Evidence synthesis failed (missing / quarantined / mismatched inputs)."""
+
+
+class StaleRubricVersionError(EvidenceSynthesisError):
+    """Synthesis rubric version does not match the application's job definition."""
+
+
+class ProhibitedAttributeError(HiringProductError):
+    """A prohibited / protected attribute was supplied to the recommendation pipeline."""
+
+
+class RecommendationGenerationError(HiringProductError):
+    """Recommendation generation failed (generator error / malformed output)."""
+
+
+class GeneratorOutputInvalidError(RecommendationGenerationError):
+    """The recommendation generator returned malformed or schema-invalid output."""
+
+
+class AssertionEvaluationUnavailableError(HiringProductError):
+    """The assertion-governance provider could not evaluate a claim (fail-safe)."""
+
+
+class ReviewerAuthorityError(BoundaryViolationError):
+    """A non-human actor attempted a human-only recommendation review action."""
+
+
