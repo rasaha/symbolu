@@ -1,0 +1,31 @@
+{
+  "name": "phase_v2_signal_retention",
+  "purpose": "Build and evaluate a separately-versioned experimental Phase v2 that tests whether selective updates + bounded multi-timescale state preserve a distant focus cue that frozen Phase v1 dilutes via dense no-decay accumulation.",
+  "frozen_contract": {
+    "modifies_frozen_lightweight_phase": false,
+    "freeze_verifier": "FREEZE OK",
+    "lightweight_phase_tests": "98/98",
+    "phase_v1_preserved_as_negative_baseline": true,
+    "no_quadratic_attention": true,
+    "new_package": "symbolu/phase_v2_experimental"
+  },
+  "prior_negative_result_recorded": {
+    "v1_retention_gain_D_minus_C_survival": -0.025,
+    "phase_only_relevance_F1": 0.356,
+    "local_plus_phase_relevance_F1": 0.388,
+    "local_only_relevance_F1": 0.325,
+    "base_rate": 0.25,
+    "distance_diagnostic": "rare focus signal declines ~1/N; Phase topic decoding near chance; no-decay cumulative state dilutes"
+  },
+  "hypothesis": "Selective writes into a persistent (gamma~1) bank preserve a rare distant focus cue across long distractor sequences that dense accumulation dilutes.",
+  "variants": {
+    "V1": "frozen Phase v1 (dense, no decay, no gate) — negative baseline",
+    "V2-S": "selective write, single persistent bank (gamma=1)",
+    "V2-SD": "selective write + learned bounded decay",
+    "V2-M": "selective write, multi-timescale banks (0.5/0.9/0.99/1.0)"
+  },
+  "training_modes": {"e2e": "focus-decode CE + write-budget reg", "gate_sup": "+ supervised write gate (write header, skip distractors) — research scaffold, not an inference oracle"},
+  "artifacts": ["config.py","selective_phase.py","multiscale_phase.py","train.py","focus_probe.py","distance_eval.py","dilution_eval.py","ablations.py","resource_audit.py","run_study.py","results/{raw,aggregate.json,tables.md}","PHASE_V2_{S,SD,M}_MANIFEST.json","PHASE_V2_SIGNAL_RETENTION_REPORT.md"],
+  "reproduce": ["PYTHONPATH=. python3 -m experiments.phase_v2_signal_retention.run_study"],
+  "acceptance_gate": "See report; V2-S/gate_sup is the candidate. Downstream integration (oracle-slot retention / bounded quadratic hybrid) gated on passing."
+}
