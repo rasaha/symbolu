@@ -169,7 +169,7 @@ def assert_no_nxn(model, N=48):
     return flags
 
 
-def train_one(arm, vocab, stream, steps, N, target_params, seed, num_slots, lr=2e-3, B=24, log=None):
+def train_one(arm, vocab, stream, steps, N, target_params, seed, num_slots, lr=2e-3, B=16, log=None):
     set_seed(seed)
     model, nparams = M.build_matched(arm, len(vocab), target_params, d=128, h=4, layers=4,
                                      max_len=1200, window=WINDOW, num_slots=num_slots)
