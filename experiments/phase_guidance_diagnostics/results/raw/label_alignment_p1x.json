@@ -1,0 +1,15 @@
+{
+  "pressure": "1x",
+  "n_candidates": 8,
+  "counts": {
+    "topic_related_needed_label1": 300,
+    "topic_related_notneeded_label1": 0,
+    "distractor_needed_label0": 131,
+    "distractor_notneeded_label0": 2269,
+    "n_examples": 300
+  },
+  "mean_topic_facts_per_ex": 1,
+  "mean_distractors_per_ex": 8,
+  "label1_precision_for_needed": 1.0,
+  "interpretation": "write label 1 is placed on the topic-fact value token; because the task uses exactly one topic fact whose value IS the gold answer, label==1 <=> needed-later with ~1.0 precision. The label is therefore ALIGNED with future utility here; there is no over-retention of topic-but-unneeded facts (no superseded/multi-version topic facts in this generator). Misalignment is NOT the failure mode. The real gap is that L_write is weak/unlearned because content-addressed reads solve the answer without needing selective writes (see slot_chain_trace / score_decomposition)."
+}
