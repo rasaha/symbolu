@@ -38,10 +38,14 @@ class FocusConditionedGate(nn.Module):
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, std=0.02); nn.init.zeros_(m.bias)
 
-    def logit(self, h: Tensor, focus_pos: int = 0) -> Tensor:
-        """h:[B,N,D] → per-head gate logit [B,N,H]. f_t = h[:,focus_pos] broadcast (causal)."""
-        f = h[:, focus_pos:focus_pos + 1]                     # [B,1,D] header/cue summary
-        f = f.expand_as(h)
+    def logit(self, h: Tensor, focus_pos: int = 0, summary_override: Tensor = None) -> Tensor:
+        """h:[B,N,D] → per-head gate logit [B,N,H]. f_t = h[:,focus_pos] broadcast (causal).
+        summary_override: optional [B,D] replacement for f_t (for summary-shuffle / random
+        controls); must not carry future/target information when used at eval."""
+        if summary_override is None:
+            f = h[:, focus_pos:focus_pos + 1].expand_as(h)     # [B,N,D] header/cue summary
+        else:
+            f = summary_override.unsqueeze(1).expand_as(h)
         feat = torch.cat([h, f, h * f, (h - f).abs()], dim=-1)
         return self.net(feat)
 

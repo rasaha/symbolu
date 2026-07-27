@@ -39,11 +39,15 @@ class AutoGateModel(nn.Module):
     def embed(self, ids):
         return self.token_embed(ids) + sinusoidal(ids.shape[1], self.embed_dim, ids.device).unsqueeze(0)
 
-    def gate_logit(self, ids):
+    def gate_logit(self, ids, summary_override=None):
         x = self.embed(ids)
         if self.gate_mode == "conditioned":
-            return self.cond_gate.logit(self.core.norm(x))           # [B,N,H] focus-conditioned
+            return self.cond_gate.logit(self.core.norm(x), summary_override=summary_override)
         return self.core.W_w(self.core.norm(x))                      # [B,N,H] token-only
+
+    def summary_rep(self, ids):
+        """The causal focus summary f_t (= normalized rep at the cue position). For controls."""
+        return self.core.norm(self.embed(ids))[:, 0]                 # [B,D]
 
     def gate(self, ids, override_logit=None):
         logit = self.gate_logit(ids) if override_logit is None else override_logit
