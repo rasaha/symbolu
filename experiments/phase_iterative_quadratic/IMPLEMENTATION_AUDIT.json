@@ -39,7 +39,29 @@
     "route_hinge": {"file": "train.py:71", "labels": "required-event index", "weight": "lambda_route=1.0", "train_only": true}
   },
   "leakage": {"learned_arm_invariant_to_labels": true, "oracle_arm_uses_labels": true, "test": "test_learned_arm_ignores_labels"},
-  "ladder": {"one_hop_oracle": 0.853, "D0": null, "D1": null, "D2": null, "static": null},
-  "pilot_authorized": null,
-  "blocking_issues": []
+  "ladder": {"one_hop_oracle": 0.853, "D0": 1.000, "D1": 0.170, "D2": 0.490, "static": 0.063,
+             "D0_ge_0.95": true, "D1_ge_0.85": false, "bottleneck": "query_update"},
+  "repair_applied": "query-alignment loss (train.py): updated query after hop h aligned to hop-(h+1) required event; re-testing in results/ladder2.json",
+  "sequencing_rule": "D1 fails -> stop and repair learned query evolution; do NOT compare Phase or alternative routers (B0-B5) until D1 passes on autonomous, leakage-free, held-out compositions",
+  "verdict": {
+    "next_token_training_present": false,
+    "evidence_navigation_losses": "verified",
+    "exact_key_value_representation": "verified",
+    "one_hop_oracle": 0.853,
+    "D0": 1.000, "D1": 0.170, "D2": 0.490,
+    "autonomous_eval_no_teacher_forcing": "verified",
+    "structured_evidence_chain_output": "verified",
+    "runtime_evidence_changes_weights": false,
+    "heldout_compositional_generalization": "not_tested",
+    "exact_bounded_softmax": "verified",
+    "full_NxN_attention": "absent",
+    "frozen_phase_guarantee": "pass",
+    "enterprise_evidence_navigation_implementation": "correct_but_not_functionally_sufficient",
+    "pilot_authorized": false
+  },
+  "blocking_issues": [
+    "learned query update fails D1 (0.17 << 0.85) — two-hop query evolution not yet usable (repair under test)",
+    "one-hop oracle 0.853 < 0.90 at N=32 (budget/capacity)",
+    "held-out compositional split not yet built"
+  ]
 }
