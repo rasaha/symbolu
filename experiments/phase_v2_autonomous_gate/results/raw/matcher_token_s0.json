@@ -1,0 +1,29 @@
+{
+  "arm": "token",
+  "seed": 0,
+  "auroc": 0.4960882365703583,
+  "margin": -0.002847400427516549,
+  "relevant_score_mean": 0.5876381993293762,
+  "distractor_score_mean": 0.5904864072799683,
+  "state_top1_2048": 0.9100000262260437,
+  "state_top1_4096": 0.7250000238418579,
+  "calibration": {
+    "top5": {
+      "precision": 0.3852906823158264,
+      "recall": 0.0495055727660656,
+      "false_write_rate": 0.6147093176841736
+    },
+    "top10": {
+      "precision": 0.38717859983444214,
+      "recall": 0.09946233034133911,
+      "false_write_rate": 0.6128214001655579
+    },
+    "top20": {
+      "precision": 0.38464727997779846,
+      "recall": 0.197633758187294,
+      "false_write_rate": 0.6153527200222015
+    }
+  },
+  "margin_focus_removed": -0.002847400427516549,
+  "margin_summary_shuffled": null
+}
