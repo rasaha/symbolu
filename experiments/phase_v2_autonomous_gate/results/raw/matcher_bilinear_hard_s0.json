@@ -1,0 +1,29 @@
+{
+  "arm": "bilinear_hard",
+  "seed": 0,
+  "auroc": 0.8453962206840515,
+  "margin": 48.011327269321086,
+  "relevant_score_mean": 42.617679595947266,
+  "distractor_score_mean": -5.375610828399658,
+  "state_top1_2048": 0.9900000095367432,
+  "state_top1_4096": 0.9925000071525574,
+  "calibration": {
+    "top5": {
+      "precision": 0.7666699290275574,
+      "recall": 0.10386054962873459,
+      "false_write_rate": 0.23333007097244263
+    },
+    "top10": {
+      "precision": 0.7764596939086914,
+      "recall": 0.21035298705101013,
+      "false_write_rate": 0.2235403060913086
+    },
+    "top20": {
+      "precision": 0.7937658429145813,
+      "recall": 0.43008291721343994,
+      "false_write_rate": 0.2062341570854187
+    }
+  },
+  "margin_focus_removed": 0.7287539981530228,
+  "margin_summary_shuffled": 2.8481521082329264
+}
