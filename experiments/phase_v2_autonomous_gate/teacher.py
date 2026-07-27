@@ -18,6 +18,7 @@ from symbolu.phase_v2_experimental.selective_phase import SelectivePhaseV2, _sca
 from experiments.phase_v3_selective_ssm.train import sinusoidal
 from .config import EMBED_DIM, NUM_HEADS, NUM_ENTITIES
 from .student_gate import gate_from_logit, FocusConditionedGate
+from .matcher_gate import MatcherGate
 
 
 class AutoGateModel(nn.Module):
@@ -28,11 +29,13 @@ class AutoGateModel(nn.Module):
         self.embed_dim = embed_dim
         self.gate_type = gate_type
         self.topk_frac = topk_frac
-        self.gate_mode = gate_mode                                   # "token" | "conditioned"
+        self.gate_mode = gate_mode              # token | conditioned | cosine | bilinear
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
         self.core = SelectivePhaseV2(cfg_v2s(embed_dim, num_heads))   # γ=1, per-head gate
         if gate_mode == "conditioned":
             self.cond_gate = FocusConditionedGate(embed_dim, num_heads)
+        elif gate_mode in ("cosine", "bilinear"):
+            self.matcher = MatcherGate(embed_dim, num_heads, kind=gate_mode)
         self.focus_head = nn.Linear(embed_dim, num_entities)
         nn.init.normal_(self.token_embed.weight, std=0.02)
 
@@ -40,10 +43,21 @@ class AutoGateModel(nn.Module):
         return self.token_embed(ids) + sinusoidal(ids.shape[1], self.embed_dim, ids.device).unsqueeze(0)
 
     def gate_logit(self, ids, summary_override=None):
-        x = self.embed(ids)
+        h = self.core.norm(self.embed(ids))
         if self.gate_mode == "conditioned":
-            return self.cond_gate.logit(self.core.norm(x), summary_override=summary_override)
-        return self.core.W_w(self.core.norm(x))                      # [B,N,H] token-only
+            return self.cond_gate.logit(h, summary_override=summary_override)
+        if self.gate_mode in ("cosine", "bilinear"):
+            return self.matcher.logit(h, summary_override=summary_override)
+        return self.core.W_w(h)                                      # [B,N,H] token-only
+
+    def match_score(self, ids, summary_override=None):
+        """Relevance score s_t [B,N] for matcher gates (for ranking loss + AUROC)."""
+        h = self.core.norm(self.embed(ids))
+        return self.matcher.match_score(h, summary_override=summary_override)
+
+    def matcher_projections(self, ids):
+        h = self.core.norm(self.embed(ids))
+        return self.matcher._project(h) + (self.matcher.event_logit(h),)   # z_f, z_h, e_logit
 
     def summary_rep(self, ids):
         """The causal focus summary f_t (= normalized rep at the cue position). For controls."""
