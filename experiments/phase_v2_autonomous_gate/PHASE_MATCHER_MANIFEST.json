@@ -1,0 +1,57 @@
+{
+  "experiment": "phase_v2_autonomous_gate / matcher study",
+  "title": "Explicit focus-event matcher (isolate semantic matching before memory writing)",
+  "date": "2026-07-27",
+  "frozen_recurrence": "S_t = S_{t-1} + B_t(k_t ⊙ v_t), gamma=1, omega=0, one persistent bank, no C_t, no slots, no quadratic; SelectivePhaseV2 unmodified (gate via gate_override)",
+  "frozen_matcher_baseline": "COND-MLP (focus-conditioned concat MLP), AUROC ~0.61, decode 1.000",
+  "frozen_baseline_hashes": {
+    "phase_v1_phase_core": "99b5255f0bb20b066d8ad9087dcae54e624927e3b9f1c41f7f68128050afa806",
+    "phase_v2s_selective_phase": "4d8d1f8dac1e711d2b4c35dcbdf72570685b38f206e92b1353d364de03ce0251",
+    "freeze": "FREEZE OK", "tests": "98 passed"
+  },
+  "method": {
+    "matcher": "z_f=LN(W_f f_t), z_h=LN(W_h h_t); cosine s=cos/tau or bilinear s=z_f^T M z_h; two-stage B_t=sigmoid(W_e h)*sigmoid(a*s+b); f_t=causal header-captured summary; no oracle bit/future/target at inference",
+    "losses": "pairwise ranking (primary) + event-vs-filler BCE + write-budget + alignment",
+    "hard_negatives": "frequency-matched repeated distractor entity; only focus-identity-match separates relevant from distractor",
+    "discipline": "COND-MLP preserved as frozen baseline; matchers added as new arms; 2-seed pilot selects candidate; 3-seed hard-negative confirmation + causal controls decides promotion"
+  },
+  "pilot_2seed_auroc": {"token": 0.498, "cond_mlp": 0.620, "cosine": 0.796, "bilinear": 0.830, "bilinear_hard": 0.837},
+  "selected_candidate": "bilinear_hard (highest, most stable hard-negative AUROC)",
+  "confirmation_3seed": {
+    "token": {"auroc": 0.502, "d2048": 0.912, "d4096": 0.737, "write_rel_hard_fill": [0.60, 0.60, 0.33]},
+    "cond_mlp": {"auroc": 0.607, "d2048": 1.000, "d4096": 1.000, "write_rel_hard_fill": [0.08, 0.00, 0.00]},
+    "bilinear_hard": {
+      "auroc": 0.803, "auroc_raw": [0.845, 0.829, 0.736], "auroc_min": 0.736,
+      "hard_auroc": 0.804, "winrate": 0.804, "rel_minus_hard_margin_raw": 39.851,
+      "d2048_state": 0.986, "d4096_state": 0.988, "d4096_raw": [0.993, 1.000, 0.970],
+      "write_relevant": 0.77, "write_ordinary": 0.39, "write_hard": 0.39, "write_filler": 0.10
+    }
+  },
+  "causal_controls_bilinear_hard": {
+    "intact_hard_auroc": 0.804, "focus_removed": 0.508, "summary_shuffled": 0.518, "random_summary": 0.493,
+    "causal_delta": 0.298, "interpretation": "advantage collapses to chance without correct focus summary -> genuine focus-event matching, NOT a shortcut"
+  },
+  "promotion": {
+    "promote": false,
+    "criteria": {
+      "overall_auroc_ge_0.70": true, "hard_auroc_ge_0.65": true, "rel_minus_hard_positive_all_seeds": true,
+      "winrate_ge_0.70": true, "write_rel_gt_hard": true,
+      "hard_falsewrite_improves_vs_condmlp": false, "d4096_no_worse_than_condmlp": false,
+      "controls_eliminate_advantage": true, "recurrence_unchanged": true
+    },
+    "reason_not_promoted": "discrimination solved causally, but no downstream decode/write-economy gain over COND-MLP because the memory task is saturated (COND-MLP decodes 1.000 writing ~only the cue)",
+    "cosine_fallback_run": false,
+    "cosine_fallback_reason": "not required: bilinear_hard PASSED the causal controls (fallback is only for a shortcut/failed-controls candidate)"
+  },
+  "final_selection_priority": "causal focus dependence (PASS, delta +0.298) -> hard-neg discrimination (PASS 0.80) -> rel-vs-hard margin (PASS) -> write separation (PASS 0.77>0.39) -> decode non-regression (marginal FAIL 0.988<1.000) -> simplicity (cosine ~ bilinear causally)",
+  "verdict": "Explicit focus-event matching VALIDATED as causal discrimination (AUROC 0.62->0.80, causal_delta +0.30); NOT promoted downstream (task saturated; write-coupling unresolved).",
+  "next_permitted_step": "gate calibration / write-coupling on a NON-saturated memory task (show validated relevance improves downstream recall where writes matter). Do NOT proceed to slots/consolidation/quadratic on discrimination alone; do NOT run further similarity sweeps. If a non-saturated task still shows no downstream gain, move to contrastive focus-event representation learning.",
+  "complexity": {"state_bytes_B1": 768, "bounded_in_N": true, "runtime_linear_in_N": true, "recurrence_unchanged": true},
+  "artifacts": [
+    "matcher_gate.py", "matcher_losses.py", "hard_dataset.py", "matcher_train.py",
+    "matcher_study.py", "matcher_confirm.py",
+    "results/matcher_pilot_raw/", "results/matcher_confirmation_raw/",
+    "results/matcher_pilot_aggregate.json", "results/matcher_confirmation_aggregate.json",
+    "results/matcher_tables.md", "PHASE_MATCHER_REPORT.md"
+  ]
+}
