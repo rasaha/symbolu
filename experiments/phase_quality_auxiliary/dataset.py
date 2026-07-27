@@ -37,13 +37,14 @@ TARGETS = ("persistence", "unresolved_recurrence", "context_shift", "sequence_an
 
 @dataclass
 class Schema:
-    n_subjects: int = 64
+    n_subjects: int = 32
     n_relations: int = 8
     n_objects: int = 32
     n_documents: int = 16
     n_sections: int = 8
     n_authorities: int = 4
     n_templates: int = 12          # wording/event templates (for held-out template splits)
+    n_versions: int = 8            # version as a categorical (readable by the quadratic branch)
     packet_K: int = 16             # bounded quadratic candidate packet size
 
     # numeric feature width per record (fed to the encoder)
@@ -113,16 +114,22 @@ def make_stream(schema: Schema, N: int, g: torch.Generator,
     relevant_positions = []                               # DISTANT (long-range) evidence only
 
     # ---- LONG-RANGE Phase targets: persistence / unresolved_recurrence (evidence OUTSIDE packet) ----
+    # Repeated distant OPEN records so the focus's long-range activity registers in a bounded
+    # temporal state (still strictly outside the local packet).
     if has_persist:
-        place(early, frel, theme_obj, OPEN, 1, "persist_early")
-        place(mid, frel, theme_obj, OPEN, 1, "persist_mid")
-        relevant_positions += [early, mid]
+        step = max(1, region // 5)
+        for j in range(4):
+            p = lo_rel + 1 + j * step
+            if p < hi_rel:
+                place(p, frel, theme_obj, OPEN, 1, f"persist_{j}")
+                relevant_positions.append(p)
     if has_recur:
         r0, r1, r2 = max(2, early - 1), mid, late
         place(r0, frel, theme_obj, OPEN, 1, "recur_open")
         place(r1, frel, theme_obj, RESOLVED, 2, "recur_resolved")
         place(r2, frel, theme_obj, OPEN, 3, "recur_reopen")
-        relevant_positions += [r0, r1, r2]
+        place(min(hi_rel - 1, r2 + 1), frel, theme_obj, OPEN, 3, "recur_reopen2")
+        relevant_positions += [r0, r1, r2, min(hi_rel - 1, r2 + 1)]
 
     # ---- LOCAL quadratic targets: context_shift / sequence_anomaly (RELATIONAL, inside packet) ----
     # Both classes place matched records so deterministic COUNTS do not discriminate; only the
@@ -130,14 +137,17 @@ def make_stream(schema: Schema, N: int, g: torch.Generator,
     # which the bounded quadratic comparison can read but simple metadata counts cannot.
     q = N - 1
     lp = [q - 2, q - 4, q - 6, q - 8]                     # local, inside the packet window
-    # context_shift: an original record, then a SUPERSEDED record (always present).
+    # context_shift: iff has_shift a SUPERSEDED record (conflicting object) is present locally;
+    # otherwise a benign NOTE at the same slot (matched count → A0 cannot leak; A1 reads the status).
     place(lp[0], frel, theme_obj, OPEN, 1, "ctx_orig")
-    shift_obj = (theme_obj + 1) % S.n_objects if has_shift else theme_obj
-    place(lp[1], frel, shift_obj, SUPERSEDED, 2, "ctx_supersede")    # conflict iff has_shift
-    # sequence_anomaly: a RESOLVED record then an OPEN record; anomaly iff the version REGRESSES.
+    if has_shift:
+        place(lp[1], frel, (theme_obj + 1) % S.n_objects, SUPERSEDED, 2, "ctx_supersede")
+    else:
+        place(lp[1], frel, theme_obj, NOTE, 1, "ctx_none")
+    # sequence_anomaly: a RESOLVED (version 4) then an OPEN record; anomaly iff the version REGRESSES
+    # (version 1 < 4) vs a normal progression (version 5). Version is a categorical the quadratic reads.
     place(lp[2], frel, theme_obj, RESOLVED, 4, "anom_prev")
-    anom_ver = 1 if has_anom else 5
-    place(lp[3], frel, theme_obj, OPEN, anom_ver, "anom_next")       # regresses iff has_anom
+    place(lp[3], frel, theme_obj, OPEN, (1 if has_anom else 5), "anom_next")
 
     # harmless unusual event (rare-but-valid): a lone EXCEPTION, distant, never an anomaly label
     hp = N // 3 + _ri(max(1, N // 8), g)
@@ -188,14 +198,15 @@ def deterministic_packet(ex: Dict, schema: Schema) -> List[int]:
 
 # ---------- featurization ----------
 CAT_FIELDS = ("document_id", "section_id", "subject_id", "relation_id", "object_id",
-              "status", "source_authority", "template")
+              "status", "source_authority", "template", "version")
 
 
 def field_dims(schema: Schema) -> Dict[str, int]:
     return {"document_id": schema.n_documents, "section_id": schema.n_sections,
             "subject_id": schema.n_subjects, "relation_id": schema.n_relations,
             "object_id": schema.n_objects, "status": N_STATUS,
-            "source_authority": schema.n_authorities, "template": schema.n_templates}
+            "source_authority": schema.n_authorities, "template": schema.n_templates,
+            "version": schema.n_versions}
 
 
 def encode_categoricals(ex: Dict, schema: Schema, device="cpu"):
