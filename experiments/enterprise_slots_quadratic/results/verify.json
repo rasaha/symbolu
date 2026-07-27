@@ -1,0 +1,138 @@
+{
+  "steps": 600,
+  "splits": {
+    "train_subjects": 32,
+    "held_subjects": 16,
+    "train_templates": 8,
+    "held_templates": 4
+  },
+  "policies": {
+    "P2": {
+      "dev": {
+        "accuracy": 0.6133333333333333,
+        "acc_given_required_survived": 0.6133333333333333,
+        "conflict_f1": 0.9896907216494846,
+        "conflict_recall_given_both_survived": 0.9795918367346939,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "heldout": {
+        "accuracy": 0.6033333333333334,
+        "acc_given_required_survived": 0.6033333333333334,
+        "conflict_f1": 0.9263157894736843,
+        "conflict_recall_given_both_survived": 0.8979591836734694,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "version_sep_heldout": {
+        "active_version_survival": 1.0,
+        "active_plus_stale_cosurvival": 0.11158798283261803,
+        "version_acc_overall": 0.9699570815450643,
+        "version_acc_given_active_and_stale_survived": 1.0,
+        "n_both": 26
+      }
+    },
+    "P3": {
+      "dev": {
+        "accuracy": 0.6033333333333334,
+        "acc_given_required_survived": 0.6033333333333334,
+        "conflict_f1": 0.9795918367346939,
+        "conflict_recall_given_both_survived": 0.9795918367346939,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "heldout": {
+        "accuracy": 0.6033333333333334,
+        "acc_given_required_survived": 0.6033333333333334,
+        "conflict_f1": 0.9375000000000001,
+        "conflict_recall_given_both_survived": 0.9183673469387755,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "version_sep_heldout": {
+        "active_version_survival": 1.0,
+        "active_plus_stale_cosurvival": 0.11158798283261803,
+        "version_acc_overall": 0.9699570815450643,
+        "version_acc_given_active_and_stale_survived": 1.0,
+        "n_both": 26
+      }
+    },
+    "P4": {
+      "dev": {
+        "accuracy": 0.6033333333333334,
+        "acc_given_required_survived": 0.6033333333333334,
+        "conflict_f1": 0.9795918367346939,
+        "conflict_recall_given_both_survived": 0.9795918367346939,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "heldout": {
+        "accuracy": 0.6033333333333334,
+        "acc_given_required_survived": 0.6033333333333334,
+        "conflict_f1": 0.9375000000000001,
+        "conflict_recall_given_both_survived": 0.9183673469387755,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "version_sep_heldout": {
+        "active_version_survival": 1.0,
+        "active_plus_stale_cosurvival": 0.11158798283261803,
+        "version_acc_overall": 0.9699570815450643,
+        "version_acc_given_active_and_stale_survived": 1.0,
+        "n_both": 26
+      }
+    },
+    "P5": {
+      "dev": {
+        "accuracy": 0.5966666666666667,
+        "acc_given_required_survived": 0.5966666666666667,
+        "conflict_f1": 0.9690721649484536,
+        "conflict_recall_given_both_survived": 0.9591836734693877,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "heldout": {
+        "accuracy": 0.5933333333333334,
+        "acc_given_required_survived": 0.5933333333333334,
+        "conflict_f1": 0.8712871287128713,
+        "conflict_recall_given_both_survived": 0.8979591836734694,
+        "required_survival": 1.0,
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0
+      },
+      "version_sep_heldout": {
+        "active_version_survival": 1.0,
+        "active_plus_stale_cosurvival": 0.11158798283261803,
+        "version_acc_overall": 0.9656652360515021,
+        "version_acc_given_active_and_stale_survived": 1.0,
+        "n_both": 26
+      }
+    }
+  },
+  "causal_rerun_heldout": {
+    "none": 0.6033333333333334,
+    "evict_required": 0.24333333333333335,
+    "evict_irrelevant": 0.44333333333333336
+  },
+  "integrity_heldout": {
+    "unauthorized_inclusion_rate": 0.0,
+    "evidence_id_preservation": 1.0,
+    "injected_unauthorized_leak_rate": 0.0
+  },
+  "checks": {
+    "leak_free_reachability": true,
+    "heldout_survival_ok": true,
+    "causal_required_gt_irrelevant": true,
+    "id_preservation": true,
+    "no_unauthorized": true,
+    "version_gain_from_slots_not_quad": false,
+    "RESCUE_VALIDATED": true
+  }
+}
