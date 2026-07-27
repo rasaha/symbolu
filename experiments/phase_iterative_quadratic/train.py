@@ -25,6 +25,7 @@ def collate_iter(batch, vocab, device="cpu"):
     H = max(e["n_required"] for e in batch)
     req_full = torch.full((B, H), -1, dtype=torch.long)      # key token positions of required hops
     req_evidx = torch.full((B, H), -1, dtype=torch.long)     # indices into the event/key list
+    hop_tgt = torch.full((B, H), -1, dtype=torch.long)       # per-hop target identity (event value)
     for i, e in enumerate(batch):
         kp = e["key_pos"]; event_pos[i, :len(kp)] = torch.tensor(kp)
         probe_pos[i] = len(e["tokens"]) - 1
@@ -32,8 +33,9 @@ def collate_iter(batch, vocab, device="cpu"):
         for h, evidx in enumerate(e["req_evidx"]):
             req_evidx[i, h] = evidx
             req_full[i, h] = e["key_pos"][evidx]
+            hop_tgt[i, h] = e["events"][evidx]["value"]      # what this hop points to
     return (ids.to(device), event_pos.to(device), probe_pos.to(device), valid_len.to(device),
-            answer.to(device), req_full.to(device), req_evidx.to(device))
+            answer.to(device), req_full.to(device), req_evidx.to(device), hop_tgt.to(device))
 
 
 def _route_loss(route_scores, req_evidx, margin):
@@ -56,9 +58,15 @@ def train_hybrid(model, gen_fn, vocab, cfg: TrainCfg, device="cpu"):
     rng = torch.Generator().manual_seed(cfg.seed + 1)
     for step in range(cfg.steps):
         data = gen_fn(cfg.batch_size, cfg.seed * 10000 + step)
-        ids, ep, pp, vl, ans, reqf, reqe = collate_iter(data, vocab, device)
+        ids, ep, pp, vl, ans, reqf, reqe, hoptgt = collate_iter(data, vocab, device)
         out = model(ids, ep, pp, vl, required_hops=reqf)
         loss = F.cross_entropy(out["answer_logits"], ans)
+        # per-hop supervision (§13): each hop's attention output should predict that hop's target
+        for h, hl in enumerate(out["hop_logits"]):
+            if h < hoptgt.shape[1]:
+                m = hoptgt[:, h] >= 0
+                if m.any():
+                    loss = loss + F.cross_entropy(hl[m], hoptgt[m, h])
         if model.routing_mode in ("learned", "phase_zero", "phase_shuffle"):
             loss = loss + cfg.lambda_route * _route_loss(out["route_scores"], reqe, cfg.margin)
         opt.zero_grad(); loss.backward()

@@ -35,6 +35,7 @@ class IterativeHybrid(nn.Module):
         self.qupdate = QueryUpdate(embed_dim)
         self.val_bind = nn.Linear(embed_dim, embed_dim)     # local key↔value binding (minimal P mixing)
         self.answer_head = nn.Linear(2 * embed_dim, n_id)   # decode from [final query ; last attn output]
+        self.hop_head = nn.Linear(embed_dim, n_id)          # per-hop target head (staged supervision §13)
         if use_phase:
             self.phase = PhaseFeature(embed_dim, num_heads)
         self.phase_zero = routing_mode == "phase_zero"
@@ -62,7 +63,7 @@ class IterativeHybrid(nn.Module):
         reps = reps.scatter(1, kp, ev)                           # attention sees bound key reps
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
-        route_scores = []
+        route_scores = []; hop_outputs = []
         for h in range(self.hops):
             scores = self.router.score(q, ev)                          # [B,Ne]
             route_scores.append(scores)
@@ -84,9 +85,12 @@ class IterativeHybrid(nn.Module):
                 routed_full = torch.cat([rk, rk + 1], dim=1)           # include each key's VALUE token
             o = self.qblock(q.unsqueeze(1), reps, probe_pos.unsqueeze(1), routed_full,
                             self.W, valid_len)[:, 0]
+            hop_outputs.append(o)
             if self.iterative:
                 q = self.qupdate(q, o)
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
         logits = self.answer_head(torch.cat([q, o], dim=-1))           # decode from query + last attn output
-        return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev}
+        hop_logits = [self.hop_head(oh) for oh in hop_outputs]         # per-hop target prediction (staged)
+        return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev,
+                "hop_logits": hop_logits}

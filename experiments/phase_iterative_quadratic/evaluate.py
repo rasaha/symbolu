@@ -13,7 +13,7 @@ def evaluate(model, data, vocab, device="cpu", batch_size=64):
     hop_hit = {}; chain_hit = 0; n_chain = 0
     for i in range(0, len(data), batch_size):
         b = data[i:i + batch_size]
-        ids, ep, pp, vl, ans, reqf, reqe = collate_iter(b, vocab, device)
+        ids, ep, pp, vl, ans, reqf, reqe, hoptgt = collate_iter(b, vocab, device)
         out = model(ids, ep, pp, vl, required_hops=reqf)
         pred = out["answer_logits"].argmax(-1)
         correct += (pred == ans).sum().item(); total += len(b)
