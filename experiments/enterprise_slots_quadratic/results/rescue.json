@@ -1,0 +1,203 @@
+{
+  "steps": 5,
+  "mode": "streaming",
+  "N": 256,
+  "policies_K8": {
+    "S3_P2": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.2,
+      "version_acc": 0.2,
+      "version_acc_given_survived": 0.21739130434782608,
+      "conflict_f1": 0.0,
+      "required_survival": 0.75,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 43.5,
+      "n_survived": 30
+    },
+    "S3_P3": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.1935483870967742,
+      "version_acc": 0.2,
+      "version_acc_given_survived": 0.20833333333333334,
+      "conflict_f1": 0.0,
+      "required_survival": 0.775,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 43.45,
+      "n_survived": 31
+    },
+    "S3_P4": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.0,
+      "version_acc": 0.25,
+      "version_acc_given_survived": 0.0,
+      "conflict_f1": 0.0,
+      "required_survival": 0.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 25.6,
+      "n_survived": 0
+    },
+    "S3_P5": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.0,
+      "version_acc": 0.25,
+      "version_acc_given_survived": 0.0,
+      "conflict_f1": 0.0,
+      "required_survival": 0.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 25.6,
+      "n_survived": 0
+    },
+    "S3R_roles": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.0,
+      "version_acc": 0.225,
+      "version_acc_given_survived": 0.0,
+      "conflict_f1": 0.0,
+      "required_survival": 0.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 24.95,
+      "n_survived": 0
+    },
+    "S1G_global": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.2222222222222222,
+      "version_acc": 0.225,
+      "version_acc_given_survived": 0.2727272727272727,
+      "conflict_f1": 0.0,
+      "required_survival": 0.45,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 8.0,
+      "n_survived": 18
+    },
+    "S4_oracle": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.175,
+      "version_acc": 0.25,
+      "version_acc_given_survived": 0.21212121212121213,
+      "conflict_f1": 0.0,
+      "required_survival": 1.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 253.825,
+      "n_survived": 40
+    }
+  },
+  "capacity_S3_P2": {
+    "K4": {
+      "accuracy": 0.15,
+      "acc_given_required_survived": 0.09090909090909091,
+      "version_acc": 0.225,
+      "version_acc_given_survived": 0.25,
+      "conflict_f1": 0.0,
+      "required_survival": 0.275,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 24.125,
+      "n_survived": 11
+    },
+    "K8": {
+      "accuracy": 0.175,
+      "acc_given_required_survived": 0.2,
+      "version_acc": 0.2,
+      "version_acc_given_survived": 0.21739130434782608,
+      "conflict_f1": 0.0,
+      "required_survival": 0.75,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 43.5,
+      "n_survived": 30
+    },
+    "K16": {
+      "accuracy": 0.25,
+      "acc_given_required_survived": 0.25,
+      "version_acc": 0.225,
+      "version_acc_given_survived": 0.18181818181818182,
+      "conflict_f1": 0.0,
+      "required_survival": 1.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 72.75,
+      "n_survived": 40
+    },
+    "K32": {
+      "accuracy": 0.2,
+      "acc_given_required_survived": 0.2,
+      "version_acc": 0.225,
+      "version_acc_given_survived": 0.18181818181818182,
+      "conflict_f1": 0.0,
+      "required_survival": 1.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 117.25,
+      "n_survived": 40
+    }
+  },
+  "S4_ref": {
+    "accuracy": 0.175,
+    "acc_given_required_survived": 0.175,
+    "version_acc": 0.25,
+    "version_acc_given_survived": 0.21212121212121213,
+    "conflict_f1": 0.0,
+    "required_survival": 1.0,
+    "unauthorized_inclusion": 0.0,
+    "evidence_id_preservation": 1.0,
+    "records_encoded_per_query": 253.825,
+    "n_survived": 40
+  },
+  "taxonomy_S3_P2_K8": {
+    "counts": {
+      "MISSING_ADMISSION": 2,
+      "PREMATURE_EVICTION": 7,
+      "DUPLICATE_WASTE": 7,
+      "STALE_DOMINANCE": 0,
+      "CONFLICT_PAIR_INCOMPLETE": 0,
+      "CHAIN_LINK_MISSING": 0,
+      "REASONING_FAILURE": 15,
+      "OUTPUT_MAPPING_FAILURE": 2
+    },
+    "pct": {
+      "MISSING_ADMISSION": 0.06060606060606061,
+      "PREMATURE_EVICTION": 0.21212121212121213,
+      "DUPLICATE_WASTE": 0.21212121212121213,
+      "STALE_DOMINANCE": 0.0,
+      "CONFLICT_PAIR_INCOMPLETE": 0.0,
+      "CHAIN_LINK_MISSING": 0.0,
+      "REASONING_FAILURE": 0.45454545454545453,
+      "OUTPUT_MAPPING_FAILURE": 0.06060606060606061
+    },
+    "n_errors": 33,
+    "n": 40
+  },
+  "integrity": {
+    "unauthorized_inclusion_rate": 0.0,
+    "evidence_id_preservation": 1.0,
+    "injected_unauthorized_leak_rate": 0.0
+  },
+  "causal_S3_K16": {
+    "none": 0.25,
+    "evict_required": 0.225,
+    "evict_irrelevant": 0.125,
+    "shuffle_slots": 0.25,
+    "zero_slot_repr": 0.125
+  },
+  "verdict": {
+    "S3_to_S4_gap": 0.0,
+    "gap_explained_by_missing_evidence_pct": 0.48484848484848486,
+    "gap_explained_by_reasoning_pct": 0.5151515151515151,
+    "acc_given_required_survived": 0.2,
+    "best_deterministic_policy": "S3_P2",
+    "best_policy_closes_gap_pct": 0.0,
+    "S1G_vs_S3": "equivalent",
+    "smallest_K_95pct": 16,
+    "causal_required_gt_irrelevant": false,
+    "primary_bottleneck": "reasoning_or_output",
+    "binding_slot_survival_value": "validated",
+    "provenance_access_isolation": "verified"
+  }
+}

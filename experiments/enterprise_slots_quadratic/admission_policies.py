@@ -54,9 +54,12 @@ def priority(e: Evidence, ctx: Dict, policy: str, required_ids=None) -> float:
 
 def build_ctx(events: List[Evidence], query_anchor=None) -> Dict:
     latest = _latest_version_by_key(events)
+    # material conflict = >1 ACTIVE governance (chain-relation) record for the same (subject,
+    # relation) with different version/object. Restricted to CHAIN_RELATIONS so transactional
+    # noise (e.g. many Invoice `bills` records) is NOT mistaken for a governance conflict.
     active_by_key: Dict[tuple, set] = {}
     for e in events:
-        if e.status == ACTIVE:
+        if e.status == ACTIVE and e.relation_type in CHAIN_RELATIONS:
             active_by_key.setdefault(e.key_tuple()[:3], set()).add((e.version, e.object_id_or_value))
     conflict_keys = {k for k, v in active_by_key.items() if len(v) > 1}
     # deterministic transitive chain reachability from the query anchor subject (no labels):
