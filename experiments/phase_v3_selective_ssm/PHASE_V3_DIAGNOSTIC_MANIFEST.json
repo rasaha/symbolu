@@ -1,0 +1,105 @@
+{
+  "experiment": "phase_v3_selective_ssm",
+  "title": "Phase v3 — selective complex state-space memory (retention A_t / write B_t / read C_t)",
+  "date": "2026-07-27",
+  "gated_experiment": true,
+  "verdict": "V3 does not surpass V2-S; selective write is the decisive mechanism; recurrent rotation omega_t is harmful; dynamic retention gamma_t gives no measurable gain on this pure-persistence task",
+  "hypothesis": "Phase becomes a usable long-range state-memory mechanism when retention, writing, and reading are all input-dependent, with causal streaming, bounded state, complex dynamics, and O(N).",
+  "frozen_baseline": {
+    "branch": "claude/frozen-phase-transformer-diag-jzabnu",
+    "git_commit_baseline": "956a3e8",
+    "phase_v1_hash_phase_core": "99b5255f0bb20b066d8ad9087dcae54e624927e3b9f1c41f7f68128050afa806",
+    "phase_v2s_hash_selective_phase": "4d8d1f8dac1e711d2b4c35dcbdf72570685b38f206e92b1353d364de03ce0251",
+    "lightweight_phase_tests": "98 passed",
+    "freeze": "FREEZE OK",
+    "python": "3.11.15", "torch": "2.13.0+cu130",
+    "hardware": "Linux x86_64, 4 CPU (CPU-only)",
+    "working_tree": "clean at baseline; v1/v2 byte-identical after v3 added"
+  },
+  "constraints_respected": {
+    "frozen_v1_unmodified": true,
+    "v2s_unmodified": true,
+    "v3_separately_versioned": "symbolu/phase_v3_experimental",
+    "no_slots_or_quadratic_in_primary_test": true,
+    "no_C_t_multibank_slots_quadratic_beyond_this": true
+  },
+  "streaming_equivalence": {"full_vs_token_vs_chunked_max_err": 2.4e-7, "tolerance": 1e-6, "passed": true},
+  "variants": ["V1(frozen)", "V2-S(frozen)", "V3-B(write)", "V3-AB(retention+write)", "V3-ABC(all)"],
+  "seeds": [0, 1, 2],
+  "distances": [64, 128, 256, 512, 1024, 2048, 4096],
+  "main_study_state_top1_mean": {
+    "V1":    {"64": 0.911, "128": 0.993, "256": 0.998, "512": 0.828, "1024": 0.658, "2048": 0.548, "4096": 0.474},
+    "V2-S":  {"64": 1.000, "128": 1.000, "256": 1.000, "512": 1.000, "1024": 1.000, "2048": 1.000, "4096": 0.938},
+    "V3-B":  {"64": 1.000, "128": 1.000, "256": 1.000, "512": 1.000, "1024": 0.999, "2048": 0.544},
+    "V3-AB": {"64": 0.995, "128": 0.952, "256": 0.819, "512": 0.609, "1024": 0.438, "2048": 0.383},
+    "V3-ABC":{"64": 0.999, "128": 0.998, "256": 0.958, "512": 0.792, "1024": 0.433, "2048": 0.318, "4096": 0.378}
+  },
+  "acceptance_16": {
+    "16.1_state_minus_control_ge_0.20": {"d512": 0.723, "d1024": 0.364, "d2048": 0.240, "met": true},
+    "16.2_selective_ge_state": {"met": false, "note": "readout is a lossy D-dim projection of the 2D state"},
+    "16.3_relevance_f1": {"V3ABC": 0.40, "V2S": 0.42, "target": 0.70, "met": false},
+    "16.4_above_V1_through_2k": {"V3ABC_minus_V1_d1024": -0.225, "d2048": -0.229, "met": false},
+    "16.6_annealed_ge_80pct_supervised": {"B_over_A_d2048": 1.65, "met": true},
+    "16.7_no_gate_collapse": {"write_rate": 0.28, "met": true},
+    "16.8_ablation_causality": {"met": true},
+    "16.9_streaming": {"met": true},
+    "16.10_bounded_ON": {"met": true},
+    "strongest_success_top1_ge_0.70_through_2k": {"V3ABC_d2048": 0.318, "met": false}
+  },
+  "ablations_V3ABC_d512_state_top1": {
+    "baseline": 0.506, "omega_zero": 0.823, "A_fixed": 0.780, "A_shuffled": 0.094,
+    "gamma_fixed_omega_kept": 0.463, "B_forced_zero": 0.066, "B_forced_one": 0.389,
+    "write_only": 0.780, "C_forced_zero_state": 0.506
+  },
+  "dynamics_V3ABC_s0": {
+    "gamma_per_head": [0.9999, 0.9997, 0.9973, 0.9999],
+    "write_rate_per_head": [0.42, 0.24, 0.16, 0.31], "write_rate_mean": 0.28,
+    "read_rate_per_head": [0.99, 0.96, 0.92, 0.97],
+    "omega_abs_mean": 2.30, "state_norm_per_head": [70, 11, 3, 22],
+    "flags": {"state_explosion_expected_persistent_growth": true, "no_write_or_read_collapse": true}
+  },
+  "transition_ablation_2x2": {
+    "matched": ["write_gate", "curriculum", "parameter_budget", "data", "seeds", "state_size", "readout"],
+    "state_top1_mean": {
+      "B_gamma1_omega0":    {"256": 1.000, "512": 1.000, "1024": 1.000, "2048": 1.000, "4096": 0.983},
+      "Bgamma_dynamicgamma":{"256": 1.000, "512": 1.000, "1024": 1.000, "2048": 0.998, "4096": 0.330},
+      "Bomega_dynamicomega":{"256": 0.986, "512": 0.899, "1024": 0.596, "2048": 0.423, "4096": 0.286},
+      "AB_both":            {"256": 0.819, "512": 0.609, "1024": 0.438, "2048": 0.383, "4096": 0.380},
+      "V2S_reference":      {"256": 1.000, "512": 1.000, "1024": 1.000, "2048": 1.000, "4096": 0.938}
+    },
+    "dynamics_d2048": {
+      "B":     {"eff_gamma": 1.0000, "acc_rotation_turns": 0.0,   "phase_align_cos": 1.00, "cue_retention": 1.000, "state_norm": 17.9},
+      "Bgamma":{"eff_gamma": 0.9997, "acc_rotation_turns": 0.0,   "phase_align_cos": 1.00, "cue_retention": 0.547, "state_norm": 15.5},
+      "Bomega":{"eff_gamma": 1.0000, "acc_rotation_turns": 380.1, "phase_align_cos": 0.03, "cue_retention": 1.000, "state_norm": 28.0},
+      "AB":    {"eff_gamma": 0.9974, "acc_rotation_turns": 288.2, "phase_align_cos": 0.03, "cue_retention": 0.126, "state_norm": 9.8}
+    },
+    "decision_rules": {
+      "B+gamma_materially_exceeds_B": false,
+      "B+gamma_approx_B": true,
+      "B+omega_less_than_B": true,
+      "AB_less_than_B+gamma": true
+    }
+  },
+  "architecture_decision": {
+    "transition_verdict": "V2-S retained",
+    "retained_recurrence": "S_t = S_{t-1} + B_t(k_t ⊙ v_t)  (gamma=1, omega=0)",
+    "recurrent_rotation_omega_t": "retired (harmful)",
+    "dynamic_retention_gamma_t": "no measurable gain on this pure-persistence task (not generally useless)",
+    "selective_read_C_t": "inert on state; deferred"
+  },
+  "resources": {
+    "V1": {"params": 24704, "state_bytes_B1": 768, "tokens_per_sec": 515056},
+    "V2-S": {"params": 24964, "state_bytes_B1": 768, "tokens_per_sec": 518820},
+    "V3-*": {"params": 25744, "state_bytes_B1": 768, "tokens_per_sec": 152552},
+    "complexity": {"runtime_linear_in_N": true, "state_const_in_N": true, "no_NxN": true, "no_unbounded_cache": true}
+  },
+  "next_permitted_step": "Autonomous Selective-Write Learning (experiments/phase_v2_autonomous_gate): can B_t be learned without permanent gate supervision? No C_t / multi-bank / slots / hard eviction / quadratic until an autonomous or annealed gate passes acceptance.",
+  "artifacts": [
+    "symbolu/phase_v3_experimental/{config,scan,state,selective_complex_phase,variants}.py",
+    "symbolu/phase_v3_experimental/tests/test_streaming_equivalence.py",
+    "experiments/phase_v3_selective_ssm/{config,dataset,train,focus_probe,distance_eval,dynamics_analysis,ablations,resource_audit,run_study,transition_ablation}.py",
+    "results/aggregate.json", "results/tables.md", "results/transition_ablation.json",
+    "results/transition_tables.md", "results/raw/*.json",
+    "PHASE_V3_SELECTIVE_SSM_REPORT.md"
+  ]
+}
