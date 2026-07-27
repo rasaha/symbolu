@@ -19,10 +19,10 @@ def admit_topk(scores: List[float], K: int) -> set:
 
 
 def build_store(events, admitted: set) -> dict:
-    """entity -> value, latest admitted position wins (exact update semantics)."""
+    """composite identity (entity,relation) -> value, latest admitted position wins."""
     store = {}
     for i in sorted(admitted, key=lambda i: events[i]["position"]):
-        store[events[i]["entity"]] = events[i]["value"]
+        store[events[i]["ident"]] = events[i]["value"]
     return store
 
 

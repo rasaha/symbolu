@@ -36,10 +36,11 @@ SEEDS = (0, 1, 2)
 
 @dataclass
 class DataCfg:
-    num_entities: int = NUM_ENTITIES
+    num_entities: int = 8          # 8 entities × 4 relations = 32 composite identities
+    num_relations: int = 4         # relevance requires joint (entity, relation) match (§4E)
     num_values: int = NUM_VALUES
-    n_relevant: int = 1            # one relevant event (entity=focus); avoids exact-store key collision
-    n_hard: int = 6                # frequency-matched hard negatives
+    n_relevant: int = 1            # one relevant event; avoids exact-store key collision
+    n_hard: int = 6                # frequency-matched hard negatives (same-ent/wrong-rel etc.)
     family: str = "single"
     multihop_depth: int = 2
 
