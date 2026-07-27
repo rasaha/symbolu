@@ -1,0 +1,45 @@
+{
+  "audit": "phase_iterative_quadratic",
+  "date": "2026-07-27",
+  "decisive_question": "bounded evidence-navigation engine vs teacher-forced classifier / mini generative LM",
+  "summary": "Bounded evidence engine, NOT a generative LM; autonomous eval proven leak-free; exact softmax verified; structured evidence-chain output present. Open item: diagnostic-ladder accuracy budget, not design correctness.",
+  "statuses": {
+    "2_system_boundary": "PASS",
+    "3_no_generative_lm": "PASS",
+    "4_evidence_navigation_losses": "PASS",
+    "5_exact_key_value_representation": "PASS",
+    "6_local_key_value_binding": "PARTIAL",
+    "7_exact_bounded_softmax": "PASS",
+    "8_iterative_not_static_routing": "PARTIAL",
+    "9_no_teacher_forcing_leakage": "PASS",
+    "10_diagnostic_ladder": "PENDING",
+    "11_fair_phase_vs_nonphase": "PARTIAL",
+    "12_structured_evidence_output": "PASS",
+    "13_evidence_source_of_truth": "PASS",
+    "14_inference_training_separation": "PASS",
+    "15_heldout_generalization": "PARTIAL",
+    "16_resource_complexity": "PASS",
+    "17_audit_tests": "PASS"
+  },
+  "tests": {
+    "softmax_correctness": "10/10 PASS",
+    "audit_tests": "6/6 PASS",
+    "frozen_phase_tests": "98/98 PASS",
+    "freeze_verifier": "FREEZE OK"
+  },
+  "no_lm_evidence": {
+    "answer_head_out_features": 32,
+    "hop_head_out_features": 32,
+    "vocab_size": 98,
+    "note": "heads classify identities, not vocab tokens; no lm_head / next-token / shift / autoregression"
+  },
+  "losses": {
+    "answer_ce": {"file": "train.py:63", "labels": "final chain identity", "weight": 1.0, "train_only": true},
+    "hop_ce": {"file": "train.py:69", "labels": "per-hop target identity", "weight": 1.0, "train_only": true},
+    "route_hinge": {"file": "train.py:71", "labels": "required-event index", "weight": "lambda_route=1.0", "train_only": true}
+  },
+  "leakage": {"learned_arm_invariant_to_labels": true, "oracle_arm_uses_labels": true, "test": "test_learned_arm_ignores_labels"},
+  "ladder": {"one_hop_oracle": 0.853, "D0": null, "D1": null, "D2": null, "static": null},
+  "pilot_authorized": null,
+  "blocking_issues": []
+}
