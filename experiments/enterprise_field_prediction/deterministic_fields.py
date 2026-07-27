@@ -81,3 +81,19 @@ def extract_fields(slots: List[Evidence], query_req: int, table, contract_cfg) -
     return {"budget_status": budget_status, "active_policy_status": policy_status,
             "approval_requirement": approval_requirement, "approval_evidence_status": approval_evidence,
             "material_conflict": material_conflict, "evidence_complete": evidence_complete}
+
+
+def extract_finding(slots: List[Evidence], query_req: int, table):
+    """Exact extraction → the frozen outcome-contract StructuredFinding (feeds the validated mapper)."""
+    from experiments.enterprise_output_mapping.outcome_contract import (StructuredFinding,
+        BUDGET_SUFFICIENT, BUDGET_INSUFFICIENT, BUDGET_MISSING, POLICY_IDENTIFIED, POLICY_MISSING,
+        POLICY_CONFLICTED, APPROVAL_PRESENT, APPROVAL_MISSING)
+    f = extract_fields(slots, query_req, table, None)
+    bmap = {0: BUDGET_SUFFICIENT, 1: BUDGET_INSUFFICIENT, 2: BUDGET_MISSING, 3: BUDGET_MISSING}
+    pmap = {0: POLICY_IDENTIFIED, 1: POLICY_MISSING, 2: POLICY_CONFLICTED, 3: POLICY_MISSING}
+    approval = APPROVAL_PRESENT if f["approval_evidence_status"] == 0 else APPROVAL_MISSING
+    conflict = f["material_conflict"] == 1
+    complete = f["evidence_complete"] == 1
+    return StructuredFinding(bmap[f["budget_status"]], pmap[f["active_policy_status"]], approval,
+                             material_conflict=conflict, evidence_complete=complete,
+                             unauthorized_present=False)
