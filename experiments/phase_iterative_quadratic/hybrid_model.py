@@ -33,7 +33,8 @@ class IterativeHybrid(nn.Module):
         self.router = LearnedRouter(embed_dim, router_kind)
         self.qblock = BoundedRoutedSoftmaxAttention(embed_dim, num_heads)
         self.qupdate = QueryUpdate(embed_dim)
-        self.answer_head = nn.Linear(embed_dim, n_id)
+        self.val_bind = nn.Linear(embed_dim, embed_dim)     # local key↔value binding (minimal P mixing)
+        self.answer_head = nn.Linear(2 * embed_dim, n_id)   # decode from [final query ; last attn output]
         if use_phase:
             self.phase = PhaseFeature(embed_dim, num_heads)
         self.phase_zero = routing_mode == "phase_zero"
@@ -50,9 +51,15 @@ class IterativeHybrid(nn.Module):
         """event_pos:[B,Ne] token positions of events; required_hops:[B,H] full-pos of the
         required event at each hop (for oracle routing + hop supervision); may be −1."""
         B, N = ids.shape
+        D = self.embed_dim
         reps = self.reps(ids)
         ar = torch.arange(B, device=ids.device)
-        ev = reps.gather(1, event_pos.unsqueeze(-1).expand(B, event_pos.shape[1], self.embed_dim))
+        Ne = event_pos.shape[1]
+        kp = event_pos.unsqueeze(-1).expand(B, Ne, D)
+        key_x = reps.gather(1, kp)
+        val_x = reps.gather(1, (event_pos + 1).unsqueeze(-1).expand(B, Ne, D))   # adjacent VALUE token
+        ev = key_x + self.val_bind(val_x)                        # bind each key with its value
+        reps = reps.scatter(1, kp, ev)                           # attention sees bound key reps
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
         route_scores = []
@@ -81,5 +88,5 @@ class IterativeHybrid(nn.Module):
                 q = self.qupdate(q, o)
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
-        logits = self.answer_head(q)
+        logits = self.answer_head(torch.cat([q, o], dim=-1))           # decode from query + last attn output
         return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev}

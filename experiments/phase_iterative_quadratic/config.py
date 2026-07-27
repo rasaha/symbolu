@@ -31,7 +31,7 @@ SEEDS = (0, 1, 2)
 class TrainCfg:
     lr: float = 2e-3
     batch_size: int = 32
-    steps: int = 900
+    steps: int = 2500              # oracle needs ~1600+ to converge; static/iterative comparably
     seed: int = 0
     margin: float = 0.5
     lambda_route: float = 1.0     # per-hop routing ranking loss
