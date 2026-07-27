@@ -1,0 +1,100 @@
+{
+  "single": {
+    "baseline": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.4442674219608307
+    },
+    "A_fixed": {
+      "state_top1": 0.7799999713897705,
+      "selective_top1": 0.5371428728103638,
+      "relevance_f1": 0.44130387902259827
+    },
+    "A_shuffled": {
+      "state_top1": 0.09428571164608002,
+      "selective_top1": 0.08571428805589676,
+      "relevance_f1": 0.4449816048145294
+    },
+    "A_detached": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.4442674219608307
+    },
+    "B_forced_one": {
+      "state_top1": 0.38857144117355347,
+      "selective_top1": 0.3142857253551483,
+      "relevance_f1": 0.4417065978050232
+    },
+    "B_forced_zero": {
+      "state_top1": 0.0657142847776413,
+      "selective_top1": 0.0657142847776413,
+      "relevance_f1": 0.5593254566192627
+    },
+    "B_shuffled": {
+      "state_top1": 0.5114285945892334,
+      "selective_top1": 0.4000000059604645,
+      "relevance_f1": 0.442621648311615
+    },
+    "B_detached": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.4442674219608307
+    },
+    "C_forced_one": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.44386282563209534
+    },
+    "C_forced_zero": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.0657142847776413,
+      "relevance_f1": 0.5593254566192627
+    },
+    "C_shuffled": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.4440191686153412
+    },
+    "C_detached": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943,
+      "relevance_f1": 0.4442674219608307
+    },
+    "omega_zero": {
+      "state_top1": 0.822857141494751,
+      "selective_top1": 0.5199999809265137,
+      "relevance_f1": 0.4426216185092926
+    },
+    "gamma_fixed": {
+      "state_top1": 0.4628571569919586,
+      "selective_top1": 0.334285706281662,
+      "relevance_f1": 0.44573983550071716
+    }
+  },
+  "isolate": {
+    "write_only": {
+      "state_top1": 0.7799999713897705,
+      "selective_top1": 0.5371428728103638
+    },
+    "retention_only": {
+      "state_top1": 0.38857144117355347,
+      "selective_top1": 0.3142857253551483
+    },
+    "read_only": {
+      "state_top1": 0.47999998927116394,
+      "selective_top1": 0.2914285659790039
+    },
+    "write+retention": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943
+    },
+    "write+read": {
+      "state_top1": 0.7799999713897705,
+      "selective_top1": 0.5371428728103638
+    },
+    "full_ABC": {
+      "state_top1": 0.5057142972946167,
+      "selective_top1": 0.39142856001853943
+    }
+  }
+}
