@@ -75,64 +75,49 @@ class PressureV2Generator:
         )
 
     def make(self, n_live: int, M: int, target_position: str = "early",
-             query_type: str = "latest_value", versions_per_relevant: int = 2) -> Example:
-        """Build one example with `n_live` distinct live contracts and one queried
-        relevant contract placed at `target_position`."""
+             query_type: str = "latest_value", versions_per_relevant: int = 1) -> Example:
+        """Build one example: `n_live` DISTINCT live contracts (one distinct slot
+        each), a randomly queried target contract placed at `target_position`. The
+        answer requires retrieving THAT specific contract's value — so the query and
+        the bounded memory are both essential, and failure is purely capacity (the
+        target is lost only if evicted). No exploitable focus/relevance structure."""
         r = self.rng
         v = self.v
-        focus_vendor = r.choice(self.vendors)
 
-        # relevant contracts belong to the focus vendor (count small, <= M-1)
-        n_relevant = max(2, min(M - 1, r.randint(2, max(2, M // 2))))
         contracts_pool = r.sample(self.contracts, min(n_live, len(self.contracts)))
-        relevant_contracts = contracts_pool[:n_relevant]
-        distractor_contracts = contracts_pool[n_relevant:]
-        # if pool too small, pad distractors by reusing distinct contract ids from the
-        # full set not already used
         need = n_live - len(contracts_pool)
         if need > 0:
             extra = [c for c in CONTRACTS if c not in contracts_pool]
             r.shuffle(extra)
-            distractor_contracts += extra[:need]
+            contracts_pool += extra[:need]
+        all_contracts = contracts_pool[:n_live]
 
-        target_contract = relevant_contracts[0]
+        # each distinct contract gets a distinct vendor cue (varied, non-diagnostic)
+        vend = {c: r.choice(self.vendors) for c in all_contracts}
+        eid = {c: i for i, c in enumerate(all_contracts)}
 
-        # Build the ordered fact stream. Each contract contributes 1..k versioned
-        # facts (same entity_id → supersession). Distinct contracts → distinct slots.
-        eid = {c: i for i, c in enumerate([target_contract] + relevant_contracts[1:]
-                                          + distractor_contracts)}
-        stream: List[Fact] = []
+        # query a RANDOM contract (any of the live ones) — the only way to answer is to
+        # have retained it and address it by the query. Nothing about the target is
+        # predictable from structure, so no query-free shortcut exists.
+        target_contract = r.choice(all_contracts)
+        others = [c for c in all_contracts if c != target_contract]
+        r.shuffle(others)
 
-        def emit_contract(contract, vendor, is_relevant):
-            nv = versions_per_relevant if is_relevant else 1
-            for k in range(nv):
-                stream.append(self._mk_fact(contract, vendor, VERSIONS[min(k, 3)],
-                                            arrival=len(stream), entity_id=eid[contract]))
-
-        # distractor vendors (distinct from focus)
-        other_vendors = [x for x in self.vendors if x != focus_vendor] or self.vendors
-
-        # place the target relevant contract at the requested position; scatter the
-        # remaining relevant + distractor contracts around it.
-        distractor_facts_units = [(c, r.choice(other_vendors)) for c in distractor_contracts]
-        rel_units = [(c, focus_vendor) for c in relevant_contracts[1:]]
-        r.shuffle(distractor_facts_units)
-        r.shuffle(rel_units)
-
-        # decide index where the target block goes
-        total_units = len(distractor_facts_units) + len(rel_units) + 1  # +1 target
+        total_units = len(all_contracts)
         if target_position == "early":
             tpos = r.randint(0, max(0, int(0.15 * total_units)))
         elif target_position == "late":
             tpos = r.randint(int(0.85 * total_units), total_units - 1)
         else:
             tpos = r.randint(int(0.40 * total_units), int(0.60 * total_units))
+        order = others[:]
+        order.insert(min(tpos, len(order)), target_contract)
 
-        units = distractor_facts_units + rel_units
-        r.shuffle(units)
-        units.insert(min(tpos, len(units)), (target_contract, focus_vendor))
-        for c, ven in units:
-            emit_contract(c, ven, is_relevant=(ven == focus_vendor))
+        stream: List[Fact] = []
+        for c in order:
+            stream.append(self._mk_fact(c, vend[c], VERSIONS[0],
+                                        arrival=len(stream), entity_id=eid[c]))
+        focus_vendor = vend[target_contract]  # kept only for meta/query rendering
 
         # answer per query type (deterministic from the target contract's facts)
         tfacts = [f for f in stream if f.contract == target_contract]
@@ -155,12 +140,12 @@ class PressureV2Generator:
         else:
             raise ValueError(query_type)
 
-        # render tokens: focus header + fact stream + query + answer.
+        # render tokens: fact stream + query + answer (no leaky header).
         # write labels: 1 at each fact's terminal <sep> (the write anchor), 0 at other
         # BODY tokens (so the gate learns to write ONCE per fact, not flood every
         # token — the flood was what collapsed v1's slots), -100 outside the body.
-        words: List[str] = ["focus", "vendor", focus_vendor, "<sep>"]
-        wl: List[int] = [-100, -100, -100, -100]
+        words: List[str] = []
+        wl: List[int] = []
         anchor_positions = []
         for f in stream:
             fw = f.render()
@@ -180,20 +165,87 @@ class PressureV2Generator:
             tokens=toks, answer_pos=ans_pos, answer_id=ans_id, write_labels=wl,
             facts=stream, gold_support_entity_ids=[eid[target_contract]],
             query_type=query_type, target_position=target_position,
-            meta={"n_live_contracts": n_live, "M": M, "focus_vendor": focus_vendor,
-                  "target_contract": target_contract, "n_relevant": n_relevant,
+            meta={"n_live_contracts": n_live, "M": M,
+                  "target_contract": target_contract,
                   "n_facts": len(stream), "seq_len": len(toks),
                   "target_entity_id": eid[target_contract],
                   "distinct_entity_ids": len(set(f.entity_id for f in stream))},
         )
 
 
+    def make_focus(self, n_live: int, M: int, target_position: str = "early") -> Example:
+        """Focus-retention variant (for testing Phase as a retention signal under
+        oracle addressing). A FOCUS vendor is declared in an early header. R relevant
+        contracts (that vendor's, R<=M-1) are the only ones ever queried; the rest are
+        distractors of other vendors. The queried target is a random relevant contract
+        placed at `target_position`, flooded by distractors. To keep the target, a model
+        must give high RETENTION to focus-vendor facts — which requires the DISTANT
+        header (global context) a local window cannot see when a far fact arrives. So a
+        local-only arm cannot prioritize; a global (Phase) retention signal could.
+        Oracle addressing means acc = survival of the queried relevant fact."""
+        r = self.rng; v = self.v
+        focus_vendor = r.choice(self.vendors)
+        R = max(2, min(M - 1, r.randint(2, max(2, M // 2))))
+        pool = r.sample(self.contracts, min(n_live, len(self.contracts)))
+        need = n_live - len(pool)
+        if need > 0:
+            extra = [c for c in CONTRACTS if c not in pool]; r.shuffle(extra); pool += extra[:need]
+        pool = pool[:n_live]
+        relevant = pool[:R]; distractors = pool[R:]
+        other_vendors = [x for x in self.vendors if x != focus_vendor] or self.vendors
+        vend = {c: focus_vendor for c in relevant}
+        for c in distractors:
+            vend[c] = r.choice(other_vendors)
+        eid = {c: i for i, c in enumerate(pool)}
+        target = r.choice(relevant)
+        others = [c for c in pool if c != target]; r.shuffle(others)
+        total = len(pool)
+        if target_position == "early":
+            tpos = r.randint(0, max(0, int(0.15 * total)))
+        elif target_position == "late":
+            tpos = r.randint(int(0.85 * total), total - 1)
+        else:
+            tpos = r.randint(int(0.40 * total), int(0.60 * total))
+        order = others[:]; order.insert(min(tpos, len(order)), target)
+        stream = [self._mk_fact(c, vend[c], VERSIONS[0], arrival=i, entity_id=eid[c])
+                  for i, c in enumerate(order)]
+        tfact = [f for f in stream if f.contract == target][-1]
+        q = ["what", "is", "the", "latest", "valid", "value", "for", "contract", target]
+        ans = tfact.value
+
+        words = ["focus", "vendor", focus_vendor, "<sep>"]
+        wl = [-100, -100, -100, -100]
+        for f in stream:
+            for w in f.render():
+                words.append(w); wl.append(1 if w == "<sep>" else 0)
+        toks = v.encode(words) + [v.id("<Q>")] + v.encode(q) + [v.id("<A>")]
+        wl = wl + [-100] * (len(toks) - len(wl))
+        ans_pos = len(toks) - 1; ans_id = v.id(ans)
+        toks.append(ans_id); wl.append(-100)
+        return Example(tokens=toks, answer_pos=ans_pos, answer_id=ans_id, write_labels=wl,
+                       facts=stream, gold_support_entity_ids=[eid[target]],
+                       query_type="focus_latest_value", target_position=target_position,
+                       meta={"n_live_contracts": n_live, "M": M, "focus_vendor": focus_vendor,
+                             "target_contract": target, "n_relevant": R, "n_facts": len(stream),
+                             "seq_len": len(toks), "target_entity_id": eid[target],
+                             "distinct_entity_ids": len(set(f.entity_id for f in stream))})
+
+
 def generate(vocab: Vocab, split: str, seed: int, n: int, n_live: int, M: int,
              target_mix: Optional[Dict[str, float]] = None,
-             query_type: str = "latest_value") -> List[Example]:
+             query_type: str = "latest_value", focus_retention: bool = False) -> List[Example]:
     gen = PressureV2Generator(vocab, split, seed)
     target_mix = target_mix or {"early": 0.5, "middle": 0.25, "late": 0.25}
     out = []
+    if focus_retention:
+        for i in range(n):
+            rp = gen.rng.random(); cum = 0.0; tp = "early"
+            for pos, w in target_mix.items():
+                cum += w
+                if rp <= cum:
+                    tp = pos; break
+            out.append(gen.make_focus(n_live=n_live, M=M, target_position=tp))
+        return out
     for i in range(n):
         rp = gen.rng.random()
         cum = 0.0; tp = "early"

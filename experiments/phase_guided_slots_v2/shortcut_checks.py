@@ -32,13 +32,10 @@ HERE = Path(__file__).resolve().parent
 @torch.no_grad()
 def _build_state(model, ids):
     h, g = model.encode(ids)
-    hg = torch.cat([h, g], dim=-1)
-    r_write = torch.sigmoid(model.g_write(hg)).squeeze(-1)
-    k_guide = model.g_kguide(hg); p_retain = model.g_retain(hg).squeeze(-1)
-    wk = model.k_local(h) + (k_guide if model.guide_write else 0.0)
+    r_write, p_retain = model.guidance(h, g)
+    wk = model.k_local(h)                     # pure content key
     wv = model.w_val(h)
-    retain = p_retain if model.guide_write else torch.zeros_like(p_retain)
-    state = model.slots.write_stream(wk, wv, r_write, retain, ids)
+    state = model.slots.write_stream(wk, wv, r_write, p_retain, ids)
     return h, g, state
 
 
@@ -55,7 +52,9 @@ def _answer(model, h, g, state, apos, mode, examples=None, ids=None):
     elif mode == "shuffle_slot_keys":
         keys = keys[:, torch.randperm(keys.shape[1])]
     hA = h[ar, apos]; gA = g[ar, apos]
-    rq = model.q_read(hA) + (model.q_read_g(gA) if model.guide_read else 0.0)
+    rq = model.q_read(hA)
+    if model.use_phase and model.guide:
+        rq = rq + model.g_readbonus(gA)
     scores = torch.einsum("bd,bmd->bm", rq, keys) / (keys.shape[-1] ** 0.5)
     scores = scores.masked_fill(active < 0.5, float("-inf"))
     K = min(model.cfg.top_k, keys.shape[1])

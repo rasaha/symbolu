@@ -1,0 +1,50 @@
+{
+  "variant": "V3-ABC",
+  "gamma_per_head": [
+    0.9998932480812073,
+    0.9996675252914429,
+    0.9973213076591492,
+    0.9998798966407776
+  ],
+  "write_rate_per_head": [
+    0.4244914650917053,
+    0.2412990927696228,
+    0.15632078051567078,
+    0.3059258460998535
+  ],
+  "read_rate_per_head": [
+    0.9879111647605896,
+    0.9582388997077942,
+    0.9220594167709351,
+    0.9688911437988281
+  ],
+  "effective_horizon_per_head": [
+    9367.5126953125,
+    3007.74755859375,
+    373.31646728515625,
+    8326.162109375
+  ],
+  "state_norm_per_head": [
+    70.177490234375,
+    10.746384620666504,
+    2.818211317062378,
+    22.420316696166992
+  ],
+  "mean_pairwise_head_write_corr": 0.8365290760993958,
+  "gamma_mean": 0.9991904497146606,
+  "write_rate_mean": 0.2820093333721161,
+  "read_rate_mean": 0.9592751860618591,
+  "omega_abs_mean": 2.297358512878418,
+  "flags": {
+    "gamma_saturating": true,
+    "gamma_collapsed": false,
+    "write_all": false,
+    "write_none": false,
+    "read_all": false,
+    "read_none": false,
+    "state_explosion": true,
+    "state_cancellation": false,
+    "inactive_heads": 0,
+    "identical_heads": false
+  }
+}

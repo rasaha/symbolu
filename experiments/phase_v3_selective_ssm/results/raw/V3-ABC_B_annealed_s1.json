@@ -1,0 +1,83 @@
+{
+  "variant": "V3-ABC",
+  "mode": "B_annealed",
+  "seed": 1,
+  "distances": {
+    "64": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.07249999791383743,
+      "random_top1": 0.05000000074505806,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4555453062057495,
+      "relevance_auroc": 0.5153527855873108
+    },
+    "128": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.057500001043081284,
+      "random_top1": 0.05000000074505806,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4422762393951416,
+      "relevance_auroc": 0.506874680519104
+    },
+    "256": {
+      "state_top1": 1.0,
+      "selective_top1": 0.9975000023841858,
+      "raw_top1": 0.9975000023841858,
+      "shuffled_top1": 0.07000000029802322,
+      "random_top1": 0.042500000447034836,
+      "state_topk": 1.0,
+      "relevance_f1": 0.43904775381088257,
+      "relevance_auroc": 0.509173572063446
+    },
+    "512": {
+      "state_top1": 0.9775000214576721,
+      "selective_top1": 0.9175000190734863,
+      "raw_top1": 0.9175000190734863,
+      "shuffled_top1": 0.05000000074505806,
+      "random_top1": 0.03999999910593033,
+      "state_topk": 0.9975000023841858,
+      "relevance_f1": 0.43975719809532166,
+      "relevance_auroc": 0.5085837244987488
+    },
+    "1024": {
+      "state_top1": 0.6549999713897705,
+      "selective_top1": 0.5525000095367432,
+      "raw_top1": 0.5525000095367432,
+      "shuffled_top1": 0.07249999791383743,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 0.8575000166893005,
+      "relevance_f1": 0.42743533849716187,
+      "relevance_auroc": 0.5014104247093201
+    },
+    "2048": {
+      "state_top1": 0.44999998807907104,
+      "selective_top1": 0.375,
+      "raw_top1": 0.375,
+      "shuffled_top1": 0.07500000298023224,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 0.7300000190734863,
+      "relevance_f1": 0.3842051923274994,
+      "relevance_auroc": 0.49873045086860657
+    },
+    "4096": {
+      "state_top1": 0.5049999952316284,
+      "selective_top1": 0.39500001072883606,
+      "raw_top1": 0.39500001072883606,
+      "shuffled_top1": 0.05999999865889549,
+      "random_top1": 0.06750000268220901,
+      "state_topk": 0.762499988079071,
+      "relevance_f1": 0.45489561557769775,
+      "relevance_auroc": 0.5011687278747559
+    }
+  },
+  "distractor_robust": {
+    "state_top1": 0.9599999785423279,
+    "selective_top1": 0.8774999976158142,
+    "shuffled_top1": 0.05999999865889549,
+    "relevance_f1": 0.2840043604373932
+  }
+}

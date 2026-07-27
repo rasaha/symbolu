@@ -1,0 +1,26 @@
+{
+  "arm": "D-v2",
+  "n_live": 12,
+  "seed": 2,
+  "survival": 0.855,
+  "acc": 0.73,
+  "acc_given_survived": 0.8538011695906432,
+  "acc_given_evicted": 0.0,
+  "early_survival": 0.9607843137254902,
+  "middle_survival": 0.5,
+  "evictions": 3.995,
+  "decision_trace": {
+    "frac_examples_target_survival_changed_by_phase": 0.016666666666666666,
+    "frac_changes_that_help": 0.5,
+    "frac_changes_that_hurt": 0.5,
+    "help_minus_hurt": 0.0,
+    "mean_phase_over_local_ratio": 1.3256676999834591,
+    "lambda": 0.25
+  },
+  "shortcut": {
+    "intact_survival": 0.8583333333333333,
+    "intact_acc": 0.7583333333333333,
+    "remove_target_slot_acc": 0.01666666753590107,
+    "remove_focus_header_survival": 0.8583333333333333
+  }
+}

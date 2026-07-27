@@ -1,0 +1,59 @@
+{
+  "canonical": false,
+  "status": "EXPERIMENTAL \u2014 NOT promoted to canonical; frozen v1 (symbolu/lightweight_phase) is unchanged and remains the negative baseline.",
+  "package": "symbolu.phase_v2_experimental",
+  "equations": {
+    "recurrence": "S_t^(b) = gamma_b * S_{t-1}^(b) + w_t * (k_phasor_t (.) v_t)",
+    "amplitude": "A_t^(b) = gamma_b * A_{t-1}^(b) + w_t * a_{k,t}",
+    "gate": "w_t = sigmoid(W_w h_t) in [0,1], causal (token only)",
+    "readout": "o_t^(b) = Re(q_phasor_t (.) S_t^(b)) / stopgrad(max(a_q (.) A_t^(b), eps)); fuse = W_fuse(concat_b o_t^(b))*aux_scale",
+    "v1_special_case": "one bank, gamma=1, w_t==1 (dense, no decay) == frozen v1"
+  },
+  "sources": {
+    "config.py": "6495751660dac52317282300861d8f30988a442f0e65bd2f017d3ca717eed44f",
+    "selective_phase.py": "4d8d1f8dac1e711d2b4c35dcbdf72570685b38f206e92b1353d364de03ce0251",
+    "multiscale_phase.py": "e1c4e72c8df5c4268de18a3c5f29a14a10f76cac37d1855dd814edc83bf7c217"
+  },
+  "streaming_tests": {
+    "full_vs_token_stream_maxerr": "~3e-7",
+    "full_vs_chunked_maxerr": "~1e-7",
+    "chunked_scan_vs_reference_loop_maxerr": "~1e-6",
+    "state_reset": "fresh zero-state per call",
+    "batch_isolation": "per-example independent",
+    "causality": "gate+scan use only past tokens",
+    "note": "verified in smoke tests"
+  },
+  "no_NxN_tensor": true,
+  "state_size_constant_in_N": true,
+  "runtime_linear_in_N": true,
+  "training_recipe": "FocusModel = embed + small local window + variant + focus decoder; modes e2e (focus-decode CE + write-budget reg) or gate_sup (+ supervised write gate: write header, skip distractors). Adam lr 1e-3, ~250 steps, rho=0.10.",
+  "variant": "V2-S",
+  "config_hash": "160266440f2a3c43570c1197d4502251d72593200f6f4d504061054e4a57d56a",
+  "config": {
+    "embed_dim": 96,
+    "num_heads": 4,
+    "bounded_phase": true,
+    "amp_floor": 0.05,
+    "amp_scale": 0.95,
+    "denom_eps": 0.1,
+    "detach_denominator": true,
+    "aux_scale": 1.0,
+    "layernorm_eps": 1e-05,
+    "gate_mode": "scalar_per_head",
+    "gate_bias_init": 0.0,
+    "gate_local_context": false,
+    "bank_gammas": [
+      1.0
+    ],
+    "learned_decay": false,
+    "gamma_min": 0.5,
+    "gamma_max": 0.999999,
+    "initial_gamma": 0.99,
+    "version": "v2-experimental"
+  },
+  "params": 55876,
+  "state_bytes_B1": 1152,
+  "banks": 1,
+  "tokens_per_sec": 6353,
+  "known_limitations": "Focus retention is strong ONLY with gate supervision (gate_sup); end-to-end gate optimization does not learn selective writing at this scale."
+}

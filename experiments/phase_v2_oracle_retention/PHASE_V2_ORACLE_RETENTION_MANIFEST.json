@@ -1,0 +1,104 @@
+{
+  "experiment": "phase_v2_oracle_retention",
+  "title": "Phase v2-S as a retention-priority signal in oracle-addressed bounded memory",
+  "date": "2026-07-26",
+  "gated_experiment": true,
+  "verdict": "NEGATIVE",
+  "verdict_summary": "Phase v2-S inserted only into retention/eviction priority gives no reliable target-survival or answer-accuracy gain over the oracle capacity baseline. The bounded-lambda Phase term is causally inert at the discrete eviction boundary and the learned retention does not exploit the focus cue. Primary endpoint (Delta-survival >= 0.10) not met at either pressure. Do not proceed to the quadratic-attention hybrid on this signal.",
+  "constraints_respected": {
+    "frozen_phase_v1_unmodified": true,
+    "oracle_identity_allocation_unchanged": true,
+    "query_lookup_unchanged": true,
+    "value_encoding_slot_value_decoder_identical_across_arms": true,
+    "no_quadratic_attention_hybrid_started": true,
+    "lambda_bounded_0_to_0.25": true
+  },
+  "acceptance_gates": {
+    "freeze": "FREEZE OK",
+    "lightweight_phase_tests": "98 passed",
+    "working_tree_clean_on_push": true
+  },
+  "hypothesis": "distant focus cue -> Phase v2-S preserves relevance in bounded state -> focus-target record gets higher retention priority -> survives eviction more often -> answer accuracy improves",
+  "primary_endpoint": {
+    "name": "Delta-survival = P_D-v2(target survives) - P_C-oracle(target survives)",
+    "acceptance_threshold": 0.10,
+    "result": {
+      "L12": {"mean": -0.0183, "std": 0.0760, "raw": [0.080, -0.105, -0.030]},
+      "L16": {"mean": 0.0083, "std": 0.0413, "raw": [0.040, -0.050, 0.035]}
+    },
+    "met": false
+  },
+  "secondary_endpoints": {
+    "D-v2_minus_C_acc": {"L12": {"mean": -0.0517, "std": 0.0821}, "L16": {"mean": -0.0600, "std": 0.0502}},
+    "D-v2_minus_C_early_survival": {"L12": {"mean": 0.0543, "std": 0.0611}, "L16": {"mean": 0.0287, "std": 0.0662}}
+  },
+  "arms": {
+    "C-oracle": "r_final = r_local (capacity baseline)",
+    "D-v2": "r_local + lambda*norm(r_phase) from Phase v2-S",
+    "D-zero": "r_local + lambda*0 (phase computed then zeroed)",
+    "D-random": "r_local + lambda*randn (scale-matched)",
+    "D-shuffled": "r_local + lambda*norm(r_phase) shuffled across batch",
+    "D-v1_optional": "r_local + lambda*norm(r_phase) from FROZEN Phase v1 (audited only)"
+  },
+  "study": {
+    "seeds": [0, 1, 2],
+    "pressures": [12, 16],
+    "num_slots": 8,
+    "lambda_fixed": 0.25,
+    "curriculum": "[(2,100),(4,120),(8,150),(n_live,180)]",
+    "train_examples": 300,
+    "test_examples": 200,
+    "optimizer": "Adam lr=1e-3 batch=16 grad_clip=1.0",
+    "wall_clock_seconds": 5148
+  },
+  "cell_means": {
+    "L12": {
+      "C-oracle": {"survival": 0.847, "early_survival": 0.870, "acc": 0.825, "acc_given_survived": 0.967, "acc_given_evicted": 0.040},
+      "D-v2": {"survival": 0.828, "early_survival": 0.925, "acc": 0.773, "acc_given_survived": 0.928, "acc_given_evicted": 0.028},
+      "D-zero": {"survival": 0.813, "early_survival": 0.828, "acc": 0.785, "acc_given_survived": 0.949, "acc_given_evicted": 0.079},
+      "D-random": {"survival": 0.788, "early_survival": 0.819, "acc": 0.738, "acc_given_survived": 0.928, "acc_given_evicted": 0.040},
+      "D-shuffled": {"survival": 0.817, "early_survival": 0.847, "acc": 0.775, "acc_given_survived": 0.941, "acc_given_evicted": 0.038}
+    },
+    "L16": {
+      "C-oracle": {"survival": 0.727, "early_survival": 0.764, "acc": 0.722, "acc_given_survived": 0.986, "acc_given_evicted": 0.018},
+      "D-v2": {"survival": 0.735, "early_survival": 0.793, "acc": 0.662, "acc_given_survived": 0.891, "acc_given_evicted": 0.026},
+      "D-zero": {"survival": 0.677, "early_survival": 0.689, "acc": 0.662, "acc_given_survived": 0.973, "acc_given_evicted": 0.009},
+      "D-random": {"survival": 0.738, "early_survival": 0.774, "acc": 0.725, "acc_given_survived": 0.961, "acc_given_evicted": 0.064},
+      "D-shuffled": {"survival": 0.717, "early_survival": 0.734, "acc": 0.665, "acc_given_survived": 0.911, "acc_given_evicted": 0.045}
+    }
+  },
+  "lambda_ablation": {
+    "note": "seed 0 only, n_live=12; seed 0 is the seed on which D-v2 also beat C in the main study, so this mild positive trend is within the 3-seed noise band and does not rescue the endpoint",
+    "sweep": {
+      "0.0": {"survival": 0.820, "early_survival": 0.852, "acc": 0.827},
+      "0.01": {"survival": 0.833, "early_survival": 0.852, "acc": 0.813},
+      "0.05": {"survival": 0.873, "early_survival": 0.926, "acc": 0.847},
+      "0.1": {"survival": 0.853, "early_survival": 0.877, "acc": 0.840},
+      "0.25": {"survival": 0.867, "early_survival": 0.926, "acc": 0.840}
+    }
+  },
+  "causal_diagnostics": {
+    "decision_trace_frac_eviction_decisions_changed_by_phase": {"range": [0.0, 0.025], "interpretation": "Phase term almost never changes the eviction victim at lambda=0.25; causally inert at the boundary"},
+    "shortcut_remove_focus_header_survival_vs_intact": "unchanged in every seed (e.g. 0.883->0.883, 0.858->0.858); learned retention does not key off the focus cue",
+    "shortcut_remove_target_slot_acc": "~0.008 (chance) in every seed; answer genuinely depends on bounded memory (task valid)",
+    "controls_specificity": "D-zero ~ C, but D-random / D-shuffled NOT below C (D-random>C at L16); no specificity to the real focus signal"
+  },
+  "resources": {
+    "C-oracle": {"params": 940516, "state_bytes_B1": 3072, "tokens_per_sec": 20308},
+    "D-v2": {"params": 996392, "state_bytes_B1": 4224, "phase_state_bytes_B1": 1152, "tokens_per_sec": 18873},
+    "D-v1": {"params": 996004, "state_bytes_B1": 3072, "tokens_per_sec": 19458},
+    "complexity": {"runtime_linear_in_N": true, "state_const_in_N": true, "no_NxN": true, "no_unbounded_cache": true}
+  },
+  "phase_v2_module_hashes_sha256": {
+    "symbolu/phase_v2_experimental/config.py": "6495751660dac52317282300861d8f30988a442f0e65bd2f017d3ca717eed44f",
+    "symbolu/phase_v2_experimental/multiscale_phase.py": "e1c4e72c8df5c4268de18a3c5f29a14a10f76cac37d1855dd814edc83bf7c217",
+    "symbolu/phase_v2_experimental/selective_phase.py": "4d8d1f8dac1e711d2b4c35dcbdf72570685b38f206e92b1353d364de03ce0251"
+  },
+  "next_permitted_step": "Do NOT begin the quadratic-attention hybrid. The blocking issue is the discrete eviction boundary; any further Phase-retention work (soft/temperature eviction, or phase feeding value-refresh instead of eviction rank) must be its own separately gated experiment.",
+  "artifacts": [
+    "config.py", "retention_model.py", "retention_losses.py", "train_eval.py",
+    "decision_trace.py", "shortcut_checks.py", "resource_audit.py", "ablations.py",
+    "run_study.py", "results/aggregate.json", "results/tables.md", "results/raw/",
+    "results/lambda_sweep.json", "PHASE_V2_ORACLE_RETENTION_REPORT.md"
+  ]
+}

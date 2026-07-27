@@ -1,0 +1,73 @@
+{
+  "variant": "V3-B",
+  "mode": "B_annealed",
+  "seed": 1,
+  "distances": {
+    "64": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.07000000029802322,
+      "random_top1": 0.05000000074505806,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4458593726158142,
+      "relevance_auroc": 0.5218531489372253
+    },
+    "128": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.06499999761581421,
+      "random_top1": 0.05000000074505806,
+      "state_topk": 1.0,
+      "relevance_f1": 0.44284507632255554,
+      "relevance_auroc": 0.5125559568405151
+    },
+    "256": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.05999999865889549,
+      "random_top1": 0.042500000447034836,
+      "state_topk": 1.0,
+      "relevance_f1": 0.44664573669433594,
+      "relevance_auroc": 0.5160441994667053
+    },
+    "512": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.04500000178813934,
+      "random_top1": 0.03999999910593033,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4583379626274109,
+      "relevance_auroc": 0.5025678277015686
+    },
+    "1024": {
+      "state_top1": 0.9975000023841858,
+      "selective_top1": 0.9925000071525574,
+      "raw_top1": 0.9925000071525574,
+      "shuffled_top1": 0.06750000268220901,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4578513503074646,
+      "relevance_auroc": 0.5087153911590576
+    },
+    "2048": {
+      "state_top1": 0.625,
+      "selective_top1": 0.5099999904632568,
+      "raw_top1": 0.5099999904632568,
+      "shuffled_top1": 0.04500000178813934,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 0.8774999976158142,
+      "relevance_f1": 0.4285443127155304,
+      "relevance_auroc": 0.5018011331558228
+    }
+  },
+  "distractor_robust": {
+    "state_top1": 1.0,
+    "selective_top1": 1.0,
+    "shuffled_top1": 0.07500000298023224,
+    "relevance_f1": 0.30217355489730835
+  }
+}

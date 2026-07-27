@@ -1,0 +1,73 @@
+{
+  "variant": "V3-B",
+  "mode": "B_annealed",
+  "seed": 2,
+  "distances": {
+    "64": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.057500001043081284,
+      "random_top1": 0.08749999850988388,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4612109661102295,
+      "relevance_auroc": 0.5356671810150146
+    },
+    "128": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.10999999940395355,
+      "random_top1": 0.07750000059604645,
+      "state_topk": 1.0,
+      "relevance_f1": 0.44601720571517944,
+      "relevance_auroc": 0.5149704813957214
+    },
+    "256": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.07249999791383743,
+      "random_top1": 0.04500000178813934,
+      "state_topk": 1.0,
+      "relevance_f1": 0.45658665895462036,
+      "relevance_auroc": 0.5225237607955933
+    },
+    "512": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.04749999940395355,
+      "random_top1": 0.06750000268220901,
+      "state_topk": 1.0,
+      "relevance_f1": 0.42174574732780457,
+      "relevance_auroc": 0.5078302025794983
+    },
+    "1024": {
+      "state_top1": 1.0,
+      "selective_top1": 0.9850000143051147,
+      "raw_top1": 0.9850000143051147,
+      "shuffled_top1": 0.06499999761581421,
+      "random_top1": 0.06499999761581421,
+      "state_topk": 1.0,
+      "relevance_f1": 0.42116740345954895,
+      "relevance_auroc": 0.5034199357032776
+    },
+    "2048": {
+      "state_top1": 0.512499988079071,
+      "selective_top1": 0.35749998688697815,
+      "raw_top1": 0.35749998688697815,
+      "shuffled_top1": 0.07000000029802322,
+      "random_top1": 0.057500001043081284,
+      "state_topk": 0.75,
+      "relevance_f1": 0.3778006434440613,
+      "relevance_auroc": 0.5015594363212585
+    }
+  },
+  "distractor_robust": {
+    "state_top1": 1.0,
+    "selective_top1": 1.0,
+    "shuffled_top1": 0.07249999791383743,
+    "relevance_f1": 0.28028440475463867
+  }
+}

@@ -25,7 +25,7 @@ from typing import Dict
 
 import torch
 
-from experiments.phase_guided_slots.guided_models import GCfg, build
+from experiments.phase_guided_slots_v2.guided_models_v2 import GCfg2, build_v2
 from experiments.phase_guided_slots_v2.task_schema import build_vocab
 from experiments.phase_guided_slots_v2.datasets_pressure_v2 import generate
 from experiments.phase_guided_slots_v2.train_eval import TCfg, train, evaluate
@@ -48,8 +48,10 @@ class PCfg:
     local_window: int = 16
     max_seq_len: int = 1400
     steps: int = 400
-    lambda_write: float = 0.5
-    match_threshold: float = 0.7   # instance attr on GuidedBoundedSlots (module unmodified)
+    lambda_write: float = 1.0
+    lambda_keydiv: float = 0.5      # keep distinct composite identities on distinct keys
+    match_threshold: float = 0.85   # constructor arg to GuidedBoundedSlots (module unmodified)
+    gate_bias_init: float = -3.0    # start writing rarely; BCE raises gate at anchors
     n_train: int = 400
     n_val: int = 60
     n_test: int = 120
@@ -69,21 +71,20 @@ def make_data(vocab, pc: PCfg, seed: int):
 
 def train_arm(arm: str, pc: PCfg, seed: int, force=False):
     vocab = build_vocab()
-    cfg = GCfg(vocab_size=vocab.size, embed_dim=pc.embed_dim, num_heads=pc.num_heads,
-               local_window=pc.local_window, num_slots=pc.M, top_k=pc.top_k,
-               max_seq_len=pc.max_seq_len)
+    cfg = GCfg2(vocab_size=vocab.size, embed_dim=pc.embed_dim, num_heads=pc.num_heads,
+                local_window=pc.local_window, num_slots=pc.M, top_k=pc.top_k,
+                max_seq_len=pc.max_seq_len, match_threshold=pc.match_threshold,
+                gate_bias_init=pc.gate_bias_init)
     tag = f"{arm}_M{pc.M}_K{pc.top_k}_L{pc.n_live}_s{seed}"
     path = CKPT / f"{tag}.pt"
-    m = build(cfg, arm, seed)
-    if arm != "A":
-        m.slots.match_threshold = pc.match_threshold  # instance attr; module source unchanged
+    m = build_v2(cfg, arm, seed)
     if path.exists() and not force:
         m.load_state_dict(torch.load(path, map_location="cpu"))
         meta = json.loads((CKPT / f"{tag}.json").read_text())
         return m, vocab, meta, tag
     tr, va, te = make_data(vocab, pc, seed)
     trlog = train(m, tr, vocab.pad_id, TCfg(steps=pc.steps, lambda_write=pc.lambda_write,
-                                            seed=seed), val=va)
+                                            lambda_keydiv=pc.lambda_keydiv, seed=seed), val=va)
     metrics = evaluate(m, te, vocab.pad_id)
     trace = trace_dataset(m, te, vocab.pad_id)
     torch.save(m.state_dict(), path)

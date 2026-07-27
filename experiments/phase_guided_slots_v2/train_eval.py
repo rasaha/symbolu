@@ -28,6 +28,7 @@ class TCfg:
     batch_size: int = 16
     lr: float = 1e-3
     lambda_write: float = 0.5
+    lambda_keydiv: float = 0.3   # keep distinct composite identities on distinct keys
     eval_every: int = 100
     seed: int = 0
 
@@ -47,7 +48,26 @@ def collate(batch: List[Example], pad_id: int, device):
     return ids.to(device), wl.to(device), apos.to(device), aid.to(device)
 
 
-def _losses(model, ids, wl, apos, aid, lambda_write):
+def _keydiv_loss(write_key, wl):
+    """Penalize high pairwise cosine among the anchor (per-fact) write keys so distinct
+    composite identities occupy distinct slots (prevents the collapse-to-one-direction
+    failure). write_key:[B,N,Ds], wl:[B,N] with 1 at fact anchors."""
+    B = write_key.shape[0]
+    total = write_key.new_zeros(())
+    cnt = 0
+    for b in range(B):
+        anchors = (wl[b] == 1).nonzero(as_tuple=True)[0]
+        if anchors.numel() < 2:
+            continue
+        K = F.normalize(write_key[b, anchors], dim=-1)
+        G = K @ K.T
+        off = G[~torch.eye(len(anchors), dtype=torch.bool, device=G.device)]
+        total = total + off.clamp(min=0).mean()   # push non-negative cosines toward 0
+        cnt += 1
+    return total / max(1, cnt)
+
+
+def _losses(model, ids, wl, apos, aid, lambda_write, lambda_keydiv=0.0):
     out = model(ids, apos, write_labels=wl)
     ans_loss = F.cross_entropy(out["answer_logits"], aid)
     r = out["r_write"]
@@ -64,7 +84,11 @@ def _losses(model, ids, wl, apos, aid, lambda_write):
             logit_r[mask], tgt[mask], pos_weight=pos_weight)
     else:
         w_loss = torch.zeros((), device=ids.device)
-    return ans_loss + lambda_write * w_loss, ans_loss, w_loss
+    div_loss = torch.zeros((), device=ids.device)
+    if lambda_keydiv > 0 and "write_key" in out:
+        div_loss = _keydiv_loss(out["write_key"], wl)
+    total = ans_loss + lambda_write * w_loss + lambda_keydiv * div_loss
+    return total, ans_loss, w_loss
 
 
 @torch.no_grad()
@@ -91,7 +115,7 @@ def train(model, data: List[Example], pad_id: int, cfg: TCfg,
         idx = torch.randint(0, n, (cfg.batch_size,), generator=rng).tolist()
         b = [data[i] for i in idx]
         ids, wl, apos, aid = collate(b, pad_id, device)
-        loss, al, wlo = _losses(model, ids, wl, apos, aid, cfg.lambda_write)
+        loss, al, wlo = _losses(model, ids, wl, apos, aid, cfg.lambda_write, cfg.lambda_keydiv)
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
@@ -102,6 +126,32 @@ def train(model, data: List[Example], pad_id: int, cfg: TCfg,
     if best_state is not None:
         model.load_state_dict(best_state)
     return {"final_ans": al.item(), "final_write": wlo.item(), "best_val": best}
+
+
+def train_curriculum(model, gen_fn, pad_id: int, stages, cfg: TCfg, device="cpu") -> dict:
+    """Staged-difficulty training (redesign §17). `gen_fn(n_live, n)` returns a fresh
+    train set at a given distinct-live-fact count. `stages` = [(n_live, steps), ...],
+    increasing n_live to teach store→retrieve→decode first, then add capacity pressure.
+    A single optimizer/model persists across stages (skills carry over)."""
+    torch.manual_seed(cfg.seed)
+    rng = torch.Generator().manual_seed(cfg.seed + 3)
+    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
+    model.train()
+    log = []
+    for si, (n_live, steps) in enumerate(stages):
+        data = gen_fn(n_live, 400)
+        n = len(data)
+        for step in range(steps):
+            idx = torch.randint(0, n, (cfg.batch_size,), generator=rng).tolist()
+            b = [data[i] for i in idx]
+            ids, wl, apos, aid = collate(b, pad_id, device)
+            loss, al, wlo = _losses(model, ids, wl, apos, aid, cfg.lambda_write, cfg.lambda_keydiv)
+            opt.zero_grad(); loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+        log.append({"stage": si, "n_live": n_live, "steps": steps,
+                    "final_ans": al.item(), "final_write": wlo.item()})
+    return {"curriculum": log}
 
 
 @torch.no_grad()

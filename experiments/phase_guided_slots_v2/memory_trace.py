@@ -37,13 +37,10 @@ def trace_example_batch(model, ids, examples: List[Example], match_threshold=Non
     device = ids.device
     ar = torch.arange(B)
     h, g = model.encode(ids)
-    hg = torch.cat([h, g], dim=-1)
-    r_write = torch.sigmoid(model.g_write(hg)).squeeze(-1)
-    k_guide = model.g_kguide(hg)
-    p_retain = model.g_retain(hg).squeeze(-1)
-    wk_all = model.k_local(h) + (k_guide if model.guide_write else 0.0)
+    r_write, p_retain = model.guidance(h, g)          # v2 API: gate + retention
+    wk_all = model.k_local(h)                          # PURE content key
     wv_all = model.w_val(h)
-    retain_all = p_retain if model.guide_write else torch.zeros_like(p_retain)
+    retain_all = p_retain
     M = model.cfg.num_slots
     Ds = wk_all.shape[-1]
 
@@ -123,7 +120,9 @@ def trace_example_batch(model, ids, examples: List[Example], match_threshold=Non
 
     # answer-position Top-K read
     hA = h[ar, apos]; gA = g[ar, apos]
-    rq = model.q_read(hA) + (model.q_read_g(gA) if model.guide_read else 0.0)
+    rq = model.q_read(hA)
+    if model.use_phase and model.guide:
+        rq = rq + model.g_readbonus(gA)
     scores = torch.einsum("bd,bmd->bm", rq, keys) / (Ds ** 0.5)
     scores = scores.masked_fill(active < 0.5, float("-inf"))
     K = min(model.cfg.top_k, M)
