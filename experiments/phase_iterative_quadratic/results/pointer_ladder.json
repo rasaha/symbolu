@@ -1,0 +1,49 @@
+{
+  "D0": {
+    "accuracy": 1.0
+  },
+  "grounded_D1": {
+    "accuracy": 0.74,
+    "final_accuracy": 0.77,
+    "next_entity_top1": 0.6033333333333334,
+    "next_entity_topk": 0.9166666666666666,
+    "correct_entity_prob": 0.5526428031921387,
+    "pointer_entropy": 0.8768051020304362,
+    "acc_given_correct_pointer": 0.9337016574585635,
+    "n_pointer": 300,
+    "hard_pointer": {
+      "final_accuracy": 0.7733333333333333,
+      "next_entity_top1": 0.6133333333333333,
+      "next_entity_topk": 0.9066666666666666,
+      "correct_entity_prob": 0.5458244323730469,
+      "pointer_entropy": 0.8824776840209961,
+      "acc_given_correct_pointer": 0.9728260869565217,
+      "n_pointer": 300
+    }
+  },
+  "grounded_D2": {
+    "accuracy": 0.4766666666666667,
+    "final_accuracy": 0.4766666666666667,
+    "next_entity_top1": 0.49666666666666665,
+    "next_entity_topk": 0.86,
+    "correct_entity_prob": 0.4603849156697591,
+    "pointer_entropy": 1.1104982884724934,
+    "acc_given_correct_pointer": 0.785234899328859,
+    "n_pointer": 300,
+    "hard_pointer": {
+      "final_accuracy": 0.4866666666666667,
+      "next_entity_top1": 0.49666666666666665,
+      "next_entity_topk": 0.86,
+      "correct_entity_prob": 0.4603849156697591,
+      "pointer_entropy": 1.1104982884724934,
+      "acc_given_correct_pointer": 0.8657718120805369,
+      "n_pointer": 300
+    }
+  },
+  "gate": {
+    "D0_ge_0.95": true,
+    "grounded_D1_ge_0.85": false,
+    "grounded_D2": 0.4766666666666667,
+    "verdict": "query_update_still_bottleneck"
+  }
+}
