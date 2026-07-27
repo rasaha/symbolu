@@ -24,11 +24,15 @@ from .hybrid_blocks import PhaseFeature
 class IterativeHybrid(nn.Module):
     def __init__(self, vocab_size, n_id, hops=2, router_kind="cond", use_phase=False,
                  iterative=True, routing_mode="learned", W=W_WINDOW, K=K_ROUTED,
-                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False):
+                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False, grounded_query=True,
+                 key_base=None):
         super().__init__()
         self.hops, self.iterative, self.routing_mode = hops, iterative, routing_mode
         self.use_phase, self.W, self.K = use_phase, W, K
         self.gt_query = gt_query        # D0: feed the ground-truth intermediate query (diagnostic)
+        self.grounded_query = grounded_query   # next query = soft-pointer (hop prediction) into key space
+        self.n_id = n_id
+        self.key_base = key_base if key_base is not None else (2 + n_id)   # KEY token id offset
         self.embed_dim = embed_dim
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
         self.router = LearnedRouter(embed_dim, router_kind)
@@ -102,6 +106,12 @@ class IterativeHybrid(nn.Module):
                 q = q0
             elif self.iterative:
                 q = self.qupdate(q, o)
+                if self.grounded_query:
+                    # add a soft-pointer to the predicted next entity's KEY embedding (grounds the
+                    # query in identity space so the next routing/attention stage can match it)
+                    pred = torch.softmax(self.hop_head(o), dim=-1)           # [B,n_id]
+                    key_emb = self.token_embed.weight[self.key_base:self.key_base + self.n_id]  # [n_id,D]
+                    q = q + pred @ key_emb
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
             q_norms.append((q - q_prev).norm(dim=-1).mean().item())    # §8 query-evolution diagnostic
