@@ -23,19 +23,24 @@ def _latest_version_by_key(events: List[Evidence]) -> Dict[tuple, int]:
     return best
 
 
+ENTERPRISE = {"P2", "P3", "P4", "P5"}
+
+
 def priority(e: Evidence, ctx: Dict, policy: str, required_ids=None) -> float:
     """Higher = more worth retaining. ctx carries cross-record deterministic context."""
     if policy == "P0":                              # FIFO: oldest first out → priority = arrival order
-        return float(e.timestamp)
+        return -float(e.timestamp)                  # lowest priority = oldest (evicted first)
     if policy == "P1":                              # recency: newest wins
         return float(e.timestamp)
-    if policy == "P5":                              # oracle: required evidence is paramount
+    if policy == "P6":                              # oracle: required evidence is paramount
         base = 100.0 if (required_ids and e.evidence_id in required_ids) else 0.0
         return base + float(e.timestamp) * 1e-3
-    # P2 / P3 — deterministic enterprise priority (no labels)
+    # P2–P5 — deterministic enterprise priority (no labels); P4/P5 add eviction PROTECTION (below)
     s = 0.0
     if e.relation_type in CHAIN_RELATIONS:
         s += 4.0                                    # required-chain-link kind
+    if ctx.get("query_subjects") and e.subject_id in ctx["query_subjects"]:
+        s += 4.0                                    # relevant to the query subject / discovered chain
     if e.status == ACTIVE:
         s += 3.0                                    # active constraint
     if ctx["conflict_keys"] and e.key_tuple()[:3] in ctx["conflict_keys"]:
@@ -47,27 +52,57 @@ def priority(e: Evidence, ctx: Dict, policy: str, required_ids=None) -> float:
     return s
 
 
-def build_ctx(events: List[Evidence]) -> Dict:
+def build_ctx(events: List[Evidence], query_anchor=None) -> Dict:
     latest = _latest_version_by_key(events)
-    # conflict keys: same (subject,relation) with >1 ACTIVE record of different version/object
     active_by_key: Dict[tuple, set] = {}
     for e in events:
         if e.status == ACTIVE:
             active_by_key.setdefault(e.key_tuple()[:3], set()).add((e.version, e.object_id_or_value))
     conflict_keys = {k for k, v in active_by_key.items() if len(v) > 1}
-    return {"latest_version": latest, "conflict_keys": conflict_keys}
+    # deterministic transitive chain reachability from the query anchor subject (no labels):
+    # follow chain-relation edges subject -> (object as next subject) among observed records.
+    query_subjects = set()
+    if query_anchor is not None:
+        query_subjects.add(query_anchor)            # query anchor = the request subject_id
+        for _ in range(4):                          # bounded transitive closure over subject ids
+            for e in events:
+                if e.relation_type in CHAIN_RELATIONS and e.subject_id in query_subjects:
+                    query_subjects.add(e.object_id_or_value)
+    return {"latest_version": latest, "conflict_keys": conflict_keys, "query_subjects": query_subjects}
+
+
+def protected_ids(slot_ids, id_of, ctx, policy) -> set:
+    """Records the policy must not evict. P4: both sides of a material conflict. P5: also the
+    active + a superseded version of any key that has both (for version comparison)."""
+    prot = set()
+    if policy not in ("P4", "P5"):
+        return prot
+    from .schema import ACTIVE, SUPERSEDED
+    by_key = {}
+    for eid in slot_ids:
+        by_key.setdefault(id_of[eid].key_tuple()[:3], []).append(eid)
+    for k, ids in by_key.items():
+        if policy in ("P4", "P5") and k in ctx["conflict_keys"]:
+            prot.update(ids)                        # protect all conflict participants
+        if policy == "P5":
+            has_active = any(id_of[i].status == ACTIVE for i in ids)
+            has_super = any(id_of[i].status == SUPERSEDED for i in ids)
+            if has_active and has_super:
+                # keep one active + the latest superseded
+                act = max((i for i in ids if id_of[i].status == ACTIVE), key=lambda i: id_of[i].version)
+                sup = max((i for i in ids if id_of[i].status == SUPERSEDED), key=lambda i: id_of[i].version)
+                prot.update({act, sup})
+    return prot
 
 
 def collapse_duplicates(slot_ids: List[int], id_of: Dict[int, Evidence]) -> List[int]:
-    """P3: keep one representative per exact key (prefer ACTIVE, then latest version)."""
+    """P3+: collapse only TRUE duplicates — identical key AND version AND status. Records that
+    differ in version or status (active vs superseded, conflicting versions) are DISTINCT facts and
+    are never collapsed, so conflict pairs and active/stale pairs survive dedup."""
     best: Dict[tuple, int] = {}
+    order = {eid: i for i, eid in enumerate(slot_ids)}
     for eid in slot_ids:
-        e = id_of[eid]; k = e.key_tuple()
-        cur = best.get(k)
-        if cur is None:
+        e = id_of[eid]; k = e.key_tuple() + (e.version, e.status)
+        if k not in best or e.source_authority > id_of[best[k]].source_authority:
             best[k] = eid
-        else:
-            ce = id_of[cur]
-            if (e.status == ACTIVE, e.version) > (ce.status == ACTIVE, ce.version):
-                best[k] = eid
-    return list(best.values())
+    return sorted(best.values(), key=lambda i: order[i])

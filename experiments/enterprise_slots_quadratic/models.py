@@ -16,7 +16,7 @@ import torch.nn as nn
 from .schema import DomainCfg, CAT_FIELDS, field_dims, N_ROLE, N_STATUS
 from .dataset import ABSTAIN, N_TIERS
 from .bounded_quadratic import QueryToSlot, SlotSelfAttention
-from .binding_slots import fresh_packet, simulate_slots
+from .binding_slots import fresh_packet, simulate_slots, global_packet, simulate_slots_roles
 
 EMBED_DIM = 48
 NUM_HEADS = 4
@@ -25,8 +25,10 @@ N_ANSWER = N_ROLE + 1                        # roles + ABSTAIN
 ARMS = {
     "S0": {"source": "fresh", "attn": "pool"},
     "S1": {"source": "fresh", "attn": "self"},
+    "S1G": {"source": "global", "attn": "self"},   # fair global query-time retrieval + quadratic
     "S2": {"source": "slots", "attn": "pool"},
     "S3": {"source": "slots", "attn": "self"},
+    "S3R": {"source": "roles", "attn": "self"},     # role-aware slot allocation + quadratic
     "S4": {"source": "oracle", "attn": "self"},
     "S5": {"source": "slots", "attn": "self"},
     "S6": {"source": "slots", "attn": "q2s"},
@@ -34,11 +36,15 @@ ARMS = {
 
 
 def working_set(ex, arm, K, policy="P2"):
-    cfg = ARMS[arm]
-    if cfg["source"] == "fresh":
+    src = ARMS[arm]["source"]
+    if src == "fresh":
         r = fresh_packet(ex); r["required_survived"] = all(
             (i < 0) or (i in r["ids"]) for i in ex["required_ids"]); return r
-    return simulate_slots(ex, K, policy=policy, oracle=(cfg["source"] == "oracle"))
+    if src == "global":
+        return global_packet(ex, K)
+    if src == "roles":
+        return simulate_slots_roles(ex, K, policy=policy)
+    return simulate_slots(ex, K, policy=policy, oracle=(src == "oracle"))
 
 
 class EvidenceEncoder(nn.Module):
