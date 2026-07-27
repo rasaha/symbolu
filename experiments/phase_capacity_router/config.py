@@ -38,7 +38,7 @@ SEEDS = (0, 1, 2)
 class DataCfg:
     num_entities: int = NUM_ENTITIES
     num_values: int = NUM_VALUES
-    n_relevant: int = 3            # relevant events about the focus (target is one of them)
+    n_relevant: int = 1            # one relevant event (entity=focus); avoids exact-store key collision
     n_hard: int = 6                # frequency-matched hard negatives
     family: str = "single"
     multihop_depth: int = 2
