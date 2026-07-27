@@ -72,16 +72,22 @@ def train_hybrid(model, gen_fn, vocab, cfg: TrainCfg, device="cpu"):
                 m = hoptgt[:, h] >= 0
                 if m.any():
                     loss = loss + F.cross_entropy(hl[m], hoptgt[m, h])
-        # query-alignment (§4/§13 stage 3): updated query after hop h must point at the hop-(h+1)
-        # required event, so the next routing stage can discover it. Directly trains the query update.
-        ev = out["event_reps"]                                        # [B,Ne,D]
-        for h, qh in enumerate(out.get("queries", [])):
+        # structured-pointer supervision (§ query-update repair): the pointer after hop h must select
+        # the hop-(h+1) required EVIDENCE event. Train-only; autonomous eval uses the predicted pointer.
+        for h, pl in enumerate(out.get("pointer_logits", [])):
             if h + 1 < reqe.shape[1]:
-                nxt = reqe[:, h + 1]
-                mm = nxt >= 0
+                nxt = reqe[:, h + 1]; mm = nxt >= 0
                 if mm.any():
-                    tgt = ev[mm].gather(1, nxt[mm].clamp(min=0).view(-1, 1, 1).expand(-1, 1, ev.shape[-1])).squeeze(1)
-                    loss = loss + (1.0 - F.cosine_similarity(qh[mm], tgt.detach(), dim=-1)).mean()
+                    loss = loss + F.cross_entropy(pl[mm], nxt[mm])
+        # query-alignment fallback (only when the structured pointer is not used)
+        if not out.get("pointer_logits"):
+            ev = out["event_reps"]
+            for h, qh in enumerate(out.get("queries", [])):
+                if h + 1 < reqe.shape[1]:
+                    nxt = reqe[:, h + 1]; mm = nxt >= 0
+                    if mm.any():
+                        tgt = ev[mm].gather(1, nxt[mm].clamp(min=0).view(-1, 1, 1).expand(-1, 1, ev.shape[-1])).squeeze(1)
+                        loss = loss + (1.0 - F.cosine_similarity(qh[mm], tgt.detach(), dim=-1)).mean()
         if model.routing_mode in ("learned", "phase_zero", "phase_shuffle"):
             loss = loss + cfg.lambda_route * _route_loss(out["route_scores"], reqe, cfg.margin)
         opt.zero_grad(); loss.backward()

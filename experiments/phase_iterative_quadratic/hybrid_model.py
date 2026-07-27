@@ -24,8 +24,8 @@ from .hybrid_blocks import PhaseFeature
 class IterativeHybrid(nn.Module):
     def __init__(self, vocab_size, n_id, hops=2, router_kind="cond", use_phase=False,
                  iterative=True, routing_mode="learned", W=W_WINDOW, K=K_ROUTED,
-                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False, grounded_query=True,
-                 key_base=None):
+                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False, grounded_query=False,
+                 key_base=None, pointer_query=False):
         super().__init__()
         self.hops, self.iterative, self.routing_mode = hops, iterative, routing_mode
         self.use_phase, self.W, self.K = use_phase, W, K
@@ -41,6 +41,8 @@ class IterativeHybrid(nn.Module):
         self.val_bind = nn.Linear(embed_dim, embed_dim)     # local key↔value binding (minimal P mixing)
         self.answer_head = nn.Linear(2 * embed_dim, n_id)   # decode from [final query ; last attn output]
         self.hop_head = nn.Linear(embed_dim, n_id)          # per-hop target head (staged supervision §13)
+        self.pointer_query = pointer_query                  # structured soft-pointer over evidence keys
+        self.W_ptr = nn.Linear(embed_dim, embed_dim, bias=False)   # o → key comparison space for the pointer
         if use_phase:
             self.phase = PhaseFeature(embed_dim, num_heads)
         self.phase_zero = routing_mode == "phase_zero"
@@ -54,7 +56,8 @@ class IterativeHybrid(nn.Module):
         return x
 
     def forward(self, ids, event_pos, probe_pos, valid_len, required_hops=None, req_evidx=None,
-                freeze_query=False, shuffle_query=False, shuffle_scores=False):
+                freeze_query=False, shuffle_query=False, shuffle_scores=False,
+                forced_routed=None, hard_pointer=False):
         """event_pos:[B,Ne] token positions of events; required_hops:[B,H] full-pos of the
         required event at each hop (for oracle routing + hop supervision); req_evidx:[B,H] indices
         into the event list (for D0 ground-truth intermediate query). May be −1."""
@@ -71,6 +74,7 @@ class IterativeHybrid(nn.Module):
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
         route_scores = []; hop_outputs = []; q_norms = []; queries = []
+        routed_out = []; pointer_logits = []
         for h in range(self.hops):
             # D0 diagnostic: overwrite the intermediate query with the ground-truth next entity
             if self.gt_query and h >= 1 and req_evidx is not None:
@@ -92,25 +96,36 @@ class IterativeHybrid(nn.Module):
                 sel = sel + match.float() * 10.0 + torch.rand_like(scores) * 0.01
             else:
                 sel = scores
-            if self.routing_mode == "local" or self.K == 0:
+            if forced_routed is not None:                              # parity / D0-index injection
+                routed_full = forced_routed[h]
+            elif self.routing_mode == "local" or self.K == 0:
                 routed_full = torch.full((B, 0), -1, dtype=torch.long, device=ids.device)
             else:
                 topk = sel.topk(min(self.K, scores.shape[1]), dim=-1).indices    # [B,K] into events
                 rk = event_pos.gather(1, topk)                         # KEY token positions
                 routed_full = torch.cat([rk, rk + 1], dim=1)           # include each key's VALUE token
+            routed_out.append(routed_full)
             o = self.qblock(q.unsqueeze(1), reps, probe_pos.unsqueeze(1), routed_full,
                             self.W, valid_len)[:, 0]
             hop_outputs.append(o)
             q_prev = q
             if freeze_query:                                          # control: never evolve the query
                 q = q0
+            elif self.pointer_query:
+                # structured soft pointer over the CANDIDATE EVIDENCE KEYS (not the global vocab):
+                #   scores_i = (W_ptr o)·ev_i ; pointer = softmax(scores) ; q_next = Σ pointer_i ev_i
+                pl = torch.einsum("bd,bnd->bn", self.W_ptr(o), ev)         # [B,Ne]
+                pointer_logits.append(pl)
+                if hard_pointer:
+                    idx = pl.argmax(-1)
+                    q = ev.gather(1, idx.view(B, 1, 1).expand(B, 1, D)).squeeze(1)
+                else:
+                    q = torch.softmax(pl, dim=-1).unsqueeze(1).bmm(ev).squeeze(1)   # Σ p_i ev_i
             elif self.iterative:
                 q = self.qupdate(q, o)
                 if self.grounded_query:
-                    # add a soft-pointer to the predicted next entity's KEY embedding (grounds the
-                    # query in identity space so the next routing/attention stage can match it)
-                    pred = torch.softmax(self.hop_head(o), dim=-1)           # [B,n_id]
-                    key_emb = self.token_embed.weight[self.key_base:self.key_base + self.n_id]  # [n_id,D]
+                    pred = torch.softmax(self.hop_head(o), dim=-1)
+                    key_emb = self.token_embed.weight[self.key_base:self.key_base + self.n_id]
                     q = q + pred @ key_emb
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
@@ -119,4 +134,5 @@ class IterativeHybrid(nn.Module):
         logits = self.answer_head(torch.cat([q, o], dim=-1))           # decode from query + last attn output
         hop_logits = [self.hop_head(oh) for oh in hop_outputs]         # per-hop target prediction (staged)
         return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev,
-                "hop_logits": hop_logits, "query_update_norms": q_norms, "queries": queries}
+                "hop_logits": hop_logits, "query_update_norms": q_norms, "queries": queries,
+                "routed": routed_out, "pointer_logits": pointer_logits}
