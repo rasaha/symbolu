@@ -66,6 +66,23 @@ def test_no_label_leakage_in_features():
         assert a == b
 
 
+def test_query_anchor_reachability_leak_free():
+    """Query-chain relevance uses only runtime-observable fields — never labels/oracle/answer."""
+    from experiments.enterprise_slots_quadratic.admission_policies import build_ctx
+    cfg = DomainCfg(); data = generate(cfg, 256, "streaming", 40, 9)
+    for ex in data:
+        seen = [e for e in ex["events"] if e.tag != "query"]
+        qs = build_ctx(seen, query_anchor=ex["req"])["query_subjects"]
+        ex2 = {**ex, "answer_role": (ex["answer_role"] + 1) % 6, "required_ids": [-9, -9],
+               "active_policy_id": -9, "active_version": (ex["active_version"] + 1) % 8}
+        assert build_ctx(seen, query_anchor=ex2["req"])["query_subjects"] == qs
+        # the anchor is the query record's own subject_id (observable at query time)
+        qrec = [e for e in ex["events"] if e.tag == "query"][0]
+        assert qrec.subject_id == ex["req"]
+        # slot selection is label-invariant
+        assert working_set(ex, "S3", 8, "P2")["ids"] == working_set(ex2, "S3", 8, "P2")["ids"]
+
+
 def test_slot_record_exact_fields_immutable():
     from experiments.enterprise_slots_quadratic.binding_slots import SlotRecord
     cfg = DomainCfg(); ex = generate(cfg, 64, "streaming", 1, 8)[0]
