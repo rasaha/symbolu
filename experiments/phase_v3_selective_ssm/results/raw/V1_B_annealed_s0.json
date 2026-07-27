@@ -1,0 +1,83 @@
+{
+  "variant": "V1",
+  "mode": "B_annealed",
+  "seed": 0,
+  "distances": {
+    "64": {
+      "state_top1": 0.8600000143051147,
+      "selective_top1": 0.8600000143051147,
+      "raw_top1": 0.8600000143051147,
+      "shuffled_top1": 0.05000000074505806,
+      "random_top1": 0.04749999940395355,
+      "state_topk": 0.9750000238418579,
+      "relevance_f1": 0.4375871419906616,
+      "relevance_auroc": 0.5018696784973145
+    },
+    "128": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.057500001043081284,
+      "random_top1": 0.06499999761581421,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4440914988517761,
+      "relevance_auroc": 0.5086345076560974
+    },
+    "256": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.14000000059604645,
+      "random_top1": 0.05000000074505806,
+      "state_topk": 1.0,
+      "relevance_f1": 0.430814266204834,
+      "relevance_auroc": 0.5042168498039246
+    },
+    "512": {
+      "state_top1": 0.8224999904632568,
+      "selective_top1": 0.8224999904632568,
+      "raw_top1": 0.8224999904632568,
+      "shuffled_top1": 0.04749999940395355,
+      "random_top1": 0.03999999910593033,
+      "state_topk": 0.9775000214576721,
+      "relevance_f1": 0.41931524872779846,
+      "relevance_auroc": 0.5052337050437927
+    },
+    "1024": {
+      "state_top1": 0.6725000143051147,
+      "selective_top1": 0.6725000143051147,
+      "raw_top1": 0.6725000143051147,
+      "shuffled_top1": 0.10000000149011612,
+      "random_top1": 0.0625,
+      "state_topk": 0.9125000238418579,
+      "relevance_f1": 0.4386318325996399,
+      "relevance_auroc": 0.5007719397544861
+    },
+    "2048": {
+      "state_top1": 0.4950000047683716,
+      "selective_top1": 0.4950000047683716,
+      "raw_top1": 0.4950000047683716,
+      "shuffled_top1": 0.03500000014901161,
+      "random_top1": 0.05249999836087227,
+      "state_topk": 0.762499988079071,
+      "relevance_f1": 0.43458059430122375,
+      "relevance_auroc": 0.5023010969161987
+    },
+    "4096": {
+      "state_top1": 0.4325000047683716,
+      "selective_top1": 0.4325000047683716,
+      "raw_top1": 0.4325000047683716,
+      "shuffled_top1": 0.05000000074505806,
+      "random_top1": 0.05999999865889549,
+      "state_topk": 0.699999988079071,
+      "relevance_f1": 0.428431898355484,
+      "relevance_auroc": 0.4988243281841278
+    }
+  },
+  "distractor_robust": {
+    "state_top1": 0.824999988079071,
+    "selective_top1": 0.824999988079071,
+    "shuffled_top1": 0.03500000014901161,
+    "relevance_f1": 0.2923218607902527
+  }
+}
