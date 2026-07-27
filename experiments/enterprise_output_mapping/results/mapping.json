@@ -1,0 +1,588 @@
+{
+  "steps": 800,
+  "frozen_commit": "299f5ba",
+  "K4_dev": {
+    "O0": {
+      "accuracy": 0.7766666666666666,
+      "balanced_accuracy": 0.7512294077758973,
+      "conflict": {
+        "precision": 0.881578947368421,
+        "recall": 0.9305555555555556,
+        "f1": 0.9054054054054054
+      },
+      "abstention": {
+        "precision": 0.9395973154362416,
+        "recall": 0.958904109589041,
+        "f1": 0.9491525423728814
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.06896551724137931,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.5480769230769231,
+          "recall": 0.7916666666666666
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 0.8709677419354839
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.45,
+          "recall": 0.17647058823529413
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.9864864864864865
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.881578947368421,
+          "recall": 0.9305555555555556
+        }
+      },
+      "n": 300
+    },
+    "O1": {
+      "accuracy": 0.74,
+      "balanced_accuracy": 0.7229614339196881,
+      "conflict": {
+        "precision": 0.8983050847457628,
+        "recall": 0.7361111111111112,
+        "f1": 0.8091603053435116
+      },
+      "abstention": {
+        "precision": 0.9545454545454546,
+        "recall": 0.863013698630137,
+        "f1": 0.906474820143885
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.5979381443298969,
+          "recall": 0.8055555555555556
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 0.8709677419354839
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.25,
+          "recall": 0.21568627450980393
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.9864864864864865
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.8983050847457628,
+          "recall": 0.7361111111111112
+        }
+      },
+      "n": 300
+    },
+    "O2": {
+      "accuracy": 0.74,
+      "balanced_accuracy": 0.7229614339196881,
+      "conflict": {
+        "precision": 0.8983050847457628,
+        "recall": 0.7361111111111112,
+        "f1": 0.8091603053435116
+      },
+      "abstention": {
+        "precision": 0.9485294117647058,
+        "recall": 0.8835616438356164,
+        "f1": 0.9148936170212766
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.5979381443298969,
+          "recall": 0.8055555555555556
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 0.8709677419354839
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.275,
+          "recall": 0.21568627450980393
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 0.948051948051948,
+          "recall": 0.9864864864864865
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.8983050847457628,
+          "recall": 0.7361111111111112
+        }
+      },
+      "n": 300
+    },
+    "O5": {
+      "accuracy": 1.0,
+      "balanced_accuracy": 1.0,
+      "conflict": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "abstention": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 1.0,
+          "recall": 1.0
+        }
+      },
+      "n": 300
+    },
+    "O3": {
+      "accuracy": 0.7766666666666666,
+      "balanced_accuracy": 0.7409352901288384,
+      "conflict": {
+        "precision": 0.881578947368421,
+        "recall": 0.9305555555555556,
+        "f1": 0.9054054054054054
+      },
+      "abstention": {
+        "precision": 0.9395973154362416,
+        "recall": 0.958904109589041,
+        "f1": 0.9491525423728814
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.09482758620689655,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.532258064516129,
+          "recall": 0.9166666666666666
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 0.8709677419354839
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.9864864864864865
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.881578947368421,
+          "recall": 0.9305555555555556
+        }
+      },
+      "n": 300
+    },
+    "O4": {
+      "accuracy": 0.74,
+      "balanced_accuracy": 0.710379734573283,
+      "conflict": {
+        "precision": 0.8983050847457628,
+        "recall": 0.7361111111111112,
+        "f1": 0.8091603053435116
+      },
+      "abstention": {
+        "precision": 0.9545454545454546,
+        "recall": 0.863013698630137,
+        "f1": 0.906474820143885
+      },
+      "structured_field_accuracy": 0.63,
+      "output_mapping_error_rate": 0.09482758620689655,
+      "map_den": 116,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.49640287769784175,
+          "recall": 0.9583333333333334
+        },
+        "REJECT": {
+          "precision": 0.9310344827586207,
+          "recall": 0.8709677419354839
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.9864864864864865
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.8983050847457628,
+          "recall": 0.7361111111111112
+        }
+      },
+      "n": 300
+    }
+  },
+  "K4_heldout": {
+    "O0": {
+      "accuracy": 0.57,
+      "balanced_accuracy": 0.6046286367973835,
+      "conflict": {
+        "precision": 0.7441860465116279,
+        "recall": 0.47761194029850745,
+        "f1": 0.5818181818181818
+      },
+      "abstention": {
+        "precision": 0.8817204301075269,
+        "recall": 0.656,
+        "f1": 0.7522935779816514
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.19540229885057472,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.3488372093023256,
+          "recall": 0.7258064516129032
+        },
+        "REJECT": {
+          "precision": 0.9428571428571428,
+          "recall": 0.8048780487804879
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.2558139534883721,
+          "recall": 0.1527777777777778
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.8620689655172413
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.7441860465116279,
+          "recall": 0.47761194029850745
+        }
+      },
+      "n": 300
+    },
+    "O1": {
+      "accuracy": 0.5433333333333333,
+      "balanced_accuracy": 0.5804154885969692,
+      "conflict": {
+        "precision": 0.7083333333333334,
+        "recall": 0.2537313432835821,
+        "f1": 0.3736263736263737
+      },
+      "abstention": {
+        "precision": 0.9066666666666666,
+        "recall": 0.544,
+        "f1": 0.68
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.41818181818181815,
+          "recall": 0.7419354838709677
+        },
+        "REJECT": {
+          "precision": 0.9428571428571428,
+          "recall": 0.8048780487804879
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.2,
+          "recall": 0.2222222222222222
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.8793103448275862
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.7083333333333334,
+          "recall": 0.2537313432835821
+        }
+      },
+      "n": 300
+    },
+    "O2": {
+      "accuracy": 0.5433333333333333,
+      "balanced_accuracy": 0.5804154885969692,
+      "conflict": {
+        "precision": 0.7083333333333334,
+        "recall": 0.2537313432835821,
+        "f1": 0.3736263736263737
+      },
+      "abstention": {
+        "precision": 0.8987341772151899,
+        "recall": 0.568,
+        "f1": 0.6960784313725489
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.41818181818181815,
+          "recall": 0.7419354838709677
+        },
+        "REJECT": {
+          "precision": 0.9428571428571428,
+          "recall": 0.8048780487804879
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.21052631578947367,
+          "recall": 0.2222222222222222
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 0.9272727272727272,
+          "recall": 0.8793103448275862
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.7083333333333334,
+          "recall": 0.2537313432835821
+        }
+      },
+      "n": 300
+    },
+    "O5": {
+      "accuracy": 1.0,
+      "balanced_accuracy": 1.0,
+      "conflict": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "abstention": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.0,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "REJECT": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 1.0,
+          "recall": 1.0
+        }
+      },
+      "n": 300
+    },
+    "O3": {
+      "accuracy": 0.5833333333333334,
+      "balanced_accuracy": 0.621978714366527,
+      "conflict": {
+        "precision": 0.7391304347826086,
+        "recall": 0.5074626865671642,
+        "f1": 0.6017699115044248
+      },
+      "abstention": {
+        "precision": 0.875,
+        "recall": 0.672,
+        "f1": 0.7601809954751132
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.1839080459770115,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.35365853658536583,
+          "recall": 0.9354838709677419
+        },
+        "REJECT": {
+          "precision": 0.825,
+          "recall": 0.8048780487804879
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.8620689655172413
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.7391304347826086,
+          "recall": 0.5074626865671642
+        }
+      },
+      "n": 300
+    },
+    "O4": {
+      "accuracy": 0.5333333333333333,
+      "balanced_accuracy": 0.5779065280234925,
+      "conflict": {
+        "precision": 0.7083333333333334,
+        "recall": 0.2537313432835821,
+        "f1": 0.3736263736263737
+      },
+      "abstention": {
+        "precision": 0.9066666666666666,
+        "recall": 0.544,
+        "f1": 0.68
+      },
+      "structured_field_accuracy": 0.4533333333333333,
+      "output_mapping_error_rate": 0.1839080459770115,
+      "map_den": 87,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "duplicate_occupancy": 0.029166666666666667,
+      "per_outcome": {
+        "APPROVE": {
+          "precision": 0.3352272727272727,
+          "recall": 0.9516129032258065
+        },
+        "REJECT": {
+          "precision": 0.673469387755102,
+          "recall": 0.8048780487804879
+        },
+        "REVIEW_REQUIRED": {
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "ABSTAIN_INCOMPLETE_EVIDENCE": {
+          "precision": 1.0,
+          "recall": 0.8793103448275862
+        },
+        "ABSTAIN_MATERIAL_CONFLICT": {
+          "precision": 0.7083333333333334,
+          "recall": 0.2537313432835821
+        }
+      },
+      "n": 300
+    }
+  },
+  "causal_K4": {
+    "O1_predicted_fields": 0.5649999976158142,
+    "O1_true_fields": 1.0,
+    "corrupt_policy_field": 0.39500001072883606
+  },
+  "capacity": {
+    "K4": {
+      "O0": 0.57,
+      "O1": 0.5433333333333333,
+      "O2": 0.5433333333333333,
+      "O5": 1.0,
+      "O3": 0.5833333333333334,
+      "O4": 0.5333333333333333
+    },
+    "K8": {
+      "O0": 0.7833333333333333,
+      "O1": 0.8033333333333333,
+      "O2": 0.79,
+      "O5": 1.0,
+      "O3": 0.8033333333333333,
+      "O4": 0.8033333333333333
+    },
+    "K16": {
+      "O0": 0.82,
+      "O1": 0.8533333333333334,
+      "O2": 0.8533333333333334,
+      "O5": 1.0,
+      "O3": 0.82,
+      "O4": 0.8533333333333334
+    }
+  },
+  "dup_control": {
+    "with_dup_O1": 0.5433333333333333,
+    "with_dup_occ": 0.029166666666666667,
+    "no_dup_O1": 0.5833333333333334,
+    "no_dup_occ": 0.0
+  },
+  "acceptance": {
+    "acc_gain_ge_0.10": false,
+    "mapping_err_reduction_ge_50pct": true,
+    "abstention_preserved": true,
+    "conflict_f1_ge_0.90": false,
+    "id_preservation_1.0": true,
+    "unauthorized_0": true,
+    "generalizes": false,
+    "K_le_8": true,
+    "VALIDATED": false
+  },
+  "verdict": {
+    "frozen_baseline": "verified",
+    "structured_reasoning_contract": "validated",
+    "output_mapping_rescue": "unsupported",
+    "best_mapper": "O1",
+    "output_mapping_failure_reduction": 0.19540229885057472,
+    "final_accuracy_improvement": -0.026666666666666616,
+    "abstention_integrity": "validated",
+    "duplicate_noise_hardening": "unsupported",
+    "best_slot_capacity": 4,
+    "typed_vs_latent": "equivalent",
+    "evidence_id_preservation": 1.0,
+    "unauthorized_inclusion": 0.0,
+    "primary_remaining_bottleneck": "structured_reasoning",
+    "authorized_architecture": "ledger->joins->P5 slots->bounded quadratic->typed findings->hard gates->constrained outcome"
+  }
+}

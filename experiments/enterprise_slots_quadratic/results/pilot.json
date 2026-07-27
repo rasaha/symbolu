@@ -1,0 +1,258 @@
+{
+  "seed": 0,
+  "steps": 700,
+  "required_survival": {
+    "one_shot": {
+      "N64_K4": {
+        "S0": 1.0,
+        "S1": 1.0,
+        "S2": 0.275,
+        "S3": 0.275,
+        "S4": 1.0
+      },
+      "N64_K8": {
+        "S0": 1.0,
+        "S1": 1.0,
+        "S2": 0.385,
+        "S3": 0.385,
+        "S4": 1.0
+      },
+      "N64_K16": {
+        "S0": 1.0,
+        "S1": 1.0,
+        "S2": 0.825,
+        "S3": 0.825,
+        "S4": 1.0
+      },
+      "N256_K4": {
+        "S0": 0.465,
+        "S1": 0.465,
+        "S2": 0.275,
+        "S3": 0.275,
+        "S4": 1.0
+      },
+      "N256_K8": {
+        "S0": 0.465,
+        "S1": 0.465,
+        "S2": 0.305,
+        "S3": 0.305,
+        "S4": 1.0
+      },
+      "N256_K16": {
+        "S0": 0.465,
+        "S1": 0.465,
+        "S2": 0.305,
+        "S3": 0.305,
+        "S4": 1.0
+      }
+    },
+    "streaming": {
+      "N64_K4": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.275,
+        "S3": 0.275,
+        "S4": 1.0
+      },
+      "N64_K8": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.385,
+        "S3": 0.385,
+        "S4": 1.0
+      },
+      "N64_K16": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.825,
+        "S3": 0.825,
+        "S4": 1.0
+      },
+      "N256_K4": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.275,
+        "S3": 0.275,
+        "S4": 1.0
+      },
+      "N256_K8": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.305,
+        "S3": 0.305,
+        "S4": 1.0
+      },
+      "N256_K16": {
+        "S0": 0.0,
+        "S1": 0.0,
+        "S2": 0.305,
+        "S3": 0.305,
+        "S4": 1.0
+      }
+    }
+  },
+  "accuracy": {
+    "streaming": {
+      "K4": {
+        "S0": 0.38333333333333336,
+        "S1": 0.4166666666666667,
+        "S2": 0.42,
+        "S3": 0.41,
+        "S4": 0.64
+      },
+      "K8": {
+        "S0": 0.38333333333333336,
+        "S1": 0.4166666666666667,
+        "S2": 0.37666666666666665,
+        "S3": 0.4033333333333333,
+        "S4": 0.7766666666666666
+      },
+      "K16": {
+        "S0": 0.38333333333333336,
+        "S1": 0.4166666666666667,
+        "S2": 0.38,
+        "S3": 0.44,
+        "S4": 0.6566666666666666
+      }
+    },
+    "one_shot": {
+      "S0": {
+        "accuracy": 0.3566666666666667,
+        "conflict_f1": 0.9344262295081968,
+        "version_acc": 0.16333333333333333
+      },
+      "S1": {
+        "accuracy": 0.4266666666666667,
+        "conflict_f1": 1.0,
+        "version_acc": 0.22
+      },
+      "S2": {
+        "accuracy": 0.3566666666666667,
+        "conflict_f1": 0.8387096774193548,
+        "version_acc": 0.17333333333333334
+      },
+      "S3": {
+        "accuracy": 0.44333333333333336,
+        "conflict_f1": 0.9767441860465116,
+        "version_acc": 0.33
+      },
+      "S4": {
+        "accuracy": 0.7733333333333333,
+        "conflict_f1": 1.0,
+        "version_acc": 0.8266666666666667
+      }
+    }
+  },
+  "detail_streaming_K16": {
+    "S0": {
+      "accuracy": 0.38333333333333336,
+      "conflict": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "active_version_acc": 0.13666666666666666,
+      "abstention": {
+        "precision": 0.41353383458646614,
+        "recall": 0.88,
+        "f1": 0.5626598465473145
+      },
+      "required_survival_rate": 0.0,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 32.0
+    },
+    "S1": {
+      "accuracy": 0.4166666666666667,
+      "conflict": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "active_version_acc": 0.12666666666666668,
+      "abstention": {
+        "precision": 0.4166666666666667,
+        "recall": 1.0,
+        "f1": 0.5882352941176471
+      },
+      "required_survival_rate": 0.0,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 32.0
+    },
+    "S2": {
+      "accuracy": 0.38,
+      "conflict": {
+        "precision": 0.8529411764705882,
+        "recall": 0.47540983606557374,
+        "f1": 0.6105263157894736
+      },
+      "active_version_acc": 0.14,
+      "abstention": {
+        "precision": 0.5985401459854015,
+        "recall": 0.656,
+        "f1": 0.6259541984732825
+      },
+      "required_survival_rate": 0.29,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 79.41
+    },
+    "S3": {
+      "accuracy": 0.44,
+      "conflict": {
+        "precision": 1.0,
+        "recall": 0.8688524590163934,
+        "f1": 0.9298245614035088
+      },
+      "active_version_acc": 0.30333333333333334,
+      "abstention": {
+        "precision": 0.8266666666666667,
+        "recall": 0.496,
+        "f1": 0.62
+      },
+      "required_survival_rate": 0.29,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 79.41
+    },
+    "S4": {
+      "accuracy": 0.6566666666666666,
+      "conflict": {
+        "precision": 1.0,
+        "recall": 0.9836065573770492,
+        "f1": 0.9917355371900827
+      },
+      "active_version_acc": 0.8033333333333333,
+      "abstention": {
+        "precision": 1.0,
+        "recall": 0.992,
+        "f1": 0.9959839357429718
+      },
+      "required_survival_rate": 1.0,
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 80.12
+    }
+  },
+  "integrity_S3": {
+    "unauthorized_inclusion_rate": 0.0,
+    "evidence_id_preservation": 1.0,
+    "injected_unauthorized_leak_rate": 0.0
+  },
+  "causal_S3": {
+    "none": 0.44,
+    "evict_required": 0.33,
+    "evict_irrelevant": 0.28,
+    "shuffle_slots": 0.44,
+    "zero_slot_repr": 0.37
+  },
+  "validity_gate": {
+    "S1_beats_S0_relational": true,
+    "S2_beats_S0_survival_streaming": true,
+    "S4_can_solve": true,
+    "provenance_access_pass": true,
+    "causal_required_gt_irrelevant": false,
+    "PILOT_VALID": false
+  }
+}

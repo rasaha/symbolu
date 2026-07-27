@@ -1,0 +1,481 @@
+{
+  "steps": 800,
+  "frozen_commit": "a4b01e2",
+  "ownership": {
+    "budget_status": "DETERMINISTIC",
+    "approval_requirement": "DETERMINISTIC",
+    "evidence_complete": "DETERMINISTIC",
+    "active_policy_status": "RELATIONAL",
+    "material_conflict": "RELATIONAL",
+    "approval_evidence_status": "RELATIONAL"
+  },
+  "K8": {
+    "F0": {
+      "dev": {
+        "outcome_accuracy": 0.6466666666666666,
+        "field_macro_accuracy": 0.844,
+        "field_accuracy": {
+          "budget_status": 0.9733333333333334,
+          "policy_status": 0.6566666666666666,
+          "approval_status": 0.98,
+          "material_conflict": 0.74,
+          "evidence_complete": 0.87
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 0.9733333333333334,
+          "policy_status": 0.6566666666666666,
+          "approval_status": 0.98,
+          "material_conflict": 0.74,
+          "evidence_complete": 0.87
+        },
+        "conflict": {
+          "precision": 0.38461538461538464,
+          "recall": 0.1388888888888889,
+          "f1": 0.20408163265306123
+        },
+        "abstention": {
+          "precision": 0.7692307692307693,
+          "recall": 0.410958904109589,
+          "f1": 0.5357142857142857
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      },
+      "heldout": {
+        "outcome_accuracy": 0.64,
+        "field_macro_accuracy": 0.8399999999999999,
+        "field_accuracy": {
+          "budget_status": 0.94,
+          "policy_status": 0.6633333333333333,
+          "approval_status": 0.94,
+          "material_conflict": 0.7666666666666667,
+          "evidence_complete": 0.89
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 0.94,
+          "policy_status": 0.6633333333333333,
+          "approval_status": 0.94,
+          "material_conflict": 0.7666666666666667,
+          "evidence_complete": 0.89
+        },
+        "conflict": {
+          "precision": 0.4444444444444444,
+          "recall": 0.1791044776119403,
+          "f1": 0.2553191489361702
+        },
+        "abstention": {
+          "precision": 0.72,
+          "recall": 0.432,
+          "f1": 0.54
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      }
+    },
+    "F1": {
+      "dev": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.952,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      },
+      "heldout": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.9553333333333333,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      }
+    },
+    "F2": {
+      "dev": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.952,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      },
+      "heldout": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.9553333333333333,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      }
+    },
+    "F5": {
+      "dev": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.952,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.76
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      },
+      "heldout": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 0.9553333333333333,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 0.7766666666666666
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      }
+    },
+    "F6": {
+      "dev": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 1.0,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 1.0
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 1.0
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      },
+      "heldout": {
+        "outcome_accuracy": 1.0,
+        "field_macro_accuracy": 1.0,
+        "field_accuracy": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 1.0
+        },
+        "field_accuracy_given_survived": {
+          "budget_status": 1.0,
+          "policy_status": 1.0,
+          "approval_status": 1.0,
+          "material_conflict": 1.0,
+          "evidence_complete": 1.0
+        },
+        "conflict": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "abstention": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "evidence_id_preservation": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "n": 300
+      }
+    },
+    "F4_consistency": {
+      "outcome_accuracy": 0.64,
+      "field_macro_accuracy": 0.8246666666666667,
+      "field_accuracy": {
+        "budget_status": 0.94,
+        "policy_status": 0.6666666666666666,
+        "approval_status": 0.94,
+        "material_conflict": 0.7666666666666667,
+        "evidence_complete": 0.81
+      },
+      "field_accuracy_given_survived": {
+        "budget_status": 0.94,
+        "policy_status": 0.6666666666666666,
+        "approval_status": 0.94,
+        "material_conflict": 0.7666666666666667,
+        "evidence_complete": 0.81
+      },
+      "conflict": {
+        "precision": 0.4444444444444444,
+        "recall": 0.1791044776119403,
+        "f1": 0.2553191489361702
+      },
+      "abstention": {
+        "precision": 0.72,
+        "recall": 0.432,
+        "f1": 0.54
+      },
+      "evidence_id_preservation": 1.0,
+      "unauthorized_inclusion": 0.0,
+      "n": 300
+    }
+  },
+  "oracle_intervention": {
+    "base_accuracy": 0.64,
+    "oracle_gain": {
+      "budget_status": 0.033333333333333326,
+      "policy_status": 0.2566666666666666,
+      "approval_status": 0.0033333333333332993,
+      "material_conflict": 0.18666666666666665,
+      "evidence_complete": 0.06666666666666665
+    },
+    "ranked_load_bearing": [
+      [
+        "policy_status",
+        0.2566666666666666
+      ],
+      [
+        "material_conflict",
+        0.18666666666666665
+      ],
+      [
+        "evidence_complete",
+        0.06666666666666665
+      ],
+      [
+        "budget_status",
+        0.033333333333333326
+      ],
+      [
+        "approval_status",
+        0.0033333333333332993
+      ]
+    ]
+  },
+  "capacity_F1": {
+    "K4": {
+      "outcome_accuracy": 0.7333333333333333,
+      "field_macro": 0.8213333333333332,
+      "field_given_survived": {
+        "budget_status": 1.0,
+        "policy_status": 1.0,
+        "approval_status": 0.6747572815533981,
+        "material_conflict": 1.0,
+        "evidence_complete": 1.0
+      }
+    },
+    "K8": {
+      "outcome_accuracy": 1.0,
+      "field_macro": 0.9553333333333333,
+      "field_given_survived": {
+        "budget_status": 1.0,
+        "policy_status": 1.0,
+        "approval_status": 1.0,
+        "material_conflict": 1.0,
+        "evidence_complete": 0.7766666666666666
+      }
+    },
+    "K16": {
+      "outcome_accuracy": 1.0,
+      "field_macro": 0.9553333333333333,
+      "field_given_survived": {
+        "budget_status": 1.0,
+        "policy_status": 1.0,
+        "approval_status": 1.0,
+        "material_conflict": 1.0,
+        "evidence_complete": 0.7766666666666666
+      }
+    }
+  },
+  "leak_audit": {
+    "label_invariant_routing": true
+  },
+  "support_removal": {
+    "base": 1.0,
+    "remove_budget": 0.4166666666666667,
+    "remove_active_policy": 0.6066666666666667,
+    "budget_is_causal": true,
+    "policy_is_causal": true
+  },
+  "acceptance": {
+    "field_macro_gain_ge_0.10": true,
+    "final_acc_gain_ge_0.08": true,
+    "conflict_f1_ge_0.90": true,
+    "abstention_preserved": true,
+    "id_preservation_1.0": true,
+    "unauthorized_0": true,
+    "generalizes": true,
+    "leak_free": true,
+    "K_le_8": true,
+    "VALIDATED": true
+  },
+  "verdict": {
+    "frozen_output_mapper": "verified",
+    "primary_failed_field": "policy_status",
+    "secondary_failed_field": "material_conflict",
+    "error_missing_support_pct": 0.223,
+    "error_reasoning_readout_pct": 0.045,
+    "best_field_architecture": "F1",
+    "deterministic_fields": [
+      "budget_status",
+      "approval_requirement",
+      "evidence_complete"
+    ],
+    "relational_fields": [
+      "active_policy_status",
+      "material_conflict",
+      "approval_evidence_status"
+    ],
+    "structured_field_macro_improvement": 0.1153333333333334,
+    "final_mapped_accuracy_improvement": 0.36,
+    "best_slot_capacity": 8,
+    "field_specific_masking": "validated",
+    "consistency_constraints": "validated",
+    "evidence_id_preservation": 1.0,
+    "unauthorized_inclusion": 0.0,
+    "primary_remaining_bottleneck": "none",
+    "authorized_architecture": "ledger->joins->P5 slots->field-specific masks->deterministic exact fields + bounded quadratic relational fields->consistency->deterministic mapper"
+  }
+}

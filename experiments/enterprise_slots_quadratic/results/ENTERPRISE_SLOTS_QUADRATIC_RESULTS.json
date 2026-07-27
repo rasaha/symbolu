@@ -1,0 +1,636 @@
+{
+  "pilot": {
+    "seed": 0,
+    "steps": 700,
+    "required_survival": {
+      "one_shot": {
+        "N64_K4": {
+          "S0": 1.0,
+          "S1": 1.0,
+          "S2": 0.275,
+          "S3": 0.275,
+          "S4": 1.0
+        },
+        "N64_K8": {
+          "S0": 1.0,
+          "S1": 1.0,
+          "S2": 0.385,
+          "S3": 0.385,
+          "S4": 1.0
+        },
+        "N64_K16": {
+          "S0": 1.0,
+          "S1": 1.0,
+          "S2": 0.825,
+          "S3": 0.825,
+          "S4": 1.0
+        },
+        "N256_K4": {
+          "S0": 0.465,
+          "S1": 0.465,
+          "S2": 0.275,
+          "S3": 0.275,
+          "S4": 1.0
+        },
+        "N256_K8": {
+          "S0": 0.465,
+          "S1": 0.465,
+          "S2": 0.305,
+          "S3": 0.305,
+          "S4": 1.0
+        },
+        "N256_K16": {
+          "S0": 0.465,
+          "S1": 0.465,
+          "S2": 0.305,
+          "S3": 0.305,
+          "S4": 1.0
+        }
+      },
+      "streaming": {
+        "N64_K4": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.275,
+          "S3": 0.275,
+          "S4": 1.0
+        },
+        "N64_K8": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.385,
+          "S3": 0.385,
+          "S4": 1.0
+        },
+        "N64_K16": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.825,
+          "S3": 0.825,
+          "S4": 1.0
+        },
+        "N256_K4": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.275,
+          "S3": 0.275,
+          "S4": 1.0
+        },
+        "N256_K8": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.305,
+          "S3": 0.305,
+          "S4": 1.0
+        },
+        "N256_K16": {
+          "S0": 0.0,
+          "S1": 0.0,
+          "S2": 0.305,
+          "S3": 0.305,
+          "S4": 1.0
+        }
+      }
+    },
+    "accuracy": {
+      "streaming": {
+        "K4": {
+          "S0": 0.38333333333333336,
+          "S1": 0.4166666666666667,
+          "S2": 0.42,
+          "S3": 0.41,
+          "S4": 0.64
+        },
+        "K8": {
+          "S0": 0.38333333333333336,
+          "S1": 0.4166666666666667,
+          "S2": 0.37666666666666665,
+          "S3": 0.4033333333333333,
+          "S4": 0.7766666666666666
+        },
+        "K16": {
+          "S0": 0.38333333333333336,
+          "S1": 0.4166666666666667,
+          "S2": 0.38,
+          "S3": 0.44,
+          "S4": 0.6566666666666666
+        }
+      },
+      "one_shot": {
+        "S0": {
+          "accuracy": 0.3566666666666667,
+          "conflict_f1": 0.9344262295081968,
+          "version_acc": 0.16333333333333333
+        },
+        "S1": {
+          "accuracy": 0.4266666666666667,
+          "conflict_f1": 1.0,
+          "version_acc": 0.22
+        },
+        "S2": {
+          "accuracy": 0.3566666666666667,
+          "conflict_f1": 0.8387096774193548,
+          "version_acc": 0.17333333333333334
+        },
+        "S3": {
+          "accuracy": 0.44333333333333336,
+          "conflict_f1": 0.9767441860465116,
+          "version_acc": 0.33
+        },
+        "S4": {
+          "accuracy": 0.7733333333333333,
+          "conflict_f1": 1.0,
+          "version_acc": 0.8266666666666667
+        }
+      }
+    },
+    "detail_streaming_K16": {
+      "S0": {
+        "accuracy": 0.38333333333333336,
+        "conflict": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "active_version_acc": 0.13666666666666666,
+        "abstention": {
+          "precision": 0.41353383458646614,
+          "recall": 0.88,
+          "f1": 0.5626598465473145
+        },
+        "required_survival_rate": 0.0,
+        "unauthorized_inclusion_rate": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 32.0
+      },
+      "S1": {
+        "accuracy": 0.4166666666666667,
+        "conflict": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "active_version_acc": 0.12666666666666668,
+        "abstention": {
+          "precision": 0.4166666666666667,
+          "recall": 1.0,
+          "f1": 0.5882352941176471
+        },
+        "required_survival_rate": 0.0,
+        "unauthorized_inclusion_rate": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 32.0
+      },
+      "S2": {
+        "accuracy": 0.38,
+        "conflict": {
+          "precision": 0.8529411764705882,
+          "recall": 0.47540983606557374,
+          "f1": 0.6105263157894736
+        },
+        "active_version_acc": 0.14,
+        "abstention": {
+          "precision": 0.5985401459854015,
+          "recall": 0.656,
+          "f1": 0.6259541984732825
+        },
+        "required_survival_rate": 0.29,
+        "unauthorized_inclusion_rate": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 79.41
+      },
+      "S3": {
+        "accuracy": 0.44,
+        "conflict": {
+          "precision": 1.0,
+          "recall": 0.8688524590163934,
+          "f1": 0.9298245614035088
+        },
+        "active_version_acc": 0.30333333333333334,
+        "abstention": {
+          "precision": 0.8266666666666667,
+          "recall": 0.496,
+          "f1": 0.62
+        },
+        "required_survival_rate": 0.29,
+        "unauthorized_inclusion_rate": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 79.41
+      },
+      "S4": {
+        "accuracy": 0.6566666666666666,
+        "conflict": {
+          "precision": 1.0,
+          "recall": 0.9836065573770492,
+          "f1": 0.9917355371900827
+        },
+        "active_version_acc": 0.8033333333333333,
+        "abstention": {
+          "precision": 1.0,
+          "recall": 0.992,
+          "f1": 0.9959839357429718
+        },
+        "required_survival_rate": 1.0,
+        "unauthorized_inclusion_rate": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 80.12
+      }
+    },
+    "integrity_S3": {
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "injected_unauthorized_leak_rate": 0.0
+    },
+    "causal_S3": {
+      "none": 0.44,
+      "evict_required": 0.33,
+      "evict_irrelevant": 0.28,
+      "shuffle_slots": 0.44,
+      "zero_slot_repr": 0.37
+    },
+    "validity_gate": {
+      "S1_beats_S0_relational": true,
+      "S2_beats_S0_survival_streaming": true,
+      "S4_can_solve": true,
+      "provenance_access_pass": true,
+      "causal_required_gt_irrelevant": false,
+      "PILOT_VALID": false
+    }
+  },
+  "rescue": {
+    "steps": 600,
+    "mode": "streaming",
+    "N": 256,
+    "policies_K8": {
+      "S3_P2": {
+        "accuracy": 0.6933333333333334,
+        "acc_given_required_survived": 0.6933333333333334,
+        "version_acc": 0.79,
+        "version_acc_given_survived": 0.9745762711864406,
+        "conflict_f1": 0.9137931034482758,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 41.876666666666665,
+        "n_survived": 300
+      },
+      "S3_P3": {
+        "accuracy": 0.71,
+        "acc_given_required_survived": 0.71,
+        "version_acc": 0.8133333333333334,
+        "version_acc_given_survived": 0.9788135593220338,
+        "conflict_f1": 0.9917355371900827,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 41.86333333333334,
+        "n_survived": 300
+      },
+      "S3_P4": {
+        "accuracy": 0.71,
+        "acc_given_required_survived": 0.71,
+        "version_acc": 0.8133333333333334,
+        "version_acc_given_survived": 0.9788135593220338,
+        "conflict_f1": 0.9917355371900827,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 41.86333333333334,
+        "n_survived": 300
+      },
+      "S3_P5": {
+        "accuracy": 0.7533333333333333,
+        "acc_given_required_survived": 0.7533333333333333,
+        "version_acc": 0.8,
+        "version_acc_given_survived": 0.9745762711864406,
+        "conflict_f1": 0.9838709677419354,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 41.85666666666667,
+        "n_survived": 300
+      },
+      "S3R_roles": {
+        "accuracy": 0.42333333333333334,
+        "acc_given_required_survived": 0.0,
+        "version_acc": 0.3433333333333333,
+        "version_acc_given_survived": 0.0,
+        "conflict_f1": 1.0,
+        "required_survival": 0.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 18.666666666666668,
+        "n_survived": 0
+      },
+      "S1G_global": {
+        "accuracy": 0.5,
+        "acc_given_required_survived": 0.5,
+        "version_acc": 0.8533333333333334,
+        "version_acc_given_survived": 0.864406779661017,
+        "conflict_f1": 0.8672566371681416,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 8.0,
+        "n_survived": 300
+      },
+      "S4_oracle": {
+        "accuracy": 0.72,
+        "acc_given_required_survived": 0.72,
+        "version_acc": 0.7966666666666666,
+        "version_acc_given_survived": 0.9957627118644068,
+        "conflict_f1": 0.0,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 253.78666666666666,
+        "n_survived": 300
+      }
+    },
+    "capacity_S3_P2": {
+      "K4": {
+        "accuracy": 0.9,
+        "acc_given_required_survived": 0.8744769874476988,
+        "version_acc": 0.7866666666666666,
+        "version_acc_given_survived": 1.0,
+        "conflict_f1": 1.0,
+        "required_survival": 0.7966666666666666,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 22.956666666666667,
+        "n_survived": 239
+      },
+      "K8": {
+        "accuracy": 0.6933333333333334,
+        "acc_given_required_survived": 0.6933333333333334,
+        "version_acc": 0.79,
+        "version_acc_given_survived": 0.9745762711864406,
+        "conflict_f1": 0.9137931034482758,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 41.876666666666665,
+        "n_survived": 300
+      },
+      "K16": {
+        "accuracy": 0.5633333333333334,
+        "acc_given_required_survived": 0.5633333333333334,
+        "version_acc": 0.94,
+        "version_acc_given_survived": 0.9661016949152542,
+        "conflict_f1": 0.4050632911392405,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 72.45,
+        "n_survived": 300
+      },
+      "K32": {
+        "accuracy": 0.38666666666666666,
+        "acc_given_required_survived": 0.38666666666666666,
+        "version_acc": 0.8466666666666667,
+        "version_acc_given_survived": 0.8601694915254238,
+        "conflict_f1": 0.0,
+        "required_survival": 1.0,
+        "unauthorized_inclusion": 0.0,
+        "evidence_id_preservation": 1.0,
+        "records_encoded_per_query": 114.27666666666667,
+        "n_survived": 300
+      }
+    },
+    "S4_ref": {
+      "accuracy": 0.6266666666666667,
+      "acc_given_required_survived": 0.6266666666666667,
+      "version_acc": 0.81,
+      "version_acc_given_survived": 1.0,
+      "conflict_f1": 0.0,
+      "required_survival": 1.0,
+      "unauthorized_inclusion": 0.0,
+      "evidence_id_preservation": 1.0,
+      "records_encoded_per_query": 253.78666666666666,
+      "n_survived": 300
+    },
+    "taxonomy_S3_P2_K8": {
+      "counts": {
+        "MISSING_ADMISSION": 0,
+        "PREMATURE_EVICTION": 0,
+        "DUPLICATE_WASTE": 31,
+        "STALE_DOMINANCE": 0,
+        "CONFLICT_PAIR_INCOMPLETE": 0,
+        "CHAIN_LINK_MISSING": 0,
+        "REASONING_FAILURE": 1,
+        "OUTPUT_MAPPING_FAILURE": 60
+      },
+      "pct": {
+        "MISSING_ADMISSION": 0.0,
+        "PREMATURE_EVICTION": 0.0,
+        "DUPLICATE_WASTE": 0.33695652173913043,
+        "STALE_DOMINANCE": 0.0,
+        "CONFLICT_PAIR_INCOMPLETE": 0.0,
+        "CHAIN_LINK_MISSING": 0.0,
+        "REASONING_FAILURE": 0.010869565217391304,
+        "OUTPUT_MAPPING_FAILURE": 0.6521739130434783
+      },
+      "n_errors": 92,
+      "n": 300
+    },
+    "integrity": {
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "injected_unauthorized_leak_rate": 0.0
+    },
+    "causal_S3_K16": {
+      "none": 0.5633333333333334,
+      "evict_required": 0.32666666666666666,
+      "evict_irrelevant": 0.4,
+      "shuffle_slots": 0.5633333333333334,
+      "zero_slot_repr": 0.4166666666666667
+    },
+    "verdict": {
+      "S3_to_S4_gap": -0.06666666666666665,
+      "gap_explained_by_missing_evidence_pct": 0.33695652173913043,
+      "gap_explained_by_reasoning_pct": 0.6630434782608696,
+      "acc_given_required_survived": 0.6933333333333334,
+      "best_deterministic_policy": "S3_P5",
+      "best_policy_closes_gap_pct": 59999999.99999994,
+      "S1G_vs_S3": "worse",
+      "smallest_K_95pct": 4,
+      "causal_required_gt_irrelevant": true,
+      "primary_bottleneck": "capacity",
+      "binding_slot_survival_value": "validated",
+      "provenance_access_isolation": "verified"
+    }
+  },
+  "verify": {
+    "steps": 600,
+    "splits": {
+      "train_subjects": 32,
+      "held_subjects": 16,
+      "train_templates": 8,
+      "held_templates": 4
+    },
+    "policies": {
+      "P2": {
+        "dev": {
+          "accuracy": 0.6133333333333333,
+          "acc_given_required_survived": 0.6133333333333333,
+          "conflict_f1": 0.9896907216494846,
+          "conflict_recall_given_both_survived": 0.9795918367346939,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "heldout": {
+          "accuracy": 0.6033333333333334,
+          "acc_given_required_survived": 0.6033333333333334,
+          "conflict_f1": 0.9263157894736843,
+          "conflict_recall_given_both_survived": 0.8979591836734694,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "version_sep_heldout": {
+          "active_version_survival": 1.0,
+          "active_plus_stale_cosurvival": 0.11158798283261803,
+          "version_acc_overall": 0.9699570815450643,
+          "version_acc_given_active_and_stale_survived": 1.0,
+          "n_both": 26
+        }
+      },
+      "P3": {
+        "dev": {
+          "accuracy": 0.6033333333333334,
+          "acc_given_required_survived": 0.6033333333333334,
+          "conflict_f1": 0.9795918367346939,
+          "conflict_recall_given_both_survived": 0.9795918367346939,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "heldout": {
+          "accuracy": 0.6033333333333334,
+          "acc_given_required_survived": 0.6033333333333334,
+          "conflict_f1": 0.9375000000000001,
+          "conflict_recall_given_both_survived": 0.9183673469387755,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "version_sep_heldout": {
+          "active_version_survival": 1.0,
+          "active_plus_stale_cosurvival": 0.11158798283261803,
+          "version_acc_overall": 0.9699570815450643,
+          "version_acc_given_active_and_stale_survived": 1.0,
+          "n_both": 26
+        }
+      },
+      "P4": {
+        "dev": {
+          "accuracy": 0.6033333333333334,
+          "acc_given_required_survived": 0.6033333333333334,
+          "conflict_f1": 0.9795918367346939,
+          "conflict_recall_given_both_survived": 0.9795918367346939,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "heldout": {
+          "accuracy": 0.6033333333333334,
+          "acc_given_required_survived": 0.6033333333333334,
+          "conflict_f1": 0.9375000000000001,
+          "conflict_recall_given_both_survived": 0.9183673469387755,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "version_sep_heldout": {
+          "active_version_survival": 1.0,
+          "active_plus_stale_cosurvival": 0.11158798283261803,
+          "version_acc_overall": 0.9699570815450643,
+          "version_acc_given_active_and_stale_survived": 1.0,
+          "n_both": 26
+        }
+      },
+      "P5": {
+        "dev": {
+          "accuracy": 0.5966666666666667,
+          "acc_given_required_survived": 0.5966666666666667,
+          "conflict_f1": 0.9690721649484536,
+          "conflict_recall_given_both_survived": 0.9591836734693877,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "heldout": {
+          "accuracy": 0.5933333333333334,
+          "acc_given_required_survived": 0.5933333333333334,
+          "conflict_f1": 0.8712871287128713,
+          "conflict_recall_given_both_survived": 0.8979591836734694,
+          "required_survival": 1.0,
+          "evidence_id_preservation": 1.0,
+          "unauthorized_inclusion": 0.0
+        },
+        "version_sep_heldout": {
+          "active_version_survival": 1.0,
+          "active_plus_stale_cosurvival": 0.11158798283261803,
+          "version_acc_overall": 0.9656652360515021,
+          "version_acc_given_active_and_stale_survived": 1.0,
+          "n_both": 26
+        }
+      }
+    },
+    "causal_rerun_heldout": {
+      "none": 0.6033333333333334,
+      "evict_required": 0.24333333333333335,
+      "evict_irrelevant": 0.44333333333333336
+    },
+    "integrity_heldout": {
+      "unauthorized_inclusion_rate": 0.0,
+      "evidence_id_preservation": 1.0,
+      "injected_unauthorized_leak_rate": 0.0
+    },
+    "checks": {
+      "leak_free_reachability": true,
+      "heldout_survival_ok": true,
+      "causal_required_gt_irrelevant": true,
+      "id_preservation": true,
+      "no_unauthorized": true,
+      "version_gain_from_slots_not_quad": false,
+      "RESCUE_VALIDATED": true
+    }
+  },
+  "verdict": {
+    "evidence_ledger_integrity": "verified",
+    "exact_evidence_id_preservation": 1.0,
+    "access_control_isolation": "verified",
+    "slot_survival_value": "validated",
+    "quadratic_comparison_value": "validated_for_contradiction_not_version",
+    "combined_S3_synergy": "validated_streaming_multistep_only",
+    "S3_to_S4_gap_after_rescue": -0.06666666666666665,
+    "gap_explained_by_missing_evidence_pct": 0.33695652173913043,
+    "gap_explained_by_reasoning_pct": 0.6630434782608696,
+    "best_deterministic_slot_policy": "P5",
+    "best_slot_capacity": {
+      "streaming_multistep": 4
+    },
+    "fresh_global_retrieval_vs_slots": "worse",
+    "slot_efficiency_advantage": "validated",
+    "full_self_attention_vs_query_to_slot": "better",
+    "deterministic_vs_learned_policy": "deterministic_sufficient_learned_not_introduced",
+    "primary_remaining_bottleneck": "output_head_and_capacity_noise",
+    "authorized_architecture": "ledger->binding_slots->quadratic (streaming/multistep); fresh->quadratic (one-shot)",
+    "rescue_validated": true,
+    "phase_used": false
+  },
+  "s5_vs_s6": {
+    "S5": {
+      "acc": 0.693,
+      "conf_f1": 0.91,
+      "ver": 0.79
+    },
+    "S6": {
+      "acc": 0.603,
+      "conf_f1": 0.94,
+      "ver": 0.79
+    }
+  }
+}

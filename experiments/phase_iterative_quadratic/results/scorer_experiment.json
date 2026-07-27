@@ -1,0 +1,111 @@
+{
+  "N": 32,
+  "seed": 0,
+  "steps": 3000,
+  "arms": {
+    "P0_baseline": {
+      "grounded_D1": 0.74,
+      "next_entity_top1": 0.5966666666666667,
+      "next_entity_top3": 0.9166666666666666,
+      "mrr": 0.7602235476175944,
+      "correct_entity_prob": 0.5563131459554036,
+      "pointer_entropy": 0.8755887730916341,
+      "acc_given_correct_pointer": 0.9217877094972067,
+      "beam3": 0.7833333333333333,
+      "oracle_ptr": 0.9066666666666666,
+      "params": 86785
+    },
+    "P1_bilinear": {
+      "grounded_D1": 0.49333333333333335,
+      "next_entity_top1": 0.44,
+      "next_entity_top3": 0.71,
+      "mrr": 0.6006977335611979,
+      "correct_entity_prob": 0.31708931605021157,
+      "pointer_entropy": 1.5789210764567057,
+      "acc_given_correct_pointer": 0.7348484848484849,
+      "beam3": 0.6166666666666667,
+      "oracle_ptr": 0.9433333333333334,
+      "scorer_params": 32384,
+      "total_params": 119169
+    },
+    "P2_mlp": {
+      "grounded_D1": 0.78,
+      "next_entity_top1": 0.6333333333333333,
+      "next_entity_top3": 0.9166666666666666,
+      "mrr": 0.7786972554524739,
+      "correct_entity_prob": 0.5881081517537435,
+      "pointer_entropy": 0.7799335352579753,
+      "acc_given_correct_pointer": 0.9052631578947369,
+      "beam3": 0.8033333333333333,
+      "oracle_ptr": 0.94,
+      "scorer_params": 44801,
+      "total_params": 131586
+    },
+    "P3_best_joint_beam": {
+      "grounded_D1": 0.7766666666666666,
+      "next_entity_top1": 0.6033333333333334,
+      "next_entity_top3": 0.9233333333333333,
+      "mrr": 0.7587733586629232,
+      "correct_entity_prob": 0.5844146410624186,
+      "pointer_entropy": 0.7491279093424479,
+      "acc_given_correct_pointer": 0.9226519337016574,
+      "beam3": 0.7766666666666666,
+      "oracle_ptr": 0.9333333333333333,
+      "hard_top1": 0.7533333333333333,
+      "soft": 0.8,
+      "best_kind": "mlp",
+      "params": 131586,
+      "latency_s_per_64": 0.0183,
+      "peak_mem_mb": 1.0
+    }
+  },
+  "P0_heldout_controls": {
+    "clean": 0.7466666666666667,
+    "identity_renaming": 0.74,
+    "shuffled_order": 0.7333333333333333,
+    "unseen_entity_pair": 0.20333333333333334,
+    "unseen_relation_compose": 0.3233333333333333,
+    "no_material_collapse": false
+  },
+  "P0_hard_negatives": {
+    "n_errors": 119,
+    "err_on_relevant": 0.01680672268907563,
+    "err_on_hard": 0.20168067226890757,
+    "err_on_ordinary": 0.7815126050420168
+  },
+  "P3_causal_controls": {
+    "clean_acc": 0.8046875,
+    "leakfree_reqe_invariant": true,
+    "random_pointer_acc": 0.1171875,
+    "required_removed_acc": 0.0,
+    "forced_candidate_scorer_independent": false
+  },
+  "P3_heldout_controls": {
+    "clean": 0.7666666666666667,
+    "identity_renaming": 0.7766666666666666,
+    "shuffled_order": 0.76,
+    "unseen_entity_pair": 0.14,
+    "unseen_relation_compose": 0.09333333333333334,
+    "no_material_collapse": false
+  },
+  "P3_hard_negatives": {
+    "n_errors": 118,
+    "err_on_relevant": 0.00847457627118644,
+    "err_on_hard": 0.23728813559322035,
+    "err_on_ordinary": 0.7542372881355932
+  },
+  "acceptance": {
+    "pointer_top1_ge_0.75": false,
+    "grounded_D1_ge_0.85": false,
+    "beam3_ge_0.85": false,
+    "acc_given_correct_pointer_ge_0.90": true,
+    "heldout_no_material_collapse": false,
+    "leakfree": true,
+    "PASS": false
+  },
+  "verdict": {
+    "pointer_discrimination": "improved_but_insufficient",
+    "iterative_3Q_pilot": "blocked",
+    "phase_comparison": "blocked"
+  }
+}
