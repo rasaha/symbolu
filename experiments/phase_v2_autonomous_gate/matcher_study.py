@@ -36,6 +36,7 @@ ARMS = {
     "cosine": ("cosine", "matcher", False),
     "bilinear": ("bilinear", "matcher", False),
     "bilinear_hard": ("bilinear", "matcher", True),
+    "cosine_hard": ("cosine", "matcher", True),   # cosine fallback trained on hard negatives
 }
 
 
