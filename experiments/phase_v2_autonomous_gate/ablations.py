@@ -19,8 +19,8 @@ from experiments.phase_v3_selective_ssm.config import DataCfg
 from experiments.phase_v3_selective_ssm.focus_probe import _fit_linear
 
 
-@torch.no_grad()
 def _state_probe(model, vocab, dcfg, distance, seed, gate_fn=None, mutate=None, n_train=500, n_eval=350):
+    @torch.no_grad()
     def feats(data):
         Xs, ys = [], []
         for i in range(0, len(data), 32):
@@ -31,7 +31,7 @@ def _state_probe(model, vocab, dcfg, distance, seed, gate_fn=None, mutate=None, 
             gate = gate_fn(model, ids) if gate_fn else model.gate(ids)
             f = model.features(ids, gate=gate)
             ar = torch.arange(ids.shape[0])
-            Xs.append(f["state"][ar, pp]); ys.append(fo)
+            Xs.append(f["state"][ar, pp].detach()); ys.append(fo)
         return torch.cat(Xs), torch.cat(ys)
     Xtr, ytr = feats(D.generate(vocab, dcfg, distance, n_train, 5000 + seed))
     Xte, yte = feats(D.generate(vocab, dcfg, distance, n_eval, 9000 + seed))
