@@ -24,10 +24,11 @@ from .hybrid_blocks import PhaseFeature
 class IterativeHybrid(nn.Module):
     def __init__(self, vocab_size, n_id, hops=2, router_kind="cond", use_phase=False,
                  iterative=True, routing_mode="learned", W=W_WINDOW, K=K_ROUTED,
-                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS):
+                 embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False):
         super().__init__()
         self.hops, self.iterative, self.routing_mode = hops, iterative, routing_mode
         self.use_phase, self.W, self.K = use_phase, W, K
+        self.gt_query = gt_query        # D0: feed the ground-truth intermediate query (diagnostic)
         self.embed_dim = embed_dim
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
         self.router = LearnedRouter(embed_dim, router_kind)
@@ -48,9 +49,11 @@ class IterativeHybrid(nn.Module):
             x = x + self.phase(x, zero=self.phase_zero, shuffle=self.phase_shuffle)
         return x
 
-    def forward(self, ids, event_pos, probe_pos, valid_len, required_hops=None):
+    def forward(self, ids, event_pos, probe_pos, valid_len, required_hops=None, req_evidx=None,
+                freeze_query=False, shuffle_query=False, shuffle_scores=False):
         """event_pos:[B,Ne] token positions of events; required_hops:[B,H] full-pos of the
-        required event at each hop (for oracle routing + hop supervision); may be −1."""
+        required event at each hop (for oracle routing + hop supervision); req_evidx:[B,H] indices
+        into the event list (for D0 ground-truth intermediate query). May be −1."""
         B, N = ids.shape
         D = self.embed_dim
         reps = self.reps(ids)
@@ -63,9 +66,17 @@ class IterativeHybrid(nn.Module):
         reps = reps.scatter(1, kp, ev)                           # attention sees bound key reps
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
-        route_scores = []; hop_outputs = []
+        route_scores = []; hop_outputs = []; q_norms = []
         for h in range(self.hops):
+            # D0 diagnostic: overwrite the intermediate query with the ground-truth next entity
+            if self.gt_query and h >= 1 and req_evidx is not None:
+                gi = req_evidx[:, h].clamp(min=0).view(B, 1, 1).expand(B, 1, D)
+                q = ev.gather(1, gi).squeeze(1)
+            if shuffle_query and h >= 1:                               # control: scramble intermediate query
+                q = q[torch.randperm(B, device=ids.device)]
             scores = self.router.score(q, ev)                          # [B,Ne]
+            if shuffle_scores:                                         # control: scramble routing scores
+                scores = scores[:, torch.randperm(scores.shape[1], device=ids.device)]
             route_scores.append(scores)
             if self.routing_mode == "random":
                 sel = torch.rand_like(scores)
@@ -86,11 +97,15 @@ class IterativeHybrid(nn.Module):
             o = self.qblock(q.unsqueeze(1), reps, probe_pos.unsqueeze(1), routed_full,
                             self.W, valid_len)[:, 0]
             hop_outputs.append(o)
-            if self.iterative:
+            q_prev = q
+            if freeze_query:                                          # control: never evolve the query
+                q = q0
+            elif self.iterative:
                 q = self.qupdate(q, o)
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
+            q_norms.append((q - q_prev).norm(dim=-1).mean().item())    # §8 query-evolution diagnostic
         logits = self.answer_head(torch.cat([q, o], dim=-1))           # decode from query + last attn output
         hop_logits = [self.hop_head(oh) for oh in hop_outputs]         # per-hop target prediction (staged)
         return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev,
-                "hop_logits": hop_logits}
+                "hop_logits": hop_logits, "query_update_norms": q_norms}

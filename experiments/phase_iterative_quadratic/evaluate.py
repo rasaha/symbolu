@@ -14,7 +14,9 @@ def evaluate(model, data, vocab, device="cpu", batch_size=64):
     for i in range(0, len(data), batch_size):
         b = data[i:i + batch_size]
         ids, ep, pp, vl, ans, reqf, reqe, hoptgt = collate_iter(b, vocab, device)
-        out = model(ids, ep, pp, vl, required_hops=reqf)
+        # required_hops/req_evidx are read by the model ONLY in oracle / gt-query (D0) modes;
+        # learned autonomous arms ignore them (verified by the label-leakage test).
+        out = model(ids, ep, pp, vl, required_hops=reqf, req_evidx=reqe)
         pred = out["answer_logits"].argmax(-1)
         correct += (pred == ans).sum().item(); total += len(b)
         # per-hop admission: was the required hop-h event in the routed top-K at hop h?

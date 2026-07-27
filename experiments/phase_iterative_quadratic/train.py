@@ -39,16 +39,21 @@ def collate_iter(batch, vocab, device="cpu"):
 
 
 def _route_loss(route_scores, req_evidx, margin):
-    """Per hop, the required event's score must exceed the others by a margin."""
+    """Per hop, the required event's score must exceed the others by a margin (vectorized)."""
     losses = []
     for h, sc in enumerate(route_scores):                    # sc:[B,Ne]
-        tgt = req_evidx[:, h] if h < req_evidx.shape[1] else torch.full((sc.shape[0],), -1, device=sc.device)
-        for b in range(sc.shape[0]):
-            if tgt[b] < 0:
-                continue
-            pos = sc[b, tgt[b]]
-            neg = torch.cat([sc[b, :tgt[b]], sc[b, tgt[b] + 1:]])
-            losses.append(F.relu(margin - pos + neg).mean())
+        if h >= req_evidx.shape[1]:
+            continue
+        tgt = req_evidx[:, h]                                 # [B]
+        valid = tgt >= 0
+        if not valid.any():
+            continue
+        t = tgt.clamp(min=0).unsqueeze(1)                    # [B,1]
+        pos = sc.gather(1, t)                                 # [B,1]
+        hinge = F.relu(margin - pos + sc)                    # [B,Ne]
+        keep = torch.ones_like(sc, dtype=torch.bool).scatter(1, t, False)  # exclude target itself
+        per_ex = (hinge * keep).sum(1) / keep.sum(1).clamp(min=1)          # [B]
+        losses.append(per_ex[valid].mean())
     return torch.stack(losses).mean() if losses else torch.zeros((), device=route_scores[0].device)
 
 
@@ -59,7 +64,7 @@ def train_hybrid(model, gen_fn, vocab, cfg: TrainCfg, device="cpu"):
     for step in range(cfg.steps):
         data = gen_fn(cfg.batch_size, cfg.seed * 10000 + step)
         ids, ep, pp, vl, ans, reqf, reqe, hoptgt = collate_iter(data, vocab, device)
-        out = model(ids, ep, pp, vl, required_hops=reqf)
+        out = model(ids, ep, pp, vl, required_hops=reqf, req_evidx=reqe)
         loss = F.cross_entropy(out["answer_logits"], ans)
         # per-hop supervision (§13): each hop's attention output should predict that hop's target
         for h, hl in enumerate(out["hop_logits"]):

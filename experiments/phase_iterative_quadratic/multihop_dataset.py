@@ -82,8 +82,10 @@ def make(vocab: Vocab, N, depth, g, n_hard=8) -> dict:
 
     tokens = [vocab.cue(fe, fr)]
     key_pos = []
-    for ev in events:
+    for i, ev in enumerate(events):
         key_pos.append(len(tokens))
+        ev["evidence_id"] = f"E{i:03d}"          # unique auditable evidence ID (enterprise contract)
+        ev["source_pos"] = len(tokens)           # token position of this evidence record
         tokens.append(vocab.key(ev["entity"], ev["relation"]))
         tokens.append(vocab.val(ev["value"]))
     tokens.append(vocab.PROBE)
