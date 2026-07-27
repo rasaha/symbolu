@@ -20,8 +20,8 @@ from .evaluate import evaluate
 from .causal_controls import phase_causal_controls
 
 HERE = Path(__file__).resolve().parent
-PILOT_ARMS = ("A0", "A1", "A3", "A5")
-STEPS = 700
+PILOT_ARMS = ("A0", "A1", "A3", "A5", "A6")   # A6 (trained GRU) included: is long-range learnable by ANY temporal model?
+STEPS = 900
 SEED = 0
 
 
