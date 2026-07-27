@@ -19,11 +19,16 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from .config import cfg_v3b, cfg_v3ab, cfg_v3abc
+from .config import (cfg_v3b, cfg_v3ab, cfg_v3abc,
+                     cfg_cell_B, cfg_cell_Bgamma, cfg_cell_Bomega, cfg_cell_AB)
 from .selective_complex_phase import SelectiveComplexPhaseV3
 
 VARIANTS = ("V1", "V2-S", "V3-B", "V3-AB", "V3-ABC")
 V3_VARIANTS = ("V3-B", "V3-AB", "V3-ABC")
+# 2×2 transition-ablation cells (selective write held ON; isolate γ_t vs ω_t)
+CELLS = ("T-B", "T-Bgamma", "T-Bomega", "T-AB")
+_CELL_CFG = {"T-B": cfg_cell_B, "T-Bgamma": cfg_cell_Bgamma,
+             "T-Bomega": cfg_cell_Bomega, "T-AB": cfg_cell_AB}
 
 
 class V3Variant(nn.Module):
@@ -128,4 +133,6 @@ def build_variant(name: str, embed_dim=96, num_heads=4, **kw) -> nn.Module:
         return V3Variant(cfg_v3ab(embed_dim, num_heads, **kw), "V3-AB")
     if name == "V3-ABC":
         return V3Variant(cfg_v3abc(embed_dim, num_heads, **kw), "V3-ABC")
+    if name in _CELL_CFG:
+        return V3Variant(_CELL_CFG[name](embed_dim, num_heads, **kw), name)
     raise ValueError(f"unknown variant {name}")

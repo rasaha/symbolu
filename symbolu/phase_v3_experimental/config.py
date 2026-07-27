@@ -59,6 +59,11 @@ class PhaseV3Config:
     initial_gamma: float = 0.999              # bias γ toward long memory (horizon ~1000)
     fixed_gamma: float = 0.999                 # γ when retention is not input-dependent
     use_omega: bool = True                     # complex rotation on/off
+    # Optional DECOUPLING of γ and ω input-dependence (for the 2×2 transition ablation).
+    # None → fall back to the coupled behavior (γ dep = input_dependent_retention;
+    # ω dep = input_dependent_retention and use_omega). Set explicitly to isolate.
+    input_dependent_gamma: object = None       # Optional[bool]
+    input_dependent_omega: object = None       # Optional[bool]
 
     # input-dependent selective write B_t (§5)
     input_dependent_write: bool = True
@@ -90,6 +95,20 @@ class PhaseV3Config:
     @property
     def head_dim(self) -> int:
         return self.embed_dim // self.num_heads
+
+    @property
+    def eff_gamma_dep(self) -> bool:
+        """Whether γ_t is input-dependent (decoupled override, else coupled default)."""
+        if self.input_dependent_gamma is not None:
+            return bool(self.input_dependent_gamma)
+        return self.input_dependent_retention
+
+    @property
+    def eff_omega_dep(self) -> bool:
+        """Whether ω_t is input-dependent (decoupled override, else coupled default)."""
+        if self.input_dependent_omega is not None:
+            return bool(self.input_dependent_omega)
+        return self.input_dependent_retention and self.use_omega
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -125,3 +144,33 @@ def cfg_v3abc(embed_dim=96, num_heads=4, **kw) -> PhaseV3Config:
                          input_dependent_retention=True, use_omega=True,
                          input_dependent_write=True,
                          input_dependent_read=True, **kw)
+
+
+# ---- 2×2 transition ablation (isolate γ_t vs ω_t) --------------------------
+# All four cells: selective per-head write B_t ON, read gate OFF (C_t=1), single bank,
+# identical readout and parameter budget (W_γ/W_ω exist in every cell, unused when fixed).
+def cfg_cell(embed_dim, num_heads, gamma_dep, omega_dep, **kw) -> PhaseV3Config:
+    return PhaseV3Config(
+        embed_dim=embed_dim, num_heads=num_heads,
+        input_dependent_write=True, input_dependent_read=False, fixed_read=1.0,
+        input_dependent_retention=True,       # base flag on; decoupled flags decide each axis
+        use_omega=True,
+        input_dependent_gamma=gamma_dep, input_dependent_omega=omega_dep,
+        fixed_gamma=1.0,                        # γ=1 EXACTLY when γ is fixed (true persistence)
+        **kw)
+
+
+def cfg_cell_B(embed_dim=96, num_heads=4, **kw):      # γ=1, ω=0
+    return cfg_cell(embed_dim, num_heads, False, False, **kw)
+
+
+def cfg_cell_Bgamma(embed_dim=96, num_heads=4, **kw):  # γ_t, ω=0  (= recommended V3-AB0)
+    return cfg_cell(embed_dim, num_heads, True, False, **kw)
+
+
+def cfg_cell_Bomega(embed_dim=96, num_heads=4, **kw):  # γ=1, ω_t
+    return cfg_cell(embed_dim, num_heads, False, True, **kw)
+
+
+def cfg_cell_AB(embed_dim=96, num_heads=4, **kw):      # γ_t, ω_t
+    return cfg_cell(embed_dim, num_heads, True, True, **kw)

@@ -47,7 +47,8 @@ class FocusModel(nn.Module):
         self.variant = build_variant(variant_name, embed_dim, num_heads)
         self.focus_head = nn.Linear(embed_dim, num_entities)
         nn.init.normal_(self.token_embed.weight, std=0.02)
-        self.is_v3 = variant_name.startswith("V3")
+        # v3 = anything wrapping a SelectiveComplexPhaseV3 core (incl. 2×2 cells)
+        self.is_v3 = hasattr(self.variant, "core") and hasattr(self.variant.core, "_controls")
         self.is_v2 = variant_name == "V2-S"
 
     def embed(self, ids):

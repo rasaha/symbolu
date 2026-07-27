@@ -108,15 +108,15 @@ class SelectiveComplexPhaseV3(nn.Module):
         ov = overrides or {}
         perm = torch.randperm(B, device=x_norm.device)
 
-        # γ_t ∈ [γmin, γmax]
-        if cfg.input_dependent_retention:
+        # γ_t ∈ [γmin, γmax] (input-dependent iff eff_gamma_dep)
+        if cfg.eff_gamma_dep:
             gamma = cfg.gamma_min + (cfg.gamma_max - cfg.gamma_min) * torch.sigmoid(self.W_gamma(x_norm))
         else:
             gamma = torch.full((B, N, H), cfg.fixed_gamma, device=x_norm.device)
         gamma = _apply_mode_real(gamma, ov.get("gamma_mode", cfg.gamma_mode), cfg.fixed_gamma, perm)
 
-        # ω_t ∈ [-ωmax, ωmax]
-        if cfg.input_dependent_retention and cfg.use_omega:
+        # ω_t ∈ [-ωmax, ωmax] (input-dependent iff eff_omega_dep)
+        if cfg.eff_omega_dep:
             omega = cfg.omega_max * torch.tanh(self.W_omega(x_norm))
         else:
             omega = torch.zeros((B, N, H), device=x_norm.device)
