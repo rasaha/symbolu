@@ -1,0 +1,73 @@
+{
+  "variant": "V3-B",
+  "mode": "B_annealed",
+  "seed": 0,
+  "distances": {
+    "64": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.027499999850988388,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4738807678222656,
+      "relevance_auroc": 0.5455318093299866
+    },
+    "128": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.032499998807907104,
+      "random_top1": 0.0625,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4528195858001709,
+      "relevance_auroc": 0.5235220789909363
+    },
+    "256": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.0625,
+      "random_top1": 0.06499999761581421,
+      "state_topk": 1.0,
+      "relevance_f1": 0.45201489329338074,
+      "relevance_auroc": 0.5154275894165039
+    },
+    "512": {
+      "state_top1": 1.0,
+      "selective_top1": 1.0,
+      "raw_top1": 1.0,
+      "shuffled_top1": 0.03500000014901161,
+      "random_top1": 0.054999999701976776,
+      "state_topk": 1.0,
+      "relevance_f1": 0.4404630661010742,
+      "relevance_auroc": 0.507166862487793
+    },
+    "1024": {
+      "state_top1": 1.0,
+      "selective_top1": 0.9800000190734863,
+      "raw_top1": 0.9800000190734863,
+      "shuffled_top1": 0.07500000298023224,
+      "random_top1": 0.07000000029802322,
+      "state_topk": 1.0,
+      "relevance_f1": 0.455018013715744,
+      "relevance_auroc": 0.502226710319519
+    },
+    "2048": {
+      "state_top1": 0.4950000047683716,
+      "selective_top1": 0.3725000023841858,
+      "raw_top1": 0.3725000023841858,
+      "shuffled_top1": 0.042500000447034836,
+      "random_top1": 0.07750000059604645,
+      "state_topk": 0.7825000286102295,
+      "relevance_f1": 0.43394947052001953,
+      "relevance_auroc": 0.504179835319519
+    }
+  },
+  "distractor_robust": {
+    "state_top1": 1.0,
+    "selective_top1": 1.0,
+    "shuffled_top1": 0.03500000014901161,
+    "relevance_f1": 0.2949572503566742
+  }
+}
