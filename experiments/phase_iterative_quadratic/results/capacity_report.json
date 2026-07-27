@@ -1,0 +1,51 @@
+{
+  "N": 32,
+  "seed": 0,
+  "eval_n": 300,
+  "configs": {
+    "dim64_h4": {
+      "dim": 64,
+      "heads": 4,
+      "params": 86785,
+      "steps": 3000,
+      "train_time_s": 271.9,
+      "peak_mem_mb": 1.0,
+      "accuracy": 0.74,
+      "latency_s_per_64": 0.013,
+      "final_accuracy": 0.77,
+      "next_entity_top1": 0.6066666666666667,
+      "next_entity_topk": 0.91,
+      "correct_entity_prob": 0.5528281656901042,
+      "pointer_entropy": 0.8939564514160157,
+      "acc_given_correct_pointer": 0.9120879120879121,
+      "n_pointer": 300,
+      "D0": 1.0
+    },
+    "dim128_h8": {
+      "dim": 128,
+      "heads": 8,
+      "params": 320961,
+      "steps": 3000,
+      "train_time_s": 297.5,
+      "peak_mem_mb": 1.0,
+      "accuracy": 0.6933333333333334,
+      "latency_s_per_64": 0.0199,
+      "final_accuracy": 0.69,
+      "next_entity_top1": 0.5433333333333333,
+      "next_entity_topk": 0.9,
+      "correct_entity_prob": 0.5378689384460449,
+      "pointer_entropy": 0.6787863032023111,
+      "acc_given_correct_pointer": 0.8834355828220859,
+      "n_pointer": 300,
+      "D0": 1.0
+    }
+  },
+  "comparison": {
+    "grounded_D1_gain": -0.047,
+    "param_ratio": 3.7,
+    "latency_ratio": 1.53,
+    "mem_ratio": 1.0,
+    "grounded_D1_ge_0.85": false,
+    "capacity_justified": false
+  }
+}

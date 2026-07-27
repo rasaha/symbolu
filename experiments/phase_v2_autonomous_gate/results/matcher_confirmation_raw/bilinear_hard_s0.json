@@ -1,0 +1,59 @@
+{
+  "arm": "bilinear_hard",
+  "seed": 0,
+  "auroc": 0.844624400138855,
+  "hard_auroc": 0.8466763496398926,
+  "paired_winrate_rel_vs_hard": 0.8466763496398926,
+  "rel_minus_hard_margin": 48.377081785634694,
+  "relevant_score_mean": 42.33483123779297,
+  "hard_score_mean": -5.935262680053711,
+  "ordinary_score_mean": -5.522906303405762,
+  "filler_score_mean": -3.278482437133789,
+  "write_relevant": 0.8421071767807007,
+  "write_ordinary": 0.42285460233688354,
+  "write_hard": 0.4155200719833374,
+  "write_filler": 0.11809871345758438,
+  "write_cue": 0.6977114081382751,
+  "write_total": 0.23212407529354095,
+  "calibration": {
+    "top5": {
+      "precision": 0.7563977241516113,
+      "recall": 0.10282284766435623
+    },
+    "top10": {
+      "precision": 0.773995041847229,
+      "recall": 0.21039913594722748
+    },
+    "top20": {
+      "precision": 0.7998729944229126,
+      "recall": 0.43484610319137573
+    }
+  },
+  "decode": {
+    "256": {
+      "state": 1.0,
+      "readout": 1.0
+    },
+    "512": {
+      "state": 1.0,
+      "readout": 1.0
+    },
+    "1024": {
+      "state": 0.9975000023841858,
+      "readout": 0.9950000047683716
+    },
+    "2048": {
+      "state": 0.9900000095367432,
+      "readout": 0.987500011920929
+    },
+    "4096": {
+      "state": 0.9925000071525574,
+      "readout": 0.9950000047683716
+    }
+  },
+  "controls": {
+    "focus_removed": 0.515386700630188,
+    "summary_shuffled": 0.5120015144348145,
+    "random_summary": 0.5122969746589661
+  }
+}

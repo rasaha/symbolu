@@ -1,0 +1,29 @@
+{
+  "arm": "cond_mlp",
+  "seed": 0,
+  "auroc": 0.6095722317695618,
+  "margin": 0.10754024982489269,
+  "relevant_score_mean": 0.10801579803228378,
+  "distractor_score_mean": 0.000512960075866431,
+  "state_top1_2048": 1.0,
+  "state_top1_4096": 1.0,
+  "calibration": {
+    "top5": {
+      "precision": 1.0,
+      "recall": 0.12846381962299347,
+      "false_write_rate": 0.0
+    },
+    "top10": {
+      "precision": 0.8320406079292297,
+      "recall": 0.21376380324363708,
+      "false_write_rate": 0.16795939207077026
+    },
+    "top20": {
+      "precision": 0.5808166861534119,
+      "recall": 0.2984120547771454,
+      "false_write_rate": 0.41918331384658813
+    }
+  },
+  "margin_focus_removed": 0.0006858229393038985,
+  "margin_summary_shuffled": 0.0032066026077646934
+}

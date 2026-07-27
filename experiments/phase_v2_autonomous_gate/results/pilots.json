@@ -1,0 +1,137 @@
+{
+  "claim1_token_cue_preservation": {
+    "A_supervised_teacher": {
+      "d2048_state_top1": 0.8887500166893005,
+      "d4096_state_top1": 0.7512499988079071,
+      "d2048_readout_top1": 0.7537499964237213,
+      "d2048_control_top1": 0.06375000067055225,
+      "header_minus_filler": 0.2276293215528131,
+      "event_minus_filler": 0.2763421528964247,
+      "write_rate": 0.41158144176006317,
+      "state_norm": 13.806056499481201
+    },
+    "B_annealed": {
+      "d2048_state_top1": 0.9987500011920929,
+      "d4096_state_top1": 0.949999988079071,
+      "d2048_readout_top1": 0.9862500131130219,
+      "d2048_control_top1": 0.06500000134110451,
+      "header_minus_filler": 0.14171025805175305,
+      "event_minus_filler": 0.0401864245009487,
+      "write_rate": 0.3455129712820053,
+      "state_norm": 12.478786945343018
+    },
+    "F_e2e_scratch": {
+      "d2048_state_top1": 0.9775000214576721,
+      "d4096_state_top1": 0.8512499928474426,
+      "d2048_readout_top1": 0.9074999988079071,
+      "d2048_control_top1": 0.061250001192092896,
+      "header_minus_filler": 0.1819494590163231,
+      "event_minus_filler": 0.009600448646734566,
+      "write_rate": 0.37048424780368805,
+      "state_norm": 20.695305824279785
+    }
+  },
+  "token_controls": {
+    "baseline": 0.8914285898208618,
+    "gate_force_one": 0.9657142758369446,
+    "gate_force_zero": 0.0657142847776413,
+    "gate_shuffle_examples": 0.9228571653366089,
+    "gate_shuffle_positions": 0.6114285588264465,
+    "gate_random_matched": 0.33142855763435364,
+    "remove_focus_header": 0.24857142567634583,
+    "shuffle_focus_identity": 0.05999999865889549
+  },
+  "claim1_validated": false,
+  "claim2_conditioned": [
+    {
+      "mode": "conditioned",
+      "seed": 0,
+      "relevant_gate_mean": 0.10660945624113083,
+      "distractor_gate_mean": 0.0004897927865386009,
+      "paired_margin": 0.10614330592848804,
+      "standardized_margin": 0.6307786853557898,
+      "auroc_relevant_vs_distractor": 0.6093504428863525,
+      "state_top1_2048": 1.0,
+      "state_top1_4096": 1.0,
+      "control_top1_2048": 0.07750000059604645,
+      "header_minus_filler": 0.5689493286423628,
+      "write_rate": 0.054213194597348656,
+      "margin_focus_removed": 6.016674026951397e-05,
+      "margin_focus_shuffled": 0.10614330592848804,
+      "margin_summary_shuffled": 0.0054387670446916685,
+      "margin_random_summary": 1.0294691626077857e-05
+    },
+    {
+      "mode": "conditioned",
+      "seed": 1,
+      "relevant_gate_mean": 0.10496879369020462,
+      "distractor_gate_mean": 0.00047103111864998937,
+      "paired_margin": 0.10461670079079623,
+      "standardized_margin": 0.623026206851631,
+      "auroc_relevant_vs_distractor": 0.6297245621681213,
+      "state_top1_2048": 1.0,
+      "state_top1_4096": 1.0,
+      "control_top1_2048": 0.08500000089406967,
+      "header_minus_filler": 0.5298395448444501,
+      "write_rate": 0.05385757034758879,
+      "margin_focus_removed": 0.0005061600813285545,
+      "margin_focus_shuffled": 0.10461670079079623,
+      "margin_summary_shuffled": 0.00013773276558317417,
+      "margin_random_summary": 2.0892459495955863e-08
+    }
+  ],
+  "claim2_token": [
+    {
+      "mode": "token",
+      "seed": 0,
+      "relevant_gate_mean": 0.5901961922645569,
+      "distractor_gate_mean": 0.5893285870552063,
+      "paired_margin": 0.0010245689044915305,
+      "standardized_margin": 0.004701770640700844,
+      "auroc_relevant_vs_distractor": 0.5012743473052979,
+      "state_top1_2048": 0.9100000262260437,
+      "state_top1_4096": 0.7250000238418579,
+      "control_top1_2048": 0.07750000059604645,
+      "header_minus_filler": 0.2441461228579283,
+      "write_rate": 0.5892823354948913,
+      "margin_focus_removed": 0.0010245689044915305,
+      "margin_focus_shuffled": 0.0010245689044915305
+    },
+    {
+      "mode": "token",
+      "seed": 1,
+      "relevant_gate_mean": 0.6504034399986267,
+      "distractor_gate_mean": 0.648179292678833,
+      "paired_margin": 0.0020940648459824855,
+      "standardized_margin": 0.009496922506713423,
+      "auroc_relevant_vs_distractor": 0.5027316808700562,
+      "state_top1_2048": 0.8675000071525574,
+      "state_top1_4096": 0.7774999737739563,
+      "control_top1_2048": 0.07500000298023224,
+      "header_minus_filler": 0.2111125202476979,
+      "write_rate": 0.6480063293435829,
+      "margin_focus_removed": 0.0020940648459824855,
+      "margin_focus_shuffled": 0.0020940648459824855
+    }
+  ],
+  "claim2_acceptance": {
+    "conditioned_margin_mean": 0.10538000335964214,
+    "conditioned_margin_all_positive": true,
+    "conditioned_auroc_mean": 0.6195375025272369,
+    "conditioned_standardized_margin_mean": 0.6269024461037105,
+    "token_margin_mean": 0.0015593168752370081,
+    "token_auroc_mean": 0.502003014087677,
+    "controls_eliminate_margin": true,
+    "decode_above_controls": true,
+    "conditioned_gate_passes": true,
+    "preferred_success": false,
+    "launch_full_study": true
+  },
+  "verdict": {
+    "long_distance_teacher_upper_bound": "invalid (scratch matches/exceeds teacher \u2014 cue preservation is autonomous)",
+    "token_only_autonomous_gate": "fails",
+    "focus_conditioned_gate": "separates relevant events",
+    "structural_scope": "focus-conditioned relevance selection",
+    "full_study": "launch"
+  }
+}

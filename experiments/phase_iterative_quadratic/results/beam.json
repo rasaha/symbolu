@@ -1,0 +1,9 @@
+{
+  "soft": 0.74,
+  "hard_top1": 0.74,
+  "beam3": 0.7966666666666666,
+  "oracle_ptr": 0.9333333333333333,
+  "beam_gain_over_soft": 0.057,
+  "gap_to_oracle_closed": 0.293,
+  "grounded_D1_beam_ge_0.85": false
+}
