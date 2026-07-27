@@ -57,7 +57,7 @@ class IterativeHybrid(nn.Module):
 
     def forward(self, ids, event_pos, probe_pos, valid_len, required_hops=None, req_evidx=None,
                 freeze_query=False, shuffle_query=False, shuffle_scores=False,
-                forced_routed=None, hard_pointer=False):
+                forced_routed=None, hard_pointer=False, forced_query=None):
         """event_pos:[B,Ne] token positions of events; required_hops:[B,H] full-pos of the
         required event at each hop (for oracle routing + hop supervision); req_evidx:[B,H] indices
         into the event list (for D0 ground-truth intermediate query). May be −1."""
@@ -80,6 +80,9 @@ class IterativeHybrid(nn.Module):
             if self.gt_query and h >= 1 and req_evidx is not None:
                 gi = req_evidx[:, h].clamp(min=0).view(B, 1, 1).expand(B, 1, D)
                 q = ev.gather(1, gi).squeeze(1)
+            # beam / hypothesis injection: force the hop-1 query to a supplied evidence rep
+            if forced_query is not None and h == 1:
+                q = forced_query
             if shuffle_query and h >= 1:                               # control: scramble intermediate query
                 q = q[torch.randperm(B, device=ids.device)]
             scores = self.router.score(q, ev)                          # [B,Ne]

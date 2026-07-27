@@ -1,0 +1,19 @@
+{
+  "dim": 128,
+  "heads": 8,
+  "one_hop_oracle": 0.84,
+  "grounded_D1": {
+    "accuracy": 0.6933333333333334,
+    "final_accuracy": 0.7,
+    "next_entity_top1": 0.5566666666666666,
+    "next_entity_topk": 0.8966666666666666,
+    "correct_entity_prob": 0.5388845189412435,
+    "pointer_entropy": 0.6655842463175455,
+    "acc_given_correct_pointer": 0.8622754491017964,
+    "n_pointer": 300
+  },
+  "gate": {
+    "one_hop_oracle_ge_0.90": false,
+    "grounded_D1_ge_0.85": false
+  }
+}
