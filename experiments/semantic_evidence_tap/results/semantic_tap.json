@@ -1,0 +1,296 @@
+{
+  "interpreter_quality_q": 0.85,
+  "frozen_commit": "3a3a5b3",
+  "normalization": {
+    "dev": {
+      "N0": {
+        "downstream_outcome_accuracy": 1.0,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 0.0,
+        "interpreted_field_recall": 0.0,
+        "source_span_exact_match": 0.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N1": {
+        "downstream_outcome_accuracy": 0.37333333333333335,
+        "unsupported_fact_admission_rate": 0.18468468468468469,
+        "exact_field_accuracy": 0.0,
+        "interpreted_field_recall": 0.8153153153153153,
+        "source_span_exact_match": 0.9459459459459459,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N2": {
+        "downstream_outcome_accuracy": 0.94,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8153153153153153,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N3": {
+        "downstream_outcome_accuracy": 0.94,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8153153153153153,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N4": {
+        "downstream_outcome_accuracy": 0.94,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8153153153153153,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N5": {
+        "downstream_outcome_accuracy": 1.0,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 1.0,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      }
+    },
+    "heldout": {
+      "N0": {
+        "downstream_outcome_accuracy": 1.0,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 0.0,
+        "interpreted_field_recall": 0.0,
+        "source_span_exact_match": 0.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N1": {
+        "downstream_outcome_accuracy": 0.35,
+        "unsupported_fact_admission_rate": 0.1765601217656012,
+        "exact_field_accuracy": 0.0,
+        "interpreted_field_recall": 0.8234398782343988,
+        "source_span_exact_match": 0.9467275494672754,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N2": {
+        "downstream_outcome_accuracy": 0.92,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8234398782343988,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N3": {
+        "downstream_outcome_accuracy": 0.92,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8234398782343988,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N4": {
+        "downstream_outcome_accuracy": 0.92,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 0.8234398782343988,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      },
+      "N5": {
+        "downstream_outcome_accuracy": 1.0,
+        "unsupported_fact_admission_rate": 0.0,
+        "exact_field_accuracy": 1.0,
+        "interpreted_field_recall": 1.0,
+        "source_span_exact_match": 1.0,
+        "evidence_id_preservation": 1.0,
+        "n": 300
+      }
+    }
+  },
+  "tap": {
+    "dev": {
+      "T0": {
+        "unsupported_claim_recall": 0.0,
+        "supported_claim_precision": 0.4223245109321059,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 0.01,
+        "n": 300
+      },
+      "T1": {
+        "unsupported_claim_recall": 0.0,
+        "supported_claim_precision": 0.5594512195121951,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 0.09,
+        "n": 300
+      },
+      "T2": {
+        "unsupported_claim_recall": 0.3137450199203187,
+        "supported_claim_precision": 0.5158116654954322,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 0.02666666666666667,
+        "n": 300
+      },
+      "T3": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      },
+      "T4": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      },
+      "T5": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      }
+    },
+    "heldout": {
+      "T0": {
+        "unsupported_claim_recall": 0.0,
+        "supported_claim_precision": 0.42292030250145435,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 0.0033333333333333335,
+        "n": 300
+      },
+      "T1": {
+        "unsupported_claim_recall": 0.0,
+        "supported_claim_precision": 0.5605242868157286,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 0.11,
+        "n": 300
+      },
+      "T2": {
+        "unsupported_claim_recall": 0.2973790322580645,
+        "supported_claim_precision": 0.5105337078651685,
+        "authority_exceedance_recall": 0.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 0.006666666666666667,
+        "n": 300
+      },
+      "T3": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      },
+      "T4": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 1.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      },
+      "T5": {
+        "unsupported_claim_recall": 1.0,
+        "supported_claim_precision": 1.0,
+        "authority_exceedance_recall": 1.0,
+        "false_block_rate": 0.0,
+        "qualifier_preservation": 0.0,
+        "final_response_admissibility": 1.0,
+        "n": 300
+      }
+    }
+  },
+  "causal": {
+    "normalization": {
+      "base_outcome": 0.96,
+      "span_removal_block_rate": 1.0,
+      "provenance_corruption_block_rate": 1.0,
+      "irrelevant_injection_outcome": 0.96,
+      "shuffle_docs_outcome": 0.9266666666666666,
+      "irrelevant_invariant": true,
+      "shuffle_invariant": false,
+      "span_removal_blocks": true,
+      "provenance_blocks": true
+    },
+    "tap": {
+      "authority_always_blocked": 1.0,
+      "authority_recall_is_1.0": true
+    }
+  },
+  "acceptance": {
+    "exact_field_accuracy_ge_0.98": true,
+    "source_span_match_ge_0.95": true,
+    "unsupported_fact_admission_le_0.01": true,
+    "evidence_id_preservation_1.0": true,
+    "downstream_within_0.05_of_N5": false,
+    "tap_unsupported_recall_ge_0.95": true,
+    "tap_supported_precision_ge_0.95": true,
+    "authority_exceedance_recall_1.0": true,
+    "heldout_degradation_le_0.05": true,
+    "norm_causal_ok": true,
+    "tap_prompt_only_insufficient": true,
+    "VALIDATED": false
+  },
+  "verdict": {
+    "frozen_deterministic_pipeline": "verified",
+    "semantic_normalization": "unsupported",
+    "best_normalization_architecture": "N3",
+    "deterministic_fields": [
+      "amount",
+      "date",
+      "document_id",
+      "policy_version",
+      "explicit_status",
+      "named_authority",
+      "approval_record_exists"
+    ],
+    "interpreted_fields": [
+      "approval_granted",
+      "clauses_conflict",
+      "exception_applies"
+    ],
+    "unsupported_fact_admission_rate": 0.0,
+    "downstream_outcome_accuracy": 0.92,
+    "oracle_normalization_gap": 0.07999999999999996,
+    "hybrid_handoff_value": "validated",
+    "tap_assertion_governance": "validated",
+    "best_tap_architecture": "T3",
+    "unsupported_claim_recall": 1.0,
+    "supported_claim_precision": 1.0,
+    "authority_exceedance_recall": 1.0,
+    "qualifier_preservation_rate": 1.0,
+    "evidence_id_preservation": 1.0,
+    "unauthorized_inclusion": 0.0,
+    "primary_remaining_bottleneck": "document_interpretation",
+    "authorized_architecture": "raw docs -> deterministic extraction where exact + bounded semantic interpretation where necessary -> provisional validation -> ledger -> deterministic joins -> P5 slots -> exact typed fields -> deterministic mapper -> Hybrid LLM explanation -> TAP governance -> Decision Governance -> ActionGate"
+  }
+}
