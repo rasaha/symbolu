@@ -66,7 +66,7 @@ class IterativeHybrid(nn.Module):
         reps = reps.scatter(1, kp, ev)                           # attention sees bound key reps
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
-        route_scores = []; hop_outputs = []; q_norms = []
+        route_scores = []; hop_outputs = []; q_norms = []; queries = []
         for h in range(self.hops):
             # D0 diagnostic: overwrite the intermediate query with the ground-truth next entity
             if self.gt_query and h >= 1 and req_evidx is not None:
@@ -105,7 +105,8 @@ class IterativeHybrid(nn.Module):
             else:
                 q = self.qupdate(q0, o) if h == 0 else q               # static: single update from q0
             q_norms.append((q - q_prev).norm(dim=-1).mean().item())    # §8 query-evolution diagnostic
+            queries.append(q)                                          # updated query after hop h
         logits = self.answer_head(torch.cat([q, o], dim=-1))           # decode from query + last attn output
         hop_logits = [self.hop_head(oh) for oh in hop_outputs]         # per-hop target prediction (staged)
         return {"answer_logits": logits, "route_scores": route_scores, "event_reps": ev,
-                "hop_logits": hop_logits, "query_update_norms": q_norms}
+                "hop_logits": hop_logits, "query_update_norms": q_norms, "queries": queries}
