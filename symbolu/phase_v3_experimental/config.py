@@ -56,8 +56,8 @@ class PhaseV3Config:
     gamma_min: float = 0.90
     gamma_max: float = 0.9999
     omega_max: float = 3.141592653589793      # π
-    initial_gamma: float = 0.99               # bias γ toward long memory (not exact 1)
-    fixed_gamma: float = 0.99                  # γ when retention is not input-dependent
+    initial_gamma: float = 0.999              # bias γ toward long memory (horizon ~1000)
+    fixed_gamma: float = 0.999                 # γ when retention is not input-dependent
     use_omega: bool = True                     # complex rotation on/off
 
     # input-dependent selective write B_t (§5)
@@ -67,7 +67,7 @@ class PhaseV3Config:
 
     # input-dependent selective read C_t (§6)
     input_dependent_read: bool = True
-    read_bias_init: float = 0.0
+    read_bias_init: float = 2.0                 # start C_t≈0.88 (pass-through), learn to gate
     fixed_read: float = 1.0                     # C_t when read is not input-dependent
 
     # eval-time ablation overrides (§14); "learned"/"fixed" = no override
