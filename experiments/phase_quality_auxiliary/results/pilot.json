@@ -1,38 +1,38 @@
 {
   "seed": 0,
-  "steps": 8,
+  "steps": 700,
   "lengths": {
     "256": {
       "A0": {
-        "macro_auroc": 0.6772287063467979,
-        "macro_auprc": 0.6624937406643009,
-        "macro_brier": 0.24996960475614907,
+        "macro_auroc": 0.7350931569880774,
+        "macro_auprc": 0.7305642405465659,
+        "macro_brier": 0.14005022271059908,
         "per_target": {
           "persistence": {
-            "auroc": 0.7736626430893947,
-            "auprc": 0.7429855452012052,
-            "brier": 0.25545755703846806
+            "auroc": 1.0,
+            "auprc": 1.0,
+            "brier": 0.06139029248892094
           },
           "unresolved_recurrence": {
-            "auroc": 0.9696546756111837,
-            "auprc": 0.9691763578942844,
-            "brier": 0.24851847580130154
+            "auroc": 1.0,
+            "auprc": 1.0,
+            "brier": 0.0017957801206783613
           },
           "context_shift": {
-            "auroc": 0.4317111111111111,
-            "auprc": 0.4607573503811331,
-            "brier": 0.2507201946475139
+            "auroc": 0.40775555555555554,
+            "auprc": 0.4487909247715471,
+            "brier": 0.2509193731658002
           },
           "sequence_anomaly": {
-            "auroc": 0.5338863955755021,
-            "auprc": 0.4770557091805811,
-            "brier": 0.2451821915373128
+            "auroc": 0.5326170723967542,
+            "auprc": 0.4734660374147165,
+            "brier": 0.24609544506699677
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.7438382719468292,
-            "unresolved_recurrence": 0.9509257013501495
+            "persistence": 1.0,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
             "persistence": NaN,
@@ -45,35 +45,35 @@
         "phase_state_bytes": 0
       },
       "A1": {
-        "macro_auroc": 0.5056656873934644,
-        "macro_auprc": 0.4809531134037078,
-        "macro_brier": 0.25323010510713606,
+        "macro_auroc": 0.7233148583101151,
+        "macro_auprc": 0.7157619415848587,
+        "macro_brier": 0.15489719721486367,
         "per_target": {
           "persistence": {
-            "auroc": 0.4819384437218832,
-            "auprc": 0.5149198508180677,
-            "brier": 0.25532984820169
+            "auroc": 0.9498463320119371,
+            "auprc": 0.9476151172656452,
+            "brier": 0.11623017391892025
           },
           "unresolved_recurrence": {
-            "auroc": 0.5301877448111296,
-            "auprc": 0.4811273568859075,
-            "brier": 0.2598409655314269
+            "auroc": 1.0,
+            "auprc": 1.0,
+            "brier": 0.00527979396759709
           },
           "context_shift": {
-            "auroc": 0.5251111111111111,
-            "auprc": 0.5155154790229921,
-            "brier": 0.25048920585880646
+            "auroc": 0.46995555555555557,
+            "auprc": 0.47881762084761925,
+            "brier": 0.2509946748110541
           },
           "sequence_anomaly": {
-            "auroc": 0.4854254499297339,
-            "auprc": 0.4122497668878637,
-            "brier": 0.2472604008366207
+            "auroc": 0.47345754567296794,
+            "auprc": 0.43661502822617043,
+            "brier": 0.24708414616188326
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.5012461921905289,
-            "unresolved_recurrence": 0.5099846390168971
+            "persistence": 0.8960583402566232,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
             "persistence": NaN,
@@ -81,40 +81,40 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.015037593984962405,
+        "recurrence_fn": 0.0,
         "params": 26918,
         "phase_state_bytes": 0
       },
       "A3": {
-        "macro_auroc": 0.5517767462730179,
-        "macro_auprc": 0.5305735265457294,
-        "macro_brier": 0.25349647492096733,
+        "macro_auroc": 0.7252859300373322,
+        "macro_auprc": 0.725855919340569,
+        "macro_brier": 0.15087236163787932,
         "per_target": {
           "persistence": {
-            "auroc": 0.5620239632978486,
-            "auprc": 0.5420159213970136,
-            "brier": 0.2503594601871426
+            "auroc": 0.9453476459845886,
+            "auprc": 0.9509116310426822,
+            "brier": 0.10058605017720137
           },
           "unresolved_recurrence": {
-            "auroc": 0.656881725271262,
-            "auprc": 0.6118410621780463,
-            "brier": 0.25593161316165186
+            "auroc": 1.0,
+            "auprc": 1.0,
+            "brier": 0.00592332444242276
           },
           "context_shift": {
-            "auroc": 0.4836,
-            "auprc": 0.5285215372801714,
-            "brier": 0.2523121324204206
+            "auroc": 0.4650666666666667,
+            "auprc": 0.5238195870244842,
+            "brier": 0.2505832488091093
           },
           "sequence_anomaly": {
-            "auroc": 0.5046012965229612,
-            "auprc": 0.4399155853276866,
-            "brier": 0.25538269391465424
+            "auroc": 0.49072940749807337,
+            "auprc": 0.42869245929510996,
+            "brier": 0.24639682312278383
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.5496169112895781,
-            "unresolved_recurrence": 0.6715175034360094
+            "persistence": 0.8867349764608142,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
             "persistence": NaN,
@@ -127,35 +127,35 @@
         "phase_state_bytes": 576
       },
       "A5": {
-        "macro_auroc": 0.49448679521257244,
-        "macro_auprc": 0.47449502601112786,
-        "macro_brier": 0.2626930858388323,
+        "macro_auroc": 0.6966008570398915,
+        "macro_auprc": 0.692646407300293,
+        "macro_brier": 0.16672965920304203,
         "per_target": {
           "persistence": {
-            "auroc": 0.4899559039686428,
-            "auprc": 0.5318690702617312,
-            "brier": 0.25317646357197054
+            "auroc": 0.8697162709901564,
+            "auprc": 0.8702121398510926,
+            "brier": 0.15035137984264915
           },
           "unresolved_recurrence": {
-            "auroc": 0.49691594255098825,
-            "auprc": 0.44132017143896757,
-            "brier": 0.28348686163960823
+            "auroc": 1.0,
+            "auprc": 1.0,
+            "brier": 0.016297067756935447
           },
           "context_shift": {
-            "auroc": 0.5189777777777778,
-            "auprc": 0.5345455406390277,
-            "brier": 0.2515273844737677
+            "auroc": 0.478,
+            "auprc": 0.5049694768890229,
+            "brier": 0.25041792544122893
           },
           "sequence_anomaly": {
-            "auroc": 0.47209755655288094,
-            "auprc": 0.39024532170478504,
-            "brier": 0.2625816336699826
+            "auroc": 0.4386871571694093,
+            "auprc": 0.39540401246105666,
+            "brier": 0.2498522637713546
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.5265392781316348,
-            "unresolved_recurrence": 0.5373110194841944
+            "persistence": 0.7299916920520632,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
             "persistence": NaN,
@@ -163,93 +163,93 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.022556390977443608,
+        "recurrence_fn": 0.0,
         "params": 34678,
         "phase_state_bytes": 0
       },
       "A3_minus_A1": {
-        "macro_auroc": 0.04611105887955347,
+        "macro_auroc": 0.0019710717272171108,
         "per_target_auroc": {
-          "persistence": 0.08008551957596544,
-          "unresolved_recurrence": 0.12669398046013236,
-          "context_shift": -0.04151111111111111,
-          "sequence_anomaly": 0.01917584659322724
+          "persistence": -0.004498686027348486,
+          "unresolved_recurrence": 0.0,
+          "context_shift": -0.004888888888888887,
+          "sequence_anomaly": 0.017271861825105428
         }
       },
       "phase_causal_controls": {
         "normal": {
-          "macro_auroc": 0.5517767462730179,
-          "persistence": 0.5620239632978486,
-          "unresolved_recurrence": 0.656881725271262
+          "macro_auroc": 0.7252859300373322,
+          "persistence": 0.9453476459845886,
+          "unresolved_recurrence": 1.0
         },
         "phase_zero": {
-          "macro_auroc": 0.551766239349632,
-          "persistence": 0.5618903389604026,
-          "unresolved_recurrence": 0.6567466570618162
+          "macro_auroc": 0.7252754610705471,
+          "persistence": 0.9453031045387733,
+          "unresolved_recurrence": 1.0
         },
         "phase_shuffle_batch": {
-          "macro_auroc": 0.5518221705084927,
-          "persistence": 0.562068504743664,
-          "unresolved_recurrence": 0.6569717707442259
+          "macro_auroc": 0.7252872385763272,
+          "persistence": 0.9453031045387733,
+          "unresolved_recurrence": 1.0
         },
         "phase_shuffle_time": {
-          "macro_auroc": 0.5516866708131457,
-          "persistence": 0.5618457975145873,
-          "unresolved_recurrence": 0.6566115888523705
+          "macro_auroc": 0.725196572634988,
+          "persistence": 0.9453031045387733,
+          "unresolved_recurrence": 1.0
         },
         "phase_reverse": {
-          "macro_auroc": 0.5517655139101931,
-          "persistence": 0.561801256068772,
-          "unresolved_recurrence": 0.656881725271262
+          "macro_auroc": 0.725400571003001,
+          "persistence": 0.9453031045387733,
+          "unresolved_recurrence": 1.0
         },
         "remove_relevant_distant": {
-          "macro_auroc": 0.5517654905888976,
-          "persistence": 0.5620239632978486,
-          "unresolved_recurrence": 0.6568367025347801
+          "macro_auroc": 0.7252632635519974,
+          "persistence": 0.9453476459845886,
+          "unresolved_recurrence": 1.0
         },
         "remove_irrelevant": {
-          "macro_auroc": 0.5517880795156853,
-          "persistence": 0.5620239632978486,
-          "unresolved_recurrence": 0.656881725271262
+          "macro_auroc": 0.7252972632799995,
+          "persistence": 0.9453476459845886,
+          "unresolved_recurrence": 1.0
         },
         "causal_dependence_verified": false
       }
     },
     "1024": {
       "A0": {
-        "macro_auroc": 0.5485962122885584,
-        "macro_auprc": 0.5787863120973107,
-        "macro_brier": 0.24984968459158935,
+        "macro_auroc": 0.6170558520418288,
+        "macro_auprc": 0.655206294019755,
+        "macro_brier": 0.21695464575318016,
         "per_target": {
           "persistence": {
-            "auroc": 0.4174941850062623,
-            "auprc": 0.4243272184233484,
-            "brier": 0.24924429566008313
+            "auroc": 0.7306092324208266,
+            "auprc": 0.7944831129622105,
+            "brier": 0.20785738427440417
           },
           "unresolved_recurrence": {
-            "auroc": 0.7354238118569328,
-            "auprc": 0.7938974162742705,
-            "brier": 0.248229998790588
+            "auroc": 0.7547770700636943,
+            "auprc": 0.81811596951365,
+            "brier": 0.15551749385929384
           },
           "context_shift": {
-            "auroc": 0.5262054507337526,
-            "auprc": 0.5916211152622587,
-            "brier": 0.251615704357822
+            "auroc": 0.49578482537133683,
+            "auprc": 0.5386073593730636,
+            "brier": 0.24919313029485177
           },
           "sequence_anomaly": {
-            "auroc": 0.5152614015572858,
-            "auprc": 0.5052994984293655,
-            "brier": 0.25030873955786426
+            "auroc": 0.4870522803114572,
+            "auprc": 0.46961873423009626,
+            "brier": 0.2552505745841709
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.13076923076923078,
-            "unresolved_recurrence": 0.9129244249726177
+            "persistence": 1.0,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
-            "persistence": 0.5458829365079365,
-            "unresolved_recurrence": 0.48333333333333334
+            "persistence": 0.5300099206349206,
+            "unresolved_recurrence": 0.5683333333333334
           },
           "far(>256)": {
             "persistence": NaN,
@@ -257,44 +257,44 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.9020979020979021,
+        "recurrence_fn": 0.4195804195804196,
         "params": 9508,
         "phase_state_bytes": 0
       },
       "A1": {
-        "macro_auroc": 0.5175433135867372,
-        "macro_auprc": 0.5116228266404411,
-        "macro_brier": 0.25065899444914347,
+        "macro_auroc": 0.6265111008563464,
+        "macro_auprc": 0.636689909012328,
+        "macro_brier": 0.22610627892286683,
         "per_target": {
           "persistence": {
-            "auroc": 0.5218733225979603,
-            "auprc": 0.47399913614342076,
-            "brier": 0.2487915574165943
+            "auroc": 0.6285560923242083,
+            "auprc": 0.6151071011860165,
+            "brier": 0.24427554246125457
           },
           "unresolved_recurrence": {
-            "auroc": 0.5593514765489288,
-            "auprc": 0.5370289001202669,
-            "brier": 0.24774857922389443
+            "auroc": 0.8257984054162398,
+            "auprc": 0.863067466203082,
+            "brier": 0.1559030781568342
           },
           "context_shift": {
-            "auroc": 0.5467237610954994,
-            "auprc": 0.5938337764785703,
-            "brier": 0.2498705915116739
+            "auroc": 0.5130469690887194,
+            "auprc": 0.541465651623446,
+            "brier": 0.2492953980776351
           },
           "sequence_anomaly": {
-            "auroc": 0.4422246941045606,
-            "auprc": 0.4416294938195065,
-            "brier": 0.2562252496444113
+            "auroc": 0.538642936596218,
+            "auprc": 0.5271194170367676,
+            "brier": 0.2549510969957435
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.46923076923076923,
-            "unresolved_recurrence": 0.6010405257393209
+            "persistence": 0.6161538461538462,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
-            "persistence": 0.5059523809523809,
-            "unresolved_recurrence": 0.579047619047619
+            "persistence": 0.501984126984127,
+            "unresolved_recurrence": 0.48238095238095235
           },
           "far(>256)": {
             "persistence": NaN,
@@ -302,44 +302,44 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.6083916083916084,
+        "recurrence_fn": 0.4195804195804196,
         "params": 26918,
         "phase_state_bytes": 0
       },
       "A3": {
-        "macro_auroc": 0.5206118290605021,
-        "macro_auprc": 0.5144646014002647,
-        "macro_brier": 0.25273865776825477,
+        "macro_auroc": 0.6390662959800616,
+        "macro_auprc": 0.6400786638045362,
+        "macro_brier": 0.2230523305998688,
         "per_target": {
           "persistence": {
-            "auroc": 0.4758006799069601,
-            "auprc": 0.46388855060725687,
-            "brier": 0.25184735535325065
+            "auroc": 0.661925210234389,
+            "auprc": 0.6296954519086699,
+            "brier": 0.23680139017660898
           },
           "unresolved_recurrence": {
-            "auroc": 0.5665671907710125,
-            "auprc": 0.5263675207360687,
-            "brier": 0.24832941237541092
+            "auroc": 0.8380473030154559,
+            "auprc": 0.8665758543191948,
+            "brier": 0.15355387247814137
           },
           "context_shift": {
-            "auroc": 0.5675989116374504,
-            "auprc": 0.5960079141285539,
-            "brier": 0.2514312405085197
+            "auroc": 0.4942459520942058,
+            "auprc": 0.523753700681874,
+            "brier": 0.2494101259803609
           },
           "sequence_anomaly": {
-            "auroc": 0.4724805339265851,
-            "auprc": 0.4715944201291794,
-            "brier": 0.25934662283583776
+            "auroc": 0.5620467185761958,
+            "auprc": 0.5402896483084054,
+            "brier": 0.2524439337643639
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.45282051282051283,
-            "unresolved_recurrence": 0.635815991237678
+            "persistence": 0.6235897435897436,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
-            "persistence": 0.4007936507936508,
-            "unresolved_recurrence": 0.4461904761904762
+            "persistence": 0.5744047619047619,
+            "unresolved_recurrence": 0.5119047619047619
           },
           "far(>256)": {
             "persistence": NaN,
@@ -347,44 +347,44 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.5104895104895105,
+        "recurrence_fn": 0.40559440559440557,
         "params": 38518,
         "phase_state_bytes": 576
       },
       "A5": {
-        "macro_auroc": 0.50551195734113,
-        "macro_auprc": 0.49604247971408355,
-        "macro_brier": 0.2542399966595429,
+        "macro_auroc": 0.5911564471337503,
+        "macro_auprc": 0.5978216290367132,
+        "macro_brier": 0.2359453335626085,
         "per_target": {
           "persistence": {
-            "auroc": 0.5234836285560923,
-            "auprc": 0.49376062845157265,
-            "brier": 0.2501709555024843
+            "auroc": 0.6296296296296297,
+            "auprc": 0.5771564472474976,
+            "brier": 0.2544310867135842
           },
           "unresolved_recurrence": {
-            "auroc": 0.49917598325241636,
-            "auprc": 0.47229269103937566,
-            "brier": 0.2506606506304614
+            "auroc": 0.789096254064407,
+            "auprc": 0.846230767939018,
+            "brier": 0.18259734792565668
           },
           "context_shift": {
-            "auroc": 0.522324813774031,
-            "auprc": 0.5512532193036594,
-            "brier": 0.2505876307731289
+            "auroc": 0.46607788036932957,
+            "auprc": 0.5092333637351166,
+            "brier": 0.2507105134932836
           },
           "sequence_anomaly": {
-            "auroc": 0.47706340378198,
-            "auprc": 0.46686338006172645,
-            "brier": 0.2655407497320969
+            "auroc": 0.47982202447163513,
+            "auprc": 0.45866593722522037,
+            "brier": 0.2560423861179095
           }
         },
         "by_distance": {
           "near(<64)": {
-            "persistence": 0.5520512820512821,
-            "unresolved_recurrence": 0.5309419496166484
+            "persistence": 0.5025641025641026,
+            "unresolved_recurrence": 1.0
           },
           "mid(64-256)": {
-            "persistence": 0.5153769841269841,
-            "unresolved_recurrence": 0.46190476190476193
+            "persistence": 0.5763888888888888,
+            "unresolved_recurrence": 0.43952380952380954
           },
           "far(>256)": {
             "persistence": NaN,
@@ -392,54 +392,54 @@
           }
         },
         "anomaly_fp_on_harmless": 0.0,
-        "recurrence_fn": 0.6713286713286714,
+        "recurrence_fn": 0.4195804195804196,
         "params": 34678,
         "phase_state_bytes": 0
       },
       "A3_minus_A1": {
-        "macro_auroc": 0.0030685154737648546,
+        "macro_auroc": 0.012555195123715168,
         "per_target_auroc": {
-          "persistence": -0.04607264269100014,
-          "unresolved_recurrence": 0.007215714222083669,
-          "context_shift": 0.020875150541950993,
-          "sequence_anomaly": 0.03025583982202451
+          "persistence": 0.03336911791018071,
+          "unresolved_recurrence": 0.012248897599216102,
+          "context_shift": -0.018801016994513586,
+          "sequence_anomaly": 0.023403781979977833
         }
       },
       "phase_causal_controls": {
         "normal": {
-          "macro_auroc": 0.5206118290605021,
-          "persistence": 0.4758006799069601,
-          "unresolved_recurrence": 0.5665671907710125
+          "macro_auroc": 0.6390662959800616,
+          "persistence": 0.661925210234389,
+          "unresolved_recurrence": 0.8380473030154559
         },
         "phase_zero": {
-          "macro_auroc": 0.5206901428865139,
-          "persistence": 0.47620325639649314,
-          "unresolved_recurrence": 0.5665671907710125
+          "macro_auroc": 0.6390606775265077,
+          "persistence": 0.6617910180712113,
+          "unresolved_recurrence": 0.8384481760277939
         },
         "phase_shuffle_batch": {
-          "macro_auroc": 0.5207012115142629,
-          "persistence": 0.47611379495437467,
-          "unresolved_recurrence": 0.5663890249877511
+          "macro_auroc": 0.6391275603060775,
+          "persistence": 0.661925210234389,
+          "unresolved_recurrence": 0.8383145516903479
         },
         "phase_shuffle_time": {
-          "macro_auroc": 0.5206899815151871,
-          "persistence": 0.4760243335122562,
-          "unresolved_recurrence": 0.5664335664335665
+          "macro_auroc": 0.6388878889981602,
+          "persistence": 0.6617462873501521,
+          "unresolved_recurrence": 0.8383590931361632
         },
         "phase_reverse": {
-          "macro_auroc": 0.5207959957916473,
-          "persistence": 0.47629271783861155,
-          "unresolved_recurrence": 0.5665894614939201
+          "macro_auroc": 0.6391497327518385,
+          "persistence": 0.6617910180712113,
+          "unresolved_recurrence": 0.8384927174736092
         },
         "remove_relevant_distant": {
-          "macro_auroc": 0.5206118290605021,
-          "persistence": 0.4758006799069601,
-          "unresolved_recurrence": 0.5665671907710125
+          "macro_auroc": 0.6390718716078774,
+          "persistence": 0.661925210234389,
+          "unresolved_recurrence": 0.8380473030154559
         },
         "remove_irrelevant": {
-          "macro_auroc": 0.5206118012753934,
-          "persistence": 0.4758006799069601,
-          "unresolved_recurrence": 0.5665671907710125
+          "macro_auroc": 0.6390607481373545,
+          "persistence": 0.661925210234389,
+          "unresolved_recurrence": 0.8380473030154559
         },
         "causal_dependence_verified": false
       }
@@ -447,9 +447,9 @@
   },
   "validity_gate": {
     "labels_valid": true,
-    "A1_above_chance": false,
+    "A1_above_chance": true,
     "phase_causal_controls_functioning": true,
-    "no_obvious_leakage": true,
+    "no_obvious_leakage": false,
     "some_phase_target_gain": true,
     "PILOT_VALID": false
   }

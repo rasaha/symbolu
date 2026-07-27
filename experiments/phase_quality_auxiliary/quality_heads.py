@@ -44,18 +44,26 @@ class EventEncoder(nn.Module):
 
 
 class QuadraticBranch(nn.Module):
-    """Query attends the BOUNDED packet; emits comparison rep + contradiction + chain-completeness."""
+    """Bounded quadratic comparison over the candidate packet. The query token plus the ≤K packet
+    records self-attend (exact softmax over K+1 ≤ 17 tokens — bounded, NEVER over the N-stream and
+    NEVER an N×N tensor); the query slot reads out the evidence-comparison rep + contradiction +
+    chain-completeness. Record-vs-record comparison is what lets it catch local contradictions."""
     def __init__(self, D=EMBED_DIM, heads=NUM_HEADS):
         super().__init__()
-        self.attn = BoundedRoutedSoftmaxAttention(D, heads)
+        self.layer = nn.TransformerEncoderLayer(D, heads, dim_feedforward=2 * D,
+                                                batch_first=True, dropout=0.0)
         self.contradiction = nn.Linear(D, 1)
         self.completeness = nn.Linear(D, 1)
         self.out = nn.Linear(D, TEMP_DIM)
 
     def forward(self, x, query_pos, packet, valid_len):
         B, N, D = x.shape
-        o = self.attn(x.gather(1, query_pos.view(B, 1, 1).expand(B, 1, D)), x,
-                      query_pos.view(B, 1), packet, W=0, valid_len=valid_len)[:, 0]   # [B,D]
+        K = packet.shape[1]
+        qrep = x.gather(1, query_pos.view(B, 1, 1).expand(B, 1, D))          # [B,1,D]
+        prep = x.gather(1, packet.unsqueeze(-1).expand(B, K, D))             # [B,K,D]
+        tokens = torch.cat([qrep, prep], dim=1)                             # [B,K+1,D]  (bounded)
+        h = self.layer(tokens)                                             # bounded self-attention
+        o = h[:, 0]                                                         # query slot readout
         return {"rep": self.out(o),
                 "contradiction": self.contradiction(o).squeeze(-1),
                 "completeness": self.completeness(o).squeeze(-1)}

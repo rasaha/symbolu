@@ -13,14 +13,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .dataset import (Schema, encode_categoricals, deterministic_quality_features,
-                      deterministic_packet, CAT_FIELDS, TARGETS)
+                      deterministic_packet, CAT_FIELDS, TARGETS, DET_FEAT_DIM)
 
 
 def collate(batch, schema: Schema, device="cpu"):
     B = len(batch); N = batch[0]["N"]; K = schema.packet_K
     cats = {f: torch.zeros(B, N, dtype=torch.long, device=device) for f in CAT_FIELDS}
     num = torch.zeros(B, N, 3, device=device)
-    det = torch.zeros(B, 9, device=device)
+    det = torch.zeros(B, DET_FEAT_DIM, device=device)
     qp = torch.zeros(B, dtype=torch.long, device=device)
     packet = torch.zeros(B, K, dtype=torch.long, device=device)
     vl = torch.full((B,), N, dtype=torch.long, device=device)

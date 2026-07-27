@@ -103,40 +103,48 @@ def make_stream(schema: Schema, N: int, g: torch.Generator,
         events[pos] = _rec(-1, events[pos]["document_id"], events[pos]["section_id"], focus, rel,
                            obj, pos, ver, status, auth(), events[pos]["source_span"], tpl(), tag)
 
-    early = 1 + _ri(max(1, N // 8), g)                    # distant region (near the front)
-    mid = N // 2 + _ri(max(1, N // 8), g)
-    late = N - 2 - _ri(max(1, N // 8), g)                 # near the query
-    relevant_positions = []
+    guard = 4 * S.packet_K + 4                            # bounded packet window near the query
+    lo_rel = max(2, N // 8)
+    hi_rel = max(lo_rel + 8, N - guard)                   # DISTANT region: strictly outside packet
+    region = hi_rel - lo_rel
+    early = lo_rel + _ri(max(1, region // 4), g)
+    mid = lo_rel + region // 2 + _ri(max(1, region // 8), g)
+    late = hi_rel - _ri(max(1, region // 8), g)
+    relevant_positions = []                               # DISTANT (long-range) evidence only
 
+    # ---- LONG-RANGE Phase targets: persistence / unresolved_recurrence (evidence OUTSIDE packet) ----
     if has_persist:
         place(early, frel, theme_obj, OPEN, 1, "persist_early")
-        place(late, frel, theme_obj, OPEN, 1, "persist_late")
-        relevant_positions += [early, late]
+        place(mid, frel, theme_obj, OPEN, 1, "persist_mid")
+        relevant_positions += [early, mid]
     if has_recur:
-        r0 = max(2, early - 1); r1 = mid; r2 = late - 1
+        r0, r1, r2 = max(2, early - 1), mid, late
         place(r0, frel, theme_obj, OPEN, 1, "recur_open")
         place(r1, frel, theme_obj, RESOLVED, 2, "recur_resolved")
         place(r2, frel, theme_obj, OPEN, 3, "recur_reopen")
         relevant_positions += [r0, r1, r2]
-    if has_shift:
-        s0 = early + 1 if early + 1 < mid else early
-        place(s0, frel, theme_obj, OPEN, 1, "shift_orig")
-        place(mid + 1 if mid + 1 < late else mid, frel, (theme_obj + 1) % S.n_objects,
-              SUPERSEDED, 2, "shift_supersede")
-        relevant_positions += [s0, mid + 1 if mid + 1 < late else mid]
-    if has_anom:
-        # true anomaly: a version/status regression inconsistent with the trajectory
-        ap = mid - 2 if mid - 2 > early + 2 else mid
-        place(ap, frel, theme_obj, RESOLVED, 5, "anom_reg")           # high version resolved…
-        place(ap + 1 if ap + 1 < late else ap, frel, theme_obj, OPEN, 1, "anom_regress_ver")  # …then version drops to 1 (impossible)
-        relevant_positions += [ap, ap + 1 if ap + 1 < late else ap]
-    # harmless unusual event (rare-but-valid): a lone EXCEPTION status, never an anomaly label
+
+    # ---- LOCAL quadratic targets: context_shift / sequence_anomaly (RELATIONAL, inside packet) ----
+    # Both classes place matched records so deterministic COUNTS do not discriminate; only the
+    # RELATION between two records (object-conflict / version-regression) separates the label —
+    # which the bounded quadratic comparison can read but simple metadata counts cannot.
+    q = N - 1
+    lp = [q - 2, q - 4, q - 6, q - 8]                     # local, inside the packet window
+    # context_shift: an original record, then a SUPERSEDED record (always present).
+    place(lp[0], frel, theme_obj, OPEN, 1, "ctx_orig")
+    shift_obj = (theme_obj + 1) % S.n_objects if has_shift else theme_obj
+    place(lp[1], frel, shift_obj, SUPERSEDED, 2, "ctx_supersede")    # conflict iff has_shift
+    # sequence_anomaly: a RESOLVED record then an OPEN record; anomaly iff the version REGRESSES.
+    place(lp[2], frel, theme_obj, RESOLVED, 4, "anom_prev")
+    anom_ver = 1 if has_anom else 5
+    place(lp[3], frel, theme_obj, OPEN, anom_ver, "anom_next")       # regresses iff has_anom
+
+    # harmless unusual event (rare-but-valid): a lone EXCEPTION, distant, never an anomaly label
     hp = N // 3 + _ri(max(1, N // 8), g)
     place(hp, frel, theme_obj, EXCEPTION, 1, "harmless_unusual")
 
-    # ---- query record at the end (focus, asks about current health) ----
-    place(N - 1, frel, theme_obj, NOTE, 1, "query")
-    query_pos = N - 1
+    place(q, frel, theme_obj, NOTE, 1, "query")
+    query_pos = q
 
     # assign unique evidence ids in arrival order
     for i, e in enumerate(events):
@@ -200,26 +208,24 @@ def encode_categoricals(ex: Dict, schema: Schema, device="cpu"):
 
 
 def deterministic_quality_features(ex: Dict, schema: Schema, device="cpu") -> torch.Tensor:
-    """Already-deterministic quality dims (provenance/authority/timestamp/schema/version) computed
-    on the bounded packet — the metadata-only signal available WITHOUT temporal modeling."""
+    """GENERIC deterministic metadata available WITHOUT temporal/relational modeling — provenance,
+    authority, timestamp validity, packet occupancy, focus record count. These are matched across
+    label classes by construction, so `A0` (metadata only) cannot leak the quality targets: the
+    discriminating signal is RELATIONAL (local, for the quadratic branch) or LONG-RANGE (for the
+    temporal branch), never a simple metadata count."""
     ev = ex["events"]; packet = deterministic_packet(ex, schema)
     p = [ev[i] for i in packet]
     n = max(1, len(p))
     provenance_present = sum(1 for e in p if e["source_span"] >= 0) / n
     authority_mean = sum(e["source_authority"] for e in p) / n / schema.n_authorities
     ts_valid = sum(1 for e in p if 0 <= e["timestamp"] <= ex["N"]) / n
-    max_ver = max((e["version"] for e in p), default=0) / 8.0
-    n_superseded = sum(1 for e in p if e["status"] in (SUPERSEDED, AMENDED)) / n
-    n_open = sum(1 for e in p if e["status"] == OPEN) / n
-    n_resolved = sum(1 for e in p if e["status"] == RESOLVED) / n
-    n_conflict = sum(1 for e in p if e["relation_id"] == ex["frel"]
-                     and e["object_id"] != ex["theme_obj"]) / n
     packet_frac = len(packet) / ex["N"]
-    return torch.tensor([provenance_present, authority_mean, ts_valid, max_ver, n_superseded,
-                         n_open, n_resolved, n_conflict, packet_frac], dtype=torch.float32, device=device)
+    n_focus = sum(1 for e in p if e["subject_id"] == ex["focus"]) / n
+    return torch.tensor([provenance_present, authority_mean, ts_valid, packet_frac, n_focus],
+                        dtype=torch.float32, device=device)
 
 
-DET_FEAT_DIM = 9
+DET_FEAT_DIM = 5
 
 
 def generate(schema: Schema, N: int, n: int, seed: int, subj_pool=None, template_pool=None):
