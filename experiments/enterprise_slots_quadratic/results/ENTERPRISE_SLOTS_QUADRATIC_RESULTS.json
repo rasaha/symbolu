@@ -614,11 +614,23 @@
     },
     "fresh_global_retrieval_vs_slots": "worse",
     "slot_efficiency_advantage": "validated",
-    "full_self_attention_vs_query_to_slot": "PENDING_S5S6",
+    "full_self_attention_vs_query_to_slot": "better",
     "deterministic_vs_learned_policy": "deterministic_sufficient_learned_not_introduced",
     "primary_remaining_bottleneck": "output_head_and_capacity_noise",
     "authorized_architecture": "ledger->binding_slots->quadratic (streaming/multistep); fresh->quadratic (one-shot)",
     "rescue_validated": true,
     "phase_used": false
+  },
+  "s5_vs_s6": {
+    "S5": {
+      "acc": 0.693,
+      "conf_f1": 0.91,
+      "ver": 0.79
+    },
+    "S6": {
+      "acc": 0.603,
+      "conf_f1": 0.94,
+      "ver": 0.79
+    }
   }
 }

@@ -95,7 +95,9 @@ pair, so it cannot flag conflicts — which is why the conflict-pair-retaining S
   re-encodings.
 - **Slot efficiency advantage:** validated (slots amortize retrieval/re-encoding across a workflow;
   S1G re-encodes K per query).
-- **Full self-attention (S5) vs query-to-slot (S6):** __PENDING_S5S6__.
+- **Full self-attention (S5) vs query-to-slot (S6):** better — S5 0.69 > S6 0.60 on final accuracy
+  (slot-to-slot comparison helps the decision; S6 matches only on conflict F1 0.94 vs 0.91). Full
+  slot self-attention is worth its O(K²·d) at these small K.
 - **Primary remaining bottleneck:** the **output head** (policy-table class mapping, 65% of residual
   errors) plus **capacity-induced noise** at large K — no longer admission/eviction or evidence
   survival.
