@@ -14,7 +14,36 @@ from __future__ import annotations
 
 import math
 import torch
+import torch.nn as nn
 from torch import Tensor
+
+
+class FocusConditionedGate(nn.Module):
+    """Focus-conditioned write gate (§4 pilot):
+
+        B_t = σ( MLP([ h_t, f_t, h_t⊙f_t, |h_t − f_t| ]) )   per head
+
+    where f_t is a CAUSAL focus summary produced after the header — here the representation
+    at the cue position (position 0), frozen and broadcast forward. No future information, no
+    oracle match bit, no target label. This lets the gate compare the current event to the
+    distant focus cue, which a token-only gate cannot do. Emits a per-head logit; the actual
+    B_t activation (sigmoid / hard / top-k) is applied by gate_from_logit downstream.
+    """
+
+    def __init__(self, embed_dim, num_heads, hidden=None):
+        super().__init__()
+        h = hidden or 2 * embed_dim
+        self.net = nn.Sequential(nn.Linear(4 * embed_dim, h), nn.GELU(), nn.Linear(h, num_heads))
+        for m in self.net:
+            if isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, std=0.02); nn.init.zeros_(m.bias)
+
+    def logit(self, h: Tensor, focus_pos: int = 0) -> Tensor:
+        """h:[B,N,D] → per-head gate logit [B,N,H]. f_t = h[:,focus_pos] broadcast (causal)."""
+        f = h[:, focus_pos:focus_pos + 1]                     # [B,1,D] header/cue summary
+        f = f.expand_as(h)
+        feat = torch.cat([h, f, h * f, (h - f).abs()], dim=-1)
+        return self.net(feat)
 
 
 def gate_from_logit(logit: Tensor, kind: str = "sigmoid", topk_frac: float = 0.2) -> Tensor:

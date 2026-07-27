@@ -118,6 +118,6 @@ def train_arm(model, arm, vocab, cfg: TrainCfg, mode_schedule="staged", dcfg=Dat
     return {"final_loss": float(loss.item())}
 
 
-def build_model(vocab, gate_type="sigmoid", seed=0):
+def build_model(vocab, gate_type="sigmoid", seed=0, gate_mode="token"):
     torch.manual_seed(seed)
-    return AutoGateModel(vocab.size, gate_type=gate_type)
+    return AutoGateModel(vocab.size, gate_type=gate_type, gate_mode=gate_mode)

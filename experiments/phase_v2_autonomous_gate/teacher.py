@@ -17,18 +17,22 @@ from symbolu.phase_v2_experimental.config import cfg_v2s
 from symbolu.phase_v2_experimental.selective_phase import SelectivePhaseV2, _scan
 from experiments.phase_v3_selective_ssm.train import sinusoidal
 from .config import EMBED_DIM, NUM_HEADS, NUM_ENTITIES
-from .student_gate import gate_from_logit
+from .student_gate import gate_from_logit, FocusConditionedGate
 
 
 class AutoGateModel(nn.Module):
     def __init__(self, vocab_size, gate_type="sigmoid", embed_dim=EMBED_DIM,
-                 num_heads=NUM_HEADS, num_entities=NUM_ENTITIES, topk_frac=0.2):
+                 num_heads=NUM_HEADS, num_entities=NUM_ENTITIES, topk_frac=0.2,
+                 gate_mode="token"):
         super().__init__()
         self.embed_dim = embed_dim
         self.gate_type = gate_type
         self.topk_frac = topk_frac
+        self.gate_mode = gate_mode                                   # "token" | "conditioned"
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
         self.core = SelectivePhaseV2(cfg_v2s(embed_dim, num_heads))   # γ=1, per-head gate
+        if gate_mode == "conditioned":
+            self.cond_gate = FocusConditionedGate(embed_dim, num_heads)
         self.focus_head = nn.Linear(embed_dim, num_entities)
         nn.init.normal_(self.token_embed.weight, std=0.02)
 
@@ -37,7 +41,9 @@ class AutoGateModel(nn.Module):
 
     def gate_logit(self, ids):
         x = self.embed(ids)
-        return self.core.W_w(self.core.norm(x))                      # [B,N,H]
+        if self.gate_mode == "conditioned":
+            return self.cond_gate.logit(self.core.norm(x))           # [B,N,H] focus-conditioned
+        return self.core.W_w(self.core.norm(x))                      # [B,N,H] token-only
 
     def gate(self, ids, override_logit=None):
         logit = self.gate_logit(ids) if override_logit is None else override_logit
