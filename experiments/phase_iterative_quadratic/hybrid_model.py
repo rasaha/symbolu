@@ -19,20 +19,25 @@ from .bounded_attention import BoundedRoutedSoftmaxAttention
 from .iterative_router import LearnedRouter
 from .query_update import QueryUpdate
 from .hybrid_blocks import PhaseFeature
+from .pointer_scorer import NextHopScorer
 
 
 class IterativeHybrid(nn.Module):
     def __init__(self, vocab_size, n_id, hops=2, router_kind="cond", use_phase=False,
                  iterative=True, routing_mode="learned", W=W_WINDOW, K=K_ROUTED,
                  embed_dim=EMBED_DIM, num_heads=NUM_HEADS, gt_query=False, grounded_query=False,
-                 key_base=None, pointer_query=False):
+                 key_base=None, pointer_query=False, scorer_kind=None, n_rel=4,
+                 consumed_mask=False):
         super().__init__()
         self.hops, self.iterative, self.routing_mode = hops, iterative, routing_mode
         self.use_phase, self.W, self.K = use_phase, W, K
         self.gt_query = gt_query        # D0: feed the ground-truth intermediate query (diagnostic)
         self.grounded_query = grounded_query   # next query = soft-pointer (hop prediction) into key space
         self.n_id = n_id
+        self.n_rel = n_rel
+        self.n_ent = n_id // n_rel
         self.key_base = key_base if key_base is not None else (2 + n_id)   # KEY token id offset
+        self.val_base = self.key_base + n_id                              # VALUE token id offset
         self.embed_dim = embed_dim
         self.token_embed = nn.Embedding(vocab_size, embed_dim)
         self.router = LearnedRouter(embed_dim, router_kind)
@@ -43,6 +48,9 @@ class IterativeHybrid(nn.Module):
         self.hop_head = nn.Linear(embed_dim, n_id)          # per-hop target head (staged supervision §13)
         self.pointer_query = pointer_query                  # structured soft-pointer over evidence keys
         self.W_ptr = nn.Linear(embed_dim, embed_dim, bias=False)   # o → key comparison space for the pointer
+        self.consumed_mask = consumed_mask                  # exclude consumed events from the pointer
+        self.scorer = (NextHopScorer(embed_dim, self.n_ent, n_rel, n_id, scorer_kind)
+                       if scorer_kind else None)            # explicit candidate-conditioned scorer
         if use_phase:
             self.phase = PhaseFeature(embed_dim, num_heads)
         self.phase_zero = routing_mode == "phase_zero"
@@ -57,7 +65,7 @@ class IterativeHybrid(nn.Module):
 
     def forward(self, ids, event_pos, probe_pos, valid_len, required_hops=None, req_evidx=None,
                 freeze_query=False, shuffle_query=False, shuffle_scores=False,
-                forced_routed=None, hard_pointer=False, forced_query=None):
+                forced_routed=None, hard_pointer=False, forced_query=None, random_pointer=False):
         """event_pos:[B,Ne] token positions of events; required_hops:[B,H] full-pos of the
         required event at each hop (for oracle routing + hop supervision); req_evidx:[B,H] indices
         into the event list (for D0 ground-truth intermediate query). May be −1."""
@@ -73,6 +81,18 @@ class IterativeHybrid(nn.Module):
         reps = reps.scatter(1, kp, ev)                           # attention sees bound key reps
         q0 = reps[:, 0]                    # query CONTENT seeded from the focus (CUE at position 0)
         q = q0
+        # explicit candidate features for the scorer, derived from the tokens already in context
+        scorer_feats = None
+        if self.scorer is not None:
+            key_tok = ids.gather(1, event_pos)                   # [B,Ne] KEY token ids
+            val_tok = ids.gather(1, (event_pos + 1).clamp(max=N - 1))
+            key_ident = (key_tok - self.key_base).clamp(0, self.n_id - 1)
+            value = (val_tok - self.val_base).clamp(0, self.n_id - 1)
+            scorer_feats = {"entity": (key_ident // self.n_rel).clamp(0, self.n_ent - 1),
+                            "relation": (key_ident % self.n_rel),
+                            "value": value,
+                            "pos": event_pos.float() / max(1, N)}
+        consumed = torch.zeros(B, Ne, dtype=torch.bool, device=ids.device)
         route_scores = []; hop_outputs = []; q_norms = []; queries = []
         routed_out = []; pointer_logits = []
         for h in range(self.hops):
@@ -115,13 +135,21 @@ class IterativeHybrid(nn.Module):
             if freeze_query:                                          # control: never evolve the query
                 q = q0
             elif self.pointer_query:
-                # structured soft pointer over the CANDIDATE EVIDENCE KEYS (not the global vocab):
-                #   scores_i = (W_ptr o)·ev_i ; pointer = softmax(scores) ; q_next = Σ pointer_i ev_i
-                pl = torch.einsum("bd,bnd->bn", self.W_ptr(o), ev)         # [B,Ne]
+                # structured pointer over the CANDIDATE EVIDENCE KEYS (not the global vocab).
+                # P0: (W_ptr o)·ev_i ; P1/P2: explicit candidate-conditioned scorer over features.
+                if self.scorer is not None:
+                    pl = self.scorer(o, scorer_feats, consumed, h)         # [B,Ne]
+                else:
+                    pl = torch.einsum("bd,bnd->bn", self.W_ptr(o), ev)     # [B,Ne]
+                if random_pointer:                                        # control: destroy the signal
+                    pl = torch.randn_like(pl)
+                if self.consumed_mask:
+                    pl = pl.masked_fill(consumed, float("-inf"))
                 pointer_logits.append(pl)
+                sel_idx = pl.argmax(-1)                                    # selected next event
+                consumed = consumed.scatter(1, sel_idx.unsqueeze(1), True) # mark consumed for next hop
                 if hard_pointer:
-                    idx = pl.argmax(-1)
-                    q = ev.gather(1, idx.view(B, 1, 1).expand(B, 1, D)).squeeze(1)
+                    q = ev.gather(1, sel_idx.view(B, 1, 1).expand(B, 1, D)).squeeze(1)
                 else:
                     q = torch.softmax(pl, dim=-1).unsqueeze(1).bmm(ev).squeeze(1)   # Σ p_i ev_i
             elif self.iterative:
