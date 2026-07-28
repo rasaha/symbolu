@@ -97,7 +97,7 @@ to enforcement.
 
 ## 3 · Initial buyer and first commercial pilot
 
-### Primary buyer
+### Primary sponsor and approval group
 
 **Primary sponsor:** the GCC Head, GCC CTO, or Head of AI Platform responsible for
 moving enterprise agents into production — the role that owns the purchase.
@@ -193,13 +193,14 @@ enforcement, and end-to-end reconstruction.
 
 ## 6 · Funding
 
-<p class="tbd">TO CONFIRM — the financial headline below uses placeholders. Please
-supply: round stage, amount, runway, and use-of-funds split.</p>
+<p class="tbd">TO CONFIRM — round amount. It should be built bottom-up from the
+productization roadmap (v1 scope → minimum team → costs → contingency), sized to
+reach the first paid enforcement deployment with runway to spare.</p>
 
-> **Ugence is raising a <span class="tbd">$[amount]</span> pre-seed round to fund
-> <span class="tbd">[N]</span> months of runway, consolidate five core governance
-> capabilities into one enterprise-deployable AI Control Plane, complete two to
-> three paid pilots, and convert at least one into an enforcement deployment.**
+> **Ugence is raising <span class="tbd">$[amount]</span> in a pre-seed round to fund
+> 18 months of runway, consolidate five core governance capabilities into one
+> enterprise-deployable AI Control Plane, complete two to three paid pilots, and
+> convert at least one into an enforcement deployment.**
 
 **The transition capital funds:** Ugence has already built and internally validated
 the core technologies. The round does **not** fund eleven new research projects — it
@@ -207,10 +208,13 @@ funds consolidation of already-built governance mechanisms into one enterprise
 product, across three workstreams:
 
 <div class="wcards">
-  <div class="wcard"><h4>Product consolidation</h4><p>Unified console, common services, canonical contracts, deployment modes.</p></div>
-  <div class="wcard"><h4>Enterprise readiness</h4><p>Security, persistence, identity, audit, observability, connectors.</p></div>
-  <div class="wcard"><h4>Commercial validation</h4><p>Two to three paid pilots, measured governance performance, one enforcement conversion.</p></div>
+  <div class="wcard"><h4>Product consolidation <span class="wpct">55%</span></h4><p>Unified console, common services, canonical contracts, deployment modes.</p></div>
+  <div class="wcard"><h4>Enterprise readiness <span class="wpct">25%</span></h4><p>Security, persistence, identity, audit, observability, connectors.</p></div>
+  <div class="wcard"><h4>Commercial validation <span class="wpct">20%</span></h4><p>Two to three paid pilots, measured governance performance, one enforcement conversion.</p></div>
 </div>
+
+*Indicative use-of-funds allocation; final split follows the productization roadmap,
+which reveals real staffing and infrastructure cost.*
 
 ### What the capital changes
 
@@ -227,12 +231,15 @@ product, across three workstreams:
 The round delivers one integrated, **enterprise-deployable v1** AI Control Plane —
 a testable boundary, not "fully hardened for all regulated deployment." v1 means:
 
-- Multi-tenant identity.
-- Durable audit records.
+- Multi-tenant identity and organization isolation.
+- Durable, tamper-evident audit records.
 - Secure APIs.
 - Two runtime connectors.
-- One system-of-record connector.
+- One enterprise identity integration.
+- One governed execution-target connector, initially Kubernetes.
 - Shadow deployment, with controlled enforcement for selected actions.
+
+*Later domain packages add ATS, HRIS, claims, or financial systems of record.*
 
 ### Milestones within the round
 
@@ -257,19 +264,27 @@ a testable boundary, not "fully hardened for all regulated deployment." v1 means
 
 ### Why Ugence can execute
 
-<p class="tbd">TO CONFIRM — please supply founder background, relevant enterprise/
-technical experience, current team composition, and the key hires this round funds.</p>
+**Rakesh Mohan** is the founder of Ugence Labs, a Hyderabad-based enterprise AI
+governance company. He has designed and built the core Ugence architecture across
+action authorization, assertion assurance, decision governance, runtime contracts,
+and inference efficiency — taking the platform from concept to implemented,
+test-backed modules. The pre-seed round adds the product, integration, security, and
+commercial capabilities required to consolidate that foundation into one
+enterprise-deployable product.
 
-> The founder has already developed and validated the core governance architecture
-> across action authorization, assertion assurance, decision governance, runtime
-> contracts, and infrastructure efficiency. The round primarily funds product
-> engineering, enterprise integration, security hardening, and commercial
-> deployment — not basic research discovery.
+**Current team:** Founder-led, supported by specialist contractors and technical
+reviewers as required.
 
-**Key hires funded by the round:** <span class="tbd">[e.g. product engineering lead,
-enterprise integration engineers, security/compliance, founding GTM]</span>.
+**Initial hires funded by the round** — a small team focused on converting the
+existing technology into a deployable product, not a large organization:
 
-**Contact:** <span class="tbd">[name · email · company]</span>
+- Founding product / platform engineering lead.
+- Two enterprise integration engineers.
+- Security and compliance lead (initially fractional / consulting).
+- Founding enterprise GTM / design-partner lead.
+- Product designer or frontend engineer (unified console).
+
+**Contact:** Rakesh Mohan · Founder, Ugence Labs · rakesh@ugence.ai · ugence.ai
 
 ---
 
