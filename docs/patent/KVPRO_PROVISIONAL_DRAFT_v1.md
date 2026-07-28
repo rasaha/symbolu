@@ -424,10 +424,12 @@ or before filing and record it with the USPTO.
   the inventor, the compression method has not been publicly disclosed, published, offered for sale,
   or publicly used without an NDA. Accordingly, **no U.S. §102(b)(1) grace‑period clock has started**
   and **no foreign‑priority‑destroying disclosure has occurred** as of this draft's date.
-- **⚠️ Verify repository visibility before filing.** If the source repository (e.g., `rasaha/symbolu`)
-  is or becomes **public**, that publication of the implementation is itself a public disclosure that
-  **starts the U.S. clock and can bar most foreign rights**. Confirm the repo is **private** through
-  the filing date; if it was ever public, give counsel the exact date it went public.
+- **Repository is private (confirmed).** As represented by the inventor, the source repository
+  containing the implementation (`rasaha/symbolu`) is **private** and has not been public, so it does
+  **not** constitute a public disclosure. **Operative condition:** it must **remain private through
+  the filing date** — if it is ever made public before filing, that publication starts the U.S. clock
+  and can bar most foreign rights, so file (or re‑confirm privacy) before any change to repo
+  visibility.
 - **Prior‑art note (independent of the inventor's own disclosure):** SAW‑INT4 (arXiv 2604.19157)
   published **April 21, 2026** is third‑party prior art and is drafted over regardless of the
   inventor's disclosure status.
