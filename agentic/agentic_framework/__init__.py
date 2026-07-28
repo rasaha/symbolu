@@ -367,6 +367,21 @@ from agentic.agentic_framework.event_workflows import (
     ResumeEngine,
     format_workflow_trace,
 )
+from agentic.agentic_framework.human_governance import (
+    ReviewOutcome,
+    ReviewStatus,
+    ReviewResultCode,
+    HumanParticipant,
+    ParticipantRegistry,
+    HumanDecision,
+    DelegationRecord,
+    EscalationRecord,
+    ReviewTask,
+    HumanAuthorityValidator,
+    ReviewResult,
+    ReviewManager,
+    format_review_trace,
+)
 from agentic.agentic_framework.workflow_durability import (
     SCHEMA_VERSION,
     EventOutcome,
@@ -735,6 +750,20 @@ __all__ = [
     "FaultInjector",
     "DurableWorkflowEngine",
     "format_recovery_trace",
+    # Human governance, interactive approval & decision authority (H19)
+    "ReviewOutcome",
+    "ReviewStatus",
+    "ReviewResultCode",
+    "HumanParticipant",
+    "ParticipantRegistry",
+    "HumanDecision",
+    "DelegationRecord",
+    "EscalationRecord",
+    "ReviewTask",
+    "HumanAuthorityValidator",
+    "ReviewResult",
+    "ReviewManager",
+    "format_review_trace",
 ]
 
-__version__ = "1.18.0"  # + H18 durable workflow checkpointing & deterministic recovery
+__version__ = "1.19.0"  # + H19 human governance, interactive approval & decision authority
