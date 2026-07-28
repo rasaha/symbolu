@@ -334,6 +334,25 @@ from agentic.agentic_framework.coordination import (
     Coordinator,
     format_coordination_trace,
 )
+from agentic.agentic_framework.hierarchical_planning import (
+    GoalStatus,
+    HierarchyStatus,
+    Goal,
+    GoalTransition,
+    GoalNode,
+    GoalDependency,
+    GoalTree,
+    MissionPlan,
+    GoalDecomposer,
+    StaticDecomposer,
+    RuleBasedDecomposer,
+    WaveRecord,
+    HierarchyTrace,
+    HierarchyResult,
+    HierarchyExecutor,
+    format_goal_tree,
+    format_hierarchy_trace,
+)
 
 __all__ = [
     # Main agent
@@ -624,6 +643,24 @@ __all__ = [
     "CoordinationResult",
     "Coordinator",
     "format_coordination_trace",
+    # Hierarchical planning & goal decomposition (H15)
+    "GoalStatus",
+    "HierarchyStatus",
+    "Goal",
+    "GoalTransition",
+    "GoalNode",
+    "GoalDependency",
+    "GoalTree",
+    "MissionPlan",
+    "GoalDecomposer",
+    "StaticDecomposer",
+    "RuleBasedDecomposer",
+    "WaveRecord",
+    "HierarchyTrace",
+    "HierarchyResult",
+    "HierarchyExecutor",
+    "format_goal_tree",
+    "format_hierarchy_trace",
 ]
 
-__version__ = "1.16.0"  # + H16 authority-aware multi-agent coordination
+__version__ = "1.16.1"  # + H15 hierarchical planning & goal decomposition (plugs into H16)

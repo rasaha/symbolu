@@ -14,11 +14,11 @@ This is the step from *sequential agent handoff* to *governed collaborative
 execution*: agents now have explicit roles, capabilities, permissions, and
 contracts, so delegation knows **who is allowed to do what**.
 
-> **Note on H15.** The H16 prompt lists an H15 "hierarchical planning" phase,
-> but H15 was not implemented in this line of work — the prior phases are
-> H10–H14. H16 is deliberately **planning-strategy agnostic**: the coordinator
-> advances a mission's goals and can sit above any future hierarchical planner
-> without change. Nothing here depends on H15.
+> **Note on H15.** H16 was built before H15 and is deliberately
+> **planning-strategy agnostic** — the coordinator advances a mission's goals
+> and sits below any planner. H15 (hierarchical planning) was subsequently
+> added and plugs into this coordinator **without any change to it**; see
+> [Hierarchical Planning (H15)](./HIERARCHICAL_PLANNING.md).
 
 This layer adds coordination only. It does not modify RunBudget, WorkingMemory,
 replanning, plan validity, governance, authorization, ActionGate, TAP, routing,
