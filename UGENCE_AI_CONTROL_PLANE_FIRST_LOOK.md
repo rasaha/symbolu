@@ -57,7 +57,7 @@ Ugence sits *before* commit and can allow, constrain, escalate, or deny.
 | | |
 |---|---|
 | **Product** | **Ugence AI Control Plane** |
-| **Current customer offer** | Governed Agent Design-Partner Pilot (assembled from the existing modules) |
+| **Current customer offer** | **Ugence Agent Control Pilot** — a paid shadow deployment for one enterprise agent and one high-consequence workflow |
 | **After productization** | One repeatable enterprise platform in shadow, recommendation and enforcement modes |
 
 Being explicit about stage — the credibility this document depends on:
@@ -65,7 +65,7 @@ Being explicit about stage — the credibility this document depends on:
 | Stage | What exists |
 |---|---|
 | **Today** | Implemented governance kernels, runtime contracts, prototypes, and controlled evidence |
-| **Available now** | A bounded design-partner shadow pilot, assembled from the existing modules |
+| **Pilot-configurable now** | The core modules and harness exist; customer-specific integration and policy configuration are required before deployment |
 | **What the round builds** | One repeatable, secure, enterprise-deployable Ugence AI Control Plane |
 
 ### Six customer-facing capabilities
@@ -99,9 +99,11 @@ to enforcement.
 
 ### Primary buyer
 
-**Head of AI Platform / GCC CTO / Chief Digital Officer / enterprise agent-program
-owner** — one role that owns the purchase. Security, risk, and compliance are
-stakeholders, not the buyer.
+**Primary sponsor:** the GCC Head, GCC CTO, or Head of AI Platform responsible for
+moving enterprise agents into production — the role that owns the purchase.
+
+**Required stakeholders:** global process owner, security, risk, compliance, and
+enterprise architecture (the approval group, distinct from the sponsor).
 
 **Buying trigger:** the organization has an AI agent moving from proof-of-concept
 toward production but lacks an independent control boundary for evidence,
@@ -114,7 +116,10 @@ Kubernetes and cloud operations). It is the sharpest entry point because the act
 is concrete, policy and blast radius are measurable, shadow mode is natural, and it
 is where ActionGate's strongest controlled evidence already sits.
 
-### Design-partner pilot — what the customer receives
+### Ugence Agent Control Pilot — what the customer receives
+
+*A paid shadow deployment for one enterprise agent and one high-consequence
+workflow.*
 
 - Integration with one agent and one workflow.
 - Policy and authority mapping.
@@ -124,21 +129,18 @@ is where ActionGate's strongest controlled evidence already sits.
 - Reconstructable governance records.
 - A production-enforcement readiness recommendation.
 
-*Commercial structure:* a **paid design-partner engagement** (fixed-fee pilot,
-creditable toward an annual subscription) — a stronger commercial signal than a free
-proof-of-concept.
+*Commercial structure:* a **paid engagement** (fixed-fee pilot, creditable toward
+an annual subscription) — a stronger commercial signal than a free proof-of-concept.
 
 ### Decision-governance reference implementation — AI-assisted hiring
 
 The hiring workflow is the **reference implementation** for the Decision Governance
-model — it is where the reusable governance kernel was extracted from. It validated
-the internal decision lifecycle (recommendation → decision → authorization →
-execution → reconciliation) on a deterministic synthetic cohort, preserving the
-AI-advisory / human-binding separation and producing a reconstructable audit chain.
-The funded productization phase will connect that lifecycle **end-to-end** with
-ActionGate, operational clearance, durable enterprise identity, and execution
-reconciliation. Hiring demonstrates platform breadth; it is not the initial go-to-
-market.
+model — it is where the reusable governance kernel was extracted from. The synthetic
+reference implementation validates the internal decision records and simulated
+lifecycle transitions from recommendation through reconciliation. The funded
+productization phase will connect those records to the production ActionGate,
+operational-clearance, identity, persistence, and execution systems. Hiring
+demonstrates platform breadth; it is not the initial go-to-market.
 
 ---
 
@@ -183,8 +185,9 @@ and leave the consequential question open:
 
 > **Ugence governs the transition from AI proposal to enterprise consequence.**
 
-*(Positioning to be confirmed by a formal competitive review before external
-category claims.)*
+The competitive landscape is evolving rapidly; Ugence differentiates through
+action-specific authorization, independent decision authority, pre-commit
+enforcement, and end-to-end reconstruction.
 
 ---
 
@@ -204,23 +207,11 @@ the core technologies. The round does **not** fund eleven new research projects 
 funds consolidation of already-built governance mechanisms into one enterprise
 product, across three workstreams:
 
-**Product consolidation**
-- Unified interface and administration console.
-- Shared identity, tenant, policy, evidence, and audit services.
-- Standard APIs and canonical contracts.
-- Shadow, recommendation, and enforcement modes.
-
-**Enterprise readiness**
-- Durable persistence and tamper-evident audit.
-- Security and access control.
-- Observability and deployment tooling.
-- Connectors to runtimes and systems of record.
-
-**Commercial validation**
-- Two to three design-partner deployments.
-- Measured false-positive and false-block rates.
-- Customer integration and operational evidence.
-- Conversion of at least one pilot to paid enforcement.
+<div class="wcards">
+  <div class="wcard"><h4>Product consolidation</h4><p>Unified console, common services, canonical contracts, deployment modes.</p></div>
+  <div class="wcard"><h4>Enterprise readiness</h4><p>Security, persistence, identity, audit, observability, connectors.</p></div>
+  <div class="wcard"><h4>Commercial validation</h4><p>Two to three paid pilots, measured governance performance, one enforcement conversion.</p></div>
+</div>
 
 ### What the capital changes
 
