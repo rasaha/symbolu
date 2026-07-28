@@ -116,6 +116,7 @@ part of the runtime contract.
 | [`authority_aware_coordination.py`](../../examples/authority_aware_coordination.py) | **Coordination (H16):** capability + authority delegation; worker-failure recovery; goal-ownership transfers; one shared memory + budget |
 | [`hierarchical_planning.py`](../../examples/hierarchical_planning.py) | **Hierarchical planning (H15):** deterministic goal tree; dependency release; H16 reused unchanged; localized subtree replanning |
 | [`event_driven_workflow.py`](../../examples/event_driven_workflow.py) | **Event workflows (H17):** suspend on wait condition; resume on matching event (memory + assumption effects); waiting is budget-free; subtree-selective resume |
+| [`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py) | **Durability (H18):** checkpoint, destroy runtime, restore from disk, resume without re-running; cross-restart idempotency; corruption rejected |
 
 Run any example from the repo root:
 
@@ -162,6 +163,7 @@ weakening governance** — every step is still a full governed
 | **Authority-aware coordination (H16)** | `Coordinator`, `AgentProfile`, `CapabilityRegistry`, `DelegationContract`, `AuthorityModel` | A deterministic coordinator delegates mission goals to worker agents behind capability + authority + budget + ownership checks and immutable contracts; every goal has one owner; all agents share one `WorkingMemory` and one `RunBudget`; the coordinator never executes worker tasks | `max_delegations` + shared `RunBudget` |
 | **Hierarchical planning (H15)** | `HierarchyExecutor`, `GoalTree`, `Goal`, `StaticDecomposer`, `MissionPlan` | Deterministically decomposes a mission into an acyclic goal tree and feeds READY leaf goals to the **unchanged** H16 coordinator wave-by-wave; dependency-gated execution, localized subtree replanning, H13 assumption gating; shares one `WorkingMemory` + one `RunBudget` | `max_waves` + shared `RunBudget` |
 | **Event-driven workflows (H17)** | `WorkflowEngine`, `WorkflowInstance`, `WaitCondition`, `WorkflowEvent` | Long-lived missions suspend on wait conditions and resume deterministically when a matching event arrives, applying memory (H14) + assumption (H13) effects before continuing; waiting consumes no budget; only the affected subtree resumes; H16 coordination reused unchanged | shared `RunBudget`; waiting is free |
+| **Durable checkpoint & recovery (H18)** | `DurableWorkflowEngine`, `WorkflowCheckpoint`, `CheckpointStore`, `WorkflowRestorer` | Deterministic **local** durability: a waiting workflow serializes its full state (canonical JSON + integrity digest), survives process loss, restores into a new runtime with no hidden state, resumes without re-running completed work; cross-restart event idempotency, atomic event transactions, compare-and-save, corruption fail-closed. Not distributed / not exactly-once external | preserves the same `RunBudget` |
 
 See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py),
@@ -170,8 +172,9 @@ See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py),
 [`working_memory_continuity.py`](../../examples/working_memory_continuity.py),
 [`authority_aware_coordination.py`](../../examples/authority_aware_coordination.py),
-[`hierarchical_planning.py`](../../examples/hierarchical_planning.py), and
-[`event_driven_workflow.py`](../../examples/event_driven_workflow.py).
+[`hierarchical_planning.py`](../../examples/hierarchical_planning.py),
+[`event_driven_workflow.py`](../../examples/event_driven_workflow.py), and
+[`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py).
 These are **experimental** — composed on the public agent API, tested, and run
 without an API key, but not yet hardened to the level of the core runtime.
 Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
@@ -180,7 +183,8 @@ Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
 [Working Memory (H14)](../docs/WORKING_MEMORY.md) ·
 [Hierarchical Planning (H15)](../docs/HIERARCHICAL_PLANNING.md) ·
 [Coordination (H16)](../docs/COORDINATION.md) ·
-[Event Workflows (H17)](../docs/EVENT_WORKFLOWS.md).
+[Event Workflows (H17)](../docs/EVENT_WORKFLOWS.md) ·
+[Workflow Durability (H18)](../docs/WORKFLOW_DURABILITY.md).
 
 ---
 

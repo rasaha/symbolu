@@ -367,6 +367,30 @@ from agentic.agentic_framework.event_workflows import (
     ResumeEngine,
     format_workflow_trace,
 )
+from agentic.agentic_framework.workflow_durability import (
+    SCHEMA_VERSION,
+    EventOutcome,
+    AssignmentRecoveryStatus,
+    TransactionState,
+    FaultPoint,
+    RecoveryError,
+    CheckpointConflict,
+    canonical_json,
+    digest_of,
+    WorkflowCheckpoint,
+    CheckpointSerializer,
+    CheckpointIntegrityValidator,
+    CheckpointStore,
+    InMemoryCheckpointStore,
+    FileCheckpointStore,
+    EventTransaction,
+    RecoveryJournal,
+    RecoveryResult,
+    WorkflowRestorer,
+    FaultInjector,
+    DurableWorkflowEngine,
+    format_recovery_trace,
+)
 
 __all__ = [
     # Main agent
@@ -688,6 +712,29 @@ __all__ = [
     "WorkflowEngine",
     "ResumeEngine",
     "format_workflow_trace",
+    # Durable workflow state, checkpointing & recovery (H18)
+    "SCHEMA_VERSION",
+    "EventOutcome",
+    "AssignmentRecoveryStatus",
+    "TransactionState",
+    "FaultPoint",
+    "RecoveryError",
+    "CheckpointConflict",
+    "canonical_json",
+    "digest_of",
+    "WorkflowCheckpoint",
+    "CheckpointSerializer",
+    "CheckpointIntegrityValidator",
+    "CheckpointStore",
+    "InMemoryCheckpointStore",
+    "FileCheckpointStore",
+    "EventTransaction",
+    "RecoveryJournal",
+    "RecoveryResult",
+    "WorkflowRestorer",
+    "FaultInjector",
+    "DurableWorkflowEngine",
+    "format_recovery_trace",
 ]
 
-__version__ = "1.17.0"  # + H17 event-driven execution & long-lived workflows
+__version__ = "1.18.0"  # + H18 durable workflow checkpointing & deterministic recovery
