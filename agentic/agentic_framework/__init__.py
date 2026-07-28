@@ -353,6 +353,20 @@ from agentic.agentic_framework.hierarchical_planning import (
     format_goal_tree,
     format_hierarchy_trace,
 )
+from agentic.agentic_framework.event_workflows import (
+    WorkflowStatus,
+    WaitKind,
+    EventType,
+    WaitCondition,
+    WorkflowEvent,
+    WorkflowTransition,
+    WorkflowTraceEntry,
+    WorkflowTrace,
+    WorkflowInstance,
+    WorkflowEngine,
+    ResumeEngine,
+    format_workflow_trace,
+)
 
 __all__ = [
     # Main agent
@@ -661,6 +675,19 @@ __all__ = [
     "HierarchyExecutor",
     "format_goal_tree",
     "format_hierarchy_trace",
+    # Event-driven execution & long-lived workflows (H17)
+    "WorkflowStatus",
+    "WaitKind",
+    "EventType",
+    "WaitCondition",
+    "WorkflowEvent",
+    "WorkflowTransition",
+    "WorkflowTraceEntry",
+    "WorkflowTrace",
+    "WorkflowInstance",
+    "WorkflowEngine",
+    "ResumeEngine",
+    "format_workflow_trace",
 ]
 
-__version__ = "1.16.1"  # + H15 hierarchical planning & goal decomposition (plugs into H16)
+__version__ = "1.17.0"  # + H17 event-driven execution & long-lived workflows
