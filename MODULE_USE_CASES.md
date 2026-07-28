@@ -56,9 +56,9 @@ false-positive rates, integration cost, and measurable business impact.
 | **Execution authorization** | ActionGate, Autonomous Control Plane | Implemented · Internally Validated · Pilot Ready (ActionGate) |
 | **Context & inference efficiency** | Context Minimization, KVPro | Internally Validated (real GPUs / cross-model) |
 | **Runtime orchestration** | Agent Runtime, Autonomous Runtime, LLM Steering Controller | Implemented · Internally Validated · Pilot Ready |
-| **Infrastructure efficiency** | KVPro, Cloud Scaling Controller, CTM+/PCAM | Internally Validated (+ hardware Research) |
+| **Infrastructure efficiency** | KVPro, Cloud Scaling Controller | Internally Validated (real GPUs / real-trace replay) |
 | **Model governance (cross-cutting)** | Model Selection & Governed Inference | Implemented · Internally Validated |
-| **Advanced intelligence research** | Conscious Generation, CTM+/PCAM hardware, PSE | Research + partial Implemented |
+| **Advanced intelligence research** | PSE | Implemented (core) · Research |
 
 **Flagship shadow-mode pilot:** *AI-Assisted Hiring* (see final section) — the
 origin domain that proved the Decision Governance model and now consumes it as
@@ -568,82 +568,7 @@ ops) measuring selection agreement, unsafe-allow rate, and reviewer trust.
 
 ---
 
-## 4.2 Conscious Generation
-**Implemented · Internally Validated · Research**
-
-**Problem.** The same wrong-meaning-frame failure the Steering Controller targets,
-one layer deeper: LLMs don't explicitly isolate which semantic domain a question
-lives in, the rejected-domain boundary, or the primary-vs-secondary ranking, and
-every post-hoc mitigation acts after the model has already committed.
-
-**Ugence mechanism.** Intervene at the meaning-frame, deterministically: a
-`MATCH = C × R × S` engine classifies candidate domains before generation; the
-model answers inside the chosen frame; an audit gate decides pass/rewrite/escalate
-with traceable diagnostics. Behind the shippable layer sits a patent-backed
-research architecture (`mistral_cg`) betting that next-token probability is better
-computed as the integrated agreement of multiple semantic fields — an IP/research
-bet, off by default.
-
-**Current evidence.** Same measured internal eval as the Steering Controller
-(Mistral-7B, 110-item set): primary-frame **0.609 → 0.736**, rejected-domain
-**0.855 → 0.909**. **Disciplined negatives** as product boundary: a pre-registered
-policy gate **did not beat** the audit gate (F1 0.341 vs 0.526), so diagnostics stay
-explanation-only; deeper hidden-state ("Bhava") tracks were pre-registered and
-**intentionally closed as negative**.
-
-**Evidence basis.** Code tests + single-model internal rubric; research tracks
-pre-registered.
-
-**Honest conclusion.** The shippable layer works and matches the Steering
-Controller's results; the deeper architecture is an explicit research/IP bet that
-the **product does not depend on**. Retained-not-productized finding: raw
-pre-answer hidden states predict some within-model failures (AUROC ≈ 0.76) —
-correlational, single-model, not wired into runtime control.
-
-**Next validation step.** Human validation of the audit gate (a de-biased labeling
-packet exists); the research architecture remains a longer-horizon bet.
-
----
-
-## 4.3 CTM+ / PCAM
-**Implemented · Internally Validated · Research (hardware)**
-
-**Problem.** Compute and memory scaled up, but which data lives where is still
-decided by 1970s-era algorithms (LRU, FIFO) across the Linux page cache, GPU HBM,
-and LLM inference servers. LRU knows only recency — not workload phase structure,
-not whether a hot-tier move is cost-justified, not whether evicting a token will
-tank p99. At scale that is a direct memory-bill line item.
-
-**Ugence mechanism.** Replace the single recency signal with a coherence-aware
-controller (phase integrator, O(1) sub-10ns scorer, ARC-style dual shadow tiers,
-phase-aware victim selection across recency/frequency/attention/position, and a
-"will I regret this?" gate). The **same core algorithm** ships into five hot paths
-— Linux kernel, GPU HBM tiering, vLLM KV-cache eviction, PostgreSQL buffer pools,
-DeepSpeed ZeRO-Offload — because "which bytes go in which tier?" is structurally the
-same problem everywhere.
-
-**Current evidence.** vLLM: +18% tokens/sec, **+50% concurrent requests on the same
-GPU (32 → 48)**, memory efficiency 72% → 89%. Database (TPC-C style):
-transactions/sec +13.6%, p99 −29%, hit-rate up to **+17.8%** on hotspot/batch-ML.
-Modeled 5-year TCO: $1.84M (31%) saved on a 100-GPU cluster. Working across
-simulator, kernel module, CUDA, and vLLM + DeepSpeed; bit-parity PCAM runtime (276
-tests green).
-
-**Evidence basis.** Benchmarks + code tests across five integrations; TCO is
-modeled.
-
-**Honest conclusion.** CTM+ demonstrated concurrency and hit-rate gains over LRU on
-phase-structured workloads across five integrations. Honest boundary: on generic
-synthetic traces with **no** semantic structure it **matches LRU and slightly loses
-to ARC** — expected, since it exploits phase structure. FPGA/ASIC is a research
-path, not the adoption ask.
-
-**Next validation step.** A live single-GPU throughput closure run and an FPGA
-prototype; a hyperscaler workload trial measuring concurrency gain on real traffic.
-
----
-
-## 4.4 PSE — deterministic engine for naming & verbal identity
+## 4.2 PSE — deterministic engine for naming & verbal identity
 **Implemented (core) · Research**
 
 **Problem.** Every product, company, feature — and now every AI agent — needs names
@@ -748,7 +673,7 @@ fairness/counterfactual-invariance checks.
 > bounded enterprise shadow pilots to validate operational effectiveness,
 > false-positive rates, integration cost, and measurable business impact.**
 
-These are not fourteen unrelated tools: the runtimes *propose*, the control plane
+These are not a set of unrelated tools: the runtimes *propose*, the control plane
 *governs the exact assertion and action*, the infrastructure *runs it
 efficiently*, and Decision Governance *records who was accountable* — a single
 governed loop in which, at any point, you can name which module is responsible.
@@ -758,6 +683,6 @@ generates, not in any single box.
 *Sources: the per-module VC briefs in this repository (`*_VC_BRIEF.md`),
 `UGENCE_PLATFORM_OVERVIEW.md`, `UGENCE_DECISION_GOVERNANCE_MIDDLEWARE.md`,
 `docs/Decision_Governance_Kernel.md`, and the `ai_hiring/` validation track. All
-metrics are from our own repositories/CI on synthetic, internal, or (for KVPro and
-CTM+) own-hardware benchmarks unless a card states otherwise. No module is
+metrics are from our own repositories/CI on synthetic, internal, or (for KVPro)
+own-hardware benchmarks unless a card states otherwise. No module is
 currently Pilot Validated or Production Validated; that is the funded next step.*
