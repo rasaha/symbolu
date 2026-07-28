@@ -309,6 +309,31 @@ from agentic.agentic_framework.working_memory import (
     format_working_memory,
     format_memory_trace,
 )
+from agentic.agentic_framework.coordination import (
+    CoordinationState,
+    RejectionReason,
+    MissionStatus,
+    AgentProfile,
+    CapabilityRegistry,
+    CoordinationGoal,
+    Mission,
+    DelegationContract,
+    AgentAssignment,
+    AssignmentTransition,
+    GoalOwnershipLedger,
+    AuthorityDecision,
+    AuthorityModel,
+    WorkerResult,
+    WorkerExecutor,
+    WorkerUnavailable,
+    ScriptedWorker,
+    AgentWorker,
+    CoordinationTraceEntry,
+    CoordinationTrace,
+    CoordinationResult,
+    Coordinator,
+    format_coordination_trace,
+)
 
 __all__ = [
     # Main agent
@@ -575,6 +600,30 @@ __all__ = [
     "MemoryAssumptionBridge",
     "format_working_memory",
     "format_memory_trace",
+    # Authority-aware multi-agent coordination (H16)
+    "CoordinationState",
+    "RejectionReason",
+    "MissionStatus",
+    "AgentProfile",
+    "CapabilityRegistry",
+    "CoordinationGoal",
+    "Mission",
+    "DelegationContract",
+    "AgentAssignment",
+    "AssignmentTransition",
+    "GoalOwnershipLedger",
+    "AuthorityDecision",
+    "AuthorityModel",
+    "WorkerResult",
+    "WorkerExecutor",
+    "WorkerUnavailable",
+    "ScriptedWorker",
+    "AgentWorker",
+    "CoordinationTraceEntry",
+    "CoordinationTrace",
+    "CoordinationResult",
+    "Coordinator",
+    "format_coordination_trace",
 ]
 
-__version__ = "1.14.0"  # + H14 governed working memory & state continuity
+__version__ = "1.16.0"  # + H16 authority-aware multi-agent coordination
