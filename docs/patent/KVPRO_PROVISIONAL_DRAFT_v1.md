@@ -414,8 +414,24 @@ corresponding byte of the snapshot.
   Ugence Labs; inventory any non‑NDA public disclosure of the *method* and give counsel the dates.
 
 ## 12. Inventorship and assignment
-Inventors: [TO BE COMPLETED — every person who contributed to the conception of one or more of
-Concepts A–E]. All rights assigned to **Ugence Labs**; assignments to be executed prior to or at
-filing.
+**Sole inventor.** All of Concepts A–E were conceived by a single inventor; there are no
+co‑inventors. Inventor: **[FULL LEGAL NAME — confirm exact spelling; add residence + citizenship
+for the Application Data Sheet]**. All rights assigned to **Ugence Labs**; execute the assignment at
+or before filing and record it with the USPTO.
+
+## 13. Disclosure statement (bar‑date analysis)
+- **No non‑confidential public disclosure of the method by the inventor to date.** As represented by
+  the inventor, the compression method has not been publicly disclosed, published, offered for sale,
+  or publicly used without an NDA. Accordingly, **no U.S. §102(b)(1) grace‑period clock has started**
+  and **no foreign‑priority‑destroying disclosure has occurred** as of this draft's date.
+- **⚠️ Verify repository visibility before filing.** If the source repository (e.g., `rasaha/symbolu`)
+  is or becomes **public**, that publication of the implementation is itself a public disclosure that
+  **starts the U.S. clock and can bar most foreign rights**. Confirm the repo is **private** through
+  the filing date; if it was ever public, give counsel the exact date it went public.
+- **Prior‑art note (independent of the inventor's own disclosure):** SAW‑INT4 (arXiv 2604.19157)
+  published **April 21, 2026** is third‑party prior art and is drafted over regardless of the
+  inventor's disclosure status.
+- **Hygiene until filed:** keep the method NDA‑only; do not post, present, publish, or offer it for
+  sale before the provisional is on file.
 
 **END OF DRAFT — for review by registered patent counsel. Not legal advice.**
