@@ -203,6 +203,31 @@ from agentic.agentic_framework.adaptive_prompts import (
     create_always_deep_pipeline,
     create_conservative_pipeline,
 )
+from agentic.agentic_framework.iterate_loop import (
+    Observation,
+    LoopStep,
+    LoopHistory,
+    LoopResult,
+    CompletionVerdict,
+    CompletionChecker,
+    PredicateCompletionChecker,
+    KeywordCompletionChecker,
+    LLMCompletionChecker,
+    IterativeAgentRunner,
+    run_until_done,
+)
+from agentic.agentic_framework.multi_agent import (
+    RegisteredAgent,
+    AgentRegistry,
+    AgentTurn,
+    Handoff,
+    RouteDecision,
+    Router,
+    KeywordRouter,
+    LLMRouter,
+    MultiAgentResult,
+    MultiAgentOrchestrator,
+)
 
 __all__ = [
     # Main agent
@@ -369,6 +394,29 @@ __all__ = [
     "create_progressive_pipeline",
     "create_always_deep_pipeline",
     "create_conservative_pipeline",
+    # Iterate-until-done loop (governed re-planning)
+    "Observation",
+    "LoopStep",
+    "LoopHistory",
+    "LoopResult",
+    "CompletionVerdict",
+    "CompletionChecker",
+    "PredicateCompletionChecker",
+    "KeywordCompletionChecker",
+    "LLMCompletionChecker",
+    "IterativeAgentRunner",
+    "run_until_done",
+    # Multi-agent orchestration & handoff
+    "RegisteredAgent",
+    "AgentRegistry",
+    "AgentTurn",
+    "Handoff",
+    "RouteDecision",
+    "Router",
+    "KeywordRouter",
+    "LLMRouter",
+    "MultiAgentResult",
+    "MultiAgentOrchestrator",
 ]
 
-__version__ = "1.9.0"  # R1-R11 runtime primitives, build_agent/ToolSpec ergonomics, trace viewer, approval coverage, two pilots
+__version__ = "1.10.0"  # + iterate-until-done loop & multi-agent orchestration (experimental, governed)

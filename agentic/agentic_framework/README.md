@@ -107,6 +107,8 @@ part of the runtime contract.
 | [`governed_agent_with_approval_and_budget.py`](../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget + structured output |
 | [`pilot_research_assistant.py`](../../examples/pilot_research_assistant.py) | **Pilot 1:** Custom tools, approval, budget, structured output, audit |
 | [`pilot_internal_copilot.py`](../../examples/pilot_internal_copilot.py) | **Pilot 2:** Per-action-type approval boundary, approve + deny paths |
+| [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py) | **Iterate-until-done:** governed re-planning loop — tool results fed back, controller decides DONE vs CONTINUE, bounded by `max_iterations`/budget |
+| [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py) | **Multi-agent:** researcher → writer → reviewer handoff, each a fully governed agent, bounded by `max_handoffs` |
 
 Run any example from the repo root:
 
@@ -136,10 +138,29 @@ All examples use stub/mock adapters — no API keys required.
 
 ---
 
+## Autonomy & multi-agent (experimental)
+
+Two capabilities layer on top of the single-agent runtime **without
+weakening governance** — every step is still a full governed
+`run_with_trace()` call:
+
+| Capability | API | What it adds | Safety bound |
+|-----------|-----|-------------|--------------|
+| **Iterate-until-done loop** | `IterativeAgentRunner`, `run_until_done`, `LLMCompletionChecker` | Feeds tool observations back to the model to pick the next step, re-planning until a `CompletionChecker` says done | `max_iterations` + optional shared `BudgetPolicy` |
+| **Multi-agent handoff** | `AgentRegistry`, `MultiAgentOrchestrator`, `KeywordRouter`/`LLMRouter` | Routes a query across several governed agents with agent-to-agent handoff and a combined transcript | `max_handoffs` + optional shared `BudgetPolicy` |
+
+See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py)
+and [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py). These
+are **experimental** — composed on the public agent API, tested, and run
+without an API key, but not yet hardened to the level of the core runtime.
+
+---
+
 ## What it is not (yet)
 
-- **Not a multi-agent platform.** Governs a single agent's
-  execution path. No agent-to-agent handoffs or orchestration.
+- **Not a managed multi-agent platform.** The `MultiAgentOrchestrator`
+  above adds agent-to-agent handoff, but there is no shared blackboard,
+  parallel fan-out, or hierarchical sub-teams yet.
 - **Not a managed service.** A Python library, not a hosted
   platform.
 - **Not a no-code builder.** Developer-facing, code-first. A
