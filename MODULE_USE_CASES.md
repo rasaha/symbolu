@@ -504,34 +504,36 @@ eleventh canonical component.
 
 *KVPro is the platform's single KV-cache-efficiency component. Its charter spans
 two composable jobs — **choosing what to keep (eviction)** and **compressing what's
-kept (compression)** — in one code package (`CTM_plus/KVPolicy/`): the
-`int4_protected` codec (current, measured ship) and the CTM+/PCAM eviction policy
-(legacy Phase-4 work). The prior "CTM+ / PCAM" product names are superseded by this
-KVPro framing in the current platform taxonomy.*
+kept (compression)** — shipped as one code package: the proprietary compression
+codec (current, measured ship) and the legacy eviction policy (earlier work). The
+prior "CTM+ / PCAM" product names are superseded by this KVPro framing in the
+current platform taxonomy.*
 
 **Problem.** At long context (32K+), the **KV-cache — not model weights —**
 dominates LLM serving cost and caps concurrency. Two levers exist and both are
 handled badly by defaults: *what to evict* is still decided by LRU-style recency
-(blind to attention structure), and *how densely to store what's kept* has no 4-bit
-option that ships **at quality** — fp8 sacrifices accuracy on outlier-heavy models
-and only reaches 2×, while naive int4 collapses token-agreement vs bf16 to 0.53.
+(blind to attention structure), and *how densely to store what's kept* has no
+low-bit option that ships **at quality** — leading low-bit approaches either
+sacrifice accuracy on outlier-heavy models or fail the majority of hard
+long-context retrievals.
 
 **Ugence mechanism.**
-- **Compression (`int4_protected`, current ship).** A quality-safe, post-hoc KV
-  compressor — a one-line vLLM backend, no retraining. A ~30-second calibration
-  keeps the ~4% of K-channels carrying most of the attention signal at bf16 while
-  quantizing the rest to int4; a forked flash-attention kernel dequantizes on the
-  fly and splices protected channels back, producing output bit-comparable to bf16.
-- **Eviction (CTM+/PCAM, legacy).** A scoring-only, attention-aware victim-selection
-  policy that decides *which* KV blocks to evict using multiple signals (recency,
-  frequency, attention, position/sink class) instead of recency alone.
+- **Compression (current ship).** A quality-safe, post-hoc KV compressor — a
+  one-line vLLM backend, no retraining and no fine-tuning. A fast
+  (~30-second) per-model calibration drives a **proprietary, patent-pending
+  fidelity-preservation method** that maintains retrieval-critical behavior under
+  compression, producing output near-indistinguishable from full precision.
+  *(Mechanism disclosed under NDA.)*
+- **Eviction (legacy).** A scoring-only, attention-aware victim-selection policy
+  that decides *which* KV blocks to evict using multiple signals (recency,
+  frequency, attention, position) instead of recency alone.
 
 **Current evidence.** *Compression (measured, current):* **~2.0× raw / ~1.8× net KV
-density** on real H100/A100 GPUs; **15/15 needle == bf16** across a 4-model
-portfolio (Qwen/Mistral/Llama, 7–14B); academic benchmarks at **0.0-pt delta** with
-100% per-question agreement; **+20 pts** token-agreement over naive int4; a leading
-denser 4-bit method **collapses to 0%** hard-retrieval where KVPro and bf16 hold
-100%.
+density** on real H100/A100 GPUs; **full-precision parity** on hard long-context
+retrieval across a 4-model portfolio (Qwen/Mistral/Llama, 7–14B); academic
+benchmarks at **0.0-pt delta** with 100% per-question agreement; **+20 pts**
+token-agreement over naive low-bit; a leading denser low-bit method **collapses to
+0%** hard-retrieval where KVPro and full precision hold 100%.
 
 **Evidence basis.** Compression: benchmarks on **real GPU hardware** (own hardware,
 not third-party) + code tests. Eviction: legacy code tests / spec-parity harness.
