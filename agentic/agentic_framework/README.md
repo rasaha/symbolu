@@ -111,6 +111,7 @@ part of the runtime contract.
 | [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py) | **Multi-agent:** researcher → writer → reviewer handoff, each a fully governed agent, bounded by `max_handoffs` |
 | [`run_budget_workflow.py`](../../examples/run_budget_workflow.py) | **Cumulative RunBudget (H11):** one shared budget across iterations + handoffs, deterministic `BUDGET_EXHAUSTED` termination |
 | [`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py) | **Replanning (H12):** same goal + different observations → different plans; tool-failure recovery; reconstructable revision trace |
+| [`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py) | **Plan validity (H13):** same observation + different assumptions → different decisions; non-invalidating observations skip replanning; selective invalidation |
 
 Run any example from the repo root:
 
@@ -152,15 +153,18 @@ weakening governance** — every step is still a full governed
 | **Multi-agent handoff** | `AgentRegistry`, `MultiAgentOrchestrator`, `KeywordRouter`/`LLMRouter` | Routes a query across several governed agents with agent-to-agent handoff and a combined transcript | `max_handoffs` + shared `RunBudget` |
 | **Cumulative RunBudget (H11)** | `RunBudget`, `RunBudgetLimits`, `attach_run_budget` | One immutable-limit budget created once and shared across every iteration and handoff; reserve-before-execute over 9 dimensions (model/tool calls, tokens, cost, time, iterations, handoffs) with deterministic `BUDGET_EXHAUSTED` termination | is the bound |
 | **Observation-driven replanning (H12)** | `ReplanningRunner`, `Plan`, `PlanObservation`, `DeterministicReplanPolicy`, `RuleBasedReplanner` | Executes an explicit plan step-by-step and adapts the *future* from structured observations (CONTINUE/REVISE/ABORT/COMPLETE); completed work is immutable, revisions are deterministic and fully traceable, stagnation is detected | `max_iterations` / `max_revisions` + shared `RunBudget` |
+| **Plan validity & assumptions (H13)** | `PlanAssumption`, `AssumptionContext`, `AssumptionAwareReplanPolicy`, `build_assumption_aware_runner` | Plans declare the assumptions they depend on; observations are evaluated *against assumptions* so replanning fires only when an assumption is invalidated; selective invalidation reconsiders only dependent future steps; append-only, fully traceable | same as H12 (strategy-agnostic) |
 
 See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py),
-[`run_budget_workflow.py`](../../examples/run_budget_workflow.py), and
-[`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py).
+[`run_budget_workflow.py`](../../examples/run_budget_workflow.py),
+[`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py), and
+[`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py).
 These are **experimental** — composed on the public agent API, tested, and run
 without an API key, but not yet hardened to the level of the core runtime.
 Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
-[Replanning (H12)](../docs/REPLANNING.md).
+[Replanning (H12)](../docs/REPLANNING.md) ·
+[Plan Validity (H13)](../docs/PLAN_VALIDITY.md).
 
 ---
 

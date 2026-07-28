@@ -265,6 +265,29 @@ from agentic.agentic_framework.replanning import (
     format_plan,
     format_replanning_trace,
 )
+from agentic.agentic_framework.plan_validity import (
+    AssumptionState,
+    PlanValidity,
+    AssumptionTransition,
+    PlanAssumption,
+    AssumptionRegistry,
+    AssumptionDependency,
+    AssumptionDependencyGraph,
+    AssumptionObservation,
+    AssumptionEvaluation,
+    AssumptionEvaluator,
+    RuleBasedAssumptionEvaluator,
+    PlanValidityResult,
+    PlanValidityEvaluator,
+    ValidityTraceEntry,
+    PlanValidityTrace,
+    AssumptionContext,
+    AssumptionAwareReplanPolicy,
+    selective_replanner,
+    build_assumption_aware_runner,
+    format_assumptions,
+    format_validity_trace,
+)
 
 __all__ = [
     # Main agent
@@ -489,6 +512,28 @@ __all__ = [
     "ReplanningRunner",
     "format_plan",
     "format_replanning_trace",
+    # Plan validity & assumption tracking (H13)
+    "AssumptionState",
+    "PlanValidity",
+    "AssumptionTransition",
+    "PlanAssumption",
+    "AssumptionRegistry",
+    "AssumptionDependency",
+    "AssumptionDependencyGraph",
+    "AssumptionObservation",
+    "AssumptionEvaluation",
+    "AssumptionEvaluator",
+    "RuleBasedAssumptionEvaluator",
+    "PlanValidityResult",
+    "PlanValidityEvaluator",
+    "ValidityTraceEntry",
+    "PlanValidityTrace",
+    "AssumptionContext",
+    "AssumptionAwareReplanPolicy",
+    "selective_replanner",
+    "build_assumption_aware_runner",
+    "format_assumptions",
+    "format_validity_trace",
 ]
 
-__version__ = "1.12.0"  # + H12 observation-driven replanning (bounded adaptive execution)
+__version__ = "1.13.0"  # + H13 plan validity & assumption tracking (assumption-aware planning)
