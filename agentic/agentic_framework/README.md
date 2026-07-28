@@ -112,6 +112,7 @@ part of the runtime contract.
 | [`run_budget_workflow.py`](../../examples/run_budget_workflow.py) | **Cumulative RunBudget (H11):** one shared budget across iterations + handoffs, deterministic `BUDGET_EXHAUSTED` termination |
 | [`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py) | **Replanning (H12):** same goal + different observations → different plans; tool-failure recovery; reconstructable revision trace |
 | [`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py) | **Plan validity (H13):** same observation + different assumptions → different decisions; non-invalidating observations skip replanning; selective invalidation |
+| [`working_memory_continuity.py`](../../examples/working_memory_continuity.py) | **Working memory (H14):** stored state drives outcomes; versioned append-only records; cross-agent sharing; memory→assumption bridge |
 
 Run any example from the repo root:
 
@@ -154,17 +155,20 @@ weakening governance** — every step is still a full governed
 | **Cumulative RunBudget (H11)** | `RunBudget`, `RunBudgetLimits`, `attach_run_budget` | One immutable-limit budget created once and shared across every iteration and handoff; reserve-before-execute over 9 dimensions (model/tool calls, tokens, cost, time, iterations, handoffs) with deterministic `BUDGET_EXHAUSTED` termination | is the bound |
 | **Observation-driven replanning (H12)** | `ReplanningRunner`, `Plan`, `PlanObservation`, `DeterministicReplanPolicy`, `RuleBasedReplanner` | Executes an explicit plan step-by-step and adapts the *future* from structured observations (CONTINUE/REVISE/ABORT/COMPLETE); completed work is immutable, revisions are deterministic and fully traceable, stagnation is detected | `max_iterations` / `max_revisions` + shared `RunBudget` |
 | **Plan validity & assumptions (H13)** | `PlanAssumption`, `AssumptionContext`, `AssumptionAwareReplanPolicy`, `build_assumption_aware_runner` | Plans declare the assumptions they depend on; observations are evaluated *against assumptions* so replanning fires only when an assumption is invalidated; selective invalidation reconsiders only dependent future steps; append-only, fully traceable | same as H12 (strategy-agnostic) |
+| **Governed working memory (H14)** | `WorkingMemory`, `MemoryRecord`, `MemoryAwareObservationBuilder`, `MemoryAssumptionBridge` | Run-scoped, append-only, versioned state shared across iterations, replanning, and agent handoffs; deterministic retrieval (ACTIVE → version → confidence → recency); memory invalidation bridges to H13 assumptions; every read is traced | strategy-agnostic; runs under the shared `RunBudget` |
 
 See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py),
 [`run_budget_workflow.py`](../../examples/run_budget_workflow.py),
-[`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py), and
-[`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py).
+[`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py),
+[`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py), and
+[`working_memory_continuity.py`](../../examples/working_memory_continuity.py).
 These are **experimental** — composed on the public agent API, tested, and run
 without an API key, but not yet hardened to the level of the core runtime.
 Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
 [Replanning (H12)](../docs/REPLANNING.md) ·
-[Plan Validity (H13)](../docs/PLAN_VALIDITY.md).
+[Plan Validity (H13)](../docs/PLAN_VALIDITY.md) ·
+[Working Memory (H14)](../docs/WORKING_MEMORY.md).
 
 ---
 

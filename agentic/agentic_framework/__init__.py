@@ -288,6 +288,27 @@ from agentic.agentic_framework.plan_validity import (
     format_assumptions,
     format_validity_trace,
 )
+from agentic.agentic_framework.working_memory import (
+    MemoryState,
+    ExpirationKind,
+    ExpirationPolicy,
+    MemoryStatusTransition,
+    MemoryRecord,
+    MemoryVersion,
+    MemoryAccess,
+    MemorySelectionPolicy,
+    DeterministicSelectionPolicy,
+    MemoryLifecycle,
+    MemoryOperation,
+    MemoryTrace,
+    WorkingMemory,
+    MemoryWrite,
+    MemoryObservation,
+    MemoryAwareObservationBuilder,
+    MemoryAssumptionBridge,
+    format_working_memory,
+    format_memory_trace,
+)
 
 __all__ = [
     # Main agent
@@ -534,6 +555,26 @@ __all__ = [
     "build_assumption_aware_runner",
     "format_assumptions",
     "format_validity_trace",
+    # Governed working memory & state continuity (H14)
+    "MemoryState",
+    "ExpirationKind",
+    "ExpirationPolicy",
+    "MemoryStatusTransition",
+    "MemoryRecord",
+    "MemoryVersion",
+    "MemoryAccess",
+    "MemorySelectionPolicy",
+    "DeterministicSelectionPolicy",
+    "MemoryLifecycle",
+    "MemoryOperation",
+    "MemoryTrace",
+    "WorkingMemory",
+    "MemoryWrite",
+    "MemoryObservation",
+    "MemoryAwareObservationBuilder",
+    "MemoryAssumptionBridge",
+    "format_working_memory",
+    "format_memory_trace",
 ]
 
-__version__ = "1.13.0"  # + H13 plan validity & assumption tracking (assumption-aware planning)
+__version__ = "1.14.0"  # + H14 governed working memory & state continuity
