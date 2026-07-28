@@ -1,8 +1,8 @@
 # Appendix A — Ugence Technical Evidence Catalogue
 
 > **Read the first-look first.** The commercial overview — product, customer,
-> wedge, strategy, and funding — is in **`UGENCE_AI_CONTROL_PLANE_FIRST_LOOK.md`**.
-> This appendix is the **technical diligence layer** beneath it: the full
+> wedge, strategy, and funding — is in the **Ugence AI Control Plane — Investor
+> First Look**. This is the **technical diligence layer** beneath it: the full
 > problem / mechanism / evidence / honest-conclusion / next-step detail for every
 > module, ordered by commercial priority. Detailed caveats are kept as footnotes so
 > the cards stay skimmable.
@@ -702,9 +702,9 @@ governed loop in which, at any point, you can name which module is responsible.
 The defensibility is in the governed loop and the compounding evidence it
 generates, not in any single box.
 
-*Sources: the per-module VC briefs in this repository (`*_VC_BRIEF.md`),
-`UGENCE_PLATFORM_OVERVIEW.md`, `UGENCE_DECISION_GOVERNANCE_MIDDLEWARE.md`,
-`docs/Decision_Governance_Kernel.md`, and the `ai_hiring/` validation track. All
-metrics are from our own repositories/CI on synthetic, internal, or (for KVPro)
-own-hardware benchmarks unless a card states otherwise. No module is currently
-Pilot Validated or Production Validated; that is the funded next step.*
+*Sources: the per-module technical briefs, the platform architecture overview, the
+Decision Governance whitepaper and kernel specification, and the AI-Hiring
+validation track. All metrics are from our own repositories/CI on synthetic,
+internal, or (for KVPro) own-hardware benchmarks unless a card states otherwise. No
+module is currently Pilot Validated or Production Validated; that is the funded next
+step. Full source artifacts are available in the diligence data room.*

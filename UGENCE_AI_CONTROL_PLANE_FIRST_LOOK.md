@@ -1,15 +1,11 @@
 # Ugence AI Control Plane
 ### Governing what enterprise AI may claim, recommend, decide and execute
 
-*Investor First Look — Product, Evidence and Pilot Strategy*
-
-> **Companion document:** the detailed per-module evidence, metrics, and honest
-> limitations live in **Appendix A — Ugence Technical Evidence Catalogue**
-> (`MODULE_USE_CASES.md`). This first-look is the commercial layer above it.
+*Investor First Look*
 
 ---
 
-## 1 · The company and the problem
+## 1 · The problem, and why now
 
 **Ugence Labs is building the AI Control Plane for enterprise agents.**
 
@@ -22,8 +18,8 @@ records a reconstructable decision trail.
 
 The core mechanisms are implemented and have been evaluated through automated tests,
 controlled scenarios, cross-runtime conformance, and selected real-hardware
-benchmarks. The next commercial milestone is a set of bounded enterprise shadow
-pilots that will measure operational effectiveness, false-positive rates,
+benchmarks. The next commercial milestone is a set of bounded enterprise
+design-partner pilots that measure operational effectiveness, false-positive rates,
 integration effort, and business value.
 
 ### Why now
@@ -38,52 +34,53 @@ deleted resource, an unsupported claim presented as fact.
 > proceed** — under evidence, policy, human authority, and current operational
 > state.
 
-That is a new control category, not another monitoring dashboard. Monitoring tells
-you what an agent *did*, after the fact, and holds no authority to stop it. Ugence
-sits *before* commit and can allow, constrain, escalate, or deny.
-
 ### One governed lifecycle
 
-```
-   Agent proposes  →  Ugence verifies  →  Policy & authority applied
-        │                   │                        │
-   (assertion / action)  (evidence,             (who may decide,
-                          support, scope)         what may execute)
-        │                   │                        │
-        └───────────────────┴──────────► Execution authorized or blocked
-                                                 │
-                                          Complete decision recorded
-                                         (reconstructable audit trail)
-```
+<div class="flow">
+  <div class="flowbox"><span class="fnum">1</span><b>Propose</b><small>Agent or model proposes an action or answer</small></div>
+  <div class="flowbox"><span class="fnum">2</span><b>Verify</b><small>Evidence &amp; assertions checked before reliance</small></div>
+  <div class="flowbox"><span class="fnum">3</span><b>Authorize</b><small>Policy &amp; decision authority applied</small></div>
+  <div class="flowbox"><span class="fnum">4</span><b>Execute</b><small>Exact action allowed, held, or blocked</small></div>
+  <div class="flowbox"><span class="fnum">5</span><b>Record</b><small>Complete, reconstructable audit trail</small></div>
+</div>
 
-The runtime *proposes*; Ugence *governs*; every step is *recorded*.
+The runtime *proposes*; Ugence *governs*; every step is *recorded*. Monitoring tools
+tell you what an agent *did*, after the fact, and hold no authority to stop it.
+Ugence sits *before* commit and can allow, constrain, escalate, or deny.
 
 ---
 
 ## 2 · The product
 
-### What Ugence sells
+### The commercial product being consolidated
 
 | | |
 |---|---|
-| **One product** | **Ugence AI Control Plane** |
-| **Initial deployment** | **Governed Agent Shadow Pilot** |
-| **Initial customer** | A GCC or enterprise team moving an AI agent from proof-of-concept toward production |
-| **Initial outcome** | Identify unsupported claims, missing evidence, unauthorized actions, policy conflicts, and required human escalations **before** the agent is allowed to affect production systems |
+| **Product** | **Ugence AI Control Plane** |
+| **Current customer offer** | Governed Agent Design-Partner Pilot (assembled from the existing modules) |
+| **After productization** | One repeatable enterprise platform in shadow, recommendation and enforcement modes |
+
+Being explicit about stage — the credibility this document depends on:
+
+| Stage | What exists |
+|---|---|
+| **Today** | Implemented governance kernels, runtime contracts, prototypes, and controlled evidence |
+| **Available now** | A bounded design-partner shadow pilot, assembled from the existing modules |
+| **What the round builds** | One repeatable, secure, enterprise-deployable Ugence AI Control Plane |
 
 ### Six customer-facing capabilities
 
 The enterprise buys one platform. Beneath it, six capabilities cover the full
 "what AI says, recommends, decides, and does" boundary:
 
-| Capability | What it governs | Underlying modules |
-|---|---|---|
-| **Agent Gateway** | What context and requests enter a governed decision | Runtime adapters, Context Minimization |
-| **Truth & Evidence** | Whether a claim is supported before it's relied on | Truth Assurance Platform, Hybrid LLM, evidence assurance |
-| **Policy & Decision Authority** | Who is permitted to decide, and under which policy | Decision Governance, Model Selection policy |
-| **Action Control** | Whether this exact action may execute, and is it safe now | ActionGate, Autonomous Control Plane |
-| **Governed Runtime** | Supervised proposal of actions as a governable request | Agent Runtime, generation steering |
-| **Audit & Reconstruction** | A complete, replayable record of the decision | Decision lineage, immutable records, reconciliation |
+| Capability | What it governs |
+|---|---|
+| **Agent Gateway** | What context and requests enter a governed decision |
+| **Truth & Evidence** | Whether a claim is supported before it's relied on |
+| **Policy & Decision Authority** | Who is permitted to decide, and under which policy |
+| **Action Control** | Whether this exact action may execute, and is it safe now |
+| **Governed Runtime** | Supervised proposal of actions as a governable request |
+| **Audit & Reconstruction** | A complete, replayable record of the decision |
 
 ### Deployment model — one product, three modes
 
@@ -98,192 +95,196 @@ to enforcement.
 
 ---
 
-## 3 · Initial use cases
+## 3 · Initial buyer and first commercial pilot
 
-Ugence governs three recurring enterprise patterns:
+### Primary buyer
 
-- **Enterprise agent action control** — an agent performs infrastructure, finance,
-  or customer actions; ActionGate authorizes each exact action, and the Autonomous
-  Control Plane clears it against live operational state.
-- **AI-assisted human decisions** — AI recommends; a human decides; Decision
-  Governance preserves that separation and records who held authority.
-- **AI assertion assurance** — before a generated answer is relied upon or
-  released, the Truth Assurance Platform decides deliver / qualify / abstain.
+**Head of AI Platform / GCC CTO / Chief Digital Officer / enterprise agent-program
+owner** — one role that owns the purchase. Security, risk, and compliance are
+stakeholders, not the buyer.
 
-### Reference implementation — AI-assisted hiring
+**Buying trigger:** the organization has an AI agent moving from proof-of-concept
+toward production but lacks an independent control boundary for evidence,
+authority, execution, and audit.
 
-The hiring workflow is the reference implementation that proved the governance
-model end-to-end (it is where the reusable Decision Governance kernel was
-extracted from). One governed lifecycle:
+### Primary commercial wedge — enterprise IT / infrastructure agent action control
 
-1. AI reviews evidence and produces a **recommendation** (advisory only).
-2. Ugence verifies which evidence is **admissible** (prohibited fields quarantined).
-3. Ugence preserves the hard distinction between **AI recommendation** and **human
-   decision** — an AI-authored binding decision is structurally impossible.
-4. Ugence confirms **who holds authority**.
-5. ActionGate determines whether the authorized action **may execute**.
-6. Ugence records **recommendation → decision → authorization → execution →
-   reconciliation** as an append-only, reconstructable chain.
+The first wedge is **agents that take infrastructure and IT actions** (e.g.
+Kubernetes and cloud operations). It is the sharpest entry point because the action
+is concrete, policy and blast radius are measurable, shadow mode is natural, and it
+is where ActionGate's strongest controlled evidence already sits.
 
-*Current evidence:* built and internally validated — the reference application
-passes its full test suite and replays a synthetic candidate cohort deterministically,
-surfacing denials, evidence gaps, and reconciliation mismatches rather than hiding
-them. *Pilot objective:* run this in shadow mode alongside a live hiring workflow
-and measure audit-reconstruction completeness, missing-evidence rate, and time to
-produce an audit package. Hiring is the **reference implementation, not the only
-target market.**
+### Design-partner pilot — what the customer receives
+
+- Integration with one agent and one workflow.
+- Policy and authority mapping.
+- Four to eight weeks of shadow observation.
+- Unsupported-claim and unauthorized-action findings.
+- Human-escalation and false-positive analysis.
+- Reconstructable governance records.
+- A production-enforcement readiness recommendation.
+
+*Commercial structure:* a **paid design-partner engagement** (fixed-fee pilot,
+creditable toward an annual subscription) — a stronger commercial signal than a free
+proof-of-concept.
+
+### Decision-governance reference implementation — AI-assisted hiring
+
+The hiring workflow is the **reference implementation** for the Decision Governance
+model — it is where the reusable governance kernel was extracted from. It validated
+the internal decision lifecycle (recommendation → decision → authorization →
+execution → reconciliation) on a deterministic synthetic cohort, preserving the
+AI-advisory / human-binding separation and producing a reconstructable audit chain.
+The funded productization phase will connect that lifecycle **end-to-end** with
+ActionGate, operational clearance, durable enterprise identity, and execution
+reconciliation. Hiring demonstrates platform breadth; it is not the initial go-to-
+market.
 
 ---
 
 ## 4 · Evidence at a glance
 
 The mechanisms are built and, in controlled conditions, do what they are specified
-to do. The table below gives one built-evidence signal, one controlled-evidence
-result, and the next pilot proof for the core capabilities. Full metrics, baselines,
-and limitations are in **Appendix A**.
+to do. Below: one built-evidence signal, one controlled-evidence result, and the
+next pilot proof for the core capabilities. Full metrics and limitations are in the
+Ugence Technical Evidence Catalogue (technical diligence).
 
 | Capability | Built evidence | Controlled evidence | Next pilot proof |
 |---|---|---|---|
 | **ActionGate** | 274 dedicated tests | 27/27 red-team attacks blocked (executed, isolated) | False-block & unauthorized-action detection rates |
-| **Decision Governance** | Version-frozen, reusable kernel | Synthetic decision-lifecycle replay, reconstructable | Real-workflow audit reconstruction |
+| **Decision Governance** | Version-frozen, reusable kernel | Deterministic decision-lifecycle replay, reconstructable | Real-workflow audit reconstruction |
 | **Truth Assurance Platform** | Prototype + tests | Order-of-magnitude unsafe-delivery reduction (synthetic) | Reviewer agreement & workload reduction |
 | **Agent Runtime** | 1,550+ tests | Identical action identity across 3 real runtimes | Multi-runtime customer deployment |
-| **Context Minimization** | Frozen cross-model benchmark | 100% decision invariance, 32–50% token reduction | Token cost & review reduction on real data |
-| **KVPro** | Working GPU implementation | ~1.8× net KV density, quality parity on 4 models | Customer traffic, quality & throughput |
+| **Autonomous Control Plane** | Cross-domain, runtime-independent | Byte-identical clearance contract, 0 identity ambiguities | Correct HOLDs on live operational state |
+
+*Additional technical assets (accelerators):* **Context Minimization** (100%
+decision invariance at 32–50% token reduction, cross-model) and **KVPro** (~1.8×
+net KV density on real GPUs) reduce cost and broaden reach; detail in the catalogue.
 
 > **Evidence boundary.** Unless otherwise stated, current results are based on
 > internal software testing, controlled datasets, or company-run hardware
 > benchmarks. No capability is yet pilot-validated or production-validated with a
 > paying customer — **that is precisely what this round funds.**
 
-**Two questions we keep separate:** *Has the mechanism been built correctly?*
-(tests, invariants, deterministic replay, benchmarks — where we are strong today.)
-*Does it create customer value?* (fewer unsupported assertions, unauthorized actions
-caught, faster audit reconstruction — what the pilots are designed to prove.) Ugence
-has substantial **software proof** today; the round buys **business proof.**
+---
+
+## 5 · Market and competitive position
+
+Ugence is not another monitoring tool. Adjacent categories each control one thing
+and leave the consequential question open:
+
+| Existing category | What it controls | What remains open |
+|---|---|---|
+| **IAM / RBAC** | Who may access a system | Whether this specific AI-generated action is appropriate |
+| **AI observability** | What the model or agent did | Ability to stop or constrain *before* commit |
+| **Model gateways** | Which model is called | Decision authority and execution control |
+| **Guardrails** | Content / prompt boundaries | Enterprise action authorization and reconciliation |
+| **Workflow engines** | How a process executes | Whether the proposed action is permitted |
+
+> **Ugence governs the transition from AI proposal to enterprise consequence.**
+
+*(Positioning to be confirmed by a formal competitive review before external
+category claims.)*
 
 ---
 
-## 5 · Commercial strategy
+## 6 · Funding
 
-### Initial customer profile
+<p class="tbd">TO CONFIRM — the financial headline below uses placeholders. Please
+supply: round stage, amount, runway, and use-of-funds split.</p>
 
-- A GCC or enterprise with an active agentic-AI program.
-- One agent approaching production deployment.
-- A high-consequence workflow — HR, finance, IT operations, healthcare, claims, or
-  customer-facing actions.
-- An enterprise policy owner and human authority already identified.
-- A concrete need for traceability, controlled execution, or auditability.
+> **Ugence is raising <span class="tbd">$[amount]</span> (<span class="tbd">[pre-seed /
+> seed]</span>) to fund <span class="tbd">[N]</span> months of runway, consolidate
+> five core governance capabilities into one enterprise-deployable AI Control Plane,
+> complete two to three paid design-partner pilots, and convert at least one into an
+> enforcement deployment.**
 
-### Initial commercial motion
+**The transition capital funds:** Ugence has already built and internally validated
+the core technologies. The round does **not** fund eleven new research projects — it
+funds consolidation of already-built governance mechanisms into one enterprise
+product, across three workstreams:
 
-1. Integrate one agent in **shadow mode**.
-2. Observe proposed claims, decisions, and actions.
-3. Compare agent behavior against enterprise policy and authority.
-4. Produce a **governance findings report**.
-5. Move selected controls from shadow to **enforcement**.
-6. Expand across additional agents and workflows.
+**Product consolidation**
+- Unified interface and administration console.
+- Shared identity, tenant, policy, evidence, and audit services.
+- Standard APIs and canonical contracts.
+- Shadow, recommendation, and enforcement modes.
 
-### Expansion model
+**Enterprise readiness**
+- Durable persistence and tamper-evident audit.
+- Security and access control.
+- Observability and deployment tooling.
+- Connectors to runtimes and systems of record.
 
-Land with one agent in one workflow; expand by (a) moving controls from shadow to
-enforcement, (b) adding agents on the same runtime, and (c) reusing the same
-governance kernel across a second enterprise domain. Each deployment sits *between*
-the agents and the systems of record — a position that deepens with every workflow
-added. Pricing follows the value surface — governed agents / workflows and
-enforcement tier — with shadow pilots as the entry motion.
+**Commercial validation**
+- Two to three design-partner deployments.
+- Measured false-positive and false-block rates.
+- Customer integration and operational evidence.
+- Conversion of at least one pilot to paid enforcement.
 
----
+### What the capital changes
 
-## 6 · Defensibility and funding
+<div class="transition">
+  <div class="tcol"><h4>Today</h4><ul><li>Five core governance systems</li><li>Different interfaces</li><li>Internal &amp; synthetic validation</li><li>Founder-led deployment</li></ul></div>
+  <div class="tarrow">→ funding →</div>
+  <div class="tcol"><h4>Productization</h4><ul><li>Unified console</li><li>Shared platform services</li><li>Enterprise connectors</li><li>Security &amp; deployment tooling</li><li>Repeatable onboarding</li></ul></div>
+  <div class="tarrow">→</div>
+  <div class="tcol"><h4>Commercial outcome</h4><ul><li>One purchasable product</li><li>Two to three pilots</li><li>First paid enforcement customer</li><li>Reuse across two domains</li></ul></div>
+</div>
 
-### Why this is defensible
+### The milestone: enterprise-deployable v1
 
-- **Architectural** — governance is separated from the proposing runtime and cannot
-  be edited by the agent it judges. A runtime that grades its own homework is not
-  governed.
-- **Contract** — canonical action and decision identities let the *same* governance
-  logic apply across different runtimes and domains, verified by clean-room
-  conformance.
-- **Evidence** — every deployment generates structured data on policy conflicts,
-  human escalations, authorization outcomes, and execution reconciliation that
-  compounds per customer.
-- **Integration** — once Ugence sits between agents and enterprise systems, it
-  becomes part of the control boundary, not an optional add-on.
-- **Domain packages** — a reusable governance kernel extends through domain
-  policies, connectors, and evidence schemas.
+The round delivers one integrated, **enterprise-deployable v1** AI Control Plane —
+a testable boundary, not "fully hardened for all regulated deployment." v1 means:
 
-*(Test counts and benchmarks are diligence signals of engineering rigor — not, by
-themselves, the moat. The moat is the governed loop and the evidence it compounds.)*
+- Multi-tenant identity.
+- Durable audit records.
+- Secure APIs.
+- Two runtime connectors.
+- One system-of-record connector.
+- Shadow deployment, with controlled enforcement for selected actions.
 
-### What the next round funds
+### Milestones within the round
 
-Ugence has already built and internally validated the core technologies required to
-govern AI assertions, recommendations, decisions, and actions. These capabilities
-currently exist as modular systems with different interfaces, maturity levels, and
-deployment paths. **The primary purpose of the next round is to consolidate these
-capabilities into one commercially deployable product — the Ugence AI Control
-Plane.**
-
-The funded productization phase will create one enterprise-facing platform with:
-
-- A unified product interface and administration console.
-- One governed lifecycle from agent proposal through verification, authorization,
-  execution, and audit.
-- Shared identity, tenant, policy, workflow, evidence, and audit services.
-- Standardized APIs and canonical contracts across all modules.
-- Connectors for leading agent runtimes, enterprise applications, and systems of
-  record.
-- Production-grade security, access control, persistence, observability, and
-  deployment tooling.
-- Configurable shadow, recommendation, and enforcement modes.
-- Domain packages for initial enterprise use cases.
-- A coherent commercial SKU, implementation model, and customer onboarding
-  experience.
-
-The objective is **not to rebuild the underlying research modules** — it is to
-transform proven mechanisms into one integrated enterprise product that customers
-can configure, deploy, operate, and expand across multiple AI agents and workflows.
-
-**Commercial validation funded by the round.** Once the consolidated product is
-available, the round also funds two to three bounded enterprise shadow pilots to
-validate: integration effort, unsupported-assertion detection, unauthorized-action
-detection, false-positive and false-block rates, human-escalation requirements,
-audit-reconstruction completeness, operational latency, reduction in manual
-governance effort, and customer willingness to move from shadow mode to enforcement.
-
-### Milestones
-
-1. Release the first integrated Ugence AI Control Plane product.
-2. Consolidate the core governance modules behind one product interface and API.
-3. Complete production-grade identity, storage, audit, security, and observability
-   layers.
-4. Deploy the product in its first live enterprise shadow environment.
-5. Achieve the first pilot-validated use case.
-6. Convert at least one shadow pilot into a paid enforcement deployment.
+1. Release the first integrated, enterprise-deployable v1 product.
+2. Consolidate the core governance modules behind one interface and API.
+3. Complete production-grade identity, storage, audit, security, and observability.
+4. First live enterprise shadow deployment.
+5. First pilot-validated use case.
+6. Convert at least one pilot into a paid enforcement deployment.
 7. Demonstrate reuse of the same product across two enterprise domains.
 8. Establish measurable customer value — reduced governance effort, improved
    traceability, or prevented unauthorized activity.
 
-### The funding transition
-
 > **Today:** a deep portfolio of implemented and internally validated governance
-> technologies.
-> **After the round:** one integrated, production-ready AI Control Plane that
-> enterprises can purchase, deploy, and use across their agents and decision
-> workflows.
->
+> technologies. **After the round:** one integrated, enterprise-deployable AI
+> Control Plane enterprises can purchase, deploy, and expand across their agents.
 > **Investors fund transitions, not catalogues.**
 
 ---
 
-## Appendix
+## 7 · Team and contact
 
-**Appendix A — Ugence Technical Evidence Catalogue** (`MODULE_USE_CASES.md`):
-the full per-module problem / mechanism / evidence / honest-conclusion /
-next-validation-step detail for all thirteen modules across the three architectural
-layers, plus the AI-Hiring flagship pilot and the complete evidence-maturity
-taxonomy. Use it for technical diligence; use this first-look for the initial read.
+### Why Ugence can execute
+
+<p class="tbd">TO CONFIRM — please supply founder background, relevant enterprise/
+technical experience, current team composition, and the key hires this round funds.</p>
+
+> The founder has already developed and validated the core governance architecture
+> across action authorization, assertion assurance, decision governance, runtime
+> contracts, and infrastructure efficiency. The round primarily funds product
+> engineering, enterprise integration, security hardening, and commercial
+> deployment — not basic research discovery.
+
+**Key hires funded by the round:** <span class="tbd">[e.g. product engineering lead,
+enterprise integration engineers, security/compliance, founding GTM]</span>.
+
+**Contact:** <span class="tbd">[name · email · company]</span>
+
+---
+
+*Technical diligence: detailed metrics, limitations, and per-capability evidence are
+available in the accompanying **Ugence Technical Evidence Catalogue**.*
 
 *Ugence Labs — governing what enterprise AI may claim, recommend, decide and
 execute.*
