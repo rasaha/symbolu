@@ -242,6 +242,29 @@ from agentic.agentic_framework.run_budget import (
     attach_run_budget,
     format_run_budget,
 )
+from agentic.agentic_framework.replanning import (
+    ObservationStatus,
+    PlanStepState,
+    ReplanDecision,
+    StopReason,
+    PlanObservation,
+    PlanStep,
+    Plan,
+    PlanRevision,
+    ReplanPolicy,
+    DeterministicReplanPolicy,
+    Replanner,
+    RuleBasedReplanner,
+    ObservationBuilder,
+    ScriptedObservationBuilder,
+    DefaultObservationBuilder,
+    StagnationConfig,
+    StagnationDetector,
+    ReplanningResult,
+    ReplanningRunner,
+    format_plan,
+    format_replanning_trace,
+)
 
 __all__ = [
     # Main agent
@@ -444,6 +467,28 @@ __all__ = [
     "BudgetedAdapter",
     "attach_run_budget",
     "format_run_budget",
+    # Observation-driven replanning (H12)
+    "ObservationStatus",
+    "PlanStepState",
+    "ReplanDecision",
+    "StopReason",
+    "PlanObservation",
+    "PlanStep",
+    "Plan",
+    "PlanRevision",
+    "ReplanPolicy",
+    "DeterministicReplanPolicy",
+    "Replanner",
+    "RuleBasedReplanner",
+    "ObservationBuilder",
+    "ScriptedObservationBuilder",
+    "DefaultObservationBuilder",
+    "StagnationConfig",
+    "StagnationDetector",
+    "ReplanningResult",
+    "ReplanningRunner",
+    "format_plan",
+    "format_replanning_trace",
 ]
 
-__version__ = "1.11.0"  # + H11 cumulative RunBudget (shared run-level resource governance)
+__version__ = "1.12.0"  # + H12 observation-driven replanning (bounded adaptive execution)
