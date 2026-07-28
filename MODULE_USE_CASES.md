@@ -56,7 +56,7 @@ false-positive rates, integration cost, and measurable business impact.
 | **Execution authorization** | ActionGate, Autonomous Control Plane | Implemented · Internally Validated · Pilot Ready (ActionGate) |
 | **Context & inference efficiency** | Context Minimization, KVPro | Internally Validated (real GPUs / cross-model) |
 | **Runtime orchestration** | Agent Runtime, Autonomous Runtime, LLM Steering Controller | Implemented · Internally Validated · Pilot Ready |
-| **Infrastructure efficiency** | KVPro, Cloud Scaling Controller | Internally Validated (real GPUs / real-trace replay) |
+| **Infrastructure efficiency** | KVPro *(compression + eviction)*, Cloud Scaling Controller | Internally Validated (real GPUs / real-trace replay) |
 | **Model governance (cross-cutting)** | Model Selection & Governed Inference | Implemented · Internally Validated |
 | **Advanced intelligence research** | PSE | Implemented (core) · Research |
 
@@ -449,42 +449,68 @@ binding guarantees against messy real data. *(Flagship pilot below.)*
 
 ---
 
-## 3.1 KVPro
-**Implemented · Internally Validated**
+## 3.1 KVPro — KV-cache efficiency (compression + eviction)
+**Implemented · Internally Validated** *(eviction sub-capability: legacy / spec-stage)*
+
+*KVPro is the platform's single KV-cache-efficiency component. Its charter spans
+two composable jobs — **choosing what to keep (eviction)** and **compressing what's
+kept (compression)** — implemented as two sub-capabilities in one code package
+(`CTM_plus/KVPolicy/`): the `int4_protected` codec (current, measured ship) and the
+CTM+/PCAM eviction policy (legacy Phase-4 work, spec-parity). They are orthogonal:
+you can evict with CTM+ and compress the survivors with int4_protected. The prior
+"CTM+ / PCAM" product names are superseded by this KVPro framing in the current
+platform taxonomy.*
 
 **Problem.** At long context (32K+), the **KV-cache — not model weights —**
-dominates LLM serving cost and caps concurrency. The obvious fix, 4-bit KV, hasn't
-shipped *at quality*: fp8 sacrifices accuracy on outlier-heavy models and only
-reaches 2×, while naive int4 collapses token-agreement vs bf16 to 0.53. The gap
-between "4-bit density" and "maintained quality" binds exactly the fastest-growing
-segments (long-context, agentic, RAG).
+dominates LLM serving cost and caps concurrency. Two levers exist and both are
+handled badly by defaults: *what to evict* is still decided by LRU-style recency
+(blind to attention structure), and *how densely to store what's kept* has no 4-bit
+option that ships **at quality** — fp8 sacrifices accuracy on outlier-heavy models
+and only reaches 2×, while naive int4 collapses token-agreement vs bf16 to 0.53.
+The gap between "4-bit density" and "maintained quality" binds exactly the
+fastest-growing segments (long-context, agentic, RAG).
 
-**Ugence mechanism.** A quality-safe, post-hoc KV compressor — a one-line vLLM
-backend, no retraining. A ~30-second calibration identifies the ~4% of K-channels
-carrying most of the attention signal and keeps them at bf16 while quantizing the
-rest to int4; a forked flash-attention kernel dequantizes on the fly and splices
-protected channels back, producing output bit-comparable to bf16 per (layer,
-head). Positioned as a **capacity + quality** tool, deployed by routing memory-
-bound long-context traffic to KVPro and latency-critical chat to bf16.
+**Ugence mechanism.**
+- **Compression (`int4_protected`, current ship).** A quality-safe, post-hoc KV
+  compressor — a one-line vLLM backend, no retraining. A ~30-second calibration
+  identifies the ~4% of K-channels carrying most of the attention signal and keeps
+  them at bf16 while quantizing the rest to int4; a forked flash-attention kernel
+  dequantizes on the fly and splices protected channels back, producing output
+  bit-comparable to bf16 per (layer, head). A **capacity + quality** tool: route
+  memory-bound long-context traffic to KVPro, latency-critical chat to bf16.
+- **Eviction (CTM+/PCAM, legacy).** A scoring-only, attention-aware victim-selection
+  policy that decides *which* KV blocks to evict using multiple signals (recency,
+  frequency, attention, position/sink class) instead of recency alone. It manages
+  no memory itself — it only scores.
 
-**Current evidence.** Demonstrated **~2.0× raw / ~1.8× net KV density** on real
-H100/A100 GPUs; **15/15 needle == bf16** across a 4-model portfolio (Qwen/Mistral/
-Llama, 7–14B), academic benchmarks at **0.0-pt delta** with 100% per-question
-agreement, **+20 pts** token-agreement over naive int4. A leading denser 4-bit
-method **collapses to 0%** hard-retrieval where KVPro and bf16 hold 100%.
+**Current evidence.**
+- *Compression (measured, current):* **~2.0× raw / ~1.8× net KV density** on real
+  H100/A100 GPUs; **15/15 needle == bf16** across a 4-model portfolio (Qwen/Mistral/
+  Llama, 7–14B); academic benchmarks at **0.0-pt delta** with 100% per-question
+  agreement; **+20 pts** token-agreement over naive int4; a leading denser 4-bit
+  method **collapses to 0%** hard-retrieval where KVPro and bf16 hold 100%.
+- *Eviction (legacy, not re-validated):* earlier CTM+ benchmarks reported hit-rate
+  and concurrency gains over LRU on phase-structured workloads, but these are
+  **historical, spec-parity numbers not independently reproduced** on the current
+  ship, and CTM+ **matches LRU (and slightly loses to ARC) on structureless
+  traces** — an honest boundary, since it only helps where phase structure exists.
 
-**Evidence basis.** Benchmarks measured on **real GPU hardware** (own hardware, not
-third-party) + code tests.
+**Evidence basis.** Compression: benchmarks on **real GPU hardware** (own hardware,
+not third-party) + code tests. Eviction: legacy code tests / spec-parity harness;
+numbers not currently re-validated.
 
-**Honest conclusion.** KVPro demonstrated ~2.0× raw / ~1.8× net density with
-quality preservation that **varies by model and workload**, on real hardware.
-Trade-off stated plainly: decode is throughput-negative (**~0.13–0.67× bf16**) on
-the current unoptimized path — throughput recovery is a funded v2 item with bounded
-upside; patent-pending; pre-revenue.
+**Honest conclusion.** The **compression** codec is the proven, current story —
+~2.0× raw / ~1.8× net density with quality preservation that **varies by model and
+workload**, on real hardware; decode is throughput-negative (**~0.13–0.67× bf16**)
+on the current unoptimized path (throughput recovery is a funded v2 item);
+patent-pending; pre-revenue. The **eviction** policy is a real, orthogonal
+sub-capability but at legacy/spec maturity — it should be presented as a roadmap
+lever within KVPro, not as a separately-proven product.
 
 **Next validation step.** A serving-provider pilot measuring GPUs saved per
-concurrency target, quality parity on that provider's own traffic, and net
-throughput after v2 optimization.
+concurrency target and quality parity on that provider's own traffic (compression),
+plus net throughput after v2 optimization; separately, re-validate the eviction
+policy on current hardware before making any standalone claim for it.
 
 ---
 
