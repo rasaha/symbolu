@@ -193,14 +193,16 @@ enforcement, and end-to-end reconstruction.
 
 ## 6 · Funding
 
-<p class="tbd">TO CONFIRM — round amount. It should be built bottom-up from the
-productization roadmap (v1 scope → minimum team → costs → contingency), sized to
-reach the first paid enforcement deployment with runway to spare.</p>
+<p class="tbd">Working estimate — round amount ≈ ₹5 Cr (~US$600K), derived
+bottom-up in the productization roadmap and being finalized as assumptions are
+replaced with current quotes (Hyderabad hiring, cloud/GPU, security/compliance,
+legal/IP).</p>
 
-> **Ugence is raising <span class="tbd">$[amount]</span> in a pre-seed round to fund
-> 18 months of runway, consolidate five core governance capabilities into one
-> enterprise-deployable AI Control Plane, complete two to three paid pilots, and
-> convert at least one into an enforcement deployment.**
+> **Ugence is raising a pre-seed round — working estimate <span class="tbd">≈ ₹5 Cr
+> (~US$600K), being finalized</span> — to fund 18 months of runway, consolidate five
+> core governance capabilities into one enterprise-deployable AI Control Plane,
+> complete two to three paid pilots, and convert at least one into an enforcement
+> deployment.**
 
 **The transition capital funds:** Ugence has already built and internally validated
 the core technologies. The round does **not** fund eleven new research projects — it
@@ -272,8 +274,8 @@ test-backed modules. The pre-seed round adds the product, integration, security,
 commercial capabilities required to consolidate that foundation into one
 enterprise-deployable product.
 
-**Current team:** Founder-led, supported by specialist contractors and technical
-reviewers as required.
+**Current team:** Solo founder at present; the pre-seed round funds the initial
+product, enterprise integration, security, and commercialization team.
 
 **Initial hires funded by the round** — a small team focused on converting the
 existing technology into a deployable product, not a large organization:

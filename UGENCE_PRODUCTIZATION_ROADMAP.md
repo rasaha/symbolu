@@ -180,9 +180,14 @@ Small team focused on converting existing technology into a deployable product.
 | Contingency (15%) | 0.52 Cr | ~$63K |
 | **18-month total** | **≈ 3.98 Cr** | **≈ $480K** |
 
-**Suggested pre-seed raise: ≈ ₹4.5–5.0 Cr (~US$550–600K)** — the 18-month total
-plus buffer, sized to reach the **first paid enforcement deployment** with runway to
+**Working-estimate pre-seed raise: ≈ ₹5 Cr (~US$600K)** — the 18-month total plus
+buffer, sized to reach the **first paid enforcement deployment** with runway to
 spare rather than to the next unfinished prototype.
+
+> **This is a working estimate, not a confirmed raise.** Every §8 input is an
+> ⟨assumption⟩. The final amount will be set once Hyderabad hiring, cloud/GPU
+> infrastructure, security/compliance, and legal/IP costs are replaced with current
+> quotes. Directionally reasonable; not yet validated.
 
 **Allocation vs the first-look 55 / 25 / 20 split** (sanity check, at ₹5 Cr):
 Product consolidation ~₹2.75 Cr · Enterprise readiness ~₹1.25 Cr · Commercial
