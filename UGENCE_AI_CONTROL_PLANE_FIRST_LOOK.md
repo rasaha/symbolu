@@ -65,7 +65,7 @@ Being explicit about stage — the credibility this document depends on:
 | Stage | What exists |
 |---|---|
 | **Today** | Implemented governance kernels, runtime contracts, prototypes, and controlled evidence |
-| **Pilot-configurable now** | The core modules and harness exist; customer-specific integration and policy configuration are required before deployment |
+| **Pilot-configurable now** | The core modules and harness exist. A simple infrastructure-agent pilot can begin within weeks; more complex workflows follow the productization phase. Customer-specific integration and policy configuration are required before deployment |
 | **What the round builds** | One repeatable, secure, enterprise-deployable Ugence AI Control Plane |
 
 ### Six customer-facing capabilities
@@ -196,11 +196,10 @@ enforcement, and end-to-end reconstruction.
 <p class="tbd">TO CONFIRM — the financial headline below uses placeholders. Please
 supply: round stage, amount, runway, and use-of-funds split.</p>
 
-> **Ugence is raising <span class="tbd">$[amount]</span> (<span class="tbd">[pre-seed /
-> seed]</span>) to fund <span class="tbd">[N]</span> months of runway, consolidate
-> five core governance capabilities into one enterprise-deployable AI Control Plane,
-> complete two to three paid design-partner pilots, and convert at least one into an
-> enforcement deployment.**
+> **Ugence is raising a <span class="tbd">$[amount]</span> pre-seed round to fund
+> <span class="tbd">[N]</span> months of runway, consolidate five core governance
+> capabilities into one enterprise-deployable AI Control Plane, complete two to
+> three paid pilots, and convert at least one into an enforcement deployment.**
 
 **The transition capital funds:** Ugence has already built and internally validated
 the core technologies. The round does **not** fund eleven new research projects — it
