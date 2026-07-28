@@ -107,6 +107,16 @@ part of the runtime contract.
 | [`governed_agent_with_approval_and_budget.py`](../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget + structured output |
 | [`pilot_research_assistant.py`](../../examples/pilot_research_assistant.py) | **Pilot 1:** Custom tools, approval, budget, structured output, audit |
 | [`pilot_internal_copilot.py`](../../examples/pilot_internal_copilot.py) | **Pilot 2:** Per-action-type approval boundary, approve + deny paths |
+| [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py) | **Iterate-until-done:** governed re-planning loop — tool results fed back, controller decides DONE vs CONTINUE, bounded by `max_iterations`/budget |
+| [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py) | **Multi-agent:** researcher → writer → reviewer handoff, each a fully governed agent, bounded by `max_handoffs` |
+| [`run_budget_workflow.py`](../../examples/run_budget_workflow.py) | **Cumulative RunBudget (H11):** one shared budget across iterations + handoffs, deterministic `BUDGET_EXHAUSTED` termination |
+| [`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py) | **Replanning (H12):** same goal + different observations → different plans; tool-failure recovery; reconstructable revision trace |
+| [`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py) | **Plan validity (H13):** same observation + different assumptions → different decisions; non-invalidating observations skip replanning; selective invalidation |
+| [`working_memory_continuity.py`](../../examples/working_memory_continuity.py) | **Working memory (H14):** stored state drives outcomes; versioned append-only records; cross-agent sharing; memory→assumption bridge |
+| [`authority_aware_coordination.py`](../../examples/authority_aware_coordination.py) | **Coordination (H16):** capability + authority delegation; worker-failure recovery; goal-ownership transfers; one shared memory + budget |
+| [`hierarchical_planning.py`](../../examples/hierarchical_planning.py) | **Hierarchical planning (H15):** deterministic goal tree; dependency release; H16 reused unchanged; localized subtree replanning |
+| [`event_driven_workflow.py`](../../examples/event_driven_workflow.py) | **Event workflows (H17):** suspend on wait condition; resume on matching event (memory + assumption effects); waiting is budget-free; subtree-selective resume |
+| [`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py) | **Durability (H18):** checkpoint, destroy runtime, restore from disk, resume without re-running; cross-restart idempotency; corruption rejected |
 
 Run any example from the repo root:
 
@@ -136,10 +146,53 @@ All examples use stub/mock adapters — no API keys required.
 
 ---
 
+## Autonomy & multi-agent (experimental)
+
+Two capabilities layer on top of the single-agent runtime **without
+weakening governance** — every step is still a full governed
+`run_with_trace()` call:
+
+| Capability | API | What it adds | Safety bound |
+|-----------|-----|-------------|--------------|
+| **Iterate-until-done loop** | `IterativeAgentRunner`, `run_until_done`, `LLMCompletionChecker` | Feeds tool observations back to the model to pick the next step, re-planning until a `CompletionChecker` says done | `max_iterations` + shared `RunBudget` |
+| **Multi-agent handoff** | `AgentRegistry`, `MultiAgentOrchestrator`, `KeywordRouter`/`LLMRouter` | Routes a query across several governed agents with agent-to-agent handoff and a combined transcript | `max_handoffs` + shared `RunBudget` |
+| **Cumulative RunBudget (H11)** | `RunBudget`, `RunBudgetLimits`, `attach_run_budget` | One immutable-limit budget created once and shared across every iteration and handoff; reserve-before-execute over 9 dimensions (model/tool calls, tokens, cost, time, iterations, handoffs) with deterministic `BUDGET_EXHAUSTED` termination | is the bound |
+| **Observation-driven replanning (H12)** | `ReplanningRunner`, `Plan`, `PlanObservation`, `DeterministicReplanPolicy`, `RuleBasedReplanner` | Executes an explicit plan step-by-step and adapts the *future* from structured observations (CONTINUE/REVISE/ABORT/COMPLETE); completed work is immutable, revisions are deterministic and fully traceable, stagnation is detected | `max_iterations` / `max_revisions` + shared `RunBudget` |
+| **Plan validity & assumptions (H13)** | `PlanAssumption`, `AssumptionContext`, `AssumptionAwareReplanPolicy`, `build_assumption_aware_runner` | Plans declare the assumptions they depend on; observations are evaluated *against assumptions* so replanning fires only when an assumption is invalidated; selective invalidation reconsiders only dependent future steps; append-only, fully traceable | same as H12 (strategy-agnostic) |
+| **Governed working memory (H14)** | `WorkingMemory`, `MemoryRecord`, `MemoryAwareObservationBuilder`, `MemoryAssumptionBridge` | Run-scoped, append-only, versioned state shared across iterations, replanning, and agent handoffs; deterministic retrieval (ACTIVE → version → confidence → recency); memory invalidation bridges to H13 assumptions; every read is traced | strategy-agnostic; runs under the shared `RunBudget` |
+| **Authority-aware coordination (H16)** | `Coordinator`, `AgentProfile`, `CapabilityRegistry`, `DelegationContract`, `AuthorityModel` | A deterministic coordinator delegates mission goals to worker agents behind capability + authority + budget + ownership checks and immutable contracts; every goal has one owner; all agents share one `WorkingMemory` and one `RunBudget`; the coordinator never executes worker tasks | `max_delegations` + shared `RunBudget` |
+| **Hierarchical planning (H15)** | `HierarchyExecutor`, `GoalTree`, `Goal`, `StaticDecomposer`, `MissionPlan` | Deterministically decomposes a mission into an acyclic goal tree and feeds READY leaf goals to the **unchanged** H16 coordinator wave-by-wave; dependency-gated execution, localized subtree replanning, H13 assumption gating; shares one `WorkingMemory` + one `RunBudget` | `max_waves` + shared `RunBudget` |
+| **Event-driven workflows (H17)** | `WorkflowEngine`, `WorkflowInstance`, `WaitCondition`, `WorkflowEvent` | Long-lived missions suspend on wait conditions and resume deterministically when a matching event arrives, applying memory (H14) + assumption (H13) effects before continuing; waiting consumes no budget; only the affected subtree resumes; H16 coordination reused unchanged | shared `RunBudget`; waiting is free |
+| **Durable checkpoint & recovery (H18)** | `DurableWorkflowEngine`, `WorkflowCheckpoint`, `CheckpointStore`, `WorkflowRestorer` | Deterministic **local** durability: a waiting workflow serializes its full state (canonical JSON + integrity digest), survives process loss, restores into a new runtime with no hidden state, resumes without re-running completed work; cross-restart event idempotency, atomic event transactions, compare-and-save, corruption fail-closed. Not distributed / not exactly-once external | preserves the same `RunBudget` |
+
+See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
+[`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py),
+[`run_budget_workflow.py`](../../examples/run_budget_workflow.py),
+[`observation_driven_replanning.py`](../../examples/observation_driven_replanning.py),
+[`assumption_aware_planning.py`](../../examples/assumption_aware_planning.py),
+[`working_memory_continuity.py`](../../examples/working_memory_continuity.py),
+[`authority_aware_coordination.py`](../../examples/authority_aware_coordination.py),
+[`hierarchical_planning.py`](../../examples/hierarchical_planning.py),
+[`event_driven_workflow.py`](../../examples/event_driven_workflow.py), and
+[`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py).
+These are **experimental** — composed on the public agent API, tested, and run
+without an API key, but not yet hardened to the level of the core runtime.
+Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
+[Replanning (H12)](../docs/REPLANNING.md) ·
+[Plan Validity (H13)](../docs/PLAN_VALIDITY.md) ·
+[Working Memory (H14)](../docs/WORKING_MEMORY.md) ·
+[Hierarchical Planning (H15)](../docs/HIERARCHICAL_PLANNING.md) ·
+[Coordination (H16)](../docs/COORDINATION.md) ·
+[Event Workflows (H17)](../docs/EVENT_WORKFLOWS.md) ·
+[Workflow Durability (H18)](../docs/WORKFLOW_DURABILITY.md).
+
+---
+
 ## What it is not (yet)
 
-- **Not a multi-agent platform.** Governs a single agent's
-  execution path. No agent-to-agent handoffs or orchestration.
+- **Not a managed multi-agent platform.** The `MultiAgentOrchestrator`
+  above adds agent-to-agent handoff, but there is no shared blackboard,
+  parallel fan-out, or hierarchical sub-teams yet.
 - **Not a managed service.** A Python library, not a hosted
   platform.
 - **Not a no-code builder.** Developer-facing, code-first. A
