@@ -249,8 +249,9 @@ configurable.
   rotation, paged/fused): normalizes outliers by a **pre‑quantization matrix rotation**. The
   present system instead retains outlier channels in a higher‑precision sidecar and applies a
   **rotation‑free, in‑register conditional overlay** (§5.4), and adds the **static prefix‑
-  compatible mask** and **byte‑faithful cross‑tier reuse** that SAW‑INT4 does not address. Measured
-  behavior distinguishing the two appears in §8.
+  compatible mask** and **byte‑faithful cross‑tier reuse** that SAW‑INT4 does not address. This is a
+  **structural** distinction embodied in claim 1C and holds independent of any benchmark; see §8.3
+  for why the observed SAW behavior is treated as motivation only, not comparative evidence.
 - **CacheGen** (warm‑tier KV compression/reuse): does not disclose **format/geometry‑validated,
   byte‑faithful** restoration of a **protected‑precision** compressed state (§5.5). Concept D adds
   over it.
@@ -258,32 +259,36 @@ configurable.
   primarily **weight** quantization; none disclose the static‑mask‑for‑prefix‑reuse combination.
 
 ## 8. Unexpected results (empirical support)
-The following results were measured on the disclosed implementation and support non‑obviousness
-(unexpected retention of fidelity from a static, coarse, per‑model choice) and the specific
-distinction over rotation‑based INT4.
+The disclosed system's non‑obviousness rests on results measured **on the disclosed implementation
+itself, under controlled conditions** — it does **not** depend on any competitor performing poorly.
+The anchor is §8.1.
 
-1. **Fidelity retained at a fixed 4% static protection across model families and scales.** With
-   `protect_fraction = 0.04`, exact‑match long‑context needle‑in‑a‑haystack retrieval **equal to
-   stock BF16 (15/15)** was measured across **four models spanning three families and two scales**
-   — Qwen2.5‑7B‑Instruct, Mistral‑7B‑Instruct‑v0.3, Llama‑3.1‑8B‑Instruct, and Qwen2.5‑14B‑
-   Instruct — using the **same** calibration procedure with **no per‑family code changes**, at
-   approximately **0.5× the KV memory** of BF16 (yielding roughly **2× concurrent‑sequence
-   capacity** at a fixed memory budget). That a **single static per‑model mask** — expected to be
-   inferior to per‑sequence adaptation — preserves exact retrieval is the unexpected result.
+**8.1 — ANCHOR: exact fidelity retained by a static, coarse, per‑model mask (teaching‑away +
+unexpected result).** With `protect_fraction = 0.04`, exact‑match long‑context needle‑in‑a‑haystack
+retrieval **equal to stock BF16 (15/15)** was measured across **four models spanning three families
+and two scales** — Qwen2.5‑7B‑Instruct, Mistral‑7B‑Instruct‑v0.3, Llama‑3.1‑8B‑Instruct, and
+Qwen2.5‑14B‑Instruct — using the **same** calibration procedure with **no per‑family code changes**,
+at approximately **0.5× the KV memory** of BF16 (yielding roughly **2× concurrent‑sequence capacity**
+at a fixed memory budget). The art teaches toward per‑sequence/dynamic protection as the optimal
+choice; that a **single static per‑model mask** instead preserves **exact** retrieval — across
+multiple families and scales, with a coarse 4% selection — is the unexpected result and the
+teaching‑away. This evidence is (i) measured on the claimed system, (ii) controlled against the same
+model's BF16 reference, and (iii) commensurate in scope with independent claims 1E and 1A.
 
-2. **Rotation‑only INT4 exhibits a model‑transfer fidelity cliff that protected‑precision does
-   not.** On Qwen2.5‑7B‑Instruct, a block‑diagonal‑rotation INT4 method (SAW‑INT4/BDR, run with its
-   documented recipe) collapsed to **0% needle and 0% hard‑needle** retrieval while BF16 scored
-   **1.0**; the same rotation method scored **1.0** on the model it was tuned on (Qwen3‑4B), a
-   passing control confirming the kernel path was active. This indicates that a parameter‑free
-   rotation does not reliably transfer across models, whereas the disclosed **calibrated protected‑
-   precision** approach retained fidelity on the models tested (§8.1). *(Scope note for honesty of
-   the record: the rotation‑transfer collapse was measured on one mainstream model to date;
-   breadth across additional families is characterized as measured‑to‑date, not universal.)*
+**8.2 — byte‑faithful snapshot/restore verified.** A snapshot → zero → restore → byte‑compare
+round‑trip of the compressed state reproduced every stored tensor exactly, confirming that cross‑tier
+reuse of the compressed state adds no additional error (§5.5). Supports claim 1D.
 
-3. **Byte‑faithful snapshot/restore verified.** A snapshot → zero → restore → byte‑compare
-   round‑trip of the compressed state reproduced every stored tensor exactly, confirming that
-   cross‑tier reuse of the compressed state adds no additional error (§5.5).
+**8.3 — Motivation only (NOT relied upon as comparative evidence of record).** A block‑diagonal‑
+rotation INT4 method (SAW‑INT4/BDR) was observed, on one mainstream model (Qwen2.5‑7B‑Instruct), to
+lose long‑context retrieval where BF16 did not, while passing on the model it was tuned on. This is
+included **only to motivate the technical problem** that model‑transfer fidelity of rotation‑only
+INT4 is not guaranteed — it is **not** offered as evidence of comparative superiority, because it is
+a single model, was not run under a common harness against the disclosed system, and used a rotation
+configuration that may not be model‑specific. The distinction over SAW‑INT4 that the claims rely on
+is **structural** (rotation‑free in‑register overlay, §5.4/claim 1C), which holds independent of any
+benchmark. *(To convert §8.3 into admissible comparative evidence, run both methods on the same
+model under one harness — a scoped, planned measurement — before relying on it in prosecution.)*
 
 ## 9. Illustrative claims (hardened; §112‑ and §101‑aware)
 
@@ -389,9 +394,16 @@ corresponding byte of the snapshot.
   §101‑exposed (mathematical/mental‑process risk). Anticipate an examiner rejecting or narrowing 1A,
   and possibly merging A–E; keep A as a dependent/supporting family, not a hill to die on.
 - **Expect a KSR combination rejection** assembling KIVI + KVQuant + SAW‑INT4 + CacheGen. Rebut with
-  (i) the **rotation‑free overlay** distinction over SAW‑INT4 (§5.4, claims 1C/… ), (ii) the
-  **dense‑layout / prefix‑reuse** distinction over sparse per‑sequence KVQuant (§5.3, §5.6), and
-  (iii) **unexpected results** (§8) — not merely "no single reference did all four."
+  (i) the **rotation‑free overlay** *structural* distinction over SAW‑INT4 (§5.4, claim 1C) — which
+  does not depend on any benchmark; (ii) the **dense‑layout / prefix‑reuse** distinction over sparse
+  per‑sequence KVQuant (§5.3, §5.6); and (iii) the **§8.1 unexpected‑results/teaching‑away** anchor —
+  measured on the claimed system, not "no single reference did all four."
+- **Do NOT lean on the SAW collapse (§8.3) as evidence.** It is single‑model, not a same‑harness
+  head‑to‑head, and possibly configuration‑dependent — an examiner can disregard it (MPEP 716.02
+  requires comparison to the closest prior art under identical conditions) and the authors could
+  publicly rebut it. Keep it as motivation only. If comparative evidence is wanted, first run the
+  scoped same‑harness, same‑model measurement of both methods (the repo's open item), then it may
+  be added to the record.
 - **§112 hygiene done:** removed "cryptographically safe" (replaced with definite integrity‑value/
   byte‑faithful language) and "fundamentally incompatible" (replaced with the functional recitation
   "applied without per‑sequence or per‑request recomputation").
