@@ -56,6 +56,11 @@ from typing import Any, Dict, List, Optional, Protocol
 
 from agentic.agentic_framework.iterate_loop import _response_from_trace
 from agentic.agentic_framework.tracing import AgentRunTrace
+from agentic.agentic_framework.run_budget import (
+    RunBudget,
+    BudgetExhausted,
+    attach_run_budget,
+)
 
 __all__ = [
     "RegisteredAgent",
@@ -152,9 +157,16 @@ class MultiAgentResult:
     """Outcome of an orchestration run."""
 
     query: str
-    stop_reason: str  # "completed" | "max_handoffs" | "budget_exceeded" | "error" | "empty"
+    stop_reason: str  # "completed" | "max_handoffs" | "budget_exceeded" | "budget_exhausted" | "error" | "empty"
     turns: List[AgentTurn] = field(default_factory=list)
     handoffs: List[Handoff] = field(default_factory=list)
+    #: Deterministic RunBudget termination reason (H11), when the shared
+    #: run budget stopped the orchestration (e.g. "HANDOFF_LIMIT").
+    termination_reason: Optional[str] = None
+    #: The shared RunBudget (H11), when one was supplied.
+    run_budget: Optional["RunBudget"] = None
+    #: Per-turn RunBudget snapshots for cumulative reconstruction.
+    budget_timeline: List[dict] = field(default_factory=list)
 
     @property
     def final_response(self) -> str:
@@ -181,6 +193,9 @@ class MultiAgentResult:
             "final_agent": self.final_agent,
             "final_response": self.final_response,
             "total_tokens": self.total_tokens,
+            "termination_reason": self.termination_reason,
+            "run_budget": self.run_budget.snapshot() if self.run_budget is not None else None,
+            "budget_timeline": self.budget_timeline,
             "handoff_path": self.handoff_path(),
             "turns": [
                 {
@@ -373,7 +388,12 @@ class MultiAgentOrchestrator:
         registry: The team of agents.
         router: Selects the next agent / signals completion.
         max_handoffs: Hard cap on agent transfers (terminal, non-optional).
-        budget_policy: Optional ``BudgetPolicy`` applied to every turn.
+        budget_policy: Optional per-turn ``BudgetPolicy`` (resets each turn).
+        run_budget: Optional shared :class:`RunBudget` (H11).  Created once
+            by the caller; every agent consumes from it cumulatively, so a
+            handoff never resets accounting.  When a limit is hit the run
+            terminates with ``stop_reason="budget_exhausted"`` and a
+            deterministic ``termination_reason``.
         fresh_sessions: When True (default) each agent starts a fresh
             session at the beginning of the run.
         context_window: Number of most-recent turns whose output is passed
@@ -387,6 +407,7 @@ class MultiAgentOrchestrator:
         *,
         max_handoffs: int = 4,
         budget_policy: Optional[Any] = None,
+        run_budget: Optional[RunBudget] = None,
         fresh_sessions: bool = True,
         context_window: int = 3,
     ) -> None:
@@ -398,6 +419,9 @@ class MultiAgentOrchestrator:
         self.router = router
         self.max_handoffs = max_handoffs
         self.budget_policy = budget_policy
+        #: Shared cumulative RunBudget (H11).  Every agent in the team
+        #: consumes from this same object — handoffs never reset it.
+        self.run_budget = run_budget
         self.fresh_sessions = fresh_sessions
         self.context_window = context_window
 
@@ -414,6 +438,7 @@ class MultiAgentOrchestrator:
     def run(self, query: str) -> MultiAgentResult:
         """Route the query through the team until done or a bound is hit."""
         result = MultiAgentResult(query=query, stop_reason="empty")
+        result.run_budget = self.run_budget
 
         if self.fresh_sessions:
             for name in self.registry.names():
@@ -421,10 +446,19 @@ class MultiAgentOrchestrator:
                 if hasattr(reg.agent, "new_session"):
                     reg.agent.new_session()
 
+        # H11: install the ONE shared budget on every agent (idempotent) and
+        # mark the workflow start.  Agent A and Agent B consume the same
+        # object — a handoff never resets it.
+        if self.run_budget is not None:
+            for name in self.registry.names():
+                attach_run_budget(self.registry.get(name).agent, self.run_budget)
+            self.run_budget.start()
+
         # Pick the starting agent.
         decision = self.router.route(query, result.turns, self.registry, current=None)
         if decision.done or decision.target is None:
             result.stop_reason = "completed" if decision.done else "empty"
+            self._finish_budget(result)
             return result
 
         current = decision.target
@@ -433,8 +467,26 @@ class MultiAgentOrchestrator:
         max_turns = self.max_handoffs + 1
 
         for _ in range(max_turns):
+            # H11: gate before the turn runs — a budget already exhausted by
+            # earlier agents/turns blocks this one before execution.
+            if self.run_budget is not None:
+                gate = self.run_budget.can_afford()
+                if not gate.ok:
+                    result.stop_reason = "budget_exhausted"
+                    result.termination_reason = gate.reason
+                    self._finish_budget(result)
+                    return result
+
             reg = self.registry.get(current)
-            trace = reg.agent.run_with_trace(instruction, budget_policy=self.budget_policy)
+            # H11: a model-call reservation may reject mid-turn -> BudgetExhausted.
+            try:
+                trace = reg.agent.run_with_trace(instruction, budget_policy=self.budget_policy)
+            except BudgetExhausted as exc:
+                result.stop_reason = "budget_exhausted"
+                result.termination_reason = exc.reason
+                self._finish_budget(result)
+                return result
+
             turn = AgentTurn(
                 agent_name=current,
                 instruction=instruction,
@@ -443,18 +495,40 @@ class MultiAgentOrchestrator:
             )
             result.turns.append(turn)
 
+            # H11: record post-hoc tool-call consumption from the governed trace.
+            if self.run_budget is not None:
+                self.run_budget.record_usage(tool_calls=trace.actions_executed)
+                self.run_budget.tick()
+                result.budget_timeline.append(self.run_budget.snapshot())
+                if self.run_budget.is_exhausted():
+                    result.stop_reason = "budget_exhausted"
+                    result.termination_reason = self.run_budget.termination_reason
+                    self._finish_budget(result)
+                    return result
+
             if trace.budget_exceeded:
                 result.stop_reason = "budget_exceeded"
+                self._finish_budget(result)
                 return result
             if trace.error_occurred:
                 result.stop_reason = "error"
+                self._finish_budget(result)
                 return result
 
             decision = self.router.route(query, result.turns, self.registry, current)
             if decision.done or decision.target is None:
                 result.stop_reason = "completed"
+                self._finish_budget(result)
                 return result
             if decision.target != current:
+                # H11: reserve the handoff BEFORE switching agents.
+                if self.run_budget is not None:
+                    res = self.run_budget.reserve(handoffs=1)
+                    if not res.ok:
+                        result.stop_reason = "budget_exhausted"
+                        result.termination_reason = res.reason
+                        self._finish_budget(result)
+                        return result
                 result.handoffs.append(
                     Handoff(from_agent=current, to_agent=decision.target, reason=decision.reason)
                 )
@@ -464,7 +538,14 @@ class MultiAgentOrchestrator:
                 # Router asked for the same agent again — treat as settled to
                 # avoid an unbounded self-loop.
                 result.stop_reason = "completed"
+                self._finish_budget(result)
                 return result
 
         result.stop_reason = "max_handoffs"
+        self._finish_budget(result)
         return result
+
+    def _finish_budget(self, result: MultiAgentResult) -> None:
+        """Mark the shared budget complete unless it terminated the run."""
+        if self.run_budget is not None and not self.run_budget.is_exhausted():
+            self.run_budget.complete()

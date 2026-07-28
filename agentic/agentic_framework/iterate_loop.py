@@ -55,6 +55,11 @@ from typing import Any, Callable, List, Optional, Protocol
 
 from agentic.agentic_framework.streaming_events import RUN_COMPLETED, TEXT_CHUNK
 from agentic.agentic_framework.tracing import AgentRunTrace
+from agentic.agentic_framework.run_budget import (
+    RunBudget,
+    BudgetExhausted,
+    attach_run_budget,
+)
 
 __all__ = [
     "Observation",
@@ -145,10 +150,17 @@ class LoopResult:
 
     goal: str
     done: bool
-    stop_reason: str  # "completed" | "max_iterations" | "budget_exceeded" | "error"
+    stop_reason: str  # "completed" | "max_iterations" | "budget_exceeded" | "budget_exhausted" | "error"
     iterations: int
     history: LoopHistory
     final_response: str
+    #: Deterministic RunBudget termination reason (H11), when the shared
+    #: run budget stopped the loop (e.g. "MODEL_CALL_LIMIT").
+    termination_reason: Optional[str] = None
+    #: The shared RunBudget (H11), when one was supplied.
+    run_budget: Optional["RunBudget"] = None
+    #: Per-step RunBudget snapshots so cumulative usage can be reconstructed.
+    budget_timeline: List[dict] = field(default_factory=list)
 
     @property
     def total_tokens(self) -> int:
@@ -162,6 +174,9 @@ class LoopResult:
             "iterations": self.iterations,
             "final_response": self.final_response,
             "total_tokens": self.total_tokens,
+            "termination_reason": self.termination_reason,
+            "run_budget": self.run_budget.snapshot() if self.run_budget is not None else None,
+            "budget_timeline": self.budget_timeline,
             "steps": [
                 {
                     "iteration": s.iteration,
@@ -354,8 +369,14 @@ class IterativeAgentRunner:
             :class:`KeywordCompletionChecker` (stops on a ``[DONE]``
             marker in the response).
         max_iterations: Hard cap on loop length (terminal, non-optional).
-        budget_policy: Optional ``BudgetPolicy`` shared across *all*
-            iterations for cumulative cost/token enforcement.
+        budget_policy: Optional per-invocation ``BudgetPolicy`` passed
+            into each governed step (resets every step — legacy R9 path).
+        run_budget: Optional shared :class:`RunBudget` (H11).  Created once
+            by the caller and consumed cumulatively across every iteration
+            — model calls, tokens, cost and iterations are reserved from
+            the same object and never reset until the workflow completes.
+            When a limit is hit the loop terminates deterministically with
+            ``stop_reason="budget_exhausted"`` and ``termination_reason``.
         reprompt: Optional builder ``(goal, history) -> str`` for the next
             instruction when the checker gives no explicit one.
         on_step: Optional callback invoked with each completed
@@ -371,6 +392,7 @@ class IterativeAgentRunner:
         checker: Optional[CompletionChecker] = None,
         max_iterations: int = 6,
         budget_policy: Optional[Any] = None,
+        run_budget: Optional[RunBudget] = None,
         reprompt: Optional[Callable[[str, LoopHistory], str]] = None,
         on_step: Optional[Callable[[LoopStep], None]] = None,
         fresh_session: bool = True,
@@ -381,6 +403,9 @@ class IterativeAgentRunner:
         self.checker = checker or KeywordCompletionChecker()
         self.max_iterations = max_iterations
         self.budget_policy = budget_policy
+        #: Shared cumulative RunBudget (H11).  When provided it persists
+        #: across every iteration — it is never re-created inside the loop.
+        self.run_budget = run_budget
         self.reprompt = reprompt or self._default_reprompt
         self.on_step = on_step
         self.fresh_session = fresh_session
@@ -400,16 +425,41 @@ class IterativeAgentRunner:
         if self.fresh_session and hasattr(self.agent, "new_session"):
             self.agent.new_session()
 
+        # H11: install the shared budget on the agent (idempotent) and
+        # mark the workflow start.  The budget is NOT re-created here.
+        if self.run_budget is not None:
+            attach_run_budget(self.agent, self.run_budget)
+            self.run_budget.start()
+
         history = LoopHistory(goal=goal)
         instruction = goal
         done = False
         stop_reason = "max_iterations"
+        termination_reason: Optional[str] = None
+        budget_timeline: List[dict] = []
 
         for i in range(self.max_iterations):
-            trace = self.agent.run_with_trace(
-                instruction,
-                budget_policy=self.budget_policy,
-            )
+            # H11: reserve this iteration BEFORE executing it.  A rejected
+            # reservation stops the loop before any work is done.
+            if self.run_budget is not None:
+                res = self.run_budget.reserve(iterations=1)
+                if not res.ok:
+                    stop_reason = "budget_exhausted"
+                    termination_reason = res.reason
+                    break
+
+            # H11: a model-call reservation may reject mid-step; that raises
+            # BudgetExhausted (BaseException), which unwinds here.
+            try:
+                trace = self.agent.run_with_trace(
+                    instruction,
+                    budget_policy=self.budget_policy,
+                )
+            except BudgetExhausted as exc:
+                stop_reason = "budget_exhausted"
+                termination_reason = exc.reason
+                break
+
             step = LoopStep(
                 iteration=i,
                 instruction=instruction,
@@ -418,6 +468,14 @@ class IterativeAgentRunner:
                 trace=trace,
             )
             history.steps.append(step)
+
+            # H11: record post-hoc consumption (tool calls from the governed
+            # trace; tokens/cost were recorded by the budgeted adapter).
+            if self.run_budget is not None:
+                self.run_budget.record_usage(tool_calls=trace.actions_executed)
+                self.run_budget.tick()
+                budget_timeline.append(self.run_budget.snapshot())
+
             if self.on_step is not None:
                 self.on_step(step)
 
@@ -429,6 +487,13 @@ class IterativeAgentRunner:
                 stop_reason = "error"
                 break
 
+            # H11: a cumulative gate (tokens/cost/tool/time) crossed during
+            # this step blocks the next one.
+            if self.run_budget is not None and self.run_budget.is_exhausted():
+                stop_reason = "budget_exhausted"
+                termination_reason = self.run_budget.termination_reason
+                break
+
             verdict = self.checker.check(goal, history)
             if verdict.done:
                 done = True
@@ -437,6 +502,9 @@ class IterativeAgentRunner:
 
             instruction = verdict.next_instruction or self.reprompt(goal, history)
 
+        if self.run_budget is not None and not self.run_budget.is_exhausted():
+            self.run_budget.complete()
+
         return LoopResult(
             goal=goal,
             done=done,
@@ -444,6 +512,9 @@ class IterativeAgentRunner:
             iterations=len(history.steps),
             history=history,
             final_response=history.latest_response(),
+            termination_reason=termination_reason,
+            run_budget=self.run_budget,
+            budget_timeline=budget_timeline,
         )
 
 
@@ -454,6 +525,7 @@ def run_until_done(
     checker: Optional[CompletionChecker] = None,
     max_iterations: int = 6,
     budget_policy: Optional[Any] = None,
+    run_budget: Optional[RunBudget] = None,
     on_step: Optional[Callable[[LoopStep], None]] = None,
 ) -> LoopResult:
     """Convenience one-call wrapper around :class:`IterativeAgentRunner`."""
@@ -462,6 +534,7 @@ def run_until_done(
         checker=checker,
         max_iterations=max_iterations,
         budget_policy=budget_policy,
+        run_budget=run_budget,
         on_step=on_step,
     )
     return runner.run(goal)

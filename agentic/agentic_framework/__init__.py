@@ -228,6 +228,20 @@ from agentic.agentic_framework.multi_agent import (
     MultiAgentResult,
     MultiAgentOrchestrator,
 )
+from agentic.agentic_framework.run_budget import (
+    BudgetDimension,
+    TerminationReason,
+    RunBudgetStatus,
+    RunBudgetLimits,
+    RunBudgetUsage,
+    Reservation,
+    BudgetViolation,
+    BudgetExhausted,
+    RunBudget,
+    BudgetedAdapter,
+    attach_run_budget,
+    format_run_budget,
+)
 
 __all__ = [
     # Main agent
@@ -417,6 +431,19 @@ __all__ = [
     "LLMRouter",
     "MultiAgentResult",
     "MultiAgentOrchestrator",
+    # Cumulative Run Budget (H11) — shared run-level resource governance
+    "BudgetDimension",
+    "TerminationReason",
+    "RunBudgetStatus",
+    "RunBudgetLimits",
+    "RunBudgetUsage",
+    "Reservation",
+    "BudgetViolation",
+    "BudgetExhausted",
+    "RunBudget",
+    "BudgetedAdapter",
+    "attach_run_budget",
+    "format_run_budget",
 ]
 
-__version__ = "1.10.0"  # + iterate-until-done loop & multi-agent orchestration (experimental, governed)
+__version__ = "1.11.0"  # + H11 cumulative RunBudget (shared run-level resource governance)

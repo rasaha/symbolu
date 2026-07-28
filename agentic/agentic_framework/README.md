@@ -109,6 +109,7 @@ part of the runtime contract.
 | [`pilot_internal_copilot.py`](../../examples/pilot_internal_copilot.py) | **Pilot 2:** Per-action-type approval boundary, approve + deny paths |
 | [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py) | **Iterate-until-done:** governed re-planning loop — tool results fed back, controller decides DONE vs CONTINUE, bounded by `max_iterations`/budget |
 | [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py) | **Multi-agent:** researcher → writer → reviewer handoff, each a fully governed agent, bounded by `max_handoffs` |
+| [`run_budget_workflow.py`](../../examples/run_budget_workflow.py) | **Cumulative RunBudget (H11):** one shared budget across iterations + handoffs, deterministic `BUDGET_EXHAUSTED` termination |
 
 Run any example from the repo root:
 
@@ -146,13 +147,16 @@ weakening governance** — every step is still a full governed
 
 | Capability | API | What it adds | Safety bound |
 |-----------|-----|-------------|--------------|
-| **Iterate-until-done loop** | `IterativeAgentRunner`, `run_until_done`, `LLMCompletionChecker` | Feeds tool observations back to the model to pick the next step, re-planning until a `CompletionChecker` says done | `max_iterations` + optional shared `BudgetPolicy` |
-| **Multi-agent handoff** | `AgentRegistry`, `MultiAgentOrchestrator`, `KeywordRouter`/`LLMRouter` | Routes a query across several governed agents with agent-to-agent handoff and a combined transcript | `max_handoffs` + optional shared `BudgetPolicy` |
+| **Iterate-until-done loop** | `IterativeAgentRunner`, `run_until_done`, `LLMCompletionChecker` | Feeds tool observations back to the model to pick the next step, re-planning until a `CompletionChecker` says done | `max_iterations` + shared `RunBudget` |
+| **Multi-agent handoff** | `AgentRegistry`, `MultiAgentOrchestrator`, `KeywordRouter`/`LLMRouter` | Routes a query across several governed agents with agent-to-agent handoff and a combined transcript | `max_handoffs` + shared `RunBudget` |
+| **Cumulative RunBudget (H11)** | `RunBudget`, `RunBudgetLimits`, `attach_run_budget` | One immutable-limit budget created once and shared across every iteration and handoff; reserve-before-execute over 9 dimensions (model/tool calls, tokens, cost, time, iterations, handoffs) with deterministic `BUDGET_EXHAUSTED` termination | is the bound |
 
-See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py)
-and [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py). These
+See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
+[`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py), and
+[`run_budget_workflow.py`](../../examples/run_budget_workflow.py). These
 are **experimental** — composed on the public agent API, tested, and run
 without an API key, but not yet hardened to the level of the core runtime.
+The RunBudget design is documented in [RunBudget (H11)](../docs/RUN_BUDGET.md).
 
 ---
 
