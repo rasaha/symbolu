@@ -1,9 +1,15 @@
-# Ugence Labs / Symbolu — Evidence-Led Problem Catalogue
+# Appendix A — Ugence Technical Evidence Catalogue
+
+> **Read the first-look first.** The commercial overview — product, customer,
+> wedge, strategy, and funding — is in **`UGENCE_AI_CONTROL_PLANE_FIRST_LOOK.md`**.
+> This appendix is the **technical diligence layer** beneath it: the full
+> problem / mechanism / evidence / honest-conclusion / next-step detail for every
+> module.
 
 **State the problem confidently. State the mechanism precisely. State the
 evidence conservatively. State the pilot objective measurably.**
 
-*Prepared for investor review. This is not a product brochure — it is an
+*Prepared for technical diligence. This is deliberately not a brochure — it is an
 evidence-led catalogue. Every capability is presented as a problem it attacks, a
 specific mechanism, the evidence that actually exists today, an honest conclusion
 about what can be claimed, and the measurable objective a customer pilot must
