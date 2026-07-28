@@ -117,6 +117,8 @@ part of the runtime contract.
 | [`hierarchical_planning.py`](../../examples/hierarchical_planning.py) | **Hierarchical planning (H15):** deterministic goal tree; dependency release; H16 reused unchanged; localized subtree replanning |
 | [`event_driven_workflow.py`](../../examples/event_driven_workflow.py) | **Event workflows (H17):** suspend on wait condition; resume on matching event (memory + assumption effects); waiting is budget-free; subtree-selective resume |
 | [`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py) | **Durability (H18):** checkpoint, destroy runtime, restore from disk, resume without re-running; cross-restart idempotency; corruption rejected |
+| [`human_governance_review.py`](../../examples/human_governance_review.py) | **Human governance (H19):** workflow pauses for a named reviewer; authority-checked approve/reject/request-changes; delegation + escalation chains; checkpoint recovery of a pending review; duplicate-decision idempotency; audit trace |
+| [`governed_external_actions.py`](../../examples/governed_external_actions.py) | **External actions (H20):** authorized execution (once); authority/ActionGate denial before the adapter; resource-version conflict; idempotent duplicate suppression; human-review approval binding; unknown-outcome reconciliation; compensation as a linked governed action |
 
 Run any example from the repo root:
 
@@ -164,6 +166,8 @@ weakening governance** — every step is still a full governed
 | **Hierarchical planning (H15)** | `HierarchyExecutor`, `GoalTree`, `Goal`, `StaticDecomposer`, `MissionPlan` | Deterministically decomposes a mission into an acyclic goal tree and feeds READY leaf goals to the **unchanged** H16 coordinator wave-by-wave; dependency-gated execution, localized subtree replanning, H13 assumption gating; shares one `WorkingMemory` + one `RunBudget` | `max_waves` + shared `RunBudget` |
 | **Event-driven workflows (H17)** | `WorkflowEngine`, `WorkflowInstance`, `WaitCondition`, `WorkflowEvent` | Long-lived missions suspend on wait conditions and resume deterministically when a matching event arrives, applying memory (H14) + assumption (H13) effects before continuing; waiting consumes no budget; only the affected subtree resumes; H16 coordination reused unchanged | shared `RunBudget`; waiting is free |
 | **Durable checkpoint & recovery (H18)** | `DurableWorkflowEngine`, `WorkflowCheckpoint`, `CheckpointStore`, `WorkflowRestorer` | Deterministic **local** durability: a waiting workflow serializes its full state (canonical JSON + integrity digest), survives process loss, restores into a new runtime with no hidden state, resumes without re-running completed work; cross-restart event idempotency, atomic event transactions, compare-and-save, corruption fail-closed. Not distributed / not exactly-once external | preserves the same `RunBudget` |
+| **Human governance & approval (H19)** | `ReviewManager`, `ReviewTask`, `HumanParticipant`, `ParticipantRegistry`, `HumanDecision`, `HumanAuthorityValidator` | Named humans become first-class governed actors: a workflow suspends on a review gate, a named participant issues an **authority-checked** decision (approve / reject / request-changes / delegate / escalate) validated *before* any state change, recorded append-only; a terminal decision becomes the H17 event that resolves the wait via the unchanged H18 engine; review state rides on H14 memory so it is checkpointed and restored; decisions are idempotent across restart. Not authentication / identity / e-signatures / a legally binding approval system | reuses H16 authority discipline; runs under the same durable engine |
+| **Governed external actions (H20)** | `ExternalActionExecutor`, `ExternalActionIntent`, `ExternalResourceRef`, `ActionGate`, `ExternalResourceAdapter`, `ActionReconciler`, `CompensationPlan` | A safe, durable execution boundary for external side effects: every action is an immutable intent, **authority + ActionGate checked before the adapter**, validated against live resource **preconditions/version** immediately pre-mutation, **duplicate-suppressed by a stable idempotency key** (durable across restart), its result durably recorded before the goal completes; an interrupted action becomes `UNKNOWN` (never replayed) and is resolved by **reconciliation**; compensation is a separate linked governed action. Not distributed transactions / not universal exactly-once / not automatic rollback | reuses H16/H19 authority + the H18 durable engine |
 
 See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`multi_agent_handoff.py`](../../examples/multi_agent_handoff.py),
@@ -173,8 +177,10 @@ See [`iterate_until_done_agent.py`](../../examples/iterate_until_done_agent.py),
 [`working_memory_continuity.py`](../../examples/working_memory_continuity.py),
 [`authority_aware_coordination.py`](../../examples/authority_aware_coordination.py),
 [`hierarchical_planning.py`](../../examples/hierarchical_planning.py),
-[`event_driven_workflow.py`](../../examples/event_driven_workflow.py), and
-[`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py).
+[`event_driven_workflow.py`](../../examples/event_driven_workflow.py),
+[`durable_workflow_recovery.py`](../../examples/durable_workflow_recovery.py),
+[`human_governance_review.py`](../../examples/human_governance_review.py), and
+[`governed_external_actions.py`](../../examples/governed_external_actions.py).
 These are **experimental** — composed on the public agent API, tested, and run
 without an API key, but not yet hardened to the level of the core runtime.
 Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
@@ -184,7 +190,9 @@ Design docs: [RunBudget (H11)](../docs/RUN_BUDGET.md) ·
 [Hierarchical Planning (H15)](../docs/HIERARCHICAL_PLANNING.md) ·
 [Coordination (H16)](../docs/COORDINATION.md) ·
 [Event Workflows (H17)](../docs/EVENT_WORKFLOWS.md) ·
-[Workflow Durability (H18)](../docs/WORKFLOW_DURABILITY.md).
+[Workflow Durability (H18)](../docs/WORKFLOW_DURABILITY.md) ·
+[Human Governance (H19)](../docs/HUMAN_GOVERNANCE.md) ·
+[External Actions (H20)](../docs/EXTERNAL_ACTIONS.md).
 
 ---
 
