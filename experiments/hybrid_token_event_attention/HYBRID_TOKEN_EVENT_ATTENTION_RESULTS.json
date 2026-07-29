@@ -1,0 +1,376 @@
+{
+  "meta": {
+    "experiment": "hybrid_token_event_attention",
+    "note": "Real CPU run of the pure-python autograd pipeline. Token path is a documented local Mistral stand-in (no Mistral/GPU in sandbox), used identically across arms. Architecture: gated-residual full event self-attention over K governed EvidenceRecords; H2 is the mean-pool ablation with identical encoder+head init.",
+    "seeds": [
+      0,
+      1
+    ],
+    "d": 24,
+    "K_default": 8,
+    "n_train": 800,
+    "n_heldout": 300,
+    "event_epochs": 20,
+    "integrated_epochs": 18,
+    "runtime_sec": 883.8
+  },
+  "arms": {
+    "H0_token_only": {
+      "per_family": {
+        "exact_threshold": 0.0333,
+        "active_policy": 0.3333,
+        "approval_req_vs_granted": 0.3333,
+        "authoritative_source": 0.1667,
+        "active_vs_stale": 0.1667,
+        "supporting_vs_opposing": 0.2667,
+        "exception_interaction": 0.4,
+        "multi_record_chain": 0.2667,
+        "unresolved_conflict": 0.0,
+        "evidence_incomplete": 0.1
+      },
+      "macro_all": 0.2067,
+      "macro_relational": 0.2917,
+      "overall": 0.2067
+    },
+    "H1_token_retrieved": {
+      "per_family": {
+        "exact_threshold": 0.5,
+        "active_policy": 0.4333,
+        "approval_req_vs_granted": 0.4333,
+        "authoritative_source": 0.4667,
+        "active_vs_stale": 0.1667,
+        "supporting_vs_opposing": 0.3,
+        "exception_interaction": 0.1667,
+        "multi_record_chain": 0.1667,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      },
+      "macro_all": 0.4633,
+      "macro_relational": 0.3417,
+      "overall": 0.4633
+    },
+    "H2_events_meanpool_oracle": {
+      "macro_all": 0.8233,
+      "macro_relational": 0.6458,
+      "overall": 0.8233,
+      "per_family": {
+        "exact_threshold": 0.8,
+        "active_policy": 0.9667,
+        "approval_req_vs_granted": 0.4667,
+        "authoritative_source": 0.3,
+        "active_vs_stale": 0.9667,
+        "supporting_vs_opposing": 0.8333,
+        "exception_interaction": 0.9833,
+        "multi_record_chain": 0.9167,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      }
+    },
+    "H2_events_meanpool_predicted": {
+      "macro_all": 0.735,
+      "macro_relational": 0.5958,
+      "overall": 0.735,
+      "per_family": {
+        "exact_threshold": 0.7333,
+        "active_policy": 0.7667,
+        "approval_req_vs_granted": 0.4333,
+        "authoritative_source": 0.35,
+        "active_vs_stale": 0.8167,
+        "supporting_vs_opposing": 0.7167,
+        "exception_interaction": 0.8833,
+        "multi_record_chain": 0.7,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 0.95
+      }
+    },
+    "H3_events_selfattn_oracle": {
+      "macro_all": 0.84,
+      "macro_relational": 0.6917,
+      "overall": 0.84,
+      "per_family": {
+        "exact_threshold": 0.8333,
+        "active_policy": 0.9333,
+        "approval_req_vs_granted": 0.5,
+        "authoritative_source": 0.4167,
+        "active_vs_stale": 1.0,
+        "supporting_vs_opposing": 0.8833,
+        "exception_interaction": 0.9667,
+        "multi_record_chain": 0.8667,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      }
+    },
+    "H4_deterministic_oracle": {
+      "per_family": {
+        "exact_threshold": 1.0,
+        "active_policy": 1.0,
+        "approval_req_vs_granted": 1.0,
+        "authoritative_source": 1.0,
+        "active_vs_stale": 1.0,
+        "supporting_vs_opposing": 1.0,
+        "exception_interaction": 1.0,
+        "multi_record_chain": 1.0,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      },
+      "macro_all": 1.0,
+      "macro_relational": 1.0,
+      "overall": 1.0
+    },
+    "H4_deterministic_predicted": {
+      "per_family": {
+        "exact_threshold": 0.8667,
+        "active_policy": 0.6333,
+        "approval_req_vs_granted": 0.7333,
+        "authoritative_source": 0.8667,
+        "active_vs_stale": 0.7667,
+        "supporting_vs_opposing": 0.9,
+        "exception_interaction": 0.8,
+        "multi_record_chain": 0.5333,
+        "unresolved_conflict": 0.6667,
+        "evidence_incomplete": 1.0
+      },
+      "macro_all": 0.7767,
+      "macro_relational": 0.825,
+      "overall": 0.7767
+    },
+    "H5_oracle_events_selfattn": {
+      "macro_all": 0.84,
+      "macro_relational": 0.6917,
+      "overall": 0.84,
+      "per_family": {
+        "exact_threshold": 0.8333,
+        "active_policy": 0.9333,
+        "approval_req_vs_granted": 0.5,
+        "authoritative_source": 0.4167,
+        "active_vs_stale": 1.0,
+        "supporting_vs_opposing": 0.8833,
+        "exception_interaction": 0.9667,
+        "multi_record_chain": 0.8667,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      }
+    },
+    "H6_predicted_events_selfattn": {
+      "macro_all": 0.7533,
+      "macro_relational": 0.6333,
+      "overall": 0.7533,
+      "per_family": {
+        "exact_threshold": 0.7167,
+        "active_policy": 0.85,
+        "approval_req_vs_granted": 0.45,
+        "authoritative_source": 0.45,
+        "active_vs_stale": 0.75,
+        "supporting_vs_opposing": 0.75,
+        "exception_interaction": 0.8833,
+        "multi_record_chain": 0.7,
+        "unresolved_conflict": 0.9833,
+        "evidence_incomplete": 1.0
+      }
+    },
+    "H7_integrated_adapter": {
+      "per_family": {
+        "exact_threshold": 0.8,
+        "active_policy": 0.9,
+        "approval_req_vs_granted": 1.0,
+        "authoritative_source": 0.5,
+        "active_vs_stale": 1.0,
+        "supporting_vs_opposing": 0.6333,
+        "exception_interaction": 1.0,
+        "multi_record_chain": 0.9667,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      },
+      "macro_all": 0.88,
+      "macro_relational": 0.7833,
+      "overall": 0.88
+    },
+    "H8_integrated_lora": {
+      "per_family": {
+        "exact_threshold": 0.8667,
+        "active_policy": 1.0,
+        "approval_req_vs_granted": 1.0,
+        "authoritative_source": 0.9333,
+        "active_vs_stale": 1.0,
+        "supporting_vs_opposing": 0.7,
+        "exception_interaction": 1.0,
+        "multi_record_chain": 1.0,
+        "unresolved_conflict": 1.0,
+        "evidence_incomplete": 1.0
+      },
+      "macro_all": 0.95,
+      "macro_relational": 0.9083,
+      "overall": 0.95
+    }
+  },
+  "required_comparisons": {
+    "H3_minus_H2_relational": 0.0458,
+    "H3_minus_H2_all": 0.0167,
+    "H3_minus_H4_predicted": -0.0233,
+    "H3_minus_H4_oracle": -0.16,
+    "H5_minus_H6_construction_gap": 0.0867,
+    "H3_minus_H1_all": 0.3767,
+    "H3_minus_H0_all": 0.6333,
+    "H7_minus_H3": 0.04,
+    "H8_minus_H7": 0.07
+  },
+  "language_preservation": {
+    "base_reference_perplexity": 44.5535,
+    "H0_perplexity": 2566.8651,
+    "H7_perplexity": 44.5535,
+    "H8_perplexity": 33.9561,
+    "H7_regression_pct": 0.0,
+    "H8_regression_pct": -23.7858,
+    "H0_finetune_drift_pct": 5661.3096
+  },
+  "metrics": {
+    "conflict_f1": {
+      "H3_oracle": 0.8319,
+      "H2_oracle": 0.7664,
+      "H4_oracle": 1.0
+    },
+    "active_version_accuracy": {
+      "H3": 1.0,
+      "H2": 0.9833,
+      "H4": 1.0
+    },
+    "exception_application_accuracy": {
+      "H3": 0.9667,
+      "H4": 1.0
+    },
+    "abstention_H3_oracle": {
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "abstention_H4_oracle": {
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "admission_oracle": {
+      "required_survival": 1.0,
+      "evidence_id_preservation": 1.0,
+      "irrelevant_occupancy": 0.5575,
+      "duplicate_occupancy": 0.0336,
+      "unauthorized_inclusion": 0.0
+    },
+    "admission_predicted": {
+      "required_survival": 0.7733,
+      "evidence_id_preservation": 1.0,
+      "irrelevant_occupancy": 0.5666,
+      "duplicate_occupancy": 0.0272,
+      "unauthorized_inclusion": 0.0
+    },
+    "attention_diagnostics_H3_predicted": {
+      "event_attention_entropy": 0.6083,
+      "attention_to_required": 0.3315,
+      "attention_to_irrelevant": 0.6561,
+      "attribution_exact_match": 0.5606
+    },
+    "extraction_metrics": {
+      "event_extraction_exact_match": 0.9091,
+      "event_schema_validity": 1.0,
+      "source_span_exact_match": 1.0,
+      "entity_linking_accuracy": 0.9566
+    },
+    "required_event_survival_K8": 0.7733,
+    "evidence_id_preservation": 1.0,
+    "unauthorized_event_inclusion": 0.0,
+    "event_attribution_exact_match": 0.5606,
+    "final_accuracy_given_required_survived_H3": 0.8233
+  },
+  "capacity_study": {
+    "K4": {
+      "required_survival": 0.7467,
+      "irrelevant_occupancy": 0.4411,
+      "duplicate_occupancy": 0.0342,
+      "final_accuracy_H3": 0.73,
+      "conditional_accuracy_H3": 0.8036,
+      "event_attention_ops": 16,
+      "event_state_bytes": 576,
+      "token_cost": 0
+    },
+    "K8": {
+      "required_survival": 0.7733,
+      "irrelevant_occupancy": 0.5666,
+      "duplicate_occupancy": 0.0272,
+      "final_accuracy_H3": 0.7567,
+      "conditional_accuracy_H3": 0.8233,
+      "event_attention_ops": 64,
+      "event_state_bytes": 1152,
+      "token_cost": 0
+    },
+    "K16": {
+      "required_survival": 0.7733,
+      "irrelevant_occupancy": 0.5682,
+      "duplicate_occupancy": 0.0264,
+      "final_accuracy_H3": 0.7567,
+      "conditional_accuracy_H3": 0.8233,
+      "event_attention_ops": 256,
+      "event_state_bytes": 2304,
+      "token_cost": 0
+    }
+  },
+  "causal_controls": {
+    "baseline_all": 0.7567,
+    "baseline_relational": 0.6583,
+    "mean_pool_replace_relational": 0.575,
+    "mean_pool_replace_all": 0.55,
+    "shuffle_order_all": 0.7567,
+    "shuffle_order_relational": 0.6583,
+    "remove_required_all": 0.46,
+    "remove_irrelevant_all": 0.63,
+    "inject_duplicates_all": 0.77,
+    "corrupt_ids_authoritative": 1.0,
+    "unauthorized_admitted": 0.0,
+    "interaction_gain_relational": 0.0833,
+    "required_removal_drop": 0.2967,
+    "irrelevant_removal_delta": -0.1267,
+    "order_shuffle_delta": 0.0
+  },
+  "acceptance_criteria": {
+    "H3_minus_H2_relational_ge_0.05": {
+      "value": 0.0458,
+      "pass": false
+    },
+    "H3_minus_H1_conflict_ge_0.08": {
+      "value": 0.2,
+      "pass": true
+    },
+    "event_attribution_exact_match_ge_0.95": {
+      "value": 0.5606,
+      "pass": false
+    },
+    "evidence_id_preservation_eq_1.00": {
+      "value": 1.0,
+      "pass": true
+    },
+    "unauthorized_inclusion_eq_0.00": {
+      "value": 0.0,
+      "pass": true
+    },
+    "heldout_degradation_le_0.05": {
+      "value": 0.0867,
+      "pass": false
+    },
+    "language_regression_le_1pct_H8": {
+      "value": -23.7858,
+      "pass": true
+    },
+    "event_path_ablation_removes_relational_gain": {
+      "value": 0.0833,
+      "pass": true
+    },
+    "required_removal_material_decrease": {
+      "value": 0.2967,
+      "pass": true
+    },
+    "H6_within_0.10_of_H5_or_extraction_bottleneck": {
+      "value": 0.0867,
+      "pass": true
+    },
+    "H7_beats_or_matches_H3": {
+      "value": 0.04,
+      "pass": true
+    }
+  }
+}
