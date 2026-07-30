@@ -31,6 +31,28 @@ import torch
 PROTECT_FRAC = 0.04          # KVPro's 4% channel budget
 _ASYM = 15.0                 # unsigned int4
 _CLAMP = 1e-8
+_BS = 32                     # production K block size
+
+
+def _load_production_quantizer():
+    """Use the repo's exact production INT4 (per-block BS=32 affine) when available; else fall back
+    to a simplified per-channel affine. Feasibility signal is granularity-agnostic, but production
+    math is preferred so Phase 1 uses the real kernel's numerics."""
+    try:
+        from pathlib import Path
+        repo = Path(__file__).resolve().parents[2]
+        p = str(repo / "experiments" / "kvpro_v3_symmetric_residual")
+        if p not in sys.path:
+            sys.path.insert(0, p)
+        import quantizers as Q            # noqa
+        return Q
+    except Exception:
+        return None
+
+
+_Q = _load_production_quantizer()
+INT4_MATH = ("production: quantizers.quantize_k_sequence (per-block BS=32 affine)"
+             if _Q is not None else "fallback: simplified per-channel affine int4")
 
 DEFAULT_GATES = {
     "structure_concentration_ratio_min": 3.0,   # top-4% channels hold >=3x their "fair share" of energy
@@ -69,8 +91,11 @@ def top_channel_mask(mags, frac):
     return mask
 
 
-def int4_affine_per_channel(x):     # simplified INT4: per-(h,d) affine over tokens
-    xf = x.float()
+def int4_reconstruct(x):
+    """Reconstruct (S,H,D) under INT4. Uses the PRODUCTION per-block quantizer when available."""
+    if _Q is not None:
+        return _Q.quantize_k_sequence(x.float(), _BS, "affine").float()
+    xf = x.float()                       # fallback: per-(h,d) affine over tokens
     mn = xf.amin(dim=0, keepdim=True); mx = xf.amax(dim=0, keepdim=True)
     scale = ((mx - mn) / _ASYM).clamp(min=_CLAMP)
     q = ((xf - mn) / scale).round().clamp(0, _ASYM)
@@ -92,8 +117,10 @@ def analyze_subset(x, frac):
     mags = channel_rms(x)
     cratio, share = concentration_ratio(mags, frac)
     mask = top_channel_mask(mags, frac)
-    x_int4 = int4_affine_per_channel(x)
-    x_prot = torch.where(mask.view(1, *mask.shape).expand_as(x), x.float(), x_int4)
+    x_int4 = int4_reconstruct(x)
+    # protected channels kept at bf16 (production intent), everything else INT4
+    prot_bf16 = x.to(torch.bfloat16).float()
+    x_prot = torch.where(mask.view(1, *mask.shape).expand_as(x), prot_bf16, x_int4)
     e_int4 = rel_l2(x, x_int4)
     e_prot = rel_l2(x, x_prot)
     benefit = e_int4 / (e_prot + 1e-12)
@@ -146,7 +173,7 @@ def run(path, gates, out_json, out_csv):
     ious = [r["mask_iou_visual_vs_text"] for r in rows if "mask_iou_visual_vs_text" in r]
     comb = [r["combined_mask_budget_x"] for r in rows if "combined_mask_budget_x" in r]
     summary = {
-        "protect_frac": PROTECT_FRAC, "layers_analyzed": len(rows),
+        "protect_frac": PROTECT_FRAC, "int4_math": INT4_MATH, "layers_analyzed": len(rows),
         "visual_concentration_ratio_mean": round(mean("concentration_ratio", "visual"), 3),
         "text_concentration_ratio_mean": round(mean("concentration_ratio", "text"), 3),
         "visual_protection_benefit_mean": round(mean("protection_benefit_x", "visual"), 3),

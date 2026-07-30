@@ -78,7 +78,11 @@ Heavier (needs generation + a benchmark); gated on Phase 1 to avoid wasted effor
 - `scripts/kvpro_video_understanding/capture_vlm_kv.py` — **pod-only**: loads Qwen2.5-VL, feeds a video
   at several frame counts, dumps per-layer KV split by visual/text token, + `kv_growth.json`.
 - `scripts/kvpro_video_understanding/analyze_kv_outliers.py` — **CPU**: computes G1/G2/G3 and emits the
-  verdict JSON + per-layer CSV. No GPU/model needed.
+  verdict JSON + per-layer CSV. No GPU/model needed. **Uses the PRODUCTION INT4 quantizer**
+  (`quantizers.quantize_k_sequence`, per-block BS=32 affine) when the repo is present — so Phase 1 runs
+  the real kernel's numerics, not an approximation (falls back to a simplified affine only if run
+  standalone; the `int4_math` field in the verdict records which was used). Protected channels held at
+  bf16, matching production.
 - `scripts/kvpro_video_understanding/test_analyze_kv_outliers_cpu.py` — **CPU unit test (4/4 pass)**:
   proves the verdict flips correctly (GO when visual matches text; NO_GO_STRUCTURE when diffuse;
   mask-mismatch when outliers differ). **TEST-BACKED.**
