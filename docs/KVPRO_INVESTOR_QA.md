@@ -83,6 +83,26 @@ hoping; we've told you the physics up front. The larger execution risks are the 
 support and converting one design‑partner deployment into a third‑party‑verified cost/quality case —
 which is what the raise funds.
 
+### Q9. "You just validated an INT8 protected‑channel sidecar. Does it change the numbers?"
+**Honest answer.** Marginally, and we won't dress it up. We keep a small set of high‑salience channels
+(~4% of dimensions) at high precision; those were stored in **BF16**, and we tested storing them in
+**INT8** instead. Three findings, all *measured* on real Mistral‑7B‑Instruct‑v0.3 (A100‑80GB, real
+vLLM path — not a simulation):
+- **Quality: held.** INT8 vs BF16 scored **identical** on needle (30/30 = 30/30) and hard‑needle
+  (46/48 = 46/48), MMLU within noise, and agreed on **99.3%** of next‑token predictions. No
+  degradation we could measure.
+- **Memory: a little less.** It **halves that sidecar's bytes** (10→5 bytes per token/head/layer),
+  but the protected sidecar is a **small slice** of the compressed cache — so the effect on *total*
+  KV memory is only **low‑single‑digit percent**, not the headline 1.8×. A density knob, not a step
+  change.
+- **Speed: a little slower.** End‑to‑end decode is **~3.45% slower** (range ~2–5.5%; *measured*),
+  because the INT8 values are expanded back to BF16 before the attention kernel — it adds a small
+  step and speeds nothing up. Not a performance feature.
+
+Net: **quality‑neutral, slightly less memory, slightly slower.** We treat it as an optional density
+setting, off by default, and make **no speed claim** for it. We're flagging it here precisely so it
+isn't later mistaken for a throughput win — it isn't one.
+
 ---
 
 **Meta‑note for the room:** the strongest move with a technical investor is to *volunteer* the limits
