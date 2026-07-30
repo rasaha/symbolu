@@ -59,8 +59,10 @@ def _build_and_measure(pw, torch, mask_hd, kmin_hd, kmax_hd, S, iters, device):
     gc.collect(); torch.cuda.empty_cache(); torch.cuda.reset_peak_memory_stats()
     base = torch.cuda.memory_allocated()
 
+    # protect_minmax MUST stay on CPU: the writer stores it as _protect_minmax_cpu and does an
+    # internal .cpu() gather in _lazy_alloc; passing CUDA tensors triggers a device mismatch.
     w = pw.PagedKVWriter(layer_idx=0, protect_mask=mask_hd.to(device),
-                         protect_minmax=(kmin_hd.to(device), kmax_hd.to(device)))
+                         protect_minmax=(kmin_hd.cpu(), kmax_hd.cpu()))
     kv_cache = torch.zeros((2, NB, BS, H, D), dtype=torch.uint8, device=device)
     w._lazy_alloc(kv_cache)
 
