@@ -108,22 +108,31 @@ active-vs-stale confusion, authority exceedance, and evidence-attribution exact 
 
 ## Run
 
+Any **open-weight** causal LM works — pass an HF repo id, a pinned revision, or a local directory.
+`--model-id` is **optional**: it defaults to the open, ungated **`Qwen/Qwen2.5-0.5B-Instruct`**
+(Apache-2.0, small enough to run on CPU). Override it for a larger open model such as
+`mistralai/Mistral-7B-Instruct-v0.3`, or via `$UGENCE_REAL_MODEL_ID`.
+
 ```bash
 # 1. install real-model deps on a suitable machine (GPU or a 32 GB+ CPU host)
 pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
 
-# 2. pick any open-weight causal LM (HF repo id, a pinned revision, or a local dir)
-export UGENCE_REAL_MODEL_ID="mistralai/Mistral-7B-Instruct-v0.3"
-export UGENCE_MODEL_REVISION="<commit-sha>"    # optional pin
-
-# 3. smoke run (10–20 instances), then full
+# 2. smoke run with the open default model (no placeholder / env var needed)
 python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
-    --model-id "$UGENCE_REAL_MODEL_ID" --revision "$UGENCE_MODEL_REVISION" \
     --mode smoke --limit 20 --device auto --dtype auto
 
+# 2b. or pick a specific open-weight model (repo id, pinned revision, or local dir)
 python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
-    --model-id "$UGENCE_REAL_MODEL_ID" --mode full --device auto --dtype auto
+    --model-id "mistralai/Mistral-7B-Instruct-v0.3" --revision "<commit-sha>" \
+    --mode smoke --limit 20 --device auto --dtype auto
+
+# 3. full held-out run
+python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
+    --model-id "mistralai/Mistral-7B-Instruct-v0.3" --mode full --device auto --dtype auto
 ```
+
+`$UGENCE_REAL_MODEL_ID` / `$UGENCE_MODEL_REVISION` still work as optional overrides for the model and
+its pinned revision.
 
 CLI flags: `--model-id --revision --dataset-jsonl --mode smoke|full --limit --seed
 --device auto|cuda|mps|cpu --dtype auto|bf16|fp16|fp32 --load-in-4bit --max-input-tokens
