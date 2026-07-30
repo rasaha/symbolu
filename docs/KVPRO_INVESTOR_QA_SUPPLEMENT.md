@@ -65,6 +65,39 @@ warm-tier serving)*
 
 ---
 
+### Q12. "Concretely, what does KVPro do at each memory tier — hot, warm, and cold?"
+
+**Honest answer.** It's **one** quality-safe ~1.8× compression plus **one** bit-exact snapshot/restore,
+applied at every tier — so the density win compounds down the stack and the *same* compressed bytes
+move losslessly between tiers.
+
+- **🔥 Hot — GPU HBM (active decode).** Compress in-GPU KV to **~0.5× (≈1.8× net)** → **~2× concurrent
+  long-context sessions/GPU, ~44% fewer GPUs**, at **near-full-precision quality (100% needle vs ~12%
+  for FP8)**. This is the shipped, defensible core. The **honest cost lives here**: decode
+  **0.13–0.67× of BF16**, so latency-critical single-stream traffic stays on full precision.
+  *(measured)*
+- **♨️ Warm — CPU DRAM (reusable prefixes).** **~1.8× denser** reusable KV per GB *(modeled)* **and
+  byte-exact snapshot/restore** *(measured)* → lossless offload that **skips prefill recompute**; reuse
+  pays **50–86% lower time-to-first-token per hit** and **1.2–1.85× throughput at high hit rates**
+  *(measured)*. **Caveat:** the primitive is measured, but the **end-to-end warm-tier serving is in
+  progress** — the turnkey reuse feature is not yet shipped.
+- **🧊 Cold — NVMe/NAND flash (cross-session, archival).** **~1.8× less flash (−44%)** for the same
+  working set *(modeled)*; **byte-faithful**, so cross-session restore adds **zero extra quality loss**;
+  **endurance-safe** because reuse is write-once-read-many (shared prefixes read across many requests),
+  **not** hot per-request churn. An optional NAND density-tiering adds only **~1.14× (hardware-capped)**
+  — disclosed, not relied upon.
+
+| Tier | Component | KVPro benefit | Basis |
+|---|---|---|---|
+| **Hot** | GPU HBM | ~2× users/GPU, ~44% fewer GPUs, quality held | **measured** (cost: 0.13–0.67× decode) |
+| **Warm** | CPU DRAM | ~1.8× denser + lossless reuse → −50–86% TTFT, 1.2–1.85× throughput | modeled capacity + **measured** reuse (serving **in progress**) |
+| **Cold** | NVMe / NAND | ~1.8× less flash, byte-faithful cross-session, endurance-safe | **modeled** (+ measured snapshot primitive) |
+
+**Through-line:** the shipped, defensible core is **hot-tier capacity + held quality**; warm and cold
+are **compounding upside**, with warm-tier serving honestly flagged as still being built.
+
+---
+
 *Companion to `KVPRO_INVESTOR_QA.md`. Quality figures are perplexity/needle on standard open models;
 NVFP4 emulated numerically (matches Blackwell's result, not its silicon). "In progress" items are not
 presented as shipped. Method is proprietary / patent-pending — NDA only. Not a forward-looking
