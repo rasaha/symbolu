@@ -167,6 +167,19 @@ other serving optimizations — it does not compete with them.
 
 ---
 
+## 7a. Optional density knob — INT8 protected sidecar (latest validation)
+
+The small set of high‑precision "protected" channels can optionally be stored in **INT8 instead of
+BF16**. Validated this cycle on a real open model (Mistral‑7B‑v0.3) through the real serving path:
+**quality unchanged** (identical retrieval scores, ~99% token‑for‑token agreement — *measured*), the
+protected sidecar's bytes **halve** but that sidecar is a small share of the compressed cache, so the
+effect on total KV is **low‑single‑digit %** — a minor density refinement, **not** part of the ~1.8×
+headline. Its honest cost: **~3.45% slower decode** (*measured*), since the INT8 values expand back to
+BF16 before attention. **Shipped off by default; no speed claim.** It refines Tiers 1–3 slightly and
+changes none of the economics below.
+
+---
+
 ## 8. The honest trade‑off (disclosed, not buried)
 
 KVPro is a **capacity + quality** tool, not a raw‑speed replacement. On the current (unoptimized)
@@ -189,6 +202,10 @@ every figure** — KVPro still removes ~20% of the GPU bill for that workload.
   **identical answer on every question** tested.
 - **Byte‑faithful warm‑tier:** snapshot→restore of compressed KV verified **bit‑exact**, so DRAM/
   flash movement introduces no additional quality loss — something lossy compressors cannot offer.
+- **Real‑serving‑path confirmation (this cycle):** on Mistral‑7B‑v0.3 through the production vLLM
+  path, the compressed decode fired the fused kernel on **every step with no fallback**, and the
+  optional INT8 protected sidecar held quality **identical to BF16** — needle **30/30 = 30/30**,
+  hard‑needle **46/48 = 46/48**, ~99% token‑for‑token agreement (*measured*).
 
 ---
 
@@ -200,6 +217,8 @@ every figure** — KVPro still removes ~20% of the GPU bill for that workload.
 | Needle 15/15 == BF16 across 4 models; 0.0‑pt academic delta | **Measured** |
 | Byte‑exact snapshot/restore | **Measured** |
 | TTFT −50–86% / 1.2–1.85× throughput on reuse | **Measured** |
+| INT8 protected‑sidecar: quality parity vs BF16 (Mistral, real vLLM path) | **Measured** |
+| INT8 protected‑sidecar: ~3.45% end‑to‑end decode cost; ~50% smaller sidecar bytes | **Measured** (A100) |
 | DRAM‑tier capacity (1.8×) | **Modeled** (compression ratio applied) |
 | NAND capacity (2.06× BF16) and tiering (1.14×), endurance | **Modeled** (conservative public NAND params) |
 | Dollar figures | **Illustrative** — scale with your GPU/HBM/DRAM/flash rates |

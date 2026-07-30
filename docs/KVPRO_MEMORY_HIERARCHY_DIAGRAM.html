@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KVPro — Memory-Hierarchy Positioning</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#151a21; --muted:#5b6672; --line:#e2e6ea;
+    --hbm:#c2410c; --hbm-b:#fff3ec; --dram:#1d4ed8; --dram-b:#eef3ff; --nand:#0f766e; --nand-b:#eafaf6;
+    --kv:#7c3aed; --kv-b:#f4efff; --measured:#166534; --measured-b:#e9f6ee; --modeled:#92600a; --modeled-b:#fbf3e2;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 6px 20px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0d1117;--panel:#161b22;--ink:#e7edf3;--muted:#9aa7b4;--line:#232c36;
+      --hbm:#fb923c;--hbm-b:#2a1710;--dram:#7aa2ff;--dram-b:#111a2e;--nand:#5eead4;--nand-b:#0c1e1b;
+      --kv:#c4b5fd;--kv-b:#1b1430;--measured:#86efac;--measured-b:#0f2417;--modeled:#facc7a;--modeled-b:#241a09;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px rgba(0,0,0,.35);}
+  }
+  :root[data-theme="dark"]{--bg:#0d1117;--panel:#161b22;--ink:#e7edf3;--muted:#9aa7b4;--line:#232c36;
+    --hbm:#fb923c;--hbm-b:#2a1710;--dram:#7aa2ff;--dram-b:#111a2e;--nand:#5eead4;--nand-b:#0c1e1b;
+    --kv:#c4b5fd;--kv-b:#1b1430;--measured:#86efac;--measured-b:#0f2417;--modeled:#facc7a;--modeled-b:#241a09;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 26px rgba(0,0,0,.35);}
+  :root[data-theme="light"]{--bg:#f6f7f9;--panel:#fff;--ink:#151a21;--muted:#5b6672;--line:#e2e6ea;
+    --hbm:#c2410c;--hbm-b:#fff3ec;--dram:#1d4ed8;--dram-b:#eef3ff;--nand:#0f766e;--nand-b:#eafaf6;
+    --kv:#7c3aed;--kv-b:#f4efff;--measured:#166534;--measured-b:#e9f6ee;--modeled:#92600a;--modeled-b:#fbf3e2;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 56px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 8px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 26px}
+  .tag{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+  .m{color:var(--measured);background:var(--measured-b);border-color:color-mix(in srgb,var(--measured) 30%,transparent)}
+  .mo{color:var(--modeled);background:var(--modeled-b);border-color:color-mix(in srgb,var(--modeled) 30%,transparent)}
+  .kvtag{color:var(--kv);background:var(--kv-b);border-color:color-mix(in srgb,var(--kv) 30%,transparent)}
+  .grid{display:grid;grid-template-columns:1fr;gap:18px}
+  .hier{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .tier{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:14px 16px;position:relative;overflow:hidden}
+  .tier::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+  .t-hbm::before{background:var(--hbm)} .t-dram::before{background:var(--dram)} .t-nand::before{background:var(--nand)}
+  .tier-hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:6px}
+  .tier-name{font-size:17px;font-weight:700}
+  .chip{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px}
+  .c-hbm{color:var(--hbm);background:var(--hbm-b)} .c-dram{color:var(--dram);background:var(--dram-b)} .c-nand{color:var(--nand);background:var(--nand-b)}
+  .comp{color:var(--muted);font-size:12.5px}
+  .tier-body{display:grid;grid-template-columns:1.4fr 1fr;gap:8px 18px;align-items:center}
+  @media(max-width:640px){.tier-body{grid-template-columns:1fr}}
+  .effect{font-weight:600}
+  .effect small{display:block;color:var(--muted);font-weight:400;font-size:12.5px;margin-top:2px}
+  .metric{text-align:right;font-variant-numeric:tabular-nums}
+  @media(max-width:640px){.metric{text-align:left}}
+  .metric b{font-size:19px;color:var(--kv)}
+  .widthbar{margin-top:10px;height:8px;border-radius:6px;background:var(--line);position:relative;overflow:hidden}
+  .widthbar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;display:block}
+  .path{display:flex;align-items:stretch;gap:0;margin:6px 0 2px;flex-wrap:wrap}
+  .node{flex:1;min-width:92px;text-align:center;padding:10px 8px;border:1px dashed var(--line);
+    border-radius:10px;background:var(--panel);font-size:12.5px}
+  .node b{display:block;font-size:13.5px}
+  .arrow{align-self:center;color:var(--kv);font-weight:800;padding:0 6px}
+  .ribbon{margin-top:6px;background:var(--kv-b);border:1px solid color-mix(in srgb,var(--kv) 28%,transparent);
+    border-radius:12px;padding:12px 14px}
+  .ribbon b{color:var(--kv)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
+  @media(max-width:720px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+  .card h4{margin:0 0 4px;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+  .card p{margin:0;font-size:14px}
+  .card .big{font-size:20px;font-weight:700}
+  .note{margin-top:22px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+  .honest{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--modeled);
+    border-radius:10px;padding:12px 14px}
+  .sec{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:26px 0 8px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KVPro across the memory hierarchy</h1>
+  <p class="sub">One quality-safe ~1.8× KV compression, applied at every tier — with byte-exact snapshot/restore between them.</p>
+  <div class="legend">
+    <span class="tag m">measured — real A100/H100</span>
+    <span class="tag mo">modeled — from measured density</span>
+    <span class="tag kvtag">KVPro compressed state</span>
+  </div>
+
+  <div class="sec">The hierarchy — fast &amp; costly at top, dense &amp; cheap at bottom</div>
+  <div class="hier">
+
+    <div class="tier t-hbm">
+      <div class="tier-hd">
+        <span class="tier-name">GPU HBM</span>
+        <span class="chip c-hbm">Tier 1 · primary win</span>
+        <span class="comp">HBM3E — Micron / Samsung / SK Hynix</span>
+      </div>
+      <div class="tier-body">
+        <div class="effect">~2× long-context users per GPU · ~44% fewer GPUs
+          <small>KV compressed to ~0.5× (≈1.8× net) at near-full-precision quality</small></div>
+        <div class="metric"><b>~2×</b> users/GPU &nbsp;<span class="tag m">measured</span></div>
+      </div>
+      <div class="widthbar"><i style="width:55%;background:var(--hbm)"></i></div>
+    </div>
+
+    <div class="tier t-dram">
+      <div class="tier-hd">
+        <span class="tier-name">CPU DRAM</span>
+        <span class="chip c-dram">Tier 2 · warm reuse</span>
+        <span class="comp">DDR5 — Micron / Samsung / SK Hynix</span>
+      </div>
+      <div class="tier-body">
+        <div class="effect">~1.8× more reusable KV per GB, lossless
+          <small>Cached compressed prefixes skip prefill → faster first token</small></div>
+        <div class="metric"><b>−50–86%</b> TTFT · 1.2–1.85× tput &nbsp;<span class="tag m">measured</span></div>
+      </div>
+      <div class="widthbar"><i style="width:75%;background:var(--dram)"></i></div>
+    </div>
+
+    <div class="tier t-nand">
+      <div class="tier-hd">
+        <span class="tier-name">NVMe SSD · NAND flash</span>
+        <span class="chip c-nand">Tier 3 · cold / reuse</span>
+        <span class="comp">flash — SanDisk / Kioxia / Micron</span>
+      </div>
+      <div class="tier-body">
+        <div class="effect">~1.8× more KV per GB (−44% flash), endurance-viable for warm caches
+          <small>+~1.14× optional NAND density-tiering (hardware-capped)</small></div>
+        <div class="metric"><b>−44%</b> flash &nbsp;<span class="tag mo">modeled</span></div>
+      </div>
+      <div class="widthbar"><i style="width:100%;background:var(--nand)"></i></div>
+    </div>
+  </div>
+
+  <div class="sec">The data path — where the compressed state lives &amp; moves</div>
+  <div class="path">
+    <div class="node"><b>NAND</b>media (bulk)</div>
+    <div class="arrow">↔</div>
+    <div class="node"><b>NVMe</b>SSD interface</div>
+    <div class="arrow">↔</div>
+    <div class="node"><b>DRAM</b>warm tier</div>
+    <div class="arrow">↔</div>
+    <div class="node"><b>HBM</b>on-GPU</div>
+    <div class="arrow">→</div>
+    <div class="node"><b>GPU</b>attention</div>
+  </div>
+  <div class="ribbon">
+    <b>KVPro compressed state travels the whole path unchanged.</b> Snapshot → restore of the 4-bit
+    KV is <b>bit-exact</b> (<span class="tag m">measured</span>), so moving a cache HBM ↔ DRAM ↔ NVMe
+    adds <b>zero</b> extra quality loss — and it is reconstructed inside the attention kernel with no
+    full-precision copy. A lossy transport codec cannot make this guarantee.
+  </div>
+
+  <div class="sec">The advantage, per tier</div>
+  <div class="cards">
+    <div class="card"><h4>HBM · capacity</h4><p><span class="big">~44%</span> fewer GPUs, or ~2× the
+      long-context users on a fixed install — the defensible, measured core.</p></div>
+    <div class="card"><h4>DRAM · reuse</h4><p><span class="big">1.2–1.85×</span> batch throughput and
+      50–86% faster first token at high cache-hit rates, losslessly.</p></div>
+    <div class="card"><h4>NAND · density</h4><p><span class="big">~1.8×</span> denser warm/reused cache
+      on flash; endurance-safe because reuse is write-once-read-many.</p></div>
+  </div>
+
+  <div class="honest">
+    <b>The honest trade-off.</b> KVPro is a <b>capacity + quality</b> tool, not a speed tool. On the
+    current path decode runs <b>~0.13–0.67× of full precision</b>, so latency-critical traffic stays on
+    BF16 (credited zero above) and only memory-bound long-context traffic is routed to KVPro. An
+    optional INT8 protected-sidecar setting refines density slightly at a measured ~3.45% decode cost —
+    off by default, no speed claim. Quality anchor: needle-in-a-haystack matches full precision across
+    four models / three families / two scales (<span class="tag m">measured</span>).
+  </div>
+
+  <p class="note">Vendor names denote the component class a saving applies to (public specs); not
+    endorsements, not vendor-supplied. KVPro's compression method is proprietary / patent-pending —
+    technical detail under NDA. "Modeled" figures rest on the measured ~1.8× density anchor and stated
+    assumptions; dollar/capacity outcomes scale with your own GPU/DRAM/flash prices. Not a
+    forward-looking guarantee.</p>
+</div>
+</body>
+</html>
