@@ -1,0 +1,13 @@
+{
+  "environment": "CPU-only sandbox; no GPU",
+  "status": "RESOURCE_BLOCKED",
+  "nsight_systems": "RESOURCE_BLOCKED (no GPU)",
+  "nsight_compute": "RESOURCE_BLOCKED (no GPU; existing audits note ncu ERR_NVGPUCTRPERM on pods)",
+  "torch_profiler": "RESOURCE_BLOCKED",
+  "cuda_events": "RESOURCE_BLOCKED",
+  "important_path_check": {
+    "question": "Does config C consume INT8 inside the attention kernel, or materialize BF16 first?",
+    "answer_INFERRED": "Materializes BF16 first. phase5b_4c_paged_writer._protect_view_bf16 dequantizes int8->bf16; get_packed_view emits 'k_protect_bf16'; docstring: 'the kernel contract is unchanged — it always receives bf16'. Confirm unchanged for Mistral geometry on pod.",
+    "do_not_claim": "Config C is NOT a native INT8 decode path."
+  }
+}

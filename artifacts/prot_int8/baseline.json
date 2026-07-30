@@ -1,0 +1,37 @@
+{
+  "frozen_commit": "bfb2dfba70eb7c9d219b8d805a196062785d3798",
+  "branch": "claude/kvpro-prot-int8-validation-hkd4ff",
+  "torch_runtime": "2.13.0+cu130 imported OK on CPU; torch.cuda.is_available()=False",
+  "kvpro_modes": {
+    "protected_sidecar_bf16": "DEFAULT / shipped path (prot_format=bf16, 2 B/protected value)",
+    "protected_sidecar_int8": "Phase 6N prot_int8, FLAG-GATED OFF by default via env INT4_PROTECTED_PROT_INT8; static asymmetric uint8 (1 B), per-channel k_min/k_max calibration",
+    "residual": "int4 affine (unsigned [0,15]) per-block K, per-token V — UNCHANGED between bf16/int8 protection"
+  },
+  "implementation_files": {
+    "protected_channel_selection_calibration": "experiments/kvpro_v3_symmetric_residual/calibrate_mask_hf.py; CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py; mask loader CTM_plus/KVPolicy/kv_policy/phase5b_4c_paged_writer.py:804 (load_protect_mask_for_layer), :1739 n_protect",
+    "bf16_protected_sidecar": "phase5b_4c_paged_writer.py:1787 (k_protect_ext alloc, dtype=bf16 default), _protect_store :1876 identity, _protect_view_bf16 :1883 identity",
+    "int8_protected_sidecar": "phase5b_4c_paged_writer.py:735-773 (prot_int8_enabled/constants/quantize/dequantize), :1744-1790 (activation+uint8 alloc), :1876-1890 (store=quantize / view=dequantize)",
+    "packing_unpacking": "phase5b_4c_paged_writer.py write():1082/2080, write_decode_batched:2442; get_packed_view:2753, get_packed_view_batched:2811",
+    "paged_cache_storage": "kv_cache (2,NB,BS,H,D) uint8 nibbles + external sidecars k_scale/k_xmin/k_protect_ext/v_scale/v_xmin",
+    "attention_decode_kernels": {
+      "production": "EXTERNAL forked-vLLM CUDA flash_attn_with_int4_kvcache (fwd_kvcache_int4); no in-repo source; consumes bf16 k_protect (dummy full-K)",
+      "in_repo_triton": "int4_fused_attention_kernel.py @triton.jit (route-A, GPU-only, consumes k_fp16 overlay, NOT production)",
+      "reference": "phase6f_read_fusion.py dequant_k_reference/_fused; int4_fused_attention_sketch.py (PyTorch 'sketch')",
+      "cuda_write_ext": "CTM_plus/CUDA_int4_protected/csrc/*.cu — bf16-only, NOT built in repo, and DISABLED when int8 active (phase5b_4c_paged_writer.py:1003)"
+    },
+    "memory_accounting": "experiments/kvpro_v3_symmetric_residual/accounting.py (ANALYTICAL); scripts/kvpro_v3_profile/cost_accounting.py (MODELED); benchmark_memory.py uses torch.cuda but for a DIFFERENT (transformer attn) subject, not the sidecar",
+    "evaluation_harnesses": "experiments/kvpro_v3_symmetric_residual/{p8_gate.py,gates.py,needle_driver.py,hard_needle_driver.py,mmlu_driver.py,reconstruction_eval.py,attention_error_eval.py,token_agreement.py} — quality/generation stages require GPU+model+mask"
+  },
+  "production_path_classification": {
+    "A_simulation_fakequant_only": false,
+    "B_offline_representation": false,
+    "C_stored_in_actual_kv_cache_pages": true,
+    "D_consumed_by_production_decode_kernel_as_int8": false,
+    "E_fully_fused": false,
+    "F_reference_fallback_only_on_consumption": true,
+    "verdict": "INT8 sidecar is genuinely stored as uint8 on-page (C); every read dequantizes int8->bf16 into a separately materialized 'k_protect_bf16' buffer BEFORE attention; the kernel contract is bf16 either way (phase5b_4c_paged_writer.py:1886, :2782). No kernel consumes int8. Enabling int8 disables the only real (bf16-only, unbuilt) CUDA write kernel."
+  },
+  "prot_int8_relevant_cpu_tests": {"count": 135, "result": "135 passed", "file": "artifacts/prot_int8/test_results.txt"},
+  "protect_fraction_default": "4% -> n_protect=5 at D=128 (Qwen2.5-7B); mask artifact qwen2_5_7b_protect_mask_4pct.pt",
+  "evidence_notes": "prot_int8 is IMPLEMENTED and flag-gated OFF; not enabled by default in any config found (grep)."
+}

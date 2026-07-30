@@ -1,0 +1,2 @@
+prompt_id,position,config_pair,top1_agree,top5_overlap,max_abs_logit_diff,mean_abs_logit_diff,kl_or_jsd,logit_margin_at_divergence,classification
+NA,NA,C_minus_B,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED (no GPU/model)

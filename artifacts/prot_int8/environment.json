@@ -1,0 +1,37 @@
+{
+  "captured_utc": "2026-07-30",
+  "purpose": "Frozen baseline for KVPro prot-int8 (INT8 protected-channel sidecar) validation",
+  "git": {
+    "commit": "bfb2dfba70eb7c9d219b8d805a196062785d3798",
+    "branch": "claude/kvpro-prot-int8-validation-hkd4ff",
+    "status": "clean at session start (no uncommitted tracked changes)",
+    "head_subject": "Merge pull request #1240 from rasaha/claude/kvpro-us-patent-claims-q5xsph",
+    "remote": "origin -> rasaha/symbolu (via local proxy)"
+  },
+  "python": "3.11.15 (/usr/local/bin/python3)",
+  "os": "Linux 6.18.5-fc-v15 (Ubuntu 24.04 userspace, gcc 13.3.0)",
+  "cpu": {"model": "Intel(R) Xeon(R) Processor @ 2.10GHz", "cores": 4},
+  "memory_gib": 15,
+  "disk": {"mount": "/", "size": "252G", "used": "16G", "avail": "22G"},
+  "gpu": {
+    "present": false,
+    "nvidia_smi": "not found",
+    "nvcc": "not found",
+    "cuda_toolkit": "absent",
+    "note": "CPU-only container. No CUDA device. All GPU experiments are RESOURCE_BLOCKED."
+  },
+  "packages_at_session_start": {
+    "torch": "ABSENT at start (requirements-gpu pins torch==2.4.1 cu121; pytorch.org wheel index is proxy-blocked 403)",
+    "numpy": "installed 2.4.6 (this session, from PyPI)",
+    "pytest": "installed 9.1.1 (this session, from PyPI)",
+    "transformers": "absent (proxy/model access limited)",
+    "triton": "absent",
+    "accelerate": "absent"
+  },
+  "torch_install_attempt": {
+    "pytorch_cpu_index": "BLOCKED (proxy 403 Forbidden on download.pytorch.org)",
+    "pypi_default": "torch 2.13 CUDA build (~2.5GB) installed from PyPI; CPU-executable but no CUDA runtime; see torch_runtime field in baseline.json for final import status"
+  },
+  "network": "Outbound HTTPS via agent proxy; download.pytorch.org blocked; PyPI reachable",
+  "evidence_label_for_gpu_experiments": "RESOURCE_BLOCKED"
+}

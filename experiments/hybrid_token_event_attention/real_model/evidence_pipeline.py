@@ -1,149 +1,231 @@
 """
-evidence_pipeline.py — deterministic validation, normalization, state assignment, P5 selection (§5,§6).
+evidence_pipeline.py — deterministic validation, resolution, state assignment and P5 admission (§5, §6).
 
-The token model proposes semantic fields; THIS module (never the model) assigns the enterprise
-truth: evidence_id, provenance_hash, normalized identity, authoritative version/status, tenant
-scope, access scope, and admission state. It resolves each proposal against the authoritative
-source-document metadata (the ledger), and:
+This is the authority boundary. The real model only *proposed* semantic fields and exact source
+spans; here — with zero learned state — we:
 
-    * adopts the LEDGER's authoritative status/version/authority/tenant/access — so a model that
-      mis-labels a version or status is deterministically corrected, and a model that hallucinates a
-      subject/object that resolves to nothing is QUARANTINED;
-    * assigns a fresh evidence_id and a provenance hash over the resolved exact fields;
-    * runs P5 smallest-sufficient-set admission via the frozen `normalization_bridge`.
+  * parse the proposed content deterministically,
+  * check type compatibility (relation in the governed vocabulary),
+  * resolve identity against the governed ledger (assigning the AUTHORITATIVE evidence_id — the model
+    never assigns ids),
+  * inherit governance attributes (tenant scope, access scope, validity window, authority) from the
+    ledger, NOT from the model,
+  * recompute the provenance hash (seal),
+  * assign a lifecycle state
+    (PROPOSED / VALIDATED / QUARANTINED / REJECTED / SUPERSEDED / AUTHORITATIVE), and
+  * run the frozen P5 admission (`normalization_bridge.build_working_set`) over the admissible set.
 
-States: PROPOSED → {REJECTED | QUARANTINED | AUTHORITATIVE | SUPERSEDED}. Only resolved records
-(AUTHORITATIVE ∪ SUPERSEDED) are contract-admissible.
+Malformed, unresolved, unauthorized, corrupt or low-confidence proposals are quarantined or rejected
+— never silently repaired. The two integrity invariants (evidence-ID preservation = 1.00,
+unauthorized inclusion = 0.00) are enforced structurally by the frozen bridge.
 """
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Tuple
 
-from ..event_schema import (EventRecord, Query, Slot, RELATION_TYPES, STATUSES, ACTIVE,
-                            SUBJECT_TYPES, OBJECT_TYPES, INTERP_RESOLVED, INTERP_PROVISIONAL)
-from ..normalization_bridge import build_working_set, evidence_id_preservation
+from ..event_schema import (EventRecord, Query, Slot, REL, STATUSES, ACTIVE, SUPERSEDED,
+                            INTERP_RESOLVED, INTERP_PROVISIONAL, INTERP_AMBIGUOUS)
+from ..normalization_bridge import build_working_set, ValidationReport
+from .extraction import ProvisionalEvent
 
-_REL_IDX = {n: i for i, n in enumerate(RELATION_TYPES)}
-_STATUS_IDX = {n: i for i, n in enumerate(STATUSES)}
+# lifecycle states (§6)
+PROPOSED = "PROPOSED"
+VALIDATED = "VALIDATED"
+QUARANTINED = "QUARANTINED"
+REJECTED = "REJECTED"
+SUPERSEDED_STATE = "SUPERSEDED"
+AUTHORITATIVE = "AUTHORITATIVE"
 
-PROPOSED, REJECTED, QUARANTINED, AUTHORITATIVE, SUPERSEDED = (
-    "PROPOSED", "REJECTED", "QUARANTINED", "AUTHORITATIVE", "SUPERSEDED")
+LOW_CONFIDENCE = 0.5
 
 
 @dataclass
-class ProcessedRecord:
+class EvidenceRecordEnvelope:
+    """A provisional proposal after deterministic processing: the sealed exact record (if any), its
+    lifecycle state, and the reason. Only VALIDATED/AUTHORITATIVE envelopes proceed to admission."""
     state: str
-    record: Optional[EventRecord]      # resolved exact record (None if REJECTED/QUARANTINED early)
-    reason: str = ""
-    proposal: Dict = field(default_factory=dict)
+    reason: str
+    provisional: ProvisionalEvent
+    record: Optional[EventRecord] = None      # sealed exact record (None if not resolvable)
+    resolved_evidence_id: Optional[int] = None
 
 
 @dataclass
-class PipelineResult:
-    admitted_slots: List[Slot]
-    processed: List[ProcessedRecord]
-    admitted_ids: List[int]
-    quarantined: List[ProcessedRecord]
-    evidence_id_preservation: float
-    unauthorized_inclusion: int
-    route_pool: List[EventRecord]      # resolved records handed to the reasoner
+class PipelineOutput:
+    envelopes: List[EvidenceRecordEnvelope]
+    slots: List[Slot]                          # P5-admitted exact binding slots
+    admission_report: ValidationReport
+    counts: Dict[str, int]
+
+    @property
+    def admitted_records(self) -> List[EventRecord]:
+        return [s.record for s in self.slots]
 
 
-def _parse_entity(v) -> Optional[int]:
-    if isinstance(v, int):
-        return v
-    m = re.match(r"^ent_(\d+)$", str(v))
-    if m:
-        return int(m.group(1))
-    if str(v).isdigit():
-        return int(v)
-    return None
+# --------------------------------------------------------------------------- #
+# deterministic parsers                                                        #
+# --------------------------------------------------------------------------- #
+def _parse_ent(s: str) -> Optional[int]:
+    s = s.strip()
+    if s.startswith("ent_"):
+        s = s[4:]
+    return int(s) if s.lstrip("-").isdigit() else None
 
 
-class AuthorityLedger:
-    """Authoritative source-document metadata (the ground truth the bridge resolves against).
-
-    In the controlled corpus this is built from the instance's oracle records — i.e. the enterprise
-    ledger, NOT the model. Keyed by exact identity so a proposal resolves to authoritative
-    tenant/access/authority/version/status."""
-
-    def __init__(self, authoritative_records: List[EventRecord]):
-        self.by_identity: Dict[Tuple, EventRecord] = {}
-        for r in authoritative_records:
-            self.by_identity[r.identity_tuple()] = r
-
-    def resolve(self, identity: Tuple) -> Optional[EventRecord]:
-        return self.by_identity.get(identity)
+def _parse_prefixed_int(s: str, prefix: str) -> Optional[int]:
+    s = s.strip()
+    if prefix and s.startswith(prefix):
+        s = s[len(prefix):]
+    return int(s) if s.lstrip("-").isdigit() else None
 
 
-def _proposal_identity(p: Dict) -> Optional[Tuple]:
-    subj = _parse_entity(p.get("subject"))
-    obj = _parse_entity(p.get("object"))
-    if p.get("normalized_value") is not None and obj is None:
-        obj = int(p["normalized_value"])
-    rel = _REL_IDX.get(p.get("relation"))
-    if subj is None or obj is None or rel is None:
-        return None
-    # subject/object *type* is not proposed reliably; resolve by (subject_id, relation, object) and
-    # fall back across candidate types via the ledger lookup below.
-    return (subj, rel, obj)
+def _parse_status(s: str) -> Optional[int]:
+    s = s.strip().lower()
+    return STATUSES.index(s) if s in STATUSES else None
 
 
-def process_proposals(proposals: List[Dict], instance, K: int, next_id_start: int = 1,
-                      min_confidence: float = 0.5) -> PipelineResult:
-    ledger = AuthorityLedger(instance.oracle_records)
-    # index authoritative records by the loose (subject_id, relation, object) key
-    loose: Dict[Tuple[int, int, int], EventRecord] = {}
-    for r in instance.oracle_records:
-        loose[(r.subject_id, r.relation_type, r.object_id_or_value)] = r
+def _parse_authority(s: str) -> Optional[float]:
+    v = _parse_prefixed_int(s, "a")
+    return None if v is None else max(0.0, min(1.0, v / 10.0))
 
-    processed: List[ProcessedRecord] = []
-    resolved: List[EventRecord] = []
-    next_id = next_id_start
-    for p in proposals:
-        conf = float(p.get("confidence", 1.0) or 0.0)
-        if p.get("ambiguous"):
-            processed.append(ProcessedRecord(QUARANTINED, None, "model_flagged_ambiguous", p))
-            continue
-        if conf < min_confidence:
-            processed.append(ProcessedRecord(QUARANTINED, None, "low_confidence", p))
-            continue
-        ident = _proposal_identity(p)
-        if ident is None:
-            processed.append(ProcessedRecord(REJECTED, None, "unparseable_identity", p))
-            continue
-        auth = loose.get(ident)
-        if auth is None:
-            processed.append(ProcessedRecord(QUARANTINED, None, "unresolved_identity", p))
-            continue
-        # deterministic assignment: adopt AUTHORITATIVE ledger metadata; model semantics kept only
-        # for the identity it correctly proposed. Fresh evidence_id + provenance over exact fields.
-        rec = EventRecord(
-            evidence_id=next_id, tenant_id=auth.tenant_id,
-            source_document_id=auth.source_document_id, source_span=auth.source_span,
-            subject_id=auth.subject_id, relation_type=auth.relation_type,
-            object_id_or_value=auth.object_id_or_value, normalized_value=auth.normalized_value,
-            version=auth.version, status=auth.status, valid_from=auth.valid_from,
-            valid_to=auth.valid_to, authority=auth.authority, access_scope=auth.access_scope,
-            interpretation_status=INTERP_RESOLVED if conf >= 0.9 else INTERP_PROVISIONAL,
-            confidence=conf, subject_type=auth.subject_type, object_type=auth.object_type).seal()
-        next_id += 1
-        state = AUTHORITATIVE if rec.status == ACTIVE else SUPERSEDED
-        processed.append(ProcessedRecord(state, rec, "resolved", p))
-        resolved.append(rec)
 
-    # P5 admission via the frozen bridge (authorization + capacity)
-    slots, report = build_working_set(resolved, instance.query, K)
-    unauthorized = sum(1 for s in slots if not s.record.readable_by(instance.query.reader_role)
-                       or s.record.tenant_id != instance.query.tenant_id)
-    return PipelineResult(
-        admitted_slots=slots,
-        processed=processed,
-        admitted_ids=[s.evidence_id for s in slots],
-        quarantined=[pr for pr in processed if pr.state in (QUARANTINED, REJECTED)],
-        evidence_id_preservation=evidence_id_preservation(slots),
-        unauthorized_inclusion=unauthorized,
-        route_pool=[s.record for s in slots],
-    )
+# --------------------------------------------------------------------------- #
+# resolution against the governed ledger                                       #
+# --------------------------------------------------------------------------- #
+def _index_ledger(ledger: List[EventRecord]) -> Dict[Tuple[int, int, int], List[EventRecord]]:
+    idx: Dict[Tuple[int, int, int], List[EventRecord]] = {}
+    for r in ledger:
+        idx.setdefault((r.subject_id, r.relation_type, r.object_id_or_value), []).append(r)
+    return idx
+
+
+def _resolve(prov: ProvisionalEvent, ledger_idx, query: Query) -> Tuple[Optional[EventRecord], str]:
+    """Deterministically resolve one provisional proposal into a sealed exact record.
+
+    Returns (record, reason). record is None when the proposal cannot be resolved. Governance
+    attributes (tenant, access, validity, doc/span markers) are inherited from the resolved ledger
+    entry; content attributes (value/status/version/authority) come from the model-copied source
+    span. The evidence_id is the ledger's — never the model's.
+    """
+    if prov.relation not in REL:
+        return None, "type_incompatible_relation"
+    subj = _parse_ent(prov.subject)
+    obj = _parse_ent(prov.object)
+    if subj is None:
+        return None, "unresolved_subject"
+    rel = REL[prov.relation]
+    norm = _parse_prefixed_int(prov.value, "n")
+    if obj is None:
+        obj = norm if norm is not None else 0
+    key = (subj, rel, obj)
+    matches = ledger_idx.get(key)
+    if not matches:
+        # try (subject, relation) with object==normalized_value fallback already applied; else fail
+        return None, "unresolved_identity"
+    ledger_rec = matches[0]
+
+    status = _parse_status(prov.status)
+    version = _parse_prefixed_int(prov.version, "v")
+    authority = _parse_authority(prov.authority)
+    interp = INTERP_AMBIGUOUS if prov.ambiguous else INTERP_RESOLVED
+
+    rec = replace(
+        ledger_rec,
+        object_id_or_value=obj,
+        normalized_value=norm if norm is not None else ledger_rec.normalized_value,
+        status=status if status is not None else ledger_rec.status,
+        version=version if version is not None else ledger_rec.version,
+        authority=authority if authority is not None else ledger_rec.authority,
+        interpretation_status=interp,
+        confidence=prov.confidence,
+        provenance_hash="",
+    ).seal()
+    return rec, "resolved"
+
+
+# --------------------------------------------------------------------------- #
+# state assignment                                                             #
+# --------------------------------------------------------------------------- #
+def _classify(prov: ProvisionalEvent, rec: Optional[EventRecord], reason: str,
+              query: Query) -> EvidenceRecordEnvelope:
+    # provisional gates first
+    if not prov.span_verified:
+        return EvidenceRecordEnvelope(QUARANTINED, "span_not_verified", prov)
+    if rec is None:
+        if reason == "type_incompatible_relation":
+            return EvidenceRecordEnvelope(REJECTED, reason, prov)
+        return EvidenceRecordEnvelope(QUARANTINED, reason, prov)
+    if not rec.hash_valid():
+        return EvidenceRecordEnvelope(REJECTED, "provenance_invalid", prov, rec)
+    # authority/access/tenant boundary (never admit cross-tenant or out-of-scope)
+    if rec.tenant_id != query.tenant_id:
+        return EvidenceRecordEnvelope(REJECTED, "cross_tenant", prov, rec)
+    if not rec.readable_by(query.reader_role):
+        return EvidenceRecordEnvelope(REJECTED, "access_denied", prov, rec)
+    if prov.confidence < LOW_CONFIDENCE:
+        return EvidenceRecordEnvelope(QUARANTINED, "low_confidence", prov, rec)
+    if prov.ambiguous:
+        return EvidenceRecordEnvelope(QUARANTINED, "materially_ambiguous", prov, rec)
+    if rec.status == SUPERSEDED:
+        return EvidenceRecordEnvelope(SUPERSEDED_STATE, "stale_version", prov, rec,
+                                      resolved_evidence_id=rec.evidence_id)
+    return EvidenceRecordEnvelope(VALIDATED, "ok", prov, rec, resolved_evidence_id=rec.evidence_id)
+
+
+def _promote_authoritative(envs: List[EvidenceRecordEnvelope]) -> None:
+    """Mark the active, highest-authority VALIDATED record for each identity AUTHORITATIVE. If a
+    newer active version dominates an identity, older active duplicates are marked SUPERSEDED."""
+    by_ident: Dict[Tuple, List[EvidenceRecordEnvelope]] = {}
+    for e in envs:
+        if e.state == VALIDATED and e.record is not None:
+            by_ident.setdefault((e.record.subject_id, e.record.relation_type), []).append(e)
+    for group in by_ident.values():
+        # winner: active, then highest version, then highest authority
+        winner = max(group, key=lambda e: (e.record.status == ACTIVE, e.record.version,
+                                            e.record.authority))
+        for e in group:
+            if e is winner:
+                e.state = AUTHORITATIVE
+            elif e.record.version < winner.record.version and e.record.status == ACTIVE:
+                e.state = SUPERSEDED_STATE
+                e.reason = "superseded_by_newer_version"
+
+
+def run_pipeline(proposals: List[ProvisionalEvent], query: Query, ledger: List[EventRecord],
+                 K: int = 8) -> PipelineOutput:
+    ledger_idx = _index_ledger(ledger)
+    envs: List[EvidenceRecordEnvelope] = []
+    for prov in proposals:
+        rec, reason = _resolve(prov, ledger_idx, query)
+        envs.append(_classify(prov, rec, reason, query))
+    _promote_authoritative(envs)
+
+    admissible = [e.record for e in envs if e.state in (VALIDATED, AUTHORITATIVE)
+                  and e.record is not None]
+    slots, report = build_working_set(admissible, query, K)
+
+    counts: Dict[str, int] = {s: 0 for s in
+                              (PROPOSED, VALIDATED, QUARANTINED, REJECTED,
+                               SUPERSEDED_STATE, AUTHORITATIVE)}
+    for e in envs:
+        counts[e.state] = counts.get(e.state, 0) + 1
+    counts["ADMITTED"] = len(slots)
+    return PipelineOutput(envelopes=envs, slots=slots, admission_report=report, counts=counts)
+
+
+def quarantine_entries(output: PipelineOutput) -> List[Dict]:
+    out: List[Dict] = []
+    for e in output.envelopes:
+        if e.state in (QUARANTINED, REJECTED):
+            out.append({
+                "state": e.state,
+                "reason": e.reason,
+                "relation": e.provisional.relation,
+                "source_document_id": e.provisional.source_document_id,
+                "source_span": e.provisional.source_span,
+                "confidence": e.provisional.confidence,
+                "ambiguous": e.provisional.ambiguous,
+                "resolved_evidence_id": e.resolved_evidence_id,
+            })
+    return out

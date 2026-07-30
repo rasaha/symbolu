@@ -1,149 +1,122 @@
-# RM1 Real-Model Validation Report
+# RM1 — Real-Model Validation Report
 
-> RM1 tests an actual frozen token-language model inside the external governed dual-domain architecture. It does not validate FSCS, model-weight adaptation, production deployment, or universal superiority of event attention.
+## STATUS: RESOURCE_BLOCKED
 
-## Status: RESOURCE_BLOCKED
+A genuine open-weight causal language model could not be loaded in this environment, so no real-model scientific claim is made. The harness, its unit tests, and the frozen governed architecture were exercised; only the real-model forward pass is blocked.
 
-The RM1 harness is complete and unit-tested, but an ACTUAL open-weight model could not be loaded in this environment. No real-model scientific claim is made. Per RM1 §2/§16 the harness stops here rather than substitute the stand-in.
-
-### Block detail
-```json
-{
-  "reason": "required package(s) not installed: torch, transformers",
-  "requested_model": "mistralai/Mistral-7B-v0.3",
-  "detected": {
-    "python_version": "3.11.15",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "cpu_count": 4,
-    "disk_free_gb": 31.87,
-    "packages": {
-      "torch": null,
-      "transformers": null,
-      "accelerate": null,
-      "safetensors": null,
-      "bitsandbytes": null,
-      "numpy": null,
-      "tokenizers": null
-    },
-    "cuda_available": false,
-    "mps_available": false,
-    "gpu_count": 0,
-    "vram_gb": null,
-    "ram_gb": 16.86,
-    "supported_dtypes": [
-      "float32"
-    ]
-  },
-  "missing": [
-    "torch",
-    "transformers"
-  ],
-  "param_count_estimate": null,
-  "est_memory_gb": null,
-  "remediation": [
-    "pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt"
-  ],
-  "recommended_command": "On a CUDA machine (>=16GB VRAM for a 7B bf16 model) with deps installed:\n  pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt\n  export UGENCE_REAL_MODEL_ID=mistralai/Mistral-7B-v0.3\n  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \\\n      --model-id \"$UGENCE_REAL_MODEL_ID\" --mode smoke --limit 20",
-  "status": "RESOURCE_BLOCKED"
-}
-```
+- Requested model: `mistralai/Mistral-7B-Instruct-v0.3`
+- Reason: `missing_packages:torch,transformers`
 
 ### Detected environment
 ```json
 {
-  "python_version": "3.11.15",
-  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-  "cpu_count": 4,
-  "disk_free_gb": 31.87,
-  "packages": {
+  "versions": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
     "torch": null,
     "transformers": null,
     "accelerate": null,
     "safetensors": null,
     "bitsandbytes": null,
-    "numpy": null,
-    "tokenizers": null
+    "numpy": null
   },
-  "cuda_available": false,
-  "mps_available": false,
-  "gpu_count": 0,
-  "vram_gb": null,
-  "ram_gb": 16.86,
-  "supported_dtypes": [
-    "float32"
+  "hardware": {
+    "cpu_count": 4,
+    "total_ram_bytes": 16856244224,
+    "cuda_available": false,
+    "cuda_device_count": 0,
+    "mps_available": false,
+    "vram_bytes_per_device": [],
+    "supported_fp": [
+      "float32"
+    ]
+  }
+}
+```
+
+### Exact remediation
+```json
+{
+  "missing_package_or_access_requirement": [
+    "torch",
+    "transformers"
+  ],
+  "detected_hardware": {
+    "cpu_count": 4,
+    "total_ram_bytes": 16856244224,
+    "cuda_available": false,
+    "cuda_device_count": 0,
+    "mps_available": false,
+    "vram_bytes_per_device": [],
+    "supported_fp": [
+      "float32"
+    ]
+  },
+  "estimated_memory_requirement": "Estimated memory ~= parameter_count * bytes_per_param (2 for bf16/fp16, 4 for fp32) plus KV cache and activations; e.g. a 7B model needs ~14 GB in fp16, ~28 GB in fp32, and ~5-6 GB under 4-bit CUDA quantization.",
+  "recommended_steps": [
+    "pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt",
+    "Run on a machine with a CUDA GPU (>= 16 GB VRAM for a 7B model in bf16/fp16, or use --load-in-4bit on CUDA for ~6 GB), or a CPU host with >= 32 GB RAM for fp32 (slow).",
+    "Recommended command on a suitable machine:\n  export UGENCE_REAL_MODEL_ID=\"mistralai/Mistral-7B-Instruct-v0.3\"\n  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \\\n      --model-id \"$UGENCE_REAL_MODEL_ID\" --mode smoke --limit 20 --device auto --dtype auto"
   ]
 }
 ```
 
-### Remediation
+## Final summary
 
-- pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
-
-### Recommended command
 ```
-On a CUDA machine (>=16GB VRAM for a 7B bf16 model) with deps installed:
-  pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
-  export UGENCE_REAL_MODEL_ID=mistralai/Mistral-7B-v0.3
-  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
-      --model-id "$UGENCE_REAL_MODEL_ID" --mode smoke --limit 20
-```
-
-
----
-
 Actual model:
-    mistralai/Mistral-7B-v0.3
+mistralai/Mistral-7B-Instruct-v0.3 @ None
 
 Actual-model execution:
-    RESOURCE_BLOCKED
+RESOURCE_BLOCKED
 
 Corpus:
-    CONTROLLED (not executed — blocked before inference)
+CONTROLLED
 
 Token-only result:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Retrieval result:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Governed-event deterministic result:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Router-gated event-attention result:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Event attention incremental relational gain:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Oracle-to-predicted construction gap:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Required-event survival:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Evidence-ID preservation:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Unauthorized-event inclusion:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Explanation supported precision:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Unsupported-claim recall:
-    RESOURCE_BLOCKED (not measured)
+RESOURCE_BLOCKED
 
 Best architecture:
-    RESOURCE_BLOCKED
+RESOURCE_BLOCKED
 
 Primary bottleneck:
-    resources
+resources
 
 Evidence classification:
-    RESOURCE BLOCKED
+RESOURCE BLOCKED
 
 Authorized next step:
-    hardware rerun (load an actual open-weight model on a suitable machine with deps installed; see remediation)
+hardware rerun
+```
 
-
-> RM1 tests an actual frozen token-language model inside the external governed dual-domain architecture. It does not validate FSCS, model-weight adaptation, production deployment, or universal superiority of event attention.
+RM1 tests an actual frozen token-language model inside the external governed dual-domain architecture. It does not validate FSCS, model-weight adaptation, production deployment, or universal superiority of event attention.

@@ -1,0 +1,33 @@
+{
+  "model_id_requested": "mistralai/Mistral-7B-Instruct-v0.3",
+  "verification_status": "NOT VERIFIED IN THIS ENVIRONMENT — huggingface.co is proxy-blocked (HTTP 403). All fields below are best-known values that MUST be confirmed on the pod via `huggingface-cli download --revision main <id> config.json` or AutoConfig.from_pretrained.",
+  "expected_config_VERIFY_ON_POD": {
+    "architectures": ["MistralForCausalLM"],
+    "model_type": "mistral",
+    "num_hidden_layers": 32,
+    "num_attention_heads": 32,
+    "num_key_value_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 4096,
+    "intermediate_size": 14336,
+    "vocab_size": 32768,
+    "max_position_embeddings": 32768,
+    "rope_theta": 1000000.0,
+    "sliding_window": "null / disabled in v0.3 (CRITICAL to confirm — see compatibility_report.json)",
+    "tie_word_embeddings": false,
+    "torch_dtype": "bfloat16"
+  },
+  "license_classification_VERIFY_ON_POD": {
+    "believed_license": "Apache-2.0",
+    "classification": "OSI-approved OPEN SOURCE (Apache-2.0) — NOT the later 'open-weight'/source-available Mistral Research License (MRL). This must be stated precisely and re-confirmed from the model card on the pod; do not call any Mistral model 'open source' without confirming Apache-2.0 vs MRL.",
+    "gated": "believed false (no terms acceptance); confirm on pod",
+    "auth_required": "believed none for download; confirm on pod"
+  },
+  "approx_size": {
+    "safetensors_bf16": "~14.5 GB across ~3 shards",
+    "tokenizer": "tokenizer.model.v3 (sentencepiece) + tokenizer.json"
+  },
+  "fallback_if_unsuitable": {
+    "smaller_open_weight_mistral": "Ministral-3B is NOT Apache (research license) — avoid. If 24GB VRAM is unavailable, prefer a quantized load of v0.3 or an Apache-2.0 alternative; document the exact license of any substitute. Do not silently substitute a non-Mistral or a differently-licensed model."
+  }
+}

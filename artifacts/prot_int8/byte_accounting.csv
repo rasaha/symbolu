@@ -1,0 +1,6 @@
+protect_pct,n_protect,MODELED_prot_bf16_B,MODELED_prot_int8_B,MODELED_prot_saved_B,MODELED_prot_saved_pct,MODELED_total_bf16_B,MODELED_total_int8_B,MODELED_total_saved_pct,MEAS_sidecar_bf16_bytes,MEAS_sidecar_int8_payload_bytes,MEAS_int8_const_metadata_bytes,MEAS_sidecar_int8_total_bytes,MEAS_const_bytes_per_token,MEAS_net_saved_bytes,MEAS_net_saved_pct,GPU_allocated_reserved_peak
+0,0,0,0,0,0.0,160.0,160.0,0.0,0,0,0,0,0.0,0,0.0,RESOURCE_BLOCKED (no CUDA device)
+1,1,2,1,1,50.0,162.0,161.0,0.617,16384,8192,32,8224,0.01562,8160,49.805,RESOURCE_BLOCKED (no CUDA device)
+2,3,6,3,3,50.0,166.0,163.0,1.807,49152,24576,96,24672,0.04688,24480,49.805,RESOURCE_BLOCKED (no CUDA device)
+4,5,10,5,5,50.0,170.0,165.0,2.941,81920,40960,160,41120,0.07812,40800,49.805,RESOURCE_BLOCKED (no CUDA device)
+8,10,20,10,10,50.0,180.0,170.0,5.556,163840,81920,320,82240,0.15625,81600,49.805,RESOURCE_BLOCKED (no CUDA device)

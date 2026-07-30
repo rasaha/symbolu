@@ -1,0 +1,9 @@
+prompt,TF_agree_C_vs_B_pct,TF_bit_identical_C_vs_B,TF_first_divergence_pos,AR_greedy_exact_C_vs_B,AR_common_prefix_chars,classification
+factual_qa,100.00,True,-1,False,144,MEASURED
+arithmetic,100.00,True,-1,True,111,MEASURED
+code,100.00,True,-1,True,140,MEASURED
+instruction,100.00,True,-1,True,138,MEASURED
+summarize,93.75,False,8,False,6,MEASURED
+repeated,100.00,True,-1,True,170,MEASURED
+retrieval,100.00,True,-1,True,115,MEASURED
+SUMMARY_C_vs_B,99.315,6of7_bitidentical,,5of7_AR_exact,,MEASURED (292 positions; teacher-forced is the stable signal; AR drift expected for any KV quant)

@@ -1,15 +1,18 @@
-# RM1 real-model dependencies (NOT installed in the controlled sandbox).
-# Install on a machine with adequate hardware (GPU strongly recommended for >1B models).
+# RM1 real-model validation — runtime dependencies.
+#
+# The RM1 harness, its unit tests, and the frozen governed architecture run on the Python standard
+# library alone (the mock backend needs nothing here). These packages are required ONLY to load and
+# run an ACTUAL open-weight causal language model through Hugging Face Transformers.
+#
+# Install on a machine that also has suitable hardware (a CUDA GPU with >= 16 GB VRAM for a 7B model
+# in bf16/fp16, --load-in-4bit for ~6 GB, or a CPU host with >= 32 GB RAM for fp32).
 #
 #   pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
-#
-# Versions are lower bounds known to expose the APIs this harness uses (AutoModelForCausalLM,
-# do_sample=False generation, attn_implementation, BitsAndBytesConfig). Pin exact versions in your
-# environment for reproducibility.
+
 torch>=2.1
 transformers>=4.40
-accelerate>=0.30
+accelerate>=0.28
 safetensors>=0.4
-tokenizers>=0.19
-# optional, CUDA-only, required ONLY for --load-in-4bit:
+sentencepiece>=0.1.99      # many tokenizers (Llama/Mistral) require it
+# Optional, CUDA-only, for --load-in-4bit:
 # bitsandbytes>=0.43

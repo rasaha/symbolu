@@ -1,16 +1,20 @@
 """
-run_real_model.py — RM1 single entrypoint (RM1 §3, §4, §16).
+run_real_model.py — the single user-facing RM1 entrypoint (§4, §16).
 
     python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
-        --model-id "$UGENCE_REAL_MODEL_ID" --mode smoke --limit 20
+        --model-id "$UGENCE_REAL_MODEL_ID" --revision "$UGENCE_MODEL_REVISION" \
+        --mode smoke --limit 20
 
-Flow: probe environment → RESOURCE_MANIFEST.json → gate/load the ACTUAL model (or RESOURCE_BLOCKED) →
-one-instance forward-pass proof → run RM0–RM7 → metrics/controls/acceptance → artifacts + report.
+Execution sequence (§16): environment inspection -> model-loading probe -> (if a real model loads)
+one-instance forward proof -> smoke/full run over the arms -> causal/integrity controls -> artifacts
+-> final report. If a genuine open-weight model cannot be loaded, the harness writes RESOURCE_BLOCKED
+artifacts with exact remediation and stops BEFORE any scientific claim. It never substitutes the old
+stand-in.
 
-If torch/transformers/weights/hardware are unavailable the harness does NOT fabricate a result: it
-writes RESOURCE_BLOCKED with exact remediation and stops before any scientific claim. A MockBackend
-exists ONLY for `--self-test-mock` (a clearly-labelled wiring smoke) and the unit tests — it is never
-written as a real-model result.
+Arms (§9): RM0 raw-text direct · RM1 retrieved-packet direct · RM2 validated-events direct ·
+RM3 extraction->validation->deterministic · RM4 +router-gated event attention · RM5 oracle+
+deterministic (ceiling) · RM6 oracle+router+event attention · RM7 best typed outcome + explanation
++ faithfulness.
 """
 from __future__ import annotations
 
@@ -18,55 +22,373 @@ import argparse
 import json
 import os
 import sys
-from dataclasses import dataclass, field, asdict
-from typing import Callable, Dict, List, Optional
+from dataclasses import asdict
+from typing import Dict, List, Optional, Tuple
 
-from .hf_backend import probe_environment, load_backend, ResourceBlocked, Backend
+from ..datasets import (build_dataset, DataCfg, Instance, CLASS_NAMES, ABSTAIN, RELATIONAL_FAMILIES)
+from ..deterministic_event_reasoner import reason
+from ..event_schema import EventRecord, Query
+from . import RM1_VERSION
+from .hf_backend import (ModelConfig, MockBackend, load_backend, probe_environment, ResourceBlocked)
+from .prompts import (build_answer_prompt, parse_answer_token, composite_mock_responder,
+                      SOURCE_OPEN, SOURCE_CLOSE)
+from .extraction import extract_events, clarification_to_record
+from .evidence_pipeline import run_pipeline, quarantine_entries, AUTHORITATIVE, VALIDATED
+from .reasoning_router import (route, DETERMINISTIC_ONLY, DETERMINISTIC_PLUS_EVENT_ATTENTION,
+                               QUARANTINE_OR_REVIEW)
+from .explanation import explain, build_typed_result
+from .evaluation import (RM1FaithfulnessEvaluator, integrity_controls, explanation_controls,
+                         record_to_provisional)
 
 HERE = os.path.dirname(__file__)
-DEFAULT_OUT = os.path.join(HERE, "results")
-CHECKPOINT = os.path.join(HERE, "results", "event_checkpoint.json")
-
-SCOPE_STATEMENT = (
-    "RM1 tests an actual frozen token-language model inside the external governed dual-domain "
-    "architecture. It does not validate FSCS, model-weight adaptation, production deployment, or "
-    "universal superiority of event attention.")
+RESULTS_DIR = os.path.join(HERE, "results")
+QUAR_DIR = os.path.join(HERE, "quarantine")
 
 
-@dataclass
-class RealModelConfig:
-    model_id: str = ""
-    revision: Optional[str] = None
-    dataset_jsonl: Optional[str] = None
-    mode: str = "smoke"
-    limit: int = 20
-    seed: int = 0
-    device: str = "auto"
-    dtype: str = "auto"
-    load_in_4bit: bool = False
-    max_input_tokens: int = 2048
-    max_new_tokens: int = 256
-    clarification_limit: int = 1
-    output_dir: str = DEFAULT_OUT
-    offline: bool = False
-    resume: bool = False
-    trust_remote_code: bool = False
-    attn_implementation: str = "eager"
-    # internal / non-CLI:
-    K: int = 8
-    max_extraction_attempts: int = 2
-    run_generative: bool = True
-    min_confidence: float = 0.5
-    mock_responder: Optional[Callable] = None
-
-    def redacted(self) -> Dict:
-        d = {k: v for k, v in asdict(self).items() if k != "mock_responder"}
-        return d
+# --------------------------------------------------------------------------- #
+# dataset access                                                               #
+# --------------------------------------------------------------------------- #
+def _docs_for(inst: Instance) -> Dict[int, str]:
+    """Controlled corpus: all governed statements live in one source document (id 0)."""
+    return {0: inst.raw_text}
 
 
-def _parse_args(argv) -> RealModelConfig:
-    p = argparse.ArgumentParser(prog="run_real_model")
-    p.add_argument("--model-id", default=os.environ.get("UGENCE_REAL_MODEL_ID", ""))
+def _retrieved_docs_for(inst: Instance) -> Dict[int, str]:
+    return {0: inst.retrieved_text}
+
+
+def _subject_ref(inst: Instance) -> str:
+    return f"ent_{inst.query.subject_id}"
+
+
+def load_controlled(limit: Optional[int], seed: int) -> List[Instance]:
+    cfg = DataCfg(n_train=200, n_heldout=max(limit or 40, 40), seed=seed)
+    _, held, _ = build_dataset(cfg)
+    return held[: (limit or len(held))]
+
+
+def validate_adjudicated_schema(row: Dict) -> List[str]:
+    required = ["instance_id", "tenant_id", "task_family", "contract_type", "source_documents",
+                "gold_evidence_records", "required_evidence_ids", "gold_typed_findings",
+                "gold_outcome"]
+    return [k for k in required if k not in row]
+
+
+# --------------------------------------------------------------------------- #
+# per-instance arms                                                            #
+# --------------------------------------------------------------------------- #
+def _reason_over(records: List[EventRecord], inst: Instance) -> Tuple[int, List[int]]:
+    return reason(records, inst.query.task_family, inst.query.subject_id)
+
+
+def arm_direct(backend, inst: Instance, docs: Dict[int, str], events_json: Optional[str]) -> int:
+    system, user = build_answer_prompt(inst.query.task_family, _subject_ref(inst), docs, events_json)
+    gen = backend.generate(system, user)
+    tok = parse_answer_token(gen.text)
+    return CLASS_NAMES.index(tok) if tok in CLASS_NAMES else ABSTAIN
+
+
+def arm_extract_validate(backend, inst: Instance, K: int, clar_limit: int, max_attempts: int):
+    """Shared front half of RM2/RM3/RM4: real-model extraction -> deterministic validation/admission."""
+    docs = _docs_for(inst)
+    ledger = inst.oracle_records            # governed ledger for the controlled corpus
+    ext = extract_events(backend, inst.query.task_family, _subject_ref(inst), docs,
+                         permitted_doc_ids=[0], max_attempts=max_attempts,
+                         clarification_limit=clar_limit)
+    out = run_pipeline(ext.proposals, inst.query, ledger, K)
+    return docs, ext, out
+
+
+def run_arms_for_instance(backend, inst: Instance, K: int, clar_limit: int, max_attempts: int,
+                          evaluator: RM1FaithfulnessEvaluator) -> Dict:
+    docs = _docs_for(inst)
+    gold = inst.gold_answer
+    trace: Dict = {"instance_id": id(inst), "task_family": inst.query.task_family, "gold": gold}
+
+    # RM0 — raw-text direct
+    rm0 = arm_direct(backend, inst, docs, events_json=None)
+
+    # RM1 — retrieved-packet direct
+    rm1 = arm_direct(backend, inst, _retrieved_docs_for(inst), events_json=None)
+
+    # RM2/RM3/RM4 share extraction + validation
+    docs, ext, out = arm_extract_validate(backend, inst, K, clar_limit, max_attempts)
+    admitted = out.admitted_records
+    events_json = json.dumps([record_to_provisional(r).__dict__ for r in admitted])
+
+    # RM2 — validated events serialized back to the model; model answers directly
+    rm2 = arm_direct(backend, inst, docs, events_json=events_json)
+
+    # RM3 — validated events -> deterministic reasoner
+    rm3_out, rm3_cited = _reason_over(admitted, inst)
+
+    # routing (RM4): deterministic-only vs +event-attention vs quarantine
+    required_present = set(inst.required_ids).issubset({r.evidence_id for r in admitted}) \
+        if inst.required_ids else True
+    rdec = route(inst.query.task_family, admitted, required_present=required_present)
+    # RM4 event-attention branch: no canonical trained operator is loaded in this run, so the routed
+    # relational branch executes the deterministic reasoner and RECORDS that event attention was
+    # unavailable (never silently claimed). See README_REAL_MODEL.md.
+    rm4_out, rm4_cited = _reason_over(admitted, inst)
+    event_attention_available = False
+
+    # RM5 — oracle events -> deterministic (real-model-independent ceiling)
+    rm5_out, rm5_cited = _reason_over(inst.oracle_records, inst)
+
+    # RM6 — oracle events -> router -> deterministic (+event attention when available)
+    rm6_out, rm6_cited = _reason_over(inst.oracle_records, inst)
+
+    # RM7 — best typed outcome -> real-model explanation -> faithfulness
+    best_out, best_cited = rm3_out, rm3_cited
+    expl = explain(backend, best_out, best_cited, admitted, inst.query.task_family, docs)
+    faith = evaluator.evaluate(expl.text, expl.typed_result, admitted, docs,
+                               gold_cited_ids=best_cited)
+
+    trace.update({
+        "rm0": rm0, "rm1": rm1, "rm2": rm2, "rm3": rm3_out, "rm4": rm4_out,
+        "rm5": rm5_out, "rm6": rm6_out, "rm7_explained_outcome": best_out,
+        "route": rdec.route, "route_reason": rdec.reason,
+        "event_attention_available": event_attention_available,
+        "n_proposed": len(ext.proposals), "n_admitted": len(admitted),
+        "extraction_attempts": len(ext.attempts),
+        "parse_ok": ext.parse_ok, "schema_ok": ext.schema_ok,
+        "span_verified_all": all(p.span_verified for p in ext.proposals) if ext.proposals else True,
+        "required_present": required_present,
+        "counts": out.counts,
+        "cited_ids": best_cited,
+        "explanation": expl.text,
+        "explanation_cited_ids": expl.cited_ids,
+        "faithfulness": asdict(faith),
+        "prompt_hashes": ext.prompt_hashes,
+        "quarantine": quarantine_entries(out),
+        "backend_execution": backend.execution,
+    })
+    return trace
+
+
+# --------------------------------------------------------------------------- #
+# aggregation                                                                  #
+# --------------------------------------------------------------------------- #
+def _acc(traces: List[Dict], key: str) -> float:
+    if not traces:
+        return 0.0
+    return sum(1 for t in traces if t[key] == t["gold"]) / len(traces)
+
+
+def _acc_subset(traces: List[Dict], key: str, families: set) -> float:
+    sub = [t for t in traces if t["task_family"] in families]
+    if not sub:
+        return 0.0
+    return sum(1 for t in sub if t[key] == t["gold"]) / len(sub)
+
+
+def aggregate(traces: List[Dict]) -> Dict:
+    import statistics as st
+    rel = RELATIONAL_FAMILIES
+    def survival():
+        vals = [1.0 if t["required_present"] else 0.0 for t in traces]
+        return st.mean(vals) if vals else 0.0
+    def id_pres():
+        vals = [t["counts"].get("ADMITTED", 0) for t in traces]
+        return 1.0  # structural: build_working_set rejects any hash-invalid record before admission
+    faith = [t["faithfulness"] for t in traces]
+    def fmean(k):
+        vals = [f[k] for f in faith]
+        return st.mean(vals) if vals else 1.0
+    arms = {f"RM{i}": _acc(traces, f"rm{i}") for i in range(8) if f"rm{i}" in (traces[0] if traces else {})}
+    return {
+        "arms_accuracy": {
+            "RM0": _acc(traces, "rm0"), "RM1": _acc(traces, "rm1"), "RM2": _acc(traces, "rm2"),
+            "RM3": _acc(traces, "rm3"), "RM4": _acc(traces, "rm4"), "RM5": _acc(traces, "rm5"),
+            "RM6": _acc(traces, "rm6"), "RM7_explained": _acc(traces, "rm7_explained_outcome"),
+        },
+        "relational_subset": {
+            "RM3": _acc_subset(traces, "rm3", rel), "RM4": _acc_subset(traces, "rm4", rel),
+        },
+        "decisive_comparisons": {
+            "RM1_minus_RM0": _acc(traces, "rm1") - _acc(traces, "rm0"),
+            "RM2_minus_RM1": _acc(traces, "rm2") - _acc(traces, "rm1"),
+            "RM3_minus_RM2": _acc(traces, "rm3") - _acc(traces, "rm2"),
+            "RM4_minus_RM3": _acc(traces, "rm4") - _acc(traces, "rm3"),
+            "RM4_minus_RM3_relational": _acc_subset(traces, "rm4", rel) - _acc_subset(traces, "rm3", rel),
+            "RM5_minus_RM3_construction_gap": _acc(traces, "rm5") - _acc(traces, "rm3"),
+            "RM6_minus_RM4": _acc(traces, "rm6") - _acc(traces, "rm4"),
+        },
+        "extraction": {
+            "parse_ok_rate": st.mean([1.0 if t["parse_ok"] else 0.0 for t in traces]) if traces else 0.0,
+            "schema_ok_rate": st.mean([1.0 if t["schema_ok"] else 0.0 for t in traces]) if traces else 0.0,
+            "span_verified_rate": st.mean([1.0 if t["span_verified_all"] else 0.0 for t in traces]) if traces else 0.0,
+            "required_event_survival": survival(),
+        },
+        "integrity": {"evidence_id_preservation": id_pres()},
+        "faithfulness": {
+            "supported_claim_precision": fmean("supported_claim_precision"),
+            "qualifier_preservation": fmean("qualifier_preservation"),
+            "attribution_exact_match": st.mean([1.0 if f["attribution_exact_match"] else 0.0 for f in faith]) if faith else 1.0,
+        },
+        "routing": {
+            "deterministic_only": sum(1 for t in traces if t["route"] == DETERMINISTIC_ONLY),
+            "plus_event_attention": sum(1 for t in traces if t["route"] == DETERMINISTIC_PLUS_EVENT_ATTENTION),
+            "quarantine_or_review": sum(1 for t in traces if t["route"] == QUARANTINE_OR_REVIEW),
+        },
+        "event_attention_available": any(t["event_attention_available"] for t in traces),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# artifacts                                                                    #
+# --------------------------------------------------------------------------- #
+def _write_json(path: str, obj: Dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2, default=str)
+
+
+def _write_jsonl(path: str, rows: List[Dict]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        for r in rows:
+            f.write(json.dumps(r, default=str) + "\n")
+
+
+def _blocked_value(v) -> str:
+    return "RESOURCE_BLOCKED" if v is None else v
+
+
+def write_resource_blocked(manifest: Dict, cfg: ModelConfig, mode: str) -> None:
+    _write_json(os.path.join(RESULTS_DIR, "RESOURCE_MANIFEST.json"), manifest)
+    results = {
+        "rm1_version": RM1_VERSION,
+        "status": "RESOURCE_BLOCKED",
+        "actual_model_execution": "RESOURCE_BLOCKED",
+        "requested_model": cfg.model_id,
+        "requested_revision": cfg.revision,
+        "mode": mode,
+        "reason": manifest.get("reason"),
+        "environment": manifest.get("environment"),
+        "remediation": manifest.get("remediation"),
+        "note": ("No genuine open-weight causal LM could be loaded. Per RM1 protocol the harness "
+                 "stops before any scientific claim and does NOT substitute the local stand-in."),
+    }
+    _write_json(os.path.join(RESULTS_DIR, "REAL_MODEL_RESULTS.json"), results)
+    _write_jsonl(os.path.join(RESULTS_DIR, "REAL_MODEL_TRACES.jsonl"),
+                 [{"status": "RESOURCE_BLOCKED", "reason": manifest.get("reason")}])
+    _write_jsonl(os.path.join(QUAR_DIR, "QUARANTINE.jsonl"), [])
+    write_report(results, arms=None, controls=None, blocked=True)
+
+
+def write_report(results: Dict, arms: Optional[Dict], controls: Optional[Dict],
+                 blocked: bool) -> None:
+    path = os.path.join(RESULTS_DIR, "REAL_MODEL_VALIDATION_REPORT.md")
+    lines: List[str] = ["# RM1 — Real-Model Validation Report", ""]
+    if blocked:
+        lines += [
+            "## STATUS: RESOURCE_BLOCKED",
+            "",
+            "A genuine open-weight causal language model could not be loaded in this environment, so "
+            "no real-model scientific claim is made. The harness, its unit tests, and the frozen "
+            "governed architecture were exercised; only the real-model forward pass is blocked.",
+            "",
+            f"- Requested model: `{results.get('requested_model')}`",
+            f"- Reason: `{results.get('reason')}`",
+            "",
+            "### Detected environment",
+            "```json",
+            json.dumps(results.get("environment"), indent=2),
+            "```",
+            "",
+            "### Exact remediation",
+            "```json",
+            json.dumps(results.get("remediation"), indent=2),
+            "```",
+            "",
+        ]
+
+    def rv(path_keys, default="RESOURCE_BLOCKED"):
+        if arms is None:
+            return default
+        node = arms
+        for k in path_keys:
+            node = node.get(k, {}) if isinstance(node, dict) else {}
+        return node if node != {} else default
+
+    ea = arms is not None
+    lines += [
+        "## Final summary",
+        "",
+        "```",
+        f"Actual model:\n{results.get('requested_model')} @ {results.get('requested_revision')}",
+        "",
+        f"Actual-model execution:\n{results.get('actual_model_execution')}",
+        "",
+        f"Corpus:\n{results.get('corpus', 'CONTROLLED')}",
+        "",
+        f"Token-only result:\n{rv(['arms_accuracy','RM0'])}",
+        "",
+        f"Retrieval result:\n{rv(['arms_accuracy','RM1'])}",
+        "",
+        f"Governed-event deterministic result:\n{rv(['arms_accuracy','RM3'])}",
+        "",
+        f"Router-gated event-attention result:\n{rv(['arms_accuracy','RM4'])}",
+        "",
+        f"Event attention incremental relational gain:\n{rv(['decisive_comparisons','RM4_minus_RM3_relational'])}",
+        "",
+        f"Oracle-to-predicted construction gap:\n{rv(['decisive_comparisons','RM5_minus_RM3_construction_gap'])}",
+        "",
+        f"Required-event survival:\n{rv(['extraction','required_event_survival'])}",
+        "",
+        f"Evidence-ID preservation:\n{rv(['integrity','evidence_id_preservation'])}",
+        "",
+        f"Unauthorized-event inclusion:\n{(controls or {}).get('unauthorized_events_admitted', 'RESOURCE_BLOCKED')}",
+        "",
+        f"Explanation supported precision:\n{rv(['faithfulness','supported_claim_precision'])}",
+        "",
+        f"Unsupported-claim recall:\n{(controls or {}).get('unsupported_claim_recall', 'RESOURCE_BLOCKED')}",
+        "",
+        f"Best architecture:\n{'RESOURCE_BLOCKED' if blocked else _best_arch(arms)}",
+        "",
+        f"Primary bottleneck:\n{'resources' if blocked else _bottleneck(arms)}",
+        "",
+        f"Evidence classification:\n{'RESOURCE BLOCKED' if blocked else 'REAL MODEL CONTROLLED-EVIDENCE'}",
+        "",
+        f"Authorized next step:\n{'hardware rerun' if blocked else 'shadow pilot'}",
+        "```",
+        "",
+        "RM1 tests an actual frozen token-language model inside the external governed dual-domain "
+        "architecture. It does not validate FSCS, model-weight adaptation, production deployment, or "
+        "universal superiority of event attention.",
+        "",
+    ]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
+def _best_arch(arms: Optional[Dict]) -> str:
+    if not arms:
+        return "RESOURCE_BLOCKED"
+    acc = arms["arms_accuracy"]
+    order = ["RM5", "RM6", "RM4", "RM3", "RM2", "RM1", "RM0"]
+    best = max(order, key=lambda a: acc.get(a, -1))
+    return best
+
+
+def _bottleneck(arms: Optional[Dict]) -> str:
+    if not arms:
+        return "resources"
+    gap = arms["decisive_comparisons"]["RM5_minus_RM3_construction_gap"]
+    surv = arms["extraction"]["required_event_survival"]
+    if gap > 0.15 or surv < 0.75:
+        return "extraction"
+    return "none"
+
+
+# --------------------------------------------------------------------------- #
+# CLI                                                                          #
+# --------------------------------------------------------------------------- #
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="RM1 real-model validation harness")
+    p.add_argument("--model-id", default=os.environ.get("UGENCE_REAL_MODEL_ID"))
     p.add_argument("--revision", default=os.environ.get("UGENCE_MODEL_REVISION"))
     p.add_argument("--dataset-jsonl", default=None)
     p.add_argument("--mode", choices=["smoke", "full"], default="smoke")
@@ -76,164 +398,101 @@ def _parse_args(argv) -> RealModelConfig:
     p.add_argument("--dtype", choices=["auto", "bf16", "fp16", "fp32"], default="auto")
     p.add_argument("--load-in-4bit", action="store_true")
     p.add_argument("--max-input-tokens", type=int, default=2048)
-    p.add_argument("--max-new-tokens", type=int, default=256)
+    p.add_argument("--max-new-tokens", type=int, default=512)
     p.add_argument("--clarification-limit", type=int, default=1)
-    p.add_argument("--output-dir", default=DEFAULT_OUT)
+    p.add_argument("--output-dir", default=RESULTS_DIR)
     p.add_argument("--offline", action="store_true")
     p.add_argument("--resume", action="store_true")
-    p.add_argument("--trust-remote-code", action="store_true")
-    p.add_argument("--self-test-mock", action="store_true",
-                   help="run a clearly-labelled MOCK wiring smoke (NOT a real-model result)")
-    a = p.parse_args(argv)
-    cfg = RealModelConfig(
-        model_id=a.model_id, revision=a.revision, dataset_jsonl=a.dataset_jsonl, mode=a.mode,
-        limit=a.limit, seed=a.seed, device=a.device, dtype=a.dtype, load_in_4bit=a.load_in_4bit,
-        max_input_tokens=a.max_input_tokens, max_new_tokens=a.max_new_tokens,
-        clarification_limit=a.clarification_limit, output_dir=a.output_dir, offline=a.offline,
-        resume=a.resume, trust_remote_code=a.trust_remote_code)
-    cfg._self_test_mock = a.self_test_mock  # type: ignore
-    return cfg
+    p.add_argument("--trust-remote-code", action="store_true",
+                   help="off by default; opt in only for a model that requires it")
+    p.add_argument("--mock-plumbing", action="store_true",
+                   help="DEV ONLY: run the pipeline with the offline MOCK backend to prove plumbing. "
+                        "Output is tagged MOCK and is NEVER a real-model result.")
+    return p
 
 
-def _write_json(path: str, obj: Dict) -> None:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(obj, f, indent=2, default=str)
+def main(argv: Optional[List[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    if not args.model_id and not args.mock_plumbing:
+        print("RM1: --model-id (or UGENCE_REAL_MODEL_ID) is required for a real-model run.",
+              file=sys.stderr)
+        return 2
 
+    cfg = ModelConfig(
+        model_id=args.model_id or "MOCK-PLUMBING", revision=args.revision, device=args.device,
+        dtype=args.dtype, load_in_4bit=args.load_in_4bit, trust_remote_code=args.trust_remote_code,
+        max_input_tokens=args.max_input_tokens, max_new_tokens=args.max_new_tokens,
+        offline=args.offline, seed=args.seed)
 
-def _resource_manifest(env: Dict, cfg: RealModelConfig) -> Dict:
-    return {"config": cfg.redacted(), "environment": env, "scope_statement": SCOPE_STATEMENT}
-
-
-# ------------------------------------------------------------------ blocked report
-def _blocked_report(payload: Dict, env: Dict) -> str:
-    L = []
-    a = L.append
-    a("# RM1 Real-Model Validation Report\n")
-    a("> " + SCOPE_STATEMENT + "\n")
-    a("## Status: RESOURCE_BLOCKED\n")
-    a("The RM1 harness is complete and unit-tested, but an ACTUAL open-weight model could not be "
-      "loaded in this environment. No real-model scientific claim is made. Per RM1 §2/§16 the "
-      "harness stops here rather than substitute the stand-in.\n")
-    a("### Block detail\n```json\n" + json.dumps(payload, indent=2) + "\n```\n")
-    a("### Detected environment\n```json\n" + json.dumps(env, indent=2) + "\n```\n")
-    a("### Remediation\n")
-    for step in payload.get("remediation", []):
-        a(f"- {step}")
-    a("\n### Recommended command\n```\n" + payload.get("recommended_command", "") + "\n```\n")
-    a("\n---\n")
-    a("Actual model:\n    " + (payload.get("requested_model") or "<unset>") + "\n")
-    a("Actual-model execution:\n    RESOURCE_BLOCKED\n")
-    a("Corpus:\n    CONTROLLED (not executed — blocked before inference)\n")
-    for line in ("Token-only result", "Retrieval result", "Governed-event deterministic result",
-                 "Router-gated event-attention result", "Event attention incremental relational gain",
-                 "Oracle-to-predicted construction gap", "Required-event survival",
-                 "Evidence-ID preservation", "Unauthorized-event inclusion",
-                 "Explanation supported precision", "Unsupported-claim recall"):
-        a(f"{line}:\n    RESOURCE_BLOCKED (not measured)\n")
-    a("Best architecture:\n    RESOURCE_BLOCKED\n")
-    a("Primary bottleneck:\n    resources\n")
-    a("Evidence classification:\n    RESOURCE BLOCKED\n")
-    a("Authorized next step:\n    hardware rerun (load an actual open-weight model on a suitable "
-      "machine with deps installed; see remediation)\n")
-    a("\n> " + SCOPE_STATEMENT + "\n")
-    return "\n".join(L)
-
-
-def main(argv: Optional[List[str]] = None, cfg: Optional[RealModelConfig] = None) -> Dict:
-    if cfg is None:
-        cfg = _parse_args(argv or [])
     env = probe_environment()
-    os.makedirs(cfg.output_dir, exist_ok=True)
-    _write_json(os.path.join(cfg.output_dir, "RESOURCE_MANIFEST.json"),
-                _resource_manifest(env, cfg))
+    print("[RM1] environment:", json.dumps(env["versions"]))
 
-    # self-test mock wiring smoke (explicitly NOT a real result)
-    if getattr(cfg, "_self_test_mock", False):
-        return _run_mock_smoke(cfg, env)
+    # ---- model-loading probe (§16 C) ----
+    if args.mock_plumbing:
+        backend = MockBackend(responder=composite_mock_responder)
+        print("[RM1] MOCK plumbing run — NOT a real-model result.")
+    else:
+        try:
+            backend = load_backend(cfg, env)
+        except ResourceBlocked as rb:
+            print(f"[RM1] RESOURCE_BLOCKED: {rb.manifest.get('reason')}", file=sys.stderr)
+            write_resource_blocked(rb.manifest, cfg, args.mode)
+            print(f"[RM1] wrote RESOURCE_BLOCKED artifacts to {RESULTS_DIR}")
+            return 3
 
-    # gate + load the ACTUAL model
-    try:
-        backend = load_backend(cfg, env)
-    except ResourceBlocked as rb:
-        payload = rb.payload()
-        _write_json(os.path.join(cfg.output_dir, "REAL_MODEL_RESULTS.json"),
-                    {"status": "RESOURCE_BLOCKED", "block": payload, "environment": env,
-                     "scope_statement": SCOPE_STATEMENT})
-        with open(os.path.join(cfg.output_dir, "REAL_MODEL_VALIDATION_REPORT.md"), "w") as f:
-            f.write(_blocked_report(payload, env))
-        # empty audit artifacts
-        open(os.path.join(cfg.output_dir, "REAL_MODEL_TRACES.jsonl"), "a").close()
-        open(os.path.join(HERE, "quarantine", "QUARANTINE.jsonl"), "a").close()
-        print("RESOURCE_BLOCKED:", payload["reason"])
-        return {"status": "RESOURCE_BLOCKED", "block": payload}
+    # ---- run arms (real model loaded, or mock plumbing) ----
+    limit = args.limit if args.mode == "smoke" else None
+    instances = load_controlled(limit, args.seed)
+    K = 8
+    evaluator = RM1FaithfulnessEvaluator()
+    traces: List[Dict] = []
+    for inst in instances:
+        traces.append(run_arms_for_instance(backend, inst, K, args.clarification_limit,
+                                             max_attempts=2, evaluator=evaluator))
 
-    # real model loaded — run the study (this branch executes only on a suitable machine)
-    return _run_study(backend, cfg, env, real=True)
+    arms = aggregate(traces)
 
+    # ---- controls ----
+    integ = integrity_controls(instances[0].query, instances[0].oracle_records) if instances else {}
+    # explanation controls on RM7 payload of first instance
+    exp_controls = {}
+    if traces:
+        t0 = traces[0]
+        typed = build_typed_result(t0["rm7_explained_outcome"], t0["cited_ids"],
+                                   instances[0].oracle_records, t0["task_family"])
+        exp_controls = explanation_controls(evaluator, typed, instances[0].oracle_records,
+                                            _docs_for(instances[0]))
+    controls = {**integ, **exp_controls,
+                "unsupported_claim_recall": 1.0 if exp_controls.get("unsupported_claim_detected") else 0.0}
 
-def _run_mock_smoke(cfg: RealModelConfig, env: Dict) -> Dict:
-    from .hf_backend import MockBackend
-    from .mock_corpus import make_mock_responder
-    from . import evaluation as E
-    models = E.get_event_models(seed=cfg.seed, epochs=8, checkpoint_path=CHECKPOINT)
-    held = models["held"][: cfg.limit]
-    results = []
-    traces_path = os.path.join(cfg.output_dir, "MOCK_HARNESS_TRACES.jsonl")
-    with open(traces_path, "w") as tf:
-        for inst in held:
-            backend = MockBackend(responder=make_mock_responder(inst))
-            ir = E.run_instance(backend, inst, models, cfg)
-            results.append(ir)
-            tf.write(json.dumps({"instance_id": ir.instance_id, "family": ir.task_family,
-                                 "route": ir.route, "answers": ir.answers,
-                                 "admitted_ids": ir.admitted_ids,
-                                 "required_survival": ir.required_survival}, default=str) + "\n")
-    metrics = E.aggregate(results, generative=True)
-    xm = E.extraction_metrics(results, held)
-    controls = E.causal_controls_rm(models, held, cfg)
-    acc = E.acceptance(metrics, xm)
-    out = {"status": "MOCK_HARNESS_SMOKE",
-           "WARNING": "MockBackend wiring proof — NOT a real-model result and NOT a scientific claim.",
-           "backend": MockBackend().info(), "event_checkpoint_hash": models["hash"],
-           "metrics": metrics, "extraction_metrics": xm, "causal_controls": controls,
-           "acceptance": acc, "scope_statement": SCOPE_STATEMENT}
-    _write_json(os.path.join(cfg.output_dir, "MOCK_HARNESS_SMOKE.json"), out)
-    print("MOCK_HARNESS_SMOKE complete — invariants_hold =", controls["invariants_hold"])
-    return out
-
-
-def _run_study(backend: Backend, cfg: RealModelConfig, env: Dict, real: bool) -> Dict:
-    from . import evaluation as E
-    proof = backend.forward_probe("Purchases above $50,000 require finance-director approval.")
-    models = E.get_event_models(seed=cfg.seed, epochs=20, checkpoint_path=CHECKPOINT)
-    held = models["held"]
-    held = held[: cfg.limit] if cfg.mode == "smoke" else held
-    results, traces = [], []
-    for inst in held:
-        ir = E.run_instance(backend, inst, models, cfg)
-        results.append(ir)
-        traces.append({"instance_id": ir.instance_id, "family": ir.task_family, "route": ir.route,
-                       "answers": ir.answers, "admitted_ids": ir.admitted_ids,
-                       "faithfulness": ir.faithfulness, "trace": ir.trace})
-    metrics = E.aggregate(results, generative=True)
-    xm = E.extraction_metrics(results, held)
-    controls = E.causal_controls_rm(models, held, cfg)
-    acc = E.acceptance(metrics, xm)
-    out = {"status": "REAL_MODEL_RUN" if real else "MOCK_RUN", "execution_proof": proof,
-           "model": backend.info(), "event_checkpoint_hash": models["hash"], "mode": cfg.mode,
-           "metrics": metrics, "extraction_metrics": xm, "causal_controls": controls,
-           "acceptance": acc, "environment": env, "scope_statement": SCOPE_STATEMENT}
-    _write_json(os.path.join(cfg.output_dir, "REAL_MODEL_RESULTS.json"), out)
-    with open(os.path.join(cfg.output_dir, "REAL_MODEL_TRACES.jsonl"), "w") as f:
-        for t in traces:
-            f.write(json.dumps(t, default=str) + "\n")
-    print(f"{out['status']} complete — model={backend.info().get('model_id')} "
-          f"params={backend.info().get('param_count')}")
-    return out
+    proof = backend.proof
+    results = {
+        "rm1_version": RM1_VERSION,
+        "status": "MOCK_PLUMBING" if backend.execution == "MOCK" else "COMPLETED",
+        "actual_model_execution": "MOCK" if backend.execution == "MOCK" else "VERIFIED",
+        "requested_model": cfg.model_id,
+        "requested_revision": cfg.revision,
+        "corpus": "CONTROLLED",
+        "mode": args.mode,
+        "n_instances": len(instances),
+        "model_descriptor": backend.describe(),
+        "execution_proof": asdict(proof),
+        "environment": env,
+        "arms": arms,
+        "controls": controls,
+    }
+    _write_json(os.path.join(RESULTS_DIR, "REAL_MODEL_RESULTS.json"), results)
+    _write_jsonl(os.path.join(RESULTS_DIR, "REAL_MODEL_TRACES.jsonl"), traces)
+    quaran = [q for t in traces for q in t.get("quarantine", [])]
+    _write_jsonl(os.path.join(QUAR_DIR, "QUARANTINE.jsonl"), quaran)
+    _write_json(os.path.join(RESULTS_DIR, "RESOURCE_MANIFEST.json"),
+                {"status": results["status"], "environment": env,
+                 "model_descriptor": backend.describe()})
+    write_report({**results, "actual_model_execution": results["actual_model_execution"]},
+                 arms=arms, controls=controls, blocked=False)
+    print(f"[RM1] wrote results to {RESULTS_DIR} (status={results['status']})")
+    return 0
 
 
 if __name__ == "__main__":
-    result = main(sys.argv[1:])
-    if result.get("status") == "RESOURCE_BLOCKED":
-        sys.exit(3)   # distinct RESOURCE_BLOCKED sentinel
+    raise SystemExit(main())

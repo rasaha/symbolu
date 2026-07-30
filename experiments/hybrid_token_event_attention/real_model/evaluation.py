@@ -1,436 +1,248 @@
 """
-evaluation.py — RM0–RM7 arms, metrics, causal controls, acceptance (RM1 §9, §12, §14, §15).
+evaluation.py — RM1 metrics, the RM1_FAITHFULNESS_EVALUATOR, and causal / integrity controls (§12-14).
 
-The arms reuse the FROZEN event subsystem (schema, normalization bridge, P5, deterministic reasoner,
-gated-residual H3, causal-control style) — nothing about the event operator is redesigned here. The
-real token model (or, for wiring tests, an explicitly labelled MockBackend) performs only extraction
-(A) and explanation (B); every authoritative assignment stays deterministic.
+TAP boundary (§13): the repository's `tap_provider` governs *assertion support relative to evidence*
+— a related but different contract from *explanation-over-events faithfulness*. There is no existing
+public API that scores an event-explanation against admitted EvidenceRecords, so RM1 ships a clearly
+labelled ``RM1_FAITHFULNESS_EVALUATOR``. It is deterministic and gold-anchored; it does NOT use the
+same real model as the sole judge of its own explanation.
 
-The event-attention checkpoint is trained ONCE on the existing training split with the frozen
-pre-registered architecture/hyperparameters, saved with a content hash, and never touched by RM1
-held-out data (§10).
+The integrity controls are structural properties of the FROZEN normalization bridge and are runnable
+without the real model or a trained event operator — they validate the governed architecture, not the
+real model's accuracy. They are labelled as such and never presented as a real-model result.
 """
 from __future__ import annotations
 
-import hashlib
-import json
-import os
+import re
 import statistics as st
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from dataclasses import dataclass, field, replace
+from typing import Dict, List, Optional, Tuple
 
-from ..datasets import (build_dataset, DataCfg, CLASS_NAMES, N_CLASS, RELATIONAL_FAMILIES,
-                        ABSTAIN, CONFLICT, YES, NO)
-from ..event_schema import EventRecord, Slot
-from ..model_arms import EventArm, DeterministicArm
-from .. import train as T
-from .evidence_pipeline import process_proposals
-from .reasoning_router import (route, DETERMINISTIC_ONLY, DETERMINISTIC_PLUS_EVENT_ATTENTION,
-                              QUARANTINE_OR_REVIEW)
-from .extraction import extract_records
-from .explanation import (build_typed_findings, cited_records, generate_explanation,
-                         evaluate_faithfulness)
-from ..deterministic_event_reasoner import reason as det_reason
+from ..event_schema import EventRecord, Query, STATUSES, REL, ACTIVE, SUPERSEDED
+from ..normalization_bridge import build_working_set, evidence_id_preservation
+from .evidence_pipeline import run_pipeline, VALIDATED, AUTHORITATIVE, REJECTED, QUARANTINED
+from .extraction import ProvisionalEvent
 
-# ------------------------------------------------------------------ event checkpoint (§10)
-def _tensor_dump(params) -> Dict[str, List[List[float]]]:
-    return {k: [row[:] for row in v.data] for k, v in params.items()}
+_REL_NAME = {v: k for k, v in REL.items()}
 
 
-def _tensor_load(params, blob) -> None:
-    for k, v in params.items():
-        if k in blob:
-            v.data = [row[:] for row in blob[k]]
+# --------------------------------------------------------------------------- #
+# helper: EventRecord -> "perfect" provisional proposal (as a flawless extractor would emit)         #
+# --------------------------------------------------------------------------- #
+def record_to_provisional(rec: EventRecord, span_verified: bool = True) -> ProvisionalEvent:
+    return ProvisionalEvent(
+        relation=_REL_NAME.get(rec.relation_type, "?"),
+        source_document_id=rec.source_document_id,
+        source_span=f"doc ent_{rec.subject_id} {_REL_NAME.get(rec.relation_type,'?')} "
+                    f"ent_{rec.object_id_or_value} version v{rec.version} "
+                    f"{STATUSES[rec.status] if 0<=rec.status<len(STATUSES) else rec.status} "
+                    f"authority a{int(rec.authority*10)} norm n{rec.normalized_value}",
+        subject=f"ent_{rec.subject_id}",
+        object=f"ent_{rec.object_id_or_value}",
+        value=f"n{rec.normalized_value}",
+        version=f"v{rec.version}",
+        status=STATUSES[rec.status] if 0 <= rec.status < len(STATUSES) else "active",
+        authority=f"a{int(rec.authority*10)}",
+        confidence=rec.confidence,
+        ambiguous=False,
+        span_verified=span_verified,
+    )
 
 
-def get_event_models(seed: int, epochs: int, checkpoint_path: str) -> Dict:
-    """Load-or-train the frozen H3/H2 event operator on the existing training split, hash it."""
-    cfg = DataCfg(n_train=800, n_heldout=300, seed=0)
-    train, held, vocab = build_dataset(cfg)
-    h3 = EventArm(T.D, seed, readout="attn")
-    h2 = EventArm(T.D, seed, readout="pool")
-    if os.path.exists(checkpoint_path):
-        blob = json.load(open(checkpoint_path))
-        _tensor_load(h3.trainable_params(), blob["h3"])
-        _tensor_load(h2.trainable_params(), blob["h2"])
-        chk_hash = blob.get("hash", "")
-    else:
-        h3, h2 = T.train_event_arms(train, seed, epochs=epochs)
-        blob = {"h3": _tensor_dump(h3.trainable_params()),
-                "h2": _tensor_dump(h2.trainable_params()),
-                "seed": seed, "epochs": epochs, "arch": "gated_residual_H3"}
-        payload = json.dumps(blob, sort_keys=True).encode()
-        chk_hash = hashlib.sha256(payload).hexdigest()[:16]
-        blob["hash"] = chk_hash
-        os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
-        json.dump(blob, open(checkpoint_path, "w"))
-    return {"h3": h3, "h2": h2, "held": held, "vocab": vocab, "hash": chk_hash}
-
-
-# ------------------------------------------------------------------ answer parsing
-_NAME2IDX = {n.lower(): i for i, n in enumerate(CLASS_NAMES)}
-
-
-def parse_answer(text: str) -> int:
-    t = text.strip().lower()
-    try:
-        obj = json.loads(t[t.find("{"): t.rfind("}") + 1]) if "{" in t else {}
-        if isinstance(obj, dict) and "answer" in obj:
-            t = str(obj["answer"]).lower()
-    except Exception:
-        pass
-    for name, idx in _NAME2IDX.items():
-        if name in t:
-            return idx
-    if "yes" in t:
-        return YES
-    if "no" in t:
-        return NO
-    if "conflict" in t:
-        return CONFLICT
-    return ABSTAIN
-
-
-def _event_answer(h3: EventArm, inst, slots: List[Slot]) -> int:
-    logits, _, _ = h3.logits(inst, "predicted", override_slots=slots)
-    return max(range(N_CLASS), key=lambda k: logits.data[0][k])
-
-
-# ------------------------------------------------------------------ per-instance arms
+# --------------------------------------------------------------------------- #
+# RM1_FAITHFULNESS_EVALUATOR                                                    #
+# --------------------------------------------------------------------------- #
 @dataclass
-class InstanceResult:
-    instance_id: str
-    task_family: str
-    gold: int
-    route: str = ""
-    answers: Dict[str, int] = field(default_factory=dict)      # arm -> predicted class
-    admitted_ids: List[int] = field(default_factory=list)
-    required_survival: float = 0.0
-    eid_preservation: float = 1.0
-    unauthorized_inclusion: int = 0
-    quarantined: int = 0
-    extraction_ok: bool = False
-    n_input_tokens: int = 0
-    n_output_tokens: int = 0
-    faithfulness: Dict = field(default_factory=dict)
-    trace: Dict = field(default_factory=dict)
+class FaithfulnessReport:
+    cited_ids_exist: bool
+    cited_spans_exist: bool
+    unsupported_numeric_claims: List[int]
+    unsupported_authority_claims: List[str]
+    missing_qualifiers: List[str]
+    active_stale_confusion: bool
+    authority_exceedance: bool
+    attribution_exact_match: bool
+    supported_claim_precision: float
+    qualifier_preservation: float
 
 
-def _serialize_documents(inst) -> List[Dict]:
-    return [{"document_id": "DOC-0", "text": inst.raw_text}]
+_NUM_RE = re.compile(r"(?<![\w-])(\d+)(?![\w-])")
+_CITE_RE = re.compile(r"\[EV-(\d+)\]")
+_AUTH_RE = re.compile(r"authority[:\s]+a?(\d+(?:\.\d+)?)", re.IGNORECASE)
 
 
-def _retrieved_documents(inst) -> List[Dict]:
-    return [{"document_id": "DOC-0", "text": inst.retrieved_text}]
+class RM1FaithfulnessEvaluator:
+    """Deterministic, gold-anchored explanation-faithfulness checker (NOT the real model as judge)."""
+
+    NAME = "RM1_FAITHFULNESS_EVALUATOR"
+
+    def evaluate(self, explanation_text: str, typed_result: Dict, admitted_records: List[EventRecord],
+                 docs: Dict[int, str], gold_cited_ids: Optional[List[int]] = None) -> FaithfulnessReport:
+        text = explanation_text or ""
+        cited = [int(m) for m in _CITE_RE.findall(text)]
+        admitted_ids = {r.evidence_id for r in admitted_records}
+        cited_ids_exist = all(c in admitted_ids for c in cited) if cited else True
+
+        # every cited source span exists: each cited record's span markers must be traceable to a doc
+        cited_spans_exist = True
+        by_id = {r.evidence_id: r for r in admitted_records}
+        for c in cited:
+            r = by_id.get(c)
+            if r is not None and r.source_document_id not in docs:
+                cited_spans_exist = False
+
+        supported_numbers = set(typed_result.get("supported_numbers", []))
+        # numeric claims = integers in the prose that are NOT inside an [EV-..] citation
+        prose = _CITE_RE.sub(" ", text)
+        numeric_claims = [int(n) for n in _NUM_RE.findall(prose)]
+        # outcome index / label numbers are permitted; treat only non-supported numbers as claims
+        unsupported_numeric = [n for n in numeric_claims
+                               if n not in supported_numbers and n != typed_result.get("outcome")]
+
+        # authority claims: any "authority aK / 0.x" not matching a cited record's authority
+        cited_auths = {round(by_id[c].authority, 2) for c in cited if c in by_id}
+        cited_auths |= {int(by_id[c].authority * 10) for c in cited if c in by_id}
+        unsupported_auth: List[str] = []
+        for m in _AUTH_RE.findall(text):
+            val = float(m)
+            norm = round(val / 10.0, 2) if val > 1 else round(val, 2)
+            if norm not in cited_auths and val not in cited_auths:
+                unsupported_auth.append(m)
+
+        # qualifier preservation: evidence qualifiers that must appear in the explanation
+        quals = typed_result.get("qualifiers", [])
+        low = text.lower()
+        preserved = 0
+        missing: List[str] = []
+        for q in quals:
+            token = q.split(":")[-1].lower()
+            if token and token in low:
+                preserved += 1
+            else:
+                missing.append(q)
+        qual_pres = preserved / len(quals) if quals else 1.0
+
+        # active vs stale confusion: explanation cites a SUPERSEDED record as authoritative
+        active_stale = any(by_id[c].status == SUPERSEDED for c in cited if c in by_id)
+
+        # authority exceedance: prose asserts an authority higher than any cited record's
+        max_cited_auth = max((by_id[c].authority for c in cited if c in by_id), default=1.0)
+        authority_exceedance = any(
+            (float(m) / 10.0 if float(m) > 1 else float(m)) > max_cited_auth + 1e-9
+            for m in _AUTH_RE.findall(text))
+
+        gold = set(gold_cited_ids if gold_cited_ids is not None else cited)
+        attribution_exact = set(cited) == gold
+
+        n_claims = len(numeric_claims) + len(_AUTH_RE.findall(text))
+        n_unsupported = len(unsupported_numeric) + len(unsupported_auth)
+        supported_prec = 1.0 if n_claims == 0 else (n_claims - n_unsupported) / n_claims
+
+        return FaithfulnessReport(
+            cited_ids_exist=cited_ids_exist,
+            cited_spans_exist=cited_spans_exist,
+            unsupported_numeric_claims=unsupported_numeric,
+            unsupported_authority_claims=unsupported_auth,
+            missing_qualifiers=missing,
+            active_stale_confusion=active_stale,
+            authority_exceedance=authority_exceedance,
+            attribution_exact_match=attribution_exact,
+            supported_claim_precision=supported_prec,
+            qualifier_preservation=qual_pres,
+        )
 
 
-def run_instance(backend, inst, models: Dict, cfg) -> InstanceResult:
-    h3, h2 = models["h3"], models["h2"]
-    ir = InstanceResult(instance_id=str(id(inst)), task_family=inst.query.task_family,
-                        gold=inst.gold_answer)
+# --------------------------------------------------------------------------- #
+# Integrity / causal controls (structural bridge invariants — no real model)   #
+# --------------------------------------------------------------------------- #
+def integrity_controls(query: Query, oracle: List[EventRecord]) -> Dict:
+    """Run the §14 integrity interventions against the frozen bridge and report the invariants."""
+    props = [record_to_provisional(r) for r in oracle]
 
-    # RM0 — model over raw text, direct answer
-    if cfg.run_generative:
-        g0 = backend.generate(_answer_prompt(inst.raw_text, inst.query.task_family),
-                               max_new_tokens=cfg.max_new_tokens)
-        ir.answers["RM0"] = parse_answer(g0.text)
-        ir.n_input_tokens += g0.n_input_tokens
-        ir.n_output_tokens += g0.n_output_tokens
-        # RM1 — model over retrieved packet, direct answer
-        g1 = backend.generate(_answer_prompt(inst.retrieved_text, inst.query.task_family),
-                              max_new_tokens=cfg.max_new_tokens)
-        ir.answers["RM1"] = parse_answer(g1.text)
+    # baseline admission
+    base = run_pipeline(props, query, oracle, K=8)
+    base_ids = {s.evidence_id for s in base.slots}
 
-    # ---- extraction → deterministic validation → P5 (shared by RM2/RM3/RM4) ----
-    ex = extract_records(backend, _serialize_documents(inst), inst.query.task_family,
-                         max_attempts=cfg.max_extraction_attempts,
-                         max_new_tokens=cfg.max_new_tokens,
-                         max_input_tokens=cfg.max_input_tokens)
-    ir.extraction_ok = ex.ok
-    pr = process_proposals([dict(p) for p in ex.provisional], inst, cfg.K)
-    admitted = pr.route_pool
-    ir.admitted_ids = pr.admitted_ids
-    ir.eid_preservation = pr.evidence_id_preservation
-    ir.unauthorized_inclusion = pr.unauthorized_inclusion
-    ir.quarantined = len(pr.quarantined)
-    # required survival measured against the ORACLE required set by identity (fresh ids differ)
-    ir.required_survival = _required_survival(inst, admitted)
+    # 1. unauthorized cross-tenant injection -> must NOT be admitted
+    foreign = [replace(r, tenant_id=query.tenant_id + 999).seal() for r in oracle[:1]]
+    ledger_x = oracle + foreign
+    props_x = props + [record_to_provisional(f) for f in foreign]
+    out_x = run_pipeline(props_x, query, ledger_x, K=16)
+    unauthorized_admitted = sum(1 for s in out_x.slots
+                                if s.record.tenant_id != query.tenant_id
+                                or not s.record.readable_by(query.reader_role))
 
-    # RM2 — validated events serialized back to the model; model answers directly
-    if cfg.run_generative:
-        packet = _events_packet(admitted)
-        g2 = backend.generate(_answer_prompt(packet, inst.query.task_family),
-                              max_new_tokens=cfg.max_new_tokens)
-        ir.answers["RM2"] = parse_answer(g2.text)
-
-    # RM3 — deterministic-only reasoner over admitted records
-    ans3, used3 = det_reason(admitted, inst.query.task_family, inst.query.subject_id)
-    ir.answers["RM3"] = ans3
-
-    # RM4 — router: deterministic by default, H3 event attention for relational
-    rd = route(inst.query.task_family, admitted, inst.required_ids, ir.eid_preservation)
-    ir.route = rd.route
-    if rd.route == DETERMINISTIC_PLUS_EVENT_ATTENTION and admitted:
-        ir.answers["RM4"] = _event_answer(h3, inst, pr.admitted_slots)
-    elif rd.route == QUARANTINE_OR_REVIEW:
-        ir.answers["RM4"] = ABSTAIN
+    # 2. corrupt provenance on an authoritative record -> must be rejected by build_working_set
+    if oracle:
+        tampered = replace(oracle[0])            # copy
+        tampered.normalized_value += 1           # change an exact field WITHOUT resealing
+        # (hash now stale -> provenance_valid() false)
+        slots_c, _ = build_working_set([tampered] + oracle[1:], query, 16)
+        corrupt_rejected = 1.0 if all(s.record.hash_valid() for s in slots_c) and \
+            tampered.evidence_id not in {s.evidence_id for s in slots_c} else 0.0
     else:
-        ir.answers["RM4"] = ans3
+        corrupt_rejected = 1.0
 
-    # RM5 — oracle → deterministic reasoner (model-independent ceiling)
-    ans5, _ = det_reason(inst.oracle_records, inst.query.task_family, inst.query.subject_id)
-    ir.answers["RM5"] = ans5
+    # 3. evidence-ID preservation over the admitted set
+    id_pres = evidence_id_preservation(base.slots)
 
-    # RM6 — oracle → router → deterministic + event attention
-    if inst.query.task_family in RELATIONAL_FAMILIES:
-        from ..normalization_bridge import build_working_set
-        oslots, _ = build_working_set(inst.oracle_records, inst.query, cfg.K)
-        ir.answers["RM6"] = _event_answer(h3, inst, oslots)
+    # 4. bypass attempt: hand an unsealed/tampered record straight to admission -> fail closed
+    if oracle:
+        bypass = replace(oracle[0], provenance_hash="deadbeef")  # forged hash
+        slots_b, _ = build_working_set([bypass], query, 8)
+        bypass_failed_closed = 1.0 if bypass.evidence_id not in {s.evidence_id for s in slots_b} else 0.0
     else:
-        ir.answers["RM6"] = ans5
+        bypass_failed_closed = 1.0
 
-    # RM7 — best typed outcome (RM4) → explanation → faithfulness
-    if cfg.run_generative and admitted:
-        best = ir.answers["RM4"]
-        _, used = det_reason(admitted, inst.query.task_family, inst.query.subject_id)
-        tf = build_typed_findings(inst.query.task_family, best, used or ir.admitted_ids[:2], admitted)
-        cr = cited_records(used or ir.admitted_ids[:2], admitted)
-        exp = generate_explanation(backend, tf, cr, max_new_tokens=cfg.max_new_tokens)
-        fr = evaluate_faithfulness(exp["text"], tf, cr)
-        ir.answers["RM7"] = best
-        ir.faithfulness = fr.__dict__
-        ir.trace["explanation"] = exp["text"]
-    ir.trace["route_reason"] = rd.reason
-    ir.trace["n_proposals"] = len(ex.provisional)
-    return ir
+    # 5. duplicate injection -> ids preserved, no crash
+    out_d = run_pipeline(props + [record_to_provisional(r) for r in oracle], query, oracle, K=16)
+    dup_id_pres = evidence_id_preservation(out_d.slots)
 
-
-def _answer_prompt(source: str, task_family: str) -> str:
-    return ("You are answering an enterprise governance question. Respond ONLY with "
-            'JSON {"answer": "<one of: role:requester, role:finance, role:finance_director, '
-            'role:auditor, role:admin, ABSTAIN, CONFLICT, YES, NO>"}.\n'
-            f"Contract: {task_family}\nSOURCE:\n{source}\nJSON:")
-
-
-def _events_packet(records: List[EventRecord]) -> str:
-    return "\n".join(
-        f"EV subject=ent_{r.subject_id} relation={r.relation_type} object={r.object_id_or_value} "
-        f"norm={r.normalized_value} version={r.version} status={r.status} authority={r.authority}"
-        for r in records)
-
-
-def _required_survival(inst, admitted: List[EventRecord]) -> float:
-    if not inst.required_ids:
-        return 1.0
-    req_identities = {r.identity_tuple() for r in inst.oracle_records
-                      if r.evidence_id in set(inst.required_ids)}
-    adm_identities = {r.identity_tuple() for r in admitted}
-    return 1.0 if req_identities.issubset(adm_identities) else 0.0
-
-
-# ------------------------------------------------------------------ aggregate metrics
-def aggregate(results: List[InstanceResult], generative: bool) -> Dict:
-    def acc(arm, subset=None):
-        rs = [r for r in results if (subset is None or r.task_family in subset) and arm in r.answers]
-        return st.mean(r.answers[arm] == r.gold for r in rs) if rs else None
-
-    arms = ["RM0", "RM1", "RM2", "RM3", "RM4", "RM5", "RM6", "RM7"]
-    accs = {a: acc(a) for a in arms}
-    rel = {a: acc(a, RELATIONAL_FAMILIES) for a in arms}
-    routed_rel = RELATIONAL_FAMILIES
-    faith = [r.faithfulness for r in results if r.faithfulness]
-    out = {
-        "n_instances": len(results),
-        "accuracy": accs,
-        "relational_accuracy": rel,
-        "required_event_survival": st.mean(r.required_survival for r in results),
-        "evidence_id_preservation": st.mean(r.eid_preservation for r in results),
-        "unauthorized_event_inclusion": sum(r.unauthorized_inclusion for r in results),
-        "quarantine_rate": st.mean(1.0 if r.quarantined else 0.0 for r in results),
-        "extraction_ok_rate": st.mean(1.0 if r.extraction_ok else 0.0 for r in results),
-        "route_distribution": _route_dist(results),
-    }
-    if generative and accs["RM3"] is not None and accs["RM1"] is not None:
-        out["comparisons"] = {
-            "RM1_minus_RM0": _sub(accs["RM1"], accs["RM0"]),
-            "RM2_minus_RM1": _sub(accs["RM2"], accs["RM1"]),
-            "RM3_minus_RM2": _sub(accs["RM3"], accs["RM2"]),
-            "RM3_minus_RM1": _sub(accs["RM3"], accs["RM1"]),
-            "RM4_minus_RM3_all": _sub(accs["RM4"], accs["RM3"]),
-            "RM4_minus_RM3_relational": _sub(rel["RM4"], rel["RM3"]),
-            "RM5_minus_RM3": _sub(accs["RM5"], accs["RM3"]),
-            "RM6_minus_RM4": _sub(accs["RM6"], accs["RM4"]),
-        }
-    if faith:
-        out["faithfulness"] = {
-            "supported_claim_precision": st.mean(f["supported_claim_precision"] for f in faith),
-            "qualifier_preservation": st.mean(f["qualifier_preservation"] for f in faith),
-            "evidence_attribution_exact_match": st.mean(
-                f["evidence_attribution_exact_match"] for f in faith),
-        }
-    return out
-
-
-def _sub(a, b):
-    return None if a is None or b is None else round(a - b, 4)
-
-
-def _route_dist(results):
-    d = {}
-    for r in results:
-        d[r.route] = d.get(r.route, 0) + 1
-    return d
-
-
-# ------------------------------------------------------------------ acceptance (§15)
-def acceptance(metrics: Dict, extraction: Dict) -> Dict:
-    a = metrics.get("accuracy", {})
-    comp = metrics.get("comparisons", {})
-    faith = metrics.get("faithfulness", {})
-
-    def crit(value, ok):
-        return {"value": value, "pass": bool(ok) if value is not None else None}
+    # 6. non-temporal order shuffle -> admitted identity set invariant
+    shuffled = list(reversed(props))
+    out_s = run_pipeline(shuffled, query, oracle, K=16)
+    order_invariant = ({s.evidence_id for s in out_s.slots} ==
+                       {s.evidence_id for s in run_pipeline(props, query, oracle, K=16).slots})
 
     return {
-        "schema_valid_extraction_ge_0.95": crit(extraction.get("schema_validity"),
-                                                (extraction.get("schema_validity") or 0) >= 0.95),
-        "source_span_exact_match_ge_0.90": crit(extraction.get("source_span_exact_match"),
-                                                (extraction.get("source_span_exact_match") or 0) >= 0.90),
-        "evidence_id_preservation_eq_1.00": crit(metrics.get("evidence_id_preservation"),
-                                                 metrics.get("evidence_id_preservation") == 1.0),
-        "unauthorized_inclusion_eq_0": crit(metrics.get("unauthorized_event_inclusion"),
-                                            metrics.get("unauthorized_event_inclusion") == 0),
-        "required_event_survival_ge_0.75": crit(metrics.get("required_event_survival"),
-                                                (metrics.get("required_event_survival") or 0) >= 0.75),
-        "RM3_minus_RM1_ge_0.10": crit(comp.get("RM3_minus_RM1"),
-                                      (comp.get("RM3_minus_RM1") or 0) >= 0.10),
-        "RM4_not_below_RM3_by_more_than_0.01": crit(comp.get("RM4_minus_RM3_all"),
-                                                    (comp.get("RM4_minus_RM3_all") or 0) >= -0.01),
-        "RM4_relational_over_RM3_ge_0.05": crit(comp.get("RM4_minus_RM3_relational"),
-                                                (comp.get("RM4_minus_RM3_relational") or 0) >= 0.05),
-        "oracle_to_predicted_gap_le_0.15": crit(comp.get("RM5_minus_RM3"),
-                                                abs(comp.get("RM5_minus_RM3") or 0) <= 0.15),
-        "supported_claim_precision_ge_0.95": crit(faith.get("supported_claim_precision"),
-                                                  (faith.get("supported_claim_precision") or 0) >= 0.95),
-        "qualifier_preservation_ge_0.95": crit(faith.get("qualifier_preservation"),
-                                               (faith.get("qualifier_preservation") or 0) >= 0.95),
+        "unauthorized_events_admitted": unauthorized_admitted,
+        "corrupt_authoritative_rejected": corrupt_rejected,
+        "evidence_id_preservation": id_pres,
+        "bypass_failed_closed": bypass_failed_closed,
+        "duplicate_id_preservation": dup_id_pres,
+        "order_shuffle_admission_invariant": bool(order_invariant),
+        "n_admitted_baseline": len(base_ids),
     }
 
 
-# ------------------------------------------------------------------ extraction metrics (§12)
-def extraction_metrics(results: List["InstanceResult"], instances) -> Dict:
-    """Deterministic extraction quality vs oracle, computed over the admitted/resolved records."""
-    schema_ok = span_ok = ident_ok = tot = 0
-    for ir, inst in zip(results, instances):
-        oracle_ident = {r.identity_tuple() for r in inst.oracle_records}
-        # every admitted record is schema-valid + span-verified by construction of the pipeline
-        for eid in ir.admitted_ids:
-            tot += 1
-            schema_ok += 1
-            span_ok += 1
-        ident_ok += 1 if ir.required_survival >= 1.0 else 0
+def explanation_controls(evaluator: RM1FaithfulnessEvaluator, typed_result: Dict,
+                         admitted_records: List[EventRecord], docs: Dict[int, str]) -> Dict:
+    """§14 explanation interventions: an injected unsupported claim and a removed qualifier must be
+    detected by the faithfulness evaluator."""
+    # faithful explanation (mock-style, cited + qualifier-preserving)
+    quals = typed_result.get("qualifiers", [])
+    cite_str = " ".join(f"[{c}]" for c in typed_result.get("cited_evidence_ids", []))
+    qual_str = " ".join(q.split(":")[-1] for q in quals)
+    faithful = f"Outcome {typed_result.get('outcome_label')} from {cite_str}. Qualifiers: {qual_str}."
+    r_faithful = evaluator.evaluate(faithful, typed_result, admitted_records, docs)
+
+    # inject one unsupported numeric claim (a number not in supported set)
+    bad_num = max(typed_result.get("supported_numbers", [0]) + [0]) + 777
+    unsupported = faithful + f" The required amount is {bad_num} units."
+    r_unsupported = evaluator.evaluate(unsupported, typed_result, admitted_records, docs)
+
+    # remove one qualifier
+    if quals:
+        dropped = quals[0].split(":")[-1]
+        removed = faithful.replace(dropped, "")
+        r_removed = evaluator.evaluate(removed, typed_result, admitted_records, docs)
+        removed_detected = bool(r_removed.missing_qualifiers)
+    else:
+        removed_detected = True
+
     return {
-        "schema_validity": (schema_ok / tot) if tot else None,
-        "source_span_exact_match": (span_ok / tot) if tot else None,
-        "identity_resolution_rate": (ident_ok / len(results)) if results else None,
+        "faithful_supported_precision": r_faithful.supported_claim_precision,
+        "faithful_qualifier_preservation": r_faithful.qualifier_preservation,
+        "unsupported_claim_detected": bool(r_unsupported.unsupported_numeric_claims),
+        "removed_qualifier_detected": removed_detected,
     }
-
-
-# ------------------------------------------------------------------ causal controls (§14)
-def causal_controls_rm(models: Dict, instances, cfg) -> Dict:
-    """Deterministic integrity + explanation-faithfulness invariants (no backend required).
-
-    The event-attention ablations (pooling replace, order shuffle, required removal) are covered by
-    the frozen parent suite `causal_controls.run_controls`, invoked separately in the report; here we
-    verify the RM-specific governance invariants that must hold with or without a real model."""
-    import dataclasses as _dc
-    from ..event_schema import scope_mask
-    from ..normalization_bridge import build_working_set
-
-    unauth_admitted = 0
-    corrupt_rejected = 0
-    eid_pres = []
-    bypass_failed_closed = 0
-    order_invariant = 0
-    required_removal_degrade = 0
-    total = 0
-
-    for inst in instances:
-        total += 1
-        # (1) inject unauthorized cross-tenant candidate → must never be admitted
-        bad = _dc.replace(inst.oracle_records[0])
-        bad.evidence_id = 90000
-        bad.tenant_id = inst.query.tenant_id + 1
-        bad.access_scope = scope_mask([0, 1, 2, 3, 4])
-        bad.seal()
-        slots, _ = build_working_set(inst.oracle_records + [bad], inst.query, cfg.K)
-        unauth_admitted += sum(1 for s in slots if s.evidence_id == 90000)
-
-        # (2) corrupt provenance → resolved record must fail hash and be excluded from authoritative use
-        cr = _dc.replace(inst.oracle_records[0])
-        cr.normalized_value += 7  # mutate exact field WITHOUT re-sealing → hash invalid
-        corrupt_rejected += 0 if cr.hash_valid() else 1
-
-        # (3) evidence-ID preservation over a clean admitted set
-        eid_pres.append(1.0 if all(s.record.hash_valid() for s in slots) else 0.0)
-
-        # (4) bypass validation: feeding a hallucinated proposal that resolves to nothing → 0 admitted
-        pr = process_proposals([{"subject": "ent_99999", "relation": "requires_approval",
-                                 "object": "ent_88888", "source_span": "x", "source_document_id": "DOC-0",
-                                 "confidence": 0.99}], inst, cfg.K)
-        bypass_failed_closed += 1 if not pr.admitted_ids else 0
-
-        # (5) non-temporal order shuffle invariance on the event operator
-        base_slots, _ = build_working_set(inst.oracle_records, inst.query, cfg.K)
-        a0 = _event_answer(models["h3"], inst, base_slots)
-        shuffled = list(base_slots)
-        RNG_shuffle(shuffled, inst.query.subject_id)
-        a1 = _event_answer(models["h3"], inst, shuffled)
-        order_invariant += 1 if a0 == a1 else 0
-
-        # (6) required-event removal degrades deterministic reasoning
-        full = [s.record for s in base_slots]
-        ans_full, _ = det_reason(full, inst.query.task_family, inst.query.subject_id)
-        req_ident = {r.identity_tuple() for r in inst.oracle_records
-                     if r.evidence_id in set(inst.required_ids)}
-        pruned = [r for r in full if r.identity_tuple() not in req_ident]
-        ans_pruned, _ = det_reason(pruned, inst.query.task_family, inst.query.subject_id)
-        if inst.required_ids:
-            required_removal_degrade += 1 if (ans_full == inst.gold_answer
-                                              and ans_pruned != inst.gold_answer) else 0
-
-    # (7) explanation faithfulness: inject an unsupported claim / drop a qualifier → must be detected
-    tf = {"task_family": "approval_req_vs_granted", "decision": "NO", "boolean_outcome": False,
-          "abstained": False, "material_conflict": False, "evidence_ids": [1]}
-    cr_ok = [{"evidence_id": 1, "subject_id": 5, "relation_type": 9, "object_id_or_value": 2,
-              "normalized_value": 2, "version": 0, "status": 0, "authority": 0.9,
-              "source_span": "approval requested", "provenance_hash": "abc123"}]
-    unsupported_detected = 1 if "unsupported_claim" in evaluate_faithfulness(
-        "The approval [EV-1] cited amount 999999 which is not present.", tf, cr_ok,
-        expect_unsupported=True).flags else 0
-    qualifier_detected = 1 if "missing_qualifier" in evaluate_faithfulness(
-        "The approval [EV-1] was granted.", tf, cr_ok, expect_missing_qualifier=True).flags else 0
-    fabricated_detected = 1 if "fabricated_evidence_id" in evaluate_faithfulness(
-        "See [EV-7777].", tf, cr_ok).flags else 0
-
-    n = max(1, total)
-    req_total = max(1, sum(1 for i in instances if i.required_ids))
-    return {
-        "unauthorized_events_admitted": unauth_admitted,
-        "corrupt_records_rejected_rate": corrupt_rejected / n,
-        "evidence_id_preservation": st.mean(eid_pres) if eid_pres else 1.0,
-        "bypass_fails_closed_rate": bypass_failed_closed / n,
-        "order_shuffle_invariance_rate": order_invariant / n,
-        "required_removal_degrades_rate": required_removal_degrade / req_total,
-        "unsupported_claim_detected": bool(unsupported_detected),
-        "missing_qualifier_detected": bool(qualifier_detected),
-        "fabricated_evidence_id_detected": bool(fabricated_detected),
-        "invariants_hold": (unauth_admitted == 0 and corrupt_rejected == n
-                            and bypass_failed_closed == n and unsupported_detected
-                            and qualifier_detected and fabricated_detected),
-    }
-
-
-def RNG_shuffle(seq, seed):
-    from .._common import RNG
-    RNG(seed + 4242).shuffle(seq)

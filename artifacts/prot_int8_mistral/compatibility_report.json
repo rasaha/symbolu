@@ -1,0 +1,36 @@
+{
+  "subject": "KVPro int4_protected + prot-int8 sidecar vs Mistral-7B-Instruct-v0.3 architecture",
+  "method": "Static code inspection of the KVPro harness (no model loaded). Labels: INFERRED unless noted.",
+  "harness_architecture_generality": {
+    "rope_capture": "capture_kv.py patches transformers.models.<model_type>.modeling_<model_type>.apply_rotary_pos_emb dynamically (:60-69) -> works for model_type='mistral' provided that symbol exists in the installed transformers version (VERIFY ON POD).",
+    "kv_layout_read": "fakequant_model.layer_kv handles transformers 5.x .layers[i].keys/.values, legacy key_cache[i], and tuple layouts -> Mistral DynamicCache compatible.",
+    "geometry_source": "calibrate_mask_hf.py reads num_kv_heads/head_dim/num_layers from model.config generically (:88,107) -> no hard-coded Qwen geometry."
+  },
+  "dimension_checks": {
+    "head_dim": {"kvpro_assumption": 128, "mistral_v0_3": 128, "status": "COMPATIBLE",
+                 "note": "phase5b_4c_paged_writer + prot_int8 constants assume D=128; Mistral head_dim=128 matches (same as Qwen2.5-7B)."},
+    "gqa_kv_heads": {"kvpro_support": "generic H_kv (Qwen=4, Llama-3.1=8 already targeted)", "mistral_v0_3": 8,
+                     "status": "COMPATIBLE", "note": "GQA with 8 KV heads is within the already-exercised range."},
+    "num_layers": {"mistral_v0_3": 32, "status": "COMPATIBLE (per-layer writer; mask is (L,H_kv,D))"},
+    "rope": {"kvpro": "standard Llama-style rotary via apply_rotary_pos_emb patch", "mistral": "standard rotary, rope_theta=1e6",
+             "status": "COMPATIBLE (INFERRED) — verify apply_rotary_pos_emb signature on the installed transformers"},
+    "sliding_window_attention": {
+      "risk": "HIGH IF ENABLED",
+      "kvpro_assumption": "FULL causal attention over the whole paged KV cache; the int4_protected paged writer/kernel has no sliding-window masking.",
+      "mistral_v0_3": "sliding_window = null (SWA DISABLED) -> full attention -> COMPATIBLE",
+      "mistral_v0_1_v0_2": "sliding_window = 4096 (SWA ENABLED) -> INCOMPATIBLE without SWA handling — DO NOT USE these for this study",
+      "status": "COMPATIBLE for v0.3 ONLY, CONDITIONAL ON config.json sliding_window==null — VERIFY ON POD before running."
+    },
+    "vocab": {"mistral_v0_3": 32768, "status": "irrelevant to KV sidecar; COMPATIBLE"}
+  },
+  "protect_fraction": {"default": "4% -> n_protect=round(0.04*128)=5", "status": "same n_protect as Qwen2.5-7B; prot_int8 constants shapes unaffected"},
+  "prot_int8_requirement": {
+    "needs": "v2 mask artifact WITH per-channel k_min/k_max (Phase-6N). Build with calibrate_phase5b_protect_mask.py (emits artifact_version=2, k_min/k_max). The plain calibrate_mask_hf.py may not emit minmax.",
+    "consumed_by": "fakequant_model.py:77-82 (P8prod cell) passes k_min/k_max into reconstruct_p8; production writer loads them via load_protect_minmax_for_layer."
+  },
+  "path_classifications": {
+    "quality_ABC_fakequant": "run_p8_quality.sh cells fp/affine/P8prod use quantizers.reconstruct + reconstruct_p8 then run HF attention on reconstructed K. This is a FAKE-QUANT reference path, apples-to-apples for C-B (identical machinery, only prot dtype differs), but NOT the production vLLM int4 kernel. Label any result from it TEST-BACKED/MEASURED-fakequant, never 'production'.",
+    "production_decode": "External forked-vLLM flash_attn_with_int4_kvcache; needs the pod's patched vLLM built for Mistral geometry. Consumes bf16 protected sidecar (int8 is dequantized to bf16 before the kernel). VERIFY the fork supports num_kv_heads=8/head_dim=128 on the pod."
+  },
+  "verdict": "COMPATIBLE for Mistral-7B-Instruct-v0.3 (fake-quant quality path) CONDITIONAL ON: (1) config.json sliding_window==null, (2) apply_rotary_pos_emb present for model_type 'mistral' in the installed transformers, (3) a v2 k_min/k_max mask built for Mistral. Production-kernel compatibility is INFERRED and must be verified against the pod's vLLM fork."
+}

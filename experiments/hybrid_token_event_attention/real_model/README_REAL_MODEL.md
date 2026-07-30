@@ -1,101 +1,165 @@
 # RM1 — Real-Model Validation of the Dual-Domain Hybrid LLM
 
-RM1 replaces the local token-model **stand-in** used in the controlled experiment with an **actual
-open-weight causal LM** loaded through Hugging Face `transformers`, and tests the *frozen external*
-architecture:
+RM1 replaces the local **token-model stand-in** used in the frozen controlled study
+(`experiments/hybrid_token_event_attention/`) with an **actual open-weight causal language model**
+loaded through Hugging Face Transformers, and drives that real model through the *same frozen
+external governed architecture*:
 
 ```
-real token model → provisional evidence extraction → deterministic validation/normalization
-  → exact EvidenceRecords → P5 smallest-sufficient-set → contract-aware reasoning router
-  → deterministic reasoning by default → bounded event attention only for relational contracts
-  → typed evidence-linked findings → real-model explanation → RM1 faithfulness evaluation
+real token-language model
+    → provisional evidence extraction
+    → deterministic validation and normalization
+    → exact EvidenceRecords
+    → P5 smallest-sufficient-set selection
+    → contract-aware reasoning router
+    → deterministic reasoning by default
+    → bounded event attention only for relational contracts
+    → typed evidence-linked findings
+    → real token-model explanation
+    → TAP / RM1 faithfulness evaluation
 ```
 
-The base model is **frozen** (no fine-tuning, no LoRA, no adapters, no FSCS, no Phase). This phase
-isolates one change: the token stand-in → a real model.
+**RM1 does not** fine-tune the base model and does **not** add FSCS, LoRA, adapters, Phase
+recurrence, or any other architecture change. It isolates the single effect of swapping the token
+stand-in for a real frozen model. It is a **new additive directory**; every frozen component (event
+schema, normalization bridge, P5 selector, deterministic reasoner, H2/H3 event modules, causal
+controls, datasets, canonical results JSON and report) is **imported, never modified**.
 
-> **Scope.** RM1 tests an actual frozen token-language model inside the external governed dual-domain
-> architecture. It does not validate FSCS, model-weight adaptation, production deployment, or
-> universal superiority of event attention.
+## Honesty boundary (read first)
 
-## What the model may and may not do (§5)
+The sandbox this was authored in has **no `torch`, `transformers`, `accelerate`, `safetensors`, or
+GPU**. A genuine open-weight model therefore **cannot be loaded here**, and the harness reports
+`RESOURCE_BLOCKED` with exact remediation instead of inventing numbers. **The old stand-in is never
+substituted for a real model.** The committed result artifacts under `results/` are the honest
+`RESOURCE_BLOCKED` record for this environment plus the model-independent architecture invariants.
 
-The model performs only **(A) interpret source language into provisional evidence proposals** and
-**(B) explain an already-computed typed result**. It never assigns evidence IDs, provenance hashes,
-authority, versions, access, decision authority, or execution rights — the **deterministic bridge**
-does. The model proposes semantic fields + exact source spans; everything authoritative is assigned
-deterministically.
+To produce a real-model result, run on a suitable machine (see **Run** below); the harness will then
+load the model, record proof-of-execution, and emit `COMPLETED` artifacts.
 
-## Running
+## Real-model authority boundary (§5)
+
+The actual model may perform only two functions:
+
+- **A. interpret** governed source text into *provisional* evidence proposals (semantic fields + an
+  exact source span), and
+- **B. explain** an already-computed typed result.
+
+The model **never** assigns evidence ids, provenance hashes, authority/version/tenant/access status,
+admission decisions, or the outcome. All of that is done by the **deterministic evidence pipeline**
+(`evidence_pipeline.py`). Every proposed `source_span` must be an **exact substring** of the cited,
+permitted source document; unresolved, malformed, low-confidence, ambiguous, cross-tenant, or corrupt
+proposals are **quarantined or rejected**, never silently repaired.
+
+## Layout
+
+```
+real_model/
+├── run_real_model.py            single user-facing entrypoint (CLI, arms RM0–RM7, artifacts, report)
+├── hf_backend.py                real HF AutoModelForCausalLM + resource gate + offline MockBackend
+├── prompts.py                   interpret / explain prompts, extraction schema, offline mock responder
+├── extraction.py                schema-guided extraction, bounded retries, ClarificationRequest (§7)
+├── evidence_pipeline.py         deterministic validation → states → resolution → P5 admission (§5,§6)
+├── reasoning_router.py          deterministic contract-aware router (§8)
+├── explanation.py               real-model explanation of a computed typed result (§5 role B)
+├── evaluation.py                metrics, RM1_FAITHFULNESS_EVALUATOR, integrity/causal controls (§12–14)
+├── requirements-real-model.txt  runtime deps (needed ONLY to load a real model)
+├── tests/test_real_model_harness.py   mock-backend unit tests (no weights required)
+├── results/                     REAL_MODEL_RESULTS.json, REAL_MODEL_TRACES.jsonl,
+│                                REAL_MODEL_VALIDATION_REPORT.md, RESOURCE_MANIFEST.json
+└── quarantine/                  QUARANTINE.jsonl
+```
+
+## Arms (§9)
+
+| arm | pipeline |
+|---|---|
+| **RM0** | real model over raw source text → final answer directly |
+| **RM1** | real model over a retrieved source-span packet → final answer directly |
+| **RM2** | real-model extraction → validation → validated events serialized back → model answers directly |
+| **RM3** | real-model extraction → validation → **deterministic-only** reasoner → typed outcome |
+| **RM4** | RM3 + **router-gated** bounded event attention for relational contracts |
+| **RM5** | **oracle** EvidenceRecords → deterministic reasoner (real-model-independent ceiling) |
+| **RM6** | oracle EvidenceRecords → router → deterministic + event attention |
+| **RM7** | best typed outcome → real-model explanation → faithfulness evaluation |
+
+Decisive comparisons: `RM1−RM0` (retrieval), `RM2−RM1` (structured events), `RM3−RM2` (deterministic
+enterprise computation), `RM4−RM3` (router-gated event attention), `RM5−RM3` (construction gap),
+`RM6−RM4` (loss from real-model extraction + admission). **`RM4−RM0` is not attributed entirely to
+event attention.**
+
+### Event-attention branch
+
+RM4/RM6's relational branch requires the frozen H3 event operator. RM1 loads a canonical checkpoint
+if one exists (verifying its hash) or trains **only** the existing event module on the existing
+training split under the pre-registered architecture/hyperparameters — never on RM1 held-out data. If
+no operator is available in a given run, the routed relational branch executes the deterministic
+reasoner and the run **records `event_attention_available = false`** rather than silently claiming an
+event-attention result.
+
+## TAP boundary (§13)
+
+The repository's `tap_provider` governs **assertion support relative to evidence** — a related but
+different contract from **explanation-over-events faithfulness**. Because no existing public API
+scores an event-explanation against admitted `EvidenceRecords`, RM1 ships a clearly labelled
+**`RM1_FAITHFULNESS_EVALUATOR`** (`evaluation.py`). It is deterministic and gold-anchored, and does
+**not** use the same real model as the sole judge of its own explanation. It checks: cited-id
+existence, cited-span existence, unsupported numeric/authority claims, qualifier preservation,
+active-vs-stale confusion, authority exceedance, and evidence-attribution exact match.
+
+## Run
 
 ```bash
+# 1. install real-model deps on a suitable machine (GPU or a 32 GB+ CPU host)
 pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
-export UGENCE_REAL_MODEL_ID=<hf-repo-or-local-dir>        # e.g. mistralai/Mistral-7B-v0.3
-export UGENCE_MODEL_REVISION=<commit-or-tag>              # optional pin
 
+# 2. pick any open-weight causal LM (HF repo id, a pinned revision, or a local dir)
+export UGENCE_REAL_MODEL_ID="mistralai/Mistral-7B-Instruct-v0.3"
+export UGENCE_MODEL_REVISION="<commit-sha>"    # optional pin
+
+# 3. smoke run (10–20 instances), then full
 python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
     --model-id "$UGENCE_REAL_MODEL_ID" --revision "$UGENCE_MODEL_REVISION" \
-    --mode smoke --limit 20
+    --mode smoke --limit 20 --device auto --dtype auto
+
+python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
+    --model-id "$UGENCE_REAL_MODEL_ID" --mode full --device auto --dtype auto
 ```
 
-Key flags: `--mode smoke|full`, `--limit`, `--device auto|cuda|mps|cpu`, `--dtype auto|bf16|fp16|fp32`,
-`--load-in-4bit` (CUDA + bitsandbytes only; never silent), `--max-input-tokens`, `--max-new-tokens`,
-`--clarification-limit`, `--dataset-jsonl <path>` (adjudicated mode), `--offline`, `--resume`,
-`--trust-remote-code` (default **false**). Decoding is deterministic (`do_sample=False`).
+CLI flags: `--model-id --revision --dataset-jsonl --mode smoke|full --limit --seed
+--device auto|cuda|mps|cpu --dtype auto|bf16|fp16|fp32 --load-in-4bit --max-input-tokens
+--max-new-tokens --clarification-limit --output-dir --offline --resume --trust-remote-code`.
+Decoding is deterministic (`do_sample=false`); seeds are set and recorded (note that some GPU ops are
+not bitwise deterministic). `trust_remote_code` defaults to **false**; authentication tokens are read
+from the environment but never printed or written to artifacts. **4-bit** loading is offered only on
+CUDA with `bitsandbytes` present and only when the caller opts in — the harness never silently
+quantizes or switches model families.
 
-`--self-test-mock` runs a **clearly-labelled MockBackend wiring smoke** (writes
-`MOCK_HARNESS_SMOKE.json`) — it is NOT a real-model result and makes no scientific claim.
+### Exercising the harness without weights
 
-## Resource gate (§2)
+```bash
+# run the unit tests (no torch/transformers needed)
+python -m unittest experiments.hybrid_token_event_attention.real_model.tests.test_real_model_harness
 
-The harness probes the environment before loading weights. It uses bf16 when genuinely supported,
-fp16 on compatible CUDA/MPS, fp32 on CPU. It never silently quantizes and never silently switches
-model families. If the model cannot be loaded it terminates with **`RESOURCE_BLOCKED`** (exit code 3),
-writing `REAL_MODEL_RESULTS.json`, `REAL_MODEL_VALIDATION_REPORT.md`, and `RESOURCE_MANIFEST.json`
-with the detected hardware, the missing package/access requirement, and the exact command to run on
-a suitable machine.
-
-**This sandbox is RESOURCE_BLOCKED**: no `torch`/`transformers`, no GPU, and `huggingface.co` returns
-HTTP 403 through the egress proxy. The committed `REAL_MODEL_RESULTS.json` therefore records
-`RESOURCE_BLOCKED` — not a fabricated real-model result. Reproduce the real run on a CUDA machine
-(≈16 GB VRAM for a 7B bf16 model) with the dependencies installed and Hub access (or a local model
-directory + `--offline`).
-
-## Arms (§9) and comparisons
-
-`RM0` model over raw text · `RM1` model over retrieved packet · `RM2` model + validated events,
-model answers · `RM3` extraction→validation→deterministic reasoner · `RM4` +router+event attention
-for relational · `RM5` oracle→deterministic (ceiling) · `RM6` oracle→router+event attention ·
-`RM7` best outcome→model explanation→faithfulness. Decisive deltas: RM1−RM0, RM2−RM1, RM3−RM2,
-RM4−RM3, RM5−RM3 (construction gap), RM6−RM4. RM4−RM0 must **not** be credited to event attention.
-
-## Modules
-
-```
-run_real_model.py     single CLI entrypoint + resource gate + artifact writer
-hf_backend.py         env probe, HFBackend (lazy torch), MockBackend, ResourceBlocked
-prompts.py            schema-guided extraction + explanation prompts (no gold leakage)
-extraction.py         parse model JSON, bounded ≤2 retries with validator feedback (no gold)
-clarification.py      bounded, append-only, replayable ClarificationRequest contract
-evidence_pipeline.py  deterministic validate→normalize→states→P5 (reuses frozen bridge)
-reasoning_router.py   deterministic contract router (DET_ONLY / DET+EVENT / QUARANTINE)
-explanation.py        real-model explanation + RM1_FAITHFULNESS_EVALUATOR (deterministic)
-evaluation.py         RM0–RM7 arms, metrics, §14 causal controls, §15 acceptance, event checkpoint
-mock_corpus.py        deterministic MockBackend responders (tests / wiring smoke only)
-tests/                mock-backend unit tests (no torch required)
+# DEV ONLY: prove the pipeline plumbing end-to-end with the offline MOCK backend.
+# Output is tagged execution=MOCK and is NEVER a real-model result.
+python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
+    --mock-plumbing --mode smoke --limit 10
 ```
 
-## Reuse & integrity
+## Pre-registered acceptance criteria (§15)
 
-RM1 reuses the frozen `EventRecord` schema, normalization conventions, P5 policy, deterministic
-reasoner, H2 pooling baseline, gated-residual H3 operator, causal controls, and evidence-ID checks.
-The event operator is **not** redesigned. The event checkpoint is trained once on the existing
-training split (frozen architecture/hyperparameters), saved with a content hash, and never touched
-by RM1 held-out data. The controlled-run canonical artifacts are **not** modified.
+The RM1 architecture is *supported* only if a real forward pass is verified **and**: schema-valid
+extraction ≥ 0.95; source-span exact match ≥ 0.90; evidence-ID preservation = 1.00; unauthorized-event
+inclusion = 0.00; corrupt-record rejection = 1.00; required-event survival ≥ 0.75; `RM3 − RM1 ≥ 0.10`;
+`RM4 − RM3 ≥ −0.01` overall and `RM4 − RM3 ≥ 0.05` on the routed relational subset; oracle-to-predicted
+gap ≤ 0.15; supported-claim precision ≥ 0.95; unsupported-claim recall ≥ 0.90; qualifier preservation
+≥ 0.95. These thresholds are **not** lowered after observing results. Event attention is classified
+`TASK_SPECIFIC` (not `VALIDATED`) if it helps some routed relational families but misses the +0.05
+bar; extraction is classified `BOTTLENECK` if the oracle-to-predicted gap > 0.15 or required-event
+survival < 0.75.
 
-## Faithfulness (§13)
+## Scope
 
-The repository ships no callable TAP API for free-text enterprise explanations, so RM1 uses a
-deterministic, gold-and-record-grounded `RM1_FAITHFULNESS_EVALUATOR` (never the model judging its own
-output). It is **not** called "TAP". If a real TAP API is later exposed, wire it in without weakening
-it.
+> RM1 tests an actual frozen token-language model inside the external governed dual-domain
+> architecture. It does not validate FSCS, model-weight adaptation, production deployment, or
+> universal superiority of event attention.

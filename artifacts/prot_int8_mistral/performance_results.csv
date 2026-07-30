@@ -1,0 +1,5 @@
+seqlen,n_protect,gpu,B_read_p50_ms,B_read_p95_ms,C_read_p50_ms,C_read_p95_ms,C_over_B_p50_x,classification
+512,5,NVIDIA A100-SXM4-80GB,0.173,,0.249,,1.44,MEASURED-GPU (get_packed_view read+dequant; NOT full vLLM decode)
+2048,5,NVIDIA A100-SXM4-80GB,0.189,,0.235,,1.24,MEASURED-GPU
+8192,5,NVIDIA A100-SXM4-80GB,0.234,,0.302,,1.29,MEASURED-GPU
+NOTE,,,,,,,,"C/B>1 => INT8 read is SLOWER (adds uint8->bf16 dequant), +0.05-0.08ms on the isolated sidecar read. This is the read-path slice over the whole context, NOT a full decode step (which also runs the big attention kernel + GEMMs), so end-to-end decode impact is diluted well below these ratios. INT8 is NOT faster; direction is neutral-to-slightly-slower."

@@ -1,19 +1,27 @@
 """
-hf_backend.py — environment/resource gate + real Hugging Face causal-LM backend (RM1 §2, §3).
+hf_backend.py — real Hugging Face causal-LM backend + resource gate + offline mock backend.
 
-Two backends implement one interface (`Backend`):
+Three concrete backends, one factory:
 
-    HFBackend    loads an ACTUAL open-weight causal LM through `transformers`. torch/transformers
-                 are imported lazily so the rest of the harness (and the whole unit-test suite)
-                 works without them. Deterministic decoding (do_sample=False). Records full model
-                 provenance in `.info()`.
-    MockBackend  a scripted, torch-free stand-in used ONLY for unit tests and the clearly-labelled
-                 harness smoke. Its `.info()["backend"] == "MOCK"`; it is NEVER allowed to stand in
-                 for a real-model scientific result.
+  * ``HFCausalBackend`` — a genuine ``transformers`` ``AutoModelForCausalLM`` + ``AutoTokenizer``.
+    This is the ONLY backend whose output may be used for a scientific verdict. It records the
+    proof-of-execution fields RM1 requires (model class, revision, parameter count, logits shape,
+    generated token ids, device, dtype) on the first real forward pass.
 
-The resource gate probes the environment BEFORE any weights are loaded and refuses to run rather
-than silently degrade: it never silently quantizes and never silently switches model families. If
-the requested model cannot be loaded it raises `ResourceBlocked` carrying exact remediation.
+  * ``MockBackend`` — a deterministic, offline stub that parses the *governed source text* with a
+    fixed grammar. It is CLEARLY NOT a real model. It exists only so the surrounding harness is
+    fully exercisable (unit tests, plumbing smoke) without weights, network, torch or transformers.
+    Its results are always tagged ``execution="MOCK"`` and are never a real-model result.
+
+  * factory ``load_backend(cfg)`` — probes the environment (``probe_environment``) and either
+    returns a live ``HFCausalBackend`` or raises ``ResourceBlocked`` with exact remediation. It
+    never silently downgrades to the mock backend and never silently quantizes or switches families.
+
+Design constraints honoured here:
+  * default ``trust_remote_code=False``
+  * dtype: bfloat16 when genuinely supported, float16 only on compatible CUDA, float32 on CPU
+  * 4-bit only when CUDA is available AND ``bitsandbytes`` imports AND the caller opted in
+  * authentication tokens are read from the environment but NEVER printed or stored in artifacts
 """
 from __future__ import annotations
 
@@ -23,318 +31,477 @@ import os
 import platform
 import shutil
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
-# --------------------------------------------------------------------------- probing
+# --------------------------------------------------------------------------- #
+# Errors                                                                       #
+# --------------------------------------------------------------------------- #
+class ResourceBlocked(Exception):
+    """Raised when a genuine open-weight model cannot be loaded. Carries a structured manifest so
+    the caller can emit ``RESOURCE_BLOCKED`` with exact remediation and stop before any claim."""
+
+    def __init__(self, manifest: Dict):
+        self.manifest = manifest
+        super().__init__(manifest.get("reason", "RESOURCE_BLOCKED"))
+
+
+# --------------------------------------------------------------------------- #
+# Model-load configuration                                                     #
+# --------------------------------------------------------------------------- #
+@dataclass
+class ModelConfig:
+    model_id: str
+    revision: Optional[str] = None
+    device: str = "auto"          # auto|cuda|mps|cpu
+    dtype: str = "auto"           # auto|bf16|fp16|fp32
+    load_in_4bit: bool = False
+    trust_remote_code: bool = False
+    max_input_tokens: int = 2048
+    max_new_tokens: int = 512
+    offline: bool = False
+    seed: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Environment probe                                                            #
+# --------------------------------------------------------------------------- #
 def _pkg_version(name: str) -> Optional[str]:
+    if importlib.util.find_spec(name) is None:
+        return None
     try:
-        m = importlib.import_module(name)
-        return getattr(m, "__version__", "unknown")
+        mod = importlib.import_module(name)
+        return getattr(mod, "__version__", "unknown")
     except Exception:
         return None
 
 
-def _pkg_present(name: str) -> bool:
-    return importlib.util.find_spec(name) is not None
+def _total_ram_bytes() -> Optional[int]:
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        return None
 
 
 def probe_environment() -> Dict:
-    """Detect hardware + library availability WITHOUT importing torch unless it exists."""
-    info: Dict = {
-        "python_version": platform.python_version(),
+    """Detect interpreter, packages, hardware and supported floating-point types.
+
+    Pure-stdlib and side-effect-free: importing torch is attempted only to read device availability,
+    and never triggers a weight download. Safe to call on a machine with nothing installed.
+    """
+    versions = {
+        "python": platform.python_version(),
         "platform": platform.platform(),
-        "cpu_count": os.cpu_count(),
-        "disk_free_gb": round(shutil.disk_usage(".").free / 1e9, 2),
-        "packages": {name: _pkg_version(name) for name in
-                     ("torch", "transformers", "accelerate", "safetensors",
-                      "bitsandbytes", "numpy", "tokenizers")},
-        "cuda_available": False,
-        "mps_available": False,
-        "gpu_count": 0,
-        "vram_gb": None,
-        "ram_gb": None,
-        "supported_dtypes": ["float32"],   # CPU always supports fp32
+        "torch": _pkg_version("torch"),
+        "transformers": _pkg_version("transformers"),
+        "accelerate": _pkg_version("accelerate"),
+        "safetensors": _pkg_version("safetensors"),
+        "bitsandbytes": _pkg_version("bitsandbytes"),
+        "numpy": _pkg_version("numpy"),
     }
-    # RAM (best-effort, stdlib only)
-    try:
-        pages = os.sysconf("SC_PHYS_PAGES")
-        page_size = os.sysconf("SC_PAGE_SIZE")
-        info["ram_gb"] = round(pages * page_size / 1e9, 2)
-    except Exception:
-        pass
-    # torch-dependent probing, only if torch is actually installed
-    if info["packages"]["torch"]:
+
+    hw = {
+        "cpu_count": os.cpu_count(),
+        "total_ram_bytes": _total_ram_bytes(),
+        "cuda_available": False,
+        "cuda_device_count": 0,
+        "mps_available": False,
+        "vram_bytes_per_device": [],
+        "supported_fp": ["float32"],   # CPU always supports float32
+    }
+
+    if versions["torch"]:
         try:
-            import torch  # noqa
-            info["cuda_available"] = bool(torch.cuda.is_available())
-            if info["cuda_available"]:
-                info["gpu_count"] = torch.cuda.device_count()
+            import torch  # noqa: PLC0415
+            if torch.cuda.is_available():
+                hw["cuda_available"] = True
+                hw["cuda_device_count"] = torch.cuda.device_count()
+                for i in range(torch.cuda.device_count()):
+                    try:
+                        props = torch.cuda.get_device_properties(i)
+                        hw["vram_bytes_per_device"].append(int(props.total_memory))
+                    except Exception:
+                        hw["vram_bytes_per_device"].append(None)
+                # bf16 support on the current CUDA device
                 try:
-                    props = torch.cuda.get_device_properties(0)
-                    info["vram_gb"] = round(props.total_memory / 1e9, 2)
-                    info["gpu_name"] = props.name
-                    info["supported_dtypes"].append("float16")
                     if torch.cuda.is_bf16_supported():
-                        info["supported_dtypes"].append("bfloat16")
+                        hw["supported_fp"].append("bfloat16")
                 except Exception:
                     pass
+                hw["supported_fp"].append("float16")
             mps = getattr(getattr(torch, "backends", None), "mps", None)
             if mps is not None and mps.is_available():
-                info["mps_available"] = True
-                info["supported_dtypes"].append("float16")
-        except Exception as e:  # torch present but broken
-            info["torch_import_error"] = repr(e)
-    return info
+                hw["mps_available"] = True
+                # MPS supports fp16; bf16 support is device-dependent and not assumed
+                if "float16" not in hw["supported_fp"]:
+                    hw["supported_fp"].append("float16")
+        except Exception:
+            pass
+
+    return {"versions": versions, "hardware": hw}
 
 
-# --------------------------------------------------------------------------- resource block
+def _select_device(cfg: ModelConfig, env: Dict) -> Tuple[Optional[str], Optional[str]]:
+    """Return (device, error). device in {'cuda','mps','cpu'}; error non-None => cannot honour."""
+    hw = env["hardware"]
+    if cfg.device == "cuda":
+        return ("cuda", None) if hw["cuda_available"] else (None, "cuda_requested_but_unavailable")
+    if cfg.device == "mps":
+        return ("mps", None) if hw["mps_available"] else (None, "mps_requested_but_unavailable")
+    if cfg.device == "cpu":
+        return "cpu", None
+    # auto
+    if hw["cuda_available"]:
+        return "cuda", None
+    if hw["mps_available"]:
+        return "mps", None
+    return "cpu", None
+
+
+def _select_dtype(cfg: ModelConfig, device: str, env: Dict) -> Tuple[Optional[str], Optional[str]]:
+    """Return (dtype_name, error). Never silently picks an unsupported type."""
+    supported = env["hardware"]["supported_fp"]
+    if cfg.dtype == "bf16":
+        if "bfloat16" in supported:
+            return "bfloat16", None
+        return None, "bf16_requested_but_unsupported"
+    if cfg.dtype == "fp16":
+        if device == "cpu":
+            return None, "fp16_requested_on_cpu"  # fp16 matmul on CPU is not a supported real path
+        if "float16" in supported:
+            return "float16", None
+        return None, "fp16_requested_but_unsupported"
+    if cfg.dtype == "fp32":
+        return "float32", None
+    # auto: bf16 when supported, else fp16 on CUDA, else fp32 on CPU
+    if device == "cuda":
+        if "bfloat16" in supported:
+            return "bfloat16", None
+        return "float16", None
+    if device == "mps":
+        return "float16", None
+    return "float32", None
+
+
+def _four_bit_ok(cfg: ModelConfig, device: str, env: Dict) -> Tuple[bool, Optional[str]]:
+    if not cfg.load_in_4bit:
+        return False, None
+    if device != "cuda":
+        return False, "4bit_requires_cuda"
+    if not env["versions"]["bitsandbytes"]:
+        return False, "4bit_requires_bitsandbytes"
+    return True, None
+
+
+def build_resource_manifest(cfg: ModelConfig, env: Dict, reason: str,
+                            remediation: Dict) -> Dict:
+    """The structured record emitted on RESOURCE_BLOCKED (also written to RESOURCE_MANIFEST.json)."""
+    return {
+        "status": "RESOURCE_BLOCKED",
+        "reason": reason,
+        "requested_model": cfg.model_id,
+        "requested_revision": cfg.revision,
+        "requested_device": cfg.device,
+        "requested_dtype": cfg.dtype,
+        "requested_load_in_4bit": cfg.load_in_4bit,
+        "environment": env,
+        "remediation": remediation,
+    }
+
+
+def _missing_core_packages(env: Dict) -> List[str]:
+    need = ["torch", "transformers"]
+    return [p for p in need if not env["versions"][p]]
+
+
+# --------------------------------------------------------------------------- #
+# Backend interface + proof-of-execution                                       #
+# --------------------------------------------------------------------------- #
 @dataclass
-class ResourceBlocked(Exception):
-    reason: str
-    requested_model: str
-    detected: Dict = field(default_factory=dict)
-    missing: List[str] = field(default_factory=list)
-    param_count_estimate: Optional[str] = None
-    est_memory_gb: Optional[float] = None
-    remediation: List[str] = field(default_factory=list)
-    recommended_command: str = ""
-
-    def payload(self) -> Dict:
-        d = asdict(self)
-        d["status"] = "RESOURCE_BLOCKED"
-        return d
-
-    def __str__(self) -> str:
-        return f"RESOURCE_BLOCKED: {self.reason} (model={self.requested_model})"
-
-
-# --------------------------------------------------------------------------- generation result
-@dataclass
-class GenerationResult:
-    text: str
-    prompt_token_ids: List[int]
-    output_token_ids: List[int]
-    n_input_tokens: int
-    n_output_tokens: int
+class ExecutionProof:
+    """Recorded on the first real forward pass — the evidence that an actual model executed."""
+    model_class: str = ""
+    model_revision: Optional[str] = None
+    parameter_count: Optional[int] = None
     logits_shape: Optional[List[int]] = None
+    generated_token_ids: Optional[List[int]] = None
+    device: str = ""
+    dtype: str = ""
+    verified: bool = False
 
 
-# --------------------------------------------------------------------------- backends
+@dataclass
+class GenResult:
+    text: str
+    prompt_tokens: int
+    completion_tokens: int
+    generated_token_ids: List[int] = field(default_factory=list)
+    latency_ms: float = 0.0
+
+
 class Backend:
-    is_real: bool = False
+    """Abstract text-in / text-out causal-LM backend with deterministic (greedy) decoding."""
+    name = "abstract"
+    execution = "ABSTRACT"     # "REAL" | "MOCK"
 
-    def info(self) -> Dict:  # model provenance metadata
+    def describe(self) -> Dict:  # model-identity manifest (no secrets)
         raise NotImplementedError
 
-    def generate(self, prompt: str, max_new_tokens: int = 256,
-                 max_input_tokens: int = 2048) -> GenerationResult:
+    def generate(self, system: str, user: str, max_new_tokens: Optional[int] = None) -> GenResult:
         raise NotImplementedError
 
-    def forward_probe(self, text: str) -> Dict:
-        """One-instance proof an actual model executed: logits shape + token ids."""
+    @property
+    def proof(self) -> ExecutionProof:
         raise NotImplementedError
 
 
-class MockBackend(Backend):
-    """Deterministic scripted backend for tests / harness smoke. NEVER a real-model result."""
-    is_real = False
+# --------------------------------------------------------------------------- #
+# Real Hugging Face backend                                                    #
+# --------------------------------------------------------------------------- #
+class HFCausalBackend(Backend):
+    """Genuine transformers AutoModelForCausalLM. Greedy, deterministic decoding (do_sample=False).
 
-    def __init__(self, responder=None, model_id: str = "mock://deterministic"):
-        # responder: callable(prompt:str) -> str ; default echoes an empty JSON object
-        self.responder = responder or (lambda p: "{}")
-        self.model_id = model_id
-        self._vocab = 32000
+    Constructed only via ``load_backend`` after the resource gate has passed, so by the time this
+    object exists torch + transformers are importable and the device/dtype are honourable.
+    """
+    name = "hf-causal"
+    execution = "REAL"
 
-    def info(self) -> Dict:
-        return {
-            "backend": "MOCK", "is_real": False, "model_id": self.model_id,
-            "revision": "n/a", "architecture": "MockDeterministic", "param_count": 0,
-            "tokenizer_class": "MockTokenizer", "vocab_size": self._vocab,
-            "context_limit": 4096, "dtype": "n/a", "quantization": "none",
-            "attn_implementation": "n/a", "device": "cpu", "trust_remote_code": False,
-        }
-
-    def _toks(self, s: str) -> List[int]:
-        return [(hash(w) % self._vocab) for w in s.split()]
-
-    def generate(self, prompt: str, max_new_tokens: int = 256,
-                 max_input_tokens: int = 2048) -> GenerationResult:
-        out = self.responder(prompt)
-        pt = self._toks(prompt)[:max_input_tokens]
-        ot = self._toks(out)[:max_new_tokens]
-        return GenerationResult(text=out, prompt_token_ids=pt, output_token_ids=ot,
-                                n_input_tokens=len(pt), n_output_tokens=len(ot),
-                                logits_shape=[1, len(pt), self._vocab])
-
-    def forward_probe(self, text: str) -> Dict:
-        pt = self._toks(text)
-        return {"backend": "MOCK", "logits_shape": [1, len(pt), self._vocab],
-                "generated_token_ids": pt[:5], "device": "cpu", "dtype": "n/a",
-                "note": "MOCK backend — NOT a real-model execution proof"}
-
-
-# dtype resolution ---------------------------------------------------------------------
-def resolve_dtype(requested: str, env: Dict) -> str:
-    if requested != "auto":
-        want = {"bf16": "bfloat16", "fp16": "float16", "fp32": "float32"}[requested]
-        if want not in env["supported_dtypes"]:
-            raise ValueError(f"requested dtype {want} not supported by hardware "
-                             f"(supported: {env['supported_dtypes']})")
-        return want
-    if env["cuda_available"]:
-        return "bfloat16" if "bfloat16" in env["supported_dtypes"] else "float16"
-    if env["mps_available"]:
-        return "float16"
-    return "float32"
-
-
-def resolve_device(requested: str, env: Dict) -> str:
-    if requested != "auto":
-        return requested
-    if env["cuda_available"]:
-        return "cuda"
-    if env["mps_available"]:
-        return "mps"
-    return "cpu"
-
-
-class HFBackend(Backend):
-    """Real Hugging Face causal LM. Lazily imports torch/transformers."""
-    is_real = True
-
-    def __init__(self, config, env: Dict):
-        self.config = config
-        self.env = env
-        self._meta: Dict = {}
-        self._model = None
-        self._tok = None
-        self._torch = None
+    def __init__(self, cfg: ModelConfig, device: str, dtype: str, four_bit: bool):
+        self.cfg = cfg
+        self.device = device
+        self.dtype_name = dtype
+        self.four_bit = four_bit
+        self._proof = ExecutionProof(device=device, dtype=dtype)
         self._load()
 
-    def _load(self) -> None:
-        cfg = self.config
-        missing = [p for p in ("torch", "transformers") if not _pkg_present(p)]
-        if missing:
-            raise ResourceBlocked(
-                reason=f"required package(s) not installed: {', '.join(missing)}",
-                requested_model=cfg.model_id, detected=self.env, missing=missing,
-                remediation=[
-                    "pip install -r experiments/hybrid_token_event_attention/real_model/"
-                    "requirements-real-model.txt",
-                ],
-                recommended_command=_recommended_command(cfg))
-        if cfg.load_in_4bit:
-            if not (self.env["cuda_available"] and _pkg_present("bitsandbytes")):
-                raise ResourceBlocked(
-                    reason="--load-in-4bit requires CUDA and an importable bitsandbytes",
-                    requested_model=cfg.model_id, detected=self.env,
-                    missing=[m for m in ("bitsandbytes",) if not _pkg_present(m)] or ["cuda"],
-                    remediation=["run on a CUDA machine with bitsandbytes, or drop --load-in-4bit"],
-                    recommended_command=_recommended_command(cfg))
+    def _load(self) -> None:  # pragma: no cover - requires torch + weights, gated out in sandbox
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        self._torch = torch
-        dtype = resolve_dtype(cfg.dtype, self.env)
-        device = resolve_device(cfg.device, self.env)
-        torch_dtype = getattr(torch, dtype)
-        load_kwargs = dict(revision=cfg.revision, trust_remote_code=cfg.trust_remote_code)
-        if cfg.offline:
-            os.environ["HF_HUB_OFFLINE"] = "1"
-            os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+        dtype_map = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
+        torch_dtype = dtype_map[self.dtype_name]
+
+        kwargs: Dict = {
+            "revision": self.cfg.revision,
+            "trust_remote_code": self.cfg.trust_remote_code,
+        }
+        if self.four_bit:
+            from transformers import BitsAndBytesConfig
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_compute_dtype=torch_dtype)
+        else:
+            kwargs["torch_dtype"] = torch_dtype
+
+        if self.device == "cuda":
+            kwargs["device_map"] = "auto"
+
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.cfg.model_id, revision=self.cfg.revision,
+            trust_remote_code=self.cfg.trust_remote_code)
+        self.model = AutoModelForCausalLM.from_pretrained(self.cfg.model_id, **kwargs)
+        if self.device != "cuda":            # device_map handles cuda placement
+            self.model = self.model.to(self.device)
+        self.model.eval()
+
+        torch.manual_seed(self.cfg.seed)
+        if self.device == "cuda":
+            torch.cuda.manual_seed_all(self.cfg.seed)
+
+        self._proof.model_class = type(self.model).__name__
+        self._proof.model_revision = self.cfg.revision
         try:
-            self._tok = AutoTokenizer.from_pretrained(cfg.model_id, **load_kwargs)
-            model_kwargs = dict(load_kwargs)
-            model_kwargs["torch_dtype"] = torch_dtype
-            model_kwargs["attn_implementation"] = cfg.attn_implementation
-            if cfg.load_in_4bit:
-                from transformers import BitsAndBytesConfig
-                model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
-            self._model = AutoModelForCausalLM.from_pretrained(cfg.model_id, **model_kwargs)
-            if not cfg.load_in_4bit:
-                self._model = self._model.to(device)
-            self._model.eval()
-        except ResourceBlocked:
-            raise
-        except Exception as e:
-            raise ResourceBlocked(
-                reason=f"model load failed: {type(e).__name__}: {e}",
-                requested_model=cfg.model_id, detected=self.env,
-                remediation=[
-                    "verify the model id / local path and revision",
-                    "ensure Hugging Face Hub is reachable (this sandbox returns HTTP 403 for "
-                    "huggingface.co) or pass a local --model-id directory with --offline",
-                    "accept the model license on the Hub if required",
-                ],
-                recommended_command=_recommended_command(cfg))
-        cfgobj = getattr(self._model, "config", None)
-        n_params = sum(p.numel() for p in self._model.parameters())
-        self._meta = {
-            "backend": "HF", "is_real": True, "model_id": cfg.model_id,
-            "revision": cfg.revision or "main",
-            "architecture": type(self._model).__name__,
-            "param_count": int(n_params),
-            "tokenizer_class": type(self._tok).__name__,
-            "vocab_size": int(getattr(self._tok, "vocab_size", 0) or 0),
-            "context_limit": int(getattr(cfgobj, "max_position_embeddings", 0) or 0),
-            "dtype": dtype, "quantization": "4bit" if cfg.load_in_4bit else "none",
-            "attn_implementation": cfg.attn_implementation, "device": device,
-            "trust_remote_code": cfg.trust_remote_code,
-            "library_versions": {k: self.env["packages"][k] for k in
-                                 ("torch", "transformers", "accelerate", "safetensors")},
+            self._proof.parameter_count = int(sum(p.numel() for p in self.model.parameters()))
+        except Exception:
+            self._proof.parameter_count = None
+
+    def describe(self) -> Dict:  # pragma: no cover - requires a loaded model
+        tok = self.tokenizer
+        cfg = self.model.config
+        return {
+            "model_id": self.cfg.model_id,
+            "revision": self.cfg.revision,
+            "architecture_class": type(self.model).__name__,
+            "parameter_count": self._proof.parameter_count,
+            "tokenizer_class": type(tok).__name__,
+            "tokenizer_vocab_size": int(getattr(tok, "vocab_size", 0) or 0),
+            "context_limit": int(getattr(cfg, "max_position_embeddings", 0) or 0),
+            "dtype": self.dtype_name,
+            "quantization": "4bit" if self.four_bit else "none",
+            "attention_implementation": getattr(cfg, "_attn_implementation", "default"),
+            "device_map": "auto" if self.device == "cuda" else self.device,
+            "trust_remote_code": self.cfg.trust_remote_code,
+            "execution": self.execution,
         }
 
-    def info(self) -> Dict:
-        return dict(self._meta)
+    def generate(self, system: str, user: str,
+                 max_new_tokens: Optional[int] = None) -> GenResult:  # pragma: no cover
+        import time
+        import torch
 
-    def generate(self, prompt: str, max_new_tokens: int = 256,
-                 max_input_tokens: int = 2048) -> GenerationResult:
-        torch = self._torch
-        enc = self._tok(prompt, return_tensors="pt", truncation=True,
-                        max_length=max_input_tokens)
-        enc = {k: v.to(self._model.device) for k, v in enc.items()}
+        prompt = self._format_chat(system, user)
+        enc = self.tokenizer(prompt, return_tensors="pt", truncation=True,
+                             max_length=self.cfg.max_input_tokens)
+        input_ids = enc["input_ids"].to(self.model.device)
+        n_prompt = int(input_ids.shape[1])
+        t0 = time.time()
         with torch.no_grad():
-            out = self._model.generate(**enc, max_new_tokens=max_new_tokens,
-                                       do_sample=False, num_beams=1,
-                                       pad_token_id=getattr(self._tok, "eos_token_id", None))
-        in_len = enc["input_ids"].shape[1]
-        gen_ids = out[0][in_len:].tolist()
-        text = self._tok.decode(gen_ids, skip_special_tokens=True)
-        return GenerationResult(text=text, prompt_token_ids=enc["input_ids"][0].tolist(),
-                                output_token_ids=gen_ids, n_input_tokens=in_len,
-                                n_output_tokens=len(gen_ids))
+            out = self.model.generate(
+                input_ids,
+                attention_mask=enc.get("attention_mask", None).to(self.model.device)
+                if enc.get("attention_mask", None) is not None else None,
+                do_sample=False,                      # deterministic decoding
+                num_beams=1,
+                max_new_tokens=max_new_tokens or self.cfg.max_new_tokens,
+                pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+            )
+        latency_ms = (time.time() - t0) * 1000.0
+        gen_ids = out[0][n_prompt:].tolist()
+        text = self.tokenizer.decode(gen_ids, skip_special_tokens=True)
 
-    def forward_probe(self, text: str) -> Dict:
-        torch = self._torch
-        enc = self._tok(text, return_tensors="pt", truncation=True, max_length=64)
-        enc = {k: v.to(self._model.device) for k, v in enc.items()}
-        with torch.no_grad():
-            out = self._model(**enc)
-            next_id = int(out.logits[0, -1].argmax().item())
-        return {"backend": "HF", "model_class": type(self._model).__name__,
-                "revision": self._meta["revision"], "param_count": self._meta["param_count"],
-                "logits_shape": list(out.logits.shape), "generated_token_ids": [next_id],
-                "device": str(self._model.device), "dtype": self._meta["dtype"]}
+        if not self._proof.verified:
+            # capture proof-of-execution from a single real forward pass
+            with torch.no_grad():
+                logits = self.model(input_ids).logits
+            self._proof.logits_shape = list(logits.shape)
+            self._proof.generated_token_ids = gen_ids[:32]
+            self._proof.verified = True
+
+        return GenResult(text=text, prompt_tokens=n_prompt, completion_tokens=len(gen_ids),
+                         generated_token_ids=gen_ids, latency_ms=latency_ms)
+
+    def _format_chat(self, system: str, user: str) -> str:  # pragma: no cover
+        tok = self.tokenizer
+        if getattr(tok, "chat_template", None):
+            msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            try:
+                return tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+            except Exception:
+                pass
+        return f"{system}\n\n{user}\n"
+
+    @property
+    def proof(self) -> ExecutionProof:
+        return self._proof
 
 
-def _recommended_command(cfg) -> str:
-    return ("On a CUDA machine (>=16GB VRAM for a 7B bf16 model) with deps installed:\n"
-            "  pip install -r experiments/hybrid_token_event_attention/real_model/"
-            "requirements-real-model.txt\n"
-            f"  export UGENCE_REAL_MODEL_ID={cfg.model_id or '<hf-repo-or-local-dir>'}\n"
-            "  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \\\n"
-            "      --model-id \"$UGENCE_REAL_MODEL_ID\" --mode smoke --limit 20")
+# --------------------------------------------------------------------------- #
+# Offline mock backend (tests / plumbing only — never a verdict)               #
+# --------------------------------------------------------------------------- #
+class MockBackend(Backend):
+    """Deterministic offline backend. NOT a real model.
+
+    It does not "understand" anything: given the extraction prompt (which embeds the governed source
+    text in a fixed machine grammar) it returns a JSON extraction produced by a deterministic parser.
+    This lets the whole RM1 pipeline run end-to-end so the plumbing and the deterministic gate are
+    testable without weights. Every result carries ``execution="MOCK"`` and is excluded from claims.
+    """
+    name = "mock-offline"
+    execution = "MOCK"
+
+    def __init__(self, responder=None):
+        # responder: callable(system, user) -> str. Default returns "{}" (empty proposal set).
+        self._responder = responder or (lambda system, user: "{}")
+        self._proof = ExecutionProof(model_class="MockBackend", device="cpu", dtype="float32",
+                                     parameter_count=0, verified=True,
+                                     logits_shape=[1, 1, 1], generated_token_ids=[0])
+
+    def describe(self) -> Dict:
+        return {
+            "model_id": "MOCK-OFFLINE-STUB",
+            "revision": None,
+            "architecture_class": "MockBackend",
+            "parameter_count": 0,
+            "tokenizer_class": "whitespace-mock",
+            "tokenizer_vocab_size": 0,
+            "context_limit": 0,
+            "dtype": "float32",
+            "quantization": "none",
+            "attention_implementation": "none",
+            "device_map": "cpu",
+            "trust_remote_code": False,
+            "execution": self.execution,
+        }
+
+    def generate(self, system: str, user: str, max_new_tokens: Optional[int] = None) -> GenResult:
+        text = self._responder(system, user)
+        return GenResult(text=text, prompt_tokens=max(1, len(user) // 4),
+                         completion_tokens=max(1, len(text) // 4),
+                         generated_token_ids=[0], latency_ms=0.0)
+
+    @property
+    def proof(self) -> ExecutionProof:
+        return self._proof
 
 
-def load_backend(config, env: Optional[Dict] = None) -> Backend:
-    """Gate → real backend, or raise ResourceBlocked. `config.mock_responder` forces MockBackend."""
+# --------------------------------------------------------------------------- #
+# Factory + resource gate                                                      #
+# --------------------------------------------------------------------------- #
+def load_backend(cfg: ModelConfig, env: Optional[Dict] = None) -> HFCausalBackend:
+    """Load a REAL Hugging Face backend or raise ``ResourceBlocked`` with a full manifest.
+
+    Never returns the mock backend and never silently quantizes or switches model families.
+    """
     env = env or probe_environment()
-    if getattr(config, "mock_responder", None) is not None:
-        return MockBackend(responder=config.mock_responder, model_id=config.model_id or "mock://")
-    if not config.model_id:
-        raise ResourceBlocked(
-            reason="no model specified: pass --model-id or set UGENCE_REAL_MODEL_ID",
-            requested_model="", detected=env, missing=["model-id"],
-            remediation=["export UGENCE_REAL_MODEL_ID=<hf-repo-or-local-dir>"],
-            recommended_command=_recommended_command(config))
-    return HFBackend(config, env)
+
+    missing = _missing_core_packages(env)
+    if missing:
+        raise ResourceBlocked(build_resource_manifest(
+            cfg, env, reason=f"missing_packages:{','.join(missing)}",
+            remediation=_remediation(cfg, env, missing_packages=missing)))
+
+    device, derr = _select_device(cfg, env)
+    if derr:
+        raise ResourceBlocked(build_resource_manifest(
+            cfg, env, reason=derr, remediation=_remediation(cfg, env)))
+
+    dtype, dterr = _select_dtype(cfg, device, env)
+    if dterr:
+        raise ResourceBlocked(build_resource_manifest(
+            cfg, env, reason=dterr, remediation=_remediation(cfg, env)))
+
+    four_bit, qerr = _four_bit_ok(cfg, device, env)
+    if qerr:
+        raise ResourceBlocked(build_resource_manifest(
+            cfg, env, reason=qerr, remediation=_remediation(cfg, env)))
+
+    try:  # pragma: no cover - not reachable without torch + weights in the sandbox
+        return HFCausalBackend(cfg, device=device, dtype=dtype, four_bit=four_bit)
+    except Exception as exc:  # weights missing / gated / OOM / offline with no cache
+        raise ResourceBlocked(build_resource_manifest(
+            cfg, env, reason=f"model_load_failed:{type(exc).__name__}",
+            remediation=_remediation(cfg, env, load_error=str(exc)[:400])))
+
+
+def _estimate_memory_note(cfg: ModelConfig) -> str:
+    return ("Estimated memory ~= parameter_count * bytes_per_param (2 for bf16/fp16, 4 for fp32) "
+            "plus KV cache and activations; e.g. a 7B model needs ~14 GB in fp16, ~28 GB in fp32, "
+            "and ~5-6 GB under 4-bit CUDA quantization.")
+
+
+def _remediation(cfg: ModelConfig, env: Dict, missing_packages: Optional[List[str]] = None,
+                 load_error: Optional[str] = None) -> Dict:
+    steps: List[str] = []
+    if missing_packages:
+        steps.append(
+            "pip install -r experiments/hybrid_token_event_attention/real_model/"
+            "requirements-real-model.txt")
+    steps.append(
+        "Run on a machine with a CUDA GPU (>= 16 GB VRAM for a 7B model in bf16/fp16, or use "
+        "--load-in-4bit on CUDA for ~6 GB), or a CPU host with >= 32 GB RAM for fp32 (slow).")
+    rev = f' --revision "{cfg.revision}"' if cfg.revision else ""
+    steps.append(
+        "Recommended command on a suitable machine:\n"
+        f'  export UGENCE_REAL_MODEL_ID="{cfg.model_id}"\n'
+        "  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \\\n"
+        f'      --model-id "$UGENCE_REAL_MODEL_ID"{rev} --mode smoke --limit 20 --device auto '
+        "--dtype auto")
+    out = {
+        "missing_package_or_access_requirement": missing_packages or [],
+        "detected_hardware": env["hardware"],
+        "estimated_memory_requirement": _estimate_memory_note(cfg),
+        "recommended_steps": steps,
+    }
+    if load_error:
+        out["load_error"] = load_error
+    return out

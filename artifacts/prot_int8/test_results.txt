@@ -1,0 +1,67 @@
+# prot-int8 validation — CPU test run (2026-07-30T04:04:16Z)
+# torch 2.13.0+cu130 (CPU), python 3.11.15, no GPU
+
+CTM_plus/KVPolicy/tests/test_phase6f_read_fusion_cpu.py::TestDispatchAndEnv::test_dispatch_cpu_returns_bf16 PASSED [ 65%]
+CTM_plus/KVPolicy/tests/test_phase6f_read_fusion_cpu.py::TestDispatchAndEnv::test_env_forces_reference PASSED [ 65%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_classify PASSED [ 66%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_nsys_parse_tolerant PASSED [ 67%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_summarize_events_unusable_is_not_run PASSED [ 68%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_summarize_no_data_is_not_run PASSED [ 68%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_summarize_pct_and_unavailable PASSED [ 69%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestParse::test_summarize_route_a_events_ablation PASSED [ 70%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_attention_dominant_no_project PASSED [ 71%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_both_big_combined PASSED [ 71%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_decide_from_route_a_events PASSED [ 72%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_decide_route_a_small_protect_no_project PASSED [ 73%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_gather_dominant PASSED [ 74%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_no_profile_blocked PASSED [ 74%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_no_profile_but_profilable_inconclusive PASSED [ 75%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_protect_dominant_p8_clean_int8 PASSED [ 76%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestDecision::test_ranked_sorts_measured_first PASSED [ 77%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_build_adopts_mask_n_protect PASSED [ 77%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_format_change_ceiling PASSED [ 78%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_impl_removal_measured_with_profile PASSED [ 79%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_impl_removal_unavailable_without_profile PASSED [ 80%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_layout_total PASSED [ 80%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_read_mask_accounting_from_real_artifact PASSED [ 81%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestCost::test_route_a_full_fp16_k_load_is_the_big_lever PASSED [ 82%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestRouteABuilderAndGate::test_full_cpu_gate_passes PASSED [ 82%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestRouteABuilderAndGate::test_kernel_input_adapter_matches_fp_oracle PASSED [ 83%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestRouteABuilderAndGate::test_prot_int8_overlay_matches_p8prod PASSED [ 84%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestRouteABuilderAndGate::test_roundtrip_full_and_partial_tails PASSED [ 85%]
+scripts/kvpro_v3_profile/test_profile_cpu.py::TestRouteABuilderAndGate::test_view_shapes_and_padding PASSED [ 85%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_schema_file PASSED [ 86%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_good_geometry PASSED [ 87%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_catches_bad_packed_dim PASSED [ 88%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_catches_noncompact_protect PASSED [ 88%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_catches_structural PASSED [ 89%]
+scripts/kvpro_kernel_recovery/test_contract_cpu.py::test_catches_dtype_and_contiguity PASSED [ 90%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_check_meta_compatible_geometry_mismatch_raises PASSED [ 91%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_check_meta_compatible_match PASSED [ 91%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_check_meta_compatible_protect_format_diff_warns_but_passes PASSED [ 92%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_plan_restore_one_to_one PASSED [ 93%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_plan_restore_rejects_count_mismatch PASSED [ 94%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_plan_restore_rejects_empty PASSED [ 94%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_summarize_snapshot_counts_bytes PASSED [ 95%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestPureHelpers::test_writer_meta_format_mapping PASSED [ 96%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestSnapshotRoundtripCPU::test_default_format_verify_roundtrip_clean PASSED [ 97%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestSnapshotRoundtripCPU::test_disk_roundtrip_byte_clean PASSED [ 97%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestSnapshotRoundtripCPU::test_prot_int8_verify_roundtrip_clean PASSED [ 98%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestSnapshotRoundtripCPU::test_restore_prefix_refuses_count_mismatch PASSED [ 99%]
+CTM_plus/KVPolicy/tests/test_tier5b_snapshot_cpu.py::TestSnapshotRoundtripCPU::test_restore_prefix_refuses_geometry_mismatch PASSED [100%]
+
+============================= 135 passed in 1.83s ==============================
+
+=== ADDITIVE edge-case regression tests (scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py) ===
+configfile: pyproject.toml
+collecting ... collected 7 items
+
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_zero_protected_channels PASSED [ 14%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_one_protected_channel PASSED [ 28%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_odd_protected_count PASSED [ 42%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_nan_inf_calibration_is_clamped_not_propagated_in_scale PASSED [ 57%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_out_of_range_clamps_no_wrap PASSED [ 71%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_dtype_roundtrip_bf16_and_f32 PASSED [ 85%]
+scripts/kvpro_prot_int8_validation/test_prot_int8_edges_cpu.py::test_scale_matches_probe_formula_exactly PASSED [100%]
+
+============================== 7 passed in 1.53s ===============================

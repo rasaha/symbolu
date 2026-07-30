@@ -1,0 +1,5 @@
+seqlen,n_protect,gpu,B_prot_dtype,C_prot_dtype,B_prot_bytes,C_prot_payload_bytes,C_int8_const_bytes,C_prot_total_bytes,prot_saved_bytes,prot_saved_pct,B_read_transient_KiB,C_read_transient_KiB,classification
+512,5,NVIDIA A100-SXM4-80GB,torch.bfloat16,torch.uint8,40960,20480,~320,~20800,~20160,49.2,680,680,MEASURED-GPU (writer/read-path; not full vLLM decode)
+2048,5,NVIDIA A100-SXM4-80GB,torch.bfloat16,torch.uint8,163840,81920,~320,~82240,~81600,49.8,2720,2720,MEASURED-GPU
+8192,5,NVIDIA A100-SXM4-80GB,torch.bfloat16,torch.uint8,655360,327680,~320,~328000,~327360,50.0,10880,10880,MEASURED-GPU
+NOTE,,,,,,,,,,,,,"Stored protected sidecar halves (~50%). Per LAYER; x32 layers x batch for model total. Read-transient identical B vs C -> INT8 saves memory in STORAGE only; on READ both build the same bf16 buffer. GPU allocator peak/reserved not separately reported here (allocated deltas shown)."

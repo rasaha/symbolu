@@ -1,0 +1,32 @@
+{
+  "environment": "CPU-only (torch 2.13.0+cu130, no CUDA device)",
+  "classification": "MEASURED (CPU micro-timing) \u2014 DIRECTIONAL ONLY, not production decode TPS",
+  "finding": "INT8 protection adds a uint8->bf16 dequant on every sidecar read that BF16 passthrough does not incur. On this CPU the dequant is strictly slower than the bf16 identity read (relative cost > 1x). Both paths end at the SAME bf16 buffer, so there is no read-side speed advantage to INT8; the benefit is storage bytes.",
+  "read_path_ops": {
+    "tokens_128": {
+      "bf16_read_us": 5.306,
+      "int8_read_us": 19.847,
+      "int8_added_overhead_us": 14.541,
+      "int8_relative_cost_x": 3.74
+    },
+    "tokens_1024": {
+      "bf16_read_us": 10.729,
+      "int8_read_us": 47.343,
+      "int8_added_overhead_us": 36.613,
+      "int8_relative_cost_x": 4.412
+    },
+    "tokens_4096": {
+      "bf16_read_us": 31.672,
+      "int8_read_us": 99.828,
+      "int8_added_overhead_us": 68.156,
+      "int8_relative_cost_x": 3.152
+    }
+  },
+  "RESOURCE_BLOCKED": {
+    "decode_kernel_latency": "no GPU; production kernel is closed external CUDA (fwd_kvcache_int4)",
+    "tokens_per_second": "no GPU",
+    "achieved_bandwidth": "no GPU",
+    "nsight_systems_compute": "no GPU / ncu ERR_NVGPUCTRPERM per existing audits",
+    "kernel_launches_per_token": "no GPU"
+  }
+}

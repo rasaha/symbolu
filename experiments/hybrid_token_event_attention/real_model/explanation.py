@@ -1,11 +1,9 @@
 """
-explanation.py — real-model explanation + RM1 faithfulness evaluator (RM1 §13).
+explanation.py — real-model explanation of an already-computed typed result (§5 role B).
 
-The token model turns an already-decided typed result into prose; it does not re-decide. The
-faithfulness of that prose is judged by a DETERMINISTIC evaluator against gold annotations and the
-cited exact records — the model is never the sole judge of its own explanation. Because the
-repository ships no callable TAP API for free-text enterprise explanations, this evaluator is
-explicitly labelled `RM1_FAITHFULNESS_EVALUATOR`, NOT "TAP".
+The model NEVER computes or overrides the outcome here. It receives the typed finding, its cited
+evidence, and the source, and produces a natural-language explanation. We then extract the evidence
+ids the explanation cites so the faithfulness evaluator can check attribution against the source.
 """
 from __future__ import annotations
 
@@ -13,119 +11,63 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from ..event_schema import EventRecord, ACTIVE
-from ..datasets import CLASS_NAMES, ABSTAIN, CONFLICT, YES, NO
+from ..event_schema import EventRecord, STATUSES
+from ..datasets import CLASS_NAMES
 from .prompts import build_explanation_prompt
 
-EVALUATOR_NAME = "RM1_FAITHFULNESS_EVALUATOR"
 
+def build_typed_result(outcome: int, cited_ids: List[int], records: List[EventRecord],
+                       task_family: str) -> Dict:
+    """Serialize the deterministic typed finding + its evidence into the explainer's input payload.
 
-def build_typed_findings(task_family: str, answer: int, used_ids: List[int],
-                         admitted: List[EventRecord]) -> Dict:
+    Qualifiers are lifted from the cited exact records so the evaluator can check that the model
+    preserved them."""
+    by_id = {r.evidence_id: r for r in records}
+    quals: List[str] = []
+    numbers: List[int] = []
+    for eid in cited_ids:
+        r = by_id.get(eid)
+        if r is None:
+            continue
+        quals.append(f"status:{STATUSES[r.status] if 0 <= r.status < len(STATUSES) else r.status}")
+        quals.append(f"version:v{r.version}")
+        quals.append(f"authority:{round(r.authority, 2)}")
+        # every number traceable to a cited exact field is "supported" (value, version, authority*10)
+        numbers.extend([r.normalized_value, r.version, int(round(r.authority * 10))])
     return {
         "task_family": task_family,
-        "decision": CLASS_NAMES[answer],
-        "abstained": answer == ABSTAIN,
-        "material_conflict": answer == CONFLICT,
-        "boolean_outcome": {YES: True, NO: False}.get(answer, None),
-        "evidence_ids": list(used_ids),
+        "outcome": outcome,
+        "outcome_label": CLASS_NAMES[outcome] if 0 <= outcome < len(CLASS_NAMES) else str(outcome),
+        "cited_evidence_ids": [f"EV-{e}" for e in cited_ids],
+        "cited_evidence_ids_int": cited_ids,
+        "qualifiers": sorted(set(quals)),
+        "supported_numbers": sorted(set(numbers)),
     }
 
 
-def cited_records(used_ids: List[int], admitted: List[EventRecord]) -> List[Dict]:
-    by = {r.evidence_id: r for r in admitted}
-    out = []
-    for i in used_ids:
-        r = by.get(i)
-        if r is None:
-            continue
-        out.append({"evidence_id": r.evidence_id, "subject_id": r.subject_id,
-                    "relation_type": r.relation_type, "object_id_or_value": r.object_id_or_value,
-                    "normalized_value": r.normalized_value, "version": r.version,
-                    "status": r.status, "authority": r.authority,
-                    "source_span": r.source_span, "provenance_hash": r.provenance_hash})
-    return out
-
-
-def generate_explanation(backend, typed_findings: Dict, cited: List[Dict],
-                         max_new_tokens: int = 160) -> Dict:
-    prompt = build_explanation_prompt(typed_findings, cited)
-    gen = backend.generate(prompt, max_new_tokens=max_new_tokens)
-    return {"text": gen.text, "n_input_tokens": gen.n_input_tokens,
-            "n_output_tokens": gen.n_output_tokens}
-
-
-# ------------------------------------------------------------------ faithfulness evaluation
-_EV_RE = re.compile(r"EV[- ]?(\d+)", re.IGNORECASE)
-_NUM_RE = re.compile(r"(?<![A-Za-z])(\d+)(?![A-Za-z])")
-_NEG_QUALIFIERS = ("no ", "not ", "without", "missing", "absent", "never", "n't")
-
-
 @dataclass
-class FaithfulnessResult:
-    evaluator: str = EVALUATOR_NAME
-    supported_claim_precision: float = 1.0
-    unsupported_claim_recall: float = 1.0     # recall of DETECTING an injected unsupported claim
-    qualifier_preservation: float = 1.0
-    evidence_attribution_exact_match: float = 1.0
-    flags: List[str] = field(default_factory=list)
-    blocked: bool = False                     # corrupt provenance / missing span → must block
+class ExplanationResult:
+    text: str
+    cited_ids: List[int]
+    typed_result: Dict
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    latency_ms: float = 0.0
 
 
-def evaluate_faithfulness(text: str, typed_findings: Dict, cited: List[Dict],
-                          expect_unsupported: bool = False,
-                          expect_missing_qualifier: bool = False) -> FaithfulnessResult:
-    """Deterministic faithfulness check. `expect_*` are set by the causal controls to verify the
-    evaluator actually DETECTS an injected fault (recall)."""
-    res = FaithfulnessResult()
-    cited_ids = {c["evidence_id"] for c in cited}
-    cited_values = set()
-    for c in cited:
-        cited_values.update({c["normalized_value"], c["object_id_or_value"], c["version"],
-                             c["evidence_id"]})
-    # 0) hard blocks: corrupt provenance or missing source span among cited records
-    for c in cited:
-        if not c.get("source_span"):
-            res.blocked = True
-            res.flags.append("missing_source_span")
-        # provenance corruption is detected upstream; a blank/`CORRUPT` hash blocks here too
-        if not c.get("provenance_hash") or c["provenance_hash"] == "CORRUPT":
-            res.blocked = True
-            res.flags.append("corrupt_provenance")
+_CITE_RE = re.compile(r"\[EV-(\d+)\]")
 
-    # 1) evidence-id attribution: every EV id mentioned must be in the cited set
-    mentioned = [int(m) for m in _EV_RE.findall(text)]
-    if mentioned:
-        good = sum(1 for m in mentioned if m in cited_ids)
-        res.evidence_attribution_exact_match = good / len(mentioned)
-        if good < len(mentioned):
-            res.flags.append("fabricated_evidence_id")
 
-    # 2) numeric support: every standalone number must match a cited value or an EV id
-    ev_nums = set(mentioned)
-    numbers = [int(n) for n in _NUM_RE.findall(text)]
-    unsupported = [n for n in numbers if n not in cited_values and n not in ev_nums]
-    total_claims = max(1, len(numbers) + len(mentioned))
-    supported = total_claims - len(unsupported) - sum(1 for m in mentioned if m not in cited_ids)
-    res.supported_claim_precision = max(0.0, supported / total_claims)
-    detected_unsupported = bool(unsupported) or ("fabricated_evidence_id" in res.flags)
-    if detected_unsupported:
-        res.flags.append("unsupported_claim")
+def parse_cited_ids(text: str) -> List[int]:
+    return [int(m) for m in _CITE_RE.findall(text)]
 
-    # 3) qualifier preservation: negative outcomes must carry a negation qualifier
-    needs_negation = (typed_findings.get("boolean_outcome") is False
-                      or typed_findings.get("abstained")
-                      or bool(typed_findings.get("material_conflict")))
-    if needs_negation:
-        has_neg = any(q in text.lower() for q in _NEG_QUALIFIERS)
-        res.qualifier_preservation = 1.0 if has_neg else 0.0
-        if not has_neg:
-            res.flags.append("missing_qualifier")
 
-    # 4) control-recall bookkeeping: did we detect the injected fault?
-    if expect_unsupported:
-        res.unsupported_claim_recall = 1.0 if detected_unsupported else 0.0
-    if expect_missing_qualifier:
-        res.qualifier_preservation = res.qualifier_preservation  # already 0 if detected
-        res.unsupported_claim_recall = res.unsupported_claim_recall
-    return res
+def explain(backend, outcome: int, cited_ids: List[int], records: List[EventRecord],
+            task_family: str, docs: Dict[int, str]) -> ExplanationResult:
+    typed = build_typed_result(outcome, cited_ids, records, task_family)
+    system, user = build_explanation_prompt(typed, docs)
+    gen = backend.generate(system, user)
+    return ExplanationResult(
+        text=gen.text, cited_ids=parse_cited_ids(gen.text), typed_result=typed,
+        prompt_tokens=gen.prompt_tokens, completion_tokens=gen.completion_tokens,
+        latency_ms=gen.latency_ms)
