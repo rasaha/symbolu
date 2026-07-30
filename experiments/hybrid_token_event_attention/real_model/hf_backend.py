@@ -277,10 +277,21 @@ class HFCausalBackend(Backend):
 
     def _load(self) -> None:  # pragma: no cover - requires torch + weights, gated out in sandbox
         import torch
+        import transformers
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         dtype_map = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
         torch_dtype = dtype_map[self.dtype_name]
+
+        # transformers renamed the `torch_dtype` from_pretrained kwarg to `dtype` in 4.56 and REMOVED
+        # `torch_dtype` in 5.x — pick the key the installed version accepts (supports the 4.40 floor
+        # through 5.x). See requirements-real-model.txt.
+        try:
+            _parts = transformers.__version__.split(".")
+            _ver = (int(_parts[0]), int(_parts[1]) if len(_parts) > 1 else 0)
+        except Exception:
+            _ver = (4, 40)
+        dtype_key = "dtype" if _ver >= (4, 56) else "torch_dtype"
 
         kwargs: Dict = {
             "revision": self.cfg.revision,
@@ -291,7 +302,7 @@ class HFCausalBackend(Backend):
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True, bnb_4bit_compute_dtype=torch_dtype)
         else:
-            kwargs["torch_dtype"] = torch_dtype
+            kwargs[dtype_key] = torch_dtype
 
         if self.device == "cuda":
             kwargs["device_map"] = "auto"
