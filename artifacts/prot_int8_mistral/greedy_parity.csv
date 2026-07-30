@@ -1,2 +1,8 @@
-prompt_id,category,seqlen,gen_settings,seed,config_pair,exact_token_agreement,first_divergence_pos,common_prefix_len,final_answer_agree,classification
-NA,NA,NA,greedy T=0,NA,C_minus_B,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED (no GPU/model; run run_commands.sh on pod)
+metric,cell,value,vs,classification,note
+teacher_forced_agree_pct,A_fp_fullbf16,100.0,self,MEASURED,reference
+teacher_forced_agree_pct,B_affine_int4_bf16prot,99.127,vs_fp,MEASURED,"<1% of next-token argmax positions differ from full BF16"
+teacher_forced_agree_pct,C_P8prod_int4_int8prot,PENDING,vs_fp,PENDING,"run scripts/kvpro_prot_int8_validation/mistral_greedy_parity.py (token_agreement.py skips P8prod)"
+autoregressive_agree_pct,B_affine_int4_bf16prot,20.588,vs_fp,MEASURED-NOISY,"HIGH VARIANCE: even validated B is not greedy-bit-identical to full BF16; not a parity criterion"
+autoregressive_agree_pct,C_P8prod_int4_int8prot,PENDING,vs_fp,PENDING,see mistral_greedy_parity.py
+greedy_bit_identical_any_quantized_cell,ALL,false,vs_fp,MEASURED,"no KV-quantized config (incl B) is greedy-bit-identical to full BF16 -> greedy bit-identity is the wrong bar"
+retrieval_output_identical_C_vs_B,needle+hard_needle,true,C_vs_B,MEASURED,"C produced identical correct-answer counts AND per-mode breakdown to B (indirect token-parity evidence)"

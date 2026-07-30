@@ -4,7 +4,9 @@
 
 Frozen commit `cef376e9` · branch `claude/kvpro-prot-int8-validation-hkd4ff` · date 2026-07-30.
 
-Scope: real-model A/B/C validation of the INT8 protected-channel sidecar vs the BF16 sidecar inside INT4-Protected KVPro, using an open **Mistral** model. This report documents the **compatibility assessment, the complete run harness, and the artifacts** prepared for the pod. It does **not** contain real-model measurements, because this environment has **no GPU and no model** — those are RESOURCE_BLOCKED and must be produced on the pod via `artifacts/prot_int8_mistral/run_commands.sh`.
+Scope: real-model A/B/C validation of the INT8 protected-channel sidecar vs the BF16 sidecar inside INT4-Protected KVPro, using an open **Mistral** model.
+
+**UPDATE 2026-07-30 (pod run executed).** The A/B/C **quality** run was subsequently executed on a RunPod A100-80GB (vLLM 0.7.3, `venv-vllm`, transformers 4.49) against `mistralai/Mistral-7B-Instruct-v0.3`. The quality axis is now **MEASURED**; memory and decode-performance axes remain **RESOURCE_BLOCKED** (not captured by the quality harness). Sections below carry both the original pre-run harness description and the post-run MEASURED results, labeled accordingly.
 
 Evidence labels: **MEASURED**, **TEST-BACKED**, **MODELED**, **INFERRED**, **RESOURCE_BLOCKED**, **UNSUPPORTED**.
 
@@ -12,9 +14,11 @@ Evidence labels: **MEASURED**, **TEST-BACKED**, **MODELED**, **INFERRED**, **RES
 
 ## Executive verdict
 
-**RESOURCE_BLOCKED** — the experiment harness is complete and the compatibility gate is defined and code-verified, but the decisive real-model run cannot be executed in this CPU-only environment. Run `run_commands.sh` on the GPU pod to produce the A/B/C evidence.
+**PARTIALLY VALIDATED (quality MEASURED-clean on Mistral; memory & performance still RESOURCE_BLOCKED).**
 
-Nothing here should be read as a real-model result. The only positive claims that survive this environment are the harness-plumbing tests and the static compatibility analysis.
+On real `mistralai/Mistral-7B-Instruct-v0.3`, the INT8 protected sidecar (C, `P8prod`) shows **no material quality degradation vs the BF16 sidecar (B, `affine`)**: needle 30/30 = 30/30, hard-needle 46/48 = 46/48 (identical per-mode), MMLU-200 C=79 ≥ B=76 (Δ within noise). Runtime also **confirmed the compatibility analysis** (32 layers, 8 KV heads, head_dim 128, `n_protect=5`, SWA disabled) and the **10 B → 5 B/tok/head/layer** protected-sidecar figure.
+
+What is **still not** established: (a) **greedy bit-identity** — teacher-forced agreement is ~99% for B vs full-BF16 and no KV-quantized cell (not even B) is greedy-bit-identical, so this was never the right bar; C's own teacher-forced number is pending `mistral_greedy_parity.py`; (b) **real GPU memory** (allocated/reserved/peak) and (c) **decode performance / TPS** — the quality path is fake-quant and does not touch these. The result is therefore **EMPIRICALLY EQUIVALENT within the pre-registered quality gate**, not "zero quality cost" and not a memory/speed claim.
 
 ---
 
@@ -93,16 +97,32 @@ INT8 sidecar → prot_int8_dequantize → materialized BF16 buffer (k_protect_bf
 
 ---
 
-## 6–7. Quality / Memory / Performance tasks (all RESOURCE_BLOCKED here)
+## 6–7. Quality / Memory / Performance tasks
 
-The full task matrix (greedy parity, logit comparison, perplexity, needle/hard-needle retrieval, representative prompts, memory, performance) is wired into `run_commands.sh` and the CSV templates. Every artifact currently carries a `RESOURCE_BLOCKED` row:
+### 6a. Quality — MEASURED on Mistral (pod run 2026-07-30)
 
-- `greedy_parity.csv`, `logit_comparison.csv` — need model forward passes.
-- `perplexity_results.csv` — suggests wikitext-2-raw-v1; record exact n_samples + context_len on the pod.
-- `retrieval_results.csv` — needle + hard-needle via the repo drivers.
-- `memory_results.csv` — real `torch.cuda` allocated/reserved/peak on the pod; sidecar halving (2 B→1 B, 10 B→5 B/tok/head/layer at n_protect=5) is **MODELED** here; effective density ≈2.94% of the read stream at 4% is **MODELED**.
-- `performance_results.csv` — prefill/decode latency, TPS, kernel launches; the int8→bf16 dequant cost is **INFERRED nonzero** (CPU proxy last cycle: 3–4× vs bf16 passthrough), GPU value RESOURCE_BLOCKED.
-- `profiler_summary.json` — Nsight/torch-profiler RESOURCE_BLOCKED.
+Run: `run_p8_quality.sh --cells fp,affine,P8prod --full-quality --real-mmlu 200`, model `mistralai/Mistral-7B-Instruct-v0.3`, mask `mistral_v0_3_protect_mask_4pct_v2.pt` (n_protect=5), 2 seeds for retrieval. Cells: **A=`fp`** (full BF16), **B=`affine`** (INT4 + BF16 protect), **C=`P8prod`** (INT4 + INT8 protect). Verdict file `runs/20260730T054025Z/p8_verdict.json` → **`P8_CLEAN`**. — **MEASURED.**
+
+| Benchmark | A `fp` | B `affine` | C `P8prod` | C − B |
+|---|---|---|---|---|
+| Needle (30) | 30/30 (1.00) | 30/30 (1.00) | **30/30 (1.00)** | 0 |
+| Hard-needle (48) | 46/48 (0.958) | 46/48 (0.958) | **46/48 (0.958)** | 0 (identical per-mode: distractor 10/12, rest perfect) |
+| MMLU (200-Q) | 78 (0.390) | 76 (0.380) | **79 (0.395)** | +3 / +0.015 (noise) |
+
+- **Retrieval: C identical to B** (counts and per-mode breakdown) — strongest equivalence signal short of token diffing.
+- **MMLU: C ≥ B**, delta within noise. **Caveat:** absolute MMLU ~39% is far below Mistral's true ~60%, and `fp` also scores 39% — so this harness's MMLU protocol is a **low-power instrument** here; it is supporting, not decisive. Retrieval is the strong arm.
+- **Greedy/teacher-forced (`token_agreement.py`, MEASURED):** `fp`=100/100; `affine`(B)=**99.13% teacher-forced**, 20.6% autoregressive. The autoregressive column is **high-variance noise** (validated B itself is only 20% vs full BF16, yet passes every benchmark; S4 scored 100% — clearly not a quality signal). **No KV-quantized cell — including B — is greedy-bit-identical to full BF16**, so greedy bit-identity is not a valid parity bar. C's own teacher-forced number is **PENDING** (`token_agreement.py` skips `P8prod`; use `scripts/kvpro_prot_int8_validation/mistral_greedy_parity.py`).
+
+**Classification: EMPIRICALLY EQUIVALENT within the pre-registered quality gate** (needle + hard-needle + MMLU, no regression vs affine). Not "zero quality cost"; not greedy bit-identity.
+
+### 6b. Memory / Performance — still RESOURCE_BLOCKED
+
+The quality run is **fake-quant** (the log states: *"int4 decode fork present (NOT used by this fake-quant study)"*), so it does not touch real memory or decode speed:
+
+- `memory_results.csv` — real `torch.cuda` allocated/reserved/peak: **RESOURCE_BLOCKED** (needs a capture through the production paged backend, `INT4_PROTECTED_PROT_INT8` unset vs `=1`). Sidecar halving 10 B→5 B/tok/head/layer at n_protect=5 is confirmed as the byte figure (**MODELED/known**); effective density ≈2.94% of the read stream at 4% is **MODELED**.
+- `performance_results.csv` — prefill/decode latency, TPS, kernel launches: **RESOURCE_BLOCKED**. The int8→bf16 dequant cost is **INFERRED nonzero** (CPU proxy: 3–4× vs bf16 passthrough).
+- `profiler_summary.json` — Nsight/torch-profiler: **RESOURCE_BLOCKED**.
+- `perplexity_results.csv` — not run; **RESOURCE_BLOCKED** (optional; wikitext-2-raw-v1 suggested).
 
 ---
 
@@ -114,32 +134,36 @@ The full task matrix (greedy parity, logit comparison, perplexity, needle/hard-n
 | KVPro↔Mistral-v0.3 architecture compatibility | **INFERRED** (static) + hard-gated on pod |
 | Model license = Apache-2.0 open source | **INFERRED** (HF blocked here) → verify on pod |
 | Config C materializes BF16 (not native INT8) | **INFERRED** (code) |
-| Sidecar byte halving (10→5 B/tok/head/layer) | **MODELED** here (MEASURED as tensor bytes last cycle) |
-| Real-model greedy parity / quality / PPL / retrieval | **RESOURCE_BLOCKED** |
-| Real GPU memory & decode performance | **RESOURCE_BLOCKED** |
-| "zero quality cost" on Mistral | **UNSUPPORTED** (no run) |
+| Sidecar byte halving (10→5 B/tok/head/layer, n_protect=5) | **MEASURED** (runtime-confirmed mask geometry) |
+| Real-model quality C vs B (needle/hard-needle/MMLU) | **MEASURED** — clean (`P8_CLEAN`) on Mistral-7B-Instruct-v0.3 |
+| Real-model greedy bit-identity | **UNSUPPORTED as a bar** — no quantized cell (incl B) is greedy-bit-identical; C teacher-forced PENDING |
+| Perplexity | **RESOURCE_BLOCKED** (not run) |
+| Real GPU memory & decode performance | **RESOURCE_BLOCKED** (fake-quant path; not captured) |
+| "zero quality cost" on Mistral | **UNSUPPORTED** — result is EMPIRICALLY EQUIVALENT within the gate, not a formal zero-cost claim |
 
 ---
 
 ## 9. Limitations
 
-1. No GPU / no model / HF blocked → no real-model numbers producible here.
-2. Compatibility is static-inferred; the SWA and RoPE-symbol gates must pass on the pod.
-3. Quality path is fake-quant; production memory/perf need the vLLM int4 backend.
-4. License/config values are best-known, not fetched — the pod gate is authoritative.
+1. **Quality path is fake-quant** (reconstruct K → HF attention), correct for the C−B isolation but **not** the production vLLM int4 kernel — memory/perf are not measured by it.
+2. **MMLU is low-power** here (~39% incl. full-BF16 `fp`), so the knowledge arm is supporting, not decisive; retrieval carries the equivalence weight.
+3. **Single model, single MMLU seed.** The S1–S4 study showed model-specificity; a second architecture and ≥3 MMLU seeds would harden the claim. Retrieval used 2 seeds.
+4. **C's own greedy/teacher-forced number is pending** (`token_agreement.py` skips `P8prod`); run `mistral_greedy_parity.py`.
+5. **No pre-registered equivalence margins** were set before the run — the gate is "no regression vs affine", which is weaker than a formal equivalence test.
+6. This sandbox (where the report is authored) has no GPU; the numbers above were produced on the pod and transcribed into the artifacts.
 
 ---
 
 ## 10. Recommended next action
 
-1. On the pod: run `artifacts/prot_int8_mistral/run_commands.sh`. It verifies model/license/SWA **before** download, builds the v2 mask, runs A/B/C quality (quick then full), and points at the memory/perf capture.
-2. Fill the CSVs and re-issue this report with **MEASURED** rows and pre-registered equivalence margins for C−B.
-3. Only then classify Mistral quality; until then it is **RESOURCE_BLOCKED**, not "zero cost".
+1. Run `scripts/kvpro_prot_int8_validation/mistral_greedy_parity.py` to fill C's teacher-forced parity + first-divergence (closes the greedy-parity gap).
+2. Capture **real GPU memory + decode TPS** for B vs C through the production paged backend (`INT4_PROTECTED_PROT_INT8` unset vs `=1`) — the only remaining unmeasured claim and the one that speaks to the "reduces memory / improves decode" question.
+3. Harden quality: a second architecture + ≥3 MMLU seeds + pre-registered C−B equivalence margins, before any "equivalent" claim leaves engineering.
 
 ---
 
 ## Final verdict
 
-**RESOURCE_BLOCKED** — harness complete and compatibility-gated; decisive real-model execution not possible in this environment. No real-model validation is claimed.
+**PARTIALLY VALIDATED.** On real `mistralai/Mistral-7B-Instruct-v0.3`, INT8 protection (C) is **quality-equivalent to BF16 protection (B) within the pre-registered gate** (needle/hard-needle identical; MMLU within noise) — this is **MEASURED** and upgrades the prior CPU-only RESOURCE_BLOCKED quality gap. The **memory-reduction** and **decode-performance** claims remain **RESOURCE_BLOCKED** (fake-quant path did not measure them), and **greedy bit-identity** is **UNSUPPORTED as a bar** (no quantized cell achieves it). Not "zero quality cost"; not a demonstrated speed or GPU-memory win.
 
 *Artifacts: `artifacts/prot_int8_mistral/` (environment.json, model_metadata.json, compatibility_report.json, run_commands.sh, *.csv, profiler_summary.json, test_results.txt). Prior CPU/reference evidence: `docs/KVPRO_PROT_INT8_VALIDATION_REPORT.md`.*
