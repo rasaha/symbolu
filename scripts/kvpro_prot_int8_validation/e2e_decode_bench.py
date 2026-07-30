@@ -107,11 +107,23 @@ def run_cell(args):
                            gpu_memory_utilization=args.gpu_mem_util,
                            enforce_eager=args.enforce_eager)
     info = get_backend_info(llm)
-    active, total = _prot_int8_layer_counts(llm)
     gpu = torch.cuda.get_device_name(0)
 
+    # The PagedKVWriters are allocated LAZILY on first forward, so the prot_int8
+    # activation count is only observable AFTER a generate. Force one, then check.
+    _wu_ids = _build_prompt(tok_import, 64, PROMPTS["factual"])
+    _wu_sp = SamplingParams(temperature=0.0, max_tokens=4, min_tokens=4, ignore_eos=True)
+    llm.generate([TokensPrompt(prompt_token_ids=list(_wu_ids))], _wu_sp, use_tqdm=False)
+    active, total = _prot_int8_layer_counts(llm)
+
     # Confounder guard: ON must be fully active; OFF must be fully inactive.
-    guard_ok = (active == total and total > 0) if args.cell == "on" else (active == 0)
+    guard_ok = (active == total and total > 0) if args.cell == "on" else (active == 0 and total > 0)
+    print(f"[{args.cell}] prot_int8 activation: active={active}/{total}  guard_ok={guard_ok}  "
+          f"(ON needs active==total>0; OFF needs active==0,total>0)")
+    if not guard_ok:
+        print(f"[{args.cell}] [WARN] activation guard failed BEFORE benchmarking — "
+              f"the B/C comparison will not be clean; investigate before trusting numbers.",
+              file=sys.stderr)
 
     matrix, raw = [], []
     quality = []
