@@ -2,7 +2,7 @@
 title: "Ugence AI Control Plane — Productization and Unified Console Plan"
 subtitle: "Consolidating implemented governance technologies into one enterprise-deployable product"
 author: "Ugence Labs"
-date: "TO VERIFY FROM REPOSITORY (set at build time)"
+date: "Draft for investor and design-partner review"
 confidentiality: "Confidential — shared for investor and design-partner evaluation"
 ---
 
@@ -326,6 +326,17 @@ The proposing agent and its runtime are treated as **untrusted** with respect to
 authorization and policy modification. Governance is external by construction: the
 loop that produced a proposal never approves it.
 
+### Connector and infrastructure failures fail closed too
+
+- **Runtime-connector failure** must not produce an executable action.
+- **Identity-resolution failure** must prevent binding approval or enforcement.
+- **Audit-write failure** must prevent enforcement unless a specifically approved
+  emergency policy exists — a failed audit write is never a silent continue in
+  enforcement mode.
+- **Execution-target uncertainty** must result in **HOLD** or **REOBSERVE**.
+- **Optional-accelerator failure** may use the unaccelerated path while recording
+  degraded operation.
+
 ---
 
 ## 8 · The enterprise console
@@ -369,10 +380,14 @@ this roadmap.
 |---|---|---|
 | Phase 0 | Separate console and dedicated API foundation | `[BUILT]` |
 | Phase 1 | Action-control vertical slice — TAP, ActionGate, ACP, CER trace, Kubernetes scenarios | `[BUILT]` |
-| Phase 2 | Product kernel — tenant identity, workflow configuration, Decision Governance, policy versions, human review, durable audit | `[PLANNED]` |
-| Phase 3 | Pilot integration — two runtime connectors, Kubernetes execution connector, identity integration, review queue, pilot metrics | `[PLANNED]` |
-| Phase 4 | Controlled enforcement — exact-action credentials, commit-time recheck, execution receipts, reconciliation, promotion controls | `[PLANNED]` |
+| Phase 2 | Product kernel — tenant model, generic OIDC identity abstraction, Microsoft Entra ID reference integration, Decision Governance, human review, PostgreSQL durable audit, hash-chained event model, policy and workflow configuration | `[PLANNED]` |
+| Phase 3 | Pilot integration — Ugence Agent Runtime connector, LangGraph connector, Kubernetes execution-target connector, pilot metrics, design-partner deployment packaging | `[PLANNED]` |
+| Phase 4 | Controlled enforcement — exact-action credentialing, commit-time state verification, execution receipts, reconciliation, idempotency and duplicate-execution protection, enforcement-promotion controls | `[PLANNED]` |
 | Phase 5 | Enterprise hardening — security testing, observability, deployment packaging, audit export, backup and recovery | `[PLANNED]` |
+
+**Kept outside the v1 committed milestones:** OpenAI Agents (runtime), SAML
+(identity), WORM / immutable object-storage export (audit hardening), and
+additional execution targets.
 
 ---
 
@@ -382,21 +397,48 @@ v1 is complete when, for the Kubernetes infrastructure-agent wedge, all of the
 following hold:
 
 - Multi-tenant identity and isolation
-- OIDC or SAML integration
-- Durable, tamper-evident audit
-- Secure, versioned APIs
-- Two runtime connectors
-- One enterprise identity integration
-- One governed execution-target connector (initially Kubernetes)
-- Workflow-specific shadow mode
+- Generic OIDC support
+- Microsoft Entra ID reference integration
+- Durable PostgreSQL audit store
+- Append-only, hash-chained governance events
+- Secure and versioned APIs
+- Ugence Agent Runtime connector
+- LangGraph runtime connector
+- Kubernetes execution-target connector
 - Human review and escalation
+- Workflow-specific shadow mode
 - Controlled enforcement for selected actions
-- Execution receipt and reconciliation
+- Execution receipts
+- Reconciliation
 - Pilot metrics and audit export
 
 This is an **enterprise-deployable v1** — not a claim of universal production
 readiness for every regulated industry. Full regulated-industry certification is
 explicitly out of v1 scope.
+
+### v1 reference integrations (behind versioned interfaces)
+
+> The v1 product uses **LangGraph, PostgreSQL, Microsoft Entra ID, and Kubernetes**
+> as reference integrations behind versioned interfaces. Customer-specific
+> runtimes, identity providers, audit architectures, and execution targets may be
+> substituted without changing the governance kernel or canonical contracts.
+
+The reasoning is commercial, not ideological:
+
+- **LangGraph** — a widely-used, vendor-neutral enterprise-agent target that
+  reduces multi-runtime integration risk; Ugence already holds relevant
+  cross-runtime interoperability evidence.
+- **PostgreSQL** — enterprise-familiar and deployable for a design partner, with
+  transactional integrity and structured, reconstructable audit.
+- **OIDC with Microsoft Entra ID** — standards-based identity that aligns with GCC
+  and enterprise adoption while keeping the product portable (not
+  Microsoft-specific).
+- **Kubernetes** — matches the initial infrastructure-agent wedge, where blast
+  radius is concrete and shadow mode is natural.
+
+OpenAI Agents (runtime), SAML (identity), and WORM / immutable object-storage
+export (audit hardening) are **post-v1** items, not part of the committed v1
+acceptance boundary.
 
 ### Reference architecture
 
@@ -421,21 +463,28 @@ flowchart TB
 
 ## 11 · Connector architecture
 
-Three connector classes, each with a defined contract. The proposing agent and
+Three connector classes, each behind a versioned interface. The proposing agent and
 runtime are untrusted; failure behavior follows the fail-closed rule — a connector
 that cannot confirm a required control never yields ALLOW.
 
-| Attribute | Runtime connectors | Execution-target connectors | Enterprise-service connectors |
+- **Runtime connectors** — Ugence Agent Runtime `[committed v1]` · LangGraph
+  `[committed v1]` · OpenAI Agents `[planned after v1]`. A runtime connector maps
+  proposed actions into the Canonical Execution Request contract; it never
+  authorizes.
+- **Execution-target connector** — Kubernetes `[committed v1 reference target]`.
+- **Enterprise-service connectors** — generic OIDC identity interface with a
+  Microsoft Entra ID reference adapter; PostgreSQL durable-audit adapter; policy and
+  evidence interfaces.
+
+| Attribute | Runtime connectors (Ugence + LangGraph) | Execution-target connector (Kubernetes) | Enterprise-service connectors (OIDC/Entra · PostgreSQL audit) |
 |---|---|---|---|
-| **v1 scope** | Ugence Agent Runtime + one enterprise runtime (LangGraph or OpenAI Agents) | Kubernetes | Identity provider, policy store, evidence source, system of record |
-| **Later** | Additional agent frameworks | GitHub, Terraform, AWS, databases, enterprise APIs | Additional systems of record |
-| **Supported action types** | Proposed assertions, recommendations, actions | Concrete target operations (e.g. K8s rollout / scale / delete) | Identity, policy, evidence, and record lookups |
-| **Shadow capability** | Yes — submit without execution | Yes — evaluate, do not execute | Read-only by nature |
+| **Supported action types** | Proposed assertions, recommendations, actions → CER | Concrete target operations (e.g. K8s rollout / scale / delete) | Identity resolution; durable audit write; policy and evidence lookups |
+| **Shadow capability** | Yes — submit without execution | Yes — evaluate, do not execute | Read/resolve and record only |
 | **Enforcement capability** | N/A (proposer only) | Yes — executes only when enforcement is enabled | No — never executes actions |
-| **Authentication model** | Service auth / signed submission | Scoped just-in-time, exact-action credential | OIDC/SAML or service credentials |
-| **Receipt support** | Proposal receipt | Execution receipt | Query/response record |
-| **Reconciliation support** | N/A | Yes — execution vs. authorization | N/A |
-| **Failure behavior** | Fail-closed; no ALLOW on failure | Fail-closed; no execution on unconfirmed authorization | Unavailable required source → control indeterminate → HOLD/ESCALATE |
+| **Authentication model** | Service auth / signed submission | Scoped just-in-time, exact-action credential | OIDC (Entra ID reference); scoped DB credentials for audit |
+| **Receipt support** | Proposal receipt | Execution receipt | Audit-write receipt; query/response record |
+| **Reconciliation support** | N/A | Yes — execution vs. authorization | Stores reconciliation records |
+| **Failure behavior** | Fail-closed; no executable action on failure | Fail-closed; no execution on unconfirmed authorization; uncertainty → HOLD / REOBSERVE | Identity failure blocks binding approval/enforcement; audit-write failure blocks enforcement (no silent continue) |
 | **Version compatibility** | Contract-versioned adapter | Contract-versioned adapter | Contract-versioned adapter |
 
 ---
@@ -475,17 +524,21 @@ The commercial offer is a paid design-partner pilot:
 
 ### Security and tenancy
 
-OIDC/SAML; tenant isolation; role-based permissions; service authentication;
-secrets management; encryption in transit and at rest; replay protection; evidence
-redaction; data-retention controls; approval integrity; and audit-access control.
-The proposing agent and runtime are **untrusted** with respect to authorization and
+Generic OIDC (with Microsoft Entra ID as the first reference integration; SAML is a
+post-v1 compatibility item); tenant isolation; role-based permissions; service
+authentication; secrets management; encryption in transit and at rest; replay
+protection; evidence redaction; data-retention controls; approval integrity; and
+audit-access control. Tenant identity, user identity, service identity, role,
+group, and approval authority are preserved in governance and audit records. The
+proposing agent and runtime are **untrusted** with respect to authorization and
 policy modification.
 
 ### Deployment
 
 Separate console and API processes; Docker images; local Docker Compose for
-evaluation; Kubernetes/Helm for pilot deployment; PostgreSQL or an equivalent
-durable store; database migrations; environment configuration; and external
+evaluation; Kubernetes/Helm for pilot deployment; the PostgreSQL durable audit
+store (behind a versioned interface, so a customer may substitute another database
+architecture); database migrations; environment configuration; and external
 secrets.
 
 ### Observability
@@ -537,9 +590,26 @@ enforcement across workflows.
   identity computation, and the non-compensatory gate logic are documented in
   `ACP/PHASE1_GOVERNED_LOOP_DTO_CONTRACT.md`. Local run instructions are in the
   service and console READMEs.
-- **Open items requiring founder confirmation.** Choice of the second runtime
-  connector (LangGraph vs. OpenAI Agents); durable-audit backing store; and the
-  exact v1 identity-provider integration. CI test counts and build status are
+- **Durable audit store (v1 reference).** PostgreSQL, an append-only,
+  hash-chained, tenant-scoped audit-event model. The design includes: append-only
+  critical governance events; hash linkage across ordered records; versioned event
+  schemas; restricted update and delete permissions; tenant, workflow, case, and
+  execution identifiers; policy and control-version references; human-approval
+  records; execution receipts; reconciliation outcomes; and explicit recording of
+  degraded and unavailable controls. This is **tamper-evident, not tamper-proof**;
+  WORM / immutable object-storage export is a later enterprise-hardening option. No
+  blockchain, Kafka, EventStoreDB, or custom distributed ledger is introduced in v1.
+- **Identity (v1 reference).** The internal identity interface is **generic OIDC**;
+  the product must not become Microsoft-specific. **Microsoft Entra ID** is the
+  first tested reference integration (relevant to GCC and enterprise design
+  partners). **SAML** is a post-v1 enterprise compatibility item. Tenant, user,
+  service identity, role, group, and approval authority are preserved in governance
+  and audit records.
+- **Substitutability.** LangGraph, PostgreSQL, Microsoft Entra ID, and Kubernetes
+  are reference integrations behind versioned interfaces; a customer pilot may
+  substitute another runtime, database architecture, identity provider, or execution
+  target without changing the governance kernel or canonical contracts.
+- **Genuinely open (repository facts).** CI test counts and build status remain
   `TO VERIFY FROM REPOSITORY`.
 
 ---
