@@ -1,9 +1,13 @@
 """
 run_real_model.py — the single user-facing RM1 entrypoint (§4, §16).
 
+    # any open-weight causal LM works; --model-id is optional (defaults to an open, ungated model)
     python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
-        --model-id "$UGENCE_REAL_MODEL_ID" --revision "$UGENCE_MODEL_REVISION" \
-        --mode smoke --limit 20
+        --model-id "Qwen/Qwen2.5-0.5B-Instruct" --mode smoke --limit 20
+
+    # larger open example (the model must be downloadable / licence-accepted on your machine):
+    #   --model-id "mistralai/Mistral-7B-Instruct-v0.3"
+    # or override the default via the environment: export UGENCE_REAL_MODEL_ID=<hf-repo-or-local-dir>
 
 Execution sequence (§16): environment inspection -> model-loading probe -> (if a real model loads)
 one-instance forward proof -> smoke/full run over the arms -> causal/integrity controls -> artifacts
@@ -386,9 +390,18 @@ def _bottleneck(arms: Optional[Dict]) -> str:
 # --------------------------------------------------------------------------- #
 # CLI                                                                          #
 # --------------------------------------------------------------------------- #
+# A concrete, OPEN-WEIGHT, ungated default model so the harness runs without any placeholder.
+# Qwen2.5-0.5B-Instruct is Apache-2.0, ungated, and small enough to load on CPU; override with
+# --model-id or $UGENCE_REAL_MODEL_ID for a larger open model (e.g. mistralai/Mistral-7B-Instruct-v0.3).
+DEFAULT_OPEN_MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="RM1 real-model validation harness")
-    p.add_argument("--model-id", default=os.environ.get("UGENCE_REAL_MODEL_ID"))
+    p.add_argument("--model-id",
+                   default=os.environ.get("UGENCE_REAL_MODEL_ID") or DEFAULT_OPEN_MODEL_ID,
+                   help=("HF repo id or local dir of an OPEN-WEIGHT causal LM. Optional: defaults to "
+                         f"{DEFAULT_OPEN_MODEL_ID} (open, ungated), or $UGENCE_REAL_MODEL_ID if set."))
     p.add_argument("--revision", default=os.environ.get("UGENCE_MODEL_REVISION"))
     p.add_argument("--dataset-jsonl", default=None)
     p.add_argument("--mode", choices=["smoke", "full"], default="smoke")
@@ -413,10 +426,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    if not args.model_id and not args.mock_plumbing:
-        print("RM1: --model-id (or UGENCE_REAL_MODEL_ID) is required for a real-model run.",
-              file=sys.stderr)
-        return 2
+    if not args.mock_plumbing:
+        if not os.environ.get("UGENCE_REAL_MODEL_ID") and args.model_id == DEFAULT_OPEN_MODEL_ID:
+            print(f"RM1: no --model-id / $UGENCE_REAL_MODEL_ID given; using open default "
+                  f"{DEFAULT_OPEN_MODEL_ID}.", file=sys.stderr)
+        else:
+            print(f"RM1: using open-weight model {args.model_id}.", file=sys.stderr)
 
     cfg = ModelConfig(
         model_id=args.model_id or "MOCK-PLUMBING", revision=args.revision, device=args.device,
