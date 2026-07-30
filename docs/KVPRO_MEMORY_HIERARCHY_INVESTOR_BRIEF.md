@@ -202,6 +202,10 @@ every figure** — KVPro still removes ~20% of the GPU bill for that workload.
   **identical answer on every question** tested.
 - **Byte‑faithful warm‑tier:** snapshot→restore of compressed KV verified **bit‑exact**, so DRAM/
   flash movement introduces no additional quality loss — something lossy compressors cannot offer.
+- **Real‑serving‑path confirmation (this cycle):** on Mistral‑7B‑v0.3 through the production vLLM
+  path, the compressed decode fired the fused kernel on **every step with no fallback**, and the
+  optional INT8 protected sidecar held quality **identical to BF16** — needle **30/30 = 30/30**,
+  hard‑needle **46/48 = 46/48**, ~99% token‑for‑token agreement (*measured*).
 
 ---
 
@@ -213,6 +217,8 @@ every figure** — KVPro still removes ~20% of the GPU bill for that workload.
 | Needle 15/15 == BF16 across 4 models; 0.0‑pt academic delta | **Measured** |
 | Byte‑exact snapshot/restore | **Measured** |
 | TTFT −50–86% / 1.2–1.85× throughput on reuse | **Measured** |
+| INT8 protected‑sidecar: quality parity vs BF16 (Mistral, real vLLM path) | **Measured** |
+| INT8 protected‑sidecar: ~3.45% end‑to‑end decode cost; ~50% smaller sidecar bytes | **Measured** (A100) |
 | DRAM‑tier capacity (1.8×) | **Modeled** (compression ratio applied) |
 | NAND capacity (2.06× BF16) and tiering (1.14×), endurance | **Modeled** (conservative public NAND params) |
 | Dollar figures | **Illustrative** — scale with your GPU/HBM/DRAM/flash rates |
