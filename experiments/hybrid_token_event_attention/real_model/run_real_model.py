@@ -120,6 +120,17 @@ def run_arms_for_instance(backend, inst: Instance, K: int, clar_limit: int, max_
     admitted = out.admitted_records
     events_json = json.dumps([record_to_provisional(r).__dict__ for r in admitted])
 
+    # RM1-v1.1 interface metrics: strict (raw) vs deterministically-normalized serialization.
+    from .extraction import RES_EXACT_ID
+    _RESOLVED_STATES = ("VALIDATED", "AUTHORITATIVE", "SUPERSEDED")
+    n_prop = len(ext.proposals)
+    n_raw_exact = sum(1 for p in ext.proposals if p.document_resolution_method == RES_EXACT_ID)
+    n_span_verified = sum(1 for p in ext.proposals if p.span_verified)
+    n_resolved = sum(1 for e in out.envelopes if e.state in _RESOLVED_STATES)
+    res_methods: Dict[str, int] = {}
+    for p in ext.proposals:
+        res_methods[p.document_resolution_method] = res_methods.get(p.document_resolution_method, 0) + 1
+
     # RM2 — validated events serialized back to the model; model answers directly
     rm2 = arm_direct(backend, inst, docs, events_json=events_json)
 
@@ -157,6 +168,8 @@ def run_arms_for_instance(backend, inst: Instance, K: int, clar_limit: int, max_
         "extraction_attempts": len(ext.attempts),
         "parse_ok": ext.parse_ok, "schema_ok": ext.schema_ok,
         "span_verified_all": all(p.span_verified for p in ext.proposals) if ext.proposals else True,
+        "n_raw_exact": n_raw_exact, "n_span_verified": n_span_verified, "n_resolved": n_resolved,
+        "resolution_methods": res_methods,
         "required_present": required_present,
         "counts": out.counts,
         "cited_ids": best_cited,
@@ -184,6 +197,82 @@ def _acc_subset(traces: List[Dict], key: str, families: set) -> float:
     if not sub:
         return 0.0
     return sum(1 for t in sub if t[key] == t["gold"]) / len(sub)
+
+
+def _micro(traces: List[Dict], numer_key: str) -> Optional[float]:
+    """Micro-average numer_key over total proposals (proposal-weighted). None if no proposals."""
+    tot = sum(t.get("n_proposed", 0) for t in traces)
+    if tot == 0:
+        return None
+    return sum(t.get(numer_key, 0) for t in traces) / tot
+
+
+def _resolution_dist(traces: List[Dict]) -> Dict[str, int]:
+    d: Dict[str, int] = {}
+    for t in traces:
+        for method, n in (t.get("resolution_methods") or {}).items():
+            d[method] = d.get(method, 0) + n
+    return d
+
+
+def build_failure_taxonomy(traces: List[Dict]) -> Dict:
+    """Aggregate quarantine/rejection reasons + document-resolution outcomes (RM1 §freeze artifact)."""
+    reasons: Dict[str, int] = {}
+    states: Dict[str, int] = {}
+    for t in traces:
+        for q in t.get("quarantine", []):
+            reasons[q.get("reason", "?")] = reasons.get(q.get("reason", "?"), 0) + 1
+            states[q.get("state", "?")] = states.get(q.get("state", "?"), 0) + 1
+    tot_prop = sum(t.get("n_proposed", 0) for t in traces)
+    tot_adm = sum(t.get("n_admitted", 0) for t in traces)
+    return {
+        "n_instances": len(traces),
+        "total_proposed": tot_prop,
+        "total_admitted": tot_adm,
+        "admission_rate": (tot_adm / tot_prop) if tot_prop else None,
+        "quarantine_reason_counts": dict(sorted(reasons.items(), key=lambda x: -x[1])),
+        "quarantine_state_counts": states,
+        "document_resolution_distribution": _resolution_dist(traces),
+        "raw_model_field_exact_match": _micro(traces, "n_raw_exact"),
+        "post_normalization_resolved_match": _micro(traces, "n_resolved"),
+    }
+
+
+def _next_step(arms: Optional[Dict], blocked: bool) -> str:
+    if blocked:
+        return "hardware rerun"
+    if _bottleneck(arms) == "extraction":
+        return "bounded extraction normalization and rerun"
+    return "shadow pilot"
+
+
+def _provenance(cfg: ModelConfig, args, instances: List[Instance]) -> Dict:
+    import hashlib
+    import subprocess
+    from .prompts import EXTRACTION_SCHEMA
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=HERE,
+                                         stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        commit = None
+    prompt_hash = hashlib.sha1(json.dumps(EXTRACTION_SCHEMA, sort_keys=True, default=str)
+                               .encode()).hexdigest()[:16]
+    # dataset fingerprint: identities of the exact held-out instances used (order-sensitive)
+    digest = hashlib.sha1()
+    for inst in instances:
+        digest.update(f"{inst.query.task_family}|{inst.query.subject_id}|{inst.gold_answer}|".encode())
+        for r in inst.oracle_records:
+            digest.update(f"{r.identity_tuple()}|{r.status}|{r.version}|".encode())
+    return {
+        "rm1_version": RM1_VERSION,
+        "git_commit": commit,
+        "prompt_set_hash": prompt_hash,
+        "dataset_hash": digest.hexdigest()[:16],
+        "seed": args.seed,
+        "decoding": {"do_sample": False, "num_beams": 1, "max_new_tokens": cfg.max_new_tokens},
+        "model_id": cfg.model_id,
+        "model_revision": cfg.revision,
+    }
 
 
 def aggregate(traces: List[Dict]) -> Dict:
@@ -223,6 +312,11 @@ def aggregate(traces: List[Dict]) -> Dict:
             "schema_ok_rate": st.mean([1.0 if t["schema_ok"] else 0.0 for t in traces]) if traces else 0.0,
             "span_verified_rate": st.mean([1.0 if t["span_verified_all"] else 0.0 for t in traces]) if traces else 0.0,
             "required_event_survival": survival(),
+            # strict (raw) vs deterministically-normalized interface (micro-averaged over proposals)
+            "raw_model_field_exact_match": _micro(traces, "n_raw_exact"),
+            "post_normalization_span_verified": _micro(traces, "n_span_verified"),
+            "post_normalization_resolved_match": _micro(traces, "n_resolved"),
+            "resolution_method_distribution": _resolution_dist(traces),
         },
         "integrity": {"evidence_id_preservation": id_pres()},
         "faithfulness": {
@@ -282,8 +376,8 @@ def write_resource_blocked(manifest: Dict, cfg: ModelConfig, mode: str) -> None:
 
 
 def write_report(results: Dict, arms: Optional[Dict], controls: Optional[Dict],
-                 blocked: bool) -> None:
-    path = os.path.join(RESULTS_DIR, "REAL_MODEL_VALIDATION_REPORT.md")
+                 blocked: bool, out_dir: str = RESULTS_DIR) -> None:
+    path = os.path.join(out_dir, "REAL_MODEL_VALIDATION_REPORT.md")
     lines: List[str] = ["# RM1 — Real-Model Validation Report", ""]
     if blocked:
         lines += [
@@ -355,7 +449,7 @@ def write_report(results: Dict, arms: Optional[Dict], controls: Optional[Dict],
         "",
         f"Evidence classification:\n{'RESOURCE BLOCKED' if blocked else 'REAL MODEL CONTROLLED-EVIDENCE'}",
         "",
-        f"Authorized next step:\n{'hardware rerun' if blocked else 'shadow pilot'}",
+        f"Authorized next step:\n{_next_step(arms, blocked)}",
         "```",
         "",
         "RM1 tests an actual frozen token-language model inside the external governed dual-domain "
@@ -421,6 +515,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mock-plumbing", action="store_true",
                    help="DEV ONLY: run the pipeline with the offline MOCK backend to prove plumbing. "
                         "Output is tagged MOCK and is NEVER a real-model result.")
+    p.add_argument("--run-label", default=None,
+                   help="Write all artifacts under results/<label>/ so prior runs are not overwritten "
+                        "(e.g. --run-label rm1_v1.1). Enables clean RM1-v1 vs RM1-v1.1 comparison.")
     return p
 
 
@@ -481,8 +578,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "unsupported_claim_recall": 1.0 if exp_controls.get("unsupported_claim_detected") else 0.0}
 
     proof = backend.proof
+    # versioned output dir (RM1-v1 vs RM1-v1.1): --run-label writes under results/<label>/ so a prior
+    # run's artifacts are never overwritten.
+    rdir = os.path.join(args.output_dir, args.run_label) if args.run_label else args.output_dir
+    qdir = os.path.join(rdir, "quarantine") if args.run_label else QUAR_DIR
+    taxonomy = build_failure_taxonomy(traces)
     results = {
         "rm1_version": RM1_VERSION,
+        "run_label": args.run_label,
         "status": "MOCK_PLUMBING" if backend.execution == "MOCK" else "COMPLETED",
         "actual_model_execution": "MOCK" if backend.execution == "MOCK" else "VERIFIED",
         "requested_model": cfg.model_id,
@@ -490,22 +593,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         "corpus": "CONTROLLED",
         "mode": args.mode,
         "n_instances": len(instances),
+        "provenance": _provenance(cfg, args, instances),
         "model_descriptor": backend.describe(),
         "execution_proof": asdict(proof),
         "environment": env,
         "arms": arms,
         "controls": controls,
+        "failure_taxonomy": taxonomy,
     }
-    _write_json(os.path.join(RESULTS_DIR, "REAL_MODEL_RESULTS.json"), results)
-    _write_jsonl(os.path.join(RESULTS_DIR, "REAL_MODEL_TRACES.jsonl"), traces)
+    _write_json(os.path.join(rdir, "REAL_MODEL_RESULTS.json"), results)
+    _write_jsonl(os.path.join(rdir, "REAL_MODEL_TRACES.jsonl"), traces)
+    _write_json(os.path.join(rdir, "FAILURE_TAXONOMY.json"), taxonomy)
     quaran = [q for t in traces for q in t.get("quarantine", [])]
-    _write_jsonl(os.path.join(QUAR_DIR, "QUARANTINE.jsonl"), quaran)
-    _write_json(os.path.join(RESULTS_DIR, "RESOURCE_MANIFEST.json"),
+    _write_jsonl(os.path.join(qdir, "QUARANTINE.jsonl"), quaran)
+    _write_json(os.path.join(rdir, "RESOURCE_MANIFEST.json"),
                 {"status": results["status"], "environment": env,
-                 "model_descriptor": backend.describe()})
+                 "provenance": results["provenance"], "model_descriptor": backend.describe()})
     write_report({**results, "actual_model_execution": results["actual_model_execution"]},
-                 arms=arms, controls=controls, blocked=False)
-    print(f"[RM1] wrote results to {RESULTS_DIR} (status={results['status']})")
+                 arms=arms, controls=controls, blocked=False, out_dir=rdir)
+    print(f"[RM1] wrote results to {rdir} (status={results['status']})")
     return 0
 
 

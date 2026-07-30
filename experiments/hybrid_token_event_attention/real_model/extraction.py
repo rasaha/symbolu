@@ -30,6 +30,16 @@ def prompt_hash(system: str, user: str) -> str:
     return hashlib.sha1((system + "\x00" + user).encode()).hexdigest()[:16]
 
 
+# ---- deterministic source-document resolution methods (RM1-v1.1, §normalization) ----
+RES_EXACT_ID = "EXACT_ID"
+RES_REGISTERED_ALIAS = "REGISTERED_ALIAS"
+RES_SINGLE_PERMITTED = "SINGLE_PERMITTED_DOCUMENT"
+RES_UNIQUE_SPAN = "UNIQUE_SPAN_MATCH"
+RES_AMBIGUOUS = "AMBIGUOUS"
+RES_UNRESOLVED = "UNRESOLVED"
+_RESOLVED_METHODS = (RES_EXACT_ID, RES_REGISTERED_ALIAS, RES_SINGLE_PERMITTED, RES_UNIQUE_SPAN)
+
+
 @dataclass
 class ProvisionalEvent:
     """A single provisional proposal (pre-validation). Semantic fields are strings as proposed; the
@@ -47,7 +57,12 @@ class ProvisionalEvent:
     ambiguous: bool = False
     conditions: List[str] = field(default_factory=list)
     temporal: List[str] = field(default_factory=list)
-    span_verified: bool = False       # exact-substring check against permitted doc
+    span_verified: bool = False       # exact-substring check against the RESOLVED permitted doc
+    # deterministic document-binding audit (RM1-v1.1): the model's proposed id is NOT trusted; the
+    # span is bound to an authorized document by exact-id / alias / single-permitted / unique-span.
+    model_supplied_document_id: Optional[int] = None
+    resolved_document_id: Optional[int] = None
+    document_resolution_method: str = RES_UNRESOLVED
 
 
 @dataclass
@@ -130,22 +145,67 @@ def _schema_check(obj: dict) -> Tuple[bool, List[str]]:
     return (len(errs) == 0), errs
 
 
-def _verify_span(ev: dict, docs: Dict[int, str]) -> bool:
-    doc_id = ev.get("source_document_id")
+def _norm_text(s) -> str:
+    # documented normalization: collapse runs of whitespace (nothing else)
+    return " ".join(str(s).split())
+
+
+def _coerce_doc_id(v):
+    return int(v) if str(v).lstrip("-").isdigit() else v
+
+
+def resolve_document(ev: dict, permitted: Dict[int, str],
+                     aliases: Optional[Dict] = None) -> Tuple[Optional[int], str, bool]:
+    """Deterministically bind a proposal's span to an AUTHORIZED permitted document (RM1-v1.1).
+
+    The model's ``source_document_id`` is a hint, never trusted. Returns
+    ``(resolved_document_id, method, span_verified)``. A span that exists in more than one permitted
+    document is AMBIGUOUS (quarantined); a span found in none is UNRESOLVED. This is strictly safer
+    than blindly coercing to a single document: it never binds a span to a document that does not
+    contain it, and never silently disambiguates.
+    """
+    aliases = aliases or {}
     span = ev.get("source_span", "")
-    if doc_id not in docs or not isinstance(span, str) or not span:
-        return False
-    # exact substring after documented whitespace normalization (collapse runs of spaces)
-    def norm(s: str) -> str:
-        return " ".join(s.split())
-    return norm(span) in norm(docs[doc_id])
+    if not isinstance(span, str) or not span:
+        return None, RES_UNRESOLVED, False
+    nspan = _norm_text(span)
+    mid = _coerce_doc_id(ev.get("source_document_id"))
+
+    # 1. exact model-supplied id, and the span is actually in it
+    if mid in permitted and nspan in _norm_text(permitted[mid]):
+        return mid, RES_EXACT_ID, True
+    # 2. registered alias -> a permitted id containing the span
+    if mid in aliases and aliases[mid] in permitted and nspan in _norm_text(permitted[aliases[mid]]):
+        return aliases[mid], RES_REGISTERED_ALIAS, True
+    # 3. exactly one permitted document: bind to it IF it contains the span
+    if len(permitted) == 1:
+        only = next(iter(permitted))
+        if nspan in _norm_text(permitted[only]):
+            return only, RES_SINGLE_PERMITTED, True
+        return None, RES_UNRESOLVED, False          # invented id + span absent -> quarantine
+    # 4/5. multiple documents: resolve by UNIQUE span membership; >1 match is ambiguous
+    hits = [d for d, txt in permitted.items() if nspan in _norm_text(txt)]
+    if len(hits) == 1:
+        return hits[0], RES_UNIQUE_SPAN, True
+    if len(hits) > 1:
+        return None, RES_AMBIGUOUS, False
+    return None, RES_UNRESOLVED, False
 
 
-def _to_provisional(ev: dict, span_ok: bool) -> ProvisionalEvent:
+def _verify_span(ev: dict, docs: Dict[int, str]) -> bool:
+    # kept for the clarification path; delegates to the deterministic resolver
+    _, _, span_ok = resolve_document(ev, docs)
+    return span_ok
+
+
+def _to_provisional(ev: dict, resolved_doc: Optional[int], method: str,
+                    span_ok: bool) -> ProvisionalEvent:
+    model_doc = _coerce_doc_id(ev.get("source_document_id"))
     return ProvisionalEvent(
         relation=str(ev.get("relation", "")),
-        source_document_id=int(ev.get("source_document_id", -1))
-        if str(ev.get("source_document_id", "")).lstrip("-").isdigit() else -1,
+        # source_document_id is the RESOLVED authorized id (falls back to model's hint if unresolved)
+        source_document_id=resolved_doc if resolved_doc is not None
+        else (model_doc if isinstance(model_doc, int) else -1),
         source_span=str(ev.get("source_span", "")),
         subject=str(ev.get("subject", "")),
         object=str(ev.get("object", "")),
@@ -158,6 +218,9 @@ def _to_provisional(ev: dict, span_ok: bool) -> ProvisionalEvent:
         conditions=list(ev.get("conditions", []) or []),
         temporal=list(ev.get("temporal", []) or []),
         span_verified=span_ok,
+        model_supplied_document_id=model_doc if isinstance(model_doc, int) else None,
+        resolved_document_id=resolved_doc,
+        document_resolution_method=method,
     )
 
 
@@ -166,7 +229,8 @@ def _to_provisional(ev: dict, span_ok: bool) -> ProvisionalEvent:
 # --------------------------------------------------------------------------- #
 def extract_events(backend, task_family: str, subject_ref: str, docs: Dict[int, str],
                    permitted_doc_ids: Optional[List[int]] = None, max_attempts: int = 2,
-                   clarification_limit: int = 1, order_base: int = 0) -> ExtractionResult:
+                   clarification_limit: int = 1, order_base: int = 0,
+                   aliases: Optional[Dict] = None) -> ExtractionResult:
     permitted = {d: docs[d] for d in (permitted_doc_ids or list(docs))}
     attempts: List[AttemptLog] = []
     clar: List[ClarificationRequest] = []
@@ -200,10 +264,10 @@ def extract_events(backend, task_family: str, subject_ref: str, docs: Dict[int, 
         cand: List[ProvisionalEvent] = []
         span_errs: List[str] = []
         for i, ev in enumerate(obj["events"]):
-            span_ok = _verify_span(ev, permitted)
+            rdoc, method, span_ok = resolve_document(ev, permitted, aliases)
             if not span_ok:
-                span_errs.append(f"event[{i}]_span_not_in_source")
-            cand.append(_to_provisional(ev, span_ok))
+                span_errs.append(f"event[{i}]_span_{method.lower()}")
+            cand.append(_to_provisional(ev, rdoc, method, span_ok))
         attempts.append(AttemptLog(attempt, ph, gen.text, True, True, len(cand), span_errs))
 
         if span_errs and attempt < max_attempts:
@@ -233,7 +297,10 @@ def run_clarification(backend, req: ClarificationRequest, docs: Dict[int, str],
         ok = False
         if obj is not None:
             evs = obj.get("events", []) if isinstance(obj, dict) else []
-            ok = any(validate_against_source(_to_provisional(e, _verify_span(e, docs))) for e in evs)
+            def _mk(e):
+                rdoc, method, span_ok = resolve_document(e, docs)
+                return _to_provisional(e, rdoc, method, span_ok)
+            ok = any(validate_against_source(_mk(e)) for e in evs)
         req.append_response(ClarificationResponse(
             attempt=attempt, interpretation=interp,
             validation_outcome="RESOLVED" if ok else "REJECTED",

@@ -31,4 +31,9 @@ terminates with ``RESOURCE_BLOCKED`` and exact remediation steps. It never subst
 stand-in and calls the output a real-model result.
 """
 
-RM1_VERSION = "rm1.0.0"
+# rm1.1.0: adds a deterministic token->evidence normalization layer (bounded source-document binding
+# + strict ent_<N> entity parsing) between the probabilistic model output and exact identity. No
+# change to prompts, acceptance thresholds, model revision, decoding, dataset split, event reasoner,
+# routing policy, deterministic outcome rules, event-attention operator, or the TAP/faithfulness
+# evaluator. See README_REAL_MODEL.md (RM1-v1 vs RM1-v1.1).
+RM1_VERSION = "rm1.1.0"

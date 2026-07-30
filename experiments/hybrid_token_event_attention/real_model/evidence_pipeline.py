@@ -66,11 +66,19 @@ class PipelineOutput:
 # --------------------------------------------------------------------------- #
 # deterministic parsers                                                        #
 # --------------------------------------------------------------------------- #
+import re as _re
+_ENT_RE = _re.compile(r"\bent_(\d+)\b")
+
+
 def _parse_ent(s: str) -> Optional[int]:
-    s = s.strip()
-    if s.startswith("ent_"):
-        s = s[4:]
-    return int(s) if s.lstrip("-").isdigit() else None
+    """Accept ONLY a bounded canonical `ent_<N>` token (RM1-v1.1). A bare number like "532" is NOT
+    silently resolved — that preserves strict identity while tolerating normal model phrasing such as
+    "the subject is ent_532". Existence in the instance ledger is checked separately by the resolver.
+    """
+    if s is None:
+        return None
+    m = _ENT_RE.search(str(s))
+    return int(m.group(1)) if m else None
 
 
 def _parse_prefixed_int(s: str, prefix: str) -> Optional[int]:
@@ -151,7 +159,10 @@ def _classify(prov: ProvisionalEvent, rec: Optional[EventRecord], reason: str,
               query: Query) -> EvidenceRecordEnvelope:
     # provisional gates first
     if not prov.span_verified:
-        return EvidenceRecordEnvelope(QUARANTINED, "span_not_verified", prov)
+        from .extraction import RES_AMBIGUOUS
+        reason_ = ("ambiguous_source_document"
+                   if prov.document_resolution_method == RES_AMBIGUOUS else "span_not_verified")
+        return EvidenceRecordEnvelope(QUARANTINED, reason_, prov)
     if rec is None:
         if reason == "type_incompatible_relation":
             return EvidenceRecordEnvelope(REJECTED, reason, prov)
