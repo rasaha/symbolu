@@ -1,0 +1,49 @@
+{
+  "config": {
+    "model_id": "mistralai/Mistral-7B-v0.3",
+    "revision": "main",
+    "dataset_jsonl": null,
+    "mode": "smoke",
+    "limit": 20,
+    "seed": 0,
+    "device": "auto",
+    "dtype": "auto",
+    "load_in_4bit": false,
+    "max_input_tokens": 2048,
+    "max_new_tokens": 256,
+    "clarification_limit": 1,
+    "output_dir": "/home/user/symbolu/experiments/hybrid_token_event_attention/real_model/results",
+    "offline": false,
+    "resume": false,
+    "trust_remote_code": false,
+    "attn_implementation": "eager",
+    "K": 8,
+    "max_extraction_attempts": 2,
+    "run_generative": true,
+    "min_confidence": 0.5
+  },
+  "environment": {
+    "python_version": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "cpu_count": 4,
+    "disk_free_gb": 31.87,
+    "packages": {
+      "torch": null,
+      "transformers": null,
+      "accelerate": null,
+      "safetensors": null,
+      "bitsandbytes": null,
+      "numpy": null,
+      "tokenizers": null
+    },
+    "cuda_available": false,
+    "mps_available": false,
+    "gpu_count": 0,
+    "vram_gb": null,
+    "ram_gb": 16.86,
+    "supported_dtypes": [
+      "float32"
+    ]
+  },
+  "scope_statement": "RM1 tests an actual frozen token-language model inside the external governed dual-domain architecture. It does not validate FSCS, model-weight adaptation, production deployment, or universal superiority of event attention."
+}
