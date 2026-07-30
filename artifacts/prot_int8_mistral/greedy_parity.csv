@@ -1,8 +1,9 @@
-metric,cell,value,vs,classification,note
-teacher_forced_agree_pct,A_fp_fullbf16,100.0,self,MEASURED,reference
-teacher_forced_agree_pct,B_affine_int4_bf16prot,99.127,vs_fp,MEASURED,"<1% of next-token argmax positions differ from full BF16"
-teacher_forced_agree_pct,C_P8prod_int4_int8prot,PENDING,vs_fp,PENDING,"run scripts/kvpro_prot_int8_validation/mistral_greedy_parity.py (token_agreement.py skips P8prod)"
-autoregressive_agree_pct,B_affine_int4_bf16prot,20.588,vs_fp,MEASURED-NOISY,"HIGH VARIANCE: even validated B is not greedy-bit-identical to full BF16; not a parity criterion"
-autoregressive_agree_pct,C_P8prod_int4_int8prot,PENDING,vs_fp,PENDING,see mistral_greedy_parity.py
-greedy_bit_identical_any_quantized_cell,ALL,false,vs_fp,MEASURED,"no KV-quantized config (incl B) is greedy-bit-identical to full BF16 -> greedy bit-identity is the wrong bar"
-retrieval_output_identical_C_vs_B,needle+hard_needle,true,C_vs_B,MEASURED,"C produced identical correct-answer counts AND per-mode breakdown to B (indirect token-parity evidence)"
+prompt,TF_agree_C_vs_B_pct,TF_bit_identical_C_vs_B,TF_first_divergence_pos,AR_greedy_exact_C_vs_B,AR_common_prefix_chars,classification
+factual_qa,100.00,True,-1,False,144,MEASURED
+arithmetic,100.00,True,-1,True,111,MEASURED
+code,100.00,True,-1,True,140,MEASURED
+instruction,100.00,True,-1,True,138,MEASURED
+summarize,93.75,False,8,False,6,MEASURED
+repeated,100.00,True,-1,True,170,MEASURED
+retrieval,100.00,True,-1,True,115,MEASURED
+SUMMARY_C_vs_B,99.315,6of7_bitidentical,,5of7_AR_exact,,MEASURED (292 positions; teacher-forced is the stable signal; AR drift expected for any KV quant)

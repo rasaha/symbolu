@@ -111,7 +111,8 @@ Run: `run_p8_quality.sh --cells fp,affine,P8prod --full-quality --real-mmlu 200`
 
 - **Retrieval: C identical to B** (counts and per-mode breakdown) — strongest equivalence signal short of token diffing.
 - **MMLU: C ≥ B**, delta within noise. **Caveat:** absolute MMLU ~39% is far below Mistral's true ~60%, and `fp` also scores 39% — so this harness's MMLU protocol is a **low-power instrument** here; it is supporting, not decisive. Retrieval is the strong arm.
-- **Greedy/teacher-forced (`token_agreement.py`, MEASURED):** `fp`=100/100; `affine`(B)=**99.13% teacher-forced**, 20.6% autoregressive. The autoregressive column is **high-variance noise** (validated B itself is only 20% vs full BF16, yet passes every benchmark; S4 scored 100% — clearly not a quality signal). **No KV-quantized cell — including B — is greedy-bit-identical to full BF16**, so greedy bit-identity is not a valid parity bar. C's own teacher-forced number is **PENDING** (`token_agreement.py` skips `P8prod`; use `scripts/kvpro_prot_int8_validation/mistral_greedy_parity.py`).
+- **Greedy/teacher-forced (MEASURED):** `fp`=100/100; `affine`(B)=99.13% teacher-forced vs full BF16, 20.6% autoregressive. The autoregressive column is **high-variance noise** (validated B itself is only 20% vs full BF16, yet passes every benchmark; S4 scored 100% — clearly not a quality signal). **No KV-quantized cell — including B — is greedy-bit-identical to full BF16**, so greedy bit-identity is not a valid parity bar.
+- **C vs B directly (`mistral_greedy_parity.py`, MEASURED):** teacher-forced token agreement **C = 99.315%** over 292 positions; **6 of 7 prompt types bit-identical** (factual_qa, arithmetic, code, instruction, repeated, retrieval — first-divergence = none), **5 of 7** autoregressive-exact. Only `summarize` wobbled (first divergence at position 8, ~0.7% of all positions). No benchmark answer changed. → C and B are in **practical parity**, not byte-identity.
 
 **Classification: EMPIRICALLY EQUIVALENT within the pre-registered quality gate** (needle + hard-needle + MMLU, no regression vs affine). Not "zero quality cost"; not greedy bit-identity.
 
@@ -136,7 +137,8 @@ The quality run is **fake-quant** (the log states: *"int4 decode fork present (N
 | Config C materializes BF16 (not native INT8) | **INFERRED** (code) |
 | Sidecar byte halving (10→5 B/tok/head/layer, n_protect=5) | **MEASURED** (runtime-confirmed mask geometry) |
 | Real-model quality C vs B (needle/hard-needle/MMLU) | **MEASURED** — clean (`P8_CLEAN`) on Mistral-7B-Instruct-v0.3 |
-| Real-model greedy bit-identity | **UNSUPPORTED as a bar** — no quantized cell (incl B) is greedy-bit-identical; C teacher-forced PENDING |
+| Greedy/teacher-forced parity C vs B | **MEASURED** — 99.3% agreement, 6/7 prompts bit-identical (practical parity) |
+| Real-model greedy bit-identity | **UNSUPPORTED as a bar** — no quantized cell (incl B) is greedy-bit-identical to full BF16 |
 | Perplexity | **RESOURCE_BLOCKED** (not run) |
 | Real GPU memory & decode performance | **RESOURCE_BLOCKED** (fake-quant path; not captured) |
 | "zero quality cost" on Mistral | **UNSUPPORTED** — result is EMPIRICALLY EQUIVALENT within the gate, not a formal zero-cost claim |
