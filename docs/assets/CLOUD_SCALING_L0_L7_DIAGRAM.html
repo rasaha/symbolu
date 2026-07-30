@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:2000px;height:1130px;background:#fff;font-family:'Helvetica Neue',Arial,sans-serif;color:#111827}
+  .canvas{width:2000px;height:1130px;padding:44px 56px 30px}
+  h1{text-align:center;font-size:46px;font-weight:800;color:#1F3864;letter-spacing:-.5px}
+  .sub{text-align:center;font-size:23px;color:#4b5563;margin-top:10px}
+  .layout{display:grid;grid-template-columns:200px 1180px 1fr;gap:0 26px;margin-top:34px;align-items:stretch}
+  .bands{display:flex;flex-direction:column;gap:14px}
+  .band{border-radius:14px;display:flex;align-items:center;justify-content:center;text-align:center;
+    font-weight:800;font-size:22px;letter-spacing:1px;color:#fff;padding:10px}
+  .b-gov{background:#3f5787} .b-int{background:#15803d} .b-data{background:#a16207}
+  .band small{display:block;font-weight:600;font-size:15px;opacity:.9;margin-top:4px}
+  .stack{display:flex;flex-direction:column;gap:14px}
+  .layer{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:0 20px;
+    border:2px solid #cbd5e1;border-radius:12px;background:#f8fafc;padding:16px 22px;min-height:74px}
+  .lid{font-size:26px;font-weight:800;color:#334155;text-align:center}
+  .lname{font-size:23px;font-weight:700}
+  .ltool{font-size:18px;color:#6b7280}
+  .g{background:#eef2f8;border-color:#c3cfe2} .i{background:#eef7ef;border-color:#bfe0c6} .d{background:#faf3e4;border-color:#ecd9ad}
+  .l4{background:#e2f5e6;border:3.5px solid #15803d;position:relative;min-height:98px}
+  .l4 .lname{color:#14532d}
+  .l4 .badge{font-size:19px;font-weight:800;color:#fff;background:#15803d;border-radius:8px;padding:6px 14px;white-space:nowrap}
+  .callcol{display:flex;flex-direction:column;justify-content:center;gap:16px}
+  .call{border:2px solid #15803d;background:#eef7ef;border-radius:14px;padding:18px 20px}
+  .call h4{color:#15803d;font-size:19px;margin-bottom:8px;letter-spacing:.5px}
+  .call p{font-size:18px;color:#1f2937;line-height:1.4}
+  .call.plain{border-color:#cbd5e1;background:#f8fafc}
+  .call.plain h4{color:#334155}
+  .foot{margin-top:26px;border:2px solid #d1d5db;border-radius:14px;background:#f6f7f9;padding:20px 40px;text-align:center}
+  .foot p{font-size:20px;color:#374151;line-height:1.5}
+  .foot b{color:#15803d}
+</style></head><body><div class="canvas">
+  <h1>Where the Autoscaling Safety Interlock Sits</h1>
+  <div class="sub">The empty decision‑quality layer (L4) in the autoscaling stack — read‑only, zero‑write</div>
+
+  <div class="layout">
+    <!-- band labels column -->
+    <div class="bands">
+      <div class="band b-gov" style="flex:3">GOVERNANCE</div>
+      <div class="band b-int" style="flex:2">INTELLIGENCE</div>
+      <div class="band b-data" style="flex:3">DATA&nbsp;PLANE</div>
+    </div>
+
+    <!-- the stack, L7 (top) → L0 (bottom) -->
+    <div class="stack">
+      <div class="layer g"><div class="lid">L7</div><div class="lname">Business policy &amp; approvals</div><div class="ltool">governance</div></div>
+      <div class="layer g"><div class="lid">L6</div><div class="lname">Observability &amp; proof‑of‑value</div><div class="ltool">Datadog · Grafana</div></div>
+      <div class="layer g"><div class="lid">L5</div><div class="lname">Safety bounds (rate limits, cooldown)</div><div class="ltool">platform guardrails</div></div>
+
+      <div class="layer l4"><div class="lid" style="color:#14532d">L4</div>
+        <div class="lname">Decision Quality — <i>“did the scale‑out help?”</i></div>
+        <div class="badge">◄ THIS PRODUCT · empty layer</div></div>
+
+      <div class="layer i"><div class="lid">L3</div><div class="lname">Prediction / forecasting</div><div class="ltool">ScaleOps</div></div>
+
+      <div class="layer d"><div class="lid">L2</div><div class="lname">Cost optimization</div><div class="ltool">Kubecost · CAST AI</div></div>
+      <div class="layer d"><div class="lid">L1</div><div class="lname">Provisioning / bin‑packing</div><div class="ltool">Karpenter · Cluster Autoscaler</div></div>
+      <div class="layer d"><div class="lid">L0</div><div class="lname">Sensing / metrics</div><div class="ltool">Prometheus</div></div>
+    </div>
+
+    <!-- callouts -->
+    <div class="callcol">
+      <div class="call"><h4>WHY L4 IS EMPTY</h4><p>Every incumbent optimizes the scaling <i>action</i>
+        — cheaper, faster, more autonomous. <b>None looks back to verify it worked.</b></p></div>
+      <div class="call"><h4>WHAT WE ADD</h4><p>A causal verdict for every scale‑out —
+        <b>HELPING / NEUTRAL / NOT_HELPING / futile‑runaway</b> — beside the controller, changing nothing.</p></div>
+      <div class="call plain"><h4>HOW IT ATTACHES</h4><p>Reads the same <b>L0 Prometheus</b> you already
+        have; runs in shadow with a single <b>read‑only token</b>. No write access, no rip‑and‑replace.</p></div>
+    </div>
+  </div>
+
+  <div class="foot"><p>The autoscaler (L0–L3) decides <b>when</b> to scale; governance (L5–L7) sets
+    <b>bounds</b> and <b>reports</b>. <b>L4 — whether the scale‑out actually helped — is the one layer
+    nobody fills.</b> We fill it read‑only first, then earn the path to a bounded safety layer.</p></div>
+</div></body></html>
