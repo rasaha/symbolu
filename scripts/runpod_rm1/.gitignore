@@ -1,0 +1,5 @@
+# never commit populated environment files / secrets
+env.local
+*.env
+.env
+*.local
