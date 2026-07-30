@@ -1,0 +1,2 @@
+status,note
+RESOURCE_BLOCKED,produced by pod run (run_commands.sh); no GPU/vLLM in authoring env

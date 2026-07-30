@@ -1,0 +1,1 @@
+{"status":"RESOURCE_BLOCKED","note":"pod run writes GPU/vLLM/versions here","expected_pod":{"gpu":"NVIDIA A100-SXM4-80GB","vllm":"0.7.3","transformers":"4.49","model":"mistralai/Mistral-7B-Instruct-v0.3"}}
