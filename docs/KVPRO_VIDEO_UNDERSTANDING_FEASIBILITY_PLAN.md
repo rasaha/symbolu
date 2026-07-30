@@ -86,7 +86,17 @@ Heavier (needs generation + a benchmark); gated on Phase 1 to avoid wasted effor
 - `scripts/kvpro_video_understanding/test_analyze_kv_outliers_cpu.py` — **CPU unit test (4/4 pass)**:
   proves the verdict flips correctly (GO when visual matches text; NO_GO_STRUCTURE when diffuse;
   mask-mismatch when outliers differ). **TEST-BACKED.**
-- `scripts/kvpro_video_understanding/run_commands.sh` — pod orchestration.
+- `scripts/kvpro_video_understanding/make_sample_video.py` — generates a **synthetic smoke clip** so the
+  pipeline runs with zero downloads. **Not for the real read.**
+- `scripts/kvpro_video_understanding/run_commands.sh` — pod orchestration (auto-generates the smoke clip
+  if no video is passed).
+
+**Which video to use.** For a **trustworthy** result, feed a **natural video from the target domain**
+(moderation clip, meeting recording, bodycam, sports, etc.) — that's the content real customers process,
+and its KV structure is what matters. The synthetic clip only proves the plumbing. Easy ways to get a
+real one on the pod: your own domain clip (best), or a public sample
+(`wget https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4`). We deliberately
+do **not** commit a video binary to the repo (git hygiene); the generator + your clip cover both needs.
 
 ---
 
