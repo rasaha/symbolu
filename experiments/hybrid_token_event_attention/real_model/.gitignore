@@ -1,0 +1,5 @@
+# Non-canonical / dev-generated artifacts (regenerate locally; never scientific results)
+results/event_checkpoint.json
+results/MOCK_HARNESS_SMOKE.json
+results/MOCK_HARNESS_TRACES.jsonl
+__pycache__/

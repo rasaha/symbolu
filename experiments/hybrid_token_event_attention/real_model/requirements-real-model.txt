@@ -1,0 +1,15 @@
+# RM1 real-model dependencies (NOT installed in the controlled sandbox).
+# Install on a machine with adequate hardware (GPU strongly recommended for >1B models).
+#
+#   pip install -r experiments/hybrid_token_event_attention/real_model/requirements-real-model.txt
+#
+# Versions are lower bounds known to expose the APIs this harness uses (AutoModelForCausalLM,
+# do_sample=False generation, attn_implementation, BitsAndBytesConfig). Pin exact versions in your
+# environment for reproducibility.
+torch>=2.1
+transformers>=4.40
+accelerate>=0.30
+safetensors>=0.4
+tokenizers>=0.19
+# optional, CUDA-only, required ONLY for --load-in-4bit:
+# bitsandbytes>=0.43
