@@ -1,0 +1,2 @@
+prompt_id,category,seqlen,gen_settings,seed,config_pair,exact_token_agreement,first_divergence_pos,common_prefix_len,final_answer_agree,classification
+NA,NA,NA,greedy T=0,NA,C_minus_B,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED,RESOURCE_BLOCKED (no GPU/model; run run_commands.sh on pod)

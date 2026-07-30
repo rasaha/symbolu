@@ -1,0 +1,4 @@
+dataset,dataset_version,n_samples,context_len,config,perplexity,delta_vs_B,seeds,classification
+wikitext-2-raw-v1(suggested),NA,NA,NA,A_fullbf16,RESOURCE_BLOCKED,NA,NA,RESOURCE_BLOCKED (no GPU/model)
+wikitext-2-raw-v1(suggested),NA,NA,NA,B_int4_bf16prot,RESOURCE_BLOCKED,0,NA,RESOURCE_BLOCKED
+wikitext-2-raw-v1(suggested),NA,NA,NA,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,RESOURCE_BLOCKED

@@ -1,0 +1,8 @@
+metric,config,value_bytes,classification
+gpu_allocated,A_fullbf16,RESOURCE_BLOCKED,RESOURCE_BLOCKED (no GPU)
+gpu_reserved,B_int4_bf16prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+gpu_peak,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+kv_cache_physical,B_vs_C,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+sidecar_storage,B_vs_C,"MODELED: bf16 2B->int8 1B per protected value (10B->5B/tok/head/layer at n_protect=5); measure real torch.cuda on pod",MODELED
+temp_bf16_materialization,C_int8prot,"INFERRED: int8 IS dequantized to a bf16 buffer before attention (see IMPORTANT PATH CHECK) — measure its bytes on pod",INFERRED
+effective_density_vs_bf16,C_int8prot,"MODELED: protect halving = ~2.94% of the 170 B/tok/head/layer read stream at 4%",MODELED

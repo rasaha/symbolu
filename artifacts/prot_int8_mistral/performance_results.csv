@@ -1,0 +1,8 @@
+metric,config,value,classification
+prefill_latency_ms,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED (no GPU)
+decode_latency_ms_p50,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+decode_latency_ms_p95,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+tokens_per_second,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+kernel_launches_per_token,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED
+int8_to_bf16_dequant_cost,C_int8prot,"INFERRED nonzero: read path adds uint8->bf16 dequant (CPU proxy showed 3-4x vs passthrough); measure on GPU",INFERRED
+attention_kernel_consumes_int8_directly,C_int8prot,"NO (INFERRED): kernel always receives bf16; int8 materialized to bf16 first",INFERRED

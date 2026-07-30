@@ -1,0 +1,6 @@
+# prot-int8 Mistral harness — CPU PLUMBING tests (2026-07-30T04:31:32Z)
+# These validate the reused harness plumbing (builders, gate, quant math) that the Mistral
+# A/B/C run depends on. They are NOT a real-model run (no GPU/model here).
+
+........................................................                 [100%]
+56 passed in 3.80s

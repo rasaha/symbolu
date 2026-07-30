@@ -1,0 +1,3 @@
+benchmark,context_len,n_items,config,score,regressions_vs_B,seeds,classification
+needle,NA,NA,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,RESOURCE_BLOCKED (no GPU/model)
+hard_needle,NA,NA,C_int4_int8prot,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,RESOURCE_BLOCKED
