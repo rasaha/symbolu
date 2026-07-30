@@ -1,0 +1,1 @@
+e2e decode B/C harness — authoring env has no GPU/vLLM; compare() logic self-tested on synthetic data (PASS). Real run: pod.

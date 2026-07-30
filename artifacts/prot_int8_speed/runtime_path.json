@@ -1,0 +1,29 @@
+{
+  "purpose": "Code-traced B vs C runtime path for the end-to-end decode speed experiment (INFERRED from source; confirm live with call_stats on the pod).",
+  "common_path": [
+    "Int4ProtectedLLM(model, ...) -> vLLM LLM with kv_cache_dtype int4_protected + install_int4_protected_backend swaps each layer .impl to Int4ProtectedAttentionImpl (phase5b_backend_install.py)",
+    "prefill/decode -> Int4ProtectedAttentionImpl.forward -> PagedKVWriter.write (prefill) / write_decode_batched (decode)",
+    "decode read -> _read_decode_packed_batched -> get_packed_view -> flash_attn_with_int4_kvcache (EXTERNAL forked vLLM CUDA decode kernel)"
+  ],
+  "B_bf16_protect": {
+    "flag": "INT4_PROTECTED_PROT_INT8 unset",
+    "write": "k_protect_ext bf16; _protect_store = identity; CUDA K-write kernel eligible (fused_decode_write_k.cu) if built, else Python ref",
+    "read": "_protect_view_bf16 = identity passthrough (returns stored bf16)",
+    "kernel_input": "k_protect_bf16 (bf16) -> flash_attn_with_int4_kvcache",
+    "expected_call_stats": "decode_calls_packed>0, decode_calls_fallback=0"
+  },
+  "C_int8_protect": {
+    "flag": "INT4_PROTECTED_PROT_INT8=1 (requires v2 mask with k_min/k_max)",
+    "write": "k_protect_ext uint8; _protect_store = prot_int8_quantize; the CUDA K-write kernel is DISABLED when prot_int8 active (phase5b_4c_paged_writer.py:1003) -> Python quantize chain on WRITE (a PREFILL-side confounder to watch: write_path_fallback / write_path_calls)",
+    "read": "_protect_view_bf16 = prot_int8_dequantize -> materializes a BF16 buffer (k_protect_bf16). CONFIRMED: C materializes bf16 before attention; kernel contract is bf16 either way (phase5b_4c_paged_writer.py:1886).",
+    "kernel_input": "k_protect_bf16 (bf16, dequantized) -> SAME flash_attn_with_int4_kvcache",
+    "expected_call_stats": "decode_calls_packed>0, decode_calls_fallback=0; prot_int8 active==total layers"
+  },
+  "isolation": "Only the protected-sidecar representation differs (bf16 store/passthrough vs uint8 store/dequant). Main INT4 KV, scales, xmins, mask, pages identical.",
+  "known_confounders": [
+    "WRITE path: C disables the CUDA K-write kernel and runs a Python quantize -> may slow PREFILL more than DECODE. Measure prefill/decode separately (this harness does).",
+    "enforce_eager=True (CUDA graphs off) matches the validated verify path; CUDA-graph mode is a separate axis.",
+    "Both cells MUST show decode_calls_packed>0 and 0 fallbacks, and C must show prot_int8 active==total, else the comparison is not clean."
+  ],
+  "materializes_bf16_before_attention_C": true
+}

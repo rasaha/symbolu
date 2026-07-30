@@ -1,0 +1,1 @@
+{"status":"RESOURCE_BLOCKED","frozen_commit":"84b0011e","branch":"claude/kvpro-prot-int8-validation-hkd4ff","config":{"n_protect":5,"protect_fraction":0.04,"block_size":32,"mask":"mistral_v0_3_protect_mask_4pct_v2.pt"},"note":"pod run confirms fused kernel fired via call_stats"}
