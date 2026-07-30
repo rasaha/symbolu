@@ -1,0 +1,5 @@
+benchmark,model,dataset_version,n_examples,seqlen,gen_settings,seeds,score_A_bf16,score_B_int8,delta_B_minus_A,score_C_full_bf16,ci_or_seedvar,classification,notes
+needle_retrieval,Qwen2.5-7B-Instruct,repo needle_driver,NA,NA,greedy T=0,NA,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,NA,NA,RESOURCE_BLOCKED,requires GPU+weights+mask; p8_gate harness present but never run for prot_int8
+hard_needle_retrieval,Qwen2.5-7B-Instruct,repo hard_needle_driver,NA,NA,greedy T=0,NA,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,NA,NA,RESOURCE_BLOCKED,requires GPU+weights+mask
+mmlu,Qwen2.5-7B-Instruct,repo mmlu_driver,NA,NA,greedy,NA,RESOURCE_BLOCKED,RESOURCE_BLOCKED,NA,NA,NA,RESOURCE_BLOCKED,requires GPU+weights
+cpu_numerical_proxy_attn_out_cosine,synthetic,numerical_ab.py,270 configs,128-2048,single-query,0/1/2,1.000000,>=0.999387,<=6.1e-4,1.0(exact),min cosine 0.999387,NO_MATERIAL_DEGRADATION_OBSERVED(proxy only),"CPU proxy on synthetic K/V; NOT a real-model quality benchmark; not powered for equivalence"

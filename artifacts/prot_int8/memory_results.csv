@@ -1,0 +1,9 @@
+scope,layers,tokens,batch,bf16_bytes,int8_payload_bytes,int8_metadata_bytes,int8_total_bytes,net_saved_bytes,net_saved_pct,classification
+protected_sidecar_only,28,2048,1,2293760,1146880,4480,1151360,1142400,49.805,MEASURED-tensor-storage (CPU torch .nbytes)
+protected_sidecar_only,28,2048,8,18350080,9175040,4480,9179520,9170560,49.976,MEASURED-tensor-storage (CPU torch .nbytes)
+protected_sidecar_only,28,8192,1,9175040,4587520,4480,4592000,4583040,49.951,MEASURED-tensor-storage (CPU torch .nbytes)
+protected_sidecar_only,28,8192,8,73400320,36700160,4480,36704640,36695680,49.994,MEASURED-tensor-storage (CPU torch .nbytes)
+protected_sidecar_only,28,32768,1,36700160,18350080,4480,18354560,18345600,49.988,MEASURED-tensor-storage (CPU torch .nbytes)
+protected_sidecar_only,28,32768,8,293601280,146800640,4480,146805120,146796160,49.998,MEASURED-tensor-storage (CPU torch .nbytes)
+GPU_allocator_requested_reserved_peak_steady,,,,,,,,,,RESOURCE_BLOCKED (no CUDA device; allocator granularity/padding unmeasured)
+total_KV_read_stream_context (protect is ~6% of 170 B/tok/hd/L at 4%),28,any,any,,,,,,2.94% of total read stream (170->165 B/tok/hd/L),MODELED (accounting.py)
