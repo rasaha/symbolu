@@ -1,2 +1,2 @@
-status,note
-RESOURCE_BLOCKED,produced by pod run (run_commands.sh); no GPU/vLLM in authoring env
+note,classification
+"Output length pinned (min_tokens=N, ignore_eos) so B and C do identical decode work; both cells decode_calls_packed>0, 0 fallbacks. Per-prompt text heads captured in raw_B/raw_C.json quality[].",MEASURED-GPU

@@ -1,2 +1,10 @@
-status,note
-RESOURCE_BLOCKED,produced by pod run (run_commands.sh); no GPU/vLLM in authoring env
+metric,value,classification
+overall_verdict,C SLOWER THAN B,MEASURED-GPU
+mean_speed_ratio_C_over_B,0.9655,MEASURED-GPU
+mean_decode_delta_pct,-3.45,MEASURED-GPU
+neutral_band_pct,3.0,gate
+per_point,"3 SLOWER (-3.4 to -5.5%) + 1 NEUTRAL (-1.9% at ctx8192/b8)",MEASURED-GPU
+prefill_ttft_B_vs_C,"near-identical (write path not penalized; wfb=0)",MEASURED-GPU
+gpu,NVIDIA A100-SXM4-80GB,MEASURED
+vllm,0.7.3,MEASURED
+enforce_eager,true (CUDA graphs OFF),confounder-note
