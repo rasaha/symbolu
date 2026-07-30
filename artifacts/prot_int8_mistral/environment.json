@@ -1,0 +1,26 @@
+{
+  "captured_utc": "2026-07-30",
+  "purpose": "Environment snapshot for the Mistral real-model prot-int8 A/B/C validation",
+  "this_environment": {
+    "kind": "CPU-only sandbox (NOT the RunPod GPU box)",
+    "cwd": "/home/user/symbolu",
+    "git_root": "/home/user/symbolu",
+    "branch": "claude/kvpro-prot-int8-validation-hkd4ff",
+    "head": "cef376e9f91163e4cf73f39a82e4c9dd9e971eaa",
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130 (imports on CPU; torch.cuda.is_available()=False)",
+    "gpu": "NONE (nvidia-smi/nvcc absent)",
+    "disk_free": "~23 GB on /",
+    "hf_stack": "transformers/accelerate/sentencepiece/safetensors/datasets/evaluate/huggingface_hub ALL MISSING",
+    "hf_token": "HF_TOKEN / HUGGING_FACE_HUB_TOKEN unset",
+    "hf_home": "unset"
+  },
+  "consequence": "The Mistral A/B/C real-model run CANNOT execute here. All model-load, quality, memory and performance measurements are RESOURCE_BLOCKED in this environment and must be run on the GPU pod using run_commands.sh.",
+  "required_pod_environment": {
+    "gpu_vram_min": "24 GB (bf16 weights ~14.5 GB + KV cache + activations); A100/A10/RTX4090-class",
+    "disk_free_min": "~40 GB (weights ~14.5 GB + HF cache + datasets + results)",
+    "cuda_torch": "use the pod's existing CUDA torch (repo pins torch==2.4.1 cu121); do NOT blindly reinstall",
+    "hf_cache": "export HF_HOME=/workspace/hf_cache (dedicated, outside git)",
+    "hf_auth": "huggingface-cli login only if the model turns out to be gated (verify on pod)"
+  }
+}
