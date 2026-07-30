@@ -478,10 +478,14 @@ def load_backend(cfg: ModelConfig, env: Optional[Dict] = None) -> HFCausalBacken
 
     try:  # pragma: no cover - not reachable without torch + weights in the sandbox
         return HFCausalBackend(cfg, device=device, dtype=dtype, four_bit=four_bit)
-    except Exception as exc:  # weights missing / gated / OOM / offline with no cache
+    except Exception as exc:  # weights missing / gated / OOM / download / offline with no cache
+        _first = (str(exc).strip().splitlines() or [""])[0][:200]
+        _reason = f"model_load_failed:{type(exc).__name__}"
+        if _first:
+            _reason += f": {_first}"
         raise ResourceBlocked(build_resource_manifest(
-            cfg, env, reason=f"model_load_failed:{type(exc).__name__}",
-            remediation=_remediation(cfg, env, load_error=str(exc)[:400])))
+            cfg, env, reason=_reason,
+            remediation=_remediation(cfg, env, load_error=str(exc)[:600])))
 
 
 def _estimate_memory_note(cfg: ModelConfig) -> str:
@@ -507,6 +511,16 @@ def _remediation(cfg: ModelConfig, env: Dict, missing_packages: Optional[List[st
         "  python -m experiments.hybrid_token_event_attention.real_model.run_real_model \\\n"
         f'      --model-id "$UGENCE_REAL_MODEL_ID"{rev} --mode smoke --limit 20 --device auto '
         "--dtype auto")
+    if load_error:
+        # download / load failures: prefer local weights, authenticate, and avoid the Xet path
+        steps.append(
+            "If this was a DOWNLOAD failure (interrupted / 'Reconstructing (incomplete total...)' / "
+            "RuntimeError mid-fetch): point --model-id at a LOCAL model directory to skip the "
+            "download, e.g. --model-id /path/to/mistral-7b-instruct-v0.3 (optionally add --offline).")
+        steps.append(
+            "Otherwise: set HF_TOKEN for authenticated, higher-rate downloads; if the Xet transfer "
+            "keeps failing, disable it with HF_HUB_DISABLE_XET=1 (or `pip uninstall -y hf_xet`), or "
+            "pre-fetch once with `huggingface-cli download <model-id>` then pass its local path.")
     out = {
         "missing_package_or_access_requirement": missing_packages or [],
         "detected_hardware": env["hardware"],
