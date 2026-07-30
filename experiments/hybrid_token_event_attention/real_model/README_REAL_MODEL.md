@@ -172,3 +172,73 @@ survival < 0.75.
 > RM1 tests an actual frozen token-language model inside the external governed dual-domain
 > architecture. It does not validate FSCS, model-weight adaptation, production deployment, or
 > universal superiority of event attention.
+
+---
+
+## RM1-v1.1 — bounded extraction-normalization phase
+
+The first real-model run (**RM1-v1**, `rm1.0.0`) established four facts: a real Mistral-7B executed
+(VERIFIED); the governance boundary **failed closed** (evidence-ID preservation 1.0, unauthorized 0);
+raw token answers sometimes guessed correctly but were not evidence-grounded; and the
+token→EvidenceRecord **serialization contract was too brittle** for real-model output
+(required-event survival ≈ 0.10, construction gap ≈ 0.9). This is a failure of the *interface*, not
+of the dual architecture — the model often understood the text but was required to behave like a
+deterministic parser.
+
+**RM1-v1.1** (`rm1.1.0`) adds a deterministic normalization layer *between* the probabilistic model
+output and exact enterprise identity. It does **not** relax evidence validation. Two bounded fixes:
+
+1. **Source-document binding** (`extraction.resolve_document`): the model's `source_document_id` is a
+   hint, never trusted. A span is bound to an authorized permitted document by, in order,
+   `EXACT_ID` → `REGISTERED_ALIAS` → `SINGLE_PERMITTED_DOCUMENT` → `UNIQUE_SPAN_MATCH`; a span found
+   in more than one permitted doc is `AMBIGUOUS` (quarantined), and a span in none is `UNRESOLVED`.
+   Each proposal records `model_supplied_document_id`, `resolved_document_id`,
+   `document_resolution_method`.
+2. **Strict entity parsing** (`evidence_pipeline._parse_ent`): accept only the canonical token
+   `\bent_[0-9]+\b` (so "the subject is ent_532" resolves, "subject 532" does not), then require the
+   entity to exist in the instance ledger. Strict identity is preserved; normal phrasing is tolerated.
+
+Both are covered by negative controls (`tests/test_rm1_v1_1_normalization.py`) proving no increase in
+false admission: invented-id+unique-span → authorized doc only; invented-id+absent-span → quarantine;
+same span in two docs → ambiguous; `ent_999` outside the ledger → not admitted; bare `532` → not
+resolved; cross-tenant valid-looking entity → rejected; correct span from an unauthorized document →
+rejected.
+
+Two extraction metrics are reported separately so a semantically-correct-but-strictly-mis-serialized
+model is visible: **`raw_model_field_exact_match`** (model supplied the exact document id itself) vs
+**`post_normalization_resolved_match`** (resolved after the normalization layer).
+
+### Frozen comparison protocol (do not overwrite RM1-v1)
+
+RM1-v1 vs RM1-v1.1 changes **only** the deterministic interface. Kept identical: extraction prompts,
+acceptance thresholds, model revision, decoding, dataset split/seed, event reasoner, routing policy,
+deterministic outcome rules, event-attention operator, and the TAP/faithfulness evaluator.
+
+```bash
+# 1. FREEZE the existing RM1-v1 artifacts (on the machine that produced them)
+cd experiments/hybrid_token_event_attention/real_model/results
+mkdir -p rm1_v1
+cp REAL_MODEL_RESULTS.json  rm1_v1/RM1_v1_RESULTS.json
+cp REAL_MODEL_TRACES.jsonl  rm1_v1/RM1_v1_TRACES.jsonl
+cp RESOURCE_MANIFEST.json   rm1_v1/RM1_v1_RESOURCE_MANIFEST.json
+# derive the v1 failure taxonomy from the frozen traces (no model needed):
+cd /workspace/symbolu
+python -m experiments.hybrid_token_event_attention.real_model.analyze_traces \
+    experiments/hybrid_token_event_attention/real_model/results/rm1_v1/RM1_v1_TRACES.jsonl \
+    -o experiments/hybrid_token_event_attention/real_model/results/rm1_v1/RM1_v1_FAILURE_TAXONOMY.json
+
+# 2. RERUN the identical corpus + seed after the fixes as RM1-v1.1 (writes results/rm1_v1.1/)
+python -m experiments.hybrid_token_event_attention.real_model.run_real_model \
+    --model-id /workspace/models/mistral-7b-instruct-v0.3 --mode smoke --limit 20 --seed 0 \
+    --offline --run-label rm1_v1.1
+```
+
+`--run-label` writes every artifact under `results/<label>/` so the baseline is never overwritten.
+Provenance (git commit, prompt-set hash, dataset hash, seed, decoding config) is recorded in each
+run's `REAL_MODEL_RESULTS.json`. Compare `results/rm1_v1/` (strict interface) with
+`results/rm1_v1.1/` (normalized interface): the decisive movement should be in
+`required_event_survival` and `post_normalization_resolved_match`, with governance invariants
+unchanged.
+
+The natural-language corpus is a **separate later phase (RM2)** — do not change the corpus here, or
+the interface-robustness and language-extraction hypotheses become confounded.
