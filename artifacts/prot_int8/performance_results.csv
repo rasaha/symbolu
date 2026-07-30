@@ -1,0 +1,9 @@
+metric_group,config,bf16_us,int8_us,int8_added_us,int8_relative_x,classification
+cpu_sidecar_read_directional,tokens_128,5.306,19.847,14.541,3.74,MEASURED-CPU-directional
+cpu_sidecar_read_directional,tokens_1024,10.729,47.343,36.613,4.412,MEASURED-CPU-directional
+cpu_sidecar_read_directional,tokens_4096,31.672,99.828,68.156,3.152,MEASURED-CPU-directional
+production_gpu,decode_step_latency_ms,,,,,RESOURCE_BLOCKED (no GPU)
+production_gpu,tokens_per_second,,,,,RESOURCE_BLOCKED (no GPU)
+production_gpu,requests_per_second,,,,,RESOURCE_BLOCKED (no GPU)
+production_gpu,achieved_bandwidth_GBs,,,,,RESOURCE_BLOCKED (no GPU)
+production_gpu,kernel_launches_per_token,,,,,RESOURCE_BLOCKED (no GPU)
