@@ -14,11 +14,15 @@ Evidence labels: **MEASURED**, **TEST-BACKED**, **MODELED**, **INFERRED**, **RES
 
 ## Executive verdict
 
-**PARTIALLY VALIDATED (quality MEASURED-clean on Mistral; memory & performance still RESOURCE_BLOCKED).**
+**PARTIALLY VALIDATED (quality + sidecar-memory + read-path-speed MEASURED on Mistral; full end-to-end decode TPS still RESOURCE_BLOCKED).**
 
-On real `mistralai/Mistral-7B-Instruct-v0.3`, the INT8 protected sidecar (C, `P8prod`) shows **no material quality degradation vs the BF16 sidecar (B, `affine`)**: needle 30/30 = 30/30, hard-needle 46/48 = 46/48 (identical per-mode), MMLU-200 C=79 ≥ B=76 (Δ within noise). Runtime also **confirmed the compatibility analysis** (32 layers, 8 KV heads, head_dim 128, `n_protect=5`, SWA disabled) and the **10 B → 5 B/tok/head/layer** protected-sidecar figure.
+On real `mistralai/Mistral-7B-Instruct-v0.3` (A100-80GB):
+- **Quality — parity (MEASURED):** needle 30/30 = 30/30, hard-needle 46/48 = 46/48 (identical per-mode), MMLU-200 C=79 ≥ B=76; teacher-forced token agreement C-vs-B = 99.3% (6/7 prompts bit-identical). No benchmark answer changed.
+- **Memory — ~50% saved on the stored protected sidecar (MEASURED-GPU):** 40→20 / 160→80 / 640→320 KiB per layer. Real, but a small slice; storage-only.
+- **Speed — not faster (MEASURED-GPU):** INT8 read-path is 1.24–1.44× slower than BF16 on the isolated sidecar read (adds a dequant). End-to-end impact diluted, but no speed win.
+- Runtime **confirmed compatibility** (32 layers, 8 KV heads, head_dim 128, n_protect=5, SWA disabled) and the **10 B → 5 B/tok/head/layer** figure.
 
-What is **still not** established: (a) **greedy bit-identity** — teacher-forced agreement is ~99% for B vs full-BF16 and no KV-quantized cell (not even B) is greedy-bit-identical, so this was never the right bar; C's own teacher-forced number is pending `mistral_greedy_parity.py`; (b) **real GPU memory** (allocated/reserved/peak) and (c) **decode performance / TPS** — the quality path is fake-quant and does not touch these. The result is therefore **EMPIRICALLY EQUIVALENT within the pre-registered quality gate**, not "zero quality cost" and not a memory/speed claim.
+**Not** established: **greedy bit-identity** (no quantized cell, incl B, achieves it — wrong bar); **full end-to-end vLLM decode TPS** through the external fused kernel (RESOURCE_BLOCKED). The quality result is **EMPIRICALLY EQUIVALENT within the pre-registered gate**, not a formal "zero quality cost" claim. Honest positioning: **a small memory/density lever at no quality cost — not a throughput lever.**
 
 ---
 
@@ -116,14 +120,31 @@ Run: `run_p8_quality.sh --cells fp,affine,P8prod --full-quality --real-mmlu 200`
 
 **Classification: EMPIRICALLY EQUIVALENT within the pre-registered quality gate** (needle + hard-needle + MMLU, no regression vs affine). Not "zero quality cost"; not greedy bit-identity.
 
-### 6b. Memory / Performance — still RESOURCE_BLOCKED
+### 6b. Memory / Performance — MEASURED on GPU (read-path slice)
 
-The quality run is **fake-quant** (the log states: *"int4 decode fork present (NOT used by this fake-quant study)"*), so it does not touch real memory or decode speed:
+Captured with `scripts/kvpro_prot_int8_validation/gpu_mem_speed_capture.py` on **NVIDIA A100-SXM4-80GB**, driving the production `PagedKVWriter` in both modes (`INT4_PROTECTED_PROT_INT8` unset=B / `=1`=C), real Mistral v2 mask, n_protect=5, layer 0. — **MEASURED-GPU** (writer/read-path level; the external fused vLLM decode kernel is **not** invoked, so this is not full production TPS).
 
-- `memory_results.csv` — real `torch.cuda` allocated/reserved/peak: **RESOURCE_BLOCKED** (needs a capture through the production paged backend, `INT4_PROTECTED_PROT_INT8` unset vs `=1`). Sidecar halving 10 B→5 B/tok/head/layer at n_protect=5 is confirmed as the byte figure (**MODELED/known**); effective density ≈2.94% of the read stream at 4% is **MODELED**.
-- `performance_results.csv` — prefill/decode latency, TPS, kernel launches: **RESOURCE_BLOCKED**. The int8→bf16 dequant cost is **INFERRED nonzero** (CPU proxy: 3–4× vs bf16 passthrough).
-- `profiler_summary.json` — Nsight/torch-profiler: **RESOURCE_BLOCKED**.
-- `perplexity_results.csv` — not run; **RESOURCE_BLOCKED** (optional; wikitext-2-raw-v1 suggested).
+**Memory — stored protected sidecar (per layer):**
+
+| Seqlen | B (BF16) | C (INT8 + const) | Saved |
+|---|---|---|---|
+| 512 | 40 KiB | 20 KiB | **49.2%** |
+| 2048 | 160 KiB | 80 KiB | **49.8%** |
+| 8192 | 640 KiB | 320 KiB | **50.0%** |
+
+The **~50% sidecar-storage reduction is now MEASURED on GPU** (was MODELED). Scale: ×32 layers × batch for a model total (e.g. 8192 tokens × 32 layers ≈ 20 MiB → 10 MiB). This is the **protected sub-stream only** — small in absolute and relative terms (the full KV read stream and the 14.5 GB weights dominate). The int8 dequant constants add ~320 B/layer (amortized). **Read-transient is identical B vs C** (680 / 2720 / 10880 KiB) — INT8 reconstructs the same bf16 buffer on read, so the saving is **storage-only**, not present during the read itself.
+
+**Performance — read-path latency (get_packed_view over whole context, CUDA-event p50):**
+
+| Seqlen | B (BF16) | C (INT8) | C/B |
+|---|---|---|---|
+| 512 | 0.173 ms | 0.249 ms | **1.44×** |
+| 2048 | 0.189 ms | 0.235 ms | **1.24×** |
+| 8192 | 0.234 ms | 0.302 ms | **1.29×** |
+
+INT8 is **slower**, not neutral, on the isolated sidecar read (+0.05–0.08 ms; the added uint8→bf16 dequant). This is the read-path slice over the whole context, **not** a full decode step (which also runs the big attention kernel + GEMMs), so the **end-to-end** decode impact is diluted well below these ratios — but the direction is confirmed: **INT8 is not faster; it is neutral-to-slightly-slower.** This measured result supersedes my earlier "~1.0×" estimate.
+
+**Still not captured:** full end-to-end vLLM decode TPS through the external fused kernel (**RESOURCE_BLOCKED** — closed CUDA fork), Nsight profiler (`profiler_summary.json`, **RESOURCE_BLOCKED**), and perplexity (**not run**; optional).
 
 ---
 
@@ -140,7 +161,9 @@ The quality run is **fake-quant** (the log states: *"int4 decode fork present (N
 | Greedy/teacher-forced parity C vs B | **MEASURED** — 99.3% agreement, 6/7 prompts bit-identical (practical parity) |
 | Real-model greedy bit-identity | **UNSUPPORTED as a bar** — no quantized cell (incl B) is greedy-bit-identical to full BF16 |
 | Perplexity | **RESOURCE_BLOCKED** (not run) |
-| Real GPU memory & decode performance | **RESOURCE_BLOCKED** (fake-quant path; not captured) |
+| Stored sidecar memory reduction (~50%) | **MEASURED-GPU** (A100; 40→20 / 160→80 / 640→320 KiB per layer) |
+| Read-path speed C vs B | **MEASURED-GPU** — INT8 ~1.24–1.44× **slower** on the isolated read (not faster) |
+| Full end-to-end decode TPS (external fused kernel) | **RESOURCE_BLOCKED** (closed CUDA fork not invoked) |
 | "zero quality cost" on Mistral | **UNSUPPORTED** — result is EMPIRICALLY EQUIVALENT within the gate, not a formal zero-cost claim |
 
 ---
@@ -166,6 +189,14 @@ The quality run is **fake-quant** (the log states: *"int4 decode fork present (N
 
 ## Final verdict
 
-**PARTIALLY VALIDATED.** On real `mistralai/Mistral-7B-Instruct-v0.3`, INT8 protection (C) is **quality-equivalent to BF16 protection (B) within the pre-registered gate** (needle/hard-needle identical; MMLU within noise) — this is **MEASURED** and upgrades the prior CPU-only RESOURCE_BLOCKED quality gap. The **memory-reduction** and **decode-performance** claims remain **RESOURCE_BLOCKED** (fake-quant path did not measure them), and **greedy bit-identity** is **UNSUPPORTED as a bar** (no quantized cell achieves it). Not "zero quality cost"; not a demonstrated speed or GPU-memory win.
+**PARTIALLY VALIDATED (quality + memory + speed now MEASURED on Mistral; full end-to-end TPS still blocked).**
+
+On real `mistralai/Mistral-7B-Instruct-v0.3` (A100-80GB):
+- **Quality — MEASURED, in parity.** Needle 30/30=30/30, hard-needle 46/48=46/48 (identical per-mode), MMLU-200 C=79 ≥ B=76; teacher-forced token agreement C-vs-B = 99.3% (6/7 prompts bit-identical). No benchmark answer changed. Empirically equivalent within the gate — **not** greedy bit-identity, **not** a formal "zero quality cost" claim.
+- **Memory — MEASURED, ~50% saved on the stored protected sidecar** (40→20 / 160→80 / 640→320 KiB per layer). Real GPU reduction, but a **small slice** (protected sub-stream only; weights + full KV dominate). Saving is **storage-only** — the read reconstructs the same bf16 buffer.
+- **Speed — MEASURED, neutral-to-slightly-slower.** INT8 read-path is **1.24–1.44× slower** than BF16 on the isolated sidecar read (adds a dequant); **not faster**. End-to-end decode impact is diluted (the read is a small fraction of a full step), but there is **no speed win**.
+- **Still RESOURCE_BLOCKED:** full end-to-end vLLM decode TPS through the external closed CUDA fused kernel; Nsight profiling; perplexity.
+
+**Net:** on this model, swapping the BF16 protected sidecar for INT8 **holds quality, roughly halves that sidecar's stored bytes, and does not speed up decode (marginally slower on the read path).** The honest positioning is a **small memory/density lever at no quality cost — not a throughput lever.**
 
 *Artifacts: `artifacts/prot_int8_mistral/` (environment.json, model_metadata.json, compatibility_report.json, run_commands.sh, *.csv, profiler_summary.json, test_results.txt). Prior CPU/reference evidence: `docs/KVPRO_PROT_INT8_VALIDATION_REPORT.md`.*
