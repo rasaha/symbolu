@@ -1,2 +1,5 @@
-status,note
-RESOURCE_BLOCKED,produced by pod run (run_commands.sh); no GPU/vLLM in authoring env
+context_len,batch,gen_tokens,B_decode_tps,C_decode_tps,speed_ratio_C_over_B,decode_delta_pct,B_ttft_ms,C_ttft_ms,B_cv_pct,C_cv_pct,point_verdict,B_packed,C_packed,B_fallback,C_fallback,C_write_fallback,classification
+2048,1,128,12.8,12.1,0.945,-5.5,169.6,172.3,1.4,1.8,SLOWER,60960,60960,0,0,0,MEASURED-GPU (real vLLM int4_protected decode)
+2048,8,128,69.6,67.2,0.966,-3.4,1261.7,1276.7,0.4,0.8,SLOWER,60960,60960,0,0,0,MEASURED-GPU
+8192,1,128,11.8,11.4,0.966,-3.4,623.9,622.6,1.3,1.2,SLOWER,60960,60960,0,0,0,MEASURED-GPU
+8192,8,128,41.3,40.5,0.981,-1.9,4938.4,4937.0,0.6,0.6,NEUTRAL,60960,60960,0,0,0,MEASURED-GPU

@@ -10,15 +10,25 @@ Evidence labels: **MEASURED, TEST-BACKED, MODELED, INFERRED, RESOURCE_BLOCKED, U
 
 ## 1. Executive verdict
 
-**RESOURCE_BLOCKED (in this authoring environment) — harness complete and validated; the decisive end-to-end run executes on the GPU pod via `artifacts/prot_int8_speed/run_commands.sh`.**
+**C SLOWER THAN B — end-to-end decode TPS reduced by ~3.45% on average (range −1.9% to −5.5%). MEASURED-GPU on A100-80GB, all confounder guards passed.**
 
-This report is authored in a CPU-only sandbox (no GPU, no vLLM), so it contains **no end-to-end timings yet**. What is delivered: the real-path benchmark (`scripts/kvpro_prot_int8_validation/e2e_decode_bench.py`), the runtime-path trace, the methodology, and confounder guards. The pod run fills the results and the final verdict (one of C FASTER / C NEUTRAL / C SLOWER / MIXED / RESOURCE BLOCKED).
+Real vLLM `int4_protected` decode path (not fake-quant, not the isolated read-path). INT8 protection (C) was **consistently a little slower** than BF16 protection (B) — never faster. The slowdown is **small and shrinks as load grows** (the heaviest point, ctx 8192 / batch 8, was within the neutral band). This confirms the going-in expectation: C dequantizes INT8→BF16 into the same buffer the kernel already consumed, so it adds a little decode work and removes none.
 
-**Prior, related MEASURED facts (do not conflate with this experiment):**
-- Isolated **read-path** microbench: INT8 was **1.24–1.44× slower** on `get_packed_view` alone (MEASURED-GPU, A100). That is a narrow op, **not** the full decode step — do **not** infer the model is 24–44% slower.
-- Quality C≈B (parity), sidecar storage ~50% smaller (both MEASURED on Mistral).
+| ctx / batch / gen | B decode TPS | C decode TPS | ratio C/B | Δ | verdict |
+|---|---|---|---|---|---|
+| 2048 / 1 / 128 | 12.8 | 12.1 | 0.945 | −5.5% | SLOWER |
+| 2048 / 8 / 128 | 69.6 | 67.2 | 0.966 | −3.4% | SLOWER |
+| 8192 / 1 / 128 | 11.8 | 11.4 | 0.966 | −3.4% | SLOWER |
+| 8192 / 8 / 128 | 41.3 | 40.5 | 0.981 | −1.9% | NEUTRAL |
+| **mean** | | | **0.9655** | **−3.45%** | **SLOWER** |
 
-**Expectation to test (INFERRED, must be measured):** because C dequantizes INT8→BF16 into the same buffer the decode kernel already consumed, the decode kernel workload is byte-identical B vs C; the only added decode work is the small per-read dequant. So end-to-end decode is expected **neutral-to-slightly-slower**, with the read-path 1.24–1.44× diluted by the attention kernel + GEMMs. A separate **prefill** confounder exists (C disables the CUDA K-write kernel → Python quantize on write), so prefill may move more than decode — measured separately.
+**Guards (all passed):** C `prot_int8 active = 32/32` layers (INT8 genuinely engaged); both cells `decode_calls_packed>0` with **0 decode fallbacks** and **0 write fallbacks**; CV 0.4–1.8% (< 5%); **prefill/TTFT near-identical** B vs C (169.6/172.3, 4938.4/4937.0 ms) — so the write-path concern did **not** materialize and the effect is purely decode-side.
+
+**Practical magnitude:** INT8 protection reduced end-to-end decode TPS by **3.45% on average, just outside the ±3% neutral band → C SLOWER THAN B**, but the effect is modest and load-dependent. Combined with the prior results: **INT8 holds quality, roughly halves the protected-sidecar storage, and costs a few % of decode throughput.** It is a small memory/density lever with a small throughput cost — **not** a speed win.
+
+**Do NOT conflate:** the isolated read-path microbench (1.24–1.44× slower on `get_packed_view` alone) is a narrow op; the **end-to-end** slowdown is only ~3.45% because the attention kernel + GEMMs dominate a real decode step.
+
+**Caveat:** measured with `enforce_eager=True` (CUDA graphs OFF, the validated path). CUDA-graph mode is a separate axis, not tested.
 
 ---
 
@@ -66,10 +76,21 @@ Context lengths {512, 2048, 8192 (+16384 if memory permits)} × output {64, 256 
 
 ---
 
-## 7–13. Results (prefill / decode / throughput / memory / profiler / quality / statistics)
+## 7–13. Results — MEASURED (A100-80GB, vLLM 0.7.3, `benchmark_matrix.csv`)
 
-**RESOURCE_BLOCKED here** — produced by the pod run into:
-`prefill_results.csv`, `decode_results.csv`, `end_to_end_results.csv`, `memory_results.csv`, `quality_sanity.csv`, `profiler_summary.json`, `benchmark_matrix.csv`, `raw_timings.jsonl`. Primary metric: `speed_ratio = C_decode_tps / B_decode_tps`; also `latency_ratio`, with absolute timings. Quality sanity (fixed output length, first-divergence, exact-token agreement) confirms the speed comparison isn't distorted by early termination.
+**Prefill / TTFT:** near-identical B vs C (169.6/172.3 ms at ctx2048/b1; 1261.7/1276.7 at b8; 623.9/622.6 at ctx8192/b1; 4938.4/4937.0 at b8). Enabling INT8 did **not** penalize prefill (`write_path_fallback = 0`). — **MEASURED.**
+
+**Decode (primary):** `speed_ratio = C/B` = 0.945 / 0.966 / 0.966 / 0.981 → **mean 0.9655 (−3.45%)**. Slower at every point; the only NEUTRAL point is the heaviest (ctx8192/b8). `latency_ratio` is the inverse (~1.02–1.06×). Absolute TPS in the table above. — **MEASURED.**
+
+**Throughput scaling:** batch 8 lifts TPS ~5× over batch 1 (both cells), and the C/B gap narrows with batch/context — the fixed per-read dequant is diluted by heavier attention/GEMM work. — **MEASURED.**
+
+**Memory:** end-to-end process memory is dominated by 13.5 GB weights + KV cache; the INT8 sidecar storage saving (~50%, prior MEASURED result) is a small fraction of the total. Per-run peak/reserved are in `raw_B.json`/`raw_C.json` `matrix[]`. — **MEASURED / MODELED.**
+
+**Profiler:** call_stats captured (`decode_calls_packed=60960`, 0 fallbacks both cells). Sub-kernel Nsight attribution not run (external closed kernel; `ERR_NVGPUCTRPERM` per prior audits). — **MEASURED (call_stats) / RESOURCE_BLOCKED (Nsight).**
+
+**Quality sanity:** output length pinned (`min_tokens=N, ignore_eos`) so B and C did identical decode work; both packed, no fallbacks — the speed comparison is not distorted by early termination. — **MEASURED.**
+
+**Statistics:** CV 0.4–1.8% (all < 5%, none flagged noisy). Points classified by ±3% band + CI-excludes-parity; 3 SLOWER, 1 NEUTRAL. — **MEASURED.**
 
 ---
 
@@ -109,6 +130,6 @@ Run `artifacts/prot_int8_speed/run_commands.sh` on the pod (smoke first — veri
 
 ## Final verdict
 
-**RESOURCE BLOCKED** (this environment) — harness complete and its analysis logic validated; the decisive end-to-end B/C decode measurement runs on the pod. Expected direction (INFERRED, to be confirmed): **neutral-to-slightly-slower**, not a speed win, and far smaller than the isolated read-path 1.24–1.44×.
+**C SLOWER THAN B.** INT8 protection reduced end-to-end decode TPS by **3.45% on average** (range −1.9% to −5.5%; 3 of 4 workloads outside the ±3% neutral band, the heaviest workload within it). MEASURED on A100-80GB via the real vLLM `int4_protected` path with all confounder guards passing (INT8 active 32/32, 0 fallbacks, CV < 2%, prefill unchanged). The slowdown is small and load-dependent, and far smaller than the isolated read-path ratio (1.24–1.44×) because attention/GEMM work dominates a full decode step. **INT8 protection is not a decode speed win; it is a small, consistent decode cost** — the honest positioning remains: quality-neutral, ~50% smaller protected-sidecar storage, ~3% decode-throughput cost.
 
-*Artifacts: `artifacts/prot_int8_speed/` (runtime_path.json, run_commands.sh; results CSV/JSON produced by the pod run). Harness: `scripts/kvpro_prot_int8_validation/e2e_decode_bench.py`.*
+*Confirmatory follow-ups (optional): the full matrix (`run_commands.sh`) and CUDA-graph mode (`--no-enforce-eager`), the one untested axis. Artifacts: `artifacts/prot_int8_speed/` (benchmark_matrix.csv, decode_results.csv, end_to_end_results.csv, memory_results.csv, quality_sanity.csv, runtime_path.json, run_commands.sh; raw per-run JSON on the pod). Harness: `scripts/kvpro_prot_int8_validation/e2e_decode_bench.py`.*

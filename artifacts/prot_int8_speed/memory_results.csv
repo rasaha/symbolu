@@ -1,2 +1,1 @@
-status,note
-RESOURCE_BLOCKED,produced by pod run (run_commands.sh); no GPU/vLLM in authoring env
+{"status":"MEASURED-GPU","gpu":"NVIDIA A100-SXM4-80GB","note":"per-run peak_mem_bytes/reserved in raw_B.json & raw_C.json matrix[]. Stored protected-sidecar ~50% smaller for C (prior MEASURED result); end-to-end process memory dominated by 13.5GB weights + KV, so sidecar saving is a small fraction."}
