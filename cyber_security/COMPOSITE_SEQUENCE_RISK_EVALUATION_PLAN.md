@@ -61,8 +61,34 @@ bounded-state unavailable; recipe-version change mid-case; policy binding.
 - **Entity-linkage sensitivity.** Detection depends on the configured
   `AssemblyKeySpec`; evaluation MUST fix and report the spec set.
 
-## 5. Current evidence-based verdict
+## 5. Phase-2 update — synthetic corpus + evidence discipline
 
-Behavioral correctness on the encoded recipes and the 20 structural scenarios is
-demonstrated and deterministic. **All population accuracy metrics are `NOT RUN`**
-pending a labeled corpus. No claim of real-world detection accuracy is made.
+A deterministic 25-family adversarial synthetic corpus now exists
+(`composite_threat_detector/evaluation/corpus.py`) with independent labels, hard
+benign look-alikes, dev/calibration/**final** splits, a manifest, and a
+pre-evaluation freeze. The harness (`cli eval`) computes metrics broken down by
+family and split, each carrying an evidence-discipline label (§17 of the spec):
+
+- **`Measured — synthetic corpus`**: true-positive rate (encoded), false-escalation
+  rate, miss rate, precision, recall (encoded), unknown-threat detection (expected
+  ≈ 0), mean events before escalation, alerts/1,000 events, incorrect
+  benign-neutralization rate.
+- **`Measured — unit/integration test`**: determinism across replay.
+- **`REQUIRES ENTERPRISE DATA`**: escalation lead time before completion,
+  alerts/tenant-day, peak state/tenant.
+- **`NOT RUN`**: runtime/event, entity-linkage error rate (needs labeled linkage
+  ground truth).
+
+Synthetic-corpus numbers are **not** enterprise performance and **not**
+unknown-threat coverage. The `final` split must not be used to tune recipes,
+linkage, decay, thresholds, or benign exclusions; it is enumerated in the freeze
+(`cli freeze`) so it can be held out.
+
+## 6. Current evidence-based verdict
+
+Behavioral correctness on the encoded recipes and the structural scenarios is
+demonstrated and deterministic; the synthetic corpus is measured and labeled.
+**All enterprise/live-population accuracy metrics remain `NOT RUN` /
+`REQUIRES ENTERPRISE DATA`.** No claim of real-world detection accuracy is made.
+Verdict: `CONTINUE — synthetic evaluation only` (see
+`SHADOW_PILOT_REPORT_TEMPLATE.md`).

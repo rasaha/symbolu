@@ -103,11 +103,33 @@ for action in admitted_action_stream:        # each already cleared the per-acti
 | `composite_threat_detector/benign.py` | evidence-gated benign-context layer |
 | `composite_threat_detector/completion.py` | advisory minimal-completion analysis |
 | `composite_threat_detector/analyzer.py` | orchestration, findings, run report, facade |
-| `composite_threat_detector/policy.py` | authoritative consequence binding |
+| `composite_threat_detector/providers.py` | trusted benign-evidence providers (fixtures; no net) |
+| `composite_threat_detector/purpose.py` | declared vs. verified purpose model |
+| `composite_threat_detector/ordering.py` | ordering/clock status model |
+| `composite_threat_detector/audit.py` | append-only raw-evidence + lifecycle audit log |
+| `composite_threat_detector/governance.py` | state-exhaustion resource governance |
+| `composite_threat_detector/replay.py` | historical-replay adapter contract + reference |
+| `composite_threat_detector/policy.py` | authoritative consequence binding (shadow default) |
 | `composite_threat_detector/evidence.py` | Finding → ActionGate advisory evidence |
 | `composite_threat_detector/fragments.py` / `recipes.py` | shipped ontologies |
 | `composite_threat_detector/cli.py` | JSON CLI |
-| `evaluation/` | evaluation harness + results template (NOT RUN) |
+| `evaluation/corpus.py` | 25-family adversarial corpus + manifest + freeze |
+| `evaluation/harness.py` | metrics harness (evidence-labeled; enterprise = NOT RUN) |
+| `evaluation/review.py` | operator-review simulation |
 | `demos/scenarios.py` | illustrative scenarios |
-| `tests/` | 35 deterministic detection + non-detection tests |
+| `tests/` | 62 deterministic detection + non-detection + infra tests |
 | `RECIPE_SCHEMA.md` / `LINKAGE_SCHEMA.md` / `MIGRATION_NOTES.md` | schemas + migration |
+
+### Shadow-mode / phase-2 notes
+
+- **Advisory + shadow by default.** `PolicyBinding(shadow=True)` computes a
+  consequence but marks it non-binding (`enforced=False`). Enforcement requires a
+  scoped promotion — see `../ENFORCEMENT_PROMOTION_CHECKLIST.md`; there is no
+  global switch.
+- **Trusted context only.** Self-declared purpose never neutralizes; pass a
+  `ProviderRegistry` of verified authorizations. Findings carry a
+  `purpose`/`purpose_consistency_status`.
+- **Evaluation is synthetic + honest.** `cli eval` runs the 25-family corpus and
+  labels every metric; population accuracy on enterprise data is
+  `REQUIRES ENTERPRISE DATA`. `cli manifest` / `cli freeze` emit the corpus
+  manifest and the pre-evaluation freeze.

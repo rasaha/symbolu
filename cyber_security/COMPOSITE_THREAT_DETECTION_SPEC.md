@@ -261,3 +261,82 @@ python3 -m composite_threat_detector.cli run events.jsonl --spec by_case --spec 
 Exit code is non-zero when any `ESCALATE`/`UNAVAILABLE` finding is produced. See
 also `RECIPE_SCHEMA.md`, `LINKAGE_SCHEMA.md`, and `MIGRATION_NOTES.md` in the
 package directory.
+
+---
+
+## 16. Phase 2 — bounded shadow-mode readiness
+
+This phase adds the evaluation, evidence, and safety infrastructure needed to ask
+one question honestly: *can the analyzer detect meaningful composite risk without
+inventing harmful narratives about legitimate workflows or overwhelming operators
+with false escalations?* It does **not** enable broad enforcement or claim
+real-world accuracy. All evaluated workflows default to **shadow mode** — no
+action is blocked or executed differently.
+
+> The analyzer measures threat-consistent capability assembly and purpose
+> consistency. It does not determine a person's internal intent.
+
+**Trusted benign evidence (§3, `providers.py`).** Self-declared benign intent —
+from an agent, user, event payload, or unverified metadata — is never accepted.
+Neutralization requires an independently *verified*, scope-matched, in-window
+authorization from a trusted provider (versioned interface; replayable fixtures;
+no network in the core). A response carries source system, record id/version,
+verification status, per-dimension scope match, time-window match, approver
+identity/authority, and a deterministic evidence digest.
+
+**Declared vs. verified purpose (§4, `purpose.py`).** Findings separate
+`declared_purpose` from `verified_purpose` with a consistency status
+(`VERIFIED_CONSISTENT` / `PARTIALLY_CONSISTENT` / `INCONSISTENT` / `UNVERIFIED` /
+`EXPIRED` / `AMBIGUOUS`) and list in-scope vs. out-of-scope actions. Only
+`VERIFIED_CONSISTENT` neutralizes.
+
+**Raw evidence vs. active risk (§5, `audit.py`).** Risk weight decays; raw
+evidence and finding provenance do not. An append-only, hash-chained audit log
+retains `RAW_EVIDENCE`, `LIFECYCLE`, `ASSEMBLY_RESET`, `EVICTION`, and `OVERLOAD`
+records. Administrative reset clears *active* state only and emits an immutable
+audit event; history is never deleted (`analyzer.reconstruct`).
+
+**Ordering & clock status (§6, `ordering.py`).** Multiple ordering signals
+(event time, source sequence, ingestion time, receipt sequence, correlation-local
+sequence, clock skew) resolve deterministically to `ORDERED` /
+`PARTIALLY_ORDERED` / `AMBIGUOUS_ORDER` / `CONFLICTING_ORDER`. A strict-ordering
+recipe is **not** treated as satisfied under ambiguous/conflicting order unless it
+sets `permit_ambiguous_ordering`. Conflicts are surfaced, not normalized away.
+
+**State-exhaustion governance (§7, `governance.py`).** Per-tenant/per-actor
+quotas, candidate-linkage caps, and instance caps. A breach is fail-visible:
+`UNAVAILABLE` (fail-loud), the exact limit recorded, evictions audited. For
+high-consequence workflows the reference policy maps `UNAVAILABLE` →
+`HOLD_FOR_REVIEW`.
+
+**Recipe-version binding (§8).** Each assembly binds the recipe version in force
+when it opened. History reconstruction uses the bound version; new actions are
+also evaluated against the current version; divergent outcomes are recorded.
+Earlier findings are never rewritten.
+
+**Evaluation (§9–§12, `evaluation/`).** A deterministic 25-family adversarial
+synthetic corpus with independent labels and hard benign look-alikes; a manifest
+with dev/calibration/**final** splits; a pre-evaluation freeze (`cli freeze`). The
+harness reports metrics broken down by family/split with evidence-discipline
+labels (§17); population accuracy on a *labeled enterprise* corpus is
+`REQUIRES ENTERPRISE DATA`. An operator-review simulation (`evaluation/review.py`)
+records dispositions and review-burden metrics (read-only; never mutates rules
+during a frozen run). A historical-replay adapter contract (`replay.py`) defines
+normalization/redaction/tenant-isolation requirements; only a generic reference
+adapter is implemented and tested — named vendors are `CONTRACT ONLY`.
+
+**Shadow-pilot & promotion.** `SHADOW_PILOT_REPORT_TEMPLATE.md` (no "production
+ready" verdict permitted) and `ENFORCEMENT_PROMOTION_CHECKLIST.md` (enforcement
+prohibited until a frozen workflow passes every criterion; promotion is scoped by
+tenant/workflow/environment/action-type/recipe/severity/policy-version; no global
+switch).
+
+## 17. Evidence discipline
+
+All reported results carry one label: `Measured — unit/integration test`,
+`Measured — synthetic corpus`, `Measured — historical replay`,
+`Measured — live shadow pilot`, `Modeled — operational projection`, `NOT RUN`, or
+`REQUIRES ENTERPRISE DATA`. Do not present unit tests as threat-detection
+accuracy, synthetic results as enterprise performance, historical replay as live
+enforcement evidence, operator agreement as proof of malicious intent, or
+encoded-recipe recall as unknown-threat coverage.

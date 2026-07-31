@@ -118,6 +118,10 @@ class Recipe:
     benign_exclusions: frozenset[str] = field(default_factory=frozenset)
     severity: str = "HIGH"
     recommended_consequence: str = "HOLD_FOR_REVIEW"
+    # When the recipe declares ordering constraints, ambiguous/conflicting event
+    # order does NOT satisfy them unless this is explicitly set (§6). Default is
+    # fail-safe: unresolved order caps the signal at OBSERVE.
+    permit_ambiguous_ordering: bool = False
     physical_analogue: str = ""
     explanation_template: str = ""
 

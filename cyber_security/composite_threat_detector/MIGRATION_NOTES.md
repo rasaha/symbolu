@@ -47,3 +47,27 @@ emits advisory evidence. See the product statement in the spec.
   not treat any analyzer output as an authorization.
 - If you relied on `finding.story["headline"]`, use `finding.explanation` and the
   structured `present_fragments` / `missing_fragments` fields instead.
+
+## Phase 2 (shadow-mode readiness) schema changes
+
+| Area | Before | After |
+|------|--------|-------|
+| Benign neutralization | event-embedded `approval` accepted (self-declared) | requires a **verified** authorization from a `ProviderRegistry`; self-declared purpose never neutralizes (§3/§4) |
+| `Finding` fields | — | added `purpose`, `recipe_version_binding`, `lifecycle`, `raw_evidence_digest`, `shadow_mode`; `ordering_status` now includes `clock_status` |
+| `Recipe` | — | added `permit_ambiguous_ordering` (default `False`, fail-safe) |
+| `StateLimits` | 3 caps | added `max_assemblies_per_actor`, `max_candidate_linkages_per_event`, `max_recipe_evaluations`, `max_benign_records_per_assembly`, `max_replay_backlog` (defaults high → no behavior change) |
+| `PolicyBinding` | binding consequence | added `shadow` (default `True`): computes consequence but `enforced=False` |
+| New modules | — | `providers`, `purpose`, `ordering`, `audit`, `governance`, `replay`; `evaluation/{corpus,review}` |
+| Removed | — | none |
+
+**Justified test migrations (2).** `test_03_authorized_security_test_qualified`
+and `test_16_valid_approval_neutralizes` now pass a trusted `ProviderRegistry`
+fixture, because self-declared approvals no longer neutralize. A new test
+(`test_16b`) asserts the same claim *without* a provider does **not** neutralize.
+All other original tests remain unchanged and green.
+
+**Backward compatibility.** `SequenceRiskAnalyzer(...)` with no `providers` runs
+exactly as before except that event-embedded approvals no longer neutralize
+(they are treated as unverified claims). The `CompositeThreatMonitor` facade,
+`observe()`, `standing_findings()`, `load_ontology()`, and the demos are
+unchanged. Shadow mode is the default; nothing enforces.

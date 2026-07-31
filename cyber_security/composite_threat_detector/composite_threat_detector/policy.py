@@ -41,10 +41,17 @@ _DEFAULT_MAP = {
 
 @dataclass
 class PolicyBinding:
-    """A configurable, authoritative mapping from advisory finding to consequence."""
+    """A configurable, authoritative mapping from advisory finding to consequence.
+
+    ``shadow`` is the default for this phase: the consequence is *computed and
+    logged* but marked non-binding (``enforced=False``), so no action is actually
+    blocked or executed differently. Enforcement requires an explicit, scoped
+    promotion (see ENFORCEMENT_PROMOTION_CHECKLIST.md) — there is no global switch.
+    """
 
     mapping: dict[tuple[str, str], str] = field(
         default_factory=lambda: dict(_DEFAULT_MAP))
+    shadow: bool = True
 
     def __post_init__(self) -> None:
         for cons in self.mapping.values():
@@ -62,12 +69,18 @@ class PolicyBinding:
         cons = (self.mapping.get((signal, severity))
                 or self.mapping.get((signal, "*"))
                 or NO_CONSEQUENCE)
+        # in shadow mode the computed consequence is advisory-logged, not enforced
+        effective = NO_CONSEQUENCE if (self.shadow and cons != NO_CONSEQUENCE) else cons
         return {
             "finding_id": fid,
             "advisory_signal": signal,
             "consequence": cons,
+            "effective_consequence": effective,
+            "enforced": (not self.shadow) and cons != NO_CONSEQUENCE,
+            "shadow_mode": self.shadow,
             "authority": "ACTIONGATE_POLICY",
-            "rationale": f"policy mapped advisory {signal}/{severity} -> {cons}",
+            "rationale": f"policy mapped advisory {signal}/{severity} -> {cons}"
+                         + (" (shadow: not enforced)" if self.shadow else ""),
         }
 
 

@@ -49,8 +49,8 @@ def _load_jsonl(path: str) -> list[dict]:
     return events
 
 
-def _run(events, ontology, specs, with_policy) -> int:
-    az = SequenceRiskAnalyzer(ontology, specs=specs)
+def _run(events, ontology, specs, with_policy, providers=None) -> int:
+    az = SequenceRiskAnalyzer(ontology, specs=specs, providers=providers)
     findings = []
     for ev in events:
         findings.extend(f.to_dict() for f in az.observe(ev))
@@ -82,7 +82,10 @@ def main(argv=None) -> int:
 
     sub.add_parser("ontologies", help="list ontologies + recipes")
     sub.add_parser("specs", help="list assembly key specs")
-    sub.add_parser("eval", help="run the evaluation harness")
+    sub.add_parser("eval", help="run the synthetic-corpus evaluation")
+    sub.add_parser("manifest", help="print the corpus manifest")
+    fr = sub.add_parser("freeze", help="print the pre-evaluation freeze")
+    fr.add_argument("--commit", default="UNSET")
 
     d = sub.add_parser("demo", help="run a built-in illustration")
     d.add_argument("which", choices=["firearm", "exfiltration", "benign",
@@ -111,19 +114,40 @@ def main(argv=None) -> int:
         _emit(harness.evaluate())
         return 0
 
+    if args.cmd == "manifest":
+        from evaluation import corpus
+        _emit(corpus.manifest())
+        return 0
+
+    if args.cmd == "freeze":
+        from evaluation import corpus
+        _emit(corpus.freeze(code_commit=args.commit))
+        return 0
+
     if args.cmd == "demo":
         from demos import scenarios
+        from .providers import FixtureProvider, ProviderRegistry
         from .recipes import PHYSICAL_FIREARM_ONTOLOGY
+        # approved_export illustrates neutralization by a TRUSTED, verified record
+        export_provider = ProviderRegistry(providers=(FixtureProvider(
+            "demo-trusted", "1.0.0", [{"record_id": "CHG-771",
+             "tag": "compliance_export", "tenant": "acme", "workflow": "wf-exp",
+             "actor": "*", "target_family": "*", "operations": "*",
+             "destinations": "*", "environment": "*", "tools": "*",
+             "approver_identity": "user://dpo",
+             "approver_authority": "data_protection_officer"}]),))
         table = {
             "firearm": (PHYSICAL_FIREARM_ONTOLOGY, scenarios.firearm_events,
-                        (BY_CORRELATION,)),
-            "exfiltration": (DIGITAL_ONTOLOGY, scenarios.exfiltration_events, (BY_CASE,)),
-            "benign": (DIGITAL_ONTOLOGY, scenarios.benign_migration_events, (BY_CASE,)),
+                        (BY_CORRELATION,), None),
+            "exfiltration": (DIGITAL_ONTOLOGY, scenarios.exfiltration_events,
+                             (BY_CASE,), None),
+            "benign": (DIGITAL_ONTOLOGY, scenarios.benign_migration_events,
+                       (BY_CASE,), None),
             "approved_export": (DIGITAL_ONTOLOGY, scenarios.approved_export_events,
-                                (BY_CASE,)),
+                                (BY_CASE,), export_provider),
         }
-        ont, evs, specs = table[args.which]
-        return _run(evs, ont, specs, with_policy=True)
+        ont, evs, specs, providers = table[args.which]
+        return _run(evs, ont, specs, with_policy=True, providers=providers)
 
     if args.cmd == "run":
         ontology = ONTOLOGIES.get(args.ontology)

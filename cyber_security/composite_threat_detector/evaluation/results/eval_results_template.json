@@ -1,26 +1,44 @@
 {
-  "_comment": "Template for a real evaluation run. Populate only from an actual labeled corpus. Metrics without a corpus MUST remain 'NOT RUN'. Do not fabricate values.",
-  "corpus": {
-    "name": "NOT RUN",
-    "size": "NOT RUN",
-    "labeling": "NOT RUN"
-  },
-  "ontology": {
-    "id": "ctd.digital.actiongate",
-    "version": "NOT RUN"
+  "_comment": "Template for a real evaluation run. Populate only from an actual labeled corpus. Every value carries an evidence-discipline label (see spec §17). Metrics without a corpus MUST remain 'NOT RUN' or 'REQUIRES ENTERPRISE DATA'. Do not fabricate values. Synthetic-corpus results (python -m composite_threat_detector.cli eval) are 'Measured — synthetic corpus' and are NOT enterprise performance.",
+  "evidence_labels": [
+    "Measured — unit/integration test",
+    "Measured — synthetic corpus",
+    "Measured — historical replay",
+    "Measured — live shadow pilot",
+    "Modeled — operational projection",
+    "NOT RUN",
+    "REQUIRES ENTERPRISE DATA"
+  ],
+  "freeze": {
+    "recipe_versions": "NOT RUN",
+    "linkage_schema": "NOT RUN",
+    "corpus_hash": "NOT RUN",
+    "code_commit": "NOT RUN",
+    "policy_version": "NOT RUN"
   },
   "metrics": {
-    "true_positive_rate": "NOT RUN",
-    "false_escalation_rate": "NOT RUN",
-    "miss_rate": "NOT RUN",
-    "mean_events_before_escalation": "NOT RUN",
-    "escalation_lead_time_before_completion": "NOT RUN",
-    "cross_session_detection_rate": "NOT RUN",
-    "multi_actor_detection_rate": "NOT RUN",
-    "duplicate_sensitivity": "NOT RUN",
-    "state_memory_growth": "NOT RUN",
-    "runtime_per_event": "NOT RUN",
-    "determinism_across_repeated_runs": "NOT RUN",
-    "explanation_completeness": "NOT RUN"
+    "true_positive_rate_encoded": {"value": "NOT RUN", "label": "NOT RUN"},
+    "false_escalation_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "miss_rate_encoded": {"value": "NOT RUN", "label": "NOT RUN"},
+    "precision": {"value": "NOT RUN", "label": "NOT RUN"},
+    "recall_encoded": {"value": "NOT RUN", "label": "NOT RUN"},
+    "unknown_threat_detection": {"value": "NOT RUN", "label": "NOT RUN"},
+    "alerts_per_1000_events": {"value": "NOT RUN", "label": "NOT RUN"},
+    "alerts_per_tenant_day": {"value": "REQUIRES ENTERPRISE DATA"},
+    "mean_events_before_escalation": {"value": "NOT RUN", "label": "NOT RUN"},
+    "escalation_lead_time_before_completion": {"value": "REQUIRES ENTERPRISE DATA"},
+    "cross_session_detection_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "multi_actor_detection_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "long_and_slow_detection_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "benign_authorization_neutralization_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "incorrect_benign_neutralization_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "entity_linkage_error_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "ambiguous_order_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "unavailable_rate": {"value": "NOT RUN", "label": "NOT RUN"},
+    "state_eviction_count": {"value": "NOT RUN", "label": "NOT RUN"},
+    "runtime_per_event": {"value": "NOT RUN", "label": "NOT RUN"},
+    "peak_state_per_tenant": {"value": "REQUIRES ENTERPRISE DATA"},
+    "determinism_across_replay": {"value": "NOT RUN", "label": "NOT RUN"},
+    "explanation_completeness": {"value": "NOT RUN", "label": "NOT RUN"}
   }
 }

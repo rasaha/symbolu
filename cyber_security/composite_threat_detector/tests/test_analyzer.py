@@ -47,6 +47,12 @@ def run(ont, events, **kw):
     return az, out
 
 
+def trusted_registry(records):
+    from composite_threat_detector.providers import FixtureProvider, ProviderRegistry
+    return ProviderRegistry(providers=(
+        FixtureProvider("trusted-fixture", "1.0.0", records, source_system="test"),))
+
+
 EXFIL = "DATA_EXFILTRATION_ASSEMBLY"
 
 
@@ -62,7 +68,7 @@ def test_02_benign_lookalike_does_not_escalate():
     assert signals.ESCALATE not in signals_of(out)
 
 
-# 3. Authorized security test (valid approval) -> not escalate ------------
+# 3. Authorized security test (TRUSTED, verified approval) -> not escalate -
 def test_03_authorized_security_test_qualified():
     events = [
         dig("SECRET_READ", "t:1", "e1", {"enumerate": True}, workflow="wf-test"),
@@ -72,12 +78,18 @@ def test_03_authorized_security_test_qualified():
             approval={"tag": "authorized_security_test", "approver": "user://red",
                       "ticket": "PT-1", "workflow_id": "wf-test"}),
     ]
-    az, out = run(DIGITAL_ONTOLOGY, events, specs=(BY_CASE,))
+    registry = trusted_registry([{
+        "record_id": "PT-1", "provider_type": "penetration_test_authorization",
+        "tag": "authorized_security_test", "tenant": "acme", "workflow": "wf-test",
+        "actor": "*", "target_family": "*", "operations": "*", "destinations": "*",
+        "environment": "*", "tools": "*", "approver_identity": "user://red",
+        "approver_authority": "security_lead"}])
+    az, out = run(DIGITAL_ONTOLOGY, events, specs=(BY_CASE,), providers=registry)
     assert signals.ESCALATE not in signals_of(out)
     key = out[0].assembly_key
-    standing = az.standing_findings("acme", key)
-    exfil = [f for f in standing if f.recipe_id == EXFIL][0]
+    exfil = [f for f in az.standing_findings("acme", key) if f.recipe_id == EXFIL][0]
     assert exfil.benign_context_evidence["status"] == "NEUTRALIZED"
+    assert exfil.purpose["purpose_consistency_status"] == "VERIFIED_CONSISTENT"
     assert exfil.signal == signals.OBSERVE
 
 
@@ -243,13 +255,29 @@ def test_15_expired_approval_escalates():
     assert signals.ESCALATE in signals_of(out, EXFIL)
 
 
-# 16. Valid approval matching scope -> neutralized ------------------------
+# 16. Valid TRUSTED approval matching scope -> neutralized ----------------
 def test_16_valid_approval_neutralizes():
-    az, out = run(DIGITAL_ONTOLOGY, scenarios.approved_export_events, specs=(BY_CASE,))
+    registry = trusted_registry([{
+        "record_id": "CHG-771", "provider_type": "compliance_export",
+        "tag": "compliance_export", "tenant": "acme", "workflow": "wf-exp",
+        "actor": "*", "target_family": "*", "operations": "*", "destinations": "*",
+        "environment": "*", "tools": "*", "approver_identity": "user://dpo",
+        "approver_authority": "data_protection_officer"}])
+    az, out = run(DIGITAL_ONTOLOGY, scenarios.approved_export_events,
+                  specs=(BY_CASE,), providers=registry)
     assert signals.ESCALATE not in signals_of(out)
     key = out[0].assembly_key
     exfil = [f for f in az.standing_findings("acme", key) if f.recipe_id == EXFIL][0]
     assert exfil.benign_context_evidence["status"] == "NEUTRALIZED"
+
+
+# 16b. The SAME approval claim WITHOUT a trusted provider does NOT neutralize
+def test_16b_self_declared_purpose_does_not_neutralize():
+    az, out = run(DIGITAL_ONTOLOGY, scenarios.approved_export_events, specs=(BY_CASE,))
+    assert signals.ESCALATE in signals_of(out, EXFIL)  # self-declared != verified
+    esc = [f for f in out if f.signal == signals.ESCALATE][0]
+    assert esc.purpose["purpose_consistency_status"] == "UNVERIFIED"
+    assert esc.purpose["neutralizes"] is False
 
 
 # 17. Ambiguous entity linkage (no key dim present) -----------------------

@@ -58,11 +58,21 @@ class TimescalePolicy:
 
 @dataclass(frozen=True)
 class StateLimits:
-    """Bounded-state caps. Breach ⇒ UNAVAILABLE, never silent drop."""
+    """Bounded-state caps. Breach ⇒ UNAVAILABLE (fail-visible), never silent drop.
+
+    The first three are enforced structurally by the ledger; the rest are
+    enforced by the ResourceGovernor (§7) and surfaced in findings + audit log.
+    """
 
     max_tenants: int = 10_000
     max_assemblies_per_tenant: int = 50_000
     max_instances_per_assembly: int = 10_000
+    # governance (§7)
+    max_assemblies_per_actor: int = 25_000
+    max_candidate_linkages_per_event: int = 16
+    max_recipe_evaluations: int = 10_000
+    max_benign_records_per_assembly: int = 512
+    max_replay_backlog: int = 1_000_000
 
 
 class LimitExceeded(Exception):
@@ -104,6 +114,12 @@ class Assembly:
     closed: bool = False
     link_dims: dict[str, str] = field(default_factory=dict)
     related_correlations: set[str] = field(default_factory=set)
+    # phase-2 additions (all backward-compatible defaults)
+    lifecycle: str = "OPEN"                 # OPEN|DECAYING|CLOSED|EXPIRED|RESET|SUPERSEDED
+    bound_recipe_versions: dict = field(default_factory=dict)  # recipe_id -> version
+    max_severity_rank: int = 0              # for priority retention
+    actors: set = field(default_factory=set)
+    ingest_count: int = 0
 
     def active(self, now: float, policy: TimescalePolicy) -> list[_LedgerInstance]:
         """Instances that currently contribute (state ACTIVE, weight >= floor)."""

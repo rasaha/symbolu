@@ -33,7 +33,10 @@ from __future__ import annotations
 
 __version__ = "2.0.0"
 
-from . import benign, completion, fragments, linkage, narrative, policy, signals  # noqa: F401
+from . import (  # noqa: F401
+    audit, benign, completion, fragments, governance, linkage, narrative,
+    ordering, policy, providers, purpose, signals,
+)
 from .analyzer import (
     CompositeThreatMonitor,
     Finding,
@@ -41,8 +44,14 @@ from .analyzer import (
     RunReport,
     SequenceRiskAnalyzer,
 )
+from .audit import AuditLog
 from .evidence import to_advisory_evidence
 from .ledger import StateLimits, TimescalePolicy
+from .providers import (
+    BenignEvidenceProvider,
+    FixtureProvider,
+    ProviderRegistry,
+)
 from .linkage import (
     BY_ACTOR,
     BY_ACTOR_TARGET,
@@ -75,6 +84,15 @@ __all__ = [
     "TimescalePolicy",
     "StateLimits",
     "PolicyBinding",
+    "ProviderRegistry",
+    "FixtureProvider",
+    "BenignEvidenceProvider",
+    "AuditLog",
+    "providers",
+    "purpose",
+    "ordering",
+    "governance",
+    "audit",
     "DIGITAL_ONTOLOGY",
     "PHYSICAL_FIREARM_ONTOLOGY",
     "ONTOLOGIES",
