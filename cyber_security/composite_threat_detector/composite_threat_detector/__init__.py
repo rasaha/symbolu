@@ -1,54 +1,87 @@
-"""Composite-Threat Detector — advisory, escalate-only assembly detection.
+"""Composite Capability & Sequence-Risk Analyzer.
 
-A deterministic, dependency-light (Python stdlib only) evidence producer that
-watches a stream of *individually admissible* actions grouped by
-``correlation_id``, extracts the capability "fragments" each contributes, and
-reconstructs the composite offensive capability — the "story" — that a sequence
-of innocuous steps is quietly assembling. The canonical illustration (from the
-original prompt): a steel rod, a piston, and a trigger mechanism are each
-harmless to acquire, but assembled they are a firearm.
+ActionGate controls individual actions; this analyzer detects when individually
+acceptable actions collectively assemble a prohibited or high-risk capability.
 
-This is an **advisory** layer. Its strongest output is a recommendation to
-escalate a correlation to a human. It never admits, denies, or approves — it
-plugs into the Action Gate as behavioral evidence per
-``ACTION_GATE_SPECIFICATION.md`` §3/§12. See ``COMPOSITE_THREAT_DETECTION_SPEC.md``.
+The current implementation is:
+
+* deterministic (replayable from an event log; no wall-clock, randomness,
+  network, or LLM in the authoritative path);
+* recipe- and ontology-driven (versioned capability recipes + entity linkage);
+* advisory evidence-producing (emits ``OBSERVE`` / ``ESCALATE`` / ``UNAVAILABLE``
+  only — never ALLOW/DENY/AUTHORIZE/BLOCK/EXECUTE; an ActionGate/workflow policy
+  owns any binding consequence, see ``policy.py``);
+* limited to *encoded* capability patterns;
+* **not** a general intent-understanding system;
+* **not** a learned anomaly detector.
+
+The physical firearm example is retained only as a synthetic illustration. The
+product target is enterprise AI-agent and infrastructure workflows. See
+``COMPOSITE_THREAT_DETECTION_SPEC.md`` and
+``COMPOSITE_SEQUENCE_RISK_EVALUATION_PLAN.md``.
 
 Quickstart
 ----------
-    from composite_threat_detector import CompositeThreatMonitor, DIGITAL_ONTOLOGY
-    mon = CompositeThreatMonitor(DIGITAL_ONTOLOGY)
-    for action in action_stream:          # each already passed the per-action gate
-        for finding in mon.observe(action):
-            print(finding.signal, finding.story["headline"])
+    from composite_threat_detector import SequenceRiskAnalyzer, DIGITAL_ONTOLOGY
+    az = SequenceRiskAnalyzer(DIGITAL_ONTOLOGY)
+    for action in admitted_action_stream:   # each already cleared the per-action gate
+        for finding in az.observe(action):
+            print(finding.signal, finding.explanation)
 """
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
-from . import fragments, narrative, signals  # noqa: F401
-from .evidence import to_advisory_evidence
-from .model import Fragment, FragmentInstance, Ontology, Recipe
-from .monitor import CompositeThreatMonitor, Finding
-from .recipes import (
-    DIGITAL_ONTOLOGY,
-    ONTOLOGIES,
-    PHYSICAL_FIREARM_ONTOLOGY,
+from . import benign, completion, fragments, linkage, narrative, policy, signals  # noqa: F401
+from .analyzer import (
+    CompositeThreatMonitor,
+    Finding,
+    IngestResult,
+    RunReport,
+    SequenceRiskAnalyzer,
 )
-from .signals import ESCALATE, OBSERVE
+from .evidence import to_advisory_evidence
+from .ledger import StateLimits, TimescalePolicy
+from .linkage import (
+    BY_ACTOR,
+    BY_ACTOR_TARGET,
+    BY_CASE,
+    BY_CORRELATION,
+    BY_TARGET,
+    AssemblyKeySpec,
+)
+from .model import Fragment, FragmentInstance, Ontology, Recipe
+from .policy import PolicyBinding
+from .recipes import DIGITAL_ONTOLOGY, ONTOLOGIES, PHYSICAL_FIREARM_ONTOLOGY
+from .signals import ESCALATE, OBSERVE, UNAVAILABLE
 
 __all__ = [
+    "SequenceRiskAnalyzer",
     "CompositeThreatMonitor",
     "Finding",
+    "IngestResult",
+    "RunReport",
     "Fragment",
     "FragmentInstance",
     "Ontology",
     "Recipe",
+    "AssemblyKeySpec",
+    "BY_ACTOR",
+    "BY_CASE",
+    "BY_TARGET",
+    "BY_ACTOR_TARGET",
+    "BY_CORRELATION",
+    "TimescalePolicy",
+    "StateLimits",
+    "PolicyBinding",
     "DIGITAL_ONTOLOGY",
     "PHYSICAL_FIREARM_ONTOLOGY",
     "ONTOLOGIES",
     "to_advisory_evidence",
     "signals",
+    "policy",
     "OBSERVE",
     "ESCALATE",
+    "UNAVAILABLE",
 ]

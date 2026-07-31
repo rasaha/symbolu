@@ -1,67 +1,56 @@
-"""Deterministic reconstruction of the 'story' from matched fragments.
+"""Deterministic, concise finding text (§9).
 
-Given a recipe and the fragment instances observed for one correlation, build a
-stable, human-readable account: what capability is being assembled, which
-admissible steps contributed which part, and — the operationally useful bit —
-which part is still missing (the step to watch for next).
+No dramatic "crime story" prose. The explanation states, factually, which
+individually-admissible actions contributed which capability fragments, which are
+still missing, and why the threat interpretation dominates / is neutralized /
+remains ambiguous. Steps are ordered by their assembly position so the record
+reads in the order the assembly happened.
 """
 
 from __future__ import annotations
 
-from .model import FragmentInstance, Ontology, Recipe
+from .ledger import _LedgerInstance
+from .matcher import MatchResult
+from .model import Ontology
 
 
-def build_story(
-    ontology: Ontology,
-    recipe: Recipe,
-    instances: list[FragmentInstance],
-) -> dict:
-    """Return a structured, deterministic narrative for one recipe match.
-
-    ``instances`` is every fragment observed for the correlation (the caller need
-    not pre-filter); this function selects the ones relevant to ``recipe`` and
-    orders the reconstructed steps by their arrival ``position`` (then sequence
-    id), so the story reads in the order the assembly actually happened.
-    """
-    relevant_ids = recipe.required | recipe.optional
-    relevant = [i for i in instances if i.fragment_id in relevant_ids]
-    relevant.sort(key=lambda i: (i.position, i.sequence_id, i.fragment_id))
-
-    present = {i.fragment_id for i in relevant}
-    present_required = sorted(recipe.required & present)
-    missing_required = sorted(recipe.required - present)
-    present_optional = sorted(recipe.optional & present)
-
-    steps = [
-        {
-            "position": i.position,
-            "sequence_id": i.sequence_id,
-            "action_id": i.action_id,
-            "operation": i.operation,
-            "fragment_id": i.fragment_id,
-            "fragment_title": ontology.fragments[i.fragment_id].title,
-            "note": i.note,
-        }
-        for i in relevant
-    ]
-
-    headline = (
-        f"Correlation is assembling '{recipe.name}': {recipe.narrative}."
-        if not missing_required
-        else (
-            f"Correlation is partially assembling '{recipe.name}' "
-            f"({len(present_required)}/{len(recipe.required)} required parts). "
-            f"Still missing: {', '.join(missing_required)}."
-        )
-    )
-
+def _step(li: _LedgerInstance) -> dict:
+    inst = li.inst
     return {
-        "recipe_id": recipe.recipe_id,
-        "recipe_name": recipe.name,
-        "headline": headline,
-        "physical_analogue": recipe.physical_analogue,
-        "present_required": present_required,
-        "missing_required": missing_required,
-        "present_optional": present_optional,
-        "steps": steps,
+        "position": inst.position,
+        "sequence_id": inst.sequence_id,
+        "correlation_id": inst.correlation_id,
+        "event_id": inst.event_id,
+        "actor": inst.actor,
+        "operation": inst.operation,
+        "fragment_id": inst.fragment_id,
+        "note": inst.note,
+        "state": li.state,
     }
+
+
+def present_fragments(ontology: Ontology, result: MatchResult) -> list[dict]:
+    steps = []
+    for fid, li in result.contributing.items():
+        s = _step(li)
+        s["fragment_title"] = ontology.fragments[fid].title
+        steps.append(s)
+    steps.sort(key=lambda s: (s["position"], s["sequence_id"], s["fragment_id"]))
+    return steps
+
+
+def explanation(result: MatchResult, benign_status: str) -> str:
+    r = result.recipe
+    base = r.explanation_template or (
+        f"Linked actions have accumulated fragments of {r.name} ({r.ref}).")
+    if result.missing_required:
+        return (f"Partial assembly of {r.name} ({r.ref}): "
+                f"{len(result.present_required)}/{len(r.required)} required "
+                f"fragments present; missing {', '.join(result.missing_required)}.")
+    tail = {
+        "THREAT_DOMINATES": "No benign-context evidence neutralizes it.",
+        "AMBIGUOUS": "A benign context was asserted but is not fully supported; "
+                     "the threat interpretation is not neutralized.",
+        "NEUTRALIZED": "A valid, scope-matched approval qualifies the escalation.",
+    }.get(benign_status, "")
+    return f"{base} {tail}".strip()

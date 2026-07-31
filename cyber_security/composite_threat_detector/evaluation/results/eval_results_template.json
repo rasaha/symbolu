@@ -1,0 +1,26 @@
+{
+  "_comment": "Template for a real evaluation run. Populate only from an actual labeled corpus. Metrics without a corpus MUST remain 'NOT RUN'. Do not fabricate values.",
+  "corpus": {
+    "name": "NOT RUN",
+    "size": "NOT RUN",
+    "labeling": "NOT RUN"
+  },
+  "ontology": {
+    "id": "ctd.digital.actiongate",
+    "version": "NOT RUN"
+  },
+  "metrics": {
+    "true_positive_rate": "NOT RUN",
+    "false_escalation_rate": "NOT RUN",
+    "miss_rate": "NOT RUN",
+    "mean_events_before_escalation": "NOT RUN",
+    "escalation_lead_time_before_completion": "NOT RUN",
+    "cross_session_detection_rate": "NOT RUN",
+    "multi_actor_detection_rate": "NOT RUN",
+    "duplicate_sensitivity": "NOT RUN",
+    "state_memory_growth": "NOT RUN",
+    "runtime_per_event": "NOT RUN",
+    "determinism_across_repeated_runs": "NOT RUN",
+    "explanation_completeness": "NOT RUN"
+  }
+}
