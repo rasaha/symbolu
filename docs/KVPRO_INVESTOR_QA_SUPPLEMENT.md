@@ -1,138 +1,127 @@
-# KVPro — Investor Q&A Supplement (Blackwell/NVFP4 · Agentic)
+# KVPro — Investor Q&A Supplement (Blackwell/NVFP4 · Agentic · Memory Tiers)
 
-**Shareable / non-confidential.** Two additional anticipated-diligence questions, in the same voice as
-`KVPRO_INVESTOR_QA.md`: concede the real limit first, label every number **measured** or **modeled**,
-don't oversell. States results and positioning, not the method (proprietary / patent-pending — NDA).
+**Shareable / non-confidential.** This document describes measured outcomes, limitations, and product
+positioning only. Detailed implementation methods are proprietary, patent-pending, and disclosed only
+under NDA.
+
+Evidence labels used throughout (applied to every quantitative claim):
+**Measured — implementation** · **Measured — controlled benchmark** · **Measured — reuse primitive** ·
+**Modeled — capacity** · **Modeled — economics** · **Planned / integration in progress** ·
+**Unbenchmarked — native hardware**.
 
 ---
 
 ### Q10. "Doesn't Blackwell's native FP4 (NVFP4) just commoditize this — the hardware does 4-bit KV for free?"
 
-**Honest answer.** On the axis our buyers actually care about — **quality** — we tested this directly
-and the answer is **no**; on **speed**, we're honest that it's **open**. We emulated NVFP4's exact
-numerics (E2M1 elements + per-16-channel block scale + per-tensor FP32 scale) and measured perplexity,
-re-deriving our own int4-protected result (**+0.11%**) first as a control.
+**Honest answer.** On the axis our buyers care about — **quality** — we tested this directly; on
+**speed**, it remains open. We emulated NVFP4's numerics (E2M1 elements + per-16-channel block scale +
+per-tensor FP32 scale) and measured perplexity, re-deriving our own int4-protected result (**+0.11%**)
+first as a control. **[Measured — controlled benchmark]**
 
-- **On outlier-heavy models (Qwen2.5-7B), native NVFP4 does not hold — even with the same protection
-  mask bolted on.** It blows up to **+2,500% PPL at 4%** where int4-protected holds **+0.06–0.11%**. A
-  one-variable swap (per-channel int4 → per-block NVFP4 on the key path) reproduced the full collapse,
-  pinning the cause to NVFP4's **per-block scale**: our per-channel format is load-bearing, and
-  Blackwell's block format can't replicate it by adding protection. *(measured — quality)*
-- **On clean, QK-normalized models (Qwen3-8B), plain NVFP4 already holds (+0.98%) — no protection
-  needed.** There we add nothing. *(measured — quality)*
+- **On an outlier-heavy model (Qwen2.5-7B), native NVFP4 does not hold — even with the same protection
+  mask applied.** It reaches **+2,500% PPL at 4%** where int4-protected holds **+0.06–0.11%**. A
+  one-variable swap (per-channel int4 → per-block NVFP4 on the key path) reproduced the collapse. **The
+  controlled format swap strongly implicates the per-block scaling structure as the primary source of
+  the observed degradation in this test.** **[Measured — controlled benchmark]**
+- **On a clean, QK-normalized model (Qwen3-8B), plain NVFP4 already holds (+0.98%) — no protection
+  needed.** There we add nothing. **[Measured — controlled benchmark]**
 
-So the clean statement is: **where native FP4 works, you don't need us; where you need us, native FP4
-can't follow** — and the newest models increasingly split into "clean, so NVFP4 is fine" or
-"outlier-heavy, so you need per-channel protection." The quality moat survives the hardware.
+**The tested models illustrate two materially different regimes: models where native FP4 is already
+adequate, and models where finer-grained protection remains necessary.**
 
-**Caveats, stated plainly.** This is a **quality/PPL** result on a limited model set; NVFP4 was
-**emulated on A100** (it matches Blackwell's *numbers*, not its *silicon*); and NVFP4's **hardware
-speed on Blackwell we did not benchmark.** Blackwell is genuinely the right platform to fund a
-**fused-INT4 decode kernel** — that decode-speed opportunity is real but **unproven**, and Blackwell
-also speeds up the lossy FP4/FP8 alternatives, so on speed we make no claim yet.
-*(measured — quality; unbenchmarked — speed)*
+**These results indicate that native FP4 does not eliminate KVPro's quality advantage on the tested
+outlier-heavy model, although broader cross-model and native-Blackwell validation is still required.**
+
+**Conclusion.** Where native FP4 already preserves quality, KVPro may add little. Where block-scaled FP4
+fails on retrieval-critical behavior, the tested KVPro format retains a meaningful quality advantage.
+**Native Blackwell speed remains unmeasured.**
+
+**Evidence boundaries (explicit).**
+- NVFP4 numerics were **emulated on A100** (matches the numerical result, not the silicon).
+- **Native Blackwell silicon performance was not measured.** **[Unbenchmarked — native hardware]**
+- The current result is **quality evidence, not speed evidence.**
+- The **tested model set is limited** (two models, perplexity axis).
+- The **fused-INT4 decode opportunity remains unproven.** **[Planned / integration in progress]**
 
 ---
 
 ### Q11. "Are agentic workloads a good fit — or does the decode penalty kill it?"
 
-**Honest answer.** Agentic is one of our stronger wedges, and I'll say plainly which part is **shipped**
-and which is **in progress**. Three agent traits line up with our strengths:
+**Honest answer.** Agentic is one of our stronger wedges. Three agent traits line up with our strengths:
 
 1. **Context grows** — history, tool outputs, RAG, scratchpad — so KV memory becomes the binding limit
-   fast. Our **~1.8× density (measured)** fits roughly **2× more agents per GPU**.
-2. **Heavy shared prefixes** — the same system prompt + tool definitions repeat across thousands of
-   calls, one of the highest prefix-reuse patterns in production. Our snapshot/restore is **bit-exact
-   (measured)**, and reuse pays **50–86% lower time-to-first-token** and **1.2–1.85× throughput at high
-   hit rates (measured)**.
+   fast. Our compression yields **up to approximately 1.8× the KV-resident session capacity under
+   KV-memory-bound conditions**. **[Measured — controlled benchmark]** Realized *fleet* capacity is not
+   the same number — it also depends on **model weights, activations, scheduler behavior, batch size,
+   sequence-length distribution, and other GPU-memory consumers.**
+2. **Heavy shared prefixes** — the same system prompt + tool definitions repeat across many calls, one
+   of the highest prefix-reuse patterns in production. **In primitive-level reuse tests, snapshot/restore
+   reduced TTFT by 50–86% per cache hit and improved throughput by 1.2–1.85× at high hit rates; the
+   complete warm-tier serving integration is not yet shipped.** **[Measured — reuse primitive;
+   Planned / integration in progress]**
 3. **Quality-critical** — a cheap wrong token becomes a bad tool call or wrong branch that cascades. We
-   hold **near-full-precision quality (100% needle vs ~12% for FP8, measured)**.
+   hold near-full-precision quality (**100% needle vs ~12% for FP8, same benchmark**).
+   **[Measured — controlled benchmark]**
 
-**The honest caveat (don't imply the reuse win is turnkey).** The prefix-reuse payoff depends on
-**warm-tier serving that is not fully shipped** — the primitive is measured, the end-to-end serving
-integration is **in progress**. So *today* the reliable agentic win is **density + held quality**; the
-reuse-driven TTFT/throughput win is proven-in-primitive, not yet a one-switch serving feature.
+**The honest caveat.** The prefix-reuse payoff depends on **warm-tier serving that is not fully
+shipped** — the primitive is measured, the end-to-end serving integration is in progress. So *today* the
+reliable agentic win is **density + held quality**; the reuse-driven TTFT/throughput results are
+primitive-level, not production-serving.
 
-**And the trade-off still applies.** A **single latency-critical interactive agent** is slower on our
-path (**0.13–0.67× decode, measured**) and should stay on full precision. Long chain-of-thought steps
-are our least favorable case; short tool-call outputs are more favorable.
+**The trade-off applies.** A single latency-critical interactive agent is slower on our path
+(**0.13–0.67× of BF16, [Measured — controlled benchmark]**) and should stay on full precision. Long
+chain-of-thought steps are our least favorable case; short tool-call outputs are more favorable.
 
-**Net:** **net-helps a high-concurrency fleet of long-context, quality-sensitive agents** (density +
-quality now, prefix-reuse as warm-tier ships); **not a per-step speed tool for one interactive agent.**
-The routing rule is unchanged — capacity-bound, prefix-heavy, quality-sensitive agent traffic to KVPro;
-latency-critical single-stream to BF16. *(measured — density/quality/reuse-primitive; in progress —
-warm-tier serving)*
+**Net conclusion. KVPro is a capacity and fidelity tool for high-concurrency, long-context agent
+fleets — not a latency accelerator for a single interactive agent.** Routing rule: capacity-bound,
+prefix-heavy, quality-sensitive workloads → KVPro; latency-critical single-stream workloads → BF16.
 
 ---
 
 ### Q12. "Concretely, what does KVPro do at each memory tier — hot, warm, and cold?"
 
-**Honest answer.** It's **one** quality-safe ~1.8× compression plus **one** bit-exact snapshot/restore,
-applied at every tier — so the density win compounds down the stack and the *same* compressed bytes
-move losslessly between tiers.
+**Honest answer.** One quality-safe compression plus one snapshot/restore of the compressed
+representation, applied across tiers — so the density benefit compounds and the *same* compressed bytes
+move between tiers with no additional numerical change.
 
-- **🔥 Hot — GPU HBM (active decode).** Compress in-GPU KV to **~0.5× (≈1.8× net)** → **~2× concurrent
-  long-context sessions/GPU, ~44% fewer GPUs**, at **near-full-precision quality (100% needle vs ~12%
-  for FP8)**. This is the shipped, defensible core. The **honest cost lives here**: decode
-  **0.13–0.67× of BF16**, so latency-critical single-stream traffic stays on full precision.
-  *(measured)*
-- **♨️ Warm — CPU DRAM (reusable prefixes).** **~1.8× denser** reusable KV per GB *(modeled)* **and
-  byte-exact snapshot/restore** *(measured)* → lossless offload that **skips prefill recompute**; reuse
-  pays **50–86% lower time-to-first-token per hit** and **1.2–1.85× throughput at high hit rates**
-  *(measured)*. **Caveat:** the primitive is measured, but the **end-to-end warm-tier serving is in
-  progress** — the turnkey reuse feature is not yet shipped.
-- **🧊 Cold — NVMe/NAND flash (cross-session, archival).** **~1.8× less flash (−44%)** for the same
-  working set *(modeled)*; **byte-faithful**, so cross-session restore adds **zero extra quality loss**;
-  **endurance-safe** because reuse is write-once-read-many (shared prefixes read across many requests),
-  **not** hot per-request churn. An optional NAND density-tiering adds only **~1.14× (hardware-capped)**
-  — disclosed, not relied upon.
+- **🔥 Hot — GPU HBM (active decode).** Compress in-GPU KV to ~0.5× (**up to approximately 1.8×
+  KV-resident session capacity under KV-bound conditions** **[Measured — controlled benchmark]**),
+  implying **a modeled reduction of up to approximately 44% in GPU count for the same KV-capacity target,
+  before accounting for compute, throughput, scheduling, and operational constraints**
+  **[Modeled — capacity assumption]**, at near-full-precision quality (100% needle vs ~12% for FP8,
+  **[Measured — controlled benchmark]**). **The honest cost lives here:** decode **0.13–0.67× of BF16**
+  **[Measured — controlled benchmark]**, so latency-critical single-stream traffic stays on full
+  precision. **The implemented and measured core is hot-tier KV capacity plus held quality.**
+- **♨️ Warm — CPU DRAM (reusable prefixes).** Denser reusable KV per GB **[Modeled — capacity]** plus
+  **byte-exact snapshot and restore of the compressed KV representation** **[Measured — reuse
+  primitive]** — i.e. **lossless transfer and restoration of the already-compressed representation**.
+  This means: **no additional numerical change beyond the existing compressed representation during
+  snapshot, storage, and restore** — it does **not** mean the compressed representation is mathematically
+  identical to the original BF16 KV cache. Reuse tests show **50–86% lower TTFT per hit and 1.2–1.85×
+  throughput at high hit rates** **[Measured — reuse primitive]**. **The complete warm-tier serving
+  integration is in progress** **[Planned / integration in progress]** — these are primitive-level reuse
+  results, not production-serving results.
+- **🧊 Cold — NVMe/NAND flash (cross-session, archival).** **~1.8× lower storage requirement for the
+  same compressed working set** **[Modeled — capacity]**; storage and restore introduce **no additional
+  numerical change beyond the existing compressed representation during byte-faithful storage and
+  restore** **[Measured — reuse primitive]**. This reuse pattern is **better suited to
+  write-once/read-many reuse than per-token churn, which may reduce endurance pressure; validation on the
+  target NAND media is still required.**
 
-| Tier | Component | KVPro benefit | Basis |
+| Tier | Component | KVPro benefit | Evidence basis |
 |---|---|---|---|
-| **Hot** | GPU HBM | ~2× users/GPU, ~44% fewer GPUs, quality held | **measured** (cost: 0.13–0.67× decode) |
-| **Warm** | CPU DRAM | ~1.8× denser + lossless reuse → −50–86% TTFT, 1.2–1.85× throughput | modeled capacity + **measured** reuse (serving **in progress**) |
-| **Cold** | NVMe / NAND | ~1.8× less flash, byte-faithful cross-session, endurance-safe | **modeled** (+ measured snapshot primitive) |
+| **Hot** | GPU HBM | ~1.8× KV-resident capacity under KV-bound conditions; quality held | Measured — controlled benchmark; decode cost 0.13–0.67× BF16 |
+| **Warm** | CPU DRAM | Denser reusable KV plus byte-exact restoration of compressed representation | Modeled — capacity; Measured — reuse primitive; serving integration in progress |
+| **Cold** | NVMe / NAND | ~1.8× lower storage requirement for the same compressed working set | Modeled — capacity; measured snapshot primitive |
 
-**Through-line:** the shipped, defensible core is **hot-tier capacity + held quality**; warm and cold
-are **compounding upside**, with warm-tier serving honestly flagged as still being built.
-
----
-
-### Q13. "Could KVPro become a pricing/tiering lever — the way providers price context size today?" *(hypothesis — not validated)*
-
-**Honest answer.** In principle **yes** — KVPro turns *KV fidelity* into a runtime **dial**, and a dial
-you can turn per request is exactly what lets you build plan tiers. But the credible version is
-**capacity/latency tiering, not a "buy more quality" ladder**, and this is a **business hypothesis we
-have not tested** — labeled as such.
-
-The subtlety: KVPro's value is that **quality is held**, so a quality staircase is weak (the standard
-tier is already ~parity). The dial really buys **density (cost)** and, separately, **decode speed**. So
-the honest tiers are:
-
-- **Cheaper / longer context.** ~1.8× more long-context sessions per GPU at held quality → a
-  lower-priced long-context plan, or more context at the same price, than a BF16-only competitor. The
-  customer sees "cheaper 128K," not a percentage.
-- **Capacity tier vs latency tier (the strongest split).** A **bulk/high-concurrency** plan on KVPro
-  (cheaper; agents/RAG/batch; slightly slower per token) vs a **realtime** plan on full BF16 (pricier;
-  fastest) — exactly KVPro's own routing model, turned into two SKUs.
-- **Premium "guaranteed full-fidelity" tier.** BF16 as the reassurance upsell for regulated /
-  quality-critical buyers (legal, health, finance) who want contractual bit-exactness; KVPro is the
-  cost-efficient default.
-
-The **compression percentage belongs as the provider's *internal* dial, not a customer-facing number** —
-customers buy "cheaper / longer / faster / guaranteed," not "4% protected."
-
-**Honest caveats.** Unproven that buyers prefer a capacity tier over simply demanding the cheapest
-full-quality option; **quality-tiering by degradation is hard to sell and to trust** (which is why we
-frame it as capacity/latency, where quality stays put); the **decode penalty makes it a capacity play,
-not a speed tier**; and **how many genuinely distinct, sellable tiers exist is an empirical question** —
-answered by the density-vs-quality experiment (`KVPRO_MIXED_PRECISION_SCENARIO_TEST_PLAN.md`): each
-setting that passes the quality bar at a different density is one honest price point. **Measure first,
-then price.** *(hypothesis — not validated)*
+**Through-line. The implemented and measured core is hot-tier capacity plus held quality. Warm- and
+cold-tier reuse are compounding upside, with complete warm-tier serving still in progress.**
 
 ---
 
 *Companion to `KVPRO_INVESTOR_QA.md`. Quality figures are perplexity/needle on standard open models;
-NVFP4 emulated numerically (matches Blackwell's result, not its silicon). "In progress" items are not
-presented as shipped. Method is proprietary / patent-pending — NDA only. Not a forward-looking
-guarantee.*
+NVFP4 was emulated numerically on A100 (matches the numerical result, not the silicon), and native
+Blackwell performance was not measured. "Planned / integration in progress" items are not presented as
+shipped. This document describes measured outcomes, limitations, and product positioning only; detailed
+implementation methods are proprietary, patent-pending, and disclosed only under NDA. Not a
+forward-looking guarantee.*
