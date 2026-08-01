@@ -1,0 +1,46 @@
+# Independent distribution for the canonical StoryGraph capability.
+#
+# This is the ONE canonical source tree for StoryGraph — there is no symlink and
+# no second copy. The legacy import path ``composite_threat_detector`` is served
+# by an explicit, logic-free compatibility redirect that re-exports this package
+# (see src/ugence_storygraph/_compat and MIGRATION.md); it is NOT packaged here.
+#
+# Build:    python -m build packages/capabilities/storygraph
+# Verify:   python packages/capabilities/storygraph/verify_storygraph_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-storygraph"
+dynamic = ["version"]
+description = "Ugence StoryGraph — advisory sequence-risk analyzer (deterministic, policy-as-code, evidence-producing)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "sequence-risk", "advisory", "storygraph", "ugence"]
+# StoryGraph depends ONLY on the Python standard library. No third-party runtime
+# dependency, and — by policy — no other Ugence capability package.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+ugence-storygraph = "ugence_storygraph.cli:main"
+
+[project.urls]
+Documentation = "https://code.claude.com/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_storygraph.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_storygraph*"]
+
+[tool.setuptools.package-data]
+"ugence_storygraph.policypack" = ["schemas/*.json", "fixtures/*.json"]
+"ugence_storygraph.replay_intake" = ["*.json", "*.md"]
+"ugence_storygraph.evaluation" = ["fixtures/*.jsonl"]
