@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_consequence_policy.schema.json",
+  "title": "ActionGate Package Artifact 5 — Consequence Policy",
+  "description": "Allow, request evidence, review, hold or deny — expressed as explicit non-compensatory conditions with obligations and structured overrides (template §8, §11, §12, §14).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision_conditions", "consequences"],
+  "properties": {
+    "decision_conditions": { "$ref": "actiongate_policy.schema.json#/$defs/decision_conditions" },
+    "consequences": { "$ref": "actiongate_policy.schema.json#/$defs/consequences" },
+    "obligations": {
+      "type": "array",
+      "items": { "$ref": "actiongate_policy.schema.json#/$defs/obligation" }
+    },
+    "override": { "$ref": "actiongate_policy.schema.json#/$defs/override" }
+  }
+}

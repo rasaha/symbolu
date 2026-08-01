@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_audit_reconciliation_policy.schema.json",
+  "title": "ActionGate Package Artifact 7 — Audit and Reconciliation Policy",
+  "description": "What must be recorded and verified afterward, plus ownership/governance and pre-activation validation (template §15, §16, §17).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["audit", "governance", "validation"],
+  "properties": {
+    "audit": { "$ref": "actiongate_policy.schema.json#/$defs/audit" },
+    "governance": { "$ref": "actiongate_policy.schema.json#/$defs/governance" },
+    "validation": { "$ref": "actiongate_policy.schema.json#/$defs/validation" }
+  }
+}

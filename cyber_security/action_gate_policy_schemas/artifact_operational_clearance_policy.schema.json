@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_operational_clearance_policy.schema.json",
+  "title": "ActionGate Package Artifact 6 — Operational Clearance Policy",
+  "description": "Whether it is safe to execute NOW (template §10) plus the explicit behavior on every dependency failure (template §13). A missing required control is never permission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operational_clearance", "failure_behavior"],
+  "properties": {
+    "operational_clearance": { "$ref": "actiongate_policy.schema.json#/$defs/operational_clearance" },
+    "failure_behavior": { "$ref": "actiongate_policy.schema.json#/$defs/failure_behavior" }
+  }
+}

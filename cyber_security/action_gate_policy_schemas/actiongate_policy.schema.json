@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/actiongate_policy.schema.json",
+  "title": "ActionGate Business Rule",
+  "description": "Action-centered, executable business rule for the ActionGate pre-commit admissibility gate. A vague objective ('prevent risky production changes') is not executable; this schema forces a rule to answer WHO proposes WHAT action, on WHICH resource, under WHAT authority and evidence, in WHAT context, with WHAT operational conditions, and WHAT happens when any requirement is missing. Advisory StoryGraph findings and consequence decisions map to the deterministic ACTION_GATE_SPECIFICATION.md outcomes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_identity", "business_objective", "scope", "canonical_action",
+    "authority", "required_evidence", "scope_matching", "decision_conditions",
+    "consequences", "failure_behavior", "audit", "governance"
+  ],
+  "properties": {
+    "policy_identity": { "$ref": "#/$defs/policy_identity" },
+    "business_objective": { "$ref": "#/$defs/business_objective" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "canonical_action": { "$ref": "#/$defs/canonical_action" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "required_evidence": {
+      "type": "array", "minItems": 0,
+      "items": { "$ref": "#/$defs/evidence_requirement" }
+    },
+    "scope_matching": { "$ref": "#/$defs/scope_matching" },
+    "decision_conditions": { "$ref": "#/$defs/decision_conditions" },
+    "sequence_context": { "$ref": "#/$defs/sequence_context" },
+    "operational_clearance": { "$ref": "#/$defs/operational_clearance" },
+    "consequences": { "$ref": "#/$defs/consequences" },
+    "obligations": {
+      "type": "array", "items": { "$ref": "#/$defs/obligation" }
+    },
+    "failure_behavior": { "$ref": "#/$defs/failure_behavior" },
+    "override": { "$ref": "#/$defs/override" },
+    "audit": { "$ref": "#/$defs/audit" },
+    "governance": { "$ref": "#/$defs/governance" },
+    "validation": { "$ref": "#/$defs/validation" }
+  },
+
+  "$defs": {
+    "field_requirement": {
+      "description": "A required field marker or a concrete value.",
+      "type": ["string", "number", "boolean"]
+    },
+    "consequence_decision": {
+      "description": "ActionGate consequence vocabulary. The first six map 1:1 to the deterministic ACTION_GATE_SPECIFICATION.md outcomes; the ALLOW_WITH_OBLIGATIONS / REQUIRE_HUMAN_REVIEW / HOLD_FOR_REVIEW aliases are the business-facing names.",
+      "type": "string",
+      "enum": [
+        "ALLOW",
+        "ALLOW_WITH_CONSTRAINTS",
+        "ALLOW_WITH_OBLIGATIONS",
+        "REQUIRE_ADDITIONAL_EVIDENCE",
+        "REQUEST_MORE_EVIDENCE",
+        "REQUIRE_HUMAN_REVIEW",
+        "ESCALATE_TO_HUMAN",
+        "HOLD_FOR_REVIEW",
+        "SIMULATE_AND_RETRY",
+        "DENY",
+        "UNAVAILABLE",
+        "REEVALUATE",
+        "OBSERVE"
+      ]
+    },
+    "absence_behavior": {
+      "description": "What a missing/unverifiable requirement means. Never 'ALLOW' for a required control.",
+      "type": "string",
+      "enum": ["DENY", "HOLD_FOR_REVIEW", "REQUIRE_ADDITIONAL_EVIDENCE", "UNAVAILABLE", "OBSERVE"]
+    },
+    "condition_state": {
+      "type": "string",
+      "enum": ["SATISFIED", "FAILED", "UNKNOWN", "NOT_EVALUABLE", "AMBIGUOUS"]
+    },
+
+    "policy_identity": {
+      "$comment": "Template §1",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_name", "policy_version", "policy_domain", "status"],
+      "properties": {
+        "policy_id": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+        "policy_name": { "type": "string", "minLength": 1 },
+        "policy_domain": { "type": "string", "minLength": 1 },
+        "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "status": { "type": "string", "enum": ["draft", "shadow", "enforced", "retired"] },
+        "effective_date": { "type": "string" },
+        "expiry_date": { "type": ["string", "null"] }
+      }
+    },
+
+    "business_objective": {
+      "$comment": "Template §2 — understandable to business, risk and audit teams.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prevent"],
+      "properties": {
+        "prevent": { "type": "string", "minLength": 1 },
+        "protect": { "type": "array", "items": { "type": "string" } },
+        "rationale": { "type": "string" }
+      }
+    },
+
+    "scope": {
+      "$comment": "Template §3 — a policy MUST NOT silently apply outside its declared scope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_types"],
+      "properties": {
+        "tenants": { "type": "array", "items": { "type": "string" } },
+        "environments": { "type": "array", "items": { "type": "string" } },
+        "business_units": { "type": "array", "items": { "type": "string" } },
+        "applications": { "type": "array", "items": { "type": "string" } },
+        "geographies": { "type": "array", "items": { "type": "string" } },
+        "risk_tiers": { "type": "array", "items": { "type": "string" } },
+        "action_types": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resource_type": { "type": "string" },
+            "classification": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+
+    "canonical_action": {
+      "$comment": "Template §4 — bind the decision to the exact immutable action identity. A materially changed action requires a new evaluation. Fields mirror the ACTION_GATE_SPECIFICATION.md Canonical Action Envelope + the ACTION_CANONICALIZATION_AND_HASHING_SPEC payload_digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "actor_id", "resource_id", "environment", "tenant_id", "payload_digest"],
+      "properties": {
+        "operation": { "type": "string" },
+        "actor_id": { "$ref": "#/$defs/field_requirement" },
+        "acting_role": { "$ref": "#/$defs/field_requirement" },
+        "resource_id": { "$ref": "#/$defs/field_requirement" },
+        "resource_type": { "type": "string" },
+        "destination": { "$ref": "#/$defs/field_requirement" },
+        "amount": { "$ref": "#/$defs/field_requirement" },
+        "quantity": { "$ref": "#/$defs/field_requirement" },
+        "environment": { "type": "string" },
+        "tenant_id": { "$ref": "#/$defs/field_requirement" },
+        "requested_at": { "$ref": "#/$defs/field_requirement" },
+        "justification": { "$ref": "#/$defs/field_requirement" },
+        "payload_digest": { "$ref": "#/$defs/field_requirement" },
+        "cer_id": {
+          "description": "Canonical Execution Request id (immutable action identity).",
+          "$ref": "#/$defs/field_requirement"
+        }
+      }
+    },
+
+    "role_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": { "type": "string" },
+        "authority_source": { "type": "string" },
+        "max_approval_limit": { "type": ["number", "string"] }
+      }
+    },
+
+    "authority": {
+      "$comment": "Template §5 — identity is not authority. A known employee may still lack authority for the exact action.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permitted_proposers", "required_approvers", "minimum_approvals", "segregation_of_duties"],
+      "properties": {
+        "permitted_proposers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/role_requirement" } },
+        "required_approvers": { "type": "array", "items": { "$ref": "#/$defs/role_requirement" } },
+        "minimum_approvals": { "type": "integer", "minimum": 0 },
+        "prohibited_role_combinations": {
+          "type": "array", "items": { "type": "array", "items": { "type": "string" } }
+        },
+        "segregation_of_duties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "proposer_cannot_approve": { "type": "boolean" },
+            "approver_cannot_execute": { "type": "boolean" },
+            "proposer_cannot_execute": { "type": "boolean" }
+          }
+        },
+        "delegated_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": { "type": "boolean" },
+            "must_be_active": { "type": "boolean" },
+            "must_cover_action_type": { "type": "boolean" },
+            "must_cover_resource": { "type": "boolean" }
+          }
+        },
+        "temporary_elevated_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": { "type": "boolean" },
+            "must_be_time_boxed": { "type": "boolean" },
+            "must_reference_ticket": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "evidence_requirement": {
+      "$comment": "Template §6 — self-declared justification never substitutes for independently verifiable evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_type", "trusted_source", "absence_behavior"],
+      "properties": {
+        "evidence_type": { "type": "string" },
+        "trusted_source": { "type": "string" },
+        "required_fields": { "type": "array", "items": { "type": "string" } },
+        "scope_fields": { "type": "array", "items": { "type": "string" } },
+        "maximum_age": { "type": "string" },
+        "signature_required": { "type": "boolean" },
+        "digest_required": { "type": "boolean" },
+        "must_not_be_revoked": { "type": "boolean" },
+        "absence_behavior": { "$ref": "#/$defs/absence_behavior" }
+      }
+    },
+
+    "scope_matching": {
+      "$comment": "Template §7 — a general approval does not cover unrelated actions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["must_match"],
+      "properties": {
+        "must_match": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "parameter_limits": {
+          "type": "object",
+          "properties": {
+            "maximum_resources_per_action": { "type": "integer", "minimum": 1 },
+            "maximum_amount": { "type": ["number", "string"] }
+          }
+        },
+        "destination_constraints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "permitted_destinations": { "type": "array", "items": { "type": "string" } },
+            "prohibited_destinations": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+
+    "decision_conditions": {
+      "$comment": "Template §8 — explicit conditions, not one blended score. All mandatory conditions must be positively satisfied; a failed mandatory condition cannot be offset by optional evidence; UNKNOWN/NOT_EVALUABLE handled explicitly; hard prohibitions remain binding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "prohibited"],
+      "properties": {
+        "required": { "type": "array", "items": { "type": "string" } },
+        "prohibited": { "type": "array", "items": { "type": "string" } },
+        "unknown_condition_behavior": { "$ref": "#/$defs/absence_behavior" },
+        "non_compensatory": {
+          "type": "boolean",
+          "description": "A failed mandatory condition cannot be bought back by optional evidence. Default true."
+        }
+      }
+    },
+
+    "sequence_context": {
+      "$comment": "Template §9 — StoryGraph remains evidence to policy; it does not independently authorize or deny.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "consult_storygraph": { "type": "array", "items": { "type": "string" } },
+        "completing_action_behavior": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "WOULD_COMPLETE_PROHIBITED_CAPABILITY": {
+              "type": "object",
+              "required": ["consequence"],
+              "properties": { "consequence": { "$ref": "#/$defs/consequence_decision" } }
+            }
+          }
+        },
+        "partial_story_behavior": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "weak_evidence": { "$ref": "#/$defs/consequence_decision" },
+            "discriminating_evidence": { "$ref": "#/$defs/consequence_decision" },
+            "additional_context_required": { "$ref": "#/$defs/consequence_decision" }
+          }
+        }
+      }
+    },
+
+    "operational_clearance": {
+      "$comment": "Template §10 — the ACP / live-state clearance layer. Authorization does not mean the action is safe to execute now.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_checks", "stale_after", "recheck_at_commit"],
+      "properties": {
+        "required_checks": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "stale_after": { "type": "string" },
+        "recheck_at_commit": { "type": "boolean" }
+      }
+    },
+
+    "consequences": {
+      "$comment": "Template §11 — exactly what ActionGate returns per situation. The org declares which decisions are binding vs shadow-mode projections.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all_requirements_satisfied", "hard_prohibition", "control_unavailable"],
+      "properties": {
+        "all_requirements_satisfied": { "$ref": "#/$defs/consequence_map" },
+        "evidence_missing": { "$ref": "#/$defs/consequence_map" },
+        "approval_scope_mismatch": { "$ref": "#/$defs/consequence_map" },
+        "hard_prohibition": { "$ref": "#/$defs/consequence_map" },
+        "control_unavailable": { "$ref": "#/$defs/consequence_map" },
+        "binding_decisions": { "type": "array", "items": { "$ref": "#/$defs/consequence_decision" } },
+        "shadow_only_decisions": { "type": "array", "items": { "$ref": "#/$defs/consequence_decision" } }
+      }
+    },
+
+    "consequence_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision"],
+      "properties": {
+        "decision": { "$ref": "#/$defs/consequence_decision" },
+        "reason_code": { "type": "string" }
+      }
+    },
+
+    "obligation": {
+      "$comment": "Template §12 — an action may proceed only with additional obligations.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "expire_credential_after": { "type": "string" },
+            "notify": { "type": "string" },
+            "snapshot": { "type": "boolean" },
+            "reconcile_expected_and_actual_result": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+
+    "failure_behavior": {
+      "$comment": "Template §13 — a missing required control can NEVER be interpreted as permission.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["audit_store_unavailable"],
+      "properties": {
+        "identity_provider_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "approval_provider_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "evidence_provider_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "storygraph_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "operational_clearance_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "audit_store_unavailable": { "$ref": "#/$defs/consequence_decision" },
+        "stale_evaluation": { "$ref": "#/$defs/consequence_decision" }
+      }
+    },
+
+    "override": {
+      "$comment": "Template §14 — structured, limited, auditable. Some controls are explicitly non-overridable.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permitted"],
+      "properties": {
+        "permitted": { "type": "boolean" },
+        "permitted_roles": { "type": "array", "items": { "type": "string" } },
+        "required_reason": { "type": "boolean" },
+        "maximum_duration": { "type": "string" },
+        "second_approver_required": { "type": "boolean" },
+        "post_event_review_required": { "type": "boolean" },
+        "cannot_override": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "audit": {
+      "$comment": "Template §15 — full reconstruction: what was proposed, what evidence existed, which policy version, who approved, why, what executed, whether execution matched authorization.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "tamper_evident", "tenant_scoped", "retention", "reconstruction_required"],
+      "properties": {
+        "record": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "tamper_evident": { "type": "boolean" },
+        "tenant_scoped": { "type": "boolean" },
+        "retention": { "type": "string" },
+        "reconstruction_required": { "type": "boolean" }
+      }
+    },
+
+    "governance": {
+      "$comment": "Template §16 — an AI-generated policy must not publish itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["business_owner", "control_owner", "technical_owner", "required_approvers", "review_frequency"],
+      "properties": {
+        "business_owner": { "type": "string" },
+        "control_owner": { "type": "string" },
+        "technical_owner": { "type": "string" },
+        "required_approvers": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "review_frequency": { "type": "string" },
+        "next_review_date": { "type": "string" },
+        "rollback_version": { "type": ["string", "null"] },
+        "authored_by": { "type": "string" },
+        "human_publication_required": { "type": "boolean" }
+      }
+    },
+
+    "validation": {
+      "$comment": "Template §17 — required scenarios + staged activation before enforcement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_scenarios", "deployment_sequence"],
+      "properties": {
+        "required_scenarios": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "deployment_sequence": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["draft", "synthetic_test", "historical_replay", "shadow_mode", "limited_enforcement", "enforced"]
+          }
+        },
+        "acceptance_metrics": {
+          "type": "object",
+          "additionalProperties": { "type": ["number", "string"] }
+        }
+      }
+    }
+  }
+}

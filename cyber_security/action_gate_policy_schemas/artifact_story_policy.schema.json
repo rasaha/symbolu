@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_story_policy.schema.json",
+  "title": "ActionGate Package Artifact 4 — Story Policy",
+  "description": "What prior events alter the meaning of the action (template §9). Consults the composite_threat_detector StoryGraph layer; StoryGraph is evidence to policy, never an authorizer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sequence_context"],
+  "properties": {
+    "sequence_context": { "$ref": "actiongate_policy.schema.json#/$defs/sequence_context" }
+  }
+}

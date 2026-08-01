@@ -1,0 +1,231 @@
+{
+  "policy_identity": {
+    "policy_id": "PROD_DATABASE_DELETE",
+    "policy_name": "Production database deletion control",
+    "policy_domain": "infrastructure",
+    "policy_version": "1.0.0",
+    "status": "shadow",
+    "effective_date": "2026-08-01",
+    "expiry_date": null
+  },
+  "business_objective": {
+    "prevent": "unauthorized or accidental deletion of production databases",
+    "protect": ["customer data", "service availability", "regulatory records"],
+    "rationale": "Production database deletion is irreversible and can breach regulatory retention obligations."
+  },
+  "scope": {
+    "tenants": ["enterprise-a"],
+    "environments": ["production"],
+    "business_units": ["digital-banking"],
+    "applications": ["payments-platform"],
+    "risk_tiers": ["tier-0"],
+    "action_types": ["DATABASE_DELETE"],
+    "resources": {
+      "resource_type": "database",
+      "classification": ["critical", "regulated"]
+    }
+  },
+  "canonical_action": {
+    "operation": "DATABASE_DELETE",
+    "actor_id": "required",
+    "acting_role": "required",
+    "resource_id": "required",
+    "resource_type": "database",
+    "environment": "production",
+    "tenant_id": "required",
+    "requested_at": "required",
+    "justification": "required",
+    "payload_digest": "required",
+    "cer_id": "required"
+  },
+  "authority": {
+    "permitted_proposers": [{ "role": "database-operator" }],
+    "required_approvers": [
+      { "role": "application-owner" },
+      { "role": "production-risk-approver" }
+    ],
+    "minimum_approvals": 2,
+    "prohibited_role_combinations": [["database-operator", "production-risk-approver"]],
+    "segregation_of_duties": {
+      "proposer_cannot_approve": true,
+      "approver_cannot_execute": true
+    },
+    "delegated_authority": {
+      "allowed": true,
+      "must_be_active": true,
+      "must_cover_action_type": true,
+      "must_cover_resource": true
+    },
+    "temporary_elevated_access": {
+      "allowed": true,
+      "must_be_time_boxed": true,
+      "must_reference_ticket": true
+    }
+  },
+  "required_evidence": [
+    {
+      "evidence_type": "change_ticket",
+      "trusted_source": "service-management-system",
+      "required_fields": ["ticket_id", "approved_scope", "maintenance_window", "approver_ids"],
+      "signature_required": true,
+      "must_not_be_revoked": true,
+      "absence_behavior": "HOLD_FOR_REVIEW"
+    },
+    {
+      "evidence_type": "backup_verification",
+      "trusted_source": "backup-platform",
+      "maximum_age": "24h",
+      "digest_required": true,
+      "absence_behavior": "DENY"
+    },
+    {
+      "evidence_type": "impact_assessment",
+      "trusted_source": "risk-management-system",
+      "absence_behavior": "REQUIRE_ADDITIONAL_EVIDENCE"
+    }
+  ],
+  "scope_matching": {
+    "must_match": ["tenant_id", "actor_id", "resource_id", "operation", "environment", "maintenance_window"],
+    "parameter_limits": { "maximum_resources_per_action": 1 },
+    "destination_constraints": { "permitted_destinations": [] }
+  },
+  "decision_conditions": {
+    "required": [
+      "actor_identity_verified",
+      "actor_authority_valid",
+      "required_approvals_present",
+      "segregation_of_duties_satisfied",
+      "change_ticket_scope_matches",
+      "backup_verified",
+      "maintenance_window_active",
+      "operational_clearance_passed"
+    ],
+    "prohibited": [
+      "legal_hold_active",
+      "unresolved_incident_on_resource",
+      "approval_revoked",
+      "payload_changed_after_approval"
+    ],
+    "unknown_condition_behavior": "HOLD_FOR_REVIEW",
+    "non_compensatory": true
+  },
+  "sequence_context": {
+    "enabled": true,
+    "consult_storygraph": [
+      "unauthorized-production-destruction",
+      "privilege-escalation-and-data-removal"
+    ],
+    "completing_action_behavior": {
+      "WOULD_COMPLETE_PROHIBITED_CAPABILITY": { "consequence": "HOLD_FOR_REVIEW" }
+    },
+    "partial_story_behavior": {
+      "weak_evidence": "OBSERVE",
+      "discriminating_evidence": "REQUIRE_HUMAN_REVIEW",
+      "additional_context_required": "REQUIRE_ADDITIONAL_EVIDENCE"
+    }
+  },
+  "operational_clearance": {
+    "required_checks": [
+      "resource_exists",
+      "resource_state_matches_evaluation",
+      "no_active_incident",
+      "backup_available",
+      "dependency_health_acceptable",
+      "execution_window_open"
+    ],
+    "stale_after": "5m",
+    "recheck_at_commit": true
+  },
+  "consequences": {
+    "all_requirements_satisfied": { "decision": "ALLOW_WITH_OBLIGATIONS" },
+    "evidence_missing": { "decision": "REQUIRE_ADDITIONAL_EVIDENCE" },
+    "approval_scope_mismatch": { "decision": "HOLD_FOR_REVIEW" },
+    "hard_prohibition": { "decision": "DENY" },
+    "control_unavailable": { "decision": "UNAVAILABLE" },
+    "binding_decisions": ["DENY", "HOLD_FOR_REVIEW"],
+    "shadow_only_decisions": ["ALLOW_WITH_OBLIGATIONS", "REQUIRE_ADDITIONAL_EVIDENCE"]
+  },
+  "obligations": [
+    "create_pre_execution_snapshot",
+    "issue_single_use_credential",
+    "restrict_credential_to_resource",
+    { "expire_credential_after": "10m" },
+    "record_execution_receipt",
+    { "reconcile_expected_and_actual_result": true }
+  ],
+  "failure_behavior": {
+    "identity_provider_unavailable": "HOLD_FOR_REVIEW",
+    "approval_provider_unavailable": "REQUIRE_ADDITIONAL_EVIDENCE",
+    "evidence_provider_unavailable": "REQUIRE_ADDITIONAL_EVIDENCE",
+    "storygraph_unavailable": "OBSERVE",
+    "operational_clearance_unavailable": "UNAVAILABLE",
+    "audit_store_unavailable": "DENY",
+    "stale_evaluation": "REEVALUATE"
+  },
+  "override": {
+    "permitted": true,
+    "permitted_roles": ["chief-operations-officer", "incident-commander"],
+    "required_reason": true,
+    "maximum_duration": "2h",
+    "second_approver_required": true,
+    "post_event_review_required": true,
+    "cannot_override": ["legal_hold", "tenant_boundary_violation", "prohibited_data_destination"]
+  },
+  "audit": {
+    "record": [
+      "proposal",
+      "normalized_action",
+      "evidence_snapshot",
+      "authority_evaluation",
+      "storygraph_result",
+      "policy_result",
+      "operational_clearance",
+      "issued_credential",
+      "execution_receipt",
+      "reconciliation_result"
+    ],
+    "tamper_evident": true,
+    "tenant_scoped": true,
+    "retention": "7y",
+    "reconstruction_required": true
+  },
+  "governance": {
+    "business_owner": "infrastructure-operations",
+    "control_owner": "enterprise-risk",
+    "technical_owner": "platform-engineering",
+    "required_approvers": ["security", "compliance", "application-owner"],
+    "review_frequency": "quarterly",
+    "next_review_date": "2026-11-01",
+    "rollback_version": null,
+    "authored_by": "policy-authoring-assistant",
+    "human_publication_required": true
+  },
+  "validation": {
+    "required_scenarios": [
+      "valid_authorized_action",
+      "unauthorized_actor",
+      "expired_approval",
+      "wrong_resource",
+      "stale_evaluation",
+      "provider_unavailable",
+      "legitimate_lookalike",
+      "prohibited_sequence_completion",
+      "duplicate_request",
+      "payload_changed_after_approval"
+    ],
+    "deployment_sequence": [
+      "draft",
+      "synthetic_test",
+      "historical_replay",
+      "shadow_mode",
+      "limited_enforcement",
+      "enforced"
+    ],
+    "acceptance_metrics": {
+      "max_false_hold_rate": 0.05,
+      "min_unauthorized_action_detection": 0.99,
+      "max_stale_evaluation_rate": 0.02,
+      "min_reconstruction_success": 1.0
+    }
+  }
+}

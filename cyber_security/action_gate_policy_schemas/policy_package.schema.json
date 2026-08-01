@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/policy_package.schema.json",
+  "title": "ActionGate Policy Package (seven linked artifacts)",
+  "description": "A complete enterprise ActionGate policy as seven linked artifacts. The single flat business rule (actiongate_policy.schema.json) is the authoring form; this package is the deployable projection consumed by the gate's evidence producers, deterministic evaluator, live-state clearance layer, and audit store.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "canonical_action_schema",
+    "authority_policy",
+    "evidence_policy",
+    "story_policy",
+    "consequence_policy",
+    "operational_clearance_policy",
+    "audit_reconciliation_policy"
+  ],
+  "properties": {
+    "canonical_action_schema": { "$ref": "artifact_canonical_action.schema.json" },
+    "authority_policy": { "$ref": "artifact_authority_policy.schema.json" },
+    "evidence_policy": { "$ref": "artifact_evidence_policy.schema.json" },
+    "story_policy": { "$ref": "artifact_story_policy.schema.json" },
+    "consequence_policy": { "$ref": "artifact_consequence_policy.schema.json" },
+    "operational_clearance_policy": { "$ref": "artifact_operational_clearance_policy.schema.json" },
+    "audit_reconciliation_policy": { "$ref": "artifact_audit_reconciliation_policy.schema.json" }
+  }
+}

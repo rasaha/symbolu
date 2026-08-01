@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_canonical_action.schema.json",
+  "title": "ActionGate Package Artifact 1 — Canonical Action Schema",
+  "description": "What exact action is being evaluated (template §1-§4). Binds the decision to an immutable action identity; a materially changed action requires a new evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_identity", "business_objective", "scope", "canonical_action"],
+  "properties": {
+    "policy_identity": { "$ref": "actiongate_policy.schema.json#/$defs/policy_identity" },
+    "business_objective": { "$ref": "actiongate_policy.schema.json#/$defs/business_objective" },
+    "scope": { "$ref": "actiongate_policy.schema.json#/$defs/scope" },
+    "canonical_action": { "$ref": "actiongate_policy.schema.json#/$defs/canonical_action" }
+  }
+}
