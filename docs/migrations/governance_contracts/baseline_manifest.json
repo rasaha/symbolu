@@ -1,0 +1,38 @@
+{
+  "phase": "governance-contracts-canonical-package-migration",
+  "source_branch": "claude/storygraph-canonical-package-migration-m25c2i",
+  "source_commit_at_head": "f076fa5b22e0e37395f5e59232dba690f208663c",
+  "implementation_branch": "claude/governance-contracts-canonical-package-migration",
+  "working_tree_clean_at_start": true,
+  "distribution_name": "ugence-governance-contracts",
+  "python_namespace": "ugence_governance_contracts",
+  "baseline_tests": {
+    "governance_providers": {"passed": 42, "failed": 0, "skipped": 0},
+    "decision_governance": {"passed": 29},
+    "tap_provider": {"passed": 38},
+    "actiongate_provider": {"passed": 30},
+    "baseline_action_provider": {"passed": 5},
+    "baseline_assertion_provider": {"passed": 5},
+    "enterprise_validation_pilot": {"passed": 164},
+    "comparative_governance_benchmark": {"passed": 56},
+    "provider_heterogeneity_validation": {"passed": 51},
+    "ugence_console_api": {"passed": 4},
+    "ai_hiring": {"passed": 778},
+    "platform_freeze": {"passed": 19, "failed": 2, "note": "2 pre-existing failures unrelated to contracts: classify_change(FREEZE_COMMIT,HEAD)=UNCLASSIFIED due to repo drift; hiring now uses provider framework"},
+    "affected_total_passing": 1221
+  },
+  "runner": "pytest 9.1.1, CPython 3.11.15",
+  "baseline_freeze_hashes_file": "baseline_freeze_hashes.json",
+  "baseline_serialization_file": "baseline_serialization.json",
+  "governance_providers_test_manifest": "test_manifest.txt (42 dedup ids)",
+  "key_anchors": {
+    "governance_providers.api_snapshot_hash": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
+    "note_api_snapshot": "MUST remain identical after migration (re-exports preserve shape) -> proves API compatibility (C4)",
+    "governance_providers.core_tree_hash": "34bea18316db4801b6c5c9b879f5c742e6f6c464f196bbd8929c5e7cac58c57a",
+    "note_tree_hash": "WILL change (files become re-export shims / move out) -> documented freeze re-baseline (plan §9)"
+  },
+  "dependency_boundary": {
+    "governance_providers_FORBIDDEN_IMPORTS": ["actiongate_provider","tap_provider","baseline_assertion_provider","baseline_action_provider","ai_hiring","domains","applications","platform_freeze"],
+    "note": "ugence_governance_contracts is NOT forbidden -> governance_providers gaining it as a leaf dependency is freeze-legal and acyclic (F20)"
+  }
+}

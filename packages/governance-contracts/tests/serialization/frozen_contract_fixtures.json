@@ -1,0 +1,232 @@
+{
+  "instances": {
+    "ActionGovernanceRequest": {
+      "asdict": {
+        "action_type": "deploy",
+        "requested_parameters": {
+          "ns": "prod"
+        },
+        "actor": "agent://x",
+        "authority_context": "",
+        "target_resource": "",
+        "policy_refs": [
+          "p1"
+        ],
+        "risk_context": {},
+        "evidence_refs": [],
+        "decision_refs": [],
+        "idempotency_key": "",
+        "correlation_id": "c1",
+        "authorization_expired": false
+      },
+      "asdict_json": "{\"action_type\": \"deploy\", \"actor\": \"agent://x\", \"authority_context\": \"\", \"authorization_expired\": false, \"correlation_id\": \"c1\", \"decision_refs\": [], \"evidence_refs\": [], \"idempotency_key\": \"\", \"policy_refs\": [\"p1\"], \"requested_parameters\": {\"ns\": \"prod\"}, \"risk_context\": {}, \"target_resource\": \"\"}",
+      "fingerprint": "ba17dc4d43972aee9a7b874adf8d43159c0a6d2acda75e99eefeec72bf71a21a",
+      "repr": "ActionGovernanceRequest(action_type='deploy', requested_parameters={'ns': 'prod'}, actor='agent://x', authority_context='', target_resource='', policy_refs=('p1',), risk_context={}, evidence_refs=(), decision_refs=(), idempotency_key='', correlation_id='c1', authorization_expired=False)",
+      "ctor_sig": "(action_type: 'str', requested_parameters: 'Mapping[str, str]' = <factory>, actor: 'str' = '', authority_context: 'str' = '', target_resource: 'str' = '', policy_refs: 'tuple[str, ...]' = (), risk_context: 'Mapping[str, str]' = <factory>, evidence_refs: 'tuple[str, ...]' = (), decision_refs: 'tuple[str, ...]' = (), idempotency_key: 'str' = '', correlation_id: 'str' = '', authorization_expired: 'bool' = False) -> None"
+    },
+    "ActionGovernanceResult": {
+      "asdict": {
+        "outcome": "AUTHORIZED",
+        "constraints": [
+          "c"
+        ],
+        "obligations": [],
+        "expiry": null,
+        "authority_basis": "",
+        "reason_codes": [],
+        "provider_trace_id": "",
+        "fingerprint": "fp"
+      },
+      "asdict_json": "{\"authority_basis\": \"\", \"constraints\": [\"c\"], \"expiry\": null, \"fingerprint\": \"fp\", \"obligations\": [], \"outcome\": \"AUTHORIZED\", \"provider_trace_id\": \"\", \"reason_codes\": []}",
+      "fingerprint": "d3c77f02a37d861241a6aa8cb553731ce970e2b90c68faf44de20e4269ddc7d7",
+      "repr": "ActionGovernanceResult(outcome=<ActionGovernanceOutcome.AUTHORIZED: 'AUTHORIZED'>, constraints=('c',), obligations=(), expiry=None, authority_basis='', reason_codes=(), provider_trace_id='', fingerprint='fp')",
+      "ctor_sig": "(outcome: 'ActionGovernanceOutcome', constraints: 'tuple[str, ...]' = (), obligations: 'tuple[str, ...]' = (), expiry: 'Optional[datetime]' = None, authority_basis: 'str' = '', reason_codes: 'tuple[str, ...]' = (), provider_trace_id: 'str' = '', fingerprint: 'str' = '') -> None"
+    },
+    "AssertionGovernanceRequest": {
+      "asdict": {
+        "assertion": "rev up",
+        "assertion_type": "",
+        "evidence_refs": [
+          "e1"
+        ],
+        "source_identity": "",
+        "policy_refs": [],
+        "context": {},
+        "correlation_id": "c2"
+      },
+      "asdict_json": "{\"assertion\": \"rev up\", \"assertion_type\": \"\", \"context\": {}, \"correlation_id\": \"c2\", \"evidence_refs\": [\"e1\"], \"policy_refs\": [], \"source_identity\": \"\"}",
+      "fingerprint": "96051b89402373fa87032fdebb5b093eef07526eb5c0f1b2a512111add156212",
+      "repr": "AssertionGovernanceRequest(assertion='rev up', assertion_type='', evidence_refs=('e1',), source_identity='', policy_refs=(), context={}, correlation_id='c2')",
+      "ctor_sig": "(assertion: 'str', assertion_type: 'str' = '', evidence_refs: 'tuple[str, ...]' = (), source_identity: 'str' = '', policy_refs: 'tuple[str, ...]' = (), context: 'Mapping[str, str]' = <factory>, correlation_id: 'str' = '') -> None"
+    },
+    "AssertionGovernanceResult": {
+      "asdict": {
+        "coverage": "SUPPORTED",
+        "evidence_coverage": 1.0,
+        "covered_evidence_refs": [
+          "e1"
+        ],
+        "unsupported_elements": [],
+        "omitted_qualifiers": [],
+        "constraints": [],
+        "obligations": [],
+        "explanation_refs": [],
+        "provider_trace_id": "",
+        "fingerprint": ""
+      },
+      "asdict_json": "{\"constraints\": [], \"coverage\": \"SUPPORTED\", \"covered_evidence_refs\": [\"e1\"], \"evidence_coverage\": 1.0, \"explanation_refs\": [], \"fingerprint\": \"\", \"obligations\": [], \"omitted_qualifiers\": [], \"provider_trace_id\": \"\", \"unsupported_elements\": []}",
+      "fingerprint": "247d41e94161681663ffad5d37a8f06ce86cf57fa8bcb6f1c391d7dfbc166aaa",
+      "repr": "AssertionGovernanceResult(coverage=<AssertionCoverage.SUPPORTED: 'SUPPORTED'>, evidence_coverage=1.0, covered_evidence_refs=('e1',), unsupported_elements=(), omitted_qualifiers=(), constraints=(), obligations=(), explanation_refs=(), provider_trace_id='', fingerprint='')",
+      "ctor_sig": "(coverage: 'AssertionCoverage', evidence_coverage: 'float' = 0.0, covered_evidence_refs: 'tuple[str, ...]' = (), unsupported_elements: 'tuple[str, ...]' = (), omitted_qualifiers: 'tuple[str, ...]' = (), constraints: 'tuple[str, ...]' = (), obligations: 'tuple[str, ...]' = (), explanation_refs: 'tuple[str, ...]' = (), provider_trace_id: 'str' = '', fingerprint: 'str' = '') -> None"
+    },
+    "ExecutionDispatchRequest": {
+      "asdict": {
+        "action_type": "do",
+        "parameters": {
+          "k": "v"
+        },
+        "idempotency_key": "i1",
+        "correlation_id": "c3"
+      },
+      "asdict_json": "{\"action_type\": \"do\", \"correlation_id\": \"c3\", \"idempotency_key\": \"i1\", \"parameters\": {\"k\": \"v\"}}",
+      "fingerprint": "484747398bdcf1d083f4b05c5fc91d0eaa25cc68281a9bfb70750f15e666e106",
+      "repr": "ExecutionDispatchRequest(action_type='do', parameters={'k': 'v'}, idempotency_key='i1', correlation_id='c3')",
+      "ctor_sig": "(action_type: 'str', parameters: 'Mapping[str, str]' = <factory>, idempotency_key: 'str' = '', correlation_id: 'str' = '') -> None"
+    },
+    "ExecutionDispatchResult": {
+      "asdict": {
+        "accepted": true,
+        "external_request_id": "r1",
+        "acknowledgement": "",
+        "pending": false,
+        "timed_out": false,
+        "transport_error": "",
+        "retryable": true
+      },
+      "asdict_json": "{\"accepted\": true, \"acknowledgement\": \"\", \"external_request_id\": \"r1\", \"pending\": false, \"retryable\": true, \"timed_out\": false, \"transport_error\": \"\"}",
+      "fingerprint": "1cd04b9da28ea2838ee385dec8ffeb6f86597a8c3fadab5dfdc5c3098dbbfa60",
+      "repr": "ExecutionDispatchResult(accepted=True, external_request_id='r1', acknowledgement='', pending=False, timed_out=False, transport_error='', retryable=True)",
+      "ctor_sig": "(accepted: 'bool', external_request_id: 'str' = '', acknowledgement: 'str' = '', pending: 'bool' = False, timed_out: 'bool' = False, transport_error: 'str' = '', retryable: 'bool' = True) -> None"
+    },
+    "ExecutionObservation": {
+      "asdict": {
+        "business_outcome": "SUCCEEDED",
+        "observed_parameters": {},
+        "final": true,
+        "reason": "",
+        "provider_trace_id": "",
+        "fingerprint": ""
+      },
+      "asdict_json": "{\"business_outcome\": \"SUCCEEDED\", \"final\": true, \"fingerprint\": \"\", \"observed_parameters\": {}, \"provider_trace_id\": \"\", \"reason\": \"\"}",
+      "fingerprint": "2afad1878188f554ea5c5dfc10a141768a5fd1beb3a7b40f0ddcef39b7721c14",
+      "repr": "ExecutionObservation(business_outcome=<ExecutionBusinessOutcome.SUCCEEDED: 'SUCCEEDED'>, observed_parameters={}, final=True, reason='', provider_trace_id='', fingerprint='')",
+      "ctor_sig": "(business_outcome: 'ExecutionBusinessOutcome', observed_parameters: 'Mapping[str, str]' = <factory>, final: 'bool' = True, reason: 'str' = '', provider_trace_id: 'str' = '', fingerprint: 'str' = '') -> None"
+    },
+    "ProviderCapabilities": {
+      "asdict": {
+        "kind": "ACTION_GOVERNANCE",
+        "features": "frozenset({'f1'})",
+        "deterministic": true
+      },
+      "asdict_json": "{\"deterministic\": true, \"features\": \"frozenset({'f1'})\", \"kind\": \"ACTION_GOVERNANCE\"}",
+      "fingerprint": "cd9f719a52eb8fa6d70d71cce72db650150e9f9ef6d51e7267e0e54e4b90da21",
+      "repr": "ProviderCapabilities(kind=<ProviderKind.ACTION_GOVERNANCE: 'ACTION_GOVERNANCE'>, features=frozenset({'f1'}), deterministic=True)",
+      "ctor_sig": "(kind: 'ProviderKind', features: 'frozenset[str]' = frozenset(), deterministic: 'bool' = False) -> None"
+    },
+    "ProviderCompatibility": {
+      "asdict": {
+        "contract_version": "1.0.0",
+        "compatible_kernel_majors": "frozenset({'1'})",
+        "config_schema_version": "1"
+      },
+      "asdict_json": "{\"compatible_kernel_majors\": \"frozenset({'1'})\", \"config_schema_version\": \"1\", \"contract_version\": \"1.0.0\"}",
+      "fingerprint": "78769269fe2c383e914b5653563fd3fdbffac2a124976a21ecdd8387fa9673bd",
+      "repr": "ProviderCompatibility(contract_version='1.0.0', compatible_kernel_majors=frozenset({'1'}), config_schema_version='1')",
+      "ctor_sig": "(contract_version: 'str', compatible_kernel_majors: 'frozenset[str]' = frozenset({'1'}), config_schema_version: 'str' = '1') -> None"
+    },
+    "ProviderHealth": {
+      "asdict": {
+        "state": "AVAILABLE",
+        "healthy": true,
+        "detail": "AVAILABLE"
+      },
+      "asdict_json": "{\"detail\": \"AVAILABLE\", \"healthy\": true, \"state\": \"AVAILABLE\"}",
+      "fingerprint": "a416110e8008055d9a69f53239dbcaa88c68c78309ceb906e5a788935ab02e0f",
+      "repr": "ProviderHealth(state=<ProviderLifecycleState.AVAILABLE: 'AVAILABLE'>, healthy=True, detail='AVAILABLE')",
+      "ctor_sig": "(state: 'ProviderLifecycleState', healthy: 'bool', detail: 'str' = '') -> None"
+    },
+    "ProviderInvocationRecord": {
+      "asdict": {
+        "provider_id": "p",
+        "kind": "ACTION_GOVERNANCE",
+        "operation": "authorize",
+        "completed": true,
+        "outcome": "AUTHORIZED",
+        "trace_id": "",
+        "error_class": null,
+        "failure_class": null,
+        "fallback_provider_id": ""
+      },
+      "asdict_json": "{\"completed\": true, \"error_class\": null, \"failure_class\": null, \"fallback_provider_id\": \"\", \"kind\": \"ACTION_GOVERNANCE\", \"operation\": \"authorize\", \"outcome\": \"AUTHORIZED\", \"provider_id\": \"p\", \"trace_id\": \"\"}",
+      "fingerprint": "8be4e5bd29b061f793e923db8580ff1b255c5eadfa89531254f011a2595be85b",
+      "repr": "ProviderInvocationRecord(provider_id='p', kind='ACTION_GOVERNANCE', operation='authorize', completed=True, outcome='AUTHORIZED', trace_id='', error_class=None, failure_class=None, fallback_provider_id='')",
+      "ctor_sig": "(provider_id: 'str', kind: 'str', operation: 'str', completed: 'bool', outcome: 'str' = '', trace_id: 'str' = '', error_class: 'Optional[str]' = None, failure_class: 'Optional[str]' = None, fallback_provider_id: 'str' = '') -> None"
+    }
+  },
+  "enums": {
+    "ActionGovernanceOutcome": {
+      "AUTHORIZED": "AUTHORIZED",
+      "AUTHORIZED_WITH_CONSTRAINTS": "AUTHORIZED_WITH_CONSTRAINTS",
+      "DENIED": "DENIED",
+      "INDETERMINATE": "INDETERMINATE",
+      "EXPIRED": "EXPIRED"
+    },
+    "AssertionCoverage": {
+      "SUPPORTED": "SUPPORTED",
+      "UNSUPPORTED": "UNSUPPORTED",
+      "INDETERMINATE": "INDETERMINATE",
+      "CONSTRAINED": "CONSTRAINED"
+    },
+    "ExecutionBusinessOutcome": {
+      "SUCCEEDED": "SUCCEEDED",
+      "FAILED": "FAILED",
+      "REJECTED": "REJECTED",
+      "PENDING": "PENDING",
+      "DUPLICATE": "DUPLICATE",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "ProviderKind": {
+      "ASSERTION_GOVERNANCE": "ASSERTION_GOVERNANCE",
+      "ACTION_GOVERNANCE": "ACTION_GOVERNANCE",
+      "EXTERNAL_EXECUTION": "EXTERNAL_EXECUTION"
+    },
+    "ProviderLifecycleState": {
+      "REGISTERED": "REGISTERED",
+      "INITIALIZING": "INITIALIZING",
+      "AVAILABLE": "AVAILABLE",
+      "DEGRADED": "DEGRADED",
+      "UNAVAILABLE": "UNAVAILABLE",
+      "STOPPING": "STOPPING",
+      "STOPPED": "STOPPED"
+    },
+    "FailureClass": {
+      "RETRYABLE": "RETRYABLE",
+      "TERMINAL": "TERMINAL",
+      "INDETERMINATE": "INDETERMINATE",
+      "CONFIGURATION": "CONFIGURATION",
+      "COMPATIBILITY": "COMPATIBILITY"
+    }
+  },
+  "api_snapshot_hash": null,
+  "error_failure_classes": {
+    "ProviderError": "TERMINAL",
+    "ProviderRegistrationError": "CONFIGURATION",
+    "ProviderResolutionError": "CONFIGURATION",
+    "ProviderCompatibilityError": "COMPATIBILITY",
+    "ProviderConfigurationError": "CONFIGURATION",
+    "ProviderUnavailableError": "RETRYABLE",
+    "ProviderTimeoutError": "RETRYABLE",
+    "ProviderProtocolError": "TERMINAL",
+    "ProviderResultValidationError": "TERMINAL"
+  }
+}

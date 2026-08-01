@@ -1,157 +1,31 @@
-# Composite Capability & Sequence-Risk Analyzer
+# composite_threat_detector — COMPATIBILITY LAYER (moved)
 
-> **ActionGate controls individual actions; this analyzer detects when
-> individually acceptable actions collectively assemble a prohibited or high-risk
-> capability.**
+> **This directory is a compatibility shim, not the implementation.**
 
-It complements the per-action [Action Gate](../ACTION_GATE_SPECIFICATION.md),
-which decides one action at a time. This layer adds the **sequence axis**: it
-links individually-admissible actions into an *assembly*, accumulates the
-capability *fragments* each contributes, and — when a linked set satisfies a
-*versioned, encoded* recipe and its structural constraints — raises **advisory**
-sequence-risk evidence.
+The canonical StoryGraph capability moved to:
 
-**This version is:** deterministic; recipe- and ontology-driven; advisory,
-evidence-producing; limited to encoded capability patterns.
-**It is not:** a general intent-understanding system; a learned anomaly detector;
-a system that infers arbitrary criminal intent. It does not "understand crime."
-
-The physical firearm example (steel rod + piston + trigger → firearm) is retained
-**only as a synthetic illustration** that the engine is domain-agnostic. The
-product target is enterprise AI-agent and infrastructure workflows. See
-[`../COMPOSITE_THREAT_DETECTION_SPEC.md`](../COMPOSITE_THREAT_DETECTION_SPEC.md).
-
-## Authority boundary
-
-The analyzer emits only `OBSERVE` / `ESCALATE` / `UNAVAILABLE`. It **never** emits
-`ALLOW`, `AUTHORIZE`, `DENY`, `BLOCK`, or `EXECUTE`. An authoritative ActionGate
-or workflow policy converts an `ESCALATE` into a binding consequence
-(`HOLD_FOR_REVIEW`, `BLOCK`, …) via `policy.py` — the analyzer stays advisory, and
-**removing it can never increase authority** or turn a denied action into an
-allowed one. `UNAVAILABLE` is fail-loud (e.g. bounded-state exhaustion), never
-silent evidence loss.
-
-## Design properties
-
-- **Deterministic** — replayable from an event log; no wall-clock, randomness,
-  network, or LLM in the authoritative path; identical finding digests across runs.
-- **Multi-timescale state** — a short window alone does *not* stop low-and-slow;
-  a persistent capability ledger retains durable fragments (with graceful decay of
-  transient evidence), so an early part never silently disappears.
-- **Entity linkage over correlation id** — assemblies are grouped by a tenant-scoped
-  `assembly_key` from configurable entity dimensions, so one capability can span
-  correlations, sessions, and actors while unrelated workflows stay isolated.
-- **Constraint-aware recipes** — fragment count is necessary but not sufficient;
-  ordering, temporal, actor/resource, exclusion, and corroboration constraints
-  gate escalation, so a benign look-alike does not escalate on nouns alone.
-- **Evidence-gated benign handling** — an approval qualifies an escalation only
-  with valid, scope-matched evidence; findings record both interpretations.
-- **Bounded + fail-loud** — bounded tenant state; breaches emit `UNAVAILABLE`.
-
-## Requirements
-
-Python 3.11+, standard library only. `pytest` (dev-only) for the tests.
-
-## Run
-
-```bash
-cd cyber_security/composite_threat_detector
-
-python3 -m pytest -q                                          # deterministic tests
-
-python3 -m composite_threat_detector.cli demo exfiltration    # harmful  → ESCALATE
-python3 -m composite_threat_detector.cli demo benign          # look-alike → no escalate
-python3 -m composite_threat_detector.cli demo approved_export # valid approval → neutralized
-python3 -m composite_threat_detector.cli demo firearm         # synthetic illustration
-python3 -m composite_threat_detector.cli ontologies           # recipes
-python3 -m composite_threat_detector.cli specs                # assembly key specs
-python3 -m composite_threat_detector.cli eval                 # metrics (NOT RUN, honest)
-python3 -m composite_threat_detector.cli run events.jsonl \
-        --spec by_case --spec by_actor --policy               # your own stream
+```
+packages/capabilities/storygraph/            # canonical home
+  src/ugence_storygraph/                      # canonical namespace
+  tests/                                       # 289 tests
+  docs/                                        # capability documentation
 ```
 
-`run` reads one JSON event per line; exit code is non-zero when any
-`ESCALATE`/`UNAVAILABLE` finding is produced.
+## What lives here now
 
-## Library
+- `composite_threat_detector/__init__.py` — a **logic-free redirect** that makes
+  `import composite_threat_detector` and any `composite_threat_detector.<sub>`
+  resolve to the **same** `ugence_storygraph` module objects (identity
+  preserved). It exists only for the compatibility period.
+- `conftest.py` — puts this directory on `sys.path` for legacy invocations.
 
-```python
-from composite_threat_detector import (
-    SequenceRiskAnalyzer, DIGITAL_ONTOLOGY, BY_CASE, BY_ACTOR,
-    PolicyBinding, to_advisory_evidence,
-)
+## Migrate your imports
 
-az = SequenceRiskAnalyzer(DIGITAL_ONTOLOGY, specs=(BY_CASE, BY_ACTOR))
+| Legacy (still works) | Canonical (use this) |
+|---|---|
+| `from composite_threat_detector import StoryGraph` | `from ugence_storygraph import StoryGraph` |
+| `from composite_threat_detector.storygraph import ...` | `from ugence_storygraph.storygraph import ...` |
+| — (curated small API) | `from ugence_storygraph.api import ...` |
 
-for action in admitted_action_stream:        # each already cleared the per-action gate
-    for finding in az.observe(action):        # advisory findings whose concern rose
-        print(finding.signal, finding.explanation)
-        if finding.signal == "ESCALATE":
-            consequence = PolicyBinding().decide(finding)   # authoritative layer
-            ev = to_advisory_evidence(finding, bound_to=action_hash,
-                                      generated_at=now_rfc3339)
-```
-
-## Layout
-
-| Path | Purpose |
-|------|---------|
-| `composite_threat_detector/model.py` | Fragment / Recipe / Ontology / instance types |
-| `composite_threat_detector/linkage.py` | entity normalization + assembly-key derivation |
-| `composite_threat_detector/ledger.py` | multi-timescale state + persistent capability ledger |
-| `composite_threat_detector/matcher.py` | constraint-aware recipe matcher |
-| `composite_threat_detector/benign.py` | evidence-gated benign-context layer |
-| `composite_threat_detector/completion.py` | advisory minimal-completion analysis |
-| `composite_threat_detector/analyzer.py` | orchestration, findings, run report, facade |
-| `composite_threat_detector/providers.py` | trusted benign-evidence providers (fixtures; no net) |
-| `composite_threat_detector/purpose.py` | declared vs. verified purpose model |
-| `composite_threat_detector/ordering.py` | ordering/clock status model |
-| `composite_threat_detector/audit.py` | append-only raw-evidence + lifecycle audit log |
-| `composite_threat_detector/governance.py` | state-exhaustion resource governance |
-| `composite_threat_detector/replay.py` | historical-replay adapter contract + reference |
-| `composite_threat_detector/policy.py` | authoritative consequence binding (shadow default) |
-| `composite_threat_detector/evidence.py` | Finding → ActionGate advisory evidence |
-| `composite_threat_detector/fragments.py` / `recipes.py` | shipped ontologies |
-| `composite_threat_detector/cli.py` | JSON CLI |
-| `composite_threat_detector/storygraph.py` | story-graph engine: typed edges, bounded deterministic matcher, decomposed risk vector |
-| `composite_threat_detector/storyverdict.py` | forward completion-gating + contradiction + dual-story verdict |
-| `composite_threat_detector/stories.py` / `financial.py` / `story_bridge.py` | story library, account-takeover ontology, live-assembly bridge |
-| `composite_threat_detector/durable_audit.py` | SQLite append-only, hash-linked (tamper-evident) durable audit |
-| `evaluation/corpus.py` / `corpus_gen.py` | 25-family corpus; seeded high-volume generator + prevalence profiles |
-| `evaluation/freeze.py` | complete evaluation freeze + final-eval guard |
-| `evaluation/benchmark.py` / `alerts.py` / `review_sim.py` | load benchmark, alert-volume, review simulation |
-| `evaluation/readiness.py` | H1–H8 readiness gates + verdict |
-| `evaluation/harness.py` | metrics harness (evidence-labeled; enterprise = NOT RUN) |
-| `demos/scenarios.py` | illustrative scenarios |
-| `tests/` | 110 deterministic detection + non-detection + robustness tests |
-| `RECIPE_SCHEMA.md` / `LINKAGE_SCHEMA.md` / `MIGRATION_NOTES.md` | schemas + migration |
-
-### Shadow-mode / phase-2 notes
-
-- **Advisory + shadow by default.** `PolicyBinding(shadow=True)` computes a
-  consequence but marks it non-binding (`enforced=False`). Enforcement requires a
-  scoped promotion — see `../ENFORCEMENT_PROMOTION_CHECKLIST.md`; there is no
-  global switch.
-- **Trusted context only.** Self-declared purpose never neutralizes; pass a
-  `ProviderRegistry` of verified authorizations. Findings carry a
-  `purpose`/`purpose_consistency_status`.
-- **Evaluation is synthetic + honest.** `cli eval` runs the 25-family corpus and
-  labels every metric; population accuracy on enterprise data is
-  `REQUIRES ENTERPRISE DATA`. `cli manifest` / `cli freeze` emit the corpus
-  manifest and the pre-evaluation freeze.
-- **Story-graph layer (structural assembly, not counting).** `cli story` runs the
-  account-takeover demo: five events with a *mismatched beneficiary* stay
-  `OBSERVE` (entity gate), the matching sequence `ESCALATE`s, and a proposed
-  transfer that would finish the pattern returns `WOULD_COMPLETE_PROHIBITED`.
-  Typed edges (`SAME_ENTITY`/`ORDER`/`WITHIN`), a decomposed risk vector,
-  dual-story verified-benign counter-stories, contradiction scoring, and forward
-  completion-gating — all deterministic and advisory. See `STORY_GRAPH_SPEC.md`.
-- **Phase-3 robustness (historical-replay readiness).** `cli readiness` runs the
-  H1–H8 gates and prints a verdict (capped at `CONTINUE — historical replay
-  ready`); `cli bench` / `cli alerts` / `cli review` run the load benchmark,
-  alert-volume, and review simulation. Durable audit + `recover_from_audit`
-  provide restart recovery; provider failure modes never silently neutralize; the
-  K8s reference replay adapter is in `replay.py` (see
-  `../HISTORICAL_REPLAY_K8S_CONTRACT.md`,
-  `../HISTORICAL_REPLAY_READINESS_CHECKLIST.md`,
-  `../PHASE3_FINAL_EVALUATION_REPORT.md`).
+**Removal / review target:** `ugence-storygraph` v3.0.0. See
+`docs/migrations/storygraph/` and `packages/capabilities/storygraph/MIGRATION.md`.

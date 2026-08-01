@@ -35,6 +35,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 DISTS = {
     "decision-governance": REPO / "packaging" / "decision-governance",
+    "ugence-governance-contracts": REPO / "packages" / "governance-contracts",
     "dgm-provider-framework": REPO / "packaging" / "dgm-provider-framework",
     "dgm-actiongate-provider": REPO / "packaging" / "dgm-actiongate-provider",
     "dgm-tap-provider": REPO / "packaging" / "dgm-tap-provider",

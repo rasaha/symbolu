@@ -1,4 +1,9 @@
-"""Make the package (and demos) importable when running pytest in this directory."""
+"""COMPATIBILITY-ONLY. Put this directory on sys.path so the legacy
+``composite_threat_detector`` redirect shim (see ./composite_threat_detector/)
+is importable for root-level / legacy invocations during the compatibility
+period. The canonical package is ``ugence_storygraph`` under
+``packages/capabilities/storygraph``; new tests live there.
+"""
 
 import pathlib
 import sys
