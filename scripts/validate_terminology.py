@@ -106,6 +106,30 @@ def check_amended(path: Path, text: str) -> list[str]:
     return []
 
 
+# Documents where "AI Control Plane" must denote ONLY the optional component and the
+# governance layer must be named the Governance Services Layer.
+SINGLE_MEANING_DOCS = ["UGENCE_PLATFORM_OVERVIEW.md"]
+
+
+def check_single_meaning(path: Path, text: str) -> list[str]:
+    errs: list[str] = []
+    low = text.lower()
+    if "governance services layer" not in low:
+        errs.append('must name the governance layer "Governance Services Layer"')
+    if "ai control plane" in low.replace("autonomous control plane", ""):
+        for i, line in enumerate(text.splitlines(), 1):
+            ll = line.lower().replace("autonomous control plane", "")
+            if "ai control plane" not in ll:
+                continue
+            # Allowed only where it discusses the reserved optional meaning or the rename.
+            if "optional" not in ll and "governance services layer" not in ll:
+                errs.append(
+                    f'line {i}: "AI Control Plane" used as a layer label '
+                    "(reserve it for the optional component)"
+                )
+    return errs
+
+
 def run(repo_root: Path) -> int:
     failures = 0
     print(f"Ugence Decision Governance terminology validation @ {repo_root}")
@@ -132,7 +156,10 @@ def run(repo_root: Path) -> int:
             print(f"FAIL  {rel}: file not found")
             failures += 1
             continue
-        errs = check_amended(p, p.read_text(encoding="utf-8"))
+        text = p.read_text(encoding="utf-8")
+        errs = check_amended(p, text)
+        if rel in SINGLE_MEANING_DOCS:
+            errs = errs + check_single_meaning(p, text)
         if errs:
             failures += 1
             print(f"FAIL  {rel}")
