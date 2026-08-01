@@ -9,6 +9,7 @@ verdict.
 from __future__ import annotations
 
 from composite_threat_detector import ordering, replay
+from composite_threat_detector import stories as story_lib
 from composite_threat_detector.canonical import digest
 from composite_threat_detector.durable_audit import SCHEMA_VERSION as AUDIT_SCHEMA
 from composite_threat_detector.ledger import StateLimits, TimescalePolicy
@@ -16,6 +17,7 @@ from composite_threat_detector.linkage import (
     BY_ACTOR, BY_CASE, LINKAGE_SCHEMA_VERSION,
 )
 from composite_threat_detector.recipes import DIGITAL_ONTOLOGY
+from composite_threat_detector.storygraph import STORYGRAPH_SCHEMA_VERSION
 
 from . import corpus as C
 from . import corpus_gen, review
@@ -71,6 +73,26 @@ def current_config() -> dict:
                          limits.max_candidate_linkages_per_event],
         "normalization_schema": replay.HISTORICAL_REPLAY_CONTRACT["version"],
         "audit_schema": AUDIT_SCHEMA,
+        "storygraph_schema": STORYGRAPH_SCHEMA_VERSION,
+        # bind harmful story graphs (id@version + a digest of nodes/edges/gates)
+        # and the verified legitimate counter-stories, so an official run detects
+        # any StoryGraph change (§ implementation order item 11).
+        "story_graphs": {
+            g.ref: digest(
+                {"nodes": [(n.node_id, n.fragment_id, n.required, n.is_completion)
+                           for n in g.nodes],
+                 "edges": [(e.kind, e.a, e.b, e.dim, e.max_gap, e.actor_mode,
+                            e.corroborating_fragment, e.auth_tag) for e in g.edges],
+                 "gates": [g.entity_gate, g.ordering_gate, g.timing_gate,
+                           g.material_floor, g.threat_threshold],
+                 "weights": g.weights}, domain="CTD-STORYGRAPH")
+            for g in story_lib.STORY_LIBRARY.values()},
+        "legitimate_stories": {
+            s.ref: digest(
+                {"rules": [(r.node_id, r.operation, r.match_dims, r.amount_dim)
+                           for r in s.rules],
+                 "accepted_tags": sorted(s.accepted_tags)}, domain="CTD-LEGIT-STORY")
+            for s in story_lib.LEGITIMATE_LIBRARY.values()},
         "review_schema": sorted(review.DISPOSITIONS),
         "corpus_split_hashes": _split_hashes(),
         "generator_profiles": sorted(corpus_gen.PROFILES),

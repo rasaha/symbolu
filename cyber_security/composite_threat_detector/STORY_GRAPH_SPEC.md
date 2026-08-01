@@ -15,10 +15,22 @@ A pattern is a typed graph:
 
 - **Nodes** — capability events (reuse the fragment vocabulary), one or more
   marked *completion* (the loss-producing action).
-- **Edges** — typed constraints between *specific* node pairs: `ORDER(before→after)`,
-  `SAME_ENTITY(dim)` (e.g. the transfer beneficiary must equal the added
-  beneficiary; the transfer device must equal the registered device),
-  `WITHIN(Δt)`, `RELATED_ACTORS`, `REQUIRES_CORROBORATION`.
+- **Edges** — typed constraints between *specific* node pairs. Full vocabulary
+  (`storygraph.py`, schema `ctd.storygraph/1.0.0`): `ORDER`/`BEFORE`,
+  `WITHIN`/`WITHIN_TIME`, `SAME_ENTITY(dim)` with aliases `SAME_ACCOUNT` /
+  `SAME_DEVICE` / `SAME_BENEFICIARY` / `SAME_DESTINATION`, `RELATED_ACTOR(S)`,
+  `REQUIRES_CORROBORATION`, `CONTRADICTS` (if both nodes present the harmful story
+  is weakened → `contradicts_triggered`, category `AMBIGUOUS_COMPETING_STORIES`),
+  and `COVERED_BY_AUTHORIZATION` (legit-graph coverage annotation). The matcher
+  reports `satisfied_edges`, `failed_edges`, `contradicts_triggered`,
+  `ordering_ambiguous`, `multiple_optimal_bindings`, and `unavailable`.
+
+`evaluate_proposed_action` returns a single **structural vector** (§3) — node
+coverage, ordering/entity/timing consistency, corroboration, completion proximity,
+**trusted-context coverage**, and the typed **contradiction findings** — never one
+fraud score. The harmful story graphs, verified legitimate stories, and the
+storygraph schema are bound in the evaluation **freeze** (`evaluation/freeze.py`,
+implementation-order item 11), so an official run refuses a changed StoryGraph.
 
 This makes the discriminating relationships first-class, which a flat
 required/optional set cannot express.

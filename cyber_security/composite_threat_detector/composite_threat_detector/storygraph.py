@@ -28,28 +28,39 @@ from dataclasses import dataclass, field
 
 from .canonical import digest
 
+# versioned StoryGraph schema (§1 "versioned schema")
+STORYGRAPH_SCHEMA_VERSION = "ctd.storygraph/1.0.0"
+
 # ---------------------------------------------------------------------------
-# Edge types
+# Edge types (§1)
 # ---------------------------------------------------------------------------
 ORDER = "ORDER"
 SAME_ENTITY = "SAME_ENTITY"
 WITHIN = "WITHIN"
 RELATED_ACTORS = "RELATED_ACTORS"
 REQUIRES_CORROBORATION = "REQUIRES_CORROBORATION"
+CONTRADICTS = "CONTRADICTS"                        # if both present ⇒ story weakened
+COVERED_BY_AUTHORIZATION = "COVERED_BY_AUTHORIZATION"  # legit-graph coverage annotation
+
+# edge kinds that contribute to the *harmful* structural risk dimensions
+_HARMFUL_KINDS = (ORDER, SAME_ENTITY, WITHIN, RELATED_ACTORS, REQUIRES_CORROBORATION)
 
 
 @dataclass(frozen=True)
 class Edge:
     kind: str
     a: str                      # node id
-    b: str = ""                 # node id (unused for corroboration)
+    b: str = ""                 # node id (unused for corroboration / auth annotation)
     dim: str = ""               # for SAME_ENTITY: the entity dimension
     max_gap: float | None = None  # for WITHIN: max |Δ| in the active time unit
     actor_mode: str = "SAME"    # for RELATED_ACTORS: SAME | ANY
     corroborating_fragment: str = ""  # for REQUIRES_CORROBORATION
+    auth_tag: str = ""          # for COVERED_BY_AUTHORIZATION: authorization tag
 
     def endpoints(self) -> tuple[str, ...]:
-        return (self.a,) if self.kind == REQUIRES_CORROBORATION else (self.a, self.b)
+        if self.kind in (REQUIRES_CORROBORATION, COVERED_BY_AUTHORIZATION):
+            return (self.a,)
+        return (self.a, self.b)
 
 
 def order(a, b):
@@ -70,6 +81,17 @@ def related_actors(a, b, mode="SAME"):
 
 def requires_corroboration(a, corroborating_fragment):
     return Edge(REQUIRES_CORROBORATION, a, corroborating_fragment=corroborating_fragment)
+
+
+def contradicts(a, b):
+    """If both nodes are present, the harmful story is weakened (e.g. a verified
+    customer confirmation event that contradicts the fraud reading)."""
+    return Edge(CONTRADICTS, a, b)
+
+
+def covered_by_authorization(a, auth_tag):
+    """Legit-graph annotation: node ``a`` is covered by authorization ``auth_tag``."""
+    return Edge(COVERED_BY_AUTHORIZATION, a, auth_tag=auth_tag)
 
 
 # spec edge-name aliases (§1) — BEFORE/WITHIN_TIME/SAME_* map onto the primitives
@@ -228,10 +250,13 @@ class StoryMatch:
     unavailable: bool = False              # matcher limit exceeded (fail-visible)
     ordering_ambiguous: bool = False       # an ORDER edge has unresolved (equal) coords
     multiple_optimal_bindings: int = 1     # count of bindings achieving the best score
+    satisfied_edges: list = field(default_factory=list)   # which edges are satisfied
+    contradicts_triggered: list = field(default_factory=list)  # CONTRADICTS edges fired
 
     def is_complete(self) -> bool:
         return (not self.missing_required and self.completion_present
-                and not self.risk.gate_triggered and not self.unavailable)
+                and not self.risk.gate_triggered and not self.unavailable
+                and not self.contradicts_triggered)
 
     def to_dict(self) -> dict:
         return {
@@ -242,7 +267,9 @@ class StoryMatch:
             "binding": self.binding, "present_nodes": self.present_nodes,
             "missing_required": self.missing_required,
             "completion_present": self.completion_present,
-            "failed_edges": self.failed_edges, "evaluable_edges": self.evaluable_edges,
+            "failed_edges": self.failed_edges, "satisfied_edges": self.satisfied_edges,
+            "contradicts_triggered": self.contradicts_triggered,
+            "evaluable_edges": self.evaluable_edges,
             "bounded": self.bounded, "match_digest": self.match_digest,
         }
 
@@ -254,6 +281,8 @@ _MAX_COMBINATIONS = 4096
 def _edge_ok(edge: Edge, binding: dict, events_by_id: dict, present: set,
              all_frag_ids: set) -> bool | None:
     """True/False if evaluable, None if an endpoint is absent (not yet evaluable)."""
+    if edge.kind == COVERED_BY_AUTHORIZATION:
+        return None  # legit-graph annotation; not evaluated on the harmful events
     if edge.kind == REQUIRES_CORROBORATION:
         if edge.a not in present:
             return None
@@ -271,15 +300,23 @@ def _edge_ok(edge: Edge, binding: dict, events_by_id: dict, present: set,
         return abs(eb.coord - ea.coord) <= (edge.max_gap or float("inf"))
     if edge.kind == RELATED_ACTORS:
         return True if edge.actor_mode == "ANY" else (ea.actor == eb.actor and bool(ea.actor))
+    if edge.kind == CONTRADICTS:
+        return True  # both endpoints bound ⇒ the contradiction fires
     return True
 
 
 def _score_binding(graph: StoryGraph, binding: dict, events_by_id: dict, present: set,
                    all_frag_ids: set) -> int:
+    """Score = satisfied HARMFUL-supporting edges minus fired CONTRADICTS edges."""
     n = 0
     for e in graph.edges:
-        if _edge_ok(e, binding, events_by_id, present, all_frag_ids):
+        ok = _edge_ok(e, binding, events_by_id, present, all_frag_ids)
+        if not ok:
+            continue
+        if e.kind in _HARMFUL_KINDS:
             n += 1
+        elif e.kind == CONTRADICTS:
+            n -= 1
     return n
 
 
@@ -345,19 +382,27 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailabl
     completion_ids = {n.node_id for n in graph.nodes if n.is_completion}
     completion_present = bool(completion_ids & present)
 
-    # per-edge-kind satisfied / evaluable
+    # per-edge-kind satisfied / evaluable (HARMFUL-supporting kinds only)
     per_kind = {ORDER: [0, 0], SAME_ENTITY: [0, 0], WITHIN: [0, 0],
                 RELATED_ACTORS: [0, 0], REQUIRES_CORROBORATION: [0, 0]}
-    failed = []
+    failed, satisfied, contradicts_triggered = [], [], []
     for e in graph.edges:
         ok = _edge_ok(e, binding, events_by_id, present, all_frag_ids)
         if ok is None:
             continue
+        rec = {"kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim}
+        if e.kind == CONTRADICTS:
+            if ok:
+                contradicts_triggered.append(rec)  # story weakened
+            continue
+        if e.kind not in _HARMFUL_KINDS:
+            continue
         per_kind[e.kind][1] += 1
         if ok:
             per_kind[e.kind][0] += 1
+            satisfied.append(rec)
         else:
-            failed.append({"kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim})
+            failed.append(rec)
 
     def frac(kind):
         s, t = per_kind[kind]
@@ -400,8 +445,10 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailabl
 
     risk = RiskVector(coverage, ordering_c, entity_c, timing_c, corr, proximity,
                       harmful, gate_triggered, gate_reasons)
-    body = {"story": graph.ref, "binding": binding, "risk": risk.to_dict(),
-            "completion_present": completion_present, "unavailable": unavailable}
+    body = {"schema": STORYGRAPH_SCHEMA_VERSION, "story": graph.ref,
+            "binding": binding, "risk": risk.to_dict(),
+            "completion_present": completion_present, "unavailable": unavailable,
+            "contradicts": contradicts_triggered}
     return StoryMatch(
         story_ref=graph.ref, risk=risk, binding=dict(binding),
         present_nodes=sorted(present), missing_required=missing_req,
@@ -409,7 +456,8 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailabl
         evaluable_edges={k: tuple(v) for k, v in per_kind.items() if v[1]},
         bounded=unavailable, match_digest=digest(body, domain="CTD-STORY"),
         unavailable=unavailable, ordering_ambiguous=ordering_ambiguous,
-        multiple_optimal_bindings=optimal_count)
+        multiple_optimal_bindings=optimal_count, satisfied_edges=satisfied,
+        contradicts_triggered=contradicts_triggered)
 
 
 def from_recipe(recipe, *, completion_fragments=None) -> StoryGraph:

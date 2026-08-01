@@ -69,7 +69,14 @@ from .stories import (
     BANK_ASSISTED_TRANSFER_STORY,
     LEGITIMATE_LIBRARY,
 )
-from .storygraph import ObservedEvent, StoryGraph, StoryMatch
+from .storygraph import (
+    STORYGRAPH_SCHEMA_VERSION,
+    ObservedEvent,
+    StoryGraph,
+    StoryMatch,
+    contradicts,
+    covered_by_authorization,
+)
 from .storygraph import from_recipe as story_from_recipe
 from .storygraph import match as story_match
 from .storyverdict import (
@@ -77,6 +84,7 @@ from .storyverdict import (
     CompletionWitness,
     ProposedActionResult,
     StoryVerdict,
+    StructuralVector,
     completion_witness,
     evaluate_proposed_action,
     would_complete,

@@ -82,6 +82,7 @@ class CompletionWitness:
     completion_node: str
     witness_events: dict            # node_id -> event_id (one per required node)
     proved_relations: list          # satisfied edges proving the completion binding
+    proves: dict                    # named proof claims (same_account, valid_time, …)
     removal_breaks_completion: bool
     proposed_is_necessary: bool
     certificate_digest: str
@@ -91,7 +92,7 @@ class CompletionWitness:
             "story_ref": self.story_ref, "completes": self.completes,
             "completion_node": self.completion_node,
             "witness_events": self.witness_events,
-            "proved_relations": self.proved_relations,
+            "proved_relations": self.proved_relations, "proves": self.proves,
             "removal_breaks_completion": self.removal_breaks_completion,
             "proposed_is_necessary": self.proposed_is_necessary,
             "certificate_digest": self.certificate_digest,
@@ -126,19 +127,28 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
                for n in graph.required_nodes() if n.node_id in after.binding}
     events_by_id = {e.event_id: e for e in (events + [proposed])}
     proved = []
-    for e in graph.edges:
-        if e.a in after.binding and (not e.b or e.b in after.binding):
-            ea = events_by_id[after.binding[e.a]]
-            rel = {"kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim}
-            if e.kind == "SAME_ENTITY":
-                rel["value"] = ea.entities.get(e.dim, "")
-            proved.append(rel)
+    for rel in after.satisfied_edges:
+        r = dict(rel)
+        if rel["kind"] == "SAME_ENTITY":
+            r["value"] = events_by_id[after.binding[rel["a"]]].entities.get(rel["dim"], "")
+        proved.append(r)
 
+    def _same(dim):
+        return any(r["kind"] == "SAME_ENTITY" and r["dim"] == dim for r in proved)
+    proves = {
+        "same_account": _same("account"),
+        "same_device": _same("device"),
+        "same_beneficiary": _same("beneficiary"),
+        "valid_ordering": after.risk.ordering_consistency >= 0.999
+        and not after.ordering_ambiguous,
+        "valid_time_interval": after.risk.timing_consistency >= 0.999,
+        "proposed_is_necessary": proposed_necessary,
+    }
     body = {"story": graph.ref, "completion_node": comp_node, "witness": witness,
-            "proposed": proposed.event_id}
+            "proves": proves, "proposed": proposed.event_id}
     return CompletionWitness(
         story_ref=graph.ref, completes=True, completion_node=comp_node,
-        witness_events=witness, proved_relations=proved,
+        witness_events=witness, proved_relations=proved, proves=proves,
         removal_breaks_completion=not before.is_complete(),
         proposed_is_necessary=proposed_necessary,
         certificate_digest=digest(body, domain="CTD-WITNESS"))
@@ -148,12 +158,44 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
 # Proposed-action evaluation (the pre-commit entry point, §6)
 # ---------------------------------------------------------------------------
 @dataclass
+class StructuralVector:
+    """The single decomposed structural vector (§3) — never one fraud score.
+
+    Includes the harmful dimensions plus trusted-context coverage and the typed
+    contradiction findings. Mandatory (non-compensatory): high node coverage cannot
+    offset a failed entity binding, invalid timing, or expired/absent authorization.
+    """
+
+    node_coverage: float
+    ordering_consistency: float
+    entity_binding_consistency: float
+    timing_consistency: float
+    corroboration: float
+    completion_proximity: float
+    trusted_context_coverage: float
+    contradiction_findings: list
+
+    def to_dict(self) -> dict:
+        return {
+            "node_coverage": round(self.node_coverage, 4),
+            "ordering_consistency": round(self.ordering_consistency, 4),
+            "entity_binding_consistency": round(self.entity_binding_consistency, 4),
+            "timing_consistency": round(self.timing_consistency, 4),
+            "corroboration": round(self.corroboration, 4),
+            "completion_proximity": round(self.completion_proximity, 4),
+            "trusted_context_coverage": round(self.trusted_context_coverage, 4),
+            "contradiction_findings": self.contradiction_findings,
+        }
+
+
+@dataclass
 class ProposedActionResult:
     category: str
     signal: str
     story_ref: str
     harmful_before_complete: bool
     harmful_after_complete: bool
+    structural_vector: dict
     risk_after: dict
     legitimate_coverage: dict | None
     contradictions: list
@@ -167,6 +209,7 @@ class ProposedActionResult:
             "story_ref": self.story_ref,
             "harmful_before_complete": self.harmful_before_complete,
             "harmful_after_complete": self.harmful_after_complete,
+            "structural_vector": self.structural_vector,
             "risk_after": self.risk_after,
             "legitimate_coverage": self.legitimate_coverage,
             "contradictions": self.contradictions,
@@ -207,8 +250,18 @@ def _merge_coverage(harmful_after, harmful_graph, events_by_id, legitimate_stori
 
 def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_graph,
                              legitimate_stories=(), authorizations=(), *,
-                             facts=None, now=None) -> ProposedActionResult:
-    """Hypothetically insert ``proposed_action`` and classify (advisory)."""
+                             facts=None, now=None, trusted_context=None
+                             ) -> ProposedActionResult:
+    """Hypothetically insert ``proposed_action`` and classify (advisory).
+
+    ``trusted_context`` (spec signature) may bundle
+    ``{authorizations, facts, now}``; when given it overrides the explicit args.
+    The proposed action is inserted hypothetically — never recorded as executed.
+    """
+    if trusted_context:
+        authorizations = trusted_context.get("authorizations", authorizations)
+        facts = trusted_context.get("facts", facts)
+        now = trusted_context.get("now", now)
     facts = facts or {}
     graph = harmful_story_graph
     proposed = _rebase(assembly_events, proposed_action)
@@ -225,14 +278,29 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
     category = _classify_proposed(graph, before, after, cov, contras, witness, facts)
     signal = signals.UNAVAILABLE if after.unavailable else _SIGNAL[category]
     explanation = _explain_proposed(category, after, cov, contras, witness)
-    body = {"story": graph.ref, "category": category,
-            "risk_after": after.risk.to_dict(),
+
+    # the single combined structural vector (§3): harmful dims + trusted-context
+    # coverage + typed contradiction findings.
+    present_harmful = [n for n in after.present_nodes]
+    tcc = (len(cov.covered_nodes) / len(present_harmful)
+           if cov and present_harmful else 0.0)
+    sv = StructuralVector(
+        node_coverage=after.risk.coverage,
+        ordering_consistency=after.risk.ordering_consistency,
+        entity_binding_consistency=after.risk.entity_consistency,
+        timing_consistency=after.risk.timing_consistency,
+        corroboration=after.risk.corroboration,
+        completion_proximity=after.risk.proximity,
+        trusted_context_coverage=tcc,
+        contradiction_findings=[c.to_dict() for c in contras])
+
+    body = {"story": graph.ref, "category": category, "vector": sv.to_dict(),
             "completes": bool(witness), "cov": cov.status if cov else None}
     return ProposedActionResult(
         category=category, signal=signal, story_ref=graph.ref,
         harmful_before_complete=before.is_complete(),
         harmful_after_complete=after.is_complete(),
-        risk_after=after.risk.to_dict(),
+        structural_vector=sv.to_dict(), risk_after=after.risk.to_dict(),
         legitimate_coverage=cov.to_dict() if cov else None,
         contradictions=[c.to_dict() for c in contras],
         completion_witness=witness.to_dict() if witness else None,
@@ -245,6 +313,10 @@ def _classify_proposed(graph, before, after, cov, contras, witness, facts) -> st
                  or any(c.type == contra_mod.ENTITY_LINKAGE_AMBIGUOUS for c in contras))
     if facts.get("confirmed_violation") is True:
         return HARD_POLICY_VIOLATION
+    # a fired CONTRADICTS edge (e.g. a verified confirmation) weakens the harmful
+    # story: it is no longer a clean threat-consistent assembly.
+    if after.contradicts_triggered:
+        return AMBIGUOUS_COMPETING_STORIES
     if after.risk.coverage < graph.material_floor and witness is None:
         return NO_MATERIAL_PATTERN
     completion_covered = bool(cov and cov.completion_covered)
