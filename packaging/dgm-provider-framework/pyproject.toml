@@ -18,8 +18,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
-# Depends on the independent DGM distribution — never bundles a copy of it.
-dependencies = ["decision-governance==1.0.0"]
+# Depends on the independent DGM distribution and the canonical governance-
+# contracts leaf — never bundles a copy of either.
+dependencies = ["decision-governance==1.0.0", "ugence-governance-contracts>=0.1.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
