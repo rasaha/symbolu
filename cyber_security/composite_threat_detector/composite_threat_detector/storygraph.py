@@ -56,6 +56,12 @@ class Edge:
     actor_mode: str = "SAME"    # for RELATED_ACTORS: SAME | ANY
     corroborating_fragment: str = ""  # for REQUIRES_CORROBORATION
     auth_tag: str = ""          # for COVERED_BY_AUTHORIZATION: authorization tag
+    # for CONTRADICTS: the explicit mutual-incompatibility condition. Mere
+    # coexistence never fires a contradiction. One of:
+    #   "BOTH_PRESENT"            — the two node states are declared incompatible
+    #   "SAME_ENTITY:<dim>"       — fire only if both share entity <dim>
+    #   "DIFFERENT_ENTITY:<dim>"  — fire only if both differ on entity <dim>
+    incompatible_when: str = ""
 
     def endpoints(self) -> tuple[str, ...]:
         if self.kind in (REQUIRES_CORROBORATION, COVERED_BY_AUTHORIZATION):
@@ -83,10 +89,16 @@ def requires_corroboration(a, corroborating_fragment):
     return Edge(REQUIRES_CORROBORATION, a, corroborating_fragment=corroborating_fragment)
 
 
-def contradicts(a, b):
-    """If both nodes are present, the harmful story is weakened (e.g. a verified
-    customer confirmation event that contradicts the fraud reading)."""
-    return Edge(CONTRADICTS, a, b)
+def contradicts(a, b, incompatible_when):
+    """A CONTRADICTS edge fires only under an explicit incompatibility condition
+    (§8) — mere coexistence of the two nodes is never sufficient.
+
+    ``incompatible_when`` ∈ {"BOTH_PRESENT", "SAME_ENTITY:<dim>",
+    "DIFFERENT_ENTITY:<dim>"}.
+    """
+    if not incompatible_when:
+        raise ValueError("CONTRADICTS edge requires an explicit incompatible_when")
+    return Edge(CONTRADICTS, a, b, incompatible_when=incompatible_when)
 
 
 def covered_by_authorization(a, auth_tag):
@@ -165,6 +177,9 @@ class StoryGraph:
                 if ep not in ids:
                     raise ValueError(f"story {self.story_id!r}: edge references "
                                      f"unknown node {ep!r}")
+            if e.kind == CONTRADICTS and not e.incompatible_when:
+                raise ValueError(f"story {self.story_id!r}: CONTRADICTS edge must "
+                                 f"declare an explicit incompatible_when (§8)")
         if not any(n.is_completion for n in self.nodes):
             raise ValueError(f"story {self.story_id!r}: needs >=1 completion node")
 
@@ -301,7 +316,19 @@ def _edge_ok(edge: Edge, binding: dict, events_by_id: dict, present: set,
     if edge.kind == RELATED_ACTORS:
         return True if edge.actor_mode == "ANY" else (ea.actor == eb.actor and bool(ea.actor))
     if edge.kind == CONTRADICTS:
-        return True  # both endpoints bound ⇒ the contradiction fires
+        # fire only under the explicit incompatibility condition (§8)
+        cond = edge.incompatible_when
+        if cond == "BOTH_PRESENT":
+            return True
+        if cond.startswith("SAME_ENTITY:"):
+            dim = cond.split(":", 1)[1]
+            va, vb = ea.entities.get(dim, ""), eb.entities.get(dim, "")
+            return bool(va) and va == vb
+        if cond.startswith("DIFFERENT_ENTITY:"):
+            dim = cond.split(":", 1)[1]
+            va, vb = ea.entities.get(dim, ""), eb.entities.get(dim, "")
+            return bool(va) and bool(vb) and va != vb
+        return False  # no explicit condition ⇒ mere coexistence never fires
     return True
 
 
@@ -393,7 +420,10 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailabl
         rec = {"kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim}
         if e.kind == CONTRADICTS:
             if ok:
-                contradicts_triggered.append(rec)  # story weakened
+                contradicts_triggered.append({
+                    **rec, "condition": e.incompatible_when,
+                    "weakens": "HARMFUL", "severity": "decisive",
+                    "resolution_status": "unresolved"})  # story weakened
             continue
         if e.kind not in _HARMFUL_KINDS:
             continue

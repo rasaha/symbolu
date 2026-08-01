@@ -73,8 +73,16 @@ class BenignSummary:
 
 
 # ---------------------------------------------------------------------------
-# Minimal completion witness / deterministic certificate (§7, §10)
+# Minimal completion witness / deterministic certificate (§5, §7, §10)
 # ---------------------------------------------------------------------------
+# Frozen deterministic tie-break for selecting among multiple minimal witnesses:
+#   (1) fewest events  (2) earliest complete temporal span
+#   (3) highest mandatory-edge satisfaction  (4) lexicographic event-id order
+# The matcher realizes this: candidates per node are sorted by
+# (position, coord, event_id) and the first max-satisfaction binding wins.
+TIE_BREAK_RULE_VERSION = "ctd.witness.tiebreak/1.0.0"
+
+
 @dataclass
 class CompletionWitness:
     story_ref: str
@@ -85,6 +93,9 @@ class CompletionWitness:
     proves: dict                    # named proof claims (same_account, valid_time, …)
     removal_breaks_completion: bool
     proposed_is_necessary: bool
+    minimality_verified: bool       # removing ANY witness event breaks completion
+    removal_proofs: list            # per-event: what mandatory node/edge failed
+    tie_break_rule_version: str
     certificate_digest: str
 
     def to_dict(self) -> dict:
@@ -95,6 +106,9 @@ class CompletionWitness:
             "proved_relations": self.proved_relations, "proves": self.proves,
             "removal_breaks_completion": self.removal_breaks_completion,
             "proposed_is_necessary": self.proposed_is_necessary,
+            "minimality_verified": self.minimality_verified,
+            "removal_proofs": self.removal_proofs,
+            "tie_break_rule_version": self.tie_break_rule_version,
             "certificate_digest": self.certificate_digest,
         }
 
@@ -103,6 +117,59 @@ def _rebase(events, proposed):
     if events and proposed.epoch is None:
         return dataclasses.replace(proposed, position=max(e.position for e in events) + 1)
     return proposed
+
+
+# ---------------------------------------------------------------------------
+# Evaluation binding + stale-detection (§14) — bind a finding to the exact
+# inputs so a later commit-time system can detect that the evaluation is stale.
+# Deterministic; no wall-clock (evaluation_time is supplied as event data).
+# ---------------------------------------------------------------------------
+def _auth_snapshot(authorizations):
+    return sorted(
+        [[a.tag, a.valid, sorted(a.covered_operations), a.account, a.device,
+          a.beneficiary, a.destination, a.amount_cap, a.expires_at, a.record_id]
+         for a in authorizations],
+        key=lambda x: (x[0], str(x[9])))
+
+
+def _assembly_state_digest(events):
+    return digest(sorted([[e.event_id, e.fragment_id, sorted(e.entities.items()),
+                           e.position, e.epoch, e.actor] for e in events],
+                         key=lambda r: r[0]), domain="CTD-ASMSTATE")
+
+
+def _tcs_digest(authorizations, facts):
+    return digest({"auths": _auth_snapshot(authorizations),
+                   "facts": sorted((facts or {}).items())}, domain="CTD-TCS")
+
+
+def build_evaluation_binding(assembly_events, proposed, graph, authorizations, facts,
+                             policy_version, now):
+    return {
+        "proposed_action_identity": digest(
+            [proposed.fragment_id, sorted(proposed.entities.items()), proposed.actor],
+            domain="CTD-PROP-ID"),
+        "payload_digest": digest(sorted(proposed.entities.items()), domain="CTD-PAYLOAD"),
+        "graph_id_version": graph.ref,
+        "policy_version": policy_version or "",
+        "trusted_context_snapshot_digest": _tcs_digest(authorizations, facts),
+        "evaluation_time": now,
+        "assembly_state_digest": _assembly_state_digest(assembly_events),
+    }
+
+
+def is_stale(binding, current_assembly_events, *, current_policy_version="",
+             current_authorizations=(), current_facts=None) -> dict:
+    """Detect whether a prior evaluation binding is stale vs. current state."""
+    reasons = []
+    if _assembly_state_digest(current_assembly_events) != binding["assembly_state_digest"]:
+        reasons.append("assembly_state_changed")
+    if (current_policy_version or "") != binding["policy_version"]:
+        reasons.append("policy_version_changed")
+    if _tcs_digest(current_authorizations, current_facts) != \
+            binding["trusted_context_snapshot_digest"]:
+        reasons.append("trusted_context_changed")
+    return {"stale": bool(reasons), "reasons": reasons}
 
 
 def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent):
@@ -144,13 +211,39 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
         "valid_time_interval": after.risk.timing_consistency >= 0.999,
         "proposed_is_necessary": proposed_necessary,
     }
+    # per-event removal proofs (§5): removing ANY witness element must break
+    # completion — proving necessity of every element, not just the proposed one.
+    all_events = events + [proposed]
+    witness_ids = sorted(set(witness.values()) | {proposed.event_id})
+    removal_proofs = []
+    minimality_verified = True
+    for rid in witness_ids:
+        reduced = [e for e in all_events if e.event_id != rid]
+        rm = match(graph, reduced)
+        lost_nodes = sorted(set(after.binding) - set(rm.binding))
+        broke = not rm.is_complete()
+        removal_proofs.append({
+            "removed_event": rid,
+            "still_complete": rm.is_complete(),
+            "broke_completion": broke,
+            "unsatisfied": ("missing_required:" + ",".join(rm.missing_required))
+            if rm.missing_required else
+            ("gate:" + ";".join(rm.risk.gate_reasons)) if rm.risk.gate_triggered
+            else ("lost_binding:" + ",".join(lost_nodes)) if lost_nodes else "none",
+        })
+        if not broke:
+            minimality_verified = False
+
     body = {"story": graph.ref, "completion_node": comp_node, "witness": witness,
-            "proves": proves, "proposed": proposed.event_id}
+            "proves": proves, "proposed": proposed.event_id,
+            "removal_proofs": removal_proofs, "tie_break": TIE_BREAK_RULE_VERSION}
     return CompletionWitness(
         story_ref=graph.ref, completes=True, completion_node=comp_node,
         witness_events=witness, proved_relations=proved, proves=proves,
         removal_breaks_completion=not before.is_complete(),
         proposed_is_necessary=proposed_necessary,
+        minimality_verified=minimality_verified, removal_proofs=removal_proofs,
+        tie_break_rule_version=TIE_BREAK_RULE_VERSION,
         certificate_digest=digest(body, domain="CTD-WITNESS"))
 
 
@@ -202,6 +295,7 @@ class ProposedActionResult:
     completion_witness: dict | None
     explanation: str
     verdict_digest: str
+    evaluation_binding: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -215,6 +309,7 @@ class ProposedActionResult:
             "contradictions": self.contradictions,
             "completion_witness": self.completion_witness,
             "explanation": self.explanation, "verdict_digest": self.verdict_digest,
+            "evaluation_binding": self.evaluation_binding,
         }
 
 
@@ -250,18 +345,23 @@ def _merge_coverage(harmful_after, harmful_graph, events_by_id, legitimate_stori
 
 def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_graph,
                              legitimate_stories=(), authorizations=(), *,
-                             facts=None, now=None, trusted_context=None
+                             facts=None, now=None, trusted_context=None,
+                             policy_version=""
                              ) -> ProposedActionResult:
     """Hypothetically insert ``proposed_action`` and classify (advisory).
 
     ``trusted_context`` (spec signature) may bundle
-    ``{authorizations, facts, now}``; when given it overrides the explicit args.
-    The proposed action is inserted hypothetically — never recorded as executed.
+    ``{authorizations, facts, now, policy_version}``; when given it overrides the
+    explicit args. The proposed action is inserted hypothetically — never recorded
+    as executed. The returned ``evaluation_binding`` (§14) binds this finding to the
+    exact proposed identity, assembly state, trusted context, and policy version so a
+    later commit-time system can detect the evaluation went stale.
     """
     if trusted_context:
         authorizations = trusted_context.get("authorizations", authorizations)
         facts = trusted_context.get("facts", facts)
         now = trusted_context.get("now", now)
+        policy_version = trusted_context.get("policy_version", policy_version)
     facts = facts or {}
     graph = harmful_story_graph
     proposed = _rebase(assembly_events, proposed_action)
@@ -294,8 +394,11 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
         trusted_context_coverage=tcc,
         contradiction_findings=[c.to_dict() for c in contras])
 
+    binding = build_evaluation_binding(assembly_events, proposed, graph,
+                                       authorizations, facts, policy_version, now)
     body = {"story": graph.ref, "category": category, "vector": sv.to_dict(),
-            "completes": bool(witness), "cov": cov.status if cov else None}
+            "completes": bool(witness), "cov": cov.status if cov else None,
+            "binding": binding}
     return ProposedActionResult(
         category=category, signal=signal, story_ref=graph.ref,
         harmful_before_complete=before.is_complete(),
@@ -304,7 +407,8 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
         legitimate_coverage=cov.to_dict() if cov else None,
         contradictions=[c.to_dict() for c in contras],
         completion_witness=witness.to_dict() if witness else None,
-        explanation=explanation, verdict_digest=digest(body, domain="CTD-PROPOSED"))
+        explanation=explanation, verdict_digest=digest(body, domain="CTD-PROPOSED"),
+        evaluation_binding=binding)
 
 
 def _classify_proposed(graph, before, after, cov, contras, witness, facts) -> str:

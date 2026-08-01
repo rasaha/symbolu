@@ -25,7 +25,7 @@ def test_contradicts_edge_weakens_story():
     g = StoryGraph("c", "1", "c",
                    nodes=(StoryNode("a", "A"), StoryNode("b", "B", is_completion=True),
                           StoryNode("conf", "CONF")),
-                   edges=(order("a", "b"), contradicts("b", "conf")))
+                   edges=(order("a", "b"), contradicts("b", "conf", "BOTH_PRESENT")))
     ev = [ObservedEvent("A", "1", 1, None, "u", {}),
           ObservedEvent("B", "2", 2, None, "u", {}),
           ObservedEvent("CONF", "3", 3, None, "u", {})]
@@ -37,7 +37,7 @@ def test_contradicts_drives_ambiguous_category():
     g = StoryGraph("c", "1", "c",
                    nodes=(StoryNode("a", "A"), StoryNode("b", "B", is_completion=True),
                           StoryNode("conf", "CONF")),
-                   edges=(order("a", "b"), contradicts("b", "conf")))
+                   edges=(order("a", "b"), contradicts("b", "conf", "BOTH_PRESENT")))
     events = [ObservedEvent("A", "1", 1, None, "u", {}),
               ObservedEvent("CONF", "3", 3, None, "u", {})]
     proposed = ObservedEvent("B", "prop", 10, None, "u", {})

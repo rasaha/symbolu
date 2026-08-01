@@ -82,7 +82,8 @@ def current_config() -> dict:
                 {"nodes": [(n.node_id, n.fragment_id, n.required, n.is_completion)
                            for n in g.nodes],
                  "edges": [(e.kind, e.a, e.b, e.dim, e.max_gap, e.actor_mode,
-                            e.corroborating_fragment, e.auth_tag) for e in g.edges],
+                            e.corroborating_fragment, e.auth_tag,
+                            e.incompatible_when) for e in g.edges],
                  "gates": [g.entity_gate, g.ordering_gate, g.timing_gate,
                            g.material_floor, g.threat_threshold],
                  "weights": g.weights}, domain="CTD-STORYGRAPH")
