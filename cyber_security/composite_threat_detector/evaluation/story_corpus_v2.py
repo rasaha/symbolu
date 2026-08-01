@@ -31,6 +31,15 @@ from composite_threat_detector.storygraph import ObservedEvent
 WC = V.WOULD_COMPLETE_PROHIBITED_CAPABILITY
 SPLITS = ("dev", "calibration", "final")
 
+# frozen deterministic corpus generator (§4). The development corpus uses variants
+# (0,1,2); the Run-3 replacement final split uses a NEW seed of variant indices that
+# no development command touches. Bumping this version invalidates the freeze.
+GENERATOR_VERSION = "ctd.storycorpus.gen/2.0.0"
+# Run-2's final split was EXPOSED (see STORY_GRAPH_FINAL_SPLIT_AUDIT.md): full-corpus
+# aggregates were inspected before freeze. The replacement final split below is a
+# fresh generation the development corpus never includes.
+HOLDOUT_SEED = (911, 912, 913)
+
 
 # ---------------------------------------------------------------------------
 # builders
@@ -73,6 +82,7 @@ class Case:
     legitimate_stories: tuple = ()
     expect_would_complete: bool = False
     now: float | None = None
+    facts: tuple = ()                # frozen (k, v) pairs -> context signals
     note: str = ""
 
 
@@ -346,14 +356,16 @@ def _harmful(v):
                     now=100.0, expect_would_complete=True,
                     note="bank authorization expired before the transfer"))
 
-    # duplicate / retry storm: duplicated reset+device events
+    # duplicate / retry storm: duplicated reset+device events (same principal +
+    # same material entities => genuine retries/replays, canonicalized in the witness)
     storm = _clean_assembly(v) + [
-        _oe(F.CRED_RESET, f"reset-dup-{v}", 1, account=e["account"]),
-        _oe(F.DEVICE_NEW, f"device-dup-{v}", 2, account=e["account"],
-            device=e["device"])]
+        _oe(F.CRED_RESET, f"reset-dup-{v}", 1, actor=e["actor"], account=e["account"]),
+        _oe(F.DEVICE_NEW, f"device-dup-{v}", 2, actor=e["actor"],
+            account=e["account"], device=e["device"])]
     out.append(Case(f"H_storm_{v}", "duplicate_retry_storm", "HARMFUL",
                     tuple(storm), _transfer(v),
-                    expect_would_complete=True, note="dedup/multiplicity, still completes"))
+                    expect_would_complete=True,
+                    note="duplicate/retry storm; witness canonicalizes the duplicates"))
 
     # out-of-order ingestion but correct coordinates => still completes
     jumbled = [
@@ -404,15 +416,118 @@ def _harmful(v):
     return out
 
 
+# ---------------------------------------------------------------------------
+# IMPERFECT-but-BENIGN context families (§11) — valid activity, operationally
+# incomplete evidence. These must NOT complete and must NOT be treated as
+# positively-proven harmful. Structurally partial (no takeover setup), so the
+# context signal — not a harmful assertion — drives the advisory outcome.
+# ---------------------------------------------------------------------------
+def _benef_xfer(v):
+    """A benign beneficiary + transfer with no credential-reset / new-device setup."""
+    e = _ent(v)
+    return ([_oe(F.BENEFICIARY_ADD, f"benef-{v}", 2, account=e["account"],
+                 beneficiary=e["beneficiary"])], _transfer(v))
+
+
+def _imperfect_benign(v):
+    e = _ent(v)
+    out = []
+
+    def case(cid, family, facts=(), auths=(), legit=(), note=""):
+        asm, prop = _benef_xfer(v)
+        return Case(f"{cid}_{v}", family, "BENIGN", tuple(asm), prop,
+                    authorizations=tuple(auths), legitimate_stories=tuple(legit),
+                    facts=tuple(facts), note=note)
+
+    out.append(case("IB_delayedapproval", "valid_transfer_delayed_approval",
+                    facts=(("context_stale", True),),
+                    note="approval exists but ingestion is delayed"))
+    out.append(case("IB_providerdown", "provider_temporarily_unavailable",
+                    facts=(("provider_unavailable", True),),
+                    note="benign transfer; approval provider is down"))
+    out.append(case("IB_unmapped", "approval_in_unmapped_system",
+                    facts=(("provider_unavailable", True),),
+                    note="correct approval stored in a system we do not query"))
+    out.append(case("IB_ambiguousactor", "ambiguous_service_account_linkage",
+                    facts=(("context_conflicting", True),),
+                    note="valid actor relationship; ambiguous service-account linkage"))
+    out.append(case("IB_benefsnapshot", "beneficiary_absent_from_snapshot",
+                    facts=(("context_stale", True),),
+                    note="long-standing beneficiary absent from the current snapshot"))
+    out.append(case("IB_stalereplica", "stale_read_replica",
+                    facts=(("context_stale", True),),
+                    note="correct workflow read from a stale replica"))
+    out.append(case("IB_directorydown", "authority_directory_unavailable",
+                    facts=(("provider_unavailable", True),),
+                    note="human approval present but authority directory is down"))
+    out.append(case("IB_conflictingrecords", "conflicting_duplicate_records",
+                    facts=(("context_conflicting", True),),
+                    note="valid instruction with conflicting duplicate records"))
+    out.append(case("IB_approvalafter", "approval_after_eval_existed_before",
+                    facts=(("context_stale", True),),
+                    note="approval existed beforehand but ingested after evaluation"))
+    out.append(case("IB_orderingdelay", "ordering_obscured_by_delayed_ingestion",
+                    facts=(("context_stale", True),),
+                    note="legitimate ordering obscured by delayed ingestion"))
+    out.append(case("IB_informal", "informal_authorized_workflow_not_in_fixture",
+                    facts=(("provider_unavailable", True),),
+                    note="informal but authorized workflow absent from the fixture"))
+
+    # recovery with one missing provider record: reset+device present, recovery
+    # authorization covers only the reset (the device record is missing) => the
+    # context is PARTIALLY verified (not a harmful assertion, not fully clean).
+    recovery_partial = Authorization(
+        tag="customer_account_recovery", valid=True,
+        covered_operations=frozenset({"PASSWORD_RESET"}), account=e["account"])
+    out.append(Case(f"IB_recoverymissing_{v}", "recovery_missing_one_record",
+                    "BENIGN", tuple(_clean_assembly(v)[:2]),
+                    _oe(F.DEVICE_NEW, f"device2-{v}", 5, account=e["account"],
+                        device=e["device"]),
+                    authorizations=(recovery_partial,),
+                    legitimate_stories=(ACCOUNT_RECOVERY_STORY,),
+                    note="recovery covers the reset; the device record is missing"))
+
+    # valid transfer whose destination metadata is incomplete: bank authorization
+    # present but destination unverifiable -> partial verified context.
+    ba_no_dest = Authorization(
+        tag="bank_assisted_transaction", valid=True,
+        covered_operations=frozenset({"BENEFICIARY_ADD"}), account=e["account"],
+        beneficiary=e["beneficiary"])
+    asm, prop = _benef_xfer(v)
+    out.append(Case(f"IB_incompletedest_{v}", "incomplete_destination_metadata",
+                    "BENIGN", tuple(asm), prop,
+                    authorizations=(ba_no_dest,),
+                    legitimate_stories=(BANK_ASSISTED_TRANSFER_STORY,),
+                    facts=(("context_stale", True),),
+                    note="authorization present; destination metadata incomplete"))
+
+    return out
+
+
 def build_corpus(variants=(0, 1, 2)) -> list[Case]:
     cases = []
     for v in variants:
         cases.extend(_benign(v))
         cases.extend(_harmful(v))
+        cases.extend(_imperfect_benign(v))
     return cases
 
 
-CORPUS = build_corpus()
+CORPUS = build_corpus()   # development corpus (variants 0,1,2) — all EXPOSED
+
+
+def holdout_final_cases() -> list[Case]:
+    """The Run-3 replacement final split (a fresh generation, never evaluated by any
+    development/calibration command — only by the guarded official runner)."""
+    return build_corpus(HOLDOUT_SEED)
+
+
+def holdout_hashes() -> dict:
+    """Case-id + generator hash of the holdout, computable WITHOUT evaluating it."""
+    ids = sorted(c.case_id for c in holdout_final_cases())
+    return {"generator_version": GENERATOR_VERSION, "seed": list(HOLDOUT_SEED),
+            "n_cases": len(ids),
+            "holdout_id_hash": digest(ids, domain="CTD-STORYCORPUS2-HOLDOUT")}
 
 
 def split_of(case_id: str) -> str:
@@ -448,10 +563,12 @@ PREREGISTERED_GATES = {
     "max_evasion_false_completion_rate": 0.00,       # no evasion completes
     "max_benign_escalate_rate": 0.10,                # the corrected-defect gate
     "max_benign_threat_consistent_rate": 0.00,       # the ORIGINAL defect category
-    "min_witness_minimality_pass_rate": 1.00,             # canonical completions
-    "min_duplicate_witness_nonminimal_correct_rate": 1.00,  # honest non-minimal report
+    "min_witness_minimality_pass_rate": 1.00,             # every completion, canonicalized
+    "min_duplicate_equivalence_canonicalization_rate": 1.00,  # dups excluded, still minimal
     "min_deterministic_replay_pass_rate": 1.00,
     "min_non_mutation_pass_rate": 1.00,
+    "max_incorrect_harmful_strengthening_from_missing_context": 0,
+    "max_incorrect_benign_neutralization": 0,
 }
 
 
@@ -473,7 +590,7 @@ def _run(c: Case):
     return V.evaluate_proposed_action(
         list(c.assembly), c.proposed, ATO,
         legitimate_stories=list(c.legitimate_stories),
-        authorizations=list(c.authorizations), now=c.now)
+        authorizations=list(c.authorizations), now=c.now, facts=dict(c.facts))
 
 
 def _rate(num, den):
@@ -489,10 +606,12 @@ def evaluate_corpus(cases=CORPUS) -> dict:
     non_completions = [c for c in harmful if not c.expect_would_complete]
 
     per_case, replay_ok, nonmut_ok = [], 0, 0
-    # canonical minimality: cases with NO equivalent duplicate event must be strictly
-    # minimal; cases WITH an equivalent duplicate must correctly report non-minimal.
-    canon_minimal_ok = canon_minimal_total = 0
-    dup_nonminimal_ok = dup_total = 0
+    # witness minimality: EVERY completion (incl. duplicate/retry storms) must be
+    # strictly minimal AFTER equivalence canonicalization; duplicate-bearing cases
+    # must additionally record the excluded equivalent events.
+    minimal_ok = minimal_total = 0
+    dup_canon_ok = dup_total = 0
+    excluded_counts = []
     esc_count = observe_count = unavail_count = 0
     benign_esc = benign_tc = benign_false_complete = 0
     tp_hits = evasion_leaks = 0
@@ -537,16 +656,17 @@ def evaluate_corpus(cases=CORPUS) -> dict:
             w = r1.completion_witness
             if w:
                 witness_sizes.append(len(w.get("witness_events", {})) + 1)
-            has_dup = _has_equiv_dup(c)
-            if has_dup:
+            minimal_total += 1
+            if w and w.get("minimality_verified"):
+                minimal_ok += 1                       # strictly minimal after canon
+            if _has_equiv_dup(c):
                 dup_total += 1
-                # a duplicate-bearing completion must correctly report NON-minimal
-                if w and not w.get("minimality_verified"):
-                    dup_nonminimal_ok += 1
-            else:
-                canon_minimal_total += 1
-                if w and w.get("minimality_verified"):
-                    canon_minimal_ok += 1
+                excl = w.get("excluded_equivalent_events", []) if w else []
+                excluded_counts.append(len(excl))
+                # a duplicate-bearing completion must canonicalize: excluded events
+                # recorded AND the witness is still strictly minimal.
+                if w and excl and w.get("minimality_verified"):
+                    dup_canon_ok += 1
 
         # structural aggregates from the hypothetical after-state match
         m = story_match(ATO, list(c.assembly) + [_rebase(c)])
@@ -565,6 +685,33 @@ def evaluate_corpus(cases=CORPUS) -> dict:
                          "expect_would_complete": c.expect_would_complete,
                          "category": r1.category, "signal": r1.signal,
                          "completes": completes})
+
+    # imperfect-context metrics (§13): missing/unavailable context must never raise
+    # the harmful structural vector, nor be neutralized as VERIFIED.
+    ctx_gap = {V.CONTEXT_UNAVAILABLE, V.CONTEXT_STALE, V.CONTEXT_CONFLICTING}
+    harmful_strengthened = benign_neutralized = 0
+    ctx_request = provider_unavail = benign_ambiguity = 0
+    for c in cases:
+        r = _run(c)
+        if r.category == V.ADDITIONAL_CONTEXT_REQUIRED:
+            ctx_request += 1
+        if r.context_status == V.CONTEXT_UNAVAILABLE:
+            provider_unavail += 1
+        if c.label == "BENIGN" and r.category == V.AMBIGUOUS_COMPETING_STORIES:
+            benign_ambiguity += 1
+        if c.facts:
+            # parity: identical structural case WITHOUT the context signals must not
+            # have a LOWER harmful structural vector (i.e. missing context must not
+            # strengthen the harmful reading).
+            clean = V.evaluate_proposed_action(
+                list(c.assembly), c.proposed, ATO,
+                legitimate_stories=list(c.legitimate_stories),
+                authorizations=list(c.authorizations), now=c.now, facts={})
+            if r.structural_vector != clean.structural_vector:
+                harmful_strengthened += 1
+        if r.context_status in ctx_gap and \
+                r.category == V.VERIFIED_LEGITIMATE_STORY:
+            benign_neutralized += 1
 
     n = len(cases)
     total_edges = sum(edge_state_totals.values()) or 1
@@ -585,6 +732,15 @@ def evaluate_corpus(cases=CORPUS) -> dict:
         # advisory-signal metrics
         "benign_escalate_rate": _rate(benign_esc, len(benign)),
         "benign_threat_consistent_rate": _rate(benign_tc, len(benign)),
+        "benign_observe_rate":
+            _rate(sum(1 for pc in per_case
+                      if pc["label"] == "BENIGN" and pc["signal"] == "OBSERVE"),
+                  len(benign)),
+        "benign_ambiguity_rate": _rate(benign_ambiguity, len(benign)),
+        "context_request_rate": _rate(ctx_request, n),
+        "provider_unavailable_rate": _rate(provider_unavail, n),
+        "incorrect_harmful_strengthening_from_missing_context": harmful_strengthened,
+        "incorrect_benign_neutralization": benign_neutralized,
         "harmful_partial_escalate_rate":
             _rate(sum(1 for pc in per_case if pc["label"] == "HARMFUL"
                       and not pc["completes"] and pc["signal"] == "ESCALATE"),
@@ -598,11 +754,15 @@ def evaluate_corpus(cases=CORPUS) -> dict:
             edge_state_totals["NOT_EVALUABLE"] / total_edges, 4),
         "ambiguous_edge_rate": round(edge_state_totals["AMBIGUOUS"] / total_edges, 4),
         "dimension_failed_counts": dim_fail,
-        # canonical (no equivalent-duplicate) completions must be strictly minimal
-        "witness_minimality_pass_rate": _rate(canon_minimal_ok, canon_minimal_total),
-        # duplicate-bearing completions must correctly REPORT non-minimal (honest)
-        "duplicate_witness_nonminimal_correct_rate": _rate(dup_nonminimal_ok, dup_total),
+        # EVERY completion must be strictly minimal after equivalence canonicalization
+        "witness_minimality_pass_rate": _rate(minimal_ok, minimal_total),
+        # duplicate-bearing completions must canonicalize (exclude dups, stay minimal)
+        "duplicate_equivalence_canonicalization_rate": _rate(dup_canon_ok, dup_total),
         "n_duplicate_completions": dup_total,
+        "mean_excluded_duplicates_per_witness":
+            (round(sum(excluded_counts) / len(excluded_counts), 3)
+             if excluded_counts else 0.0),
+        "removal_proof_pass_rate": _rate(minimal_ok, minimal_total),
         "deterministic_replay_pass_rate": _rate(replay_ok, n),
         "non_mutation_pass_rate": _rate(nonmut_ok, n),
         # operational (measured on synthetic corpus)
@@ -653,13 +813,19 @@ def check_gates(metrics=None, gates=PREREGISTERED_GATES) -> dict:
     le("benign escalate", "benign_escalate_rate", gates["max_benign_escalate_rate"])
     le("benign threat-consistent (defect)", "benign_threat_consistent_rate",
        gates["max_benign_threat_consistent_rate"])
-    ge("witness minimality (canonical)", "witness_minimality_pass_rate",
+    ge("witness minimality (all completions)", "witness_minimality_pass_rate",
        gates["min_witness_minimality_pass_rate"])
-    ge("duplicate witness non-minimal reported", "duplicate_witness_nonminimal_correct_rate",
-       gates["min_duplicate_witness_nonminimal_correct_rate"])
+    ge("duplicate equivalence canonicalization",
+       "duplicate_equivalence_canonicalization_rate",
+       gates["min_duplicate_equivalence_canonicalization_rate"])
     ge("deterministic replay", "deterministic_replay_pass_rate",
        gates["min_deterministic_replay_pass_rate"])
     ge("non-mutation", "non_mutation_pass_rate", gates["min_non_mutation_pass_rate"])
+    le("missing context not harmful (E5)",
+       "incorrect_harmful_strengthening_from_missing_context",
+       gates["max_incorrect_harmful_strengthening_from_missing_context"])
+    le("no false benign neutralization", "incorrect_benign_neutralization",
+       gates["max_incorrect_benign_neutralization"])
     return {"all_pass": all(c["pass"] for c in checks), "checks": checks}
 
 

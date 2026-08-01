@@ -380,10 +380,31 @@ class StoryMatch:
     matcher_semantics_version: str = MATCHER_SEMANTICS_VERSION
 
     def is_complete(self) -> bool:
-        return (not self.missing_required and self.completion_present
-                and not self.risk.gate_triggered and not self.unavailable
-                and not self.mandatory_unsatisfied
-                and not self.contradicts_triggered)
+        """Exact completion requires every required node present AND every mandatory
+        edge positively SATISFIED (§9, fail-closed). A mandatory edge that is
+        FAILED / AMBIGUOUS / NOT_EVALUABLE never counts as satisfied."""
+        return not self.completion_blockers()
+
+    def completion_blockers(self) -> list:
+        """The explicit reasons exact completion is not proven (empty => complete)."""
+        blockers = []
+        if self.unavailable:
+            blockers.append("matcher_unavailable")
+        if self.missing_required:
+            blockers.append("missing_required:" + ",".join(self.missing_required))
+        if not self.completion_present:
+            blockers.append("no_completion_node")
+        if self.mandatory_unsatisfied:
+            blockers.append("mandatory_edge_not_positively_satisfied")
+        if self.risk.gate_triggered:
+            blockers.append("structural_gate:" + ";".join(self.risk.gate_reasons))
+        if self.contradicts_triggered:
+            blockers.append("contradiction_fired")
+        return blockers
+
+    def mandatory_edge_states(self) -> list:
+        """The state of every mandatory (all-endpoints-required) edge, for proofs."""
+        return [r for r in self.edge_results if r.get("mandatory")]
 
     def to_dict(self) -> dict:
         return {

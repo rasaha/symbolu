@@ -33,6 +33,18 @@ THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT = "THREAT_CONSISTENT_WITH_INSUFFICIE
 WOULD_COMPLETE_PROHIBITED_CAPABILITY = "WOULD_COMPLETE_PROHIBITED_CAPABILITY"
 HARD_POLICY_VIOLATION = "HARD_POLICY_VIOLATION"
 
+ADDITIONAL_CONTEXT_REQUIRED = "ADDITIONAL_CONTEXT_REQUIRED"
+
+# legitimate-context status (§12) — a SEPARATE axis from the harmful category.
+# "context not verified" is never equated with "harmful positively proven".
+CONTEXT_VERIFIED_LEGITIMATE = "VERIFIED_LEGITIMATE"
+CONTEXT_PARTIALLY_VERIFIED = "PARTIALLY_VERIFIED_LEGITIMATE"
+CONTEXT_UNAVAILABLE = "LEGITIMATE_CONTEXT_UNAVAILABLE"
+CONTEXT_CONFLICTING = "LEGITIMATE_CONTEXT_CONFLICTING"
+CONTEXT_STALE = "LEGITIMATE_CONTEXT_STALE"
+CONTEXT_NOT_FOUND = "LEGITIMATE_CONTEXT_NOT_FOUND"
+CONTEXT_HARMFUL_POSITIVE = "HARMFUL_STRUCTURE_POSITIVELY_SUPPORTED"
+
 # backward-compatible aliases (prior turn's names)
 PARTIAL_HARMFUL_MATCH = PARTIAL_HARMFUL_STORY
 VERIFIED_LEGITIMATE = VERIFIED_LEGITIMATE_STORY
@@ -51,7 +63,30 @@ _SIGNAL = {
     THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT: signals.ESCALATE,
     WOULD_COMPLETE_PROHIBITED_CAPABILITY: signals.ESCALATE,
     HARD_POLICY_VIOLATION: signals.ESCALATE,
+    ADDITIONAL_CONTEXT_REQUIRED: signals.OBSERVE,
 }
+
+
+def _context_status(cov, facts, completes) -> str:
+    """Classify the legitimate-context axis (§12), independent of the harmful score.
+
+    Provider/data problems (unavailable, conflicting, stale) are reported as such;
+    they never mean the harmful story is strengthened. A positively-proven harmful
+    structure is labeled explicitly and separately.
+    """
+    if facts.get("provider_unavailable"):
+        return CONTEXT_UNAVAILABLE
+    if facts.get("context_conflicting"):
+        return CONTEXT_CONFLICTING
+    if facts.get("context_stale"):
+        return CONTEXT_STALE
+    if cov is not None and cov.status == L.FULL:
+        return CONTEXT_VERIFIED_LEGITIMATE
+    if cov is not None and cov.status == L.PARTIAL:
+        return CONTEXT_PARTIALLY_VERIFIED
+    if completes:
+        return CONTEXT_HARMFUL_POSITIVE
+    return CONTEXT_NOT_FOUND
 
 
 # ---------------------------------------------------------------------------
@@ -75,12 +110,36 @@ class BenignSummary:
 # ---------------------------------------------------------------------------
 # Minimal completion witness / deterministic certificate (§5, §7, §10)
 # ---------------------------------------------------------------------------
-# Frozen deterministic tie-break for selecting among multiple minimal witnesses:
-#   (1) fewest events  (2) earliest complete temporal span
-#   (3) highest mandatory-edge satisfaction  (4) lexicographic event-id order
-# The matcher realizes this: candidates per node are sorted by
-# (position, coord, event_id) and the first max-satisfaction binding wins.
-TIE_BREAK_RULE_VERSION = "ctd.witness.tiebreak/1.0.0"
+# Frozen deterministic tie-break for selecting among equivalent minimal witnesses.
+# 2.0.0 canonicalizes semantically-equivalent candidate events (duplicates / retries
+# / replays) into one representative per node BEFORE proving minimality, so the
+# witness is strictly minimal even under duplicate and retry storms.
+#   (1) fewest witness events   (2) minimum temporal span
+#   (3) most directly-evidenced mandatory edges
+#   (4) earliest (position, coord) trusted-source order
+#   (5) lexicographic canonical event-id
+TIE_BREAK_RULE_VERSION = "ctd.witness.tiebreak/2.0.0"
+
+# entity fields that define an event's SEMANTIC identity for a graph node. Two
+# events sharing this key (and fragment + actor) are equivalent — duplicates,
+# retries, or replays of the same business event — and collapse to one witness
+# representative. Transport-level fields (record ids, ingest sequence, channel) are
+# deliberately excluded so a retry is recognized as equivalent; materially distinct
+# fields (a different amount / beneficiary) yield a DIFFERENT key and are never
+# collapsed.
+_EQUIV_FIELDS = ("account", "device", "beneficiary", "destination", "amount")
+
+
+def _equiv_key(e):
+    return (e.fragment_id, e.actor) + tuple(e.entities.get(f, "") for f in _EQUIV_FIELDS)
+
+
+def _equivalence_classes(events):
+    """Map semantic-key -> sorted representative-first list of event ids."""
+    classes: dict = {}
+    for e in sorted(events, key=lambda x: (x.position, x.coord, x.event_id)):
+        classes.setdefault(_equiv_key(e), []).append(e.event_id)
+    return classes
 
 
 @dataclass
@@ -93,16 +152,22 @@ class CompletionWitness:
     proves: dict                    # named proof claims (same_account, valid_time, …)
     removal_breaks_completion: bool
     proposed_is_necessary: bool
-    minimality_verified: bool       # removing ANY witness event breaks completion
-    removal_proofs: list            # per-event: what mandatory node/edge failed
+    minimality_verified: bool       # removing ANY witness class breaks completion
+    removal_proofs: list            # per-class: what mandatory node/edge failed
     tie_break_rule_version: str
     certificate_digest: str
+    canonical_witness: dict = field(default_factory=dict)   # node -> canonical event
+    excluded_equivalent_events: list = field(default_factory=list)  # collapsed dups
+    equivalence_classes: dict = field(default_factory=dict)  # node -> [event ids]
 
     def to_dict(self) -> dict:
         return {
             "story_ref": self.story_ref, "completes": self.completes,
             "completion_node": self.completion_node,
             "witness_events": self.witness_events,
+            "canonical_witness": self.canonical_witness,
+            "excluded_equivalent_events": self.excluded_equivalent_events,
+            "equivalence_classes": self.equivalence_classes,
             "proved_relations": self.proved_relations, "proves": self.proves,
             "removal_breaks_completion": self.removal_breaks_completion,
             "proposed_is_necessary": self.proposed_is_necessary,
@@ -211,32 +276,51 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
         "valid_time_interval": after.risk.timing_consistency >= 0.999,
         "proposed_is_necessary": proposed_necessary,
     }
-    # per-event removal proofs (§5): removing ANY witness element must break
-    # completion — proving necessity of every element, not just the proposed one.
+    # canonicalize equivalent candidates (§6, §7): each witness node keeps ONE
+    # representative event; semantically-equivalent duplicates/retries are excluded
+    # from the witness but their provenance stays visible.
     all_events = events + [proposed]
+    by_id = {e.event_id: e for e in all_events}
+    key_to_ids = _equivalence_classes(all_events)
     witness_ids = sorted(set(witness.values()) | {proposed.event_id})
+    equiv_classes, excluded = {}, []
+    canonical = dict(witness)
+    for node_id, rep_id in list(witness.items()) + [("__proposed__", proposed.event_id)]:
+        cls = key_to_ids.get(_equiv_key(by_id[rep_id]), [rep_id])
+        equiv_classes[node_id] = list(cls)
+        excluded.extend(eid for eid in cls if eid != rep_id)
+    excluded = sorted(set(excluded))
+
+    # class-level removal proofs (§8): removing the ENTIRE equivalence class of a
+    # witness representative must break completion — proving the node is necessary
+    # even when duplicate/retry events could otherwise substitute for it.
     removal_proofs = []
     minimality_verified = True
-    for rid in witness_ids:
-        reduced = [e for e in all_events if e.event_id != rid]
+    proved_ids = sorted(set(witness_ids))
+    for rid in proved_ids:
+        cls = set(key_to_ids.get(_equiv_key(by_id[rid]), [rid]))
+        reduced = [e for e in all_events if e.event_id not in cls]
         rm = match(graph, reduced)
         lost_nodes = sorted(set(after.binding) - set(rm.binding))
         broke = not rm.is_complete()
         removal_proofs.append({
             "removed_event": rid,
+            "removed_class": sorted(cls),
             "still_complete": rm.is_complete(),
             "broke_completion": broke,
             "unsatisfied": ("missing_required:" + ",".join(rm.missing_required))
             if rm.missing_required else
-            ("gate:" + ";".join(rm.risk.gate_reasons)) if rm.risk.gate_triggered
-            else ("lost_binding:" + ",".join(lost_nodes)) if lost_nodes else "none",
+            ("mandatory_unsatisfied" if rm.mandatory_unsatisfied else
+             ("gate:" + ";".join(rm.risk.gate_reasons)) if rm.risk.gate_triggered
+             else ("lost_binding:" + ",".join(lost_nodes)) if lost_nodes else "none"),
         })
         if not broke:
             minimality_verified = False
 
     body = {"story": graph.ref, "completion_node": comp_node, "witness": witness,
-            "proves": proves, "proposed": proposed.event_id,
-            "removal_proofs": removal_proofs, "tie_break": TIE_BREAK_RULE_VERSION}
+            "canonical": canonical, "excluded": excluded, "proves": proves,
+            "proposed": proposed.event_id, "removal_proofs": removal_proofs,
+            "tie_break": TIE_BREAK_RULE_VERSION}
     return CompletionWitness(
         story_ref=graph.ref, completes=True, completion_node=comp_node,
         witness_events=witness, proved_relations=proved, proves=proves,
@@ -244,6 +328,8 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
         proposed_is_necessary=proposed_necessary,
         minimality_verified=minimality_verified, removal_proofs=removal_proofs,
         tie_break_rule_version=TIE_BREAK_RULE_VERSION,
+        canonical_witness=canonical, excluded_equivalent_events=excluded,
+        equivalence_classes=equiv_classes,
         certificate_digest=digest(body, domain="CTD-WITNESS"))
 
 
@@ -296,6 +382,7 @@ class ProposedActionResult:
     explanation: str
     verdict_digest: str
     evaluation_binding: dict | None = None
+    context_status: str = CONTEXT_NOT_FOUND
 
     def to_dict(self) -> dict:
         return {
@@ -310,6 +397,7 @@ class ProposedActionResult:
             "completion_witness": self.completion_witness,
             "explanation": self.explanation, "verdict_digest": self.verdict_digest,
             "evaluation_binding": self.evaluation_binding,
+            "context_status": self.context_status,
         }
 
 
@@ -376,6 +464,20 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
     contras = contra_mod.detect(after, cov, facts)
 
     category = _classify_proposed(graph, before, after, cov, contras, witness, facts)
+    context_status = _context_status(cov, facts, witness is not None)
+
+    # §12: when a partial (non-completing) material story cannot be neutralized only
+    # because legitimate context is UNAVAILABLE / STALE / CONFLICTING, request
+    # additional context — do NOT convert missing benign evidence into a stronger
+    # harmful assertion. A positively-proven completion is unaffected (the harmful
+    # structure stands on its own; benign context we cannot verify never covers it).
+    context_gap = context_status in (CONTEXT_UNAVAILABLE, CONTEXT_STALE,
+                                     CONTEXT_CONFLICTING)
+    if (witness is None and context_gap and after.risk.coverage >= graph.material_floor
+            and category in (PARTIAL_HARMFUL_STORY,
+                             THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT)):
+        category = ADDITIONAL_CONTEXT_REQUIRED
+
     signal = signals.UNAVAILABLE if after.unavailable else _SIGNAL[category]
     explanation = _explain_proposed(category, after, cov, contras, witness)
 
@@ -398,7 +500,7 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
                                        authorizations, facts, policy_version, now)
     body = {"story": graph.ref, "category": category, "vector": sv.to_dict(),
             "completes": bool(witness), "cov": cov.status if cov else None,
-            "binding": binding}
+            "context_status": context_status, "binding": binding}
     return ProposedActionResult(
         category=category, signal=signal, story_ref=graph.ref,
         harmful_before_complete=before.is_complete(),
@@ -408,7 +510,7 @@ def evaluate_proposed_action(assembly_events, proposed_action, harmful_story_gra
         contradictions=[c.to_dict() for c in contras],
         completion_witness=witness.to_dict() if witness else None,
         explanation=explanation, verdict_digest=digest(body, domain="CTD-PROPOSED"),
-        evaluation_binding=binding)
+        evaluation_binding=binding, context_status=context_status)
 
 
 def _classify_proposed(graph, before, after, cov, contras, witness, facts) -> str:

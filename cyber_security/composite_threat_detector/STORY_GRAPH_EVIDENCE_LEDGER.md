@@ -70,8 +70,41 @@ A test (`test_prior_run_preserved`) asserts these constants remain on record.
 
 ---
 
-## Run 2 — corrected partial-match semantics
+## Run 2 — corrected partial-match semantics (SUPERSEDED)
 
 See `STORY_GRAPH_PARTIAL_MATCH_VALIDATION.md` for the Run-2 specification, the new
-semantic version, the re-frozen configuration, and the fresh final-split verdict.
-Run 2 supersedes Run 1; it does not delete it.
+semantic version, the re-frozen configuration, and the final-split verdict.
+
+- **Commit:** `019e1f0d`
+- **Freeze digest:** `sha-256:ed63bc9ba3f7636548360ecfb7d3cec6426fc02c884734a861a1f8347055c3da`
+- **Corpus hash:** `sha-256:53e171feb364969f6a19bc286565e32d3666b6b5fb1c0878763b0be3cfd6fb42`
+- **Correctness metrics:** encoded completion 1.0, benign/evasion false completion
+  0.0, benign ESCALATE 0.0 — these stand.
+- **Original verdict:** `CONTINUE — StoryGraph adversarial validation passed`.
+
+### Run-3 verification finding on Run 2
+
+Run 2's correctness results are sound, but its **final split was EXPOSED**: full
+corpus aggregates including final-split cases were inspected before freeze and the
+corpus/coverage model was tuned afterward (see `STORY_GRAPH_FINAL_SPLIT_AUDIT.md`).
+Run 2 therefore does **not** establish evaluation *independence*. Disposition: the
+Run-2 final split is retained as development evidence; a replacement held-out final
+split is introduced in Run 3.
+
+## Run 3 — verification & proof semantics (CURRENT)
+
+See `STORY_GRAPH_VERIFICATION_VALIDATION.md`. Run 3 does not add detection features;
+it (a) audits and replaces the exposed final split with a held-out generation, (b)
+canonicalizes duplicate/retry events so witnesses are strictly minimal
+(`ctd.witness.tiebreak/2.0.0`), (c) proves mandatory-edge fail-closed completion,
+and (d) adds the imperfect-benign context taxonomy (missing context is never harmful
+evidence).
+
+- **Commit:** `pending-run3`
+- **Freeze digest:** `sha-256:2e696f6a9579f82946a6bf77cbdaab6efe2d8a10df6cf9907b1ccf5330781767`
+- **Holdout final id-hash:** `sha-256:c25b15049035c813a49aed056ec734106546c5b31d2f921c1ac48d36b3a121c7`
+  (generator `ctd.storycorpus.gen/2.0.0`, seed `[911,912,913]`, 147 cases)
+- **Verdict:** `CONTINUE — evaluation integrity and proof semantics passed`.
+
+Run 3 supersedes Run 2's *integrity claim* only; all Run-1 and Run-2 hashes,
+metrics, commits, and verdicts above remain on the record.

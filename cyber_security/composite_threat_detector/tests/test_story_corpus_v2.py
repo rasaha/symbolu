@@ -49,8 +49,8 @@ def test_integrity_metrics():
     m = S.evaluate_corpus()
     assert m["deterministic_replay_pass_rate"] == 1.0
     assert m["non_mutation_pass_rate"] == 1.0
-    assert m["witness_minimality_pass_rate"] == 1.0            # canonical
-    assert m["duplicate_witness_nonminimal_correct_rate"] == 1.0
+    assert m["witness_minimality_pass_rate"] == 1.0            # all completions
+    assert m["duplicate_equivalence_canonicalization_rate"] == 1.0
 
 
 def test_not_evaluable_edges_are_measured():

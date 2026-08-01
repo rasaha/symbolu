@@ -16,6 +16,7 @@ from composite_threat_detector.ledger import StateLimits, TimescalePolicy
 from composite_threat_detector.linkage import (
     BY_ACTOR, BY_CASE, LINKAGE_SCHEMA_VERSION,
 )
+from composite_threat_detector import storyverdict
 from composite_threat_detector.recipes import DIGITAL_ONTOLOGY
 from composite_threat_detector.storygraph import (
     MATCHER_SEMANTICS_VERSION, PARTIAL_ESCALATION_POLICY_VERSION,
@@ -117,6 +118,12 @@ def current_config() -> dict:
         # proceed if the corpus or the gates changed (§13, §15).
         "story_corpus_v2_hashes": story_corpus_v2.corpus_hashes(),
         "story_corpus_v2_gates": story_corpus_v2.PREREGISTERED_GATES,
+        # Run-3 verification: the corrected witness tie-break, the frozen corpus
+        # generator, and the REPLACEMENT (holdout) final split — its case-id hash is
+        # computed without evaluating outcomes, so freezing it does not expose it.
+        "witness_tiebreak_version": storyverdict.TIE_BREAK_RULE_VERSION,
+        "story_corpus_generator": story_corpus_v2.GENERATOR_VERSION,
+        "story_corpus_holdout": story_corpus_v2.holdout_hashes(),
     }
 
 

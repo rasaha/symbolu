@@ -48,4 +48,62 @@ RUN_1 = {
         "workflows escalated on untested relationships."),
 }
 
-PRIOR_RUNS = (RUN_1,)
+RUN_2 = {
+    "run_id": "run-2-partial-match-correction",
+    "status": "SUPERSEDED",
+    "commit": "019e1f0d",
+    "freeze_version": "ctd.freeze/2.0.0",
+    "storygraph_schema": "ctd.storygraph/1.1.0",
+    "matcher_semantics": "ctd.storygraph.matcher/2.0.0",
+    "partial_escalation_policy": "ctd.partial_escalation/1.0.0",
+    "freeze_digest":
+        "sha-256:ed63bc9ba3f7636548360ecfb7d3cec6426fc02c884734a861a1f8347055c3da",
+    "corpus_hash":
+        "sha-256:53e171feb364969f6a19bc286565e32d3666b6b5fb1c0878763b0be3cfd6fb42",
+    "metrics": {
+        "n_cases": 108, "encoded_completion_detection_rate": 1.0,
+        "benign_false_completion_rate": 0.0, "evasion_false_completion_rate": 0.0,
+        "benign_escalate_rate": 0.0, "benign_threat_consistent_rate": 0.0,
+    },
+    "original_verdict": "CONTINUE — StoryGraph adversarial validation passed",
+    "verification_finding": (
+        "Run-2 final split was EXPOSED: full-corpus aggregates (incl. final-split "
+        "cases) were inspected before freeze and the corpus/coverage model was "
+        "tuned afterward. The Run-2 correctness results stand, but the Run-2 final "
+        "split does not establish evaluation INDEPENDENCE."),
+    "final_split_disposition": "EXPOSED -> retained as development evidence",
+}
+
+RUN_3 = {
+    "run_id": "run-3-verification-and-proof-semantics",
+    "status": "CURRENT",
+    "commit": "pending-run3",
+    "storygraph_schema": "ctd.storygraph/1.1.0",
+    "matcher_semantics": "ctd.storygraph.matcher/2.0.0",
+    "witness_tiebreak": "ctd.witness.tiebreak/2.0.0",
+    "corpus_generator": "ctd.storycorpus.gen/2.0.0",
+    "holdout_seed": [911, 912, 913],
+    "freeze_digest":
+        "sha-256:2e696f6a9579f82946a6bf77cbdaab6efe2d8a10df6cf9907b1ccf5330781767",
+    "holdout_id_hash":
+        "sha-256:c25b15049035c813a49aed056ec734106546c5b31d2f921c1ac48d36b3a121c7",
+    "metrics": {
+        "n_cases": 147, "n_benign": 99, "n_harmful": 48,
+        "encoded_completion_detection_rate": 1.0,
+        "benign_false_completion_rate": 0.0, "benign_escalate_rate": 0.0606,
+        "benign_threat_consistent_rate": 0.0,
+        "witness_minimality_pass_rate": 1.0,
+        "duplicate_equivalence_canonicalization_rate": 1.0,
+        "deterministic_replay_pass_rate": 1.0, "non_mutation_pass_rate": 1.0,
+        "incorrect_harmful_strengthening_from_missing_context": 0,
+        "incorrect_benign_neutralization": 0,
+    },
+    "verdict": "CONTINUE — evaluation integrity and proof semantics passed",
+    "note": (
+        "Run-3 replaces the exposed Run-2 final split with a held-out generation "
+        "never evaluated before freeze; adds witness canonicalization under "
+        "duplicates (tiebreak 2.0.0), mandatory-edge fail-closed proofs, and the "
+        "imperfect-benign context taxonomy. Synthetic robustness only."),
+}
+
+PRIOR_RUNS = (RUN_1, RUN_2, RUN_3)
