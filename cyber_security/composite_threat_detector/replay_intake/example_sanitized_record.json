@@ -1,0 +1,40 @@
+{
+  "_note": "SYNTHETIC illustration of the sanitized record shape ONLY. This is NOT enterprise data. Every identifier is a redaction token.",
+  "records": [
+    {
+      "tenant": "tenant-token-a1b2",
+      "source_system": "identity_provider",
+      "source_event_id": "evt-0001",
+      "record_kind": "event",
+      "canonical_event_type": "CREDENTIAL_RESET",
+      "event_time": "2026-01-15T09:00:00Z",
+      "ingestion_time": "2026-01-15T09:00:03Z",
+      "source_ordering": 1,
+      "workflow_id": "case-token-77",
+      "actor": "redacted:9f3ac2b1de4470aa",
+      "account": "redacted:11c0ffee22334455",
+      "redaction_status": "OK",
+      "data_quality_status": "OK"
+    },
+    {
+      "tenant": "tenant-token-a1b2",
+      "source_system": "payment_engine",
+      "source_event_id": "evt-0004",
+      "record_kind": "proposal",
+      "canonical_event_type": "TRANSFER",
+      "event_time": "2026-01-15T09:12:00Z",
+      "ingestion_time": "2026-01-15T09:12:01Z",
+      "source_ordering": 4,
+      "workflow_id": "case-token-77",
+      "actor": "redacted:9f3ac2b1de4470aa",
+      "account": "redacted:11c0ffee22334455",
+      "beneficiary": "redacted:beef00112233abcd",
+      "device": "redacted:d0d0cafe99887766",
+      "amount": "9000",
+      "currency": "USD",
+      "pre_action_evaluation": true,
+      "redaction_status": "OK",
+      "data_quality_status": "OK"
+    }
+  ]
+}

@@ -134,9 +134,35 @@ class ReplayFinding:
     context_status: str
     explanation: str
     finding_digest: str
+    version_binding: dict = field(default_factory=dict)  # §10.8 full version binding
+    post_hoc_only: bool = False                            # §10 POST_HOC_ONLY label
 
     def to_dict(self) -> dict:
-        return self.__dict__
+        return dict(self.__dict__)
+
+
+def version_binding(bundle: C.CompiledPolicyBundle) -> dict:
+    """Bind a replay result to EVERY behaviorally relevant version (§1.7, §10.8).
+
+    The per-graph digest binds graph structure; matcher / witness / partial-policy /
+    schema versions are NOT in that digest, so they are bound explicitly here so a
+    replay finding cannot be silently reproduced under a different algorithm version.
+    """
+    return {
+        "policy_ref": bundle.policy_ref,
+        "graph_ref": bundle.graph.ref,
+        "graph_structure_digest": bundle.lineage["graph_digest"],
+        "bundle_digest": bundle.bundle_digest,
+        "graph_version": bundle.graph_version,
+        "matcher_version": V.__dict__.get("MATCHER_VERSION")
+        or __import__("composite_threat_detector.storygraph",
+                      fromlist=["MATCHER_SEMANTICS_VERSION"]).MATCHER_SEMANTICS_VERSION,
+        "partial_policy_version": bundle.graph.partial_policy.version,
+        "witness_tiebreak_version": V.TIE_BREAK_RULE_VERSION,
+        "witness_minimality_basis": V.MINIMALITY_BASIS,
+        "schema_version": bundle.schema_version,
+        "compiler_version": bundle.compiler_version,
+    }
 
 
 def _sort_key(rec):
@@ -157,11 +183,19 @@ def run_replay(pack: dict, records: list, *, now=None) -> dict:
             continue
         groups.setdefault((rec["tenant"], rec["workflow_id"]), []).append(rec)
 
+    vbind = version_binding(bundle)
     findings, per_case = [], []
     for (tenant, wf), recs in sorted(groups.items()):
         assembly, proposal, auths, facts, pos = [], None, [], {}, 0
+        post_hoc = False
         for rec in recs:
             kind = rec["record_kind"]
+            # §10: only simulate PRE-commit evaluation when the records establish what
+            # was known before execution. An execution receipt / already-executed
+            # proposal means we can only reason POST_HOC.
+            if kind == "execution_receipt" or rec.get("already_executed") is True \
+                    or rec.get("pre_action_evaluation") is False:
+                post_hoc = True
             if kind in ("event", "proposal"):
                 frag = frag_map.get(rec["canonical_event_type"])
                 if frag is None:
@@ -199,24 +233,29 @@ def run_replay(pack: dict, records: list, *, now=None) -> dict:
                                        legitimate_stories=legit, authorizations=auths,
                                        facts=facts, now=now)
         consequence = bundle.consequence_map.get(r.category, "OBSERVE")
-        expl = (f"[{consequence}] {r.category}: {r.explanation} "
+        tag = "POST_HOC_ONLY " if post_hoc else ""
+        expl = (f"{tag}[{consequence}] {r.category}: {r.explanation} "
                 f"(context: {r.context_status})")
+        # the finding digest binds the full version set (§1.7, §10.8), not just the
+        # graph structure, so it cannot be reproduced under a different algorithm.
         fd = digest({"tenant": tenant, "wf": wf, "cat": r.category,
-                     "verdict": r.verdict_digest}, domain="CTD-REPLAY-FINDING")
+                     "verdict": r.verdict_digest, "versions": vbind,
+                     "post_hoc": post_hoc}, domain="CTD-REPLAY-FINDING")
         f = ReplayFinding(
             tenant=tenant, workflow_id=wf, category=r.category, signal=r.signal,
             consequence=consequence,
             completes=r.category == V.WOULD_COMPLETE_PROHIBITED_CAPABILITY,
-            context_status=r.context_status, explanation=expl, finding_digest=fd)
+            context_status=r.context_status, explanation=expl, finding_digest=fd,
+            version_binding=vbind, post_hoc_only=post_hoc)
         findings.append(f)
         per_case.append(f.to_dict())
 
-    report_digest = digest({"pack": bundle.bundle_digest,
+    report_digest = digest({"pack": bundle.bundle_digest, "versions": vbind,
                             "findings": [f.finding_digest for f in findings],
                             "dq": dq}, domain="CTD-REPLAY-REPORT")
     return {
         "policy_ref": bundle.policy_ref, "bundle_digest": bundle.bundle_digest,
-        "data_quality": dq, "n_workflows": len(groups),
+        "version_binding": vbind, "data_quality": dq, "n_workflows": len(groups),
         "findings": per_case, "report_digest": report_digest,
         "metrics": replay_metrics(findings, dq),
     }

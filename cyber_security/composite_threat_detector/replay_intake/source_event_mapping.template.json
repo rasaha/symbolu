@@ -1,0 +1,32 @@
+{
+  "_template": "Source-event mapping specification (§5). One entry per supplied source event type. Unmapped events are reported UNMAPPED, never silently discarded.",
+  "schema_version": "ctd.event_mapping/1.0.0",
+  "mappings": [
+    {
+      "source_system": "<e.g. identity_provider>",
+      "source_event_type": "<vendor event type>",
+      "canonical_event_type": "CREDENTIAL_RESET",
+      "fragment_id": "CRED_RESET",
+      "required_source_fields": ["<...>"],
+      "field_map": {
+        "event_id": "<source path>",
+        "tenant_id": "<source path>",
+        "actor": "<source path>",
+        "account": "<source path>"
+      },
+      "transformations": {"<canonical>": "<transformation description>"},
+      "tenant_resolution": "<how tenant is derived; mandatory>",
+      "actor_resolution": "<redaction token derivation>",
+      "account_resolution": "<redaction token derivation>",
+      "device_resolution": "<...>",
+      "beneficiary_or_destination_resolution": "<...>",
+      "event_time_field": "<source path>",
+      "ingestion_time_field": "<source path>",
+      "source_ordering_field": "<source path or null>",
+      "deduplication_identity_fields": ["<...>"],
+      "payload_digest_fields": ["account", "device", "beneficiary", "destination", "amount"],
+      "redaction_treatment": "<fields tokenized>",
+      "rejection_behavior": "REJECT | QUARANTINE | UNMAPPED"
+    }
+  ]
+}

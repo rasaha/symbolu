@@ -1,0 +1,40 @@
+{
+  "_template": "Trusted-provider mapping (§9). Provider failure may NEVER map to ALLOW. Missing provider evidence must not strengthen the harmful graph.",
+  "schema_version": "ctd.provider_mapping/1.0.0",
+  "providers": [
+    {
+      "provider_id": "customer_account_recovery",
+      "provider_type": "case_management",
+      "authority_source": "<team/system that owns recovery cases>",
+      "evidence_schema": "<schema id/version>",
+      "supported_operations": ["PASSWORD_RESET", "DEVICE_REGISTER"],
+      "covered_entities": ["account"],
+      "scope_matching_fields": ["account"],
+      "validity_window": "<e.g. 72h>",
+      "revocation_semantics": "explicit_revoke",
+      "supersession_semantics": "latest_wins",
+      "availability_behavior": "OBSERVE",
+      "verification_method": "signed_case_record",
+      "tenant_isolation": true,
+      "replay_fixture_format": "authorization_record",
+      "schema_version": "ctd.provider_mapping/1.0.0"
+    },
+    {
+      "provider_id": "bank_assisted_transaction",
+      "provider_type": "payment_workflow",
+      "authority_source": "<assisted-banking system>",
+      "evidence_schema": "<schema id/version>",
+      "supported_operations": ["BENEFICIARY_ADD", "TRANSFER"],
+      "covered_entities": ["account", "beneficiary"],
+      "scope_matching_fields": ["account", "beneficiary", "destination"],
+      "validity_window": "<e.g. 24h>",
+      "revocation_semantics": "explicit_revoke",
+      "supersession_semantics": "latest_wins",
+      "availability_behavior": "REQUIRE_ADDITIONAL_EVIDENCE",
+      "verification_method": "signed_txn_record",
+      "tenant_isolation": true,
+      "replay_fixture_format": "authorization_record",
+      "schema_version": "ctd.provider_mapping/1.0.0"
+    }
+  ]
+}

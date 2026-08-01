@@ -1,0 +1,16 @@
+{
+  "_template": "Reviewer worksheet (§11). One entry per replay finding. Reviewers classify structural findings — they are NOT asked to infer malicious intent.",
+  "replay_run_id": "<uuid>",
+  "reviews": [
+    {
+      "finding_id": "<workflow finding_digest>",
+      "reviewer_role": "fraud-operations | risk | control-owner",
+      "classification": "MEANINGFUL_ENCODED_RISK | VALID_LEGITIMATE_WORKFLOW | PARTIAL_LEGITIMATE_COVERAGE | LINKAGE_ERROR | ORDERING_ERROR | MISSING_CONTEXT | POLICY_TOO_BROAD | POLICY_TOO_NARROW | DUPLICATE_FINDING | UNACTIONABLE_EXPLANATION | UNKNOWN_UNENCODED_PATTERN | INSUFFICIENT_EVIDENCE",
+      "confidence": "LOW | MEDIUM | HIGH",
+      "explanation_quality": "POOR | ADEQUATE | GOOD",
+      "evidence_completeness": "INCOMPLETE | PARTIAL | COMPLETE",
+      "required_follow_up": "<text or null>",
+      "disagreement_reason": "<text or null>"
+    }
+  ]
+}

@@ -113,3 +113,16 @@ prior 16 story tests pass unchanged), `completion_witness()` (minimal determinis
 certificate), and `evaluate_proposed_action()` (the pre-commit dual-story entry
 point). `stories.py` adds `ACCOUNT_RECOVERY_STORY` / `BANK_ASSISTED_TRANSFER_STORY`.
 Still additive: the analyzer core is untouched; all signals remain advisory.
+
+## Sanitized-enterprise-replay readiness (account-takeover slice)
+
+Additive, StoryGraph frozen. `policypack/replay.py` findings/report now carry a
+`version_binding` (graph structure digest + matcher/partial-policy/witness/schema/
+compiler versions) so a replay result is bound to the exact algorithm, closing a
+digest-audit gap; a workflow with an execution receipt is labeled `POST_HOC_ONLY`.
+`policypack/replay_gates.py` pre-registers the R1–R9 acceptance gates + data-quality
+minimums (sealed digest). `replay_intake/` is the customer data-intake package
+(manifest/record/mapping templates, redaction + secure-handoff guidance). No sanitized
+enterprise dataset was available, so historical replay is NOT claimed complete — see
+`SANITIZED_ENTERPRISE_REPLAY_REPORT.md` (verdict: STOP — sanitized enterprise replay
+data required). Analyzer core untouched; all signals remain advisory.
