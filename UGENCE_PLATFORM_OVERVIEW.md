@@ -4,17 +4,19 @@
 *How three architectural layers containing ten platform components form one architecture — not ten unrelated tools.*
 *Version 1.2 — July 2026*
 
-> **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical umbrella vocabulary
-> per [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > The canonical **umbrella** name for the platform and product family is **Ugence Decision
 > Governance**. The bounded binding-decision capability is **Decision Authority** (`decision_governance`
-> package). **Note the two senses of "AI Control Plane" across the corpus:** *(a)* in this overview it
-> names the **governance layer** that governs the AI interaction boundary (assert · decide · act ·
-> clear); *(b)* in the repository restructuring/packaging architecture it names an **optional,
-> bypassable administration & coordination layer** (registry, connectors, observability, optional
-> orchestrator). The ADR governs sense (b); this overview's **ten-component taxonomy is unchanged**,
-> and **Model Selection** remains a cross-cutting policy service here (a distinct capability in the
-> capability-engine inventory). Documentation-only; nothing is renamed.
+> package). **"AI Control Plane" now has a single canonical current meaning:** an **optional,
+> bypassable administration & coordination component** (registry, connectors, observability, and an
+> optional orchestrator that carries no domain authority). The governance layer this overview
+> describes — the four components that govern the AI interaction boundary (enter · assert · act ·
+> clear) — is named the **Governance Services Layer** (previously labeled "AI Control Plane" in this
+> document). Generic lowercase "control plane" in the prose below refers to that **Governance Services
+> Layer**, not the optional AI Control Plane component. This overview's **ten-component taxonomy is
+> unchanged**, and **Model Selection** remains a cross-cutting policy service here (a distinct
+> capability in the capability-engine inventory). Documentation-only; nothing is renamed in code.
 
 > **How to read this document.** This is an architecture overview, in the spirit of an AWS or
 > NVIDIA platform document — not a marketing flyer and not a research paper. Every section answers
@@ -22,8 +24,8 @@
 > another product own it?** If the architecture is right, the platform should look inevitable.
 >
 > **v1.2 — documentation sync (no architectural change).** This revision incorporates the completed
-> Hybrid LLM v2 and Truth Assurance Platform (TAP) work. The only substantive change is that the AI
-> Control Plane is now described as governing the **complete AI interaction boundary** across four
+> Hybrid LLM v2 and Truth Assurance Platform (TAP) work. The only substantive change is that the
+> Governance Services Layer is now described as governing the **complete AI interaction boundary** across four
 > distinct responsibilities — what may **enter** reasoning, what **assertions** may leave, what
 > **actions** may be committed, and whether **execution** is operationally safe — by adding **TAP** as
 > an **emerging** governance capability for delivered assertions. TAP's maturity is stated honestly
@@ -64,7 +66,7 @@ belong together as one platform.
 ## Page 2 — Platform Architecture
 
 Ugence is one platform: **three architectural layers containing ten platform components.**
-**Specialized AI Systems** (four components) reason, steer, and execute; the **AI Control Plane**
+**Specialized AI Systems** (four components) reason, steer, and execute; the **Governance Services Layer**
 (four components) governs the **complete AI interaction boundary** — what may enter reasoning, what
 assertions may leave, what actions may be committed, and whether execution is safe; **AI
 Infrastructure** (two components) runs the result efficiently — and never governs.
@@ -86,7 +88,7 @@ Infrastructure** (two components) runs the result efficiently — and never gove
                                       │  proposes actions
                                       ▼
    ───────────────────────────────────────────────────────────────────
-     AI CONTROL PLANE               — govern the AI interaction boundary (enter · assert · act · clear)
+     GOVERNANCE SERVICES LAYER      — govern the AI interaction boundary (enter · assert · act · clear)
    ───────────────────────────────────────────────────────────────────
      • Context Minimization         — decide what context is admissible
      • Truth Assurance Platform     — validate delivered assertions   (emerging)
@@ -109,7 +111,7 @@ Infrastructure** (two components) runs the result efficiently — and never gove
 | Layer | Owns exactly | Does **not** own |
 |---|---|---|
 | **Specialized AI Systems** | Reasoning, steering, and *execution* — turning intent into proposed actions. | It does not authorize its own actions, and it does not manage its own compute substrate. |
-| **AI Control Plane** | *Governance* — validating the assertions the system delivers, authorizing the exact action it commits, and clearing that action against live operational safety. | It does not reason, plan, or execute; it never generates the assertion or action it judges. |
+| **Governance Services Layer** | *Governance* — validating the assertions the system delivers, authorizing the exact action it commits, and clearing that action against live operational safety. | It does not reason, plan, or execute; it never generates the assertion or action it judges. |
 | **AI Infrastructure** | *Efficiency* — memory and scaling substrates that make AI affordable and fast. | It never governs and never decides what an agent may do; it executes what is already authorized. |
 
 The boundaries are deliberate. Reasoning is separated from governance so that governance can be
@@ -119,7 +121,7 @@ but together they close a loop no single vendor closes today.
 
 > **Note (non-normative) — Model Selection Policy.** *Policy-aware model selection* (deciding which
 > approved, eligible model may attempt a request) is a **cross-cutting platform policy service**,
-> provisionally affiliated with the AI Control Plane, at **research maturity** — **not** one of the ten
+> provisionally affiliated with the Governance Services Layer, at **research maturity** — **not** one of the ten
 > canonical components, and **not** an eleventh module. The ten-component taxonomy above is unchanged.
 > Placement, responsibility boundary, mechanism, and maturity are recorded in
 > `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`.
@@ -205,11 +207,11 @@ specialized in surface.
 
 ---
 
-## Page 4 — AI Control Plane
+## Page 4 — Governance Services Layer
 
 **Why this layer exists.** A runtime that grades its own homework is not governed. For autonomous AI
 to touch anything consequential, governance of what it *says* and what it *does* must be **external,
-deterministic, and identical across every runtime**. That is the AI Control Plane's job — and only its
+deterministic, and identical across every runtime**. That is the Governance Services Layer's job — and only its
 job.
 
 **What it owns.** Governance of the complete AI interaction boundary — the information crossing between
@@ -302,7 +304,7 @@ authorized this action, and was it safe?"
 **Why the runtime can't own this.** A runtime is optimized to *produce* good assertions and actions;
 governance must be willing to *reject* them, deterministically, under rules the runtime cannot edit at
 runtime. Those are opposing objectives. Separating them is what makes the authorization trustworthy —
-and it is why the AI Control Plane is a distinct layer, not a runtime feature.
+and it is why the Governance Services Layer is a distinct layer, not a runtime feature.
 
 ---
 
@@ -322,7 +324,7 @@ affordable and make scaling decisions well — without ever deciding *what the A
 
 **Why infrastructure never governs.** Infrastructure runs *what has already been authorized*. It
 makes execution cheaper and more reliable, but it has no view of intent and no authority over
-actions — deliberately. Governance lives one layer up, in the AI Control Plane. Keeping
+actions — deliberately. Governance lives one layer up, in the Governance Services Layer. Keeping
 infrastructure "dumb" about policy is what lets it be swapped, scaled, and hardened independently.
 KVPro speeds up a call; it never decides whether the call should happen. The Cloud Scaling
 Controller decides whether to add a replica; it never decides whether the agent may act.
@@ -492,5 +494,5 @@ that stays scarce — and that every serious autonomous deployment will eventual
 ---
 
 *Ugence Labs — the governed AI platform.*
-*Specialized AI Systems · AI Control Plane · AI Infrastructure*
-*Ten platform components across three architectural layers, one architecture — Specialized AI Systems: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime; AI Control Plane: Context Minimization · Truth Assurance Platform (emerging) · ActionGate · Autonomous Control Plane; AI Infrastructure: KVPro · Cloud Scaling Controller.*
+*Specialized AI Systems · Governance Services Layer · AI Infrastructure*
+*Ten platform components across three architectural layers, one architecture — Specialized AI Systems: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime; Governance Services Layer: Context Minimization · Truth Assurance Platform (emerging) · ActionGate · Autonomous Control Plane; AI Infrastructure: KVPro · Cloud Scaling Controller.*

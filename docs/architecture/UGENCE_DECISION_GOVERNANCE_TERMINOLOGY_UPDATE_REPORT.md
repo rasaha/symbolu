@@ -59,9 +59,9 @@ migration under explicit freeze re-baselining.
 (administration, policy distribution, capability registry, connector config, observability,
 audit correlation, workflow composition, optional orchestration). It is **not** the umbrella
 and **not** a universal authority. A single-capability customer deploys none of it.
-*(Corpus note: `UGENCE_PLATFORM_OVERVIEW.md` also uses "AI Control Plane" for its governance
-layer; the overview's terminology note flags both senses. Its ten-component taxonomy is
-unchanged.)*
+*(Single canonical meaning: "AI Control Plane" denotes only this optional component. The
+governance layer formerly labeled "AI Control Plane" in `UGENCE_PLATFORM_OVERVIEW.md` is renamed
+the **Governance Services Layer**; that overview's ten-component taxonomy is unchanged.)*
 
 ## 5. Orchestrator classification
 
@@ -121,8 +121,9 @@ Concise terminology notes (not rewrites) linking the ADR were added to:
   Authority + Model Selection; conceptual Model-C target; conceptual migration roadmap)
 - `UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md`
 - `UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md`
-- `UGENCE_PLATFORM_OVERVIEW.md` (dual-sense "AI Control Plane" clarified; ten-component
-  taxonomy unchanged)
+- `UGENCE_PLATFORM_OVERVIEW.md` (governance-layer usage of "AI Control Plane" renamed to
+  **Governance Services Layer**; "AI Control Plane" reserved for the optional component;
+  ten-component taxonomy unchanged)
 - `UGENCE_PRODUCTIZATION_ROADMAP.md`
 
 New documents: this report, the ADR, the terminology audit, and the terminology validator
@@ -168,10 +169,13 @@ phase is documentation-only.
 
 - **`decision_governance` name overload persists in code** until the deferred capability
   migration; the alias note is the interim mitigation.
-- **"AI Control Plane" carries two senses** across the corpus (governance layer in the platform
-  overview vs. optional admin/coordination layer in the packaging architecture). This report
-  and the overview's note disambiguate them, but a future consolidation may want a single term
-  for sense (a).
+- **"AI Control Plane" now has a single canonical current meaning** — the optional, bypassable
+  administration & coordination component. The governance-layer sense was renamed **Governance
+  Services Layer** in the current architecture documents (platform overview). Residual
+  governance-layer uses of "AI Control Plane" may remain in *accepted ADRs and
+  historical/frozen/investor materials*, which are preserved and pointed to the terminology
+  ADR rather than rewritten (e.g. `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`, which references
+  the Governance Services Layer as Model Selection's provisional owner).
 - **Original audit commit `4cb3f1e` never existed;** the audit here is a fresh, evidence-based
   reconstruction, not a recovery of prior content.
 

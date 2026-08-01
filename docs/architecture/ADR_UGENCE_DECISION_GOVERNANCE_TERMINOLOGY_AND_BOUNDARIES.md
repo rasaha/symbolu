@@ -107,6 +107,15 @@ may execute), **Sequence** (risk across linked events).
 The AI Control Plane is **optional and bypassable**. A single-capability customer deploys
 none of it. It is neither the umbrella nor a universal governance authority.
 
+**Single canonical meaning (Governance Services Layer).** "AI Control Plane" denotes **only**
+this optional component. The governance layer that some current documents (notably
+`UGENCE_PLATFORM_OVERVIEW.md`) previously labeled "AI Control Plane" — the components that
+govern the AI interaction boundary (enter · assert · act · clear) — is renamed the
+**Governance Services Layer**. Current architecture documents must not use "AI Control Plane"
+for that governance layer. Accepted ADRs and historical/frozen materials that still use the
+older sense are preserved and point here (e.g. `ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`,
+whose "provisionally owned by the AI Control Plane" means the Governance Services Layer).
+
 ### Optional orchestrator
 
 The orchestrator is **optional**. It composes workflows and does not become an adjudicator

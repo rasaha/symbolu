@@ -6,6 +6,14 @@ resolves the placement inconsistency flagged in `WHY_ENTERPRISE_AI_NEEDS_A_RUNTI
 add an eleventh canonical platform module. Every factual claim is traceable to a repository source
 cited inline.*
 
+> **Terminology reconciliation (2026-08-01).** Per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md),
+> "AI Control Plane" now denotes **only** the optional, bypassable administration & coordination
+> component. Where this ADR says Model Selection is "provisionally owned by the AI Control Plane,"
+> read that as the **Governance Services Layer** (the governance neighborhood that governs the AI
+> interaction boundary). This accepted ADR's argument is otherwise unchanged; no code, API, or
+> maturity claim is modified.
+
 ---
 
 ## Context

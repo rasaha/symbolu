@@ -45,7 +45,7 @@ current branch tip. They establish the size of the reconciliation, not a rename 
 
 | Term as used today | Files | Altitude(s) it is used at | Problem |
 |---|---:|---|---|
-| `AI Control Plane` | 82 | governance layer; sometimes implied umbrella | must be pinned as **optional**, not the umbrella |
+| `AI Control Plane` | 82 | governance layer **and** optional component (conflated); sometimes implied umbrella | pin the term to the **optional** component; the governance-layer usage is renamed **Governance Services Layer** |
 | `decision_governance` (package) | 45 | bounded capability (frozen kernel) | correct target of altitude (2); **do not rename this phase** |
 | `Hybrid LLM` | 43 | reasoning substrate | sometimes wrongly absorbs Model Selection |
 | `Orchestrator` / `orchestrat*` | 39 | optional composition service | must be pinned as **optional / bypassable** |
@@ -166,6 +166,12 @@ The AI Control Plane is an **optional** shared platform component beneath Ugence
 Governance. It may provide central administration, policy distribution, a capability
 registry, connector configuration, cross-module observability, audit correlation, workflow
 composition, and optional orchestration.
+
+> **Single canonical meaning.** "AI Control Plane" denotes **only** this optional, bypassable
+> component. The governance layer that current documents (notably `UGENCE_PLATFORM_OVERVIEW.md`)
+> previously labeled "AI Control Plane" — the four components that govern the AI interaction
+> boundary — is renamed the **Governance Services Layer**. Current architecture documents must
+> not use "AI Control Plane" for that governance layer.
 
 **It must remain bypassable.** Customers must be able to deploy and invoke individual
 products or capabilities without requiring the AI Control Plane. The **Optional
