@@ -2,7 +2,7 @@
 
 Historical evidence is never overwritten. Run 1's frozen hashes, metrics, commit,
 and corrected verdict are recorded here as immutable constants so a superseding run
-cannot silently erase them. See ``STORY_GRAPH_EVIDENCE_LEDGER.md`` for prose.
+cannot silently erase them. See ``docs/evaluation/STORY_GRAPH_EVIDENCE_LEDGER.md`` for prose.
 """
 
 from __future__ import annotations

@@ -3,8 +3,8 @@
 **Scope:** one narrowly-scoped workflow — Kubernetes / infrastructure-agent
 high-consequence actions. This is a **contract + tested reference adapter**, not a
 vendor integration claim and not live enforcement. Reference implementation:
-`composite_threat_detector/replay.py::K8sAuditReplayAdapter`; example fixture:
-`composite_threat_detector/evaluation/fixtures/k8s_replay_example.jsonl`.
+`ugence_storygraph/replay.py::K8sAuditReplayAdapter`; example fixture:
+`ugence_storygraph/evaluation/fixtures/k8s_replay_example.jsonl`.
 
 Broad enterprise replay is out of scope. Named source systems other than the two
 implemented reference adapters (`kubernetes_audit`, `generic_normalized`) are

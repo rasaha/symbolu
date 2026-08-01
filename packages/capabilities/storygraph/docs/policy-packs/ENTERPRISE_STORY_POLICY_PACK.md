@@ -4,7 +4,7 @@ This phase **freezes further StoryGraph algorithm development** and turns the ve
 account-takeover vertical slice into a governed, customer-configurable enterprise
 policy package with a deterministic historical-replay path over sanitized fixtures.
 
-Module: `composite_threat_detector/policypack/`. Baseline preserved and extended:
+Module: `ugence_storygraph/policypack/`. Baseline preserved and extended:
 **248 → 279 tests passing.**
 
 ## Core-algorithm freeze result (§2)

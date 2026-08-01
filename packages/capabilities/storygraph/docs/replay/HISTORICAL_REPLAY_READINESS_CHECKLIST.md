@@ -1,7 +1,7 @@
 # Historical-Replay Readiness Checklist (H1–H8)
 
 Historical replay must not begin until these synthetic readiness gates pass. Run
-them with `python3 -m composite_threat_detector.cli readiness`
+them with `python3 -m ugence_storygraph.cli readiness`
 (`evaluation/readiness.py`). Thresholds are **frozen before the final run** and
 are experimental development thresholds — **not** universal enterprise standards.
 

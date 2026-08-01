@@ -1,5 +1,12 @@
 # Phase 3 — Historical-Replay Readiness: Final Evaluation Report
 
+> **Historical record — preserved verbatim.** This report predates the
+> canonical-package migration. Its claims, counts, and verdicts are **not**
+> rewritten. Commands and module paths below reflect the historical
+> `composite_threat_detector` layout; the current equivalent is
+> `python3 -m ugence_storygraph.cli readiness` (package
+> `packages/capabilities/storygraph`). See `../../MIGRATION.md`.
+
 > This phase does not add another detection algorithm. It tests whether the
 > existing deterministic sequence-risk analyzer remains safe, reconstructable,
 > bounded, and operationally useful under realistic benign prevalence, provider

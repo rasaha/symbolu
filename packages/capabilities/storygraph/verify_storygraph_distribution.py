@@ -117,23 +117,55 @@ def _foreign_members(wheel: Path) -> set[str]:
     return {t for t in tops if not (t == "ugence_storygraph" or t.endswith(".dist-info"))}
 
 
+#: Runtime data files that MUST ship in the wheel.
+_REQUIRED_WHEEL_DATA = (
+    "ugence_storygraph/policypack/schemas/storypolicypack.schema.json",
+    "ugence_storygraph/policypack/fixtures/account_takeover_replay.json",
+    "ugence_storygraph/replay_intake/replay_record.schema.json",
+    "ugence_storygraph/evaluation/fixtures/k8s_replay_example.jsonl",
+)
+
+
+def _check_wheel_content_policy(wheel: Path) -> None:
+    """Enforce the wheel-content policy: required runtime data ships; repository-
+    only documentation / evidence / migration material does NOT."""
+    with zipfile.ZipFile(wheel) as z:
+        names = z.namelist()
+    missing = [r for r in _REQUIRED_WHEEL_DATA if r not in names]
+    assert not missing, f"required runtime data missing from wheel: {missing}"
+    # No documentation, tests, historical/evidence, or migration material ships.
+    # (replay_intake/*.md are runtime intake templates and are allowed.)
+    forbidden = [
+        n for n in names
+        if (n.startswith("ugence_storygraph/") and n.endswith(".md")
+            and not n.startswith("ugence_storygraph/replay_intake/"))
+        or "/docs/" in n or "/tests/" in n
+        or any(tok in n.lower() for tok in
+               ("_evidence_ledger", "_validation", "historical", "migration_report",
+                "baseline_manifest", "story_graph_evidence"))
+    ]
+    assert not forbidden, f"repository-only material leaked into wheel: {forbidden}"
+
+
 def main() -> int:
     findlinks = PKG / "_dist_wheels"
     if findlinks.exists():
         shutil.rmtree(findlinks)
     findlinks.mkdir()
 
-    print("[1/4] build the single StoryGraph wheel")
+    print("[1/5] build the single StoryGraph wheel")
     _run([sys.executable, "-m", "build", "--wheel", str(PKG), "-o", str(findlinks)])
     wheel = _latest(findlinks, "ugence_storygraph-*.whl")
     print(f"      built {wheel.name}")
 
-    print("[2/4] assert the wheel bundles no foreign top-level package")
+    print("[2/5] assert wheel-content policy (no foreign pkgs; runtime data only)")
     foreign = _foreign_members(wheel)
     assert not foreign, f"wheel bundles foreign packages: {sorted(foreign)}"
-    print("      wheel contains only ugence_storygraph/ + dist-info")
+    _check_wheel_content_policy(wheel)
+    print("      only ugence_storygraph/ + dist-info; required runtime data ships;"
+          " docs/tests/evidence/migration excluded")
 
-    print("[3/4] create an isolated venv and install ONLY this wheel")
+    print("[3/5] create an isolated venv and install ONLY this wheel")
     with tempfile.TemporaryDirectory() as td:
         env = Path(td) / "venv"
         venv.create(env, with_pip=True, clear=True, system_site_packages=False)
@@ -142,8 +174,13 @@ def main() -> int:
         _run([str(py), "-m", "pip", "install", "--quiet", "--no-index",
               "--find-links", str(findlinks), "ugence-storygraph"])
 
-        print("[4/4] run the isolated proof (cwd has no monorepo source)")
+        print("[4/5] run the isolated proof (cwd has no monorepo source)")
         _run([str(py), "-c", _CHECK], cwd=str(td))
+
+        print("[5/5] run the canonical examples against the installed wheel")
+        examples_dir = PKG / "examples"
+        for example in sorted(examples_dir.glob("*.py")):
+            _run([str(py), str(example)], cwd=str(td))
 
     shutil.rmtree(findlinks, ignore_errors=True)
     print("\nISOLATED SINGLE-WHEEL STORYGRAPH DISTRIBUTION VERIFIED ✔")

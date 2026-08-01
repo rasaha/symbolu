@@ -3,7 +3,7 @@
 A recipe encodes one prohibited/high-risk capability as an assembly of benign
 fragments plus the structural constraints that distinguish a real assembly from a
 sequence that merely shares nouns. Recipes are data; the matcher (`matcher.py`) is
-domain-agnostic. Defined in `composite_threat_detector/model.py::Recipe`.
+domain-agnostic. Defined in `ugence_storygraph/model.py::Recipe`.
 
 Identity is `recipe_id@version`; every finding names it, like the gate's
 `policy_version`.

@@ -46,7 +46,7 @@ class PolicyBinding:
     ``shadow`` is the default for this phase: the consequence is *computed and
     logged* but marked non-binding (``enforced=False``), so no action is actually
     blocked or executed differently. Enforcement requires an explicit, scoped
-    promotion (see ENFORCEMENT_PROMOTION_CHECKLIST.md) — there is no global switch.
+    promotion (see docs/evaluation/ENFORCEMENT_PROMOTION_CHECKLIST.md) — there is no global switch.
     """
 
     mapping: dict[tuple[str, str], str] = field(

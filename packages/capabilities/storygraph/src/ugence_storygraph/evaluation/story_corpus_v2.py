@@ -35,7 +35,7 @@ SPLITS = ("dev", "calibration", "final")
 # (0,1,2); the Run-3 replacement final split uses a NEW seed of variant indices that
 # no development command touches. Bumping this version invalidates the freeze.
 GENERATOR_VERSION = "ctd.storycorpus.gen/2.0.0"
-# Run-2's final split was EXPOSED (see STORY_GRAPH_FINAL_SPLIT_AUDIT.md): full-corpus
+# Run-2's final split was EXPOSED (see docs/evaluation/STORY_GRAPH_FINAL_SPLIT_AUDIT.md): full-corpus
 # aggregates were inspected before freeze. The replacement final split below is a
 # fresh generation the development corpus never includes.
 HOLDOUT_SEED = (911, 912, 913)

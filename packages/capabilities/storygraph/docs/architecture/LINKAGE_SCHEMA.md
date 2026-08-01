@@ -1,6 +1,6 @@
 # Entity-Linkage Schema
 
-Schema version: **`ctd.linkage/1.0.0`** (`composite_threat_detector/linkage.py`).
+Schema version: **`ctd.linkage/1.0.0`** (`ugence_storygraph/linkage.py`).
 
 Groups events into assemblies by **explicit identifiers**, never inferred intent.
 No embeddings, no LLM — a pure function of an event's structured fields.

@@ -10,7 +10,7 @@ enterprise AI-agent and infrastructure workflows.
 
 Nothing here decides admissibility. The analyzer produces *advisory evidence*:
 its strongest output is a recommendation to escalate a case to a human (see
-``signals.py`` and ``COMPOSITE_THREAT_DETECTION_SPEC.md`` §2). It can never
+``signals.py`` and ``docs/architecture/COMPOSITE_THREAT_DETECTION_SPEC.md`` §2). It can never
 admit, deny, authorize, block, or satisfy a hard requirement in the underlying
 ActionGate. An ActionGate/workflow policy — not this analyzer — owns any binding
 consequence (``policy.py``).
