@@ -142,8 +142,13 @@ def main() -> int:
         _run([str(py), "-m", "pip", "install", "--quiet", "--no-index",
               "--find-links", str(findlinks), "ugence-storygraph"])
 
-        print("[4/4] run the isolated proof (cwd has no monorepo source)")
+        print("[4/5] run the isolated proof (cwd has no monorepo source)")
         _run([str(py), "-c", _CHECK], cwd=str(td))
+
+        print("[5/5] run the canonical examples against the installed wheel")
+        examples_dir = PKG / "examples"
+        for example in sorted(examples_dir.glob("*.py")):
+            _run([str(py), str(example)], cwd=str(td))
 
     shutil.rmtree(findlinks, ignore_errors=True)
     print("\nISOLATED SINGLE-WHEEL STORYGRAPH DISTRIBUTION VERIFIED ✔")
