@@ -28,8 +28,8 @@ EVIDENCE_CHAIN_VERSION = "ctd.evidence_chain/1.0.0"
 APPROVED_EVIDENCE_PATHS = (
     "packages/capabilities/storygraph/src/ugence_storygraph/evaluation/evidence/*",
     "packages/capabilities/storygraph/src/ugence_storygraph/evaluation/results/*_evidence_record.json",
-    "packages/capabilities/storygraph/docs/*_EVIDENCE_*.md",
-    "packages/capabilities/storygraph/docs/STORY_GRAPH_EVIDENCE_LEDGER.md",
+    "packages/capabilities/storygraph/docs/evaluation/*_EVIDENCE_*.md",
+    "packages/capabilities/storygraph/docs/evaluation/STORY_GRAPH_EVIDENCE_LEDGER.md",
 )
 
 # Fields an evidence-only record MUST carry (all reference Commit A; no derived

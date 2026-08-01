@@ -6,10 +6,10 @@ labeled evaluation corpus — which does not exist in-repo — are marked
 **`NOT RUN`**. Metrics measurable from the built-in *illustrative* scenarios are
 labeled as such and are explicitly **not** a benchmark.
 
-The runnable harness is `composite_threat_detector/evaluation/harness.py`
-(`python3 -m composite_threat_detector.cli eval`). The results template with all
+The runnable harness is `ugence_storygraph/evaluation/harness.py`
+(`python3 -m ugence_storygraph.cli eval`). The results template with all
 population metrics pre-marked `NOT RUN` is
-`composite_threat_detector/evaluation/results/eval_results_template.json`.
+`ugence_storygraph/evaluation/results/eval_results_template.json`.
 
 ## 1. What a real corpus must contain
 
@@ -64,7 +64,7 @@ bounded-state unavailable; recipe-version change mid-case; policy binding.
 ## 5. Phase-2 update — synthetic corpus + evidence discipline
 
 A deterministic 25-family adversarial synthetic corpus now exists
-(`composite_threat_detector/evaluation/corpus.py`) with independent labels, hard
+(`ugence_storygraph/evaluation/corpus.py`) with independent labels, hard
 benign look-alikes, dev/calibration/**final** splits, a manifest, and a
 pre-evaluation freeze. The harness (`cli eval`) computes metrics broken down by
 family and split, each carrying an evidence-discipline label (§17 of the spec):

@@ -17,8 +17,8 @@ The current implementation is:
 
 The physical firearm example is retained only as a synthetic illustration. The
 product target is enterprise AI-agent and infrastructure workflows. See
-``COMPOSITE_THREAT_DETECTION_SPEC.md`` and
-``COMPOSITE_SEQUENCE_RISK_EVALUATION_PLAN.md``.
+``docs/architecture/COMPOSITE_THREAT_DETECTION_SPEC.md`` and
+``docs/evaluation/COMPOSITE_SEQUENCE_RISK_EVALUATION_PLAN.md``.
 
 Quickstart
 ----------

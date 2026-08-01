@@ -10,7 +10,7 @@ Explicitly:
 * This does **not** predict attacker intent.
 * This is **not** claimed to be novel or patentable (attack-path reachability and
   multi-stage attack reconstruction have substantial prior art — see
-  ``COMPOSITE_THREAT_DETECTION_SPEC.md`` §14).
+  ``docs/architecture/COMPOSITE_THREAT_DETECTION_SPEC.md`` §14).
 * The output is advisory evidence, exactly like the rest of the analyzer.
 
 Phrasing used everywhere: *"the analyzer identifies which capability fragments

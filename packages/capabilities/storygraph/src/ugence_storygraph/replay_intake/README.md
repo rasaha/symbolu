@@ -4,7 +4,7 @@ This package lets a customer hand over **sanitized historical records** for the
 account-takeover vertical slice so they can be normalized, linked, replayed, and
 reviewed with the frozen Story Policy Pack. It is produced because **no valid
 sanitized enterprise dataset is present** in the repository — see
-`../SANITIZED_ENTERPRISE_REPLAY_REPORT.md` (verdict:
+`docs/replay/SANITIZED_ENTERPRISE_REPLAY_REPORT.md` (verdict:
 `STOP — sanitized enterprise replay data required`).
 
 Nothing here is enterprise data. `example_sanitized_record.json` is a **synthetic**
@@ -49,7 +49,7 @@ illustration of the record shape only.
 ## Data-quality bar (pre-registered)
 
 The pre-registered minimums and R1–R9 acceptance gates
-(`composite_threat_detector/policypack/replay_gates.py`, sealed digest recorded in the
+(`ugence_storygraph/policypack/replay_gates.py`, sealed digest recorded in the
 phase report) must be met before findings are examined. Replay **stops visibly** when
 missing/unreliable fields make a mandatory relationship impossible to evaluate.
 

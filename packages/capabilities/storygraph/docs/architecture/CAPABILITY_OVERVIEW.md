@@ -4,7 +4,7 @@
 > individually acceptable actions collectively assemble a prohibited or high-risk
 > capability.**
 
-It complements the per-action [Action Gate](../ACTION_GATE_SPECIFICATION.md),
+It complements the per-action [Action Gate](../../../../../cyber_security/ACTION_GATE_SPECIFICATION.md),
 which decides one action at a time. This layer adds the **sequence axis**: it
 links individually-admissible actions into an *assembly*, accumulates the
 capability *fragments* each contributes, and — when a linked set satisfies a
@@ -19,7 +19,7 @@ a system that infers arbitrary criminal intent. It does not "understand crime."
 The physical firearm example (steel rod + piston + trigger → firearm) is retained
 **only as a synthetic illustration** that the engine is domain-agnostic. The
 product target is enterprise AI-agent and infrastructure workflows. See
-[`../COMPOSITE_THREAT_DETECTION_SPEC.md`](../COMPOSITE_THREAT_DETECTION_SPEC.md).
+[`COMPOSITE_THREAT_DETECTION_SPEC.md`](./COMPOSITE_THREAT_DETECTION_SPEC.md).
 
 ## Authority boundary
 
@@ -55,18 +55,18 @@ Python 3.11+, standard library only. `pytest` (dev-only) for the tests.
 ## Run
 
 ```bash
-cd cyber_security/composite_threat_detector
+pip install packages/capabilities/storygraph          # or the built wheel
 
-python3 -m pytest -q                                          # deterministic tests
+python3 -m pytest packages/capabilities/storygraph -q         # deterministic tests
 
-python3 -m composite_threat_detector.cli demo exfiltration    # harmful  → ESCALATE
-python3 -m composite_threat_detector.cli demo benign          # look-alike → no escalate
-python3 -m composite_threat_detector.cli demo approved_export # valid approval → neutralized
-python3 -m composite_threat_detector.cli demo firearm         # synthetic illustration
-python3 -m composite_threat_detector.cli ontologies           # recipes
-python3 -m composite_threat_detector.cli specs                # assembly key specs
-python3 -m composite_threat_detector.cli eval                 # metrics (NOT RUN, honest)
-python3 -m composite_threat_detector.cli run events.jsonl \
+python3 -m ugence_storygraph.cli demo exfiltration    # harmful  → ESCALATE
+python3 -m ugence_storygraph.cli demo benign          # look-alike → no escalate
+python3 -m ugence_storygraph.cli demo approved_export # valid approval → neutralized
+python3 -m ugence_storygraph.cli demo firearm         # synthetic illustration
+python3 -m ugence_storygraph.cli ontologies           # recipes
+python3 -m ugence_storygraph.cli specs                # assembly key specs
+python3 -m ugence_storygraph.cli eval                 # metrics (NOT RUN, honest)
+python3 -m ugence_storygraph.cli run events.jsonl \
         --spec by_case --spec by_actor --policy               # your own stream
 ```
 
@@ -76,7 +76,7 @@ python3 -m composite_threat_detector.cli run events.jsonl \
 ## Library
 
 ```python
-from composite_threat_detector import (
+from ugence_storygraph import (
     SequenceRiskAnalyzer, DIGITAL_ONTOLOGY, BY_CASE, BY_ACTOR,
     PolicyBinding, to_advisory_evidence,
 )
@@ -96,27 +96,27 @@ for action in admitted_action_stream:        # each already cleared the per-acti
 
 | Path | Purpose |
 |------|---------|
-| `composite_threat_detector/model.py` | Fragment / Recipe / Ontology / instance types |
-| `composite_threat_detector/linkage.py` | entity normalization + assembly-key derivation |
-| `composite_threat_detector/ledger.py` | multi-timescale state + persistent capability ledger |
-| `composite_threat_detector/matcher.py` | constraint-aware recipe matcher |
-| `composite_threat_detector/benign.py` | evidence-gated benign-context layer |
-| `composite_threat_detector/completion.py` | advisory minimal-completion analysis |
-| `composite_threat_detector/analyzer.py` | orchestration, findings, run report, facade |
-| `composite_threat_detector/providers.py` | trusted benign-evidence providers (fixtures; no net) |
-| `composite_threat_detector/purpose.py` | declared vs. verified purpose model |
-| `composite_threat_detector/ordering.py` | ordering/clock status model |
-| `composite_threat_detector/audit.py` | append-only raw-evidence + lifecycle audit log |
-| `composite_threat_detector/governance.py` | state-exhaustion resource governance |
-| `composite_threat_detector/replay.py` | historical-replay adapter contract + reference |
-| `composite_threat_detector/policy.py` | authoritative consequence binding (shadow default) |
-| `composite_threat_detector/evidence.py` | Finding → ActionGate advisory evidence |
-| `composite_threat_detector/fragments.py` / `recipes.py` | shipped ontologies |
-| `composite_threat_detector/cli.py` | JSON CLI |
-| `composite_threat_detector/storygraph.py` | story-graph engine: typed edges, bounded deterministic matcher, decomposed risk vector |
-| `composite_threat_detector/storyverdict.py` | forward completion-gating + contradiction + dual-story verdict |
-| `composite_threat_detector/stories.py` / `financial.py` / `story_bridge.py` | story library, account-takeover ontology, live-assembly bridge |
-| `composite_threat_detector/durable_audit.py` | SQLite append-only, hash-linked (tamper-evident) durable audit |
+| `ugence_storygraph/model.py` | Fragment / Recipe / Ontology / instance types |
+| `ugence_storygraph/linkage.py` | entity normalization + assembly-key derivation |
+| `ugence_storygraph/ledger.py` | multi-timescale state + persistent capability ledger |
+| `ugence_storygraph/matcher.py` | constraint-aware recipe matcher |
+| `ugence_storygraph/benign.py` | evidence-gated benign-context layer |
+| `ugence_storygraph/completion.py` | advisory minimal-completion analysis |
+| `ugence_storygraph/analyzer.py` | orchestration, findings, run report, facade |
+| `ugence_storygraph/providers.py` | trusted benign-evidence providers (fixtures; no net) |
+| `ugence_storygraph/purpose.py` | declared vs. verified purpose model |
+| `ugence_storygraph/ordering.py` | ordering/clock status model |
+| `ugence_storygraph/audit.py` | append-only raw-evidence + lifecycle audit log |
+| `ugence_storygraph/governance.py` | state-exhaustion resource governance |
+| `ugence_storygraph/replay.py` | historical-replay adapter contract + reference |
+| `ugence_storygraph/policy.py` | authoritative consequence binding (shadow default) |
+| `ugence_storygraph/evidence.py` | Finding → ActionGate advisory evidence |
+| `ugence_storygraph/fragments.py` / `recipes.py` | shipped ontologies |
+| `ugence_storygraph/cli.py` | JSON CLI |
+| `ugence_storygraph/storygraph.py` | story-graph engine: typed edges, bounded deterministic matcher, decomposed risk vector |
+| `ugence_storygraph/storyverdict.py` | forward completion-gating + contradiction + dual-story verdict |
+| `ugence_storygraph/stories.py` / `financial.py` / `story_bridge.py` | story library, account-takeover ontology, live-assembly bridge |
+| `ugence_storygraph/durable_audit.py` | SQLite append-only, hash-linked (tamper-evident) durable audit |
 | `evaluation/corpus.py` / `corpus_gen.py` | 25-family corpus; seeded high-volume generator + prevalence profiles |
 | `evaluation/freeze.py` | complete evaluation freeze + final-eval guard |
 | `evaluation/benchmark.py` / `alerts.py` / `review_sim.py` | load benchmark, alert-volume, review simulation |
