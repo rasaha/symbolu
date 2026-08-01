@@ -432,8 +432,12 @@ def _classify_proposed(graph, before, after, cov, contras, witness, facts) -> st
         return LEGITIMATE_STORY_PARTIAL_COVERAGE
     if ambiguous:
         return AMBIGUOUS_COMPETING_STORIES
+    # §7: a THREAT_CONSISTENT escalation requires POSITIVE discriminating evidence
+    # (the frozen partial-escalation policy) — not merely a high score assembled
+    # from untested edges. escalation_eligible encodes that requirement.
     if (after.risk.harmful_score >= graph.threat_threshold
             and not after.risk.gate_triggered
+            and after.escalation_eligible
             and (cov is None or cov.status == L.NONE)):
         return THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT
     return PARTIAL_HARMFUL_STORY
@@ -574,6 +578,6 @@ def _classify_legacy(graph, m, benign, contras, weakens_both, completes, facts) 
     if benign.fully_covers and contras:
         return AMBIGUOUS_COMPETING_STORIES
     if (m.risk.harmful_score >= graph.threat_threshold and not m.risk.gate_triggered
-            and not benign.fully_covers):
+            and m.escalation_eligible and not benign.fully_covers):
         return THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT
     return PARTIAL_HARMFUL_STORY

@@ -28,8 +28,31 @@ from dataclasses import dataclass, field
 
 from .canonical import digest
 
-# versioned StoryGraph schema (§1 "versioned schema")
-STORYGRAPH_SCHEMA_VERSION = "ctd.storygraph/1.0.0"
+# versioned StoryGraph schema (§1 "versioned schema").
+# 1.1.0: adds edge/node discriminating metadata + explicit CONTRADICTS condition.
+STORYGRAPH_SCHEMA_VERSION = "ctd.storygraph/1.1.0"
+# The matching *semantics* are versioned separately from the graph schema (§11).
+# 2.0.0 corrects partial-match semantics: a non-evaluable edge is NEVER treated as
+# satisfied, dimensions never default to 1.0 on a zero denominator, and partial
+# stories require positive discriminating evidence before escalation.
+MATCHER_SEMANTICS_VERSION = "ctd.storygraph.matcher/2.0.0"
+
+# ---------------------------------------------------------------------------
+# Explicit edge-evaluation states (§3) — every evaluated edge is exactly one.
+# NOT_EVALUABLE is never conflated with SATISFIED or FAILED.
+# ---------------------------------------------------------------------------
+EDGE_SATISFIED = "SATISFIED"
+EDGE_FAILED = "FAILED"
+EDGE_NOT_EVALUABLE = "NOT_EVALUABLE"
+EDGE_AMBIGUOUS = "AMBIGUOUS"
+
+# structural-dimension statuses (§5)
+DIM_SATISFIED = "SATISFIED"
+DIM_FAILED = "FAILED"
+DIM_PARTIAL = "PARTIAL"
+DIM_NOT_EVALUABLE = "NOT_EVALUABLE"
+DIM_AMBIGUOUS = "AMBIGUOUS"
+DIM_NOT_APPLICABLE = "NOT_APPLICABLE"
 
 # ---------------------------------------------------------------------------
 # Edge types (§1)
@@ -62,6 +85,11 @@ class Edge:
     #   "SAME_ENTITY:<dim>"       — fire only if both share entity <dim>
     #   "DIFFERENT_ENTITY:<dim>"  — fire only if both differ on entity <dim>
     incompatible_when: str = ""
+    # discriminating metadata (§8): a discriminating edge encodes a high-specificity
+    # relationship (e.g. transfer beneficiary == the newly added beneficiary). Only
+    # an *evaluated & satisfied* discriminating edge counts as positive harmful
+    # evidence for partial escalation. Common/low-specificity edges do not.
+    is_discriminating: bool = False
 
     def endpoints(self) -> tuple[str, ...]:
         if self.kind in (REQUIRES_CORROBORATION, COVERED_BY_AUTHORIZATION):
@@ -69,16 +97,16 @@ class Edge:
         return (self.a, self.b)
 
 
-def order(a, b):
-    return Edge(ORDER, a, b)
+def order(a, b, *, discriminating=False):
+    return Edge(ORDER, a, b, is_discriminating=discriminating)
 
 
-def same_entity(a, b, dim):
-    return Edge(SAME_ENTITY, a, b, dim=dim)
+def same_entity(a, b, dim, *, discriminating=False):
+    return Edge(SAME_ENTITY, a, b, dim=dim, is_discriminating=discriminating)
 
 
-def within(a, b, max_gap):
-    return Edge(WITHIN, a, b, max_gap=max_gap)
+def within(a, b, max_gap, *, discriminating=False):
+    return Edge(WITHIN, a, b, max_gap=max_gap, is_discriminating=discriminating)
 
 
 def related_actors(a, b, mode="SAME"):
@@ -142,6 +170,10 @@ class StoryNode:
     title: str = ""
     required: bool = True
     is_completion: bool = False  # a loss-producing final action
+    # specificity metadata (§8): COMMON administrative events (password reset,
+    # device enrollment) are low-specificity and are NOT strong harmful evidence on
+    # their own; DISCRIMINATING nodes carry pattern-specific meaning.
+    specificity_class: str = "COMMON"   # COMMON | DISCRIMINATING
 
 
 # default frozen weights (human-set, NOT learned) — sum need not be 1; normalized.
@@ -149,6 +181,27 @@ DEFAULT_WEIGHTS = {
     "coverage": 0.35, "ordering_consistency": 0.15, "entity_consistency": 0.25,
     "timing_consistency": 0.10, "corroboration": 0.05, "proximity": 0.10,
 }
+
+# frozen partial-escalation decision policy (§7). A partial (non-completing) story
+# may only be treated as escalation-eligible when POSITIVE structural evidence is
+# present — never merely because common admin events occurred, the completion node
+# is absent, discriminating edges were untested, or a ratio over one edge is 1.0.
+PARTIAL_ESCALATION_POLICY_VERSION = "ctd.partial_escalation/1.0.0"
+
+
+@dataclass(frozen=True)
+class PartialEscalationPolicy:
+    version: str = PARTIAL_ESCALATION_POLICY_VERSION
+    min_required_coverage: float = 0.60       # required-node coverage floor
+    min_discriminating_satisfied: int = 1     # >=1 discriminating mandatory edge SAT
+    min_completion_proximity: float = 0.999   # all non-completion required present
+    # positive-evidence alternatives to proximity (any one suffices, in addition to
+    # coverage + a satisfied discriminating edge and no mandatory failure/ambiguity):
+    allow_corroboration_evidence: bool = True
+    allow_decisive_contradiction_evidence: bool = False  # weakens harmful, not raises
+
+
+DEFAULT_PARTIAL_POLICY = PartialEscalationPolicy()
 
 
 @dataclass(frozen=True)
@@ -167,6 +220,8 @@ class StoryGraph:
     threat_threshold: float = 0.70    # harmful_score at/above => threat-consistent
     severity: str = "HIGH"
     recommended_consequence: str = "HOLD_FOR_REVIEW"
+    partial_policy: "PartialEscalationPolicy" = field(
+        default_factory=lambda: DEFAULT_PARTIAL_POLICY)
 
     def __post_init__(self) -> None:
         ids = {n.node_id for n in self.nodes}
@@ -223,6 +278,51 @@ def from_ledger(active) -> list[ObservedEvent]:
 
 
 # ---------------------------------------------------------------------------
+# Structural-dimension result (§5) — explicit counts + status, never a bare 1.0.
+# ---------------------------------------------------------------------------
+@dataclass
+class DimensionResult:
+    dimension: str
+    satisfied_count: int
+    failed_count: int
+    not_evaluable_count: int
+    ambiguous_count: int
+    applicable_count: int
+    status: str
+    evaluable_ratio: float | None   # over evaluable (sat+failed) ONLY; None if none
+
+    def to_dict(self) -> dict:
+        return {
+            "dimension": self.dimension,
+            "satisfied_count": self.satisfied_count,
+            "failed_count": self.failed_count,
+            "not_evaluable_count": self.not_evaluable_count,
+            "ambiguous_count": self.ambiguous_count,
+            "applicable_count": self.applicable_count,
+            "status": self.status,
+            "evaluable_ratio": (round(self.evaluable_ratio, 4)
+                                if self.evaluable_ratio is not None else None),
+        }
+
+
+def _dim_result(dimension, sat, failed, ne, amb) -> DimensionResult:
+    applicable = sat + failed + ne + amb
+    evaluable = sat + failed
+    ratio = (sat / evaluable) if evaluable else None
+    if applicable == 0:
+        status = DIM_NOT_APPLICABLE
+    elif failed > 0:
+        status = DIM_FAILED                     # a proven-false edge — non-compensatory
+    elif evaluable == 0:
+        status = DIM_AMBIGUOUS if amb > 0 else DIM_NOT_EVALUABLE
+    elif sat == applicable:
+        status = DIM_SATISFIED
+    else:
+        status = DIM_PARTIAL                     # some satisfied, some untested/ambiguous
+    return DimensionResult(dimension, sat, failed, ne, amb, applicable, status, ratio)
+
+
+# ---------------------------------------------------------------------------
 # Risk vector + match result
 # ---------------------------------------------------------------------------
 @dataclass
@@ -267,10 +367,22 @@ class StoryMatch:
     multiple_optimal_bindings: int = 1     # count of bindings achieving the best score
     satisfied_edges: list = field(default_factory=list)   # which edges are satisfied
     contradicts_triggered: list = field(default_factory=list)  # CONTRADICTS edges fired
+    # §3/§4/§5 explicit partial-match reporting
+    edge_results: list = field(default_factory=list)      # per-edge full state record
+    not_evaluable_edges: list = field(default_factory=list)
+    ambiguous_edges: list = field(default_factory=list)
+    dimension_results: dict = field(default_factory=dict)  # dim -> DimensionResult dict
+    mandatory_unsatisfied: bool = False   # a mandatory edge is FAILED/AMBIGUOUS/NE
+    # §7 positive-evidence partial-escalation gate
+    escalation_eligible: bool = False
+    escalation_reasons: list = field(default_factory=list)
+    discriminating_satisfied: int = 0
+    matcher_semantics_version: str = MATCHER_SEMANTICS_VERSION
 
     def is_complete(self) -> bool:
         return (not self.missing_required and self.completion_present
                 and not self.risk.gate_triggered and not self.unavailable
+                and not self.mandatory_unsatisfied
                 and not self.contradicts_triggered)
 
     def to_dict(self) -> dict:
@@ -283,8 +395,17 @@ class StoryMatch:
             "missing_required": self.missing_required,
             "completion_present": self.completion_present,
             "failed_edges": self.failed_edges, "satisfied_edges": self.satisfied_edges,
+            "not_evaluable_edges": self.not_evaluable_edges,
+            "ambiguous_edges": self.ambiguous_edges,
             "contradicts_triggered": self.contradicts_triggered,
             "evaluable_edges": self.evaluable_edges,
+            "edge_results": self.edge_results,
+            "dimension_results": self.dimension_results,
+            "mandatory_unsatisfied": self.mandatory_unsatisfied,
+            "escalation_eligible": self.escalation_eligible,
+            "escalation_reasons": self.escalation_reasons,
+            "discriminating_satisfied": self.discriminating_satisfied,
+            "matcher_semantics_version": self.matcher_semantics_version,
             "bounded": self.bounded, "match_digest": self.match_digest,
         }
 
@@ -293,43 +414,98 @@ _MAX_CANDIDATES_PER_NODE = 6
 _MAX_COMBINATIONS = 4096
 
 
-def _edge_ok(edge: Edge, binding: dict, events_by_id: dict, present: set,
-             all_frag_ids: set) -> bool | None:
-    """True/False if evaluable, None if an endpoint is absent (not yet evaluable)."""
+def _edge_state(edge: Edge, binding: dict, events_by_id: dict, present: set,
+                all_frag_ids: set) -> tuple[str, dict]:
+    """Return the explicit edge-evaluation state (§3) + a detail record (§4).
+
+    NOT_EVALUABLE is returned whenever an endpoint node is unbound or the evidence
+    needed to judge the edge is absent — it is NEVER conflated with SATISFIED. For
+    CONTRADICTS, a fired incompatibility maps to FAILED (the harmful hypothesis is
+    weakened); a non-fired evaluable one maps to SATISFIED (harmful intact).
+    """
     if edge.kind == COVERED_BY_AUTHORIZATION:
-        return None  # legit-graph annotation; not evaluated on the harmful events
+        return EDGE_NOT_EVALUABLE, {"reason": "legit-graph annotation; not scored "
+                                    "on harmful events"}
     if edge.kind == REQUIRES_CORROBORATION:
         if edge.a not in present:
-            return None
-        return edge.corroborating_fragment in all_frag_ids
+            return EDGE_NOT_EVALUABLE, {"reason": f"anchor node {edge.a!r} absent"}
+        ok = edge.corroborating_fragment in all_frag_ids
+        return ((EDGE_SATISFIED if ok else EDGE_FAILED),
+                {"corroborating_fragment": edge.corroborating_fragment,
+                 "observed": ok})
     a, b = edge.a, edge.b
     if a not in binding or b not in binding:
-        return None
+        missing = [n for n in (a, b) if n not in binding]
+        return EDGE_NOT_EVALUABLE, {"reason": "endpoint node(s) absent",
+                                    "missing_nodes": missing}
     ea, eb = events_by_id[binding[a]], events_by_id[binding[b]]
     if edge.kind == ORDER:
-        return ea.coord < eb.coord
+        if ea.coord == eb.coord:
+            return EDGE_AMBIGUOUS, {"reason": "endpoints share a coordinate; order "
+                                    "unresolved", "coord": ea.coord}
+        return ((EDGE_SATISFIED if ea.coord < eb.coord else EDGE_FAILED),
+                {"a_coord": ea.coord, "b_coord": eb.coord})
     if edge.kind == SAME_ENTITY:
         va, vb = ea.entities.get(edge.dim, ""), eb.entities.get(edge.dim, "")
-        return bool(va) and va == vb
+        if not va or not vb:
+            return EDGE_NOT_EVALUABLE, {"reason": f"entity {edge.dim!r} missing on "
+                                        "an endpoint", "dim": edge.dim,
+                                        "expected": va, "observed": vb}
+        return ((EDGE_SATISFIED if va == vb else EDGE_FAILED),
+                {"dim": edge.dim, "expected": va, "observed": vb})
     if edge.kind == WITHIN:
-        return abs(eb.coord - ea.coord) <= (edge.max_gap or float("inf"))
+        gap = abs(eb.coord - ea.coord)
+        return ((EDGE_SATISFIED if gap <= (edge.max_gap or float("inf"))
+                 else EDGE_FAILED), {"gap": gap, "max_gap": edge.max_gap})
     if edge.kind == RELATED_ACTORS:
-        return True if edge.actor_mode == "ANY" else (ea.actor == eb.actor and bool(ea.actor))
+        if edge.actor_mode == "ANY":
+            return EDGE_SATISFIED, {"mode": "ANY"}
+        if not ea.actor or not eb.actor:
+            return EDGE_NOT_EVALUABLE, {"reason": "actor missing on an endpoint"}
+        return ((EDGE_SATISFIED if ea.actor == eb.actor else EDGE_FAILED),
+                {"a_actor": ea.actor, "b_actor": eb.actor})
     if edge.kind == CONTRADICTS:
-        # fire only under the explicit incompatibility condition (§8)
         cond = edge.incompatible_when
+        va = vb = ""
+        if cond.startswith("SAME_ENTITY:") or cond.startswith("DIFFERENT_ENTITY:"):
+            dim = cond.split(":", 1)[1]
+            va, vb = ea.entities.get(dim, ""), eb.entities.get(dim, "")
+            if not va or not vb:
+                return EDGE_NOT_EVALUABLE, {"reason": f"entity {dim!r} missing; "
+                                            "contradiction not evaluable", "dim": dim}
         if cond == "BOTH_PRESENT":
-            return True
-        if cond.startswith("SAME_ENTITY:"):
-            dim = cond.split(":", 1)[1]
-            va, vb = ea.entities.get(dim, ""), eb.entities.get(dim, "")
-            return bool(va) and va == vb
-        if cond.startswith("DIFFERENT_ENTITY:"):
-            dim = cond.split(":", 1)[1]
-            va, vb = ea.entities.get(dim, ""), eb.entities.get(dim, "")
-            return bool(va) and bool(vb) and va != vb
-        return False  # no explicit condition ⇒ mere coexistence never fires
-    return True
+            fired = True
+        elif cond.startswith("SAME_ENTITY:"):
+            fired = va == vb
+        elif cond.startswith("DIFFERENT_ENTITY:"):
+            fired = va != vb
+        else:
+            fired = False  # no explicit condition ⇒ mere coexistence never fires
+        # a fired contradiction FAILS the harmful hypothesis for this edge.
+        return ((EDGE_FAILED if fired else EDGE_SATISFIED),
+                {"condition": cond, "fired": fired})
+    return EDGE_SATISFIED, {}
+
+
+def _edge_ok(edge: Edge, binding: dict, events_by_id: dict, present: set,
+             all_frag_ids: set) -> bool | None:
+    """Back-compat tri-state: True=SATISFIED, False=FAILED, None=NOT_EVALUABLE.
+
+    AMBIGUOUS collapses to None (not evaluable to a definite pass/fail). CONTRADICTS
+    keeps its historical meaning here (True == the contradiction FIRES) so
+    ``_score_binding`` and the legacy contradicts reporting are unchanged.
+    """
+    if edge.kind == CONTRADICTS:
+        state, detail = _edge_state(edge, binding, events_by_id, present, all_frag_ids)
+        if state == EDGE_NOT_EVALUABLE:
+            return None
+        return bool(detail.get("fired"))
+    state, _ = _edge_state(edge, binding, events_by_id, present, all_frag_ids)
+    if state == EDGE_SATISFIED:
+        return True
+    if state == EDGE_FAILED:
+        return False
+    return None  # NOT_EVALUABLE or AMBIGUOUS
 
 
 def _score_binding(graph: StoryGraph, binding: dict, events_by_id: dict, present: set,
@@ -408,86 +584,187 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailabl
     missing_req = sorted(req_ids - present)
     completion_ids = {n.node_id for n in graph.nodes if n.is_completion}
     completion_present = bool(completion_ids & present)
+    required_node_ids = req_ids
 
-    # per-edge-kind satisfied / evaluable (HARMFUL-supporting kinds only)
-    per_kind = {ORDER: [0, 0], SAME_ENTITY: [0, 0], WITHIN: [0, 0],
-                RELATED_ACTORS: [0, 0], REQUIRES_CORROBORATION: [0, 0]}
-    failed, satisfied, contradicts_triggered = [], [], []
+    # --- explicit per-edge evaluation (§3, §4) -------------------------------
+    # count[kind] = [satisfied, failed, not_evaluable, ambiguous] for harmful kinds
+    counts = {k: [0, 0, 0, 0] for k in _HARMFUL_KINDS}
+    contra_counts = [0, 0, 0]   # [fired(FAILED), not_fired(SATISFIED), not_evaluable]
+    edge_results, satisfied, failed = [], [], []
+    not_evaluable_edges, ambiguous_edges, contradicts_triggered = [], [], []
+    mandatory_unsatisfied = False
+    discriminating_satisfied = 0
+
+    def _node_endpoints(edge):
+        if edge.kind in (REQUIRES_CORROBORATION, COVERED_BY_AUTHORIZATION):
+            return (edge.a,)
+        return (edge.a, edge.b)
+
     for e in graph.edges:
-        ok = _edge_ok(e, binding, events_by_id, present, all_frag_ids)
-        if ok is None:
-            continue
-        rec = {"kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim}
-        if e.kind == CONTRADICTS:
-            if ok:
-                contradicts_triggered.append({
-                    **rec, "condition": e.incompatible_when,
-                    "weakens": "HARMFUL", "severity": "decisive",
-                    "resolution_status": "unresolved"})  # story weakened
-            continue
-        if e.kind not in _HARMFUL_KINDS:
-            continue
-        per_kind[e.kind][1] += 1
-        if ok:
-            per_kind[e.kind][0] += 1
-            satisfied.append(rec)
-        else:
-            failed.append(rec)
+        state, detail = _edge_state(e, binding, events_by_id, present, all_frag_ids)
+        node_eps = _node_endpoints(e)
+        eps_all_required = all(graph.node(n).required for n in node_eps)
+        eps_all_bound = all((n in binding) if e.kind not in
+                            (REQUIRES_CORROBORATION,) else (n in present)
+                            for n in node_eps)
+        rec = {"edge_id": f"{e.kind}:{e.a}->{e.b}" if e.b else f"{e.kind}:{e.a}",
+               "kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim,
+               "mandatory": eps_all_required, "is_discriminating": e.is_discriminating,
+               "state": state,
+               "bound_source": binding.get(e.a, ""), "bound_target": binding.get(e.b, ""),
+               "detail": detail}
+        edge_results.append(rec)
 
-    def frac(kind):
-        s, t = per_kind[kind]
-        return (s / t) if t else 1.0
+        if e.kind == COVERED_BY_AUTHORIZATION:
+            continue
+        if e.kind == CONTRADICTS:
+            if state == EDGE_NOT_EVALUABLE:
+                contra_counts[2] += 1
+            elif detail.get("fired"):
+                contra_counts[0] += 1
+                contradicts_triggered.append({
+                    "kind": e.kind, "a": e.a, "b": e.b, "dim": e.dim,
+                    "condition": e.incompatible_when, "weakens": "HARMFUL",
+                    "severity": "decisive", "resolution_status": "unresolved"})
+                # a fired mandatory contradiction weakens completion
+                if eps_all_required and eps_all_bound:
+                    mandatory_unsatisfied = True
+            else:
+                contra_counts[1] += 1
+            continue
+
+        # harmful structural kinds
+        idx = {EDGE_SATISFIED: 0, EDGE_FAILED: 1, EDGE_NOT_EVALUABLE: 2,
+               EDGE_AMBIGUOUS: 3}[state]
+        counts[e.kind][idx] += 1
+        if state == EDGE_SATISFIED:
+            satisfied.append(rec)
+            if e.is_discriminating:
+                discriminating_satisfied += 1
+        elif state == EDGE_FAILED:
+            failed.append(rec)
+        elif state == EDGE_NOT_EVALUABLE:
+            not_evaluable_edges.append(rec)
+        else:
+            ambiguous_edges.append(rec)
+        # §6: a mandatory edge that is bound but NOT satisfied blocks completion,
+        # whether it FAILED, is AMBIGUOUS, or is NOT_EVALUABLE (never "assumed ok").
+        if eps_all_required and eps_all_bound and state != EDGE_SATISFIED:
+            mandatory_unsatisfied = True
+
+    # --- dimension results (§5) — counts + status, NEVER a bare 1.0 ----------
+    dim_map = {"ordering_consistency": ORDER, "entity_consistency": SAME_ENTITY,
+               "timing_consistency": WITHIN, "corroboration": REQUIRES_CORROBORATION}
+    dim_results = {}
+    for name, kind in dim_map.items():
+        s, f, ne, amb = counts[kind]
+        dim_results[name] = _dim_result(name, s, f, ne, amb)
+    dim_results["contradictions"] = _dim_result(
+        "contradictions", contra_counts[1], contra_counts[0], contra_counts[2], 0)
 
     coverage = len(present_req) / len(req_ids) if req_ids else 0.0
-    ordering_c = frac(ORDER)
-    entity_c = frac(SAME_ENTITY)
-    timing_c = frac(WITHIN)
-    corr = frac(REQUIRES_CORROBORATION)
     non_completion_req = {n.node_id for n in req if not n.is_completion}
     proximity = (len(present & non_completion_req) / len(non_completion_req)
                  if non_completion_req else 1.0)
+    dim_results["coverage"] = _dim_result("coverage", len(present_req),
+                                          len(missing_req), 0, 0)
 
+    # honest scalar consistency values: the evaluable ratio, or 0.0 when nothing was
+    # evaluable (positive evidence absent) — NEVER 1.0 on a zero denominator.
+    def _scalar(name):
+        r = dim_results[name].evaluable_ratio
+        return r if r is not None else 0.0
+    ordering_c = _scalar("ordering_consistency")
+    entity_c = _scalar("entity_consistency")
+    timing_c = _scalar("timing_consistency")
+    corr = _scalar("corroboration")
+
+    # weighted harmful score: NOT_APPLICABLE dims are excluded from the denominator;
+    # NOT_EVALUABLE dims contribute 0 (no positive evidence) but keep their weight,
+    # so an incomplete story with untested discriminators cannot score high.
     w = graph.weights
-    dims = {"coverage": coverage, "ordering_consistency": ordering_c,
-            "entity_consistency": entity_c, "timing_consistency": timing_c,
-            "corroboration": corr, "proximity": proximity}
-    wsum = sum(w.get(k, 0) for k in dims) or 1.0
-    raw = sum(w.get(k, 0) * v for k, v in dims.items()) / wsum
+    scalar_dims = {"coverage": coverage, "proximity": proximity,
+                   "ordering_consistency": ordering_c, "entity_consistency": entity_c,
+                   "timing_consistency": timing_c, "corroboration": corr}
+    edge_backed = {"ordering_consistency", "entity_consistency", "timing_consistency",
+                   "corroboration"}
+    num = den = 0.0
+    for k, v in scalar_dims.items():
+        if k in edge_backed and dim_results[k].status == DIM_NOT_APPLICABLE:
+            continue                       # exclude a dimension the graph never uses
+        den += w.get(k, 0)
+        num += w.get(k, 0) * v
+    raw = (num / den) if den else 0.0
 
+    # structural gate: fires ONLY on a genuinely evaluated failure (a dimension with
+    # evaluable edges whose ratio is below the gate). A NOT_EVALUABLE dimension is
+    # never a gate failure — absence of tested evidence is not proof of violation.
     gate_reasons = []
-    if entity_c < graph.entity_gate:
-        gate_reasons.append(f"entity_consistency {entity_c:.2f} < gate {graph.entity_gate}")
-    if ordering_c < graph.ordering_gate:
-        gate_reasons.append(f"ordering_consistency {ordering_c:.2f} < gate {graph.ordering_gate}")
-    if graph.timing_gate and timing_c < graph.timing_gate:
-        gate_reasons.append(f"timing_consistency {timing_c:.2f} < gate {graph.timing_gate}")
+
+    def _gate(name, threshold):
+        dr = dim_results[name]
+        if threshold <= 0 or dr.evaluable_ratio is None:
+            return
+        if dr.evaluable_ratio < threshold:
+            gate_reasons.append(f"{name} {dr.evaluable_ratio:.2f} < gate {threshold} "
+                                f"(status {dr.status})")
+    _gate("entity_consistency", graph.entity_gate)
+    _gate("ordering_consistency", graph.ordering_gate)
+    _gate("timing_consistency", graph.timing_gate)
     gate_triggered = bool(gate_reasons)
-    # a structural-gate failure caps the harmful score below the threat threshold
     harmful = min(raw, graph.threat_threshold - 1e-9) if gate_triggered else raw
 
-    # ordering ambiguity: an ORDER edge whose bound endpoints share a coordinate
-    ordering_ambiguous = False
-    for e in graph.edges:
-        if e.kind == ORDER and e.a in binding and e.b in binding:
-            if events_by_id[binding[e.a]].coord == events_by_id[binding[e.b]].coord:
-                ordering_ambiguous = True
-                break
+    ordering_ambiguous = any(r["kind"] == ORDER and r["state"] == EDGE_AMBIGUOUS
+                             for r in edge_results)
+
+    # --- positive-evidence partial-escalation gate (§7) ----------------------
+    pol = graph.partial_policy
+    mandatory_failure = any(
+        r["mandatory"] and r["state"] in (EDGE_FAILED, EDGE_AMBIGUOUS)
+        for r in edge_results if r["kind"] != COVERED_BY_AUTHORIZATION)
+    positive_proximity = proximity >= pol.min_completion_proximity
+    positive_corr = (pol.allow_corroboration_evidence
+                     and dim_results["corroboration"].satisfied_count >= 1)
+    esc_reasons = []
+    if coverage < pol.min_required_coverage:
+        esc_reasons.append(f"coverage {coverage:.2f} < {pol.min_required_coverage}")
+    if discriminating_satisfied < pol.min_discriminating_satisfied:
+        esc_reasons.append(
+            f"discriminating_satisfied {discriminating_satisfied} < "
+            f"{pol.min_discriminating_satisfied}")
+    if mandatory_failure:
+        esc_reasons.append("a mandatory edge FAILED/AMBIGUOUS")
+    if not (positive_proximity or positive_corr):
+        esc_reasons.append("no completion-proximity or corroboration evidence")
+    escalation_eligible = not esc_reasons
 
     risk = RiskVector(coverage, ordering_c, entity_c, timing_c, corr, proximity,
                       harmful, gate_triggered, gate_reasons)
-    body = {"schema": STORYGRAPH_SCHEMA_VERSION, "story": graph.ref,
+    body = {"schema": STORYGRAPH_SCHEMA_VERSION,
+            "matcher": MATCHER_SEMANTICS_VERSION, "story": graph.ref,
             "binding": binding, "risk": risk.to_dict(),
+            "dims": {k: v.to_dict() for k, v in dim_results.items()},
             "completion_present": completion_present, "unavailable": unavailable,
+            "mandatory_unsatisfied": mandatory_unsatisfied,
+            "escalation_eligible": escalation_eligible,
             "contradicts": contradicts_triggered}
+    per_kind_evaluable = {k: (counts[k][0], counts[k][0] + counts[k][1])
+                          for k in _HARMFUL_KINDS if sum(counts[k])}
     return StoryMatch(
         story_ref=graph.ref, risk=risk, binding=dict(binding),
         present_nodes=sorted(present), missing_required=missing_req,
         completion_present=completion_present, failed_edges=failed,
-        evaluable_edges={k: tuple(v) for k, v in per_kind.items() if v[1]},
+        evaluable_edges=per_kind_evaluable,
         bounded=unavailable, match_digest=digest(body, domain="CTD-STORY"),
         unavailable=unavailable, ordering_ambiguous=ordering_ambiguous,
         multiple_optimal_bindings=optimal_count, satisfied_edges=satisfied,
-        contradicts_triggered=contradicts_triggered)
+        contradicts_triggered=contradicts_triggered,
+        edge_results=edge_results, not_evaluable_edges=not_evaluable_edges,
+        ambiguous_edges=ambiguous_edges,
+        dimension_results={k: v.to_dict() for k, v in dim_results.items()},
+        mandatory_unsatisfied=mandatory_unsatisfied,
+        escalation_eligible=escalation_eligible, escalation_reasons=esc_reasons,
+        discriminating_satisfied=discriminating_satisfied)
 
 
 def from_recipe(recipe, *, completion_fragments=None) -> StoryGraph:

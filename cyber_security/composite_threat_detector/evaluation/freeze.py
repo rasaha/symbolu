@@ -17,10 +17,14 @@ from composite_threat_detector.linkage import (
     BY_ACTOR, BY_CASE, LINKAGE_SCHEMA_VERSION,
 )
 from composite_threat_detector.recipes import DIGITAL_ONTOLOGY
-from composite_threat_detector.storygraph import STORYGRAPH_SCHEMA_VERSION
+from composite_threat_detector.storygraph import (
+    MATCHER_SEMANTICS_VERSION, PARTIAL_ESCALATION_POLICY_VERSION,
+    STORYGRAPH_SCHEMA_VERSION,
+)
 
 from . import corpus as C
 from . import corpus_gen, review
+from . import story_corpus_v2
 
 FREEZE_VERSION = "ctd.freeze/2.0.0"
 POLICY_VERSION = "ctd.policy/1.0.0"
@@ -74,18 +78,29 @@ def current_config() -> dict:
         "normalization_schema": replay.HISTORICAL_REPLAY_CONTRACT["version"],
         "audit_schema": AUDIT_SCHEMA,
         "storygraph_schema": STORYGRAPH_SCHEMA_VERSION,
+        # the corrected partial-match matching semantics + the partial-escalation
+        # decision policy are versioned and frozen (§11): an official run refuses to
+        # proceed if either identifier changes.
+        "matcher_semantics": MATCHER_SEMANTICS_VERSION,
+        "partial_escalation_policy_version": PARTIAL_ESCALATION_POLICY_VERSION,
         # bind harmful story graphs (id@version + a digest of nodes/edges/gates)
         # and the verified legitimate counter-stories, so an official run detects
-        # any StoryGraph change (§ implementation order item 11).
+        # any StoryGraph change (§ implementation order item 11). The digest now also
+        # binds discriminating metadata and the per-graph partial-escalation policy.
         "story_graphs": {
             g.ref: digest(
-                {"nodes": [(n.node_id, n.fragment_id, n.required, n.is_completion)
-                           for n in g.nodes],
+                {"nodes": [(n.node_id, n.fragment_id, n.required, n.is_completion,
+                            n.specificity_class) for n in g.nodes],
                  "edges": [(e.kind, e.a, e.b, e.dim, e.max_gap, e.actor_mode,
                             e.corroborating_fragment, e.auth_tag,
-                            e.incompatible_when) for e in g.edges],
+                            e.incompatible_when, e.is_discriminating)
+                           for e in g.edges],
                  "gates": [g.entity_gate, g.ordering_gate, g.timing_gate,
                            g.material_floor, g.threat_threshold],
+                 "partial_policy": [g.partial_policy.version,
+                                    g.partial_policy.min_required_coverage,
+                                    g.partial_policy.min_discriminating_satisfied,
+                                    g.partial_policy.min_completion_proximity],
                  "weights": g.weights}, domain="CTD-STORYGRAPH")
             for g in story_lib.STORY_LIBRARY.values()},
         "legitimate_stories": {
@@ -97,6 +112,11 @@ def current_config() -> dict:
         "review_schema": sorted(review.DISPOSITIONS),
         "corpus_split_hashes": _split_hashes(),
         "generator_profiles": sorted(corpus_gen.PROFILES),
+        # the expanded StoryGraph adversarial corpus (Run 2) split hashes + the
+        # pre-registered acceptance gates, so an official final run refuses to
+        # proceed if the corpus or the gates changed (§13, §15).
+        "story_corpus_v2_hashes": story_corpus_v2.corpus_hashes(),
+        "story_corpus_v2_gates": story_corpus_v2.PREREGISTERED_GATES,
     }
 
 

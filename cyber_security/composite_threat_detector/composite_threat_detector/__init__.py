@@ -70,8 +70,12 @@ from .stories import (
     LEGITIMATE_LIBRARY,
 )
 from .storygraph import (
+    MATCHER_SEMANTICS_VERSION,
+    PARTIAL_ESCALATION_POLICY_VERSION,
     STORYGRAPH_SCHEMA_VERSION,
+    DimensionResult,
     ObservedEvent,
+    PartialEscalationPolicy,
     StoryGraph,
     StoryMatch,
     contradicts,
@@ -147,6 +151,11 @@ __all__ = [
     # story-graph layer
     "StoryGraph",
     "StoryMatch",
+    "DimensionResult",
+    "PartialEscalationPolicy",
+    "MATCHER_SEMANTICS_VERSION",
+    "PARTIAL_ESCALATION_POLICY_VERSION",
+    "STORYGRAPH_SCHEMA_VERSION",
     "ObservedEvent",
     "story_match",
     "story_from_recipe",

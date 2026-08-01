@@ -20,23 +20,31 @@ from .storygraph import (
 # ---------------------------------------------------------------------------
 # Account-takeover-and-transfer (financial ontology)
 # ---------------------------------------------------------------------------
+# §8: COMMON (low-specificity) admin events vs DISCRIMINATING pattern-specific ones.
+# A password reset / new device / limit bump is ordinary account administration; the
+# BENEFICIARY_ADD and the completing TRANSFER carry the pattern-specific meaning.
 _ATO_NODES = (
-    StoryNode("reset", F.CRED_RESET, "Credential reset"),
-    StoryNode("device", F.DEVICE_NEW, "New device"),
-    StoryNode("benef", F.BENEFICIARY_ADD, "Beneficiary added"),
-    StoryNode("limit", F.LIMIT_UP, "Limit increase", required=False),
-    StoryNode("xfer", F.TRANSFER, "Value transfer", is_completion=True),
+    StoryNode("reset", F.CRED_RESET, "Credential reset", specificity_class="COMMON"),
+    StoryNode("device", F.DEVICE_NEW, "New device", specificity_class="COMMON"),
+    StoryNode("benef", F.BENEFICIARY_ADD, "Beneficiary added",
+              specificity_class="DISCRIMINATING"),
+    StoryNode("limit", F.LIMIT_UP, "Limit increase", required=False,
+              specificity_class="COMMON"),
+    StoryNode("xfer", F.TRANSFER, "Value transfer", is_completion=True,
+              specificity_class="DISCRIMINATING"),
 )
 _ATO_EDGES = (
-    order("reset", "xfer"), order("device", "xfer"),
-    order("benef", "xfer"), order("limit", "xfer"),
-    # the discriminators: same account throughout; transfer beneficiary/device
-    # must match the added beneficiary / registered device.
+    # discriminating: credential-reset-then-transfer, within a bounded window.
+    order("reset", "xfer", discriminating=True),
+    order("device", "xfer"), order("benef", "xfer"), order("limit", "xfer"),
+    # same account throughout (linkage; not itself discriminating).
     same_entity("reset", "xfer", "account"),
-    same_entity("benef", "xfer", "beneficiary"),
-    same_entity("device", "xfer", "device"),
+    # the discriminators: transfer beneficiary/device must be the newly added
+    # beneficiary / newly registered device.
+    same_entity("benef", "xfer", "beneficiary", discriminating=True),
+    same_entity("device", "xfer", "device", discriminating=True),
     # the whole assembly must fall within a window (default: step units)
-    within("reset", "xfer", max_gap=1_000.0),
+    within("reset", "xfer", max_gap=1_000.0, discriminating=True),
 )
 
 ACCOUNT_TAKEOVER_TRANSFER = StoryGraph(
@@ -95,9 +103,13 @@ ACCOUNT_RECOVERY_STORY = LegitimateStory(
 # A separately-verified bank-assisted transaction can additionally cover the
 # transfer node (destination + amount scoped).
 BANK_ASSISTED_TRANSFER_STORY = LegitimateStory(
-    story_id="BANK_ASSISTED_TRANSFER", version="1.0.0",
+    story_id="BANK_ASSISTED_TRANSFER", version="1.1.0",
     name="Verified bank-assisted transaction",
     rules=(
+        # a verified bank-assisted transaction legitimizes both the beneficiary it
+        # will pay and the transfer itself (scoped by account + beneficiary + amount).
+        CoverageRule(node_id="benef", operation="BENEFICIARY_ADD",
+                     match_dims=("account", "beneficiary")),
         CoverageRule(node_id="xfer", operation="TRANSFER",
                      match_dims=("account", "beneficiary", "destination"),
                      amount_dim="amount"),
