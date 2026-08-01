@@ -1,6 +1,14 @@
 # Ugence AI Control Plane — Productization Roadmap
 ### Internal / data-room document — not for first investor contact
 
+> **Terminology update — Ugence Decision Governance (2026-08-01).** Per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md):
+> the canonical **umbrella** is **Ugence Decision Governance**; the **AI Control Plane** named in this
+> title is the **optional, bypassable** administration & coordination layer, not the umbrella and not a
+> universal authority. The "Decision Governance kernel" listed below is the **Decision Authority**
+> capability (`decision_governance` package, name unchanged). **Model Selection** is a distinct
+> capability, separate from Hybrid LLM. Documentation-only; nothing is renamed.
+
 *Purpose: answer the question every investor asks after the first look — "what
 exactly must be built, in what order, by whom, and in how many months?" — and derive
 the pre-seed round size **bottom-up** rather than by convention.*

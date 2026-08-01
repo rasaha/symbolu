@@ -4,6 +4,18 @@
 *How three architectural layers containing ten platform components form one architecture — not ten unrelated tools.*
 *Version 1.2 — July 2026*
 
+> **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical umbrella vocabulary
+> per [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> The canonical **umbrella** name for the platform and product family is **Ugence Decision
+> Governance**. The bounded binding-decision capability is **Decision Authority** (`decision_governance`
+> package). **Note the two senses of "AI Control Plane" across the corpus:** *(a)* in this overview it
+> names the **governance layer** that governs the AI interaction boundary (assert · decide · act ·
+> clear); *(b)* in the repository restructuring/packaging architecture it names an **optional,
+> bypassable administration & coordination layer** (registry, connectors, observability, optional
+> orchestrator). The ADR governs sense (b); this overview's **ten-component taxonomy is unchanged**,
+> and **Model Selection** remains a cross-cutting policy service here (a distinct capability in the
+> capability-engine inventory). Documentation-only; nothing is renamed.
+
 > **How to read this document.** This is an architecture overview, in the spirit of an AWS or
 > NVIDIA platform document — not a marketing flyer and not a research paper. Every section answers
 > three questions: **Why does this layer exist? What one responsibility does it own? Why doesn't

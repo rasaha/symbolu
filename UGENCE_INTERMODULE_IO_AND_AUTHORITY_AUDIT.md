@@ -1,5 +1,13 @@
 # Ugence Inter-Module I/O, Authority & Composition Audit
 
+> **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> **Ugence Decision Governance** is the umbrella; the "Decision Governance" authority discussed
+> below is the **Decision Authority** capability (`decision_governance` package, name unchanged).
+> **Model Selection** is a distinct capability (tenth), not a Hybrid LLM submodule. The optional
+> orchestrator composes workflows but **acquires no authority** from the capabilities it invokes —
+> authority stays federated by function. Documentation-only; nothing is renamed here.
+
 **Continues:** `UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md` (branch `claude/ugence-modularity-audit-uujl0h`,
 reference commit `e7cb8d35f5d667174d4278c36229d34354869cc9`).
 

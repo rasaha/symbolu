@@ -21,6 +21,47 @@ deleted, or changed.** All findings were verified against the live repository at
 
 ---
 
+> ## Terminology update — Ugence Decision Governance (2026-08-01)
+>
+> *Canonical vocabulary per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> Documentation-only; no package, API, or freeze artifact is renamed here.*
+>
+> - **Ugence Decision Governance** is the umbrella (platform + product family). The capability
+>   previously called "Decision Governance" in this plan is now the **Decision Authority**
+>   capability, still implemented under the **`decision_governance`** package (name unchanged
+>   this phase). Read "Decision Governance" headings in §2/§3/§9 below as *the Decision
+>   Authority capability / its `decision_governance` kernel*.
+> - The **capability inventory is ten, not nine**: **Model Selection** is a distinct capability,
+>   separated from Hybrid LLM (§4).
+> - The **AI Control Plane** and the **orchestrator** are **optional, bypassable** platform
+>   services — never the umbrella and never a universal authority.
+> - **Conceptual Model-C target** (directories are *not* created/renamed this phase):
+>   ```text
+>   packages/
+>   ├── governance-contracts/
+>   ├── capabilities/
+>   │   ├── tap/  ├── decision-authority/  ├── actiongate/  ├── acp/  ├── storygraph/
+>   │   ├── agent-runtime/  ├── context-minimization/  ├── model-selection/
+>   │   ├── hybrid-llm/  └── llm-steering/
+>   ├── platform/
+>   │   ├── shared-services/  └── optional-ai-control-plane/
+>   ├── products/  (assert/ · decide/ · act/ · sequence/)
+>   └── adapters/
+>   ```
+> - **Migration roadmap (conceptual):** Completed — (1) StoryGraph canonical-package migration,
+>   (2) StoryGraph documentation canonicalization, (3) Governance Contracts canonical-package
+>   migration. Next — (4) integrate completed branches, (5) **Decision Authority** capability
+>   migration, (6) Governance Provider Framework migration, (7) Model Selection focused
+>   classification & migration, (8) ActionGate consolidation & migration, (9) ACP migration,
+>   (10) Agent Runtime migration, (11) TAP migration, (12) Context Minimization migration,
+>   (13) Hybrid LLM research relocation, (14) LLM Steering research relocation, (15) Optional AI
+>   Control Plane & product-composition implementation. The **next capability migration concerns
+>   the bounded Decision Authority engine, not the umbrella Ugence Decision Governance product
+>   family.**
+
+---
+
 ## 1. Verified baseline (current repository state)
 
 | Item | Verified value |
@@ -219,8 +260,10 @@ Candidate status ∈ `CANONICAL_IMPLEMENTATION` · `CANONICAL_ADAPTER` · `REFER
 
 ## 4. Capabilities vs commercial products
 
-**Capabilities** (internal, reusable engines): TAP, Decision Governance, ActionGate, ACP,
-StoryGraph, Agent Runtime, Context Minimization, Hybrid LLM, LLM Steering.
+**Capabilities** (internal, reusable engines — **ten**; see the Terminology update above and the
+ADR): TAP, **Decision Authority** (implemented under the `decision_governance` package), ActionGate,
+ACP, StoryGraph, Agent Runtime, Context Minimization, **Model Selection**, Hybrid LLM, LLM Steering.
+*(Model Selection was previously folded under Hybrid LLM; it is a distinct capability.)*
 
 **Products** (customer-facing compositions over capability **public contracts** — never new
 copies of the engines):
@@ -228,7 +271,7 @@ copies of the engines):
 | Product | Composes (capabilities) | Business outcome |
 |---|---|---|
 | **Ugence Assert** | TAP (+ audit) | governed assertion/evidence |
-| **Ugence Decide** | Decision Governance + TAP (+ audit) | accountable business decisions |
+| **Ugence Decide** | Decision Authority (`decision_governance`) + TAP (+ audit) | accountable business decisions |
 | **Ugence Act** | ActionGate + ACP + Agent Runtime (+ audit) | governed agent action |
 | **Ugence Sequence** | StoryGraph + ActionGate (+ audit) | sequence-risk governance |
 | **(future) Private-Model Governance** | Hybrid LLM + Context Minimization + LLM Steering | private-model efficiency & steering |
