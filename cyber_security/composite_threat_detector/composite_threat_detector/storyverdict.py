@@ -120,6 +120,12 @@ class BenignSummary:
 #   (5) lexicographic canonical event-id
 TIE_BREAK_RULE_VERSION = "ctd.witness.tiebreak/2.0.0"
 
+# §3 — precise minimality statement. The canonical witness is minimal over semantic
+# event-equivalence classes; duplicate/replayed source records remain visible as
+# provenance but are not independent required evidence. This is NOT ordinary
+# source-record minimality.
+MINIMALITY_BASIS = "SEMANTIC_EQUIVALENCE_CLASS"
+
 # entity fields that define an event's SEMANTIC identity for a graph node. Two
 # events sharing this key (and fragment + actor) are equivalent — duplicates,
 # retries, or replays of the same business event — and collapse to one witness
@@ -160,6 +166,12 @@ class CompletionWitness:
     excluded_equivalent_events: list = field(default_factory=list)  # collapsed dups
     equivalence_classes: dict = field(default_factory=dict)  # node -> [event ids]
 
+    @property
+    def canonical_witness_minimal(self) -> bool:
+        """Precise name (§3): the canonical witness is minimal over semantic
+        event-equivalence classes. Alias of the historical ``minimality_verified``."""
+        return self.minimality_verified
+
     def to_dict(self) -> dict:
         return {
             "story_ref": self.story_ref, "completes": self.completes,
@@ -171,7 +183,13 @@ class CompletionWitness:
             "proved_relations": self.proved_relations, "proves": self.proves,
             "removal_breaks_completion": self.removal_breaks_completion,
             "proposed_is_necessary": self.proposed_is_necessary,
-            "minimality_verified": self.minimality_verified,
+            # §3 precise terminology: minimality is over SEMANTIC EQUIVALENCE CLASSES,
+            # not ordinary source-record minimality. Duplicate/replayed source records
+            # stay visible as provenance (excluded_equivalent_events) but are not
+            # treated as independent required evidence.
+            "minimality_basis": MINIMALITY_BASIS,
+            "canonical_witness_minimal": self.minimality_verified,
+            "minimality_verified": self.minimality_verified,  # back-compat alias
             "removal_proofs": self.removal_proofs,
             "tie_break_rule_version": self.tie_break_rule_version,
             "certificate_digest": self.certificate_digest,
@@ -320,7 +338,7 @@ def completion_witness(graph: StoryGraph, events: list, proposed: ObservedEvent)
     body = {"story": graph.ref, "completion_node": comp_node, "witness": witness,
             "canonical": canonical, "excluded": excluded, "proves": proves,
             "proposed": proposed.event_id, "removal_proofs": removal_proofs,
-            "tie_break": TIE_BREAK_RULE_VERSION}
+            "minimality_basis": MINIMALITY_BASIS, "tie_break": TIE_BREAK_RULE_VERSION}
     return CompletionWitness(
         story_ref=graph.ref, completes=True, completion_node=comp_node,
         witness_events=witness, proved_relations=proved, proves=proves,

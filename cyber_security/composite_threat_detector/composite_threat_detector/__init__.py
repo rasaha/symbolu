@@ -85,6 +85,8 @@ from .storygraph import from_recipe as story_from_recipe
 from .storygraph import match as story_match
 from .storyverdict import (
     ADDITIONAL_CONTEXT_REQUIRED,
+    MINIMALITY_BASIS,
+    TIE_BREAK_RULE_VERSION,
     BenignSummary,
     CompletionWitness,
     ProposedActionResult,
