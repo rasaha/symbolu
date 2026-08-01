@@ -1,0 +1,54 @@
+name: terminology-ci
+
+# Documentation-only guard for the Ugence Decision Governance terminology phase.
+# Runs the terminology validator/test, a documentation-link check, and the freeze /
+# API checks so a docs change cannot silently touch a frozen artifact.
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/validate_terminology.py"
+      - "tests/test_terminology_validation.py"
+      - ".github/workflows/terminology-ci.yml"
+  push:
+    branches:
+      - "claude/storygraph-canonical-package-migration-**"
+
+jobs:
+  terminology:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+
+      - name: Terminology validation (scripts/validate_terminology.py)
+        run: python scripts/validate_terminology.py
+
+      - name: Terminology test (pytest)
+        run: python -m pytest tests/test_terminology_validation.py -q
+
+      - name: Documentation-link validation
+        run: python scripts/check_doc_links.py
+
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
+
+      - name: Freeze change classification (informational)
+        # Net-new tooling files classify as UNCLASSIFIED by design (they are outside
+        # frozen packages); this step reports the classification without blocking.
+        continue-on-error: true
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="$(git rev-parse HEAD~1)"; fi
+          python -m platform_freeze.classify_change --base "$BASE" --head HEAD || true
