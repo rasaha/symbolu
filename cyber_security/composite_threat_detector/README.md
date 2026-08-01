@@ -113,6 +113,9 @@ for action in admitted_action_stream:        # each already cleared the per-acti
 | `composite_threat_detector/evidence.py` | Finding → ActionGate advisory evidence |
 | `composite_threat_detector/fragments.py` / `recipes.py` | shipped ontologies |
 | `composite_threat_detector/cli.py` | JSON CLI |
+| `composite_threat_detector/storygraph.py` | story-graph engine: typed edges, bounded deterministic matcher, decomposed risk vector |
+| `composite_threat_detector/storyverdict.py` | forward completion-gating + contradiction + dual-story verdict |
+| `composite_threat_detector/stories.py` / `financial.py` / `story_bridge.py` | story library, account-takeover ontology, live-assembly bridge |
 | `composite_threat_detector/durable_audit.py` | SQLite append-only, hash-linked (tamper-evident) durable audit |
 | `evaluation/corpus.py` / `corpus_gen.py` | 25-family corpus; seeded high-volume generator + prevalence profiles |
 | `evaluation/freeze.py` | complete evaluation freeze + final-eval guard |
@@ -136,6 +139,13 @@ for action in admitted_action_stream:        # each already cleared the per-acti
   labels every metric; population accuracy on enterprise data is
   `REQUIRES ENTERPRISE DATA`. `cli manifest` / `cli freeze` emit the corpus
   manifest and the pre-evaluation freeze.
+- **Story-graph layer (structural assembly, not counting).** `cli story` runs the
+  account-takeover demo: five events with a *mismatched beneficiary* stay
+  `OBSERVE` (entity gate), the matching sequence `ESCALATE`s, and a proposed
+  transfer that would finish the pattern returns `WOULD_COMPLETE_PROHIBITED`.
+  Typed edges (`SAME_ENTITY`/`ORDER`/`WITHIN`), a decomposed risk vector,
+  dual-story verified-benign counter-stories, contradiction scoring, and forward
+  completion-gating — all deterministic and advisory. See `STORY_GRAPH_SPEC.md`.
 - **Phase-3 robustness (historical-replay readiness).** `cli readiness` runs the
   H1–H8 gates and prints a verdict (capped at `CONTINUE — historical replay
   ready`); `cli bench` / `cli alerts` / `cli review` run the load benchmark,

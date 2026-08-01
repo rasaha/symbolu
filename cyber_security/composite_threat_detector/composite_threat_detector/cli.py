@@ -65,6 +65,54 @@ def _run(events, ontology, specs, with_policy, providers=None) -> int:
     return 1 if escs else 0
 
 
+def _story_demo() -> int:
+    """Account-takeover story-graph demo: structural assembly + forward completion."""
+    from .analyzer import SequenceRiskAnalyzer
+    from .financial import FINANCIAL_ONTOLOGY, TRANSFER
+    from .stories import ACCOUNT_TAKEOVER_TRANSFER as ATO
+    from . import story_bridge, storyverdict
+
+    def ev(op, seq, eid, **kw):
+        d = {"tenant_id": "bank", "workflow_id": "acct-1", "actor": "u1",
+             "correlation_id": "s", "sequence_id": seq, "event_id": eid,
+             "operation": op, "credential_scope": {"principal": "u1"}, "arguments": {},
+             "account": "acct-1"}
+        d.update(kw)
+        return d
+
+    setup = [ev("PASSWORD_RESET", "s:1", "1"),
+             ev("DEVICE_REGISTER", "s:2", "2", device="dev-x"),
+             ev("BENEFICIARY_ADD", "s:3", "3", beneficiary="bob"),
+             ev("LIMIT_INCREASE", "s:4", "4")]
+    good_xfer = ev("TRANSFER", "s:5", "5", beneficiary="bob", device="dev-x", amount="9000")
+    bad_xfer = ev("TRANSFER", "s:5", "5", beneficiary="mallory", device="dev-x")
+
+    def run(events):
+        az = SequenceRiskAnalyzer(FINANCIAL_ONTOLOGY, specs=(BY_CASE,))
+        for e in events:
+            az.observe(e)
+        key = list(az.ledger._by_tenant["bank"].keys())[0]
+        return az, key
+
+    out = {}
+    az, key = run(setup + [good_xfer])
+    out["true_account_takeover"] = storyverdict.evaluate(
+        ATO, story_bridge.observed_events(az, "bank", key)).to_dict()
+    az, key = run(setup + [bad_xfer])
+    out["wrong_beneficiary_same_nouns"] = storyverdict.evaluate(
+        ATO, story_bridge.observed_events(az, "bank", key)).to_dict()
+    az, key = run(setup)  # 4/5 present; would a transfer complete it?
+    events = story_bridge.observed_events(az, "bank", key)
+    prop = story_bridge.proposed_event(
+        TRANSFER, entities={"account": "acct-1", "beneficiary": "bob", "device": "dev-x"})
+    out["forward_completion_of_pending_transfer"] = storyverdict.evaluate(
+        ATO, events, proposed=prop).to_dict()
+    _emit({s: {"category": v["category"], "signal": v["signal"],
+               "risk": v["risk"], "explanation": v["explanation"]}
+           for s, v in out.items()})
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(
         prog="composite_threat_detector",
@@ -96,6 +144,7 @@ def main(argv=None) -> int:
     rv = sub.add_parser("review", help="operator-review simulation")
     rv.add_argument("--profile", default="enterprise_like")
     rv.add_argument("--scale", type=int, default=200)
+    sub.add_parser("story", help="story-graph account-takeover demo (dual-story)")
 
     d = sub.add_parser("demo", help="run a built-in illustration")
     d.add_argument("which", choices=["firearm", "exfiltration", "benign",
@@ -154,6 +203,9 @@ def main(argv=None) -> int:
         from evaluation import review_sim
         _emit(review_sim.simulate(args.profile, scale=args.scale))
         return 0
+
+    if args.cmd == "story":
+        return _story_demo()
 
     if args.cmd == "demo":
         from demos import scenarios

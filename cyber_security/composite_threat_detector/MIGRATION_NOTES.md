@@ -90,3 +90,13 @@ unchanged. Shadow mode is the default; nothing enforces.
 new failure-mode semantics are additive (event-embedded approvals were already
 non-neutralizing without a provider since phase 2). Recovery model is documented
 as *recomputed state from durable event replay*.
+
+## Story-graph layer (additive; no breaking changes)
+
+New modules `storygraph.py`, `storyverdict.py`, `stories.py`, `financial.py`,
+`story_bridge.py` and a `cli story` command. This layer is **entirely additive** —
+the default `SequenceRiskAnalyzer.observe()` path, all findings, and every prior
+test are unchanged (110 → 126 tests). It reads an assembly's active instances and
+the purpose/providers verdict through `story_bridge`; it does not alter ingestion,
+the ledger, or recipe matching. Story verdicts are advisory (`OBSERVE`/`ESCALATE`
+only). See `STORY_GRAPH_SPEC.md`.

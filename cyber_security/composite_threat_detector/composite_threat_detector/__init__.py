@@ -34,8 +34,9 @@ from __future__ import annotations
 __version__ = "2.0.0"
 
 from . import (  # noqa: F401
-    audit, benign, completion, fragments, governance, linkage, narrative,
-    ordering, policy, providers, purpose, signals,
+    audit, benign, completion, financial, fragments, governance, linkage,
+    narrative, ordering, policy, providers, purpose, signals, stories,
+    story_bridge, storygraph, storyverdict,
 )
 from .analyzer import (
     CompositeThreatMonitor,
@@ -56,6 +57,16 @@ from .providers import (
     ProviderRegistry,
     ProviderUnavailable,
 )
+from .financial import FINANCIAL_ONTOLOGY
+from .stories import (
+    ACCOUNT_TAKEOVER_TRANSFER,
+    DIGITAL_EXFILTRATION_STORY,
+    STORY_LIBRARY,
+)
+from .storygraph import ObservedEvent, StoryGraph, StoryMatch
+from .storygraph import match as story_match
+from .storyverdict import BenignSummary, StoryVerdict, evaluate as story_evaluate
+from .storyverdict import would_complete
 from .linkage import (
     BY_ACTOR,
     BY_ACTOR_TARGET,
@@ -110,4 +121,22 @@ __all__ = [
     "OBSERVE",
     "ESCALATE",
     "UNAVAILABLE",
+    # story-graph layer
+    "StoryGraph",
+    "StoryMatch",
+    "ObservedEvent",
+    "story_match",
+    "story_evaluate",
+    "would_complete",
+    "BenignSummary",
+    "StoryVerdict",
+    "STORY_LIBRARY",
+    "ACCOUNT_TAKEOVER_TRANSFER",
+    "DIGITAL_EXFILTRATION_STORY",
+    "FINANCIAL_ONTOLOGY",
+    "stories",
+    "storygraph",
+    "storyverdict",
+    "story_bridge",
+    "financial",
 ]
