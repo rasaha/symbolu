@@ -130,7 +130,7 @@ for action in admitted_action_stream:        # each already cleared the per-acti
 
 - **Advisory + shadow by default.** `PolicyBinding(shadow=True)` computes a
   consequence but marks it non-binding (`enforced=False`). Enforcement requires a
-  scoped promotion — see `../ENFORCEMENT_PROMOTION_CHECKLIST.md`; there is no
+  scoped promotion — see `../evaluation/ENFORCEMENT_PROMOTION_CHECKLIST.md`; there is no
   global switch.
 - **Trusted context only.** Self-declared purpose never neutralizes; pass a
   `ProviderRegistry` of verified authorizations. Findings carry a

@@ -25,6 +25,7 @@ wheel" reflects the package-data policy proven by `verify_storygraph_distributio
 | HISTORICAL_REPLAY_READINESS_CHECKLIST.md | `docs/replay/` | Replay | No | Current | StoryGraph |
 | SANITIZED_ENTERPRISE_REPLAY_REPORT.md | `docs/replay/` | Replay / evidence | No | Historical | StoryGraph |
 | COMPOSITE_SEQUENCE_RISK_EVALUATION_PLAN.md | `docs/evaluation/` | Evaluation plan | No | Current | StoryGraph |
+| ENFORCEMENT_PROMOTION_CHECKLIST.md | `docs/evaluation/` | Enforcement-promotion gate | No | Current | StoryGraph |
 | SHADOW_PILOT_REPORT_TEMPLATE.md | `docs/evaluation/` | Evaluation template | No | Current | StoryGraph |
 | STORY_GRAPH_FINAL_SPLIT_AUDIT.md | `docs/evaluation/` | Evaluation / evidence | No | Historical | StoryGraph |
 | STORY_GRAPH_EVIDENCE_LEDGER.md | `docs/evaluation/` | Evidence ledger | No | Historical | StoryGraph |
