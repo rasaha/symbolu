@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_evidence_policy.schema.json",
+  "title": "ActionGate Package Artifact 3 — Evidence Policy",
+  "description": "What trusted, independently-verifiable proof is required and how it must match the proposed action (template §6-§7). Self-declared justification never substitutes for verified evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["required_evidence", "scope_matching"],
+  "properties": {
+    "required_evidence": {
+      "type": "array",
+      "items": { "$ref": "actiongate_policy.schema.json#/$defs/evidence_requirement" }
+    },
+    "scope_matching": { "$ref": "actiongate_policy.schema.json#/$defs/scope_matching" }
+  }
+}

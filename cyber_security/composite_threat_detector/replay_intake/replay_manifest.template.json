@@ -1,0 +1,27 @@
+{
+  "_template": "Immutable replay manifest (§3). Fill every field. Do NOT place raw secrets, credentials, names, account numbers, or PII anywhere in this manifest.",
+  "dataset_id": "<customer-assigned dataset id>",
+  "dataset_version": "<semver>",
+  "anonymized_tenant_id": "<opaque tenant token; never a real customer/legal name>",
+  "source_systems": [
+    {"source_system_id": "identity_provider", "schema_version": "<vendor schema version>"},
+    {"source_system_id": "mobile_banking_app", "schema_version": "<...>"},
+    {"source_system_id": "beneficiary_management_system", "schema_version": "<...>"},
+    {"source_system_id": "core_account_system", "schema_version": "<...>"},
+    {"source_system_id": "payment_engine", "schema_version": "<...>"},
+    {"source_system_id": "case_management", "schema_version": "<...>"}
+  ],
+  "record_counts_by_source": {"<source_system_id>": 0},
+  "covered_time_period": {"from": "<RFC3339>", "to": "<RFC3339>"},
+  "extraction_timestamp": "<RFC3339>",
+  "redaction_method": "<e.g. deterministic-hash tokens for actor/account/device/beneficiary/destination>",
+  "hashing_method": "<e.g. SHA-256 with per-dataset salt held by the customer>",
+  "schema_versions": {"replay_contract": "ctd.storyreplay/1.0.0", "policy_pack": "ctd.storypolicypack/1.0.0"},
+  "known_omissions": ["<fields or sources not available>"],
+  "known_clock_or_sequencing_issues": ["<e.g. ingestion lag on payment_engine>"],
+  "data_use_authorization_reference": "<signed authorization id/URL; REQUIRED>",
+  "source_file_digests": {"<relative/path>": "sha-256:<hex>"},
+  "evaluated_code_commit": "<Commit A hash, filled by the official runner>",
+  "story_policy_pack_version": "ACCOUNT_TAKEOVER_TRANSFER@<customer version>",
+  "replay_run_id": "<uuid, assigned at run time>"
+}

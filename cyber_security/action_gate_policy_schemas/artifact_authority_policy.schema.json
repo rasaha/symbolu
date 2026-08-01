@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/actiongate/artifact_authority_policy.schema.json",
+  "title": "ActionGate Package Artifact 2 — Authority Policy",
+  "description": "Who may propose, approve and execute (template §5). Identity is not authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["authority"],
+  "properties": {
+    "authority": { "$ref": "actiongate_policy.schema.json#/$defs/authority" }
+  }
+}

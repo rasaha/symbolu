@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/ctd/storypolicypack.schema.json",
+  "title": "Enterprise Story Policy Pack",
+  "description": "Versioned, customer-configurable policy that declares the controlled action, the harmful StoryGraph, verified legitimate counter-stories, trusted providers, event mappings, ActionGate consequence mapping, governance lifecycle, and validation. Compiled deterministically by composite_threat_detector.policypack.compiler; the Python validator (policypack.schema.validate_pack) is authoritative and this document is the interoperable contract. Adds no matching algorithm — encodes the frozen StoryGraph slice.",
+  "type": "object",
+  "required": ["schema_version", "policy_identity", "business_objective", "scope", "canonical_action", "harmful_story", "legitimate_stories", "consequences", "governance", "validation"],
+  "properties": {
+    "schema_version": { "const": "ctd.storypolicypack/1.0.0" },
+    "policy_identity": {
+      "type": "object",
+      "required": ["policy_id", "policy_name", "policy_version", "schema_version", "domain", "status"],
+      "properties": {
+        "policy_id": { "type": "string" },
+        "policy_name": { "type": "string" },
+        "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "schema_version": { "type": "string" },
+        "domain": { "type": "string" },
+        "status": { "enum": ["DRAFT", "VALIDATING", "SHADOW_APPROVED", "SHADOW_ACTIVE", "ENFORCEMENT_CANDIDATE", "ENFORCED", "SUSPENDED", "RETIRED"] },
+        "effective_from": { "type": ["string", "null"] },
+        "expires_at": { "type": ["string", "null"] },
+        "supersedes": { "type": ["string", "null"] },
+        "change_reason": { "type": "string" }
+      }
+    },
+    "business_objective": {
+      "type": "object",
+      "required": ["prevent"],
+      "properties": {
+        "prevent": { "type": "string" },
+        "protect": { "type": "array", "items": { "type": "string" } },
+        "rationale": { "type": "string" },
+        "risk_classification": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["action_types"],
+      "properties": {
+        "tenants": { "type": "array", "items": { "type": "string" } },
+        "environments": { "type": "array", "items": { "type": "string" } },
+        "action_types": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "resource_types": { "type": "array", "items": { "type": "string" } },
+        "data_classification": { "type": "array", "items": { "type": "string" } },
+        "risk_tier": { "type": "string" }
+      }
+    },
+    "canonical_action": {
+      "type": "object",
+      "required": ["operation", "actor", "resource", "environment", "payload_digest"],
+      "properties": {
+        "operation": { "type": "string" },
+        "canonical_action_id": {},
+        "payload_digest": {}
+      }
+    },
+    "harmful_story": {
+      "type": "object",
+      "required": ["story_id", "version", "nodes", "edges", "graph_version", "matcher_version"],
+      "properties": {
+        "story_id": { "type": "string" },
+        "version": { "type": "string" },
+        "graph_version": { "type": "string" },
+        "matcher_version": { "type": "string" },
+        "nodes": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["node_id", "fragment_id"],
+            "properties": {
+              "node_id": { "type": "string" },
+              "fragment_id": { "type": "string" },
+              "required": { "type": "boolean" },
+              "is_completion": { "type": "boolean" },
+              "specificity_class": { "enum": ["COMMON", "DISCRIMINATING"] }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "enum": ["ORDER", "SAME_ENTITY", "WITHIN", "RELATED_ACTORS", "REQUIRES_CORROBORATION", "CONTRADICTS", "COVERED_BY_AUTHORIZATION"] },
+              "a": { "type": "string" },
+              "b": { "type": "string" },
+              "dim": { "type": "string" },
+              "max_gap": { "type": ["number", "null"] },
+              "incompatible_when": { "type": "string" },
+              "is_discriminating": { "type": "boolean" }
+            }
+          }
+        },
+        "gates": { "type": "object" }
+      }
+    },
+    "legitimate_stories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["story_id", "version", "accepted_tags", "rules"],
+        "properties": {
+          "story_id": { "type": "string" },
+          "version": { "type": "string" },
+          "accepted_tags": { "type": "array", "items": { "type": "string" } },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["node_id", "operation"],
+              "properties": {
+                "node_id": { "type": "string" },
+                "operation": { "type": "string" },
+                "match_dims": { "type": "array", "items": { "type": "string" } },
+                "amount_dim": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "consequences": {
+      "type": "object",
+      "description": "Maps each StoryGraph finding category to an approved ActionGate consequence. StoryGraph stays advisory; policy owns the binding consequence.",
+      "additionalProperties": {
+        "enum": ["OBSERVE", "ADDITIONAL_CONTEXT_REQUIRED", "REQUIRE_REVIEW", "WOULD_HOLD_FOR_REVIEW", "HOLD_FOR_REVIEW", "REQUIRE_ADDITIONAL_EVIDENCE", "DENY", "UNAVAILABLE"]
+      }
+    },
+    "event_mappings": { "type": "array" },
+    "provider_mappings": { "type": "array" },
+    "governance": {
+      "type": "object",
+      "required": ["business_owner", "control_owner", "technical_owner", "required_approvers", "review_frequency"],
+      "properties": {
+        "business_owner": { "type": "string" },
+        "control_owner": { "type": "string" },
+        "technical_owner": { "type": "string" },
+        "required_approvers": { "type": "array", "items": { "type": "string" } },
+        "review_frequency": { "type": "string" },
+        "human_publication_confirmed": { "type": "boolean" }
+      }
+    },
+    "validation": { "type": "object" }
+  }
+}
