@@ -54,6 +54,16 @@ platform freeze manifest's `core_tree_hashes[governance_providers]` and
 `platform/PLATFORM_FREEZE_V1.json`). The four public API snapshots are unchanged;
 `api_compatibility` classifies the change as **PATCH**.
 
+## Source-checkout importability
+
+When installed as a wheel, `ugence_governance_contracts` is a declared dependency
+of `dgm-provider-framework` and is simply importable. In an **uninstalled source
+checkout**, `governance_providers/__init__.py` performs a tiny, documented
+one-time bootstrap: if the package is not already importable it puts
+`packages/governance-contracts/src` on `sys.path` (no-op once installed). This
+keeps `import governance_providers` working from a bare checkout with no editable
+install, matching how the repo already resolves its root packages.
+
 ## Rollback
 
 `git revert` the migration commits in reverse, or check out the pre-migration

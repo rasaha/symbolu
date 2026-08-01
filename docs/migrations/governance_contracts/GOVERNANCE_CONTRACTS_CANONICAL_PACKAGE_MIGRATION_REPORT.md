@@ -128,8 +128,12 @@ envelope, correlation echo) — **documented, not implemented**. See
 ## Known limitations
 - Consumers remain on the compat path; a later phase may migrate them to the
   canonical import (each is a small, mechanical, per-package tree-hash re-baseline).
-- The compat shims rely on `ugence_governance_contracts` being installed/importable
-  (editable install in-repo; declared wheel dependency for the framework).
+- The compat shims import `ugence_governance_contracts`; it is a declared wheel
+  dependency of the framework, and a documented one-time bootstrap in
+  `governance_providers/__init__.py` puts `packages/governance-contracts/src` on
+  `sys.path` for a bare source checkout (no-op once installed). Verified: all
+  consumer suites and the standalone-import boundary test pass with **no** editable
+  install.
 - No contract semantics evolved; all gaps deferred.
 
 ## Rollback procedure

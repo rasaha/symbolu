@@ -10,3 +10,11 @@ from pathlib import Path
 project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+
+# Canonical migrated packages live under packages/<name>/src. Put them on the
+# path so a source checkout resolves them without an editable install (e.g. the
+# governance_providers contract shims import ugence_governance_contracts).
+for _src in (project_root / "packages" / "governance-contracts" / "src",
+             project_root / "packages" / "capabilities" / "storygraph" / "src"):
+    if _src.is_dir() and str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
