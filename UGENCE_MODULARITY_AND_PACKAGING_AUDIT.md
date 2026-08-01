@@ -1,5 +1,14 @@
 # Ugence Modularity & Product-Packaging Audit
 
+> **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> **Ugence Decision Governance** is the umbrella. The capability referred to below as "Decision
+> Governance" is the **Decision Authority** capability, still implemented under the
+> **`decision_governance`** package (name unchanged this phase). The capability inventory is
+> **ten**: **Model Selection** is a distinct capability, separated from Hybrid LLM. The AI Control
+> Plane and the orchestrator are **optional and bypassable**. Documentation-only; nothing is
+> renamed here.
+
 **Question:** Can a customer buy and deploy any one of TAP, Decision Governance, ActionGate,
 ACP, StoryGraph, Agent Runtime, Hybrid LLM, Context Minimization, or LLM Steering
 *independently* — without adopting the whole Ugence platform — and if so, what shared
