@@ -34,9 +34,9 @@ from __future__ import annotations
 __version__ = "2.0.0"
 
 from . import (  # noqa: F401
-    audit, benign, completion, financial, fragments, governance, linkage,
-    narrative, ordering, policy, providers, purpose, signals, stories,
-    story_bridge, storygraph, storyverdict,
+    audit, benign, completion, contradictions, financial, fragments, governance,
+    legitimate, linkage, narrative, ordering, policy, providers, purpose, signals,
+    stories, story_bridge, storygraph, storyverdict,
 )
 from .analyzer import (
     CompositeThreatMonitor,
@@ -63,10 +63,25 @@ from .stories import (
     DIGITAL_EXFILTRATION_STORY,
     STORY_LIBRARY,
 )
+from .legitimate import Authorization, CoverageRule, LegitimateStory
+from .stories import (
+    ACCOUNT_RECOVERY_STORY,
+    BANK_ASSISTED_TRANSFER_STORY,
+    LEGITIMATE_LIBRARY,
+)
 from .storygraph import ObservedEvent, StoryGraph, StoryMatch
+from .storygraph import from_recipe as story_from_recipe
 from .storygraph import match as story_match
-from .storyverdict import BenignSummary, StoryVerdict, evaluate as story_evaluate
-from .storyverdict import would_complete
+from .storyverdict import (
+    BenignSummary,
+    CompletionWitness,
+    ProposedActionResult,
+    StoryVerdict,
+    completion_witness,
+    evaluate_proposed_action,
+    would_complete,
+)
+from .storyverdict import evaluate as story_evaluate
 from .linkage import (
     BY_ACTOR,
     BY_ACTOR_TARGET,
@@ -126,8 +141,21 @@ __all__ = [
     "StoryMatch",
     "ObservedEvent",
     "story_match",
+    "story_from_recipe",
     "story_evaluate",
+    "evaluate_proposed_action",
+    "completion_witness",
     "would_complete",
+    "ProposedActionResult",
+    "CompletionWitness",
+    "LegitimateStory",
+    "Authorization",
+    "CoverageRule",
+    "ACCOUNT_RECOVERY_STORY",
+    "BANK_ASSISTED_TRANSFER_STORY",
+    "LEGITIMATE_LIBRARY",
+    "legitimate",
+    "contradictions",
     "BenignSummary",
     "StoryVerdict",
     "STORY_LIBRARY",

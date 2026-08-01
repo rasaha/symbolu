@@ -72,6 +72,35 @@ def requires_corroboration(a, corroborating_fragment):
     return Edge(REQUIRES_CORROBORATION, a, corroborating_fragment=corroborating_fragment)
 
 
+# spec edge-name aliases (§1) — BEFORE/WITHIN_TIME/SAME_* map onto the primitives
+def before(a, b):
+    return order(a, b)
+
+
+def within_time(a, b, max_gap):
+    return within(a, b, max_gap)
+
+
+def same_account(a, b):
+    return same_entity(a, b, "account")
+
+
+def same_device(a, b):
+    return same_entity(a, b, "device")
+
+
+def same_beneficiary(a, b):
+    return same_entity(a, b, "beneficiary")
+
+
+def same_destination(a, b):
+    return same_entity(a, b, "destination")
+
+
+def related_actor(a, b, mode="SAME"):
+    return related_actors(a, b, mode)
+
+
 @dataclass(frozen=True)
 class StoryNode:
     node_id: str
@@ -196,10 +225,20 @@ class StoryMatch:
     evaluable_edges: dict         # kind -> (satisfied, total)
     bounded: bool
     match_digest: str
+    unavailable: bool = False              # matcher limit exceeded (fail-visible)
+    ordering_ambiguous: bool = False       # an ORDER edge has unresolved (equal) coords
+    multiple_optimal_bindings: int = 1     # count of bindings achieving the best score
+
+    def is_complete(self) -> bool:
+        return (not self.missing_required and self.completion_present
+                and not self.risk.gate_triggered and not self.unavailable)
 
     def to_dict(self) -> dict:
         return {
             "story_ref": self.story_ref, "risk": self.risk.to_dict(),
+            "unavailable": self.unavailable,
+            "ordering_ambiguous": self.ordering_ambiguous,
+            "multiple_optimal_bindings": self.multiple_optimal_bindings,
             "binding": self.binding, "present_nodes": self.present_nodes,
             "missing_required": self.missing_required,
             "completion_present": self.completion_present,
@@ -261,28 +300,31 @@ def match(graph: StoryGraph, events: list[ObservedEvent]) -> StoryMatch:
     combos = 1
     for nid in present_ids:
         combos *= max(1, len(cands[nid]))
-    bounded = combos > _MAX_COMBINATIONS
-    best_binding: dict = {}
-    best_score = -1
-    if not bounded:
-        best_binding, best_score = _exhaustive(graph, present_ids, cands, events_by_id,
-                                               present, all_frag_ids)
+    unavailable = combos > _MAX_COMBINATIONS
+    optimal_count = 1
+    if not unavailable:
+        best_binding, best_score, optimal_count = _exhaustive(
+            graph, present_ids, cands, events_by_id, present, all_frag_ids)
     else:
-        best_binding = {nid: cands[nid][0] for nid in present_ids}  # deterministic greedy
-        best_score = _score_binding(graph, best_binding, events_by_id, present, all_frag_ids)
+        # limit exceeded: keep a deterministic greedy binding for explainability,
+        # but report UNAVAILABLE (fail-visible) — never a silent best-guess verdict.
+        best_binding = {nid: cands[nid][0] for nid in present_ids}
 
-    return _build_match(graph, best_binding, events_by_id, present, all_frag_ids, bounded)
+    return _build_match(graph, best_binding, events_by_id, present, all_frag_ids,
+                        unavailable, optimal_count)
 
 
 def _exhaustive(graph, present_ids, cands, events_by_id, present, all_frag_ids):
-    best_binding, best_score = {}, -1
+    best_binding, best_score, count = {}, -1, 0
 
     def rec(i, binding):
-        nonlocal best_binding, best_score
+        nonlocal best_binding, best_score, count
         if i == len(present_ids):
             s = _score_binding(graph, binding, events_by_id, present, all_frag_ids)
             if s > best_score:
-                best_binding, best_score = dict(binding), s
+                best_binding, best_score, count = dict(binding), s, 1
+            elif s == best_score:
+                count += 1
             return
         nid = present_ids[i]
         for eid in cands[nid]:
@@ -291,10 +333,11 @@ def _exhaustive(graph, present_ids, cands, events_by_id, present, all_frag_ids):
         binding.pop(nid, None)
 
     rec(0, {})
-    return best_binding, best_score
+    return best_binding, best_score, max(1, count)
 
 
-def _build_match(graph, binding, events_by_id, present, all_frag_ids, bounded) -> StoryMatch:
+def _build_match(graph, binding, events_by_id, present, all_frag_ids, unavailable,
+                 optimal_count) -> StoryMatch:
     req = graph.required_nodes()
     req_ids = {n.node_id for n in req}
     present_req = sorted(present & req_ids)
@@ -347,13 +390,55 @@ def _build_match(graph, binding, events_by_id, present, all_frag_ids, bounded) -
     # a structural-gate failure caps the harmful score below the threat threshold
     harmful = min(raw, graph.threat_threshold - 1e-9) if gate_triggered else raw
 
+    # ordering ambiguity: an ORDER edge whose bound endpoints share a coordinate
+    ordering_ambiguous = False
+    for e in graph.edges:
+        if e.kind == ORDER and e.a in binding and e.b in binding:
+            if events_by_id[binding[e.a]].coord == events_by_id[binding[e.b]].coord:
+                ordering_ambiguous = True
+                break
+
     risk = RiskVector(coverage, ordering_c, entity_c, timing_c, corr, proximity,
                       harmful, gate_triggered, gate_reasons)
     body = {"story": graph.ref, "binding": binding, "risk": risk.to_dict(),
-            "completion_present": completion_present}
+            "completion_present": completion_present, "unavailable": unavailable}
     return StoryMatch(
         story_ref=graph.ref, risk=risk, binding=dict(binding),
         present_nodes=sorted(present), missing_required=missing_req,
         completion_present=completion_present, failed_edges=failed,
         evaluable_edges={k: tuple(v) for k, v in per_kind.items() if v[1]},
-        bounded=bounded, match_digest=digest(body, domain="CTD-STORY"))
+        bounded=unavailable, match_digest=digest(body, domain="CTD-STORY"),
+        unavailable=unavailable, ordering_ambiguous=ordering_ambiguous,
+        multiple_optimal_bindings=optimal_count)
+
+
+def from_recipe(recipe, *, completion_fragments=None) -> StoryGraph:
+    """Compile a flat fragment recipe into a simple StoryGraph (backward compat, §1).
+
+    Existing recipes keep working: each fragment becomes a node, ``ordering`` pairs
+    become ORDER edges, ``pair_gaps`` become WITHIN edges. Entity edges are absent
+    (flat recipes had only global scope), so the entity gate is relaxed — the
+    compiled graph reproduces the flat recipe's structural expectations without
+    inventing per-edge entity constraints it never had.
+    """
+    frag_ids = sorted(recipe.required) + sorted(set(recipe.optional) - set(recipe.required))
+    if completion_fragments is None:
+        befores = {a for a, b in recipe.ordering}
+        afters = {b for a, b in recipe.ordering}
+        completion = (afters - befores) or {sorted(recipe.required)[-1]}
+    else:
+        completion = set(completion_fragments)
+    nodes = tuple(
+        StoryNode(node_id=f, fragment_id=f, title=f,
+                  required=(f in recipe.required), is_completion=(f in completion))
+        for f in frag_ids)
+    edges = tuple(order(a, b) for a, b in recipe.ordering)
+    edges += tuple(within(a, b, hi) for (a, b), (lo, hi) in
+                   getattr(recipe, "pair_gaps", {}).items() if hi is not None)
+    return StoryGraph(
+        story_id=f"compiled.{recipe.recipe_id}", version=recipe.version,
+        name=f"compiled:{recipe.name}", nodes=nodes, edges=edges,
+        entity_gate=0.0, ordering_gate=0.999, timing_gate=0.0,
+        material_floor=0.40, threat_threshold=recipe.escalation_threshold,
+        severity=recipe.severity,
+        recommended_consequence=recipe.recommended_consequence)

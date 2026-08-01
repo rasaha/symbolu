@@ -100,3 +100,16 @@ test are unchanged (110 → 126 tests). It reads an assembly's active instances 
 the purpose/providers verdict through `story_bridge`; it does not alter ingestion,
 the ledger, or recipe matching. Story verdicts are advisory (`OBSERVE`/`ESCALATE`
 only). See `STORY_GRAPH_SPEC.md`.
+
+### Story-graph v2 (additive; 126 → 138 tests)
+
+New modules `legitimate.py` (verified counter-story + per-node coverage) and
+`contradictions.py` (typed contradiction enum). `storygraph.py` gains matcher
+`unavailable`/`ordering_ambiguous`/`multiple_optimal_bindings`, edge-name aliases
+(`before`/`within_time`/`same_account`/`same_device`/`same_beneficiary`/
+`same_destination`/`related_actor`), and `from_recipe()` (flat-recipe → graph).
+`storyverdict.py` gains the canonical taxonomy (old names kept as aliases so the
+prior 16 story tests pass unchanged), `completion_witness()` (minimal deterministic
+certificate), and `evaluate_proposed_action()` (the pre-commit dual-story entry
+point). `stories.py` adds `ACCOUNT_RECOVERY_STORY` / `BANK_ASSISTED_TRANSFER_STORY`.
+Still additive: the analyzer core is untouched; all signals remain advisory.

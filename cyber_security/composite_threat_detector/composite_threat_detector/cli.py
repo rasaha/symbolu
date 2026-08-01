@@ -101,16 +101,45 @@ def _story_demo() -> int:
     az, key = run(setup + [bad_xfer])
     out["wrong_beneficiary_same_nouns"] = storyverdict.evaluate(
         ATO, story_bridge.observed_events(az, "bank", key)).to_dict()
-    az, key = run(setup)  # 4/5 present; would a transfer complete it?
+    # dual-story: a verified account-recovery covers reset+device but not the
+    # beneficiary or transfer; the pending transfer would complete the pattern.
+    from .legitimate import Authorization
+    from .stories import ACCOUNT_RECOVERY_STORY
+    az, key = run(setup[:3])  # reset, device, beneficiary present; no transfer yet
     events = story_bridge.observed_events(az, "bank", key)
     prop = story_bridge.proposed_event(
-        TRANSFER, entities={"account": "acct-1", "beneficiary": "bob", "device": "dev-x"})
-    out["forward_completion_of_pending_transfer"] = storyverdict.evaluate(
-        ATO, events, proposed=prop).to_dict()
-    _emit({s: {"category": v["category"], "signal": v["signal"],
-               "risk": v["risk"], "explanation": v["explanation"]}
-           for s, v in out.items()})
+        TRANSFER, entities={"account": "acct-1", "beneficiary": "bob",
+                            "device": "dev-x", "amount": "9000"})
+    recovery = Authorization(tag="customer_account_recovery", valid=True,
+                             covered_operations=frozenset({"PASSWORD_RESET",
+                                                           "DEVICE_REGISTER"}),
+                             account="acct-1")
+    pa = storyverdict.evaluate_proposed_action(
+        events, prop, ATO, legitimate_stories=[ACCOUNT_RECOVERY_STORY],
+        authorizations=[recovery]).to_dict()
+
+    _emit({
+        "1_true_account_takeover": _story_row(out["true_account_takeover"]),
+        "2_wrong_beneficiary_same_nouns": _story_row(out["wrong_beneficiary_same_nouns"]),
+        "3_pre_commit_dual_story": {
+            "category": pa["category"], "signal": pa["signal"],
+            "legitimate_coverage": {
+                "status": pa["legitimate_coverage"]["status"],
+                "covered": pa["legitimate_coverage"]["covered_nodes"],
+                "uncovered": pa["legitimate_coverage"]["uncovered_nodes"]},
+            "completion_witness": {
+                "completes": pa["completion_witness"]["completes"],
+                "completion_node": pa["completion_witness"]["completion_node"],
+                "proposed_is_necessary": pa["completion_witness"]["proposed_is_necessary"],
+                "certificate": pa["completion_witness"]["certificate_digest"][:23] + "…"},
+            "explanation": pa["explanation"]},
+    })
     return 0
+
+
+def _story_row(v):
+    return {"category": v["category"], "signal": v["signal"], "risk": v["risk"],
+            "explanation": v["explanation"]}
 
 
 def main(argv=None) -> int:

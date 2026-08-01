@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from . import financial as F
 from . import fragments as D
+from .legitimate import CoverageRule, LegitimateStory
 from .storygraph import (
     StoryGraph, StoryNode, order, same_entity, within,
 )
@@ -73,4 +74,38 @@ DIGITAL_EXFILTRATION_STORY = StoryGraph(
 STORY_LIBRARY = {
     ACCOUNT_TAKEOVER_TRANSFER.story_id: ACCOUNT_TAKEOVER_TRANSFER,
     DIGITAL_EXFILTRATION_STORY.story_id: DIGITAL_EXFILTRATION_STORY,
+}
+
+# ---------------------------------------------------------------------------
+# Verified legitimate counter-story: customer account recovery
+# ---------------------------------------------------------------------------
+# A verified account-recovery case legitimizes the credential reset and the device
+# enrollment for the account — but NOT the beneficiary addition or the transfer.
+# Those nodes stay uncovered, yielding partial legitimate coverage.
+ACCOUNT_RECOVERY_STORY = LegitimateStory(
+    story_id="ACCOUNT_RECOVERY", version="1.0.0",
+    name="Verified customer account recovery",
+    rules=(
+        CoverageRule(node_id="reset", operation="PASSWORD_RESET", match_dims=("account",)),
+        CoverageRule(node_id="device", operation="DEVICE_REGISTER", match_dims=("account",)),
+    ),
+    accepted_tags=frozenset({"customer_account_recovery"}),
+)
+
+# A separately-verified bank-assisted transaction can additionally cover the
+# transfer node (destination + amount scoped).
+BANK_ASSISTED_TRANSFER_STORY = LegitimateStory(
+    story_id="BANK_ASSISTED_TRANSFER", version="1.0.0",
+    name="Verified bank-assisted transaction",
+    rules=(
+        CoverageRule(node_id="xfer", operation="TRANSFER",
+                     match_dims=("account", "beneficiary", "destination"),
+                     amount_dim="amount"),
+    ),
+    accepted_tags=frozenset({"bank_assisted_transaction"}),
+)
+
+LEGITIMATE_LIBRARY = {
+    ACCOUNT_RECOVERY_STORY.story_id: ACCOUNT_RECOVERY_STORY,
+    BANK_ASSISTED_TRANSFER_STORY.story_id: BANK_ASSISTED_TRANSFER_STORY,
 }

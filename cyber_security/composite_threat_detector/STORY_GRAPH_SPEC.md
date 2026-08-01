@@ -87,11 +87,68 @@ greedy binding under size pressure. Known-pattern only — a genuinely novel pat
 matches nothing (an anomaly/graph-learning layer would be separate and advisory).
 Positioned as **known-pattern sequence risk**, not intent inference.
 
+## 7. Dual-story graph + per-node coverage (`legitimate.py`)
+
+The legitimate explanation is its **own graph**, not a single status. A
+`LegitimateStory` maps harmful-graph nodes to `CoverageRule`s that a **verified**
+`Authorization` (from a trusted provider; `valid=True` only) must satisfy —
+per-dimension entity match, time window, amount cap. Coverage is measured against
+the **harmful** graph's nodes, so a recovery authorization that covers only the
+reset and device enrollment yields `PARTIAL` coverage of an assembly that also
+added a beneficiary and a transfer:
+
+```
+covered:   reset, device
+uncovered: benef, xfer      → status PARTIAL, completion (xfer) not covered
+```
+
+Self-declared authorization (`valid=False`) covers nothing. Hard contradictions
+remain non-compensatory — coverage never overrides them.
+
+## 8. Typed contradictions (`contradictions.py`)
+
+Explicit typed findings, each stating which graph it weakens (HARMFUL / LEGITIMATE
+/ BOTH), the affected node/edge, evidence, and advisory-vs-decisive:
+`APPROVAL_ACCOUNT_MISMATCH`, `APPROVAL_DESTINATION_MISMATCH`,
+`APPROVAL_AMOUNT_EXCEEDED`, `APPROVAL_EXPIRED`, `ACTOR_SCOPE_MISMATCH`,
+`DEVICE_BINDING_MISMATCH`, `BENEFICIARY_BINDING_MATCH`, `CONCEALMENT_EVENT_PRESENT`,
+`ORDERING_AMBIGUOUS`, `ENTITY_LINKAGE_AMBIGUOUS`.
+
+## 9. Minimal completion witness / deterministic certificate
+
+`evaluate_proposed_action(assembly_events, proposed_action, harmful_graph,
+legitimate_stories, authorizations, facts, now)` hypothetically inserts the
+proposed action (never records it) and — when it completes the harmful graph —
+returns a `CompletionWitness`: one event per required node, the proved binding
+relations (same account/device/beneficiary, order, timing), a proof that removing
+the proposed action makes the story incomplete (`removal_breaks_completion`,
+`proposed_is_necessary`), and a `certificate_digest`. The canonical categories are
+`NO_MATERIAL_PATTERN / PARTIAL_HARMFUL_STORY / VERIFIED_LEGITIMATE_STORY /
+LEGITIMATE_STORY_PARTIAL_COVERAGE / AMBIGUOUS_COMPETING_STORIES /
+THREAT_CONSISTENT_WITH_INSUFFICIENT_CONTEXT / WOULD_COMPLETE_PROHIBITED_CAPABILITY
+/ HARD_POLICY_VIOLATION`, mapped to `OBSERVE`/`ESCALATE`/`UNAVAILABLE`.
+
+## 10. Backward compatibility + matcher safety
+
+`from_recipe()` compiles an existing flat recipe into a simple StoryGraph
+(fragments → nodes, ordering → ORDER edges, gaps → WITHIN edges, relaxed entity
+gate) so prior recipes keep working. The matcher reports `unavailable` (fail-
+visible → `UNAVAILABLE` signal) when the binding-combination limit is exceeded,
+plus `ordering_ambiguous` and `multiple_optimal_bindings`.
+
+## Scope note
+
+This is the first vertical slice: one harmful graph (account takeover) + its
+verified counter-story. No large story library, no PageRank, no learned/
+probabilistic scoring, no unknown-fraud discovery. Known-pattern sequence risk,
+advisory only.
+
 ## Novelty
 
 Subgraph attack-pattern matching, competing-hypothesis analysis, and fraud
 story-graphs have substantial prior art. The differentiation is the *composition*
-— deterministic, explainable dual-story graph assembly + contradiction scoring +
-forward completion-gating bound to ActionGate's exact-action identity and verified
-non-compensatory context. Not an established-novelty claim; patentability of the
-integrated completion-gating method would require professional prior-art review.
+— deterministic, explainable dual-story graph assembly + typed contradictions +
+forward completion-gating with a minimal witness, bound to ActionGate's
+exact-action identity and verified non-compensatory context. Not an
+established-novelty claim; patentability of the integrated completion-gating method
+would require professional prior-art review.
