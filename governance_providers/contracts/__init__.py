@@ -1,33 +1,15 @@
-"""Provider contracts — three distinct, non-interchangeable governance families."""
-from __future__ import annotations
+"""COMPATIBILITY-ONLY. Legacy path for the provider contracts.
 
-from .base import BaseProvider, Provider
-from .assertion import (
-    AssertionCoverage,
-    AssertionGovernanceProvider,
-    AssertionGovernanceRequest,
-    AssertionGovernanceResult,
+Canonical: ``ugence_governance_contracts.contracts``. Re-exports the SAME objects
+(identity preserved); no logic. Removal/review target: governance_providers 0.2.0.
+"""
+from ugence_governance_contracts.contracts import (  # noqa: F401
+    Provider, BaseProvider,
+    AssertionGovernanceProvider, AssertionGovernanceRequest,
+    AssertionGovernanceResult, AssertionCoverage,
+    ActionGovernanceProvider, ActionGovernanceRequest,
+    ActionGovernanceResult, ActionGovernanceOutcome,
+    ExternalExecutionProvider, ExecutionDispatchRequest,
+    ExecutionDispatchResult, ExecutionObservation, ExecutionBusinessOutcome,
+    __all__,
 )
-from .action import (
-    ActionGovernanceOutcome,
-    ActionGovernanceProvider,
-    ActionGovernanceRequest,
-    ActionGovernanceResult,
-)
-from .execution import (
-    ExecutionBusinessOutcome,
-    ExecutionDispatchRequest,
-    ExecutionDispatchResult,
-    ExecutionObservation,
-    ExternalExecutionProvider,
-)
-
-__all__ = [
-    "Provider", "BaseProvider",
-    "AssertionGovernanceProvider", "AssertionGovernanceRequest",
-    "AssertionGovernanceResult", "AssertionCoverage",
-    "ActionGovernanceProvider", "ActionGovernanceRequest",
-    "ActionGovernanceResult", "ActionGovernanceOutcome",
-    "ExternalExecutionProvider", "ExecutionDispatchRequest",
-    "ExecutionDispatchResult", "ExecutionObservation", "ExecutionBusinessOutcome",
-]

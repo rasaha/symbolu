@@ -1,0 +1,90 @@
+"""Ugence Governance Contracts — the canonical, neutral, reusable contract layer.
+
+A **leaf** package: it defines the provider-neutral governance contracts (request
+/ result envelopes, provider protocols, provider metadata, lifecycle states, and
+the error taxonomy) that capabilities and the provider framework depend on. It
+imports **only the Python standard library** — never a capability, product,
+platform, console, or research package.
+
+Authority note: these are neutral *contracts*, not authority. The meaning of each
+result (advisory vs binding, authorization vs clearance vs execution) is owned by
+the capability that produces it — this package does not change any authority
+boundary.
+
+Import the curated surface from :mod:`ugence_governance_contracts.api`.
+"""
+
+from __future__ import annotations
+
+__version__ = "0.1.0"
+
+#: The provider-contract version this package publishes (unchanged from the
+#: pre-migration ``governance_providers`` framework value).
+CONTRACT_VERSION = "1.0.0"
+
+from .errors import (  # noqa: E402
+    FailureClass,
+    ProviderCompatibilityError,
+    ProviderConfigurationError,
+    ProviderError,
+    ProviderProtocolError,
+    ProviderRegistrationError,
+    ProviderResolutionError,
+    ProviderResultValidationError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
+from .lifecycle import (  # noqa: E402
+    ProviderLifecycleState,
+    assert_transition,
+    is_legal_transition,
+)
+from .metadata import (  # noqa: E402
+    ProviderCapabilities,
+    ProviderCompatibility,
+    ProviderDescriptor,
+    ProviderHealth,
+    ProviderKind,
+)
+from .contracts import (  # noqa: E402
+    ActionGovernanceOutcome,
+    ActionGovernanceProvider,
+    ActionGovernanceRequest,
+    ActionGovernanceResult,
+    AssertionCoverage,
+    AssertionGovernanceProvider,
+    AssertionGovernanceRequest,
+    AssertionGovernanceResult,
+    BaseProvider,
+    ExecutionBusinessOutcome,
+    ExecutionDispatchRequest,
+    ExecutionDispatchResult,
+    ExecutionObservation,
+    ExternalExecutionProvider,
+    Provider,
+)
+
+from . import api  # noqa: E402,F401
+
+__all__ = [
+    "CONTRACT_VERSION",
+    # errors
+    "FailureClass", "ProviderError", "ProviderRegistrationError",
+    "ProviderResolutionError", "ProviderCompatibilityError",
+    "ProviderConfigurationError", "ProviderUnavailableError",
+    "ProviderTimeoutError", "ProviderProtocolError", "ProviderResultValidationError",
+    # lifecycle
+    "ProviderLifecycleState", "is_legal_transition", "assert_transition",
+    # metadata
+    "ProviderKind", "ProviderCapabilities", "ProviderCompatibility",
+    "ProviderDescriptor", "ProviderHealth",
+    # contracts
+    "Provider", "BaseProvider",
+    "AssertionGovernanceProvider", "AssertionGovernanceRequest",
+    "AssertionGovernanceResult", "AssertionCoverage",
+    "ActionGovernanceProvider", "ActionGovernanceRequest",
+    "ActionGovernanceResult", "ActionGovernanceOutcome",
+    "ExternalExecutionProvider", "ExecutionDispatchRequest",
+    "ExecutionDispatchResult", "ExecutionObservation", "ExecutionBusinessOutcome",
+    "api",
+]

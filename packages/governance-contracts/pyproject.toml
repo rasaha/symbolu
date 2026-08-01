@@ -1,0 +1,33 @@
+# Independent distribution for the canonical Ugence Governance Contracts.
+#
+# This is the ONE canonical source tree for the neutral governance contracts.
+# The legacy paths under ``governance_providers`` (errors/lifecycle/metadata/
+# contracts) are logic-free re-export shims that import from this package.
+#
+# Build:    python -m build packages/governance-contracts
+# Verify:   python packages/governance-contracts/verify_governance_contracts_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-governance-contracts"
+dynamic = ["version"]
+description = "Ugence Governance Contracts — neutral, reusable provider contract layer (leaf, stdlib-only)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "contracts", "provider", "ugence"]
+# A leaf: no third-party runtime dependency and no other Ugence package.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_governance_contracts.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_governance_contracts*"]
