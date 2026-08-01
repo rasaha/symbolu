@@ -86,6 +86,16 @@ def main(argv=None) -> int:
     sub.add_parser("manifest", help="print the corpus manifest")
     fr = sub.add_parser("freeze", help="print the pre-evaluation freeze")
     fr.add_argument("--commit", default="UNSET")
+    sub.add_parser("readiness", help="run historical-replay readiness gates H1-H8")
+    bn = sub.add_parser("bench", help="synthetic operational load benchmark")
+    bn.add_argument("--profile", default="balanced")
+    bn.add_argument("--scale", type=int, default=50)
+    al = sub.add_parser("alerts", help="alert-volume + review-burden report")
+    al.add_argument("--profile", default="enterprise_like")
+    al.add_argument("--scale", type=int, default=200)
+    rv = sub.add_parser("review", help="operator-review simulation")
+    rv.add_argument("--profile", default="enterprise_like")
+    rv.add_argument("--scale", type=int, default=200)
 
     d = sub.add_parser("demo", help="run a built-in illustration")
     d.add_argument("which", choices=["firearm", "exfiltration", "benign",
@@ -122,6 +132,27 @@ def main(argv=None) -> int:
     if args.cmd == "freeze":
         from evaluation import corpus
         _emit(corpus.freeze(code_commit=args.commit))
+        return 0
+
+    if args.cmd == "readiness":
+        from evaluation import readiness
+        rep = readiness.run()
+        _emit(rep)
+        return 0 if rep["verdict"].startswith("CONTINUE") else 1
+
+    if args.cmd == "bench":
+        from evaluation import benchmark
+        _emit(benchmark.run_load(args.profile, scale=args.scale))
+        return 0
+
+    if args.cmd == "alerts":
+        from evaluation import alerts
+        _emit(alerts.alert_volume(args.profile, scale=args.scale))
+        return 0
+
+    if args.cmd == "review":
+        from evaluation import review_sim
+        _emit(review_sim.simulate(args.profile, scale=args.scale))
         return 0
 
     if args.cmd == "demo":

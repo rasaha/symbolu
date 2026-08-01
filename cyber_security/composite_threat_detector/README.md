@@ -113,11 +113,14 @@ for action in admitted_action_stream:        # each already cleared the per-acti
 | `composite_threat_detector/evidence.py` | Finding → ActionGate advisory evidence |
 | `composite_threat_detector/fragments.py` / `recipes.py` | shipped ontologies |
 | `composite_threat_detector/cli.py` | JSON CLI |
-| `evaluation/corpus.py` | 25-family adversarial corpus + manifest + freeze |
+| `composite_threat_detector/durable_audit.py` | SQLite append-only, hash-linked (tamper-evident) durable audit |
+| `evaluation/corpus.py` / `corpus_gen.py` | 25-family corpus; seeded high-volume generator + prevalence profiles |
+| `evaluation/freeze.py` | complete evaluation freeze + final-eval guard |
+| `evaluation/benchmark.py` / `alerts.py` / `review_sim.py` | load benchmark, alert-volume, review simulation |
+| `evaluation/readiness.py` | H1–H8 readiness gates + verdict |
 | `evaluation/harness.py` | metrics harness (evidence-labeled; enterprise = NOT RUN) |
-| `evaluation/review.py` | operator-review simulation |
 | `demos/scenarios.py` | illustrative scenarios |
-| `tests/` | 62 deterministic detection + non-detection + infra tests |
+| `tests/` | 110 deterministic detection + non-detection + robustness tests |
 | `RECIPE_SCHEMA.md` / `LINKAGE_SCHEMA.md` / `MIGRATION_NOTES.md` | schemas + migration |
 
 ### Shadow-mode / phase-2 notes
@@ -133,3 +136,12 @@ for action in admitted_action_stream:        # each already cleared the per-acti
   labels every metric; population accuracy on enterprise data is
   `REQUIRES ENTERPRISE DATA`. `cli manifest` / `cli freeze` emit the corpus
   manifest and the pre-evaluation freeze.
+- **Phase-3 robustness (historical-replay readiness).** `cli readiness` runs the
+  H1–H8 gates and prints a verdict (capped at `CONTINUE — historical replay
+  ready`); `cli bench` / `cli alerts` / `cli review` run the load benchmark,
+  alert-volume, and review simulation. Durable audit + `recover_from_audit`
+  provide restart recovery; provider failure modes never silently neutralize; the
+  K8s reference replay adapter is in `replay.py` (see
+  `../HISTORICAL_REPLAY_K8S_CONTRACT.md`,
+  `../HISTORICAL_REPLAY_READINESS_CHECKLIST.md`,
+  `../PHASE3_FINAL_EVALUATION_REPORT.md`).

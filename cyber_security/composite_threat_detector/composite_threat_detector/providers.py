@@ -34,10 +34,31 @@ PROVIDER_TYPES = frozenset({
     INCIDENT_CASE, HUMAN_APPROVAL, WORKFLOW_CONFIG, IAM_RECORD,
 })
 
-# verification statuses
+# verification statuses (only VERIFIED can neutralize; all others are fail-safe)
 VERIFIED = "VERIFIED"
 NOT_FOUND = "NOT_FOUND"
 UNVERIFIED = "UNVERIFIED"
+REVOKED = "REVOKED"
+SUPERSEDED = "SUPERSEDED"
+STALE = "STALE"
+EXPIRED = "EXPIRED"
+INVALID_SIGNATURE = "INVALID_SIGNATURE"
+UNVERIFIABLE = "UNVERIFIABLE"
+VERSION_MISMATCH = "VERSION_MISMATCH"
+MODIFIED_AFTER_ACTIVITY = "MODIFIED_AFTER_ACTIVITY"
+NOT_YET_INGESTED = "NOT_YET_INGESTED"
+PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+
+# statuses that must NEVER neutralize an escalation (fail-safe set)
+NON_NEUTRALIZING = frozenset({
+    NOT_FOUND, UNVERIFIED, REVOKED, SUPERSEDED, STALE, EXPIRED, INVALID_SIGNATURE,
+    UNVERIFIABLE, VERSION_MISMATCH, MODIFIED_AFTER_ACTIVITY, NOT_YET_INGESTED,
+    PROVIDER_UNAVAILABLE,
+})
+
+
+class ProviderUnavailable(Exception):
+    """A trusted provider could not be reached / could not answer (fail-loud)."""
 
 # the scope dimensions an authorization can bind
 SCOPE_DIMS = ("tenant", "actor", "workflow", "target_family", "operation",
@@ -58,6 +79,8 @@ class AuthorizationQuery:
     policy_version: str = ""
     claim_tag: str = ""
     claim_record_id: str = ""
+    activity_start: float | None = None       # earliest activity time in the assembly
+    expected_provider_version: str = ""
 
 
 @dataclass(frozen=True)
@@ -128,14 +151,44 @@ class FixtureProvider(BenignEvidenceProvider):
     """
 
     def __init__(self, provider_id: str, version: str, records: list[dict],
-                 source_system: str = "fixture"):
+                 source_system: str = "fixture", available: bool = True):
         self.provider_id = provider_id
         self.version = version
         self.source_system = source_system
+        self.available = available
         self._records = list(records)
 
-    def verify(self, query: AuthorizationQuery) -> BenignAuthorization | None:
-        best = None
+    def _status_for(self, rec: dict, query: AuthorizationQuery, tw: bool) -> str:
+        """Deterministically classify a matched record (fail-safe on any defect)."""
+        if rec.get("unverifiable"):
+            return UNVERIFIABLE
+        sig = rec.get("signature")
+        if sig is not None and sig != _expected_signature(rec):
+            return INVALID_SIGNATURE
+        req_ver = rec.get("provider_version_required") or query.expected_provider_version
+        if req_ver and req_ver != self.version:
+            return VERSION_MISMATCH
+        av_from = rec.get("available_from")
+        if av_from is not None and query.now is not None and query.now < float(av_from):
+            return NOT_YET_INGESTED           # delayed approval ingestion
+        if rec.get("revoked"):
+            return REVOKED
+        if rec.get("superseded_by"):
+            return SUPERSEDED
+        if rec.get("stale"):
+            return STALE
+        mod = rec.get("modified_at")
+        if (mod is not None and query.activity_start is not None
+                and float(mod) > float(query.activity_start)):
+            return MODIFIED_AFTER_ACTIVITY     # record changed after activity began
+        if not tw:
+            return EXPIRED
+        return VERIFIED
+
+    def verify_all(self, query: AuthorizationQuery) -> list[BenignAuthorization]:
+        if not self.available:
+            raise ProviderUnavailable(f"{self.provider_id} unavailable")
+        out: list[BenignAuthorization] = []
         for rec in self._records:
             if rec.get("tenant", "*") not in ("*", query.tenant):
                 continue  # tenant isolation is hard: never match across tenants
@@ -154,41 +207,50 @@ class FixtureProvider(BenignEvidenceProvider):
                                           query.environment),
                 "tool": _multi_match(rec.get("tools", "*"), query.tools),
             }
-            start = rec.get("start")
-            expiry = rec.get("expiry")
+            start, expiry = rec.get("start"), rec.get("expiry")
             tw = True
             if query.now is not None:
                 if start is not None and query.now < float(start):
                     tw = False
                 if expiry is not None and query.now > float(expiry):
                     tw = False
+            status = self._status_for(rec, query, tw)
             payload = {"record_id": rec.get("record_id"),
                        "record_version": rec.get("record_version", "1"),
                        "provider": self.provider_id, "version": self.version,
                        "scope": {k: rec.get(k) for k in
                                  ("tenant", "actor", "workflow", "target_family",
                                   "operations", "destinations", "environment", "tools")}}
-            auth = BenignAuthorization(
+            out.append(BenignAuthorization(
                 source_system=self.source_system,
                 provider_type=rec.get("provider_type", CHANGE_TICKET),
                 record_id=str(rec.get("record_id", "")),
                 record_version=str(rec.get("record_version", "1")),
                 tag=str(rec.get("tag", "")).strip().lower(),
-                verification_status=VERIFIED,
-                scope_match=scope_match,
+                verification_status=status, scope_match=scope_match,
                 time_window_match=tw,
                 approver_identity=str(rec.get("approver_identity", "")),
                 approver_authority=str(rec.get("approver_authority", "")),
                 policy_version=str(rec.get("policy_version", "")),
-                evidence_digest=digest(payload, domain="CTD-BENIGN"),
-                detail=payload,
-            )
-            # prefer a fully scope-matched, in-window, authored authorization
-            score = (sum(scope_match.values()), int(tw),
+                evidence_digest=digest(payload, domain="CTD-BENIGN"), detail=payload))
+        return out
+
+    def verify(self, query: AuthorizationQuery) -> BenignAuthorization | None:
+        cands = self.verify_all(query)
+        best = None
+        for auth in cands:
+            score = (int(auth.verification_status == VERIFIED),
+                     sum(auth.scope_match.values()), int(auth.time_window_match),
                      int(bool(auth.approver_authority)))
             if best is None or score > best[0]:
                 best = (score, auth)
         return best[1] if best else None
+
+
+def _expected_signature(rec: dict) -> str:
+    body = {k: rec.get(k) for k in
+            ("record_id", "record_version", "tenant", "tag", "operations")}
+    return digest(body, domain="CTD-SIGN")
 
 
 def _ops_match(record_ops, query_ops) -> bool:
@@ -206,22 +268,69 @@ def _multi_match(record_vals, query_vals) -> bool:
 
 
 @dataclass
+class RegistryResult:
+    """All candidate authorizations for a query, plus provider-health flags."""
+
+    authorizations: list           # list[BenignAuthorization]
+    provider_unavailable: bool = False
+    unavailable_providers: tuple = ()
+
+    def verified(self) -> list:
+        return [a for a in self.authorizations if a.verification_status == VERIFIED]
+
+
+@dataclass
 class ProviderRegistry:
-    """Queries trusted providers in a fixed order; returns the best authorization."""
+    """Queries trusted providers in a fixed order (deterministic)."""
 
     providers: tuple[BenignEvidenceProvider, ...] = ()
 
-    def verify(self, query: AuthorizationQuery) -> BenignAuthorization | None:
-        best = None
+    def verify_all(self, query: AuthorizationQuery) -> RegistryResult:
+        auths: list = []
+        unavailable: list = []
         for prov in self.providers:
-            auth = prov.verify(query)
-            if auth is None:
-                continue
-            score = (sum(auth.scope_match.values()), int(auth.time_window_match),
+            try:
+                if hasattr(prov, "verify_all"):
+                    auths.extend(prov.verify_all(query))
+                else:
+                    a = prov.verify(query)
+                    if a is not None:
+                        auths.append(a)
+            except ProviderUnavailable:
+                unavailable.append(getattr(prov, "provider_id", "unknown"))
+        return RegistryResult(authorizations=auths,
+                              provider_unavailable=bool(unavailable),
+                              unavailable_providers=tuple(sorted(unavailable)))
+
+    def verify(self, query: AuthorizationQuery) -> BenignAuthorization | None:
+        res = self.verify_all(query)
+        best = None
+        for auth in res.authorizations:
+            score = (int(auth.verification_status == VERIFIED),
+                     sum(auth.scope_match.values()), int(auth.time_window_match),
                      int(bool(auth.approver_authority)))
             if best is None or score > best[0]:
                 best = (score, auth)
         return best[1] if best else None
+
+    def describe(self) -> list[dict]:
+        return [{"provider_id": getattr(p, "provider_id", "unknown"),
+                 "version": getattr(p, "version", "0.0.0")}
+                for p in self.providers]
+
+
+class FailingProvider(BenignEvidenceProvider):
+    """A provider that is always unavailable (for fail-safe testing)."""
+
+    def __init__(self, provider_id="failing", version="1.0.0"):
+        self.provider_id = provider_id
+        self.version = version
+
+    def verify_all(self, query: AuthorizationQuery):
+        raise ProviderUnavailable(f"{self.provider_id} unavailable")
+
+    def verify(self, query: AuthorizationQuery):
+        raise ProviderUnavailable(f"{self.provider_id} unavailable")
 
     def describe(self) -> list[dict]:
         return [{"provider_id": p.provider_id, "version": p.version}

@@ -21,16 +21,19 @@ from dataclasses import dataclass, field
 from .canonical import digest
 
 HISTORICAL_REPLAY_CONTRACT = {
-    "version": "ctd.replay/1.0.0",
+    "version": "ctd.replay/1.1.0",
+    "narrow_target": "Kubernetes / infrastructure-agent high-consequence actions",
     "source_systems": {
         "actiongate": "CONTRACT ONLY — not implemented",
         "iam_events": "CONTRACT ONLY — not implemented",
-        "kubernetes_audit": "CONTRACT ONLY — not implemented",
+        "kubernetes_audit": "REFERENCE — implemented + tested (K8sAuditReplayAdapter)",
         "cloud_control_plane": "CONTRACT ONLY — not implemented",
         "data_access_logs": "CONTRACT ONLY — not implemented",
         "change_management": "CONTRACT ONLY — not implemented",
         "approval_records": "CONTRACT ONLY — not implemented",
         "network_egress": "CONTRACT ONLY — not implemented",
+        "resource_state_changes": "CONTRACT ONLY — not implemented",
+        "execution_receipts": "CONTRACT ONLY — not implemented",
         "generic_normalized": "REFERENCE — implemented + tested (GenericReplayAdapter)",
     },
     "requirements": [
@@ -39,8 +42,35 @@ HISTORICAL_REPLAY_CONTRACT = {
         "reject events without a tenant (no cross-tenant mixing)",
         "deterministic output; no wall-clock/randomness",
         "support redaction and synthetic substitution",
+        "report missing-context events rather than inventing context",
     ],
 }
+
+# K8s audit source-field mapping specification (§13.1-§13.2)
+K8S_FIELD_MAP = {
+    "auditID": ("event_id", "required"),
+    "requestReceivedTimestamp": ("timestamp", "required"),
+    "objectRef.namespace": ("tenant_id", "required (tenant = namespace)"),
+    "user.username": ("actor", "required (redacted)"),
+    "verb": ("_verb", "required"),
+    "objectRef.resource": ("_resource", "required"),
+    "objectRef.name": ("workflow_id", "optional"),
+    "annotations.ctd/workflow": ("workflow_id", "optional (overrides objectRef.name)"),
+    "sourceIPs": ("destination", "optional (redacted)"),
+    "stage": ("_stage", "optional"),
+}
+
+# (verb, resource-substring) -> CTD capability tag. Focused on high-consequence.
+_K8S_CAPABILITY = [
+    (("get", "list", "watch"), "secret", "credential.read"),
+    (("create", "update", "patch"), "secret", "data.write"),
+    (("delete", "deletecollection"), "", "data.delete"),
+    (("create", "update", "patch"), "rolebinding", "privilege.grant"),
+    (("create", "update", "patch"), "clusterrolebinding", "privilege.grant"),
+    (("delete", "patch"), "networkpolic", "network.egress"),  # matches networkpolicies
+    (("create", "patch"), "service", "network.egress"),
+    (("delete", "patch"), "flowschema", "monitoring.disable"),
+]
 
 
 @dataclass
@@ -119,3 +149,108 @@ class GenericReplayAdapter(ReplayAdapter):
         return NormalizationResult(
             normalized=out, dropped_fields=sorted(dropped),
             normalization_decisions=decisions, provenance_digest=prov)
+
+
+def _dig(raw: dict, dotted: str):
+    cur = raw
+    for part in dotted.split("."):
+        if isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        else:
+            return None
+    return cur
+
+
+class K8sAuditReplayAdapter(ReplayAdapter):
+    """Reference adapter for sanitized Kubernetes audit events (narrow target).
+
+    Tenant = namespace (rejected if absent → no cross-tenant mixing). ``user`` and
+    ``sourceIPs`` are redacted to stable synthetic tokens. High-consequence verbs
+    map to CTD capability tags; other events are reported as unmapped, not
+    silently coerced into a threat sequence. Missing required context is reported.
+    """
+
+    adapter_id = "kubernetes_audit"
+    version = "1.0.0"
+
+    def _capability(self, verb: str, resource: str) -> str:
+        verb, resource = verb.lower(), resource.lower()
+        for verbs, sub, cap in _K8S_CAPABILITY:
+            if verb in verbs and (sub == "" or sub in resource):
+                return cap
+        return ""
+
+    def normalize(self, raw: dict) -> NormalizationResult:
+        decisions: list = []
+        namespace = _dig(raw, "objectRef.namespace")
+        if not namespace:
+            return NormalizationResult(
+                normalized=None, rejected=True,
+                reason="missing objectRef.namespace: rejected (tenant isolation)")
+        audit_id = raw.get("auditID")
+        verb = raw.get("verb", "")
+        resource = _dig(raw, "objectRef.resource") or ""
+        cap = self._capability(verb, resource)
+        out: dict = {
+            "event_id": str(audit_id or ""),
+            "timestamp": raw.get("requestReceivedTimestamp", ""),
+            "tenant_id": str(namespace),
+            "actor": "redacted:" + digest(_dig(raw, "user.username") or "",
+                                          domain="CTD-REDACT")[-12:],
+            "workflow_id": str(raw.get("annotations", {}).get("ctd/workflow")
+                               or _dig(raw, "objectRef.name") or ""),
+            "correlation_id": str(_dig(raw, "objectRef.name") or namespace),
+            "operation": f"K8S_{verb.upper()}_{resource.upper()}",
+        }
+        if cap:
+            out["capability"] = cap
+            decisions.append(f"mapped ({verb},{resource}) -> capability {cap}")
+        else:
+            decisions.append(f"unmapped k8s action ({verb},{resource}); no capability")
+        src = _dig(raw, "sourceIPs")
+        if src:
+            out["destination"] = "redacted:" + digest(src, domain="CTD-REDACT")[-12:]
+            decisions.append("redacted sourceIPs -> synthetic token")
+        out["sequence_id"] = f"{out['correlation_id']}:{audit_id}"
+        mapped_srcs = {"auditID", "requestReceivedTimestamp", "objectRef", "user",
+                       "verb", "sourceIPs", "annotations", "stage"}
+        dropped = sorted(k for k in raw if k not in mapped_srcs)
+        missing_context = not out["workflow_id"]
+        prov = digest({"raw_id": audit_id, "adapter": self.adapter_id,
+                       "version": self.version, "normalized": out},
+                      domain="CTD-REPLAY")
+        res = NormalizationResult(
+            normalized=out, dropped_fields=dropped,
+            normalization_decisions=decisions, provenance_digest=prov)
+        res.missing_context = missing_context   # attribute for the data-quality report
+        res.unmapped_capability = not cap
+        return res
+
+
+def data_quality_report(adapter: ReplayAdapter, raw_events: list[dict]) -> dict:
+    """Deterministic data-quality summary over a batch of raw events (§13.10)."""
+    total = len(raw_events)
+    rejected = normalized = unmapped = missing_ctx = 0
+    dropped_field_counts: dict = {}
+    tenants: set = set()
+    for raw in raw_events:
+        res = adapter.normalize(raw)
+        if res.rejected:
+            rejected += 1
+            continue
+        normalized += 1
+        tenants.add(res.normalized.get("tenant_id"))
+        if getattr(res, "unmapped_capability", False):
+            unmapped += 1
+        if getattr(res, "missing_context", False):
+            missing_ctx += 1
+        for f in res.dropped_fields:
+            dropped_field_counts[f] = dropped_field_counts.get(f, 0) + 1
+    return {
+        "evidence_label": "Measured — synthetic behavioral corpus",
+        "adapter": adapter.adapter_id, "adapter_version": adapter.version,
+        "total_raw_events": total, "normalized": normalized, "rejected": rejected,
+        "unmapped_capability": unmapped, "missing_context": missing_ctx,
+        "distinct_tenants": len(tenants),
+        "dropped_field_counts": dict(sorted(dropped_field_counts.items())),
+    }

@@ -71,3 +71,22 @@ exactly as before except that event-embedded approvals no longer neutralize
 (they are treated as unverified claims). The `CompositeThreatMonitor` facade,
 `observe()`, `standing_findings()`, `load_ontology()`, and the demos are
 unchanged. Shadow mode is the default; nothing enforces.
+
+## Phase 3 (historical-replay readiness) schema changes
+
+| Area | Change |
+|------|--------|
+| `AuthorizationQuery` | added `activity_start`, `expected_provider_version` |
+| Provider statuses | added REVOKED/SUPERSEDED/STALE/EXPIRED/INVALID_SIGNATURE/UNVERIFIABLE/VERSION_MISMATCH/MODIFIED_AFTER_ACTIVITY/NOT_YET_INGESTED/PROVIDER_UNAVAILABLE; `ProviderRegistry.verify_all` + `RegistryResult`; `FailingProvider`, `ProviderUnavailable` |
+| `FixtureProvider` records | new optional keys: `revoked`, `superseded_by`, `stale`, `signature`, `provider_version_required`, `unverifiable`, `modified_at`, `available_from`; `available=` flag |
+| `PurposeAssessment` | added `provider_unavailable`, `scope_mismatch_fields`; new statuses (REVOKED/SUPERSEDED/STALE/INVALID/PROVIDER_UNAVAILABLE); conflicting/duplicate → AMBIGUOUS |
+| `StateLimits` | added `evict_on_pressure` (default `False`); ledger gains priority-retention eviction + `AddResult.evicted` |
+| `SequenceRiskAnalyzer` | added `audit=` param (in-memory or `DurableAuditLog`); appends one `INGEST` record per event; `report.evictions`; module `recover_from_audit()` and `.reconstruct()` |
+| New modules | `durable_audit.py`, and `evaluation/{corpus_gen,freeze,benchmark,alerts,review_sim,readiness}.py`; `replay.py` K8s adapter |
+| `replay.py` | `K8sAuditReplayAdapter`, `data_quality_report`, richer contract |
+| `PolicyBinding` | `WOULD_*` shadow semantics already covered by `shadow=True` (`enforced=False`) |
+
+**No breaking changes to existing tests.** All 62 phase-2 tests remain green; the
+new failure-mode semantics are additive (event-embedded approvals were already
+non-neutralizing without a provider since phase 2). Recovery model is documented
+as *recomputed state from durable event replay*.

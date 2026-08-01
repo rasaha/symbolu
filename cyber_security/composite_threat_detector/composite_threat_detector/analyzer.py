@@ -110,6 +110,7 @@ class RunReport:
     purpose_unverified: int = 0
     recipe_version_divergences: int = 0
     governance_rejections: int = 0
+    evictions: int = 0
     audit_records: int = 0
     findings_emitted: int = 0
     escalations_emitted: int = 0
@@ -140,6 +141,7 @@ class SequenceRiskAnalyzer:
         active_policy_version: str | None = None,
         providers: ProviderRegistry | None = None,
         shadow_mode: bool = True,
+        audit=None,
     ) -> None:
         if not specs:
             raise ValueError("at least one AssemblyKeySpec is required")
@@ -151,7 +153,8 @@ class SequenceRiskAnalyzer:
         self.providers = providers
         self.shadow_mode = shadow_mode
         self.ledger = CapabilityLedger(self.timescale, self.limits)
-        self.audit = AuditLog()
+        # audit may be an in-memory AuditLog (default) or a DurableAuditLog
+        self.audit = audit if audit is not None else AuditLog()
         self.governor = ResourceGovernor(limits=self.limits)
         self._claims: dict[tuple[str, str], list] = {}
         self._order_signals: dict[tuple[str, str], dict] = {}
@@ -202,6 +205,11 @@ class SequenceRiskAnalyzer:
     def ingest(self, event: dict) -> IngestResult:
         self._ingest_counter += 1
         self.report.events_ingested += 1
+        # durable event log: one INGEST record per event (full event) enables
+        # deterministic replay-based recovery after restart (§7).
+        self.audit.append("INGEST", tenant_id=str(event.get("tenant_id", "")),
+                          event_id=str(event.get("event_id", "")),
+                          detail={"event": event, "ingest_seq": self._ingest_counter})
         diag = {"event_id": str(event.get("event_id", "")), "linked": False,
                 "fragments_extracted": 0, "duplicate": False, "retried": False,
                 "ambiguous": False, "unavailable": False, "lifecycle": None}
@@ -318,6 +326,13 @@ class SequenceRiskAnalyzer:
                 diag["retried"] = True
             if add.revoked_ids:
                 self.report.capabilities_revoked += len(add.revoked_ids)
+            for ev_key, prio in add.evicted:
+                self.report.evictions += 1
+                self.audit.append("EVICTION", tenant_id=link.tenant_id,
+                                  assembly_key=ev_key,
+                                  detail={"reason": "priority_retention_pressure",
+                                          "evicted_priority": prio,
+                                          "reconstructable_via": "durable event replay"})
 
             findings.extend(self._evaluate(link.tenant_id, al, now, pos,
                                            raw_digest=rec.record_digest))
@@ -429,7 +444,8 @@ class SequenceRiskAnalyzer:
         scope = self._assembly_scope(asm, active)
         claims = self._claims.get((tenant_id, al.assembly_key), [])
         assessment = purpose_mod.assess(
-            claims, scope, self.providers, now, self.active_policy_version, recipe)
+            claims, scope, self.providers, now, self.active_policy_version, recipe,
+            activity_start=asm.first_t)
         if claims:
             if assessment.purpose_consistency_status == purpose_mod.VERIFIED_CONSISTENT:
                 self.report.purpose_verified += 1
@@ -622,6 +638,28 @@ class SequenceRiskAnalyzer:
         events = [e.to_dict() for e in self.audit.for_assembly(tenant_id, assembly_key)]
         return {"tenant_id": tenant_id, "assembly_key": assembly_key,
                 "audit_events": events, "chain_valid": self.audit.verify_chain()}
+
+
+def recover_from_audit(audit, ontology, **analyzer_kwargs) -> "SequenceRiskAnalyzer":
+    """Rebuild analyzer state by deterministically replaying the durable event log.
+
+    Recovery model: **recomputed state from durable event replay** (not a memory
+    snapshot). The durable audit log retains one ``INGEST`` record per event; a
+    fresh analyzer re-ingests them in order, reproducing active assemblies, dedup
+    state, recipe-version bindings, and byte-identical finding digests. Raw
+    evidence and provenance are already durable in the log independent of decay.
+    """
+    events = []
+    for rec in audit.all():
+        if rec.kind == "INGEST":
+            d = rec.detail
+            events.append((d.get("ingest_seq", 0), d.get("event")))
+    events.sort(key=lambda t: t[0])
+    az = SequenceRiskAnalyzer(ontology, **analyzer_kwargs)
+    for _seq, ev in events:
+        if ev is not None:
+            az.ingest(ev)
+    return az
 
 
 # ---------------------------------------------------------------------------

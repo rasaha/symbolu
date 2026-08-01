@@ -73,6 +73,10 @@ class StateLimits:
     max_recipe_evaluations: int = 10_000
     max_benign_records_per_assembly: int = 512
     max_replay_backlog: int = 1_000_000
+    # when True, a per-tenant assembly-cap breach evicts the lowest-priority
+    # assembly (audited) instead of rejecting; raw evidence stays durable, so the
+    # evicted assembly remains reconstructable by replay (no evidence loss).
+    evict_on_pressure: bool = False
 
 
 class LimitExceeded(Exception):
@@ -140,6 +144,7 @@ class AddResult:
     duplicate: bool = False        # suppressed by event_id
     retried: bool = False          # suppressed by idempotency_key
     revoked_ids: tuple[str, ...] = ()
+    evicted: tuple = ()            # (assembly_key, priority) pairs evicted under pressure
 
 
 class CapabilityLedger:
@@ -149,6 +154,7 @@ class CapabilityLedger:
         self.policy = policy
         self.limits = limits
         self._by_tenant: dict[str, dict[str, Assembly]] = {}
+        self._evicted_this_add: list = []
 
     # -- lifecycle ---------------------------------------------------------
     def get(self, tenant_id: str, assembly_key: str) -> Assembly | None:
@@ -165,14 +171,31 @@ class CapabilityLedger:
         asm = asm_map.get(assembly_key)
         if asm is None:
             if len(asm_map) >= self.limits.max_assemblies_per_tenant:
-                raise LimitExceeded(
-                    "assemblies",
-                    f"max_assemblies_per_tenant={self.limits.max_assemblies_per_tenant} "
-                    f"reached for tenant {tenant_id!r}")
+                if self.limits.evict_on_pressure:
+                    self._evict_lowest_priority(tenant_id, asm_map)
+                else:
+                    raise LimitExceeded(
+                        "assemblies",
+                        f"max_assemblies_per_tenant="
+                        f"{self.limits.max_assemblies_per_tenant} reached for tenant "
+                        f"{tenant_id!r}")
             asm = Assembly(tenant_id=tenant_id, assembly_key=assembly_key,
                            key_spec=key_spec, link_dims=dict(link_dims))
             asm_map[assembly_key] = asm
         return asm
+
+    def _evict_lowest_priority(self, tenant_id, asm_map) -> None:
+        """Evict the lowest-priority assembly (audited by caller). Tenant-scoped.
+
+        Priority = (max_severity_rank, ingest_count, assembly_key); the minimum is
+        evicted. Raw evidence persists in the durable audit log, so the evicted
+        assembly stays reconstructable — this reclaims active state, not evidence.
+        """
+        victim_key = min(
+            asm_map,
+            key=lambda k: (asm_map[k].max_severity_rank, asm_map[k].ingest_count, k))
+        victim = asm_map.pop(victim_key)
+        self._evicted_this_add.append((victim_key, victim.max_severity_rank))
 
     def add(
         self, tenant_id, assembly_key, key_spec, link_dims,
@@ -184,10 +207,12 @@ class CapabilityLedger:
 
         Raises :class:`LimitExceeded` (fail-loud) on bounded-state breach.
         """
+        self._evicted_this_add = []
         asm = self._ensure(tenant_id, assembly_key, key_spec, link_dims)
+        evicted = tuple(self._evicted_this_add)
         if asm.closed:
             # a closed case does not accumulate further; caller may reopen via reset
-            return AddResult(added=False)
+            return AddResult(added=False, evicted=evicted)
 
         # dedup: exact duplicate (same event id) or retry (same idempotency key)
         if event_id and event_id in asm.seen_event_ids:
@@ -227,7 +252,8 @@ class CapabilityLedger:
         for d, v in link_dims.items():
             asm.link_dims.setdefault(d, v)
 
-        return AddResult(added=bool(instances), revoked_ids=tuple(revoked_ids))
+        return AddResult(added=bool(instances), revoked_ids=tuple(revoked_ids),
+                         evicted=evicted)
 
     def close_case(self, tenant_id: str, assembly_key: str) -> bool:
         asm = self.get(tenant_id, assembly_key)

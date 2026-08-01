@@ -340,3 +340,69 @@ All reported results carry one label: `Measured — unit/integration test`,
 accuracy, synthetic results as enterprise performance, historical replay as live
 enforcement evidence, operator agreement as proof of malicious intent, or
 encoded-recipe recall as unknown-threat coverage.
+
+---
+
+## 18. Phase 3 — historical-replay readiness
+
+This phase validates operational robustness and prepares — but does not run — one
+narrowly scoped historical replay. No live enforcement. No detection algorithm was
+added and the recipe library was not expanded.
+
+> The analyzer tests whether independently verified context is consistent with the
+> observed sequence and covers its actor, resource, operation, destination,
+> environment, and time scope. It does not prove benign or malicious intent.
+
+**Authority (shadow).** Findings remain `OBSERVE`/`ESCALATE`/`UNAVAILABLE`. The
+authoritative policy computes *hypothetical* shadow consequences
+(`WOULD_HOLD_FOR_REVIEW`/`WOULD_BLOCK` via `PolicyBinding(shadow=True)`,
+`enforced=False`). No evaluation run changes an execution decision.
+
+**Complete freeze (`evaluation/freeze.py`).** Binds code commit, all corpus split
+hashes, recipes+versions, linkage schema, assembly-key config, thresholds, decay,
+retention, benign rules, provider fixture version, ordering rules, policy version,
+state limits, normalization + audit + review schemas, and the seed. An official
+final run refuses changed inputs; a dev profile or default thresholds cannot
+produce an official verdict.
+
+**Provider failure safety (`providers.py`, `purpose.py`).** Self-declared purpose
+never neutralizes; only a verified, scope-matched, in-window, authored,
+correctly-versioned, non-revoked authorization does. Unavailable / revoked /
+superseded / stale / expired / invalid-signature / version-mismatch /
+unverifiable / modified-after-activity / wrong-scope all fail safe; conflicting or
+duplicate evidence → `AMBIGUOUS`; scope mismatch is reported field by field.
+
+**Durable evidence + recovery (`durable_audit.py`).** A SQLite append-only,
+hash-linked (**tamper-evident**, not tamper-proof), tenant-partitioned,
+schema-versioned reference store. Recovery model: **recomputed state from durable
+event replay** — `recover_from_audit` replays the durable `INGEST` log to
+reproduce active state, dedup, version bindings, and byte-identical finding
+digests. Raw evidence survives decay, reset, closure, and restart.
+
+**State governance (`ledger.py`, `governance.py`).** Per-tenant / per-actor
+quotas and candidate-linkage caps; breaches are fail-visible (`UNAVAILABLE`,
+audited). Optional priority-retention eviction (`evict_on_pressure`) reclaims
+active state with an audited `EVICTION`; evicted assemblies stay reconstructable
+via durable replay. A noisy tenant cannot exhaust another's allocation.
+
+**Evaluation at scale (`evaluation/`).** A seeded high-volume corpus generator
+with prevalence profiles (`balanced` / `enterprise_like` / `stress` /
+`adversarial_evasion`) — prevalence is a **modeled assumption**, not an industry
+claim. A load benchmark (`Measured — synthetic operational load`, records the
+host), alert-volume + review-burden analysis (measured vs. modeled), and an
+expanded review simulation (fixture reviewers, not human validation).
+
+**Narrow replay target (`replay.py`, `HISTORICAL_REPLAY_K8S_CONTRACT.md`).** A
+tested Kubernetes-audit reference adapter (source-field mapping, redaction,
+tenant=namespace isolation, unmapped/missing-context reporting, data-quality
+report) + example fixture. Other vendors remain `CONTRACT ONLY`.
+
+**Readiness gates H1–H8 (`evaluation/readiness.py`).** Freeze integrity,
+deterministic replay, durable reconstruction, bounded-state safety, provider
+safety, ordering safety, operational performance, realistic benign burden. The
+phase ends with exactly one verdict, capped at `CONTINUE — historical replay
+ready`; it never issues production-ready / enterprise-validated / enforcement-
+ready. See `HISTORICAL_REPLAY_READINESS_CHECKLIST.md` and
+`PHASE3_FINAL_EVALUATION_REPORT.md`. Evidence labels extend to
+`Measured — synthetic operational load`, `Measured — restart/recovery test`,
+`Modeled — prevalence assumption`, and `Modeled — operator workload`.

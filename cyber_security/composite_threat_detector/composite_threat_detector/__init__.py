@@ -44,13 +44,17 @@ from .analyzer import (
     RunReport,
     SequenceRiskAnalyzer,
 )
+from .analyzer import recover_from_audit
 from .audit import AuditLog
+from .durable_audit import DurableAuditLog
 from .evidence import to_advisory_evidence
 from .ledger import StateLimits, TimescalePolicy
 from .providers import (
     BenignEvidenceProvider,
+    FailingProvider,
     FixtureProvider,
     ProviderRegistry,
+    ProviderUnavailable,
 )
 from .linkage import (
     BY_ACTOR,
@@ -88,6 +92,10 @@ __all__ = [
     "FixtureProvider",
     "BenignEvidenceProvider",
     "AuditLog",
+    "DurableAuditLog",
+    "recover_from_audit",
+    "FailingProvider",
+    "ProviderUnavailable",
     "providers",
     "purpose",
     "ordering",
