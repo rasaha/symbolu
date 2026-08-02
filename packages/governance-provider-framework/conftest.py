@@ -16,6 +16,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]  # packages/governance-provider-framework -> packages -> repo root
 for p in (
     HERE / "src",
+    HERE / "tests",  # shared test helpers (e.g. kernel_lifecycle) importable across subdirs
     REPO / "packages" / "governance-contracts" / "src",
     REPO / "packages" / "capabilities" / "decision-authority" / "src",
     REPO,
