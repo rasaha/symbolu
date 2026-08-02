@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance/github_merge_profile.schema.json",
+  "title": "GitHub Exact-Merge Clearance Profile",
+  "status": "PROPOSED",
+  "version": "action_clearance.design.v0.1",
+  "profile_id": "github_exact_merge",
+  "profile_version": "github_exact_merge.v1",
+  "description": "Design artifact, NOT a committed runtime contract. First product profile; binds the governed artifact per Code Governance v0.2 sec 4.6. No GitHub client in the core; a signal adapter produces normalized TrustedSignals.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-narrowing-only": true,
+  "x-merge-method-support": {
+    "merge": "MVP",
+    "squash": "MVP",
+    "rebase": "DEFERRED (UnsupportedProfileError; no deterministic pre-merge exact-tree binding in MVP)",
+    "merge_queue": "PHASE_I (clear the exact merge_group_sha; original PR clearance never auto-authorizes a changed group)"
+  },
+  "properties": {
+    "binding_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_ref", "pull_request_ref", "base_sha", "head_sha", "merge_method", "expected_merge_tree", "target_branch", "required_checks", "approval_state", "actor_state", "policy_version", "active_freeze_state", "active_incident_state", "authorization_consumption_state"],
+      "properties": {
+        "repository_ref": {"type": "string", "x-fingerprinted": true},
+        "org_ref": {"type": ["string", "null"], "x-fingerprinted": true},
+        "installation_ref": {"type": ["string", "null"], "x-fingerprinted": true},
+        "pull_request_ref": {"type": "string", "x-fingerprinted": true},
+        "base_sha": {"type": "string", "x-fingerprinted": true, "x-reason-on-change": "GITHUB_BASE_ADVANCED"},
+        "head_sha": {"type": "string", "x-fingerprinted": true, "x-reason-on-change": "GITHUB_HEAD_SHA_CHANGED"},
+        "merge_method": {"type": "string", "enum": ["merge", "squash", "rebase", "merge_queue"], "x-fingerprinted": true, "x-reason-on-change": "GITHUB_MERGE_METHOD_CHANGED"},
+        "expected_merge_tree": {"type": "string", "x-fingerprinted": true, "x-reason-on-change": "GITHUB_MERGE_TREE_MISMATCH"},
+        "merge_group_sha": {"type": ["string", "null"], "x-fingerprinted": true, "x-reason-on-change": "GITHUB_MERGE_GROUP_MISMATCH", "x-applies": "merge_queue"},
+        "target_branch": {"type": "string", "x-fingerprinted": true, "x-reason-on-change": "GITHUB_TARGET_BRANCH_MISMATCH"},
+        "required_checks": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "approval_state": {"type": "string", "x-fingerprinted": true, "x-reason-on-withdrawal": "GITHUB_APPROVAL_WITHDRAWN"},
+        "actor_state": {"type": "string", "x-fingerprinted": true},
+        "policy_version": {"type": "string", "x-fingerprinted": true},
+        "active_freeze_state": {"type": "string", "x-fingerprinted": true},
+        "active_incident_state": {"type": "string", "x-fingerprinted": true},
+        "authorization_consumption_state": {"type": "string", "x-fingerprinted": true}
+      }
+    },
+    "required_signals": {
+      "type": "object",
+      "properties": {
+        "merge": {"type": "array", "items": {"type": "string"}, "default": ["ARTIFACT_IDENTITY", "REQUIRED_CONTROL", "ACTOR_STATUS", "CHANGE_FREEZE", "ACTIVE_INCIDENT", "TARGET_AVAILABILITY", "PRIOR_CONSUMPTION", "AUTHORIZATION_VALIDITY", "POLICY_VALIDITY"]},
+        "squash": {"type": "array", "items": {"type": "string"}, "default": ["ARTIFACT_IDENTITY", "REQUIRED_CONTROL", "ACTOR_STATUS", "CHANGE_FREEZE", "ACTIVE_INCIDENT", "TARGET_AVAILABILITY", "PRIOR_CONSUMPTION", "AUTHORIZATION_VALIDITY", "POLICY_VALIDITY"]}
+      }
+    },
+    "profile_reason_codes": {
+      "type": "array",
+      "items": {"type": "string"},
+      "x-classification": "PROFILE_SPECIFIC",
+      "const": [
+        "GITHUB_HEAD_SHA_CHANGED",
+        "GITHUB_BASE_ADVANCED",
+        "GITHUB_MERGE_TREE_MISMATCH",
+        "GITHUB_MERGE_GROUP_MISMATCH",
+        "GITHUB_MERGE_METHOD_CHANGED",
+        "GITHUB_TARGET_BRANCH_MISMATCH",
+        "GITHUB_REQUIRED_CHECK_PENDING",
+        "GITHUB_REQUIRED_CHECK_FAILED",
+        "GITHUB_APPROVAL_WITHDRAWN"
+      ]
+    }
+  }
+}
