@@ -33,7 +33,11 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | `GovernanceHook` | Protocol | Neutral governance boundary. |
 | `GovernanceEvaluation` | dataclass | Governance result the runtime consumes. |
 | `GovernanceDisposition` | enum | `CLEAR/HOLD/BLOCK/ESCALATE`. |
-| `NoopGovernanceHook` | class | Default hook (always `CLEAR`; creates no authority). |
+| `UnconfiguredGovernanceHook` | class | **Default** hook (BLOCK; fail closed when no adapter configured). |
+| `AllowAllGovernanceHook` | class | Explicit, opt-in, **unsafe** testing hook (CLEAR bound to fingerprint). Never a default. |
+| `NoopGovernanceHook` | class | Deprecated alias of `AllowAllGovernanceHook`; emits `DeprecationWarning`. |
+| `TransitionProposal` | dataclass | Immutable exact-invocation description + deterministic fingerprint. |
+| `validate_clearance` | function | Exact-action clearance gate (fail closed). |
 | `ExecutionContext` / `CorrelationContext` | dataclass | Neutral context passed to governance. |
 | `RetryPolicy` | dataclass | Deterministic attempt-counting policy. |
 | `AgentRuntimeError` + subclasses | exception | Curated error taxonomy. |

@@ -23,7 +23,8 @@ future capabilities rather than built to justify the package.
 - **Durable persistence backend.** Only in-memory reference stores ship; durable
   backends are supplied externally behind the persistence interfaces.
 - **Concrete governance adapters.** The core ships only the neutral boundary and a
-  no-op hook; concrete TAP/ActionGate/Action Clearance/Code Governance/StoryGraph
+  fail-closed default hook (and an explicit unsafe test hook); concrete
+  TAP/ActionGate/Action Clearance/Code Governance/StoryGraph
   adapters live outside the package.
 - **Enforcement.** The runtime coordinates; it does not enforce policy or mint
   execution authority.
@@ -39,8 +40,17 @@ future capabilities rather than built to justify the package.
   an in-flight synchronous provider call — it classifies a timeout after the call
   returns based on elapsed logical time.
 
-## Explicitly preserved
+## Relationship to the legacy runtime
 
-Runtime **behavior** (task/workflow state machine semantics, retry/timeout/cancellation,
-checkpoint/recovery invariants, governance disposition handling) is preserved and
-consistent with the established runtime; this phase did not redesign it.
+This package is a **newly created coordination kernel**, not a behavior-preserving
+relocation of the legacy `agent_runtime_migration` proposer. The proposer's
+planning/reasoning/memory/reflection are **intentionally excluded** (see the fidelity
+matrix). The kernel's own semantics (task/workflow state machine, retry/timeout/
+cancellation, checkpoint/recovery invariants, and — as of 0.1.1 — fail-closed default
+governance and exact-action binding) are internally consistent and covered by the
+package suite, but they are **not** claimed to reproduce the legacy loop's behavior.
+
+## Maturity
+
+`IMPLEMENTED_AND_OFFLINE_VERIFIED` (plus a scoped CI job). **Not** live-verified,
+pilot-validated, enforcement-ready, or production-ready.

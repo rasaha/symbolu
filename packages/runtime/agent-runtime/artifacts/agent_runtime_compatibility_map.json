@@ -1,26 +1,23 @@
 {
-  "aliases": {
-    "ugence_agent_runtime.compat.Runtime": "ugence_agent_runtime.api.AgentRuntime",
-    "ugence_agent_runtime.compat.Workflow": "ugence_agent_runtime.api.WorkflowDefinition",
-    "ugence_agent_runtime.compat.WorkflowRun": "ugence_agent_runtime.api.WorkflowInstance",
-    "ugence_agent_runtime.compat.Task": "ugence_agent_runtime.api.TaskDefinition",
-    "ugence_agent_runtime.compat.TaskRun": "ugence_agent_runtime.api.TaskInstance",
-    "ugence_agent_runtime.compat.WorkflowCheckpoint": "ugence_agent_runtime.api.Checkpoint",
-    "ugence_agent_runtime.compat.Registry": "ugence_agent_runtime.api.ProviderRegistry",
-    "ugence_agent_runtime.compat.Result": "ugence_agent_runtime.api.RuntimeResult"
+  "note": "Migration guidance, NOT a runtime-compatibility shim. The legacy agent_runtime_migration.runtime.runtime.AgentRuntime is a different implementation with an incompatible API and is not substitutable by the kernel AgentRuntime.",
+  "outcome": "B_HONEST_COEXISTENCE",
+  "legacy_paths": {
+    "agent_runtime_migration.runtime.runtime.AgentRuntime": {"new": null, "classification": "PRESENT_CHANGED", "note": "Legacy proposer loop; kernel is a different workflow/task implementation."},
+    "agent_runtime_migration.workflow.Workflow": {"new": "ugence_agent_runtime.api.WorkflowDefinition", "classification": "PRESENT_CHANGED"},
+    "agent_runtime_migration.workflow.Checkpoint": {"new": "ugence_agent_runtime.api.Checkpoint", "classification": "PRESENT_CHANGED"},
+    "agent_runtime_migration.tools.registry": {"new": "ugence_agent_runtime.api.ProviderRegistry", "classification": "PRESENT_CHANGED"},
+    "agent_runtime_migration.tracing.events.RuntimeEvent": {"new": "ugence_agent_runtime.models.events.RuntimeEvent", "classification": "PRESENT_CHANGED"},
+    "agent_runtime_migration.planning": {"new": null, "classification": "INTENTIONALLY_EXCLUDED"},
+    "agent_runtime_migration.reasoning": {"new": null, "classification": "INTENTIONALLY_EXCLUDED"},
+    "agent_runtime_migration.memory": {"new": null, "classification": "INTENTIONALLY_EXCLUDED"},
+    "agent_runtime_migration.control_plane": {"new": null, "classification": "LEGACY_INTEGRATION_ONLY"},
+    "agent_runtime_migration.proposal": {"new": null, "classification": "LEGACY_INTEGRATION_ONLY"}
   },
-  "legacy_import_paths": {
-    "agent_runtime_migration.workflow.Workflow": "ugence_agent_runtime.api.WorkflowDefinition",
-    "agent_runtime_migration.workflow.Checkpoint": "ugence_agent_runtime.api.Checkpoint",
-    "agent_runtime_migration.runtime.runtime.AgentRuntime": "ugence_agent_runtime.api.AgentRuntime",
-    "agent_runtime_migration.tools.registry.ToolRegistry": "ugence_agent_runtime.api.ProviderRegistry",
-    "agent_runtime_migration.tracing.events.RuntimeEvent": "ugence_agent_runtime.models.events.RuntimeEvent"
-  },
-  "classification": {
-    "ugence_agent_runtime.compat.*": "TEMPORARY_COMPATIBILITY_REEXPORT",
-    "agent_runtime_migration.workflow.*": "DEPRECATED",
-    "agent_runtime_migration.control_plane.*": "INTERNAL_UNSUPPORTED_IMPORT",
-    "agent_runtime_migration.proposal.*": "INTERNAL_UNSUPPORTED_IMPORT"
-  },
-  "notes": "Aliases are identity-preserving; no duplicate implementation. Legacy package retained, not deleted."
+  "removed_false_claims": [
+    "identity-preserving aliases wrt legacy (compat.Runtime/Workflow/Task/... removed)",
+    "no duplicate runtime implementation (two implementations coexist by design)",
+    "runtime behavior preserved (kernel is a new coordination engine, not a relocation)"
+  ],
+  "legacy_package_retained": true,
+  "legacy_package_deleted": false
 }

@@ -1,0 +1,41 @@
+{
+  "audit": "post-merge fidelity of ugence-agent-runtime vs legacy agent_runtime_migration",
+  "merge_commit": "25c6c815",
+  "classification_legend": [
+    "PRESENT_EQUIVALENT",
+    "PRESENT_CHANGED",
+    "INTENTIONALLY_EXCLUDED",
+    "LEGACY_INTEGRATION_ONLY",
+    "MISSING_REQUIRED",
+    "NOT_APPLICABLE_TO_COORDINATION_KERNEL"
+  ],
+  "subsystems": [
+    {"legacy": "runtime/runtime.py (Goal->Plan->Action->Reflect proposer loop)", "new": "runtime/engine.py (Workflow->Task coordination)", "classification": "PRESENT_CHANGED", "note": "Different control flow and API; not a relocation."},
+    {"legacy": "planning/ (Planner, goal_decomposition)", "new": "(none)", "classification": "INTENTIONALLY_EXCLUDED", "note": "Planning is not a coordination-kernel concern."},
+    {"legacy": "reasoning/ (Reflector, reflection, uncertainty)", "new": "(none)", "classification": "INTENTIONALLY_EXCLUDED"},
+    {"legacy": "memory/ (EpisodicMemory, working memory)", "new": "(none)", "classification": "INTENTIONALLY_EXCLUDED"},
+    {"legacy": "observation/ (result_ingestion, memory_update)", "new": "(none)", "classification": "INTENTIONALLY_EXCLUDED", "note": "Agent-loop observation folding; excluded."},
+    {"legacy": "model/ (parsing, adapters)", "new": "(none)", "classification": "INTENTIONALLY_EXCLUDED", "note": "LLM concern; excluded."},
+    {"legacy": "contracts/ (Goal, Plan, Action, Observation, Result)", "new": "models/ (WorkflowDefinition, TaskDefinition, results)", "classification": "PRESENT_CHANGED", "note": "Neutral models replace agent contracts; not the same types."},
+    {"legacy": "workflow/ (Workflow, Step, Scheduler, Checkpoint)", "new": "models/workflow.py + runtime/engine.py + persistence/checkpoints.py", "classification": "PRESENT_CHANGED", "note": "Reimplemented with different status vocabulary and checkpoint format."},
+    {"legacy": "runtime/ (state, cancellation, retry, budget, resolution)", "new": "runtime/ (cancellation, retry, timeout, lifecycle, errors)", "classification": "PRESENT_CHANGED", "note": "cancellation/retry present but reworked; budget/resolution excluded."},
+    {"legacy": "tools/ (registry, selection, invocation, local_tool_policy)", "new": "providers/ (interfaces, registry)", "classification": "PRESENT_CHANGED", "note": "Provider boundary replaces tool registry; selection/policy excluded."},
+    {"legacy": "tracing/ (events, trace, sink)", "new": "observability/ + models/events.py", "classification": "PRESENT_CHANGED", "note": "Event vocabulary changed to coordination events."},
+    {"legacy": "proposal/ (cer_builder, cer_adapter, identity_bridge)", "new": "(none in core)", "classification": "LEGACY_INTEGRATION_ONLY", "note": "Concrete CER construction; stays legacy, not in neutral kernel."},
+    {"legacy": "control_plane/ (client, governed_executor, decision_adapter)", "new": "governance/ (neutral GovernanceHook)", "classification": "LEGACY_INTEGRATION_ONLY", "note": "Concrete cer_v0_3 control-plane integration; replaced in kernel by a neutral hook. Legacy retained as integration assembly."},
+    {"legacy": "compatibility/ (legacy_adapter, legacy_imports, warnings)", "new": "compat/ (migration guidance)", "classification": "LEGACY_INTEGRATION_ONLY"},
+    {"legacy": "parity/, canary/, benchmark/", "new": "tests/ + scripts/verify_isolated_install.py", "classification": "NOT_APPLICABLE_TO_COORDINATION_KERNEL", "note": "Validation harnesses; parity imports agentic and is not part of the kernel."}
+  ],
+  "governance_gaps_corrected": [
+    {"gap": "fail-open default (NoopGovernanceHook returns CLEAR by default)", "id": "P0-1", "classification": "MISSING_REQUIRED", "resolution": "UnconfiguredGovernanceHook (BLOCK) is the default; AllowAllGovernanceHook is explicit opt-in and documented unsafe."},
+    {"gap": "no immutable proposal fingerprint / exact-action binding", "id": "P0-2", "classification": "MISSING_REQUIRED", "resolution": "TransitionProposal + deterministic fingerprint constructed before evaluation and bound to the exact invocation; runtime fails closed on missing/unknown/mismatch/expiry/missing-reference."},
+    {"gap": "CLEAR did not require a non-empty binding reference", "id": "P0-2", "classification": "MISSING_REQUIRED", "resolution": "CLEAR without a binding reference (evaluation/authorization/clearance) fails closed."},
+    {"gap": "valid_until not validated before invocation", "id": "P0-2", "classification": "MISSING_REQUIRED", "resolution": "expired CLEAR fails closed at the execution check using the injected clock."}
+  ],
+  "compatibility_correction": {
+    "id": "P0-3",
+    "outcome": "B_HONEST_COEXISTENCE",
+    "note": "Legacy AgentRuntime API is incompatible with the kernel API; false identity claims removed; migration map + fidelity matrix published; a real test imports the legacy path to prove coexistence (skipped when the monorepo is absent)."
+  },
+  "consumers": {"new_package_external_imports": 0, "legacy_runtime_external_imports": 0}
+}

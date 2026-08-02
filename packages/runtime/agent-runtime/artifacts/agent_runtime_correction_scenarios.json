@@ -1,0 +1,27 @@
+{
+  "phase": "post-merge fidelity & governance-safety correction",
+  "not_h22": true,
+  "scenarios": [
+    {"id": "p0_1.default_consequential_no_provider", "verified_by": "tests/test_governance_binding.py::test_default_config_consequential_does_not_call_provider"},
+    {"id": "p0_1.default_nonconsequential_runs", "verified_by": "tests/test_governance_binding.py::test_default_config_non_consequential_can_execute"},
+    {"id": "p0_1.default_reason_code", "verified_by": "tests/test_governance_boundary.py::test_default_config_fails_closed_for_consequential"},
+    {"id": "p0_2.clear_missing_fingerprint_fails_closed", "verified_by": "tests/test_governance_binding.py::test_clear_without_fingerprint_fails_closed"},
+    {"id": "p0_2.clear_fingerprint_mismatch_fails_closed", "verified_by": "tests/test_governance_binding.py::test_mismatched_fingerprint_fails_closed"},
+    {"id": "p0_2.clear_missing_reference_fails_closed", "verified_by": "tests/test_governance_binding.py::test_missing_reference_fails_closed"},
+    {"id": "p0_2.clear_expired_fails_closed", "verified_by": "tests/test_governance_binding.py::test_expired_clear_fails_closed"},
+    {"id": "p0_2.fully_bound_clear_executes", "verified_by": "tests/test_governance_binding.py::test_fully_bound_clear_executes"},
+    {"id": "p0_2.exact_invocation_matches_proposal", "verified_by": "tests/test_governance_binding.py::test_exact_invocation_matches_evaluated_proposal"},
+    {"id": "p0_2.fingerprint_identity", "verified_by": "tests/test_governance_binding.py::test_fingerprint_changes_with_identity"},
+    {"id": "p0_2.unknown_disposition_fails_closed", "verified_by": "tests/test_governance_binding.py::test_unknown_disposition_fails_closed"},
+    {"id": "governance.hold_block_escalate_no_provider", "verified_by": "tests/test_governance_boundary.py::{test_hold_prevents_continuation,test_block_prevents_execution,test_escalate_pauses}"},
+    {"id": "recovery.no_provider_or_governance_call", "verified_by": "tests/test_persistence_recovery.py::test_recovery_makes_no_provider_or_governance_call"},
+    {"id": "p0_3.compat_imports_actual_legacy_paths", "verified_by": "tests/test_compatibility.py::test_legacy_and_kernel_runtimes_are_distinct_implementations"},
+    {"id": "p0_3.legacy_and_kernel_classified", "verified_by": "tests/test_compatibility.py::test_classification_accessible"},
+    {"id": "p0_3.no_invented_identity_aliases", "verified_by": "tests/test_compatibility.py::test_no_invented_legacy_identity_aliases"},
+    {"id": "boundary.import_side_effect_free", "verified_by": "tests/test_import_boundaries.py::test_import_has_no_external_side_effects"},
+    {"id": "packaging.wheel_only_intended_package", "verified_by": "scripts/verify_isolated_install.py"},
+    {"id": "packaging.installed_wheel_outside_monorepo", "verified_by": "scripts/verify_isolated_install.py"},
+    {"id": "packaging.installed_wheel_no_app_layer_import", "verified_by": "scripts/verify_isolated_install.py + tests/test_import_boundaries.py"},
+    {"id": "boundary.no_concrete_governance_cer_robotics_product_model", "verified_by": "tests/test_import_boundaries.py::test_no_forbidden_imports"}
+  ]
+}

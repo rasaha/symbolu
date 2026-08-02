@@ -75,19 +75,42 @@ def test_governance_reference_preserved():  # check 44
 
 
 def test_evaluation_time_is_caller_controlled():  # check 45
-    ticks = iter([11.0, 22.0, 33.0])
-    rt = create_runtime(AgentRuntimeConfig(governance_hook=DispositionHook(GovernanceDisposition.CLEAR), clock=lambda: next(ticks)))
+    # The runtime reads its injected clock several times per task (governance
+    # evaluation time, the clearance expiry check, provider timing). The FIRST read
+    # is the governance evaluation_time; the hook must receive exactly that value.
+    values = [11.0, 22.0, 33.0, 44.0, 55.0]
+    idx = {"i": 0}
+
+    def clock():
+        v = values[min(idx["i"], len(values) - 1)]
+        idx["i"] += 1
+        return v
+
+    hook = DispositionHook(GovernanceDisposition.CLEAR)
+    rt = create_runtime(AgentRuntimeConfig(governance_hook=hook, clock=clock))
     register_provider(rt, RecordingProvider("p"))
-    hook = rt.config.governance_hook
     wf = WorkflowDefinition(workflow_id="wf", tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),))
     rt.start_workflow(wf)
-    # The runtime supplied the clock value as evaluation_time (11.0), not the hook.
+    # The runtime supplied its first clock value as evaluation_time (11.0), not the hook.
     assert hook.evaluation_times == [11.0]
 
 
 def test_no_concrete_governance_package_required():  # check 46
-    # The default hook is the neutral no-op; the core requires no concrete adapter.
+    # The default hook is the neutral fail-closed hook; the core requires no concrete
+    # governance adapter to be importable.
+    from ugence_agent_runtime.governance.hooks import UnconfiguredGovernanceHook
+
     cfg = AgentRuntimeConfig()
-    assert isinstance(cfg.governance_hook, NoopGovernanceHook)
-    ev = cfg.governance_hook.evaluate.__self__.evaluate  # attribute exists
-    assert callable(ev)
+    assert isinstance(cfg.governance_hook, UnconfiguredGovernanceHook)
+
+
+def test_default_config_fails_closed_for_consequential():  # P0-1
+    # Default config + consequential task must NOT execute the provider.
+    p = RecordingProvider("p")
+    rt = create_runtime(AgentRuntimeConfig())  # default = UnconfiguredGovernanceHook
+    register_provider(rt, p)
+    wf = WorkflowDefinition(workflow_id="wf", tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),))
+    inst = rt.start_workflow(wf)
+    assert inst.status is WorkflowStatus.FAILED
+    assert p.calls == []
+    assert "GOVERNANCE_NOT_CONFIGURED" in rt.result(inst.instance_id).failures[0].reason_codes

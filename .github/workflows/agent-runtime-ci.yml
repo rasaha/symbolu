@@ -1,0 +1,77 @@
+name: agent-runtime-ci
+
+# Scoped CI for the independent ugence-agent-runtime package. Runs the package suite,
+# builds the wheel + sdist, verifies isolated installation, checks import boundaries,
+# exercises the legacy coexistence tests, and runs the platform-freeze verifier.
+# Triggered only by changes to the package, its legacy compatibility surface, or this
+# workflow — it does NOT rely on terminology-ci.
+
+on:
+  pull_request:
+    paths:
+      - "packages/runtime/agent-runtime/**"
+      - "agent_runtime_migration/**"
+      - ".github/workflows/agent-runtime-ci.yml"
+  push:
+    branches:
+      - "claude/package-agent-runtime-independently**"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Agent Runtime package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Package suite (from source, incl. legacy coexistence tests)
+        run: python -m pytest packages/runtime/agent-runtime/tests -q
+      - name: Import-boundary checks
+        run: |
+          python -m pytest \
+            packages/runtime/agent-runtime/tests/test_import_boundaries.py \
+            packages/runtime/agent-runtime/tests/test_governance_binding.py \
+            packages/runtime/agent-runtime/tests/test_compatibility.py -q
+
+  isolated-install:
+    name: Wheel build + isolated installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build wheel + sdist, install into a clean venv, run tests + demo
+        run: python packages/runtime/agent-runtime/scripts/verify_isolated_install.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

@@ -22,44 +22,48 @@ outside the package itself. Every other reference is a *forbidden-import asserti
 Because there are no runtime consumers to break, migration risk is minimal. The legacy
 package is left untouched (its 74 tests still pass) and is **not** deleted.
 
-## Compatibility surface
+## Outcome B — honest coexistence (corrected in 0.1.1)
 
-`ugence_agent_runtime.compat` provides identity-preserving aliases so any code that
-reaches for a differently-named coordination primitive can import it from one stable
-place while migrating to `ugence_agent_runtime.api`.
+**This is NOT a runtime-compatibility shim.** The legacy runtime
+`agent_runtime_migration.runtime.runtime.AgentRuntime` is a *different implementation*
+with an *incompatible API*:
 
-| Legacy alias | Canonical | Classification |
+| | Legacy proposer | Kernel |
 | --- | --- | --- |
-| `compat.Runtime` | `api.AgentRuntime` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.Workflow` | `api.WorkflowDefinition` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.WorkflowRun` | `api.WorkflowInstance` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.Task` | `api.TaskDefinition` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.TaskRun` | `api.TaskInstance` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.WorkflowCheckpoint` | `api.Checkpoint` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.Registry` | `api.ProviderRegistry` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
-| `compat.Result` | `api.RuntimeResult` | `TEMPORARY_COMPATIBILITY_REEXPORT` |
+| Construct | `AgentRuntime(*, executor, planner=…, reflector=…, memory=…)` | `AgentRuntime(config)` |
+| Drive | `run(goal: Goal, …) -> RunOutcome` | `start_workflow(definition) -> WorkflowInstance` |
+| Owns | planning, reasoning, memory, reflection | workflow/task coordination |
 
-Each alias **is** the canonical object (`compat.resolve(alias) is api.<Canonical>`), so
-there is no duplicate runtime implementation. Accessing an alias emits a
-`DeprecationWarning` pointing at the canonical import.
+Neither can substitute for the other. The 0.1.0 `ugence_agent_runtime.compat` aliases
+(`Runtime`, `Workflow`, …) were **new-package aliases**, not legacy compatibility, and
+the "identity-preserving / no duplicate implementation" claim was inaccurate. Those
+aliases have been **removed**.
 
-## Legacy `agent_runtime_migration` classification
+`ugence_agent_runtime.compat` now provides **migration guidance only**:
 
-| Legacy import | New import | Status | Planned removal |
-| --- | --- | --- | --- |
-| `agent_runtime_migration.workflow.Workflow` | `ugence_agent_runtime.api.WorkflowDefinition` | `DEPRECATED` | after consumers migrate |
-| `agent_runtime_migration.workflow.Checkpoint` | `ugence_agent_runtime.api.Checkpoint` | `DEPRECATED` | after consumers migrate |
-| `agent_runtime_migration.runtime.runtime.AgentRuntime` | `ugence_agent_runtime.api.AgentRuntime` | `DEPRECATED` | after consumers migrate |
-| `agent_runtime_migration.tracing.events.RuntimeEvent` | `ugence_agent_runtime.models.events.RuntimeEvent` | `DEPRECATED` | after consumers migrate |
-| `agent_runtime_migration.control_plane.*` (CER-coupled) | *stays legacy* | `INTERNAL_UNSUPPORTED_IMPORT` | n/a (concrete governance adapter) |
-| `agent_runtime_migration.proposal.*` (CER builder) | *stays legacy* | `INTERNAL_UNSUPPORTED_IMPORT` | n/a (concrete governance adapter) |
+- `MIGRATION_MAP` — legacy import path → `{new target | None, classification, note}`.
+- `classify(legacy_path)` / `new_target(legacy_path)`.
 
-The legacy package is **not** silently deleted. Its CER-coupled proposer/control-plane
-modules are the concrete governance integration and remain where they are; a future
-phase can rebuild them on top of this neutral core.
+| Legacy import | Kernel target | Classification |
+| --- | --- | --- |
+| `agent_runtime_migration.runtime.runtime.AgentRuntime` | *(none — different impl)* | `PRESENT_CHANGED` |
+| `agent_runtime_migration.workflow.Workflow` | `ugence_agent_runtime.api.WorkflowDefinition` | `PRESENT_CHANGED` |
+| `agent_runtime_migration.workflow.Checkpoint` | `ugence_agent_runtime.api.Checkpoint` | `PRESENT_CHANGED` |
+| `agent_runtime_migration.tracing.events.RuntimeEvent` | `ugence_agent_runtime.models.events.RuntimeEvent` | `PRESENT_CHANGED` |
+| `agent_runtime_migration.tools.registry` | `ugence_agent_runtime.api.ProviderRegistry` | `PRESENT_CHANGED` |
+| `agent_runtime_migration.planning` / `reasoning` / `memory` | *(none)* | `INTENTIONALLY_EXCLUDED` |
+| `agent_runtime_migration.control_plane` / `proposal` | *(none)* | `LEGACY_INTEGRATION_ONLY` |
+
+`tests/test_compatibility.py` imports the **actual** legacy path and asserts the two
+runtimes are distinct implementations (skipped when the monorepo is absent, e.g. the
+isolated-wheel run). The legacy package is retained (its 74 tests still pass) and is
+**not** deleted; a future migration phase disposes of it.
 
 ## Migration guidance
 
-New code should import from `ugence_agent_runtime.api`. Existing/legacy code can adopt
-the package incrementally via `ugence_agent_runtime.compat`, resolving the deprecation
-warnings as it goes.
+New code should import from `ugence_agent_runtime.api`. Because the kernel is not
+API-compatible with the legacy proposer, "migration" means **rewriting** planning/memory
+concerns to live outside the kernel and mapping legacy workflow/tool concepts to the
+kernel's models using `ugence_agent_runtime.compat.MIGRATION_MAP` — not swapping an
+import. Consult `classify(legacy_path)` for the fidelity classification of each legacy
+subsystem.

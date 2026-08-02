@@ -15,8 +15,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional
 
+from .governance.hooks import UnconfiguredGovernanceHook
 from .governance.interfaces import GovernanceHook
-from .governance.noop import NoopGovernanceHook
 from .providers.registry import ProviderRegistry
 from .runtime.errors import RuntimeConfigurationError
 from .runtime.retry import RetryPolicy
@@ -48,12 +48,14 @@ class _SequentialIdGenerator:
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     runtime_id: str = "agent-runtime"
-    runtime_version: str = "0.1.0"
+    runtime_version: str = "0.1.1"
     max_concurrent_tasks: int = 1
     default_timeout: Optional[float] = None
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     provider_registry: ProviderRegistry = field(default_factory=ProviderRegistry)
-    governance_hook: GovernanceHook = field(default_factory=NoopGovernanceHook)
+    # Fail closed by default: with no governance adapter configured, consequential
+    # transitions are BLOCKed. An always-CLEAR hook is never a default.
+    governance_hook: GovernanceHook = field(default_factory=UnconfiguredGovernanceHook)
     checkpoint_store: Optional[CheckpointStore] = None
     state_store: Optional[RuntimeStateStore] = None
     event_store: Optional[RuntimeEventStore] = None

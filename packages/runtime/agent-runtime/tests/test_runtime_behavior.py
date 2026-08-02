@@ -25,6 +25,7 @@ from ugence_agent_runtime.providers.interfaces import ToolResult
 from ugence_agent_runtime.runtime.errors import InvalidTransitionError
 
 from art_fakes import DispositionHook, FailingProvider, RecordingProvider
+from ugence_agent_runtime.governance.hooks import AllowAllGovernanceHook
 from ugence_agent_runtime.governance.interfaces import GovernanceDisposition
 
 
@@ -33,6 +34,10 @@ def _wf(*tasks):
 
 
 def _runtime(provider=None, **cfg):
+    # These tests exercise coordination, not governance. Unless a test supplies its
+    # own hook, use the explicit (opt-in, test-only) AllowAll hook so consequential
+    # tasks clear — the production default fails closed and is covered separately.
+    cfg.setdefault("governance_hook", AllowAllGovernanceHook())
     rt = create_runtime(AgentRuntimeConfig(**cfg))
     if provider is not None:
         register_provider(rt, provider)

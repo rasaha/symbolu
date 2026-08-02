@@ -8,11 +8,11 @@ fixture is imported here.
 from __future__ import annotations
 
 from ugence_agent_runtime.governance.interfaces import (
-    ExecutionContext,
     GovernanceDisposition,
     GovernanceEvaluation,
     GovernanceHook,
 )
+from ugence_agent_runtime.models.proposal import TransitionProposal
 from ugence_agent_runtime.providers.interfaces import (
     Provider,
     ToolInvocation,
@@ -56,20 +56,33 @@ class FailingProvider(Provider):
 
 
 class DispositionHook(GovernanceHook):
-    """A neutral fake governance hook returning a fixed disposition."""
+    """A neutral fake governance hook returning a fixed disposition.
 
-    def __init__(self, disposition: GovernanceDisposition, *, reference="gov-ref-1"):
+    It evaluates the immutable ``TransitionProposal`` and, for a CLEAR result, binds
+    the evaluation to the exact proposal fingerprint and supplies a binding reference,
+    so the runtime's exact-action clearance check passes. Set ``bind=False`` to model a
+    misbehaving hook that returns CLEAR without binding (which must fail closed).
+    """
+
+    def __init__(self, disposition: GovernanceDisposition, *, reference="gov-ref-1",
+                 bind=True, valid_until=None):
         self.disposition = disposition
         self.reference = reference
+        self.bind = bind
+        self.valid_until = valid_until
         self.evaluations = []
         self.evaluation_times = []
+        self.proposals = []
 
-    def evaluate(self, context: ExecutionContext, proposed_transition: str, evaluation_time: float) -> GovernanceEvaluation:
-        self.evaluations.append((context.task_id, proposed_transition))
+    def evaluate(self, proposal: TransitionProposal, evaluation_time: float) -> GovernanceEvaluation:
+        self.evaluations.append((proposal.task_id, proposal.operation))
         self.evaluation_times.append(evaluation_time)
+        self.proposals.append(proposal)
         return GovernanceEvaluation(
             disposition=self.disposition,
+            proposal_fingerprint=proposal.fingerprint if self.bind else None,
             reason_codes=("TEST",),
-            evaluation_reference=self.reference,
-            correlation_reference=context.correlation.correlation_id,
+            evaluation_reference=self.reference if self.bind else None,
+            valid_until=self.valid_until,
+            correlation_reference=proposal.correlation_id,
         )
