@@ -21,6 +21,7 @@ _SRC_PATHS = [
     _REPO_ROOT / "packages" / "governance-provider-framework" / "src",
     _REPO_ROOT / "packages" / "capabilities" / "storygraph" / "src",
     _REPO_ROOT / "packages" / "capabilities" / "decision-authority" / "src",
+    _REPO_ROOT / "packages" / "capabilities" / "action-clearance" / "src",
 ]
 for _p in _SRC_PATHS:
     if _p.is_dir() and str(_p) not in sys.path:
