@@ -13,7 +13,8 @@ def check(fixture, platform, outcome):
         results.append(
             ok("contracts", f"kernel_model:{name}")
             if isinstance(record, DomainModel)
-            and type(record).__module__.startswith("decision_governance.")
+            and type(record).__module__.startswith(
+                ("ugence_decision_authority.", "decision_governance."))
             else fail("contracts", f"kernel_model:{name}",
                       f"record {i} is not a kernel DomainModel: {type(record)!r}"))
     has_decision = any(isinstance(r, DecisionRecord) for r in outcome.records)
