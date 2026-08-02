@@ -1,0 +1,34 @@
+{
+  "$comment": "Dependency-direction guarantees for ugence_action_clearance (verified by tests/test_boundary_security.py).",
+  "allowed": [
+    "python standard library only"
+  ],
+  "forbidden_imports": [
+    "ugence_code_governance",
+    "symbolu_robotics",
+    "acp",
+    "ugence_decision_authority",
+    "tap_provider",
+    "actiongate_provider",
+    "governance_providers",
+    "ugence_governance_provider_framework",
+    "ugence_storygraph",
+    "ugence_console_api",
+    "requests",
+    "httpx",
+    "sqlalchemy",
+    "sqlite3",
+    "github",
+    "kubernetes",
+    "boto3"
+  ],
+  "guarantees": [
+    "no new ProviderKind",
+    "no persistence implementation",
+    "no dispatch/execute method",
+    "no reserve_once",
+    "no robotics ACP alias/import",
+    "no GitHub/DB/network client",
+    "stdlib-only leaf capability"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "$comment": "Classification of the merged acceptance scenarios against the package core. Non-core scenarios are NOT faked.",
+  "source_matrices": [
+    "docs/design/action_clearance/acceptance_scenarios.json (25 rows)",
+    "docs/design/action_clearance_prerequisites/acceptance_scenarios.json"
+  ],
+  "classifications": [
+    "CORE_IMPLEMENTED",
+    "FUTURE_ADAPTER",
+    "FUTURE_WORKFLOW",
+    "FUTURE_EXECUTION_LEDGER",
+    "FUTURE_PRODUCT_INTEGRATION"
+  ],
+  "core_matrix_coverage": {
+    "CORE_IMPLEMENTED": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "FUTURE_ADAPTER": [
+      21,
+      22
+    ],
+    "FUTURE_WORKFLOW": [
+      23,
+      25
+    ],
+    "FUTURE_EXECUTION_LEDGER": [
+      24
+    ]
+  },
+  "notes": {
+    "2": "ActionGate-denied: design labels 'no_evaluation' at the boundary; the neutral core fail-closes to BLOCK (AUTHORIZATION_NOT_ELIGIBLE).",
+    "21_22": "GitHub head-SHA / merge-group changes are profile manifestations of action-identity change; the neutral core already BLOCKs on ACTION_FINGERPRINT_MISMATCH, the GitHub reason codes are supplied by the (future) GitHub profile.",
+    "23_25": "receipt EXPIRED / REVOKED_BY_UPSTREAM_CHANGE are receipt-lifecycle states owned by the Workflow Service (not implemented).",
+    "24": "concurrent-dispatch reservation is owned by the execution/idempotency ledger (not implemented)."
+  },
+  "harness": "tests/test_scenario_harness.py executes every CORE_IMPLEMENTED scenario; FUTURE_* are skipped, never faked."
+}

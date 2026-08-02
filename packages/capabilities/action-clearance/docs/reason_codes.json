@@ -1,0 +1,169 @@
+{
+  "$comment": "CORE_NEUTRAL clearance reason catalog with default status. Profile-specific (GitHub) and workflow-only reasons are NOT part of the neutral core.",
+  "statuses": [
+    "CLEAR",
+    "HOLD",
+    "BLOCK",
+    "ESCALATE"
+  ],
+  "status_precedence": "BLOCK > ESCALATE > HOLD > CLEAR",
+  "reason_codes": {
+    "CLEARANCE_GRANTED": {
+      "default_status": "CLEAR",
+      "classification": "CORE_NEUTRAL"
+    },
+    "AUTHORIZATION_NOT_ELIGIBLE": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "AUTHORIZATION_EXPIRED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "AUTHORIZATION_STALE": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "UPSTREAM_REAUTHORIZATION_REQUIRED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ACTION_FINGERPRINT_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "TARGET_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ACTOR_INVALID": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ACTOR_STATUS_UNKNOWN": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "POLICY_VERSION_REJECTED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ACTIVE_CHANGE_FREEZE": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ACTIVE_INCIDENT": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "TARGET_UNAVAILABLE": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "REQUIRED_CONTROL_UNSATISFIED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "ALREADY_CONSUMED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "CONSUMPTION_RESERVED": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "CONSUMPTION_STATUS_UNKNOWN": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_MISSING": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_STALE": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_EXPIRED": {
+      "default_status": "HOLD",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_UNTRUSTED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_CONFLICT": {
+      "default_status": "ESCALATE",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_PROVENANCE_MISSING": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_SOURCE_UNAPPROVED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_ADAPTER_VERSION_UNAPPROVED": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_TRUST_LEVEL_INSUFFICIENT": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_CONTENT_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_AUTHORIZATION_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SIGNAL_ACTION_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "TENANT_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "SUBJECT_MISMATCH": {
+      "default_status": "BLOCK",
+      "classification": "CORE_NEUTRAL"
+    },
+    "CONSTRAINT_CONFLICT": {
+      "default_status": "ESCALATE",
+      "classification": "CORE_NEUTRAL"
+    },
+    "CONSTRAINT_INTERPRETATION_UNSUPPORTED": {
+      "default_status": "ESCALATE",
+      "classification": "CORE_NEUTRAL"
+    },
+    "CLEARANCE_POLICY_CONFLICT": {
+      "default_status": "ESCALATE",
+      "classification": "CORE_NEUTRAL"
+    }
+  },
+  "not_in_neutral_core": {
+    "PROFILE_SPECIFIC": [
+      "GITHUB_HEAD_SHA_CHANGED",
+      "GITHUB_BASE_ADVANCED",
+      "GITHUB_MERGE_TREE_MISMATCH",
+      "GITHUB_MERGE_GROUP_MISMATCH",
+      "GITHUB_MERGE_METHOD_CHANGED",
+      "GITHUB_TARGET_BRANCH_MISMATCH",
+      "GITHUB_REQUIRED_CHECK_PENDING",
+      "GITHUB_REQUIRED_CHECK_FAILED",
+      "GITHUB_APPROVAL_WITHDRAWN"
+    ],
+    "WORKFLOW_ONLY": [
+      "DISPATCH_DUPLICATE",
+      "RECEIPT_SUPERSEDED"
+    ],
+    "UNNECESSARY": [
+      "DENY (ActionGate owns denial)",
+      "ACP_* (acronym prohibited)"
+    ]
+  }
+}
