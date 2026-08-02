@@ -1,0 +1,2505 @@
+{
+  "api_all": [
+    "__version__",
+    "audit",
+    "common",
+    "contracts",
+    "errors",
+    "identity",
+    "policy",
+    "ports",
+    "repositories",
+    "services",
+    "vocabulary"
+  ],
+  "api_manifest": {
+    "module": "<ns>.api",
+    "symbols": [
+      {
+        "kind": "str",
+        "name": "__version__"
+      },
+      {
+        "kind": "module",
+        "name": "audit"
+      },
+      {
+        "kind": "module",
+        "name": "common"
+      },
+      {
+        "kind": "module",
+        "name": "contracts"
+      },
+      {
+        "kind": "module",
+        "name": "errors"
+      },
+      {
+        "kind": "module",
+        "name": "identity"
+      },
+      {
+        "kind": "module",
+        "name": "policy"
+      },
+      {
+        "kind": "module",
+        "name": "ports"
+      },
+      {
+        "kind": "module",
+        "name": "repositories"
+      },
+      {
+        "kind": "module",
+        "name": "services"
+      },
+      {
+        "kind": "module",
+        "name": "vocabulary"
+      }
+    ]
+  },
+  "api_manifest_sha256": "82685c11664413ae3d26340730401c12c8c40c8197b0227454b76a75ae57dfc4",
+  "enums": {
+    "<ns>.actions.status.ActionMappingStatus": {
+      "DEPRECATED": "DEPRECATED",
+      "DRAFT": "DRAFT",
+      "PUBLISHED": "PUBLISHED",
+      "RETIRED": "RETIRED"
+    },
+    "<ns>.actions.status.ActionRequestStatus": {
+      "AUTHORIZATION_PENDING": "AUTHORIZATION_PENDING",
+      "AUTHORIZED": "AUTHORIZED",
+      "AUTHORIZED_WITH_CONSTRAINTS": "AUTHORIZED_WITH_CONSTRAINTS",
+      "CANCELLED": "CANCELLED",
+      "CER_BOUND": "CER_BOUND",
+      "DENIED": "DENIED",
+      "DRAFT": "DRAFT",
+      "EXPIRED": "EXPIRED",
+      "INDETERMINATE": "INDETERMINATE",
+      "READY_FOR_AUTHORIZATION": "READY_FOR_AUTHORIZATION",
+      "READY_FOR_BINDING": "READY_FOR_BINDING",
+      "SUPERSEDED": "SUPERSEDED"
+    },
+    "<ns>.actions.status.AuthorizationOutcome": {
+      "AUTHORIZED": "AUTHORIZED",
+      "AUTHORIZED_WITH_CONSTRAINTS": "AUTHORIZED_WITH_CONSTRAINTS",
+      "DENIED": "DENIED",
+      "EXPIRED": "EXPIRED",
+      "INDETERMINATE": "INDETERMINATE"
+    },
+    "<ns>.audit.events.AuditEventType": {
+      "ACTION_AUTHORIZATION_CONSTRAINED": "ACTION_AUTHORIZATION_CONSTRAINED",
+      "ACTION_AUTHORIZATION_DENIED": "ACTION_AUTHORIZATION_DENIED",
+      "ACTION_AUTHORIZATION_EXPIRED": "ACTION_AUTHORIZATION_EXPIRED",
+      "ACTION_AUTHORIZATION_GRANTED": "ACTION_AUTHORIZATION_GRANTED",
+      "ACTION_AUTHORIZATION_INDETERMINATE": "ACTION_AUTHORIZATION_INDETERMINATE",
+      "ACTION_AUTHORIZATION_SUBMITTED": "ACTION_AUTHORIZATION_SUBMITTED",
+      "ACTION_MAPPING_PUBLISHED": "ACTION_MAPPING_PUBLISHED",
+      "ACTION_MAPPING_SELECTED": "ACTION_MAPPING_SELECTED",
+      "ACTION_REQUEST_ACCESS_DENIED": "ACTION_REQUEST_ACCESS_DENIED",
+      "ACTION_REQUEST_CANCELLED": "ACTION_REQUEST_CANCELLED",
+      "ACTION_REQUEST_CREATED": "ACTION_REQUEST_CREATED",
+      "ACTION_REQUEST_SUPERSEDED": "ACTION_REQUEST_SUPERSEDED",
+      "ACTION_REQUEST_VALIDATED": "ACTION_REQUEST_VALIDATED",
+      "ASSESSMENT_ACCESS_DENIED": "ASSESSMENT_ACCESS_DENIED",
+      "ASSESSMENT_CANCELLED": "ASSESSMENT_CANCELLED",
+      "ASSESSMENT_CONFLICT_RECORDED": "ASSESSMENT_CONFLICT_RECORDED",
+      "ASSESSMENT_EVIDENCE_BOUND": "ASSESSMENT_EVIDENCE_BOUND",
+      "ASSESSMENT_EVIDENCE_EXCLUDED": "ASSESSMENT_EVIDENCE_EXCLUDED",
+      "ASSESSMENT_FINALIZED_ADVISORY": "ASSESSMENT_FINALIZED_ADVISORY",
+      "ASSESSMENT_MISSING_EVIDENCE_RECORDED": "ASSESSMENT_MISSING_EVIDENCE_RECORDED",
+      "ASSESSMENT_OBSERVATION_REJECTED": "ASSESSMENT_OBSERVATION_REJECTED",
+      "ASSESSMENT_OBSERVATION_SUBMITTED": "ASSESSMENT_OBSERVATION_SUBMITTED",
+      "ASSESSMENT_SUPERSEDED": "ASSESSMENT_SUPERSEDED",
+      "ASSESSMENT_VALIDATED": "ASSESSMENT_VALIDATED",
+      "ASSESSMENT_VALIDATION_FAILED": "ASSESSMENT_VALIDATION_FAILED",
+      "ASSESSMENT_WORKSPACE_CREATED": "ASSESSMENT_WORKSPACE_CREATED",
+      "CAPABILITY_PUBLISHED": "CAPABILITY_PUBLISHED",
+      "CAPABILITY_RETIRED": "CAPABILITY_RETIRED",
+      "CAPABILITY_SUPERSEDED": "CAPABILITY_SUPERSEDED",
+      "CER_BOUND": "CER_BOUND",
+      "CER_CREATED": "CER_CREATED",
+      "COMPENSATION_REQUIRED": "COMPENSATION_REQUIRED",
+      "COMPENSATION_RESOLVED": "COMPENSATION_RESOLVED",
+      "DECISION_CASE_ACCESS_DENIED": "DECISION_CASE_ACCESS_DENIED",
+      "DECISION_CASE_ASSESSMENT_LINKED": "DECISION_CASE_ASSESSMENT_LINKED",
+      "DECISION_CASE_CANCELLED": "DECISION_CASE_CANCELLED",
+      "DECISION_CASE_CLOSED": "DECISION_CASE_CLOSED",
+      "DECISION_CASE_CREATED": "DECISION_CASE_CREATED",
+      "DECISION_CASE_READY_FOR_DECISION": "DECISION_CASE_READY_FOR_DECISION",
+      "DECISION_CASE_RECOMMENDATION_ADDED": "DECISION_CASE_RECOMMENDATION_ADDED",
+      "DECISION_CASE_RECOMMENDATION_REJECTED": "DECISION_CASE_RECOMMENDATION_REJECTED",
+      "DECISION_CASE_REVIEW_ASSIGNED": "DECISION_CASE_REVIEW_ASSIGNED",
+      "DECISION_CASE_REVIEW_COMPLETED": "DECISION_CASE_REVIEW_COMPLETED",
+      "DECISION_CASE_SUPERSEDED": "DECISION_CASE_SUPERSEDED",
+      "DECISION_CREATED": "DECISION_CREATED",
+      "DECISION_OVERRIDE_RECORDED": "DECISION_OVERRIDE_RECORDED",
+      "DECISION_RECORDED": "DECISION_RECORDED",
+      "EVALUATION_CREATED": "EVALUATION_CREATED",
+      "EVALUATION_UNBLOCKED": "EVALUATION_UNBLOCKED",
+      "EVIDENCE_ACCESS_DENIED": "EVIDENCE_ACCESS_DENIED",
+      "EVIDENCE_CHUNK_CREATED": "EVIDENCE_CHUNK_CREATED",
+      "EVIDENCE_CONTENT_EXTRACTED": "EVIDENCE_CONTENT_EXTRACTED",
+      "EVIDENCE_CONTENT_HASHED": "EVIDENCE_CONTENT_HASHED",
+      "EVIDENCE_DUPLICATE_CLASSIFIED": "EVIDENCE_DUPLICATE_CLASSIFIED",
+      "EVIDENCE_DUPLICATE_DETECTED": "EVIDENCE_DUPLICATE_DETECTED",
+      "EVIDENCE_ELIGIBILITY_BLOCKED": "EVIDENCE_ELIGIBILITY_BLOCKED",
+      "EVIDENCE_EXTRACTION_EMPTY": "EVIDENCE_EXTRACTION_EMPTY",
+      "EVIDENCE_EXTRACTION_ENCRYPTED": "EVIDENCE_EXTRACTION_ENCRYPTED",
+      "EVIDENCE_EXTRACTION_MALFORMED": "EVIDENCE_EXTRACTION_MALFORMED",
+      "EVIDENCE_EXTRACTION_SUCCEEDED": "EVIDENCE_EXTRACTION_SUCCEEDED",
+      "EVIDENCE_EXTRACTION_UNSUPPORTED": "EVIDENCE_EXTRACTION_UNSUPPORTED",
+      "EVIDENCE_EXTRACTION_WARNING": "EVIDENCE_EXTRACTION_WARNING",
+      "EVIDENCE_INDEXED": "EVIDENCE_INDEXED",
+      "EVIDENCE_INGESTION_COMPLETED": "EVIDENCE_INGESTION_COMPLETED",
+      "EVIDENCE_INGESTION_FAILED": "EVIDENCE_INGESTION_FAILED",
+      "EVIDENCE_INGESTION_RECEIVED": "EVIDENCE_INGESTION_RECEIVED",
+      "EVIDENCE_INTEGRITY_FAILED": "EVIDENCE_INTEGRITY_FAILED",
+      "EVIDENCE_INTEGRITY_VALIDATED": "EVIDENCE_INTEGRITY_VALIDATED",
+      "EVIDENCE_LINEAGE_REJECTED": "EVIDENCE_LINEAGE_REJECTED",
+      "EVIDENCE_LINEAGE_VALIDATED": "EVIDENCE_LINEAGE_VALIDATED",
+      "EVIDENCE_MANUAL_REVIEW_REQUIRED": "EVIDENCE_MANUAL_REVIEW_REQUIRED",
+      "EVIDENCE_NORMALIZED": "EVIDENCE_NORMALIZED",
+      "EVIDENCE_PII_QUARANTINED": "EVIDENCE_PII_QUARANTINED",
+      "EVIDENCE_PROVENANCE_CAPTURED": "EVIDENCE_PROVENANCE_CAPTURED",
+      "EVIDENCE_RECONSTRUCTION_FAILED": "EVIDENCE_RECONSTRUCTION_FAILED",
+      "EVIDENCE_RECONSTRUCTION_VALIDATED": "EVIDENCE_RECONSTRUCTION_VALIDATED",
+      "EVIDENCE_RESOURCE_LIMIT_EXCEEDED": "EVIDENCE_RESOURCE_LIMIT_EXCEEDED",
+      "EVIDENCE_UPLOAD_RECEIVED": "EVIDENCE_UPLOAD_RECEIVED",
+      "EVIDENCE_VERSION_CREATED": "EVIDENCE_VERSION_CREATED",
+      "EXECUTION_ACCESS_DENIED": "EXECUTION_ACCESS_DENIED",
+      "EXECUTION_DISPATCH_ACKNOWLEDGED": "EXECUTION_DISPATCH_ACKNOWLEDGED",
+      "EXECUTION_DISPATCH_SUBMITTED": "EXECUTION_DISPATCH_SUBMITTED",
+      "EXECUTION_DUPLICATE_DETECTED": "EXECUTION_DUPLICATE_DETECTED",
+      "EXECUTION_FAILED": "EXECUTION_FAILED",
+      "EXECUTION_INTENT_CREATED": "EXECUTION_INTENT_CREATED",
+      "EXECUTION_MANUAL_REVIEW_REQUIRED": "EXECUTION_MANUAL_REVIEW_REQUIRED",
+      "EXECUTION_MISMATCH_DETECTED": "EXECUTION_MISMATCH_DETECTED",
+      "EXECUTION_OUTCOME_RECORDED": "EXECUTION_OUTCOME_RECORDED",
+      "EXECUTION_PARTIALLY_SUCCEEDED": "EXECUTION_PARTIALLY_SUCCEEDED",
+      "EXECUTION_RECONCILED": "EXECUTION_RECONCILED",
+      "EXECUTION_RECONCILIATION_STARTED": "EXECUTION_RECONCILIATION_STARTED",
+      "EXECUTION_RETRY_REQUESTED": "EXECUTION_RETRY_REQUESTED",
+      "EXECUTION_SUCCEEDED": "EXECUTION_SUCCEEDED",
+      "EXECUTION_TIMED_OUT": "EXECUTION_TIMED_OUT",
+      "EXECUTION_TRANSPORT_FAILED": "EXECUTION_TRANSPORT_FAILED",
+      "EXECUTION_VALIDATED": "EXECUTION_VALIDATED",
+      "POLICY_DENIED": "POLICY_DENIED",
+      "RECOMMENDATION_CREATED": "RECOMMENDATION_CREATED",
+      "RUBRIC_APPROVED": "RUBRIC_APPROVED",
+      "RUBRIC_CREATED": "RUBRIC_CREATED",
+      "RUBRIC_DEPRECATED": "RUBRIC_DEPRECATED",
+      "RUBRIC_PUBLISHED": "RUBRIC_PUBLISHED",
+      "RUBRIC_REJECTED": "RUBRIC_REJECTED",
+      "RUBRIC_RETIRED": "RUBRIC_RETIRED",
+      "RUBRIC_REVISION_CREATED": "RUBRIC_REVISION_CREATED",
+      "RUBRIC_SUBMITTED": "RUBRIC_SUBMITTED",
+      "RUBRIC_VALIDATION_FAILED": "RUBRIC_VALIDATION_FAILED",
+      "SECURITY_VIOLATION": "SECURITY_VIOLATION",
+      "WORKFLOW_INITIALIZED": "WORKFLOW_INITIALIZED",
+      "WORKFLOW_TRANSITION": "WORKFLOW_TRANSITION"
+    },
+    "<ns>.audit.namespace.AuditNamespace": {
+      "DOMAIN": "DOMAIN",
+      "KERNEL": "KERNEL",
+      "LEGACY": "LEGACY"
+    },
+    "<ns>.decisions.status.AuthorityType": {
+      "COMMITTEE": "COMMITTEE",
+      "DELEGATED_POLICY": "DELEGATED_POLICY",
+      "EXTERNAL_AUTHORITY": "EXTERNAL_AUTHORITY",
+      "HUMAN_APPROVER": "HUMAN_APPROVER",
+      "HUMAN_REVIEWER": "HUMAN_REVIEWER"
+    },
+    "<ns>.decisions.status.CaseStatus": {
+      "ASSESSMENT_IN_PROGRESS": "ASSESSMENT_IN_PROGRESS",
+      "CANCELLED": "CANCELLED",
+      "CLOSED": "CLOSED",
+      "CREATED": "CREATED",
+      "DECIDED": "DECIDED",
+      "EVIDENCE_ASSEMBLY": "EVIDENCE_ASSEMBLY",
+      "READY_FOR_DECISION": "READY_FOR_DECISION",
+      "READY_FOR_RECOMMENDATION": "READY_FOR_RECOMMENDATION",
+      "RECOMMENDATION_AVAILABLE": "RECOMMENDATION_AVAILABLE",
+      "SUPERSEDED": "SUPERSEDED",
+      "UNDER_REVIEW": "UNDER_REVIEW"
+    },
+    "<ns>.decisions.status.DecisionOutcome": {
+      "ADVANCE": "ADVANCE",
+      "DEFER": "DEFER",
+      "HOLD": "HOLD",
+      "REJECT": "REJECT"
+    },
+    "<ns>.decisions.status.EffectiveStatus": {
+      "EFFECTIVE": "EFFECTIVE",
+      "SUPERSEDED": "SUPERSEDED",
+      "VOID": "VOID"
+    },
+    "<ns>.decisions.status.GeneratorType": {
+      "AI_ASSISTED": "AI_ASSISTED",
+      "DETERMINISTIC_POLICY": "DETERMINISTIC_POLICY",
+      "HUMAN": "HUMAN",
+      "IMPORTED_APPROVED_SOURCE": "IMPORTED_APPROVED_SOURCE"
+    },
+    "<ns>.decisions.status.OperatingMode": {
+      "DELEGATED_POLICY": "DELEGATED_POLICY",
+      "DELIBERATIVE": "DELIBERATIVE",
+      "REAL_TIME_PREPARATION": "REAL_TIME_PREPARATION"
+    },
+    "<ns>.decisions.status.ProposedOutcome": {
+      "ADVANCE": "ADVANCE",
+      "HOLD": "HOLD",
+      "NO_RECOMMENDATION": "NO_RECOMMENDATION",
+      "REJECT": "REJECT",
+      "REQUEST_ADDITIONAL_EVIDENCE": "REQUEST_ADDITIONAL_EVIDENCE"
+    },
+    "<ns>.decisions.status.RecommendationStatus": {
+      "PROPOSED": "PROPOSED",
+      "REJECTED": "REJECTED",
+      "SUPERSEDED": "SUPERSEDED"
+    },
+    "<ns>.decisions.status.ReviewTaskStatus": {
+      "CANCELLED": "CANCELLED",
+      "COMPLETED": "COMPLETED",
+      "PENDING": "PENDING",
+      "WAIVED": "WAIVED"
+    },
+    "<ns>.decisions.status.ReviewTaskType": {
+      "CONFLICT_REVIEW": "CONFLICT_REVIEW",
+      "DECISION_REVIEW": "DECISION_REVIEW",
+      "EVIDENCE_GAP_REVIEW": "EVIDENCE_GAP_REVIEW",
+      "RECOMMENDATION_REVIEW": "RECOMMENDATION_REVIEW",
+      "REQUIRED_REVIEW": "REQUIRED_REVIEW",
+      "SECONDARY_APPROVAL": "SECONDARY_APPROVAL"
+    },
+    "<ns>.execution.status.BusinessOutcome": {
+      "CANCELLED_EXTERNALLY": "CANCELLED_EXTERNALLY",
+      "DUPLICATE": "DUPLICATE",
+      "FAILED": "FAILED",
+      "PARTIALLY_SUCCEEDED": "PARTIALLY_SUCCEEDED",
+      "REJECTED": "REJECTED",
+      "SUCCEEDED": "SUCCEEDED",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "<ns>.execution.status.CompensationApprovalStatus": {
+      "APPROVED": "APPROVED",
+      "PROPOSED": "PROPOSED",
+      "REJECTED": "REJECTED",
+      "RESOLVED": "RESOLVED"
+    },
+    "<ns>.execution.status.CompensationType": {
+      "GOVERNED_ACTION_REQUEST": "GOVERNED_ACTION_REQUEST",
+      "MANUAL_INTERVENTION": "MANUAL_INTERVENTION",
+      "NONE_POSSIBLE": "NONE_POSSIBLE",
+      "REVERSAL": "REVERSAL"
+    },
+    "<ns>.execution.status.ExecutionStatus": {
+      "ACKNOWLEDGED": "ACKNOWLEDGED",
+      "CANCELLED": "CANCELLED",
+      "COMPENSATION_REQUIRED": "COMPENSATION_REQUIRED",
+      "DISPATCHED": "DISPATCHED",
+      "DISPATCH_PENDING": "DISPATCH_PENDING",
+      "FAILED": "FAILED",
+      "INTENT_CREATED": "INTENT_CREATED",
+      "MANUAL_REVIEW_REQUIRED": "MANUAL_REVIEW_REQUIRED",
+      "MISMATCHED": "MISMATCHED",
+      "OUTCOME_UNKNOWN": "OUTCOME_UNKNOWN",
+      "PARTIALLY_SUCCEEDED": "PARTIALLY_SUCCEEDED",
+      "READY_FOR_DISPATCH": "READY_FOR_DISPATCH",
+      "RECONCILED": "RECONCILED",
+      "RECONCILIATION_PENDING": "RECONCILIATION_PENDING",
+      "REJECTED": "REJECTED",
+      "SUCCEEDED": "SUCCEEDED",
+      "SUPERSEDED": "SUPERSEDED"
+    },
+    "<ns>.execution.status.Finality": {
+      "FINAL": "FINAL",
+      "NON_FINAL": "NON_FINAL",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "<ns>.execution.status.OutcomeSource": {
+      "ADAPTER_DISPATCH": "ADAPTER_DISPATCH",
+      "ADAPTER_STATUS_QUERY": "ADAPTER_STATUS_QUERY",
+      "EXTERNAL_CALLBACK": "EXTERNAL_CALLBACK",
+      "MANUAL_ENTRY": "MANUAL_ENTRY"
+    },
+    "<ns>.execution.status.ReconciliationStatus": {
+      "COMPENSATION_REQUIRED": "COMPENSATION_REQUIRED",
+      "INDETERMINATE": "INDETERMINATE",
+      "MANUAL_REVIEW_REQUIRED": "MANUAL_REVIEW_REQUIRED",
+      "MISMATCHED": "MISMATCHED",
+      "PARTIALLY_RECONCILED": "PARTIALLY_RECONCILED",
+      "RECONCILED": "RECONCILED"
+    },
+    "<ns>.execution.status.RetryClassification": {
+      "IDEMPOTENT_SAFE": "IDEMPOTENT_SAFE",
+      "NOT_RETRYABLE": "NOT_RETRYABLE",
+      "REQUIRES_APPROVAL": "REQUIRES_APPROVAL",
+      "UNSAFE": "UNSAFE"
+    },
+    "<ns>.execution.status.TransportStatus": {
+      "ACKNOWLEDGED": "ACKNOWLEDGED",
+      "DISPATCHED": "DISPATCHED",
+      "NOT_DISPATCHED": "NOT_DISPATCHED",
+      "TIMED_OUT": "TIMED_OUT",
+      "TRANSPORT_FAILED": "TRANSPORT_FAILED",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "<ns>.identity.actor.ActorType": {
+      "AI": "AI",
+      "HUMAN": "HUMAN",
+      "SYSTEM": "SYSTEM"
+    },
+    "<ns>.policy.access.Permission": {
+      "ASSIGN_REVIEW": "ASSIGN_REVIEW",
+      "BIND_CER": "BIND_CER",
+      "BIND_EVIDENCE": "BIND_EVIDENCE",
+      "CANCEL_ACTION_REQUEST": "CANCEL_ACTION_REQUEST",
+      "CANCEL_ASSESSMENT": "CANCEL_ASSESSMENT",
+      "CANCEL_DECISION_CASE": "CANCEL_DECISION_CASE",
+      "CLOSE_DECISION_CASE": "CLOSE_DECISION_CASE",
+      "COMPLETE_REVIEW": "COMPLETE_REVIEW",
+      "CREATE_ACTION_REQUEST": "CREATE_ACTION_REQUEST",
+      "CREATE_ASSESSMENT_WORKSPACE": "CREATE_ASSESSMENT_WORKSPACE",
+      "CREATE_COMPENSATION_REQUIREMENT": "CREATE_COMPENSATION_REQUIREMENT",
+      "CREATE_DECISION_CASE": "CREATE_DECISION_CASE",
+      "CREATE_EXECUTION_INTENT": "CREATE_EXECUTION_INTENT",
+      "DISPATCH_EXECUTION": "DISPATCH_EXECUTION",
+      "EVIDENCE_LINEAGE_READ": "EVIDENCE_LINEAGE_READ",
+      "EVIDENCE_READ": "EVIDENCE_READ",
+      "EVIDENCE_SEARCH": "EVIDENCE_SEARCH",
+      "EVIDENCE_VERSION_READ": "EVIDENCE_VERSION_READ",
+      "FINALIZE_ASSESSMENT": "FINALIZE_ASSESSMENT",
+      "LINK_ASSESSMENT": "LINK_ASSESSMENT",
+      "MAKE_DECISION": "MAKE_DECISION",
+      "MANAGE_ACTION_MAPPING": "MANAGE_ACTION_MAPPING",
+      "MANAGE_EXECUTION_ADAPTER": "MANAGE_EXECUTION_ADAPTER",
+      "OVERRIDE_RECOMMENDATION": "OVERRIDE_RECOMMENDATION",
+      "QUARANTINE_ADMIN": "QUARANTINE_ADMIN",
+      "QUARANTINE_READ": "QUARANTINE_READ",
+      "QUERY_EXECUTION_STATUS": "QUERY_EXECUTION_STATUS",
+      "RECONCILE_EXECUTION": "RECONCILE_EXECUTION",
+      "RECORD_EXTERNAL_OUTCOME": "RECORD_EXTERNAL_OUTCOME",
+      "RESOLVE_COMPENSATION_REQUIREMENT": "RESOLVE_COMPENSATION_REQUIREMENT",
+      "RETRY_EXECUTION": "RETRY_EXECUTION",
+      "SUBMIT_FOR_AUTHORIZATION": "SUBMIT_FOR_AUTHORIZATION",
+      "SUBMIT_OBSERVATION": "SUBMIT_OBSERVATION",
+      "SUBMIT_RECOMMENDATION": "SUBMIT_RECOMMENDATION",
+      "SUPERSEDE_ACTION_REQUEST": "SUPERSEDE_ACTION_REQUEST",
+      "SUPERSEDE_ASSESSMENT": "SUPERSEDE_ASSESSMENT",
+      "SUPERSEDE_DECISION_CASE": "SUPERSEDE_DECISION_CASE",
+      "VALIDATE_ACTION_REQUEST": "VALIDATE_ACTION_REQUEST",
+      "VALIDATE_ASSESSMENT": "VALIDATE_ASSESSMENT",
+      "VIEW_ACTION_REQUEST": "VIEW_ACTION_REQUEST",
+      "VIEW_ASSESSMENT": "VIEW_ASSESSMENT",
+      "VIEW_AUTHORIZATION_RESPONSE": "VIEW_AUTHORIZATION_RESPONSE",
+      "VIEW_DECISION_CASE": "VIEW_DECISION_CASE",
+      "VIEW_EXECUTION": "VIEW_EXECUTION"
+    },
+    "<ns>.surface.SurfaceCategory": {
+      "COMPATIBILITY": "COMPATIBILITY",
+      "DEPRECATED": "DEPRECATED",
+      "INTERNAL": "INTERNAL",
+      "PUBLIC": "PUBLIC"
+    },
+    "<ns>.version.CompatibilityImpact": {
+      "MAJOR": "MAJOR",
+      "MINOR": "MINOR",
+      "PATCH": "PATCH"
+    },
+    "<ns>.vocabulary.ReasonCode": {
+      "CONFLICTING_EVIDENCE": "CONFLICTING_EVIDENCE",
+      "INSUFFICIENT_SAMPLE": "INSUFFICIENT_SAMPLE",
+      "LOW_CONFIDENCE": "LOW_CONFIDENCE",
+      "MISSING_REQUIRED_EVIDENCE": "MISSING_REQUIRED_EVIDENCE",
+      "NOT_APPLICABLE": "NOT_APPLICABLE",
+      "PROHIBITED_EVIDENCE": "PROHIBITED_EVIDENCE",
+      "QUARANTINED_CONTENT": "QUARANTINED_CONTENT",
+      "STALE_EVIDENCE": "STALE_EVIDENCE"
+    },
+    "<ns>.vocabulary.UncertaintyLevel": {
+      "HIGH": "HIGH",
+      "LOW": "LOW",
+      "MEDIUM": "MEDIUM",
+      "UNKNOWN": "UNKNOWN"
+    }
+  },
+  "enums_count": 30,
+  "enums_digest": "f7034fa92c76dde710febd895fa9729dc2ebbecc0bdf5a100e2d0a1fe8ee4640",
+  "models": {
+    "<ns>.actions.action_mapping.ActionMapping": {
+      "field_order": [
+        "mapping_id",
+        "version",
+        "domain_id",
+        "decision_type",
+        "decision_outcome",
+        "permitted_action_type",
+        "target_system_type",
+        "parameter_schema",
+        "required_context_fields",
+        "prohibited_fields",
+        "status",
+        "effective_from",
+        "effective_until",
+        "content_hash"
+      ],
+      "fields": {
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "decision_outcome": {
+          "annotation": "<enum 'DecisionOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "domain_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "effective_from": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "effective_until": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "mapping_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "parameter_schema": {
+          "annotation": "<class '<ns>.actions.action_mapping.ParameterSchema'>",
+          "default": "ParameterSchema(required_fields=(), optional_fields=())",
+          "required": false
+        },
+        "permitted_action_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "prohibited_fields": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "required_context_fields": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "status": {
+          "annotation": "<enum 'ActionMappingStatus'>",
+          "default": "<ActionMappingStatus.DRAFT: 'DRAFT'>",
+          "required": false
+        },
+        "target_system_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "9470d86a7009ff9efd705dacfd3e10da2e00e8c1fc1a71e0a1a0f89c2079ef5b"
+    },
+    "<ns>.actions.action_mapping.ParameterSchema": {
+      "field_order": [
+        "required_fields",
+        "optional_fields"
+      ],
+      "fields": {
+        "optional_fields": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "required_fields": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        }
+      },
+      "schema_sha256": "52a572d3c3e59a814e48fdc4592a1c2960abd2a4988db14ded18f7e6c4848b9d"
+    },
+    "<ns>.actions.action_request.ActionRequest": {
+      "field_order": [
+        "action_request_id",
+        "tenant_id",
+        "decision_case_id",
+        "decision_case_version",
+        "decision_id",
+        "action_type",
+        "target_system",
+        "subject_refs",
+        "requested_parameters",
+        "policy_refs",
+        "authority_ref",
+        "action_mapping_ref",
+        "cer_id",
+        "status",
+        "version",
+        "request_version_id",
+        "created_by",
+        "created_at",
+        "correlation_id",
+        "idempotency_key",
+        "supersedes_action_request_id"
+      ],
+      "fields": {
+        "action_mapping_ref": {
+          "annotation": "<class '<ns>.decisions.subject.VersionedRef'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "action_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "action_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authority_ref": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "cer_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "created_by": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_case_version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "idempotency_key": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "request_version_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "requested_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "status": {
+          "annotation": "<enum 'ActionRequestStatus'>",
+          "default": "<ActionRequestStatus.DRAFT: 'DRAFT'>",
+          "required": false
+        },
+        "subject_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.SubjectRef, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "supersedes_action_request_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "target_system": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        }
+      },
+      "schema_sha256": "5f98c2c4aafbfd4b27a9ce81550838d2e9f0dca56eb06fddce546e8cf3d7f63f"
+    },
+    "<ns>.actions.authorization.ActionAuthorizationResponse": {
+      "field_order": [
+        "authorization_id",
+        "action_request_id",
+        "cer_id",
+        "outcome",
+        "reason_codes",
+        "constraints",
+        "obligations",
+        "authorized_at",
+        "expires_at",
+        "control_plane_ref",
+        "policy_versions",
+        "correlation_id",
+        "attempt"
+      ],
+      "fields": {
+        "action_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "attempt": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        },
+        "authorization_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authorized_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "cer_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "constraints": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "control_plane_ref": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "expires_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "obligations": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "outcome": {
+          "annotation": "<enum 'AuthorizationOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "policy_versions": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        }
+      },
+      "schema_sha256": "ac61664e6c638e0dba3a60b401daa4a5fedd3ff7fc1c3acd4fd51f75788c5886"
+    },
+    "<ns>.actions.cer.AuthoritySummary": {
+      "field_order": [
+        "authority_type",
+        "authority_id",
+        "decision_scope",
+        "segregation_of_duties",
+        "required_approvals",
+        "granting_policy_ref"
+      ],
+      "fields": {
+        "authority_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "authority_type": {
+          "annotation": "<enum 'AuthorityType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_scope": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "granting_policy_ref": {
+          "annotation": "typing.Optional[<ns>.decisions.subject.VersionedRef]",
+          "default": "None",
+          "required": false
+        },
+        "required_approvals": {
+          "annotation": "<class 'int'>",
+          "default": "0",
+          "required": false
+        },
+        "segregation_of_duties": {
+          "annotation": "<class 'bool'>",
+          "default": "False",
+          "required": false
+        }
+      },
+      "schema_sha256": "84365d2248104d8c3d72ac795019a634a48e4277da4ec5e41fcbfc54a94cd79d"
+    },
+    "<ns>.actions.cer.ContextEnvelopeRecord": {
+      "field_order": [
+        "cer_id",
+        "tenant_id",
+        "decision_case_id",
+        "decision_id",
+        "action_request_id",
+        "action_type",
+        "target_system",
+        "subject_context",
+        "authority_context",
+        "policy_context",
+        "decision_context",
+        "runtime_constraints",
+        "data_classifications",
+        "permitted_parameters",
+        "prohibited_parameters",
+        "required_controls",
+        "issued_at",
+        "expires_at",
+        "schema_version",
+        "content_hash",
+        "correlation_id"
+      ],
+      "fields": {
+        "action_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "action_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authority_context": {
+          "annotation": "<class '<ns>.actions.cer.AuthoritySummary'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "cer_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "data_classifications": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_context": {
+          "annotation": "<class '<ns>.actions.cer.DecisionContext'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "expires_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "issued_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "permitted_parameters": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "policy_context": {
+          "annotation": "<class '<ns>.actions.cer.PolicyContext'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "prohibited_parameters": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "required_controls": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "runtime_constraints": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "schema_version": {
+          "annotation": "<class 'str'>",
+          "default": "'cer.v1'",
+          "required": false
+        },
+        "subject_context": {
+          "annotation": "<class '<ns>.actions.cer.SubjectContext'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "target_system": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "542b88f5abd02eb667fc204065f6149b37ea1ab249f982b3ad84fa444fc0f1f5"
+    },
+    "<ns>.actions.cer.DecisionContext": {
+      "field_order": [
+        "decision_case_id",
+        "decision_case_version",
+        "decision_id",
+        "decision_outcome",
+        "override_record_id",
+        "reason_codes"
+      ],
+      "fields": {
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_case_version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_outcome": {
+          "annotation": "<enum 'DecisionOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "override_record_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[<ns>.vocabulary.ReasonCode, ...]",
+          "default": "()",
+          "required": false
+        }
+      },
+      "schema_sha256": "5ad5a61983979a3a5824e8a590b7911a0809b3dfde1cd07bb35956a20f2a808c"
+    },
+    "<ns>.actions.cer.PolicyContext": {
+      "field_order": [
+        "policy_refs",
+        "jurisdiction"
+      ],
+      "fields": {
+        "jurisdiction": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        }
+      },
+      "schema_sha256": "4c22ca4334bbb4de1798ad6c79165ebb99339936b4463da880f56010be1df056"
+    },
+    "<ns>.actions.cer.SubjectContext": {
+      "field_order": [
+        "subject_refs",
+        "data_classifications"
+      ],
+      "fields": {
+        "data_classifications": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "subject_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.SubjectRef, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "ee00704b78903ffd986fb21e722cb09b11e45f20216d9217fdd65d5ef7782ac9"
+    },
+    "<ns>.audit.event.AuditEvent": {
+      "field_order": [
+        "event_id",
+        "event_type",
+        "entity_type",
+        "entity_id",
+        "actor_type",
+        "actor_id",
+        "timestamp",
+        "previous_state",
+        "new_state",
+        "payload_hash",
+        "correlation_id",
+        "causation_id",
+        "previous_event_hash",
+        "metadata"
+      ],
+      "fields": {
+        "actor_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "actor_type": {
+          "annotation": "<enum 'ActorType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "causation_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "entity_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "entity_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "event_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "event_type": {
+          "annotation": "<enum 'AuditEventType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "metadata": {
+          "annotation": "typing.Mapping[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "new_state": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "payload_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "previous_event_hash": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "previous_state": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "timestamp": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        }
+      },
+      "schema_sha256": "9915b4bbf851e4630d5ad90b9484e59f4dd587247693e722e5bcc0102b037db9"
+    },
+    "<ns>.base.DomainModel": {
+      "field_order": [],
+      "fields": {},
+      "schema_sha256": "59897daa847f705568d7a055f8200db7cfa3e8b5e32120d94a2cb73091d693ae"
+    },
+    "<ns>.decisions.authority.AuthorityContext": {
+      "field_order": [
+        "authority_id",
+        "authority_type",
+        "decision_scope",
+        "granting_policy_ref",
+        "effective_from",
+        "effective_until",
+        "limits",
+        "segregation_of_duties",
+        "required_approvals",
+        "delegation_ref"
+      ],
+      "fields": {
+        "authority_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authority_type": {
+          "annotation": "<enum 'AuthorityType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_scope": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "delegation_ref": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "effective_from": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "effective_until": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "granting_policy_ref": {
+          "annotation": "typing.Optional[<ns>.decisions.subject.VersionedRef]",
+          "default": "None",
+          "required": false
+        },
+        "limits": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "required_approvals": {
+          "annotation": "<class 'int'>",
+          "default": "0",
+          "required": false
+        },
+        "segregation_of_duties": {
+          "annotation": "<class 'bool'>",
+          "default": "False",
+          "required": false
+        }
+      },
+      "schema_sha256": "20b006a1e427ae159a7771db94a043648cab06b8e501e199f8eb807309679ca6"
+    },
+    "<ns>.decisions.case.DecisionCase": {
+      "field_order": [
+        "decision_case_id",
+        "tenant_id",
+        "decision_type",
+        "subject_refs",
+        "policy_refs",
+        "assessment_refs",
+        "recommendation_refs",
+        "decision_refs",
+        "review_tasks",
+        "authority_context",
+        "operating_mode",
+        "require_recommendation",
+        "status",
+        "version",
+        "case_version_id",
+        "created_by",
+        "created_at",
+        "correlation_id",
+        "supersedes_case_version_id"
+      ],
+      "fields": {
+        "assessment_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "authority_context": {
+          "annotation": "typing.Optional[<ns>.decisions.authority.AuthorityContext]",
+          "default": "None",
+          "required": false
+        },
+        "case_version_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "created_by": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "decision_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "operating_mode": {
+          "annotation": "<enum 'OperatingMode'>",
+          "default": "<OperatingMode.DELIBERATIVE: 'DELIBERATIVE'>",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "recommendation_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "require_recommendation": {
+          "annotation": "<class 'bool'>",
+          "default": "False",
+          "required": false
+        },
+        "review_tasks": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "status": {
+          "annotation": "<enum 'CaseStatus'>",
+          "default": "<CaseStatus.CREATED: 'CREATED'>",
+          "required": false
+        },
+        "subject_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.SubjectRef, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "supersedes_case_version_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        }
+      },
+      "schema_sha256": "e5fc6f64ed165cea664311f4cede8392be4dc015a8b18a7e8d7c2dfbed8fd44e"
+    },
+    "<ns>.decisions.decision.DecisionRecord": {
+      "field_order": [
+        "decision_id",
+        "decision_case_id",
+        "tenant_id",
+        "decision_type",
+        "outcome",
+        "authority_type",
+        "decided_by",
+        "decided_at",
+        "recommendation_refs",
+        "assessment_refs",
+        "policy_refs",
+        "reason_codes",
+        "override_record_id",
+        "effective_status",
+        "supersedes_decision_id"
+      ],
+      "fields": {
+        "assessment_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "authority_type": {
+          "annotation": "<enum 'AuthorityType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decided_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "decided_by": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "decision_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "effective_status": {
+          "annotation": "<enum 'EffectiveStatus'>",
+          "default": "<EffectiveStatus.EFFECTIVE: 'EFFECTIVE'>",
+          "required": false
+        },
+        "outcome": {
+          "annotation": "<enum 'DecisionOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "override_record_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[<ns>.vocabulary.ReasonCode, ...]",
+          "default": "()",
+          "required": false
+        },
+        "recommendation_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "supersedes_decision_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "90f3f1a909dbb6714da6f4aa770d3dcad39c46c54541edddd00f311737d28dca"
+    },
+    "<ns>.decisions.override.OverrideRecord": {
+      "field_order": [
+        "override_id",
+        "decision_case_id",
+        "tenant_id",
+        "final_outcome",
+        "authorized_by",
+        "reason_codes",
+        "original_recommendation_id",
+        "original_proposed_outcome",
+        "policy_default_outcome",
+        "permitting_policy_ref",
+        "notes",
+        "created_at"
+      ],
+      "fields": {
+        "authorized_by": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "final_outcome": {
+          "annotation": "<enum 'DecisionOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "notes": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "original_proposed_outcome": {
+          "annotation": "typing.Optional[<ns>.decisions.status.ProposedOutcome]",
+          "default": "None",
+          "required": false
+        },
+        "original_recommendation_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "override_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "permitting_policy_ref": {
+          "annotation": "typing.Optional[<ns>.decisions.subject.VersionedRef]",
+          "default": "None",
+          "required": false
+        },
+        "policy_default_outcome": {
+          "annotation": "typing.Optional[<ns>.decisions.status.DecisionOutcome]",
+          "default": "None",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[<ns>.vocabulary.ReasonCode, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "75902c31b231bd0184444064c8ad3f845895ed6b2c5f4e23705bb2727a572b75"
+    },
+    "<ns>.decisions.recommendation.RecommendationRecord": {
+      "field_order": [
+        "recommendation_id",
+        "decision_case_id",
+        "tenant_id",
+        "recommendation_type",
+        "proposed_outcome",
+        "assessment_refs",
+        "policy_refs",
+        "reason_codes",
+        "uncertainty",
+        "generated_by",
+        "generator_type",
+        "model_provenance",
+        "created_at",
+        "status",
+        "supersedes_recommendation_id",
+        "advisory_only"
+      ],
+      "fields": {
+        "advisory_only": {
+          "annotation": "typing.Literal[True]",
+          "default": "True",
+          "required": false
+        },
+        "assessment_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "generated_by": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "generator_type": {
+          "annotation": "<enum 'GeneratorType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "model_provenance": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[<ns>.decisions.subject.VersionedRef, ...]",
+          "default": "()",
+          "required": false
+        },
+        "proposed_outcome": {
+          "annotation": "<enum 'ProposedOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "reason_codes": {
+          "annotation": "tuple[<ns>.vocabulary.ReasonCode, ...]",
+          "default": "()",
+          "required": false
+        },
+        "recommendation_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "recommendation_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "status": {
+          "annotation": "<enum 'RecommendationStatus'>",
+          "default": "<RecommendationStatus.PROPOSED: 'PROPOSED'>",
+          "required": false
+        },
+        "supersedes_recommendation_id": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "uncertainty": {
+          "annotation": "typing.Optional[<ns>.vocabulary.UncertaintyLevel]",
+          "default": "None",
+          "required": false
+        }
+      },
+      "schema_sha256": "474660737a4407fe635d7cdb3568052f8a3fd844f52b43fcb7ff26474c6cae3e"
+    },
+    "<ns>.decisions.review.ReviewTask": {
+      "field_order": [
+        "task_id",
+        "decision_case_id",
+        "tenant_id",
+        "task_type",
+        "assigned_to",
+        "required_role",
+        "status",
+        "due_at",
+        "created_at",
+        "completed_at",
+        "completed_by",
+        "revision"
+      ],
+      "fields": {
+        "assigned_to": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "completed_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "completed_by": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "decision_case_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "due_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "required_role": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "revision": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        },
+        "status": {
+          "annotation": "<enum 'ReviewTaskStatus'>",
+          "default": "<ReviewTaskStatus.PENDING: 'PENDING'>",
+          "required": false
+        },
+        "task_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "task_type": {
+          "annotation": "<enum 'ReviewTaskType'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "10fbb5d21d687ba708a3d3ca013a1acda8cd86ba40dd6464ea751e389a8c7582"
+    },
+    "<ns>.decisions.subject.SubjectRef": {
+      "field_order": [
+        "subject_id",
+        "subject_type"
+      ],
+      "fields": {
+        "subject_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "subject_type": {
+          "annotation": "<class 'str'>",
+          "default": "'subject'",
+          "required": false
+        }
+      },
+      "schema_sha256": "f2d6a73df919839796c3f4babc0ad085cf1c16e708e02badb273245cb8d5a3dc"
+    },
+    "<ns>.decisions.subject.VersionedRef": {
+      "field_order": [
+        "ref_id",
+        "version",
+        "kind"
+      ],
+      "fields": {
+        "kind": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "ref_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "37c1ed8225a3eba3369e2f222272c1ef6d173201b23bd6b1225b62fbfb6ea63c"
+    },
+    "<ns>.execution.compensation.CompensationRequirement": {
+      "field_order": [
+        "compensation_id",
+        "execution_intent_id",
+        "reconciliation_id",
+        "tenant_id",
+        "reason_codes",
+        "affected_effects",
+        "proposed_compensation_type",
+        "required_authority",
+        "approval_status",
+        "created_by",
+        "created_at",
+        "resolved_at",
+        "resolution_ref",
+        "resolved_by",
+        "revision"
+      ],
+      "fields": {
+        "affected_effects": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "approval_status": {
+          "annotation": "<enum 'CompensationApprovalStatus'>",
+          "default": "<CompensationApprovalStatus.PROPOSED: 'PROPOSED'>",
+          "required": false
+        },
+        "compensation_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "created_by": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "execution_intent_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "proposed_compensation_type": {
+          "annotation": "<enum 'CompensationType'>",
+          "default": "<CompensationType.MANUAL_INTERVENTION: 'MANUAL_INTERVENTION'>",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "reconciliation_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "required_authority": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "resolution_ref": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "resolved_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "resolved_by": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "revision": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "ea6a4e6bc631011c9d6bf48aad3b2c1bebea5fbfd209afc89b3ffb256238c095"
+    },
+    "<ns>.execution.execution_attempt.ExecutionAttempt": {
+      "field_order": [
+        "execution_attempt_id",
+        "execution_intent_id",
+        "attempt_number",
+        "adapter_id",
+        "adapter_version",
+        "request_payload_hash",
+        "dispatched_at",
+        "transport_status",
+        "external_request_id",
+        "acknowledgement",
+        "completed_at",
+        "error_code",
+        "error_detail",
+        "retry_classification",
+        "correlation_id"
+      ],
+      "fields": {
+        "acknowledgement": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "adapter_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "adapter_version": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "attempt_number": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "completed_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "dispatched_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "error_code": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "error_detail": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "execution_attempt_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "execution_intent_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "external_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "request_payload_hash": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "retry_classification": {
+          "annotation": "<enum 'RetryClassification'>",
+          "default": "<RetryClassification.NOT_RETRYABLE: 'NOT_RETRYABLE'>",
+          "required": false
+        },
+        "transport_status": {
+          "annotation": "<enum 'TransportStatus'>",
+          "default": "<TransportStatus.NOT_DISPATCHED: 'NOT_DISPATCHED'>",
+          "required": false
+        }
+      },
+      "schema_sha256": "6753c1f0e29cc6c2df9e190c26cf8c8510e36134d0fb5a2cf85389d52714d1bc"
+    },
+    "<ns>.execution.execution_intent.ExecutionIntent": {
+      "field_order": [
+        "execution_intent_id",
+        "tenant_id",
+        "action_request_id",
+        "action_request_version",
+        "authorization_id",
+        "cer_id",
+        "action_type",
+        "target_system",
+        "authorized_parameters",
+        "authorization_constraints",
+        "authorization_obligations",
+        "authority_ref",
+        "policy_refs",
+        "correlation_id",
+        "execution_idempotency_key",
+        "created_by",
+        "created_at",
+        "expires_at",
+        "content_hash",
+        "status",
+        "version",
+        "intent_version_id"
+      ],
+      "fields": {
+        "action_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "action_request_version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "action_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authority_ref": {
+          "annotation": "typing.Optional[str]",
+          "default": "None",
+          "required": false
+        },
+        "authorization_constraints": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "authorization_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "authorization_obligations": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "authorized_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "cer_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "created_by": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "execution_idempotency_key": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "execution_intent_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "expires_at": {
+          "annotation": "typing.Optional[datetime.datetime]",
+          "default": "None",
+          "required": false
+        },
+        "intent_version_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "status": {
+          "annotation": "<enum 'ExecutionStatus'>",
+          "default": "<ExecutionStatus.INTENT_CREATED: 'INTENT_CREATED'>",
+          "required": false
+        },
+        "target_system": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "1",
+          "required": false
+        }
+      },
+      "schema_sha256": "7597ba4ef29da717cdc1b0e4dd17bac2eccfbbef9ffffbc857c7e5255c7f2ae7"
+    },
+    "<ns>.execution.execution_record.ExecutionRecord": {
+      "field_order": [
+        "execution_record_id",
+        "execution_intent_id",
+        "execution_attempt_id",
+        "tenant_id",
+        "external_system",
+        "external_request_id",
+        "external_result_id",
+        "business_outcome",
+        "observed_parameters",
+        "observed_at",
+        "source",
+        "evidence_refs",
+        "finality",
+        "reason_codes",
+        "content_hash",
+        "correlation_id"
+      ],
+      "fields": {
+        "business_outcome": {
+          "annotation": "<enum 'BusinessOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "execution_attempt_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "execution_intent_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "execution_record_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "external_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "external_result_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "external_system": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "finality": {
+          "annotation": "<enum 'Finality'>",
+          "default": "<Finality.UNKNOWN: 'UNKNOWN'>",
+          "required": false
+        },
+        "observed_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "observed_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "source": {
+          "annotation": "<enum 'OutcomeSource'>",
+          "default": "<OutcomeSource.ADAPTER_STATUS_QUERY: 'ADAPTER_STATUS_QUERY'>",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "20468351db11d60fe894479e366c66fca571ccfc068a79f8c241fb548a8b62fc"
+    },
+    "<ns>.execution.external_system.ExternalDispatchResponse": {
+      "field_order": [
+        "transport_status",
+        "external_request_id",
+        "acknowledgement",
+        "retry_classification",
+        "error_code",
+        "error_detail"
+      ],
+      "fields": {
+        "acknowledgement": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "error_code": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "error_detail": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "external_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "retry_classification": {
+          "annotation": "<enum 'RetryClassification'>",
+          "default": "<RetryClassification.NOT_RETRYABLE: 'NOT_RETRYABLE'>",
+          "required": false
+        },
+        "transport_status": {
+          "annotation": "<enum 'TransportStatus'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "25f478772e68bc0960ed88ed15e7c321af5aa046b37b2524764b4ef7279f7bbc"
+    },
+    "<ns>.execution.external_system.ExternalStatusResponse": {
+      "field_order": [
+        "external_request_id",
+        "business_outcome",
+        "observed_parameters",
+        "external_result_id",
+        "observed_at",
+        "finality",
+        "reason_codes"
+      ],
+      "fields": {
+        "business_outcome": {
+          "annotation": "<enum 'BusinessOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "external_request_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "external_result_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "finality": {
+          "annotation": "<enum 'Finality'>",
+          "default": "<Finality.UNKNOWN: 'UNKNOWN'>",
+          "required": false
+        },
+        "observed_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "observed_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        }
+      },
+      "schema_sha256": "3dbe1da12e2b69af340900c7fe16023de9d1620198cff93e61425430f42434aa"
+    },
+    "<ns>.execution.reconciliation.ReconciliationResult": {
+      "field_order": [
+        "reconciliation_id",
+        "execution_intent_id",
+        "tenant_id",
+        "execution_record_ids",
+        "expected_action_type",
+        "expected_target_system",
+        "expected_parameters",
+        "observed_outcome",
+        "observed_parameters",
+        "status",
+        "mismatch_codes",
+        "missing_observations",
+        "excess_observations",
+        "compensation_required",
+        "reconciled_by",
+        "reconciled_at",
+        "notes",
+        "content_hash",
+        "correlation_id"
+      ],
+      "fields": {
+        "compensation_required": {
+          "annotation": "<class 'bool'>",
+          "default": "False",
+          "required": false
+        },
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "excess_observations": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "execution_intent_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "execution_record_ids": {
+          "annotation": "tuple[str, ...]",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "expected_action_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "expected_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "expected_target_system": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "mismatch_codes": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "missing_observations": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "notes": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "observed_outcome": {
+          "annotation": "<enum 'BusinessOutcome'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "observed_parameters": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "reconciled_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "reconciled_by": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "reconciliation_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "status": {
+          "annotation": "<enum 'ReconciliationStatus'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "17bd829dece36ba94dd05a013890cfb7b04df6381fe9fad45e1656fda9857603"
+    },
+    "<ns>.ports.linked_record.LinkedRecordSnapshot": {
+      "field_order": [
+        "record_type",
+        "record_id",
+        "version",
+        "tenant_id",
+        "status",
+        "content_hash",
+        "subject_ref",
+        "policy_refs",
+        "created_at",
+        "metadata"
+      ],
+      "fields": {
+        "content_hash": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "created_at": {
+          "annotation": "<class 'datetime.datetime'>",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "metadata": {
+          "annotation": "dict[str, str]",
+          "default": "PydanticUndefined",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[str, ...]",
+          "default": "()",
+          "required": false
+        },
+        "record_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "record_type": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "status": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "subject_ref": {
+          "annotation": "<class 'str'>",
+          "default": "''",
+          "required": false
+        },
+        "tenant_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "version": {
+          "annotation": "<class 'int'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "24d4d8105e117058fd440c8e97431c78310cb82ba99592862fcd93c29ff31a44"
+    },
+    "<ns>.vocabulary.ReasonCodeSpec": {
+      "field_order": [
+        "code",
+        "summary",
+        "description",
+        "category"
+      ],
+      "fields": {
+        "category": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "code": {
+          "annotation": "<enum 'ReasonCode'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "description": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "summary": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        }
+      },
+      "schema_sha256": "20af8ffbe37ee1ae7b68d50bb7ec531b5738d40fe1c03e49181296e582bb90f9"
+    },
+    "<ns>.vocabulary.UncertaintyRule": {
+      "field_order": [
+        "capability_id",
+        "requires_uncertainty",
+        "default_level",
+        "allowed_levels"
+      ],
+      "fields": {
+        "allowed_levels": {
+          "annotation": "tuple[<ns>.vocabulary.UncertaintyLevel, ...]",
+          "default": "(<UncertaintyLevel.HIGH: 'HIGH'>, <UncertaintyLevel.MEDIUM: 'MEDIUM'>, <UncertaintyLevel.LOW: 'LOW'>, <UncertaintyLevel.UNKNOWN: 'UNKNOWN'>)",
+          "required": false
+        },
+        "capability_id": {
+          "annotation": "<class 'str'>",
+          "default": "PydanticUndefined",
+          "required": true
+        },
+        "default_level": {
+          "annotation": "<enum 'UncertaintyLevel'>",
+          "default": "<UncertaintyLevel.UNKNOWN: 'UNKNOWN'>",
+          "required": false
+        },
+        "requires_uncertainty": {
+          "annotation": "<class 'bool'>",
+          "default": "True",
+          "required": false
+        }
+      },
+      "schema_sha256": "e81a9c92e32d7376985708fa240c014616a548b9cf1dcb1ecc4368f644e39de2"
+    }
+  },
+  "models_count": 29,
+  "models_digest": "ecf2af545153760b5cd2efad43dee11a233660424bee87b75532c59ee7474940",
+  "namespace": "decision_governance",
+  "top_all": [
+    "Clock",
+    "DomainModel",
+    "DomainValidationError",
+    "GovernanceError",
+    "IdFactory",
+    "REASON_CODE_CATALOG",
+    "ReasonCode",
+    "ReasonCodeSpec",
+    "UncertaintyLevel",
+    "UncertaintyRule",
+    "__version__",
+    "canonical_hash",
+    "get_reason_code_spec",
+    "is_known_reason_code",
+    "new_id",
+    "utc_now"
+  ],
+  "version": "1.0.0"
+}
