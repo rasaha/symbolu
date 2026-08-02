@@ -1,0 +1,34 @@
+{
+  "$comment": "Preflight verification checks (MVP 1E). Fails closed; prints no credential; performs no mutation.",
+  "outcomes": [
+    "PASS",
+    "FAIL",
+    "PASS_WITH_WARNINGS",
+    "NOT_RUN"
+  ],
+  "permission_verification": [
+    "VERIFIED_FROM_SOURCE",
+    "DECLARED_AND_VALIDATED",
+    "UNVERIFIED"
+  ],
+  "checks": [
+    "config_schema_valid",
+    "tenant_pilot_identity",
+    "repository_allowlist",
+    "branch_allowlist",
+    "evaluation_bounds",
+    "concurrency_bounds",
+    "stop_criteria",
+    "durable_store_healthy",
+    "durable_store_integrity",
+    "github_adapter_approved",
+    "github_host_allowlisted",
+    "endpoints_read_only",
+    "github_permissions_read_only",
+    "credential_resolver_available",
+    "snapshot_schemas_known",
+    "execution_disabled",
+    "no_write_capable_api",
+    "live_metadata_get"
+  ]
+}

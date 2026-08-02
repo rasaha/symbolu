@@ -1,0 +1,27 @@
+{
+  "$comment": "Immutable pilot security events (MVP 1E). Never contain a credential value; critical events trigger abort.",
+  "security_event_kinds": [
+    "READ_ONLY_BOUNDARY_VIOLATION",
+    "CREDENTIAL_LEAK_TEST_FAILURE",
+    "UNAPPROVED_HOST",
+    "UNAPPROVED_ENDPOINT",
+    "WRITE_PERMISSION_DETECTED",
+    "CONFIG_INTEGRITY_MISMATCH",
+    "ADAPTER_IDENTITY_MISMATCH",
+    "STORE_INTEGRITY_FAILURE",
+    "UNEXPECTED_EXECUTION_SYMBOL"
+  ],
+  "static_scan_findings": [
+    "PROHIBITED_HTTP_VERB",
+    "DIRECT_HTTP_CLIENT",
+    "GITHUB_MUTATION_ENDPOINT",
+    "GRAPHQL_MUTATION",
+    "WRITE_SCOPE",
+    "MERGE_OR_APPROVAL",
+    "EXECUTION_PROVIDER_IMPORT",
+    "RESERVE_ONCE",
+    "TOKEN_LOGGING",
+    "CREDENTIAL_FIELD_IN_SCHEMA"
+  ],
+  "critical_events_abort": true
+}

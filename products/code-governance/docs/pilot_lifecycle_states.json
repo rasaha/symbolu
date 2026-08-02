@@ -1,0 +1,42 @@
+{
+  "$comment": "Pilot lifecycle states + permitted transitions (MVP 1E). No automatic start from DRAFT; no restart of COMPLETED/ABORTED/INTEGRITY_FAILURE.",
+  "states": [
+    "DRAFT",
+    "READY",
+    "ACTIVE",
+    "PAUSED",
+    "STOPPING",
+    "COMPLETED",
+    "ABORTED",
+    "INTEGRITY_FAILURE"
+  ],
+  "transitions": {
+    "DRAFT": [
+      "READY"
+    ],
+    "READY": [
+      "ACTIVE"
+    ],
+    "ACTIVE": [
+      "PAUSED",
+      "STOPPING",
+      "ABORTED",
+      "INTEGRITY_FAILURE"
+    ],
+    "PAUSED": [
+      "ACTIVE",
+      "STOPPING",
+      "ABORTED",
+      "INTEGRITY_FAILURE"
+    ],
+    "STOPPING": [
+      "COMPLETED",
+      "ABORTED",
+      "INTEGRITY_FAILURE"
+    ],
+    "COMPLETED": [],
+    "ABORTED": [],
+    "INTEGRITY_FAILURE": []
+  },
+  "append_only_history": true
+}

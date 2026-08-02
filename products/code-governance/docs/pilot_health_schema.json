@@ -1,0 +1,29 @@
+{
+  "$comment": "Operator health + readiness (MVP 1E).",
+  "health_statuses": [
+    "HEALTHY",
+    "DEGRADED",
+    "UNHEALTHY",
+    "INTEGRITY_FAILURE"
+  ],
+  "readiness_false_when": [
+    "kill_switch_active",
+    "lifecycle_not_active",
+    "config_invalid",
+    "store_integrity_failed",
+    "required_adapter_unavailable",
+    "execution_disabled_invariant_missing"
+  ],
+  "recovery_statuses": [
+    "RECOVERED_READY",
+    "RECOVERED_ACTIVE_REQUIRES_CONFIRMATION",
+    "RECOVERED_PAUSED",
+    "RECOVERED_COMPLETED",
+    "RECOVERED_ABORTED",
+    "RECOVERED_INTEGRITY_FAILURE",
+    "CONFIGURATION_MISMATCH",
+    "STORE_INTEGRITY_FAILURE",
+    "NO_PRIOR_RUN"
+  ],
+  "execution_status": "DISABLED"
+}
