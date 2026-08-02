@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ugence-code-governance"
-version = "0.3.0"
-description = "Ugence Code Governance — shadow governance workflow, durable shadow audit persistence, read-only enterprise signal adapters, and bounded shadow-pilot measurement for source-control changes (MVP 1D, read-only, non-enforcing, execution disabled)."
+version = "0.4.0"
+description = "Ugence Code Governance — shadow governance workflow, durable shadow audit persistence, read-only enterprise signal adapters, bounded shadow-pilot measurement, and a deployable security-bounded pilot operator for source-control changes (MVP 1E, read-only, non-enforcing, execution disabled)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
@@ -26,6 +26,9 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+
+[project.scripts]
+cg-pilot = "ugence_code_governance.pilot_operator.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
