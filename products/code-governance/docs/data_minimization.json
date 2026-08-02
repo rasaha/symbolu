@@ -1,0 +1,37 @@
+{
+  "$comment": "Data-minimization policy for durable payloads (MVP 1C). Field names matching these substrings are REJECTED (fail closed). Naive datetimes are rejected. Only governance-relevant references/hashes/metadata are persisted.",
+  "prohibited_key_substrings": [
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "private_key",
+    "privatekey",
+    "api_key",
+    "apikey",
+    "oauth",
+    "credential",
+    "webhook",
+    "salary",
+    "ssn",
+    "social_security",
+    "medical",
+    "health_record",
+    "date_of_birth",
+    "home_address"
+  ],
+  "payload_classifications": [
+    "REFERENCE_ONLY",
+    "NORMALIZED_METADATA",
+    "CANONICAL_PAYLOAD",
+    "PROHIBITED"
+  ],
+  "never_persisted": [
+    "credentials",
+    "tokens",
+    "webhook secrets",
+    "diffs/source",
+    "unrelated company or employee data",
+    "PII"
+  ]
+}

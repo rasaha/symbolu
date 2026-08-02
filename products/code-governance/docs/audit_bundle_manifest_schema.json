@@ -1,0 +1,32 @@
+{
+  "$comment": "Shape of a Code Governance audit bundle (MVP 1C). The bundle is canonical JSON, offline-verifiable, unsigned, and makes no legal non-repudiation claim.",
+  "bundle_version": "code_governance.audit_bundle.v1",
+  "top_level_keys": [
+    "manifest",
+    "records",
+    "events",
+    "chain_summary",
+    "reconstruction",
+    "execution_status",
+    "bundle_fingerprint"
+  ],
+  "manifest_keys": [
+    "bundle_version",
+    "store_schema_version",
+    "tenant_id",
+    "workflow_id",
+    "workflow_revision_id",
+    "record_count",
+    "event_count",
+    "record_inventory",
+    "execution_status"
+  ],
+  "verification": [
+    "recompute each record payload + envelope fingerprint",
+    "recompute + link the event chain from GENESIS",
+    "check record inventory + duplicates + tenant/revision binding",
+    "require the governance-chain execution-disabled marker",
+    "recompute the bundle_fingerprint over the body"
+  ],
+  "execution_status": "DISABLED"
+}

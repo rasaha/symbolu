@@ -1,0 +1,74 @@
+{
+  "$comment": "Durable record types (MVP 1C). External projections are audit evidence of externally-owned authoritative records \u2014 reference + content hash \u2014 never re-issued authority.",
+  "record_types": [
+    {
+      "record_type": "GOVERNED_CHANGE_IDENTITY",
+      "external_projection": false
+    },
+    {
+      "record_type": "EVIDENCE_RECORD",
+      "external_projection": false
+    },
+    {
+      "record_type": "CLAIM_MANIFEST",
+      "external_projection": false
+    },
+    {
+      "record_type": "CLAIM_EVALUATION",
+      "external_projection": false
+    },
+    {
+      "record_type": "TAP_RESULT_PROJECTION",
+      "external_projection": true
+    },
+    {
+      "record_type": "GOVERNANCE_RECOMMENDATION",
+      "external_projection": false
+    },
+    {
+      "record_type": "DECISION_RECORD_PROJECTION",
+      "external_projection": true
+    },
+    {
+      "record_type": "CONTEXT_ENVELOPE_PROJECTION",
+      "external_projection": true
+    },
+    {
+      "record_type": "PREPARED_MERGE_ACTION",
+      "external_projection": false
+    },
+    {
+      "record_type": "ACTIONGATE_RESULT_PROJECTION",
+      "external_projection": true
+    },
+    {
+      "record_type": "OPERATIONAL_SNAPSHOT",
+      "external_projection": false
+    },
+    {
+      "record_type": "TRUSTED_SIGNAL_PROJECTION",
+      "external_projection": false
+    },
+    {
+      "record_type": "CLEARANCE_REQUEST_PROJECTION",
+      "external_projection": false
+    },
+    {
+      "record_type": "ACTION_CLEARANCE_EVALUATION",
+      "external_projection": false
+    },
+    {
+      "record_type": "HUMAN_INTERVENTION_ASSESSMENT",
+      "external_projection": false
+    },
+    {
+      "record_type": "WORKFLOW_REVISION",
+      "external_projection": false
+    },
+    {
+      "record_type": "GOVERNANCE_CHAIN",
+      "external_projection": false
+    }
+  ],
+  "external_projection_note": "TAP/DecisionRecord/CER/ActionGate results are stored ONLY as projections; the durable store never issues authority."
+}
