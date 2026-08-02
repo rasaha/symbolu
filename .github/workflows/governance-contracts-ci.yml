@@ -1,0 +1,93 @@
+name: governance-contracts-ci
+
+# Scoped CI for the independent ugence-governance-contracts leaf package. Runs the
+# package suite (contract-shape, serialization/determinism, leaf-dependency /
+# import-boundary, public-API agreement, and legacy-coexistence tests), builds the
+# wheel + sdist, verifies isolated clean-venv installation (including the py.typed
+# marker and no foreign top-level packages), exercises the provider-framework
+# compatibility surface that re-exports these contracts, and runs the platform-freeze
+# verifier. Triggered only by changes to the package, its compatibility surfaces, or
+# this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/governance-contracts/**"
+      - "packages/governance-provider-framework/**"
+      - "governance_providers/**"
+      - ".github/workflows/governance-contracts-ci.yml"
+  push:
+    # Run on feature-branch pushes AND on the repository's actual default branch, so a
+    # merge touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/governance-contracts-**"
+    paths:
+      - "packages/governance-contracts/**"
+      - "packages/governance-provider-framework/**"
+      - "governance_providers/**"
+      - ".github/workflows/governance-contracts-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Governance Contracts package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Package suite (contract, serialization, packaging, legacy compat)
+        run: python -m pytest packages/governance-contracts/tests -q
+      - name: Provider-framework compatibility surface (re-exports these contracts)
+        # Scoped to the contract-re-export identity + the import-direction boundary.
+        # The optional-adapter test (test_optional_adapter_dependency.py) exercises
+        # GPF's Decision Authority kernel adapter (needs pydantic) and is owned by
+        # GPF's own CI — it is not a governance-contracts concern, so it is excluded
+        # to keep this a stdlib-only contract-layer workflow.
+        run: |
+          python -m pytest \
+            packages/governance-provider-framework/tests/compatibility \
+            packages/governance-provider-framework/tests/boundaries/test_dependency_boundaries.py -q
+
+  isolated-install:
+    name: Wheel build + isolated installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build wheel + sdist, install into a clean --no-index venv, run the leaf proof
+        run: python packages/governance-contracts/verify_governance_contracts_distribution.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

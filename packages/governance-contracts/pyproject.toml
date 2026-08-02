@@ -31,3 +31,8 @@ version = { attr = "ugence_governance_contracts.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["ugence_governance_contracts*"]
+
+# The package is fully type-annotated; ship the PEP 561 marker so typed consumers
+# (capabilities, the provider framework) get the contract types under mypy/pyright.
+[tool.setuptools.package-data]
+ugence_governance_contracts = ["py.typed"]
