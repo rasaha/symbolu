@@ -57,6 +57,7 @@ def _clear(**over):
             disposition=GovernanceDisposition.CLEAR,
             proposal_fingerprint=proposal.fingerprint,
             evaluation_reference="ref-1",
+            correlation_reference=proposal.correlation_id,
         )
         base.update(over)
         return GovernanceEvaluation(**base)
@@ -135,7 +136,7 @@ def test_exact_invocation_matches_evaluated_proposal():
     inv_fp = compute_fingerprint(
         proposal.workflow_id, proposal.instance_id, proposal.task_id,
         inv.provider_id, inv.operation, inv.arguments, inv.idempotency_key,
-        proposal.proposal_version,
+        inv.correlation_id, proposal.proposal_version,
     )
     assert inv_fp == proposal.fingerprint
 
