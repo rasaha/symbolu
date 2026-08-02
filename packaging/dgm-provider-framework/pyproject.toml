@@ -1,9 +1,21 @@
-# Independent PRIVATE distribution for the DGM Governance Provider Framework.
+# COMPATIBILITY distribution for the legacy ``dgm-provider-framework`` wheel name.
 #
-# ./governance_providers is a SYMLINK to the canonical ../../governance_providers
-# package — one source tree, packaged directly (no kernel or framework copy).
-# It DEPENDS ON the independent decision-governance distribution rather than
-# owning any kernel files.
+# The Governance Provider Framework was migrated to the canonical package
+# ``ugence-governance-provider-framework``
+# (``packages/governance-provider-framework``). The ./governance_providers entry is
+# a SYMLINK to the root ``governance_providers`` compatibility shim — a logic-free
+# namespace that re-exports the canonical package. This distribution therefore ships
+# NO framework implementation of its own; it exists only so existing
+# ``dgm-provider-framework`` dependency declarations (the TAP, ActionGate, and
+# baseline provider wheels) keep resolving. It depends on the canonical wheel WITH
+# the ``adapters`` extra, which carries the implementation and the kernel-bound
+# adapters — preserving the pre-migration transitive closure exactly.
+#
+# It does NOT package concrete providers, does NOT duplicate Governance Contracts,
+# and does NOT pull applications or domains.
+#
+# Transitional: pinned to the frozen framework version 0.1.0. Removal/review target
+# tracked with the ``governance_providers`` shim.
 #
 # Build with:  python -m build packaging/dgm-provider-framework
 [build-system]
@@ -12,21 +24,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dgm-provider-framework"
-dynamic = ["version"]
-description = "Governance Provider Framework for the Decision Governance Middleware."
+version = "0.1.0"
+description = "Governance Provider Framework (compatibility distribution) — re-exports ugence-governance-provider-framework."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
-# Depends on the independent DGM distribution and the canonical governance-
-# contracts leaf — never bundles a copy of either.
-dependencies = ["decision-governance==1.0.0", "ugence-governance-contracts>=0.1.0"]
+# No implementation here: the canonical package carries the framework. The
+# ``adapters`` extra preserves the legacy wheel's kernel-bound behavior (pulls the
+# decision-governance kernel facade + the ugence-governance-contracts leaf).
+dependencies = ["ugence-governance-provider-framework[adapters]==0.1.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
-
-[tool.setuptools.dynamic]
-version = { attr = "governance_providers.version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
