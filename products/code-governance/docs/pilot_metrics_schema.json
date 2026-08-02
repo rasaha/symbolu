@@ -1,0 +1,43 @@
+{
+  "$comment": "Descriptive pilot metric profile (MVP 1D). Not a single blended score; mandatory failures stay individually visible. No precision/recall unless a labelled outcome set exists.",
+  "metric_groups": {
+    "clearance_distribution": [
+      "CLEAR",
+      "HOLD",
+      "BLOCK",
+      "ESCALATE"
+    ],
+    "intervention": [
+      "human_intervention_required_count",
+      "human_intervention_required_rate"
+    ],
+    "adapter_reliability": [
+      "adapter_success_count",
+      "adapter_failure_count",
+      "adapter_failure_rate"
+    ],
+    "source_data_quality": [
+      "stale_signal_rate",
+      "source_conflict_rate",
+      "artifact_mismatch_rate"
+    ],
+    "human_agreement": [
+      "reviewer_feedback_coverage",
+      "reviewer_agreement_rate",
+      "status_disagreement_rate",
+      "intervention_disagreement_rate"
+    ],
+    "policy_quality": [
+      "policy_config_issue_rate",
+      "source_data_error_rate"
+    ],
+    "possible_error_categories": [
+      "possible_false_hold",
+      "possible_false_block",
+      "possible_false_escalate",
+      "possible_missed_escalation"
+    ]
+  },
+  "no_single_safety_score": true,
+  "precision_recall_claimed": false
+}

@@ -104,15 +104,21 @@ def test_product_imports_only_allowed_upstream():
             assert root not in _FORBIDDEN_ROOTS, f"{p} imports forbidden root {root}"
 
 
-# 43. no GitHub write client or merge credentials
+# 43. no GitHub write client or merge credentials. The read-only GitHub adapter
+# (MVP 1D) may reference the GitHub API base URL, but ONLY inside adapters/ and
+# never together with a write method, credential env var, or write client.
 def test_no_github_write_or_credentials():
     banned = ("requests.post", "requests.put", "requests.patch", "requests.delete",
-              "merge_pull_request(", "GITHUB_TOKEN", "github_token", "api.github.com",
+              "merge_pull_request(", "GITHUB_TOKEN", "github_token",
               "PyGithub", "from github import", "httpx.post")
+    base_url_only_in = "adapters"  # api.github.com permitted only in the read-only adapter
     for p in _iter_product_py():
         text = p.read_text()
         for token in banned:
             assert token not in text, f"{p} contains banned token {token!r}"
+        if "api.github.com" in text:
+            assert base_url_only_in in p.parts, \
+                f"{p} references api.github.com outside adapters/"
 
 
 # 44. no robotics ACP imports

@@ -1,45 +1,48 @@
-# Code Governance — Next Phases (out of scope for MVP 1C)
+# Code Governance — Next Phases (out of scope for MVP 1D)
 
-MVP 1C adds an opt-in **durable shadow audit store**, **restart-safe recovery**,
-and **integrity-verified reconstruction** on top of the 1A/1B shadow workflow. It
-is a persistence phase: it changes how the shadow record is stored, not what the
+MVP 1D adds read-only enterprise signal adapters, a bounded shadow-pilot runner,
+and measurable human-intervention quality on top of the 1A/1B/1C shadow workflow +
+durable audit store. It is an integration + pilot-readiness phase: it changes what
+signals the shadow path can read and how pilot quality is measured, not what the
 product is allowed to do. Execution remains `DISABLED`.
 
 The following are **not** implemented and must not be started under this phase:
 
 | Item | Owner / phase |
 |---|---|
-| Enforcement-grade / replicated durability (fsync/quorum/HA) | later (infrastructure) |
 | Atomic one-time execution **reservation** / `reserve_once` | execution / idempotency ledger |
 | Authoritative execution-consumption ledger | later |
-| GitHub execution provider (`EXTERNAL_EXECUTION`) + merge credential | provider (later) |
-| Enforced merge (direct + squash), merge queue, rebase | later |
-| Auto-resume / auto-continuation of a workflow after restart | later (with a human/authority in the loop) |
-| Durable, enforcement-grade `ClearanceReceipt` lifecycle | Workflow Service (later) |
-| Live operational-signal adapters (identity / incident / change-management / GitHub) | product/integration |
+| GitHub execution provider (`EXTERNAL_EXECUTION`) + merge credential + write permissions | provider (later) |
+| Enforced merge (direct + squash), merge queue, rebase, deployment enforcement | later |
+| Live non-GitHub enterprise clients (Okta/Entra/ServiceNow/Jira/PagerDuty/Datadog/K8s/cloud) | product/integration (read-only) |
+| Autonomous policy-learning / feedback-driven policy change | later (human-driven, separately authorized) |
+| Signed-producer (trust level 3) adapter attestation | later |
 | External database (PostgreSQL/MySQL/Redis/Kafka/cloud) | later |
+| Production-enforcement-readiness certification | later |
 
 ## What a future enforcement phase would build on this foundation
 
-The 1C store already provides the audit substrate an enforcement phase needs:
-content-addressed records, a hash-linked event journal, atomic per-stage commits,
-restart-safe recovery, and offline-verifiable bundles. An enforcement phase would
-add — **separately, and without weakening any 1C boundary** — a reservation
-primitive, an authoritative consumption ledger, and a real execution provider,
-each behind its own explicit authority and credential boundary.
+1D provides the read-only signal front-end, the provenance-bound registry, and the
+measured pilot substrate an enforcement phase needs. An enforcement phase would
+add — **separately, and without weakening any 1D boundary** — a reservation
+primitive, an authoritative consumption ledger, a real GitHub execution provider
+behind explicit write credentials, and live read-only source clients, each behind
+its own authority and credential boundary. Reviewer feedback and pilot metrics
+inform, but never automatically drive, such a change.
 
 ## Invariants every later phase must preserve
 
 - `execution_status()` stays `DISABLED` until an explicit, separately-authorized
-  execution phase; the durable store never becomes an execution ledger.
-- ActionGate authorization is required before Action Clearance; Action Clearance
-  never creates authority, broadens, reserves, or dispatches; `CLEAR` is not
-  execution.
-- The `DecisionRecord` remains the binding governance decision; the durable store
-  holds projections, never re-issued authority.
-- No new `ProviderKind`; no neutral-contract change; the canonical Action
-  Clearance package, ActionGate, TAP, Decision Authority, GPF, StoryGraph, and
-  robotics ACP stay unmodified.
-- Persistence stays confined to `persistence/`; stdlib `sqlite3` only until an
-  external store is a deliberate, separately-scoped decision.
+  execution phase; adapters and the pilot never gain a write path.
+- Adapters supply conditions only; they never create authority, approve, authorize,
+  merge, or execute. Source failures fail closed and never become positive signals.
+- ActionGate authorization is required before Action Clearance; `CLEAR` is not
+  execution; the DecisionRecord remains the binding decision.
+- No new `ProviderKind`; no neutral-contract change; the canonical Action Clearance
+  package, ActionGate, TAP, Decision Authority, GPF, StoryGraph, and robotics ACP
+  stay unmodified.
+- Credentials never enter the durable store; only governance-relevant data is
+  collected; no unrelated employee/company data.
+- Reviewer feedback never automatically changes policy; a successful pilot never
+  enables enforcement automatically.
 - The bare acronym "ACP" never appears in new technical surfaces.

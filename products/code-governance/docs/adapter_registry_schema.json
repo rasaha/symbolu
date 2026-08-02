@@ -1,0 +1,38 @@
+{
+  "$comment": "Immutable adapter-registry projection (MVP 1D). Resolved at pilot time; not a mutable policy DB. Credential resolver is a REFERENCE only.",
+  "registry_fields": [
+    "registry_id",
+    "registry_version",
+    "tenant_id",
+    "entries",
+    "policy_refs"
+  ],
+  "entry_fields": [
+    "adapter_id",
+    "adapter_version",
+    "source_id",
+    "source_kind",
+    "approved_signal_types",
+    "max_trust_level",
+    "approved_adapter_versions",
+    "approved_hosts",
+    "approved_path_prefixes",
+    "allow_head",
+    "max_response_bytes",
+    "timeout_s",
+    "allowed_content_types",
+    "max_redirects",
+    "freshness_max_age_s",
+    "credential_resolver_ref",
+    "enabled",
+    "policy_refs"
+  ],
+  "authorization_fails_closed_on": [
+    "unregistered adapter",
+    "unregistered source",
+    "disabled adapter",
+    "unapproved version",
+    "cross-tenant",
+    "over-claimed trust level"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "$comment": "Shadow-pilot configuration (MVP 1D). Allowlist-based; thresholds are configuration, not universal truth. A successful pilot does NOT enable execution.",
+  "config_fields": [
+    "pilot_id",
+    "pilot_version",
+    "tenant_id",
+    "allowed_repositories",
+    "allowed_branches",
+    "allowed_workflow_modes",
+    "allowed_adapter_ids",
+    "required_signal_types",
+    "evaluation_profile_ref",
+    "intervention_routing_ref",
+    "start_at",
+    "end_at",
+    "maximum_evaluations",
+    "retention_category",
+    "reviewer_feedback_enabled",
+    "reviewer_role_required",
+    "reporting_interval_s",
+    "thresholds",
+    "policy_refs"
+  ],
+  "threshold_fields": [
+    "minimum_evaluations",
+    "minimum_feedback_coverage",
+    "maximum_source_failure_rate",
+    "maximum_stale_signal_rate",
+    "maximum_unexplained_escalation_rate",
+    "maximum_unresolved_integrity_failures",
+    "minimum_reconstruction_complete_rate"
+  ],
+  "pilot_statuses": [
+    "INSUFFICIENT_DATA",
+    "MEETS_CONFIGURED_THRESHOLDS",
+    "DOES_NOT_MEET_CONFIGURED_THRESHOLDS",
+    "INTEGRITY_FAILURE"
+  ],
+  "retention_categories": [
+    "SHORT_PILOT",
+    "STANDARD_AUDIT",
+    "REFERENCE_ONLY"
+  ]
+}

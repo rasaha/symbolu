@@ -1,0 +1,51 @@
+{
+  "$comment": "Approved GitHub read facts -> canonical Action Clearance signal types (MVP 1D). Only canonical SignalType values are used; unmapped facts stay product-level advisory.",
+  "read_endpoints": [
+    "GET /repos/{owner}/{repo}/pulls/{number}",
+    "GET /repos/{owner}/{repo}/commits/{head_sha}/check-runs"
+  ],
+  "required_read_permissions": [
+    "metadata:read",
+    "pull_requests:read",
+    "checks:read",
+    "statuses:read"
+  ],
+  "forbidden_write_permissions": [
+    "contents:write",
+    "pull_requests:write",
+    "checks:write",
+    "statuses:write",
+    "issues:write",
+    "actions:write",
+    "administration:write"
+  ],
+  "mappings": [
+    {
+      "fact": "artifact identity still matches (repo+pr+base+head)",
+      "signal": "ARTIFACT_IDENTITY",
+      "consistency": "AUTHORITATIVE",
+      "mismatch": "fails closed (ARTIFACT_IDENTITY_MISMATCH / SOURCE_IDENTITY_MISMATCH)"
+    },
+    {
+      "fact": "pull request open and not draft",
+      "signal": "TARGET_AVAILABILITY",
+      "consistency": "EVENTUALLY_CONSISTENT"
+    },
+    {
+      "fact": "required check runs completed + successful",
+      "signal": "REQUIRED_CONTROL",
+      "consistency": "EVENTUALLY_CONSISTENT"
+    }
+  ],
+  "canonical_signal_types": [
+    "AUTHORIZATION_VALIDITY",
+    "ACTOR_STATUS",
+    "POLICY_VALIDITY",
+    "CHANGE_FREEZE",
+    "ACTIVE_INCIDENT",
+    "ARTIFACT_IDENTITY",
+    "REQUIRED_CONTROL",
+    "TARGET_AVAILABILITY",
+    "PRIOR_CONSUMPTION"
+  ]
+}
