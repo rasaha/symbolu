@@ -70,6 +70,21 @@ from .reconstruction import GovernanceChainRecord, ReconstructionResult
 # --- workflow records ----------------------------------------------------
 from .workflow import WorkflowRevision
 
+# --- MVP 1B: shadow Action Clearance integration -------------------------
+from .clearance import (
+    ActionClearanceEvaluationRecord,
+    ActionClearanceShadowAdapter,
+    AuthorityRole,
+    CodeGovernanceClearanceProfile,
+    CodeGovernanceOperationalSnapshot,
+    HumanInterventionAssessment,
+    InterventionRoutingPolicy,
+    InterventionType,
+    RepositoryClassification,
+    SignalSourceEntry,
+    TrustedSignalSourceProjection,
+)
+
 # --- errors --------------------------------------------------------------
 from .errors import (
     ChainIncompleteError,
@@ -125,6 +140,18 @@ __all__ = [
     "GovernanceChainRecord",
     "ReconstructionResult",
     "WorkflowRevision",
+    # MVP 1B — shadow Action Clearance integration
+    "ActionClearanceShadowAdapter",
+    "CodeGovernanceClearanceProfile",
+    "RepositoryClassification",
+    "CodeGovernanceOperationalSnapshot",
+    "TrustedSignalSourceProjection",
+    "SignalSourceEntry",
+    "ActionClearanceEvaluationRecord",
+    "HumanInterventionAssessment",
+    "InterventionRoutingPolicy",
+    "InterventionType",
+    "AuthorityRole",
     # errors
     "CodeGovernanceError",
     "DecisionAuthorityRequiredError",

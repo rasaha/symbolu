@@ -31,7 +31,16 @@ LEGAL_TRANSITIONS: Mapping[S, frozenset] = {
     S.DECISION_RECORDED: frozenset({S.CONTEXT_BOUND, S.ERROR}),
     S.CONTEXT_BOUND: frozenset({S.ACTION_PREPARED, S.ERROR}),
     S.ACTION_PREPARED: frozenset({S.ACTION_EVALUATED, S.ERROR}),
-    S.ACTION_EVALUATED: frozenset({S.SHADOW_COMPLETE, S.CHAIN_INCOMPLETE, S.ERROR}),
+    # ACTION_EVALUATED may finalize directly (MVP 1A) or enter the MVP 1B shadow
+    # Action Clearance stage.
+    S.ACTION_EVALUATED: frozenset({
+        S.SHADOW_COMPLETE, S.CLEARANCE_PENDING, S.CHAIN_INCOMPLETE, S.ERROR}),
+    # MVP 1B clearance stage
+    S.CLEARANCE_PENDING: frozenset({
+        S.CLEARANCE_EVALUATED, S.CLEARANCE_INPUT_INCOMPLETE,
+        S.CLEARANCE_INTEGRITY_FAILURE, S.CLEARANCE_EVALUATION_ERROR, S.ERROR}),
+    S.CLEARANCE_EVALUATED: frozenset({S.INTERVENTION_ASSESSED, S.ERROR}),
+    S.INTERVENTION_ASSESSED: frozenset({S.SHADOW_COMPLETE, S.CHAIN_INCOMPLETE, S.ERROR}),
     # terminal states
     S.SHADOW_COMPLETE: frozenset(),
     S.STALE_ARTIFACT: frozenset(),
@@ -41,6 +50,9 @@ LEGAL_TRANSITIONS: Mapping[S, frozenset] = {
     S.BLOCKED: frozenset(),
     S.ESCALATED: frozenset(),
     S.ERROR: frozenset(),
+    S.CLEARANCE_INPUT_INCOMPLETE: frozenset(),
+    S.CLEARANCE_INTEGRITY_FAILURE: frozenset(),
+    S.CLEARANCE_EVALUATION_ERROR: frozenset(),
 }
 
 

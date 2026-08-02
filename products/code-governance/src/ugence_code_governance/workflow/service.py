@@ -44,6 +44,13 @@ class WorkflowRun:
     action_result_fingerprint: Optional[str] = None
     chain_id: Optional[str] = None
     policy_refs: Tuple[str, ...] = ()
+    # MVP 1B — shadow Action Clearance stage
+    clearance_stage_state: Optional[str] = None
+    clearance_evaluation_ref: Optional[str] = None
+    clearance_result_id: Optional[str] = None
+    clearance_status: Optional[str] = None
+    intervention_assessment_ref: Optional[str] = None
+    human_intervention_required: Optional[bool] = None
 
     def transition(self, target: WorkflowState, *, at: datetime) -> None:
         assert_transition(self.state, target)
@@ -79,6 +86,12 @@ class WorkflowRun:
             action_result_fingerprint=self.action_result_fingerprint,
             chain_id=self.chain_id,
             policy_refs=self.policy_refs,
+            clearance_stage_state=self.clearance_stage_state,
+            clearance_evaluation_ref=self.clearance_evaluation_ref,
+            clearance_result_id=self.clearance_result_id,
+            clearance_status=self.clearance_status,
+            intervention_assessment_ref=self.intervention_assessment_ref,
+            human_intervention_required=self.human_intervention_required,
         )
 
 

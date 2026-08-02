@@ -19,6 +19,7 @@ keywords = ["code-governance", "governance", "shadow", "assertion-governance", "
 dependencies = [
     "ugence-governance-contracts",
     "ugence-decision-authority",
+    "ugence-action-clearance",
     "dgm-tap-provider",
     "dgm-actiongate-provider",
 ]

@@ -58,6 +58,22 @@ from .reconstruction.service import ChainReconstructionService, ReconstructionRe
 from .fingerprints import domain_hash
 from .github.normalizer import normalize_pull_request_event
 from .workflow.service import WorkflowRun, new_run
+from .models.enums import ActionClearanceStatus
+from .clearance.adapter import ActionClearanceShadowAdapter, is_eligible
+from .clearance.intervention import (
+    HumanInterventionAssessment,
+    InterventionRoutingPolicy,
+    assess_intervention,
+)
+from .clearance.profile import CodeGovernanceClearanceProfile
+from .clearance.records import ActionClearanceEvaluationRecord, evaluation_record_id
+from .clearance.signal_adapter import ClearanceInputError, build_trusted_signals
+from .clearance.snapshot import CodeGovernanceOperationalSnapshot
+from .clearance.source_projection import TrustedSignalSourceProjection
+
+# Canonical Action Clearance evaluator — public API only.
+from ugence_action_clearance import evaluate_clearance  # type: ignore
+from ugence_action_clearance import ClearanceStatus  # type: ignore
 
 
 class CodeGovernanceService:
@@ -74,6 +90,10 @@ class CodeGovernanceService:
         self._kernel = DecisionCerKernel()
         self._tap = TapClaimAdapter()
         self._actiongate = ActionGateShadowAdapter()
+        self._clearance_adapter = ActionClearanceShadowAdapter()
+        # shadow/reference in-memory clearance records (tenant-keyed; immutable)
+        self._clearance_eval_repo: Dict[Tuple[str, str], ActionClearanceEvaluationRecord] = {}
+        self._intervention_repo: Dict[Tuple[str, str], HumanInterventionAssessment] = {}
         self._reconstruction = ChainReconstructionService(
             evidence_repo=self._evidence_repo,
             claim_repo=self._claim_repo,
@@ -81,6 +101,8 @@ class CodeGovernanceService:
             prepared_action_repo=self._action_repo,
             workflow_repo=self._workflow_repo,
             chain_repo=self._chain_repo,
+            clearance_eval_repo=self._clearance_eval_repo,
+            intervention_repo=self._intervention_repo,
         )
         # live run contexts keyed by (tenant_id, revision_id)
         self._runs: Dict[Tuple[str, str], WorkflowRun] = {}
@@ -347,8 +369,14 @@ class CodeGovernanceService:
 
     # --- 9. ActionGate shadow evaluation + chain finalization -----------
     def evaluate_action_shadow(
-        self, tenant_id: str, revision_id: str, *, at: datetime
+        self, tenant_id: str, revision_id: str, *, at: datetime, finalize: bool = True
     ) -> ShadowActionEvaluation:
+        """Evaluate the prepared action through ActionGate in shadow mode.
+
+        ``finalize=True`` (MVP 1A default) finalizes the chain to SHADOW_COMPLETE.
+        ``finalize=False`` (MVP 1B) stops at ACTION_EVALUATED so the shadow Action
+        Clearance stage can run before finalization.
+        """
         run = self._run(tenant_id, revision_id)
         scr = self._scr(tenant_id, revision_id)
         action: PreparedMergeAction = scr["prepared_action"]
@@ -357,14 +385,203 @@ class CodeGovernanceService:
         run.action_result_fingerprint = evaluation.result_fingerprint
         run.transition(WorkflowState.ACTION_EVALUATED, at=at)
         scr["shadow_eval"] = evaluation
-        # Build + persist the reconstructable governance chain.
-        self._finalize_chain(tenant_id, revision_id, at=at)
+        if finalize:
+            # MVP 1A path: build + persist the reconstructable governance chain.
+            self._finalize_chain(tenant_id, revision_id, at=at)
         return evaluation
+
+    # --- MVP 1B: shadow Action Clearance stage --------------------------
+    def record_operational_snapshot(
+        self,
+        tenant_id: str,
+        revision_id: str,
+        snapshot: CodeGovernanceOperationalSnapshot,
+        *,
+        projection: TrustedSignalSourceProjection,
+        profile: CodeGovernanceClearanceProfile,
+        at: datetime,
+    ) -> None:
+        """Record a supplied operational snapshot + source projection + profile.
+
+        Transitions ACTION_EVALUATED -> CLEARANCE_PENDING. No live integration; the
+        caller supplies the already-captured snapshot.
+        """
+        run = self._run(tenant_id, revision_id)
+        scr = self._scr(tenant_id, revision_id)
+        scr["snapshot"] = snapshot
+        scr["projection"] = projection
+        scr["clearance_profile"] = profile
+        run.transition(WorkflowState.CLEARANCE_PENDING, at=at)
+
+    def build_trusted_signals(self, tenant_id: str, revision_id: str):
+        """Build canonical TrustedSignals from the recorded snapshot (public op)."""
+        scr = self._scr(tenant_id, revision_id)
+        shadow_eval: ShadowActionEvaluation = scr["shadow_eval"]
+        action: PreparedMergeAction = scr["prepared_action"]
+        profile: CodeGovernanceClearanceProfile = scr["clearance_profile"]
+        bundle = build_trusted_signals(
+            scr["snapshot"], scr["projection"],
+            tenant_id=tenant_id, subject_ref=action.repository,
+            authorization_ref=shadow_eval.result_fingerprint,
+            action_fingerprint=action.fingerprint,
+            required_signal_types=profile.required_signal_types)
+        scr["signal_bundle"] = bundle
+        return bundle
+
+    def evaluate_action_clearance_shadow(
+        self,
+        tenant_id: str,
+        revision_id: str,
+        *,
+        evaluation_time: datetime,
+        authorization_issued_at: Optional[datetime] = None,
+        actor_ref: Optional[str] = None,
+    ) -> ActionClearanceEvaluationRecord:
+        """Evaluate Action Clearance in shadow mode for the current revision.
+
+        Only eligible ActionGate outcomes are evaluated; an ineligible/denied
+        outcome records NOT_EVALUATED_UPSTREAM_NOT_AUTHORIZED without fabricating a
+        clearance result. Input/integrity problems fail closed to a terminal state.
+        """
+        run = self._run(tenant_id, revision_id)
+        scr = self._scr(tenant_id, revision_id)
+        shadow_eval: ShadowActionEvaluation = scr["shadow_eval"]
+        action: PreparedMergeAction = scr["prepared_action"]
+        profile: CodeGovernanceClearanceProfile = scr["clearance_profile"]
+        actor = actor_ref or getattr(scr.get("actor"), "actor_id", "unknown-actor")
+        issued = authorization_issued_at or run.created_at
+        rec_id = evaluation_record_id(run.revision_id, shadow_eval.result_fingerprint)
+
+        # Upstream not authorized -> not evaluated, no fabricated clearance.
+        if not is_eligible(shadow_eval):
+            record = ActionClearanceEvaluationRecord(
+                record_id=rec_id, tenant_id=tenant_id, workflow_id=run.workflow_id,
+                workflow_revision_id=run.revision_id,
+                change_fingerprint=run.change.fingerprint,
+                prepared_action_fingerprint=action.fingerprint,
+                stage_state=ActionClearanceStatus.NOT_EVALUATED_UPSTREAM_NOT_AUTHORIZED,
+                action_request_fingerprint=shadow_eval.request_fingerprint,
+                action_result_fingerprint=shadow_eval.result_fingerprint,
+                actiongate_outcome=shadow_eval.outcome,
+                reason_codes=("AUTHORIZATION_NOT_ELIGIBLE",) + tuple(shadow_eval.reason_codes),
+                policy_refs=(profile.policy_ref,))
+            self._store_clearance(tenant_id, run, record, at=evaluation_time)
+            run.transition(WorkflowState.CLEARANCE_EVALUATED, at=evaluation_time)
+            return record
+
+        # Eligible -> build signals + canonical request, evaluate.
+        try:
+            bundle = scr.get("signal_bundle") or self.build_trusted_signals(tenant_id, revision_id)
+        except ClearanceInputError:
+            run.clearance_stage_state = ActionClearanceStatus.INPUT_INCOMPLETE.value
+            run.transition(WorkflowState.CLEARANCE_INPUT_INCOMPLETE, at=evaluation_time)
+            self._persist_snapshot(run)
+            raise
+
+        adapter = self._clearance_adapter
+        try:
+            authz = adapter.authorization_context(
+                shadow_eval, action, actor_ref=actor, authorization_issued_at=issued)
+            action_id = adapter.action_identity(action, actor_ref=actor)
+            policy_ctx = adapter.policy_context(profile)
+            request = adapter.build_request(
+                request_id=f"cgc-{run.revision_id}", tenant_id=tenant_id,
+                evaluation_time=evaluation_time, authorization=authz, action=action_id,
+                signals=bundle, policy=policy_ctx, workflow_id=run.workflow_id)
+            result = evaluate_clearance(request, profile.to_clearance_policy())
+        except Exception as exc:  # deterministic evaluation should not raise; fail closed
+            run.clearance_stage_state = ActionClearanceStatus.EVALUATION_ERROR.value
+            run.transition(WorkflowState.CLEARANCE_EVALUATION_ERROR, at=evaluation_time)
+            self._persist_snapshot(run)
+            raise
+
+        record = ActionClearanceEvaluationRecord(
+            record_id=rec_id, tenant_id=tenant_id, workflow_id=run.workflow_id,
+            workflow_revision_id=run.revision_id, change_fingerprint=run.change.fingerprint,
+            prepared_action_fingerprint=action.fingerprint,
+            stage_state=ActionClearanceStatus.EVALUATED,
+            action_request_fingerprint=shadow_eval.request_fingerprint,
+            action_result_fingerprint=shadow_eval.result_fingerprint,
+            actiongate_outcome=shadow_eval.outcome,
+            clearance_request_fingerprint=result.request_fingerprint,
+            clearance_result_id=result.result_id,
+            clearance_result_fingerprint=result.result_fingerprint,
+            clearance_status=result.status.value,
+            reason_codes=tuple(result.reason_codes),
+            effective_constraints=tuple(result.effective_constraints),
+            effective_obligations=tuple(result.obligations),
+            signal_refs=tuple(result.signal_refs),
+            signal_bundle_fingerprint=result.signal_bundle_fingerprint,
+            clearance_policy_ref=profile.policy_ref,
+            evaluated_at=result.evaluated_at, valid_until=result.valid_until,
+            policy_refs=tuple(result.policy_refs))
+        scr["clearance_result"] = result
+        self._store_clearance(tenant_id, run, record, at=evaluation_time)
+        run.transition(WorkflowState.CLEARANCE_EVALUATED, at=evaluation_time)
+        return record
+
+    def _store_clearance(self, tenant_id: str, run: WorkflowRun,
+                         record: ActionClearanceEvaluationRecord, *, at: datetime) -> None:
+        self._clearance_eval_repo[(tenant_id, record.record_id)] = record
+        self._scr(tenant_id, run.revision_id)["clearance_record"] = record
+        run.clearance_stage_state = record.stage_state.value
+        run.clearance_evaluation_ref = record.record_id
+        run.clearance_result_id = record.clearance_result_id or None
+        run.clearance_status = record.clearance_status or None
+
+    def assess_human_intervention(
+        self,
+        tenant_id: str,
+        revision_id: str,
+        *,
+        at: datetime,
+        routing: Optional[InterventionRoutingPolicy] = None,
+        sensitive: bool = False,
+    ) -> HumanInterventionAssessment:
+        """Deterministically route clearance reasons to an intervention assessment.
+
+        Advisory/routing metadata only — never a binding decision. Then finalizes
+        the extended governance chain to SHADOW_COMPLETE.
+        """
+        run = self._run(tenant_id, revision_id)
+        scr = self._scr(tenant_id, revision_id)
+        record: ActionClearanceEvaluationRecord = scr["clearance_record"]
+        profile: CodeGovernanceClearanceProfile = scr["clearance_profile"]
+        routing = routing or InterventionRoutingPolicy()
+        # Choose the routing status: canonical clearance status when evaluated, else
+        # a fail-closed BLOCK for the upstream-not-authorized case.
+        if record.stage_state is ActionClearanceStatus.EVALUATED:
+            status = ClearanceStatus(record.clearance_status)
+            reason_codes = record.reason_codes
+        else:
+            status = ClearanceStatus.BLOCK
+            reason_codes = ("AUTHORIZATION_NOT_ELIGIBLE",)
+        assessment = assess_intervention(
+            tenant_id=tenant_id, workflow_id=run.workflow_id,
+            workflow_revision_id=run.revision_id, clearance_status=status,
+            reason_codes=reason_codes, signal_refs=record.signal_refs,
+            profile=profile, routing=routing, claim_refs=(run.claim_manifest_id or "",),
+            sensitive=sensitive)
+        self._intervention_repo[(tenant_id, assessment.assessment_id)] = assessment
+        scr["intervention"] = assessment
+        run.intervention_assessment_ref = assessment.assessment_id
+        run.human_intervention_required = bool(assessment.required)
+        run.transition(WorkflowState.INTERVENTION_ASSESSED, at=at)
+        self._finalize_chain(tenant_id, revision_id, at=at)
+        return assessment
+
+    def get_clearance_evaluation(self, tenant_id: str, record_id: str):
+        return self._clearance_eval_repo.get((tenant_id, record_id))
+
+    def get_intervention_assessment(self, tenant_id: str, assessment_id: str):
+        return self._intervention_repo.get((tenant_id, assessment_id))
 
     def _finalize_chain(self, tenant_id: str, revision_id: str, *, at: datetime) -> None:
         run = self._run(tenant_id, revision_id)
         scr = self._scr(tenant_id, revision_id)
         cid = chain_id_for(run.workflow_id, run.revision_id)
+        cev: Optional[ActionClearanceEvaluationRecord] = scr.get("clearance_record")
+        hia: Optional[HumanInterventionAssessment] = scr.get("intervention")
         chain = GovernanceChainRecord(
             chain_id=cid,
             workflow_id=run.workflow_id,
@@ -391,6 +608,26 @@ class CodeGovernanceService:
             created_at=run.created_at,
             evaluated_at=at,
             policy_refs=run.policy_refs,
+            action_clearance_status=(cev.stage_state if cev
+                                     else ActionClearanceStatus.NOT_EVALUATED),
+            clearance_evaluation_ref=(cev.record_id if cev else ""),
+            clearance_evaluation_fingerprint=(cev.fingerprint if cev else ""),
+            clearance_request_fingerprint=(cev.clearance_request_fingerprint if cev else ""),
+            clearance_result_id=(cev.clearance_result_id if cev else ""),
+            clearance_result_fingerprint=(cev.clearance_result_fingerprint if cev else ""),
+            clearance_status=(cev.clearance_status if cev else ""),
+            clearance_reason_codes=(cev.reason_codes if cev else ()),
+            clearance_signal_refs=(cev.signal_refs if cev else ()),
+            clearance_signal_bundle_fingerprint=(cev.signal_bundle_fingerprint if cev else ""),
+            clearance_policy_ref=(cev.clearance_policy_ref if cev else ""),
+            clearance_evaluated_at=(cev.evaluated_at if cev else None),
+            clearance_valid_until=(cev.valid_until if cev else None),
+            clearance_effective_constraints=(cev.effective_constraints if cev else ()),
+            clearance_effective_obligations=(cev.effective_obligations if cev else ()),
+            intervention_assessment_ref=(hia.assessment_id if hia else ""),
+            intervention_assessment_fingerprint=(hia.fingerprint if hia else ""),
+            human_intervention_required=(bool(hia.required) if hia else False),
+            required_authorities=(hia.required_authorities if hia else ()),
         )
         # Fail closed if any mandatory link is missing.
         missing = [

@@ -77,6 +77,9 @@ def test_product_defines_no_neutral_contract():
 
 # 42. no upward dependency from shared packages to product
 def test_no_upstream_package_imports_product():
+    # Use real AST import analysis, not a substring scan: a capability package may
+    # legitimately *name* ``ugence_code_governance`` in a forbidden-imports list or
+    # boundary declaration without importing it. Only an actual import is a violation.
     offenders = []
     for pkg in ("packages", "actiongate_provider", "tap_provider",
                 "governance_providers", "decision_governance"):
@@ -84,7 +87,7 @@ def test_no_upstream_package_imports_product():
         if not root.exists():
             continue
         for p in root.rglob("*.py"):
-            if "ugence_code_governance" in p.read_text():
+            if "ugence_code_governance" in _imported_roots(p):
                 offenders.append(str(p))
     assert not offenders, f"upstream imports product: {offenders}"
 
