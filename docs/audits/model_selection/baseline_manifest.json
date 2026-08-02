@@ -1,0 +1,85 @@
+{
+  "audit": "Model Selection — Capability Boundary, Authority, Evidence, Duplication, Packaging & Migration-Readiness",
+  "phase": "audit-only (no source moved, no package created, no behavior changed)",
+  "captured_directly_from_repo": true,
+  "repository_state": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_head": "66066e99fd187de017668303c94ff4164981840c",
+    "default_head_subject": "Merge pull request #1267 from rasaha/claude/gpf-canonical-package-migration-y3qoew",
+    "pr_1267_integrated": true,
+    "gpf_migration_head_and_merge_ancestors_of_default": true,
+    "earlier_canonical_migrations_integrated": {
+      "governance_contracts_pr_1261": true,
+      "storygraph_pr_1260_1262_1263": true,
+      "decision_authority_pr_1264": true,
+      "governance_provider_framework_pr_1266_1267": true
+    },
+    "audit_branch": "claude/model-selection-audit-5hocjo",
+    "audit_branch_note": "Harness-mandated branch name. The task prompt proposed 'claude/model-selection-boundary-and-migration-readiness-audit'; the harness mandates 'claude/model-selection-audit-5hocjo' and forbids pushing elsewhere, so the mandated name is authoritative. Branch created from the verified default tip 66066e99.",
+    "starting_commit": "66066e99fd187de017668303c94ff4164981840c",
+    "working_tree_at_start": "clean",
+    "python_version": "3.11.15",
+    "platform": "Linux",
+    "dependency_gaps_at_start": ["pytest", "pydantic", "numpy"],
+    "dependency_gap_resolution": "pip-installed to run the baseline; NO repository file changed to do so"
+  },
+  "completed_components_verified_present": {
+    "packages/governance-contracts": "ugence_governance_contracts",
+    "packages/capabilities/storygraph": "ugence_storygraph",
+    "packages/capabilities/decision-authority": "ugence_decision_authority",
+    "packages/governance-provider-framework": "ugence_governance_provider_framework"
+  },
+  "integrated_baseline": {
+    "platform_freeze_verify": {
+      "result": "PASS",
+      "substantive_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6",
+      "checks_ok": ["component_versions", "public_api_snapshots", "api_compatibility", "core_tree_hashes", "conformance_hashes", "dependency_direction", "package_ownership", "frozen_invariants", "packaging_integrity", "benchmark_identity", "documentation_presence"]
+    },
+    "terminology_validator": "PASS",
+    "governance_contracts_tests": "45 passed",
+    "storygraph_tests": "316 passed",
+    "decision_authority_tests": "79 passed",
+    "governance_provider_framework_tests": "84 passed",
+    "governance_providers_legacy_tests": "no tests (relocated to packages/governance-provider-framework by PR #1267)",
+    "tap_provider_smoke": "38 passed",
+    "actiongate_provider_smoke": "30 passed",
+    "dependency_direction": {"passed": true, "dependency_violations": 0, "platform_imports_hiring": 0, "ownership_problems": 0},
+    "platform_freeze_tests": "19 passed, 2 PRE-EXISTING failures (unchanged from prior GPF baseline)"
+  },
+  "pre_existing_failures_recorded_separately": [
+    {"id": "platform_freeze/tests/test_freeze.py::test_classify_change_reports_evidence", "cause": "tooling returns UNCLASSIFIED for empty diff; test expects PATCH/MINOR/APPLICATION_LOCAL", "caused_by_this_audit": false},
+    {"id": "platform_freeze/tests/test_freeze.py::test_hiring_baseline_discovery", "cause": "asserts uses_provider_framework is False, but hiring was wired to the provider framework in an earlier phase", "caused_by_this_audit": false}
+  ],
+  "model_selection_footprint": {
+    "capability_definition": "Two-stage policy: ExecutionGate (deterministic eligibility, 'can execute') + ModelPolicy/route (selection among eligible, 'which should execute'). Governs the choice of an already-approved provider/model for a request.",
+    "primary_directories": {
+      "execution_gate": {"role": "production-shaped core: ExecutionGate + ModelPolicy.select + ExecutableRegistry", "source_loc_excl_frozen": 1039, "test_loc": 196, "frozen_replay_loc": 1158, "tests": 21, "external_imports": "none (stdlib + self only)", "consumers": ["control_plane/adapters.py", "control_plane_shadow/adapters/execution_gate_adapter.py", "execution_gate_shadow/*", "governed_inference_pilot/adapters/execution_gate.py"], "local_replay_freeze": "execution_gate/frozen/replay_v1 (13 artifacts; aggregate 8b05b2da798a6222; verifier PASS)"},
+      "model_selection_experiment": {"role": "research/benchmark harness; policy.py is the 'scientific' route() engine; simulator/metrics/harness/baselines are research-only", "source_loc": 1449, "test_loc": 200, "tests": 15, "external_imports": "none", "consumers": ["control_plane_shadow/adapters/model_policy_adapter.py"]},
+      "model_selection_pilot": {"role": "real-provider shadow pilot (Anthropic/OpenAI/Bedrock adapters) — CREDENTIAL-BLOCKED, runs deterministic stub; F1/F2/G modes; counterfactual outcome store", "source_loc": 1877, "test_loc": 201, "tests": 17, "external_imports": "none cross-package (urllib/boto3 stdlib/lazy only)", "consumers": []},
+      "model_selection_reconciliation": {"role": "objective reconciliation: Policy A (soft utility) vs B (hard quality floor + min cost) vs C (lexicographic); imports experiment read-only", "source_loc": 271, "test_loc": 127, "tests": 9, "external_imports": "model_selection_experiment", "consumers": []}
+    },
+    "same_capability_outside_primary_dirs": {
+      "governed_inference_pilot/adapters/execution_gate.py": "imports frozen execution_gate.gate (eligibility)",
+      "governed_inference_pilot/adapters/model_policy.py": "re-implements selection (argmin cost s.t. quality>=q_min, per reconciliation study)"
+    },
+    "core_product_logic_file_hashes_sha256_16": {
+      "execution_gate/gate.py": "75d604d0aced4962",
+      "execution_gate/policy.py": "4251c21e3be40512",
+      "execution_gate/states.py": "c7a9bee694304ba6",
+      "execution_gate/model.py": "deaf3e6e6297bc29",
+      "execution_gate/registry.py": "47e798f6a05b4d0b",
+      "execution_gate/reason_codes.py": "4040dda300e21a23",
+      "model_selection_experiment/policy.py": "3ebdbfd2f51691b0",
+      "model_selection_pilot/policy.py": "cb5b9708c8848de1",
+      "model_selection_reconciliation/variants.py": "e778c586064d4201"
+    },
+    "ms_test_baseline": {"execution_gate": 21, "model_selection_experiment": 15, "model_selection_pilot": 17, "model_selection_reconciliation": 9, "execution_gate_shadow": 23, "total_collected": 85, "result": "85 passed"}
+  },
+  "freeze_and_api_impact": {
+    "model_selection_in_platform_freeze": false,
+    "platform_freeze_core_trees": ["decision_governance", "governance_providers", "actiongate_provider", "tap_provider"],
+    "platform_freeze_public_api_modules": ["decision_governance.api", "governance_providers.api", "actiongate_provider.api", "tap_provider.api"],
+    "conclusion": "Model Selection (execution_gate + model_selection_*) is NOT a platform-frozen core tree and has NO platform public-API snapshot. A future migration has ZERO platform-freeze / API-snapshot impact. execution_gate carries its own independent replay freeze (execution_gate/frozen/replay_v1), which would move with it."
+  },
+  "migration_readiness_verdict": "READY — separate Model Selection product logic from research evaluation"
+}
