@@ -111,14 +111,16 @@ def test_no_github_write_or_credentials():
     banned = ("requests.post", "requests.put", "requests.patch", "requests.delete",
               "merge_pull_request(", "GITHUB_TOKEN", "github_token",
               "PyGithub", "from github import", "httpx.post")
-    base_url_only_in = "adapters"  # api.github.com permitted only in the read-only adapter
+    # The GitHub API base URL is permitted only in the read-only adapter (MVP 1D)
+    # and the pilot operator's preflight/config boundary (MVP 1E), never elsewhere.
+    base_url_dirs = {"adapters", "pilot_operator"}
     for p in _iter_product_py():
         text = p.read_text()
         for token in banned:
             assert token not in text, f"{p} contains banned token {token!r}"
         if "api.github.com" in text:
-            assert base_url_only_in in p.parts, \
-                f"{p} references api.github.com outside adapters/"
+            assert base_url_dirs & set(p.parts), \
+                f"{p} references api.github.com outside adapters/ or pilot_operator/"
 
 
 # 44. no robotics ACP imports
@@ -128,11 +130,19 @@ def test_no_robotics_acp_imports():
             assert root not in {"symbolu_robotics", "acp"}, f"{p} imports {root}"
 
 
-# 45. no direct external execution invocation
+# 45. no direct external execution invocation. subprocess/os.system are banned
+# everywhere. The named execution-provider symbols are banned everywhere EXCEPT
+# the pilot operator's static security *scanner* (MVP 1E), where they are the
+# deny-list patterns it detects — never actual usage.
 def test_no_execution_invocation():
-    banned = ("subprocess", "os.system", "dispatch_execution", "create_execution_intent",
-              "ExecutionService", "submit_for_authorization")
+    always_banned = ("subprocess", "os.system")
+    scanner_only = ("dispatch_execution", "create_execution_intent",
+                    "ExecutionService", "submit_for_authorization")
     for p in _iter_product_py():
         text = p.read_text()
-        for token in banned:
+        for token in always_banned:
             assert token not in text, f"{p} references execution primitive {token!r}"
+        is_scanner = p.name == "security.py" and "pilot_operator" in p.parts
+        if not is_scanner:
+            for token in scanner_only:
+                assert token not in text, f"{p} references execution primitive {token!r}"

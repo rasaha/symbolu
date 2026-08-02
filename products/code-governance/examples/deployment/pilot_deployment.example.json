@@ -1,0 +1,54 @@
+{
+  "__comment": "Example bounded live-shadow pilot deployment config (MVP 1E). PLACEHOLDERS ONLY — never commit real credentials. The operator resolves credentials from the referenced env var at request time; the value is never stored here or in the durable store.",
+  "config_id": "cg-pilot-billing-01",
+  "config_version": "v1",
+  "pilot_id": "billing-readonly-pilot",
+  "tenant_id": "tenant-acme",
+  "allowed_repositories": ["acme/billing"],
+  "allowed_branches": ["main"],
+  "allowed_pull_request_numbers": [],
+  "durable_store_path": "/data/cg-pilot/governance.db",
+  "github_adapter_registry_ref": "cg-adapter-registry:reg-v1",
+  "credential_references": [
+    {
+      "reference_id": "github-readonly",
+      "resolver_kind": "ENVIRONMENT",
+      "source_host": "api.github.com",
+      "environment_variable_name": "CG_PILOT_GITHUB_READONLY_TOKEN",
+      "required_scopes": ["metadata:read", "pull_requests:read", "checks:read", "statuses:read"]
+    }
+  ],
+  "approved_snapshot_adapters": [
+    "cg.identity_snapshot",
+    "cg.change_window_snapshot",
+    "cg.incident_snapshot",
+    "cg.target_health_snapshot",
+    "cg.control_status_snapshot"
+  ],
+  "evaluation_profile_ref": "cg-clearance-profile:billing:v1",
+  "intervention_routing_ref": "cg-intervention-routing:v1",
+  "reviewer_role_allowlist": [
+    "application-security-owner",
+    "service-owner",
+    "incident-commander",
+    "compliance-reviewer"
+  ],
+  "maximum_evaluations": 50,
+  "maximum_evaluations_per_hour": 30,
+  "maximum_concurrent_collections": 2,
+  "maximum_concurrent_evaluations": 2,
+  "collection_timeout_s": 10.0,
+  "retry_max_attempts": 2,
+  "pilot_start_at": "2026-09-01T00:00:00Z",
+  "pilot_end_at": "2026-09-15T00:00:00Z",
+  "manual_pause": false,
+  "stop_thresholds": {
+    "max_integrity_failures": 0,
+    "max_artifact_mismatch_rate": 0.2,
+    "max_source_failure_rate": 0.3,
+    "max_unexplained_escalation_rate": 0.2
+  },
+  "retention_category": "SHORT_PILOT",
+  "schema_version": "code_governance.pilot_deployment_config.v1",
+  "policy_refs": ["cg-pilot-policy:v1"]
+}
