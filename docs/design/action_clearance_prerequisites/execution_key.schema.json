@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance_prerequisites/execution_key.schema.json",
+  "title": "ExecutionKey (Action Clearance prerequisites)",
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Canonical one-time execution reservation key. Stable across retries, unique across distinct authorized actions. Maps onto ugence_decision_authority execution_idempotency_key.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenant_id", "authorization_ref", "authorized_action_fingerprint", "target_ref", "operation"],
+  "properties": {
+    "tenant_id": {"type": "string"},
+    "authorization_ref": {"type": "string"},
+    "authorized_action_fingerprint": {"type": "string", "description": "SHA over the exact action identity; folds in merge_method and profile."},
+    "target_ref": {"type": "string"},
+    "operation": {"type": "string", "examples": ["merge"]}
+  },
+  "x-carried-not-in-key": {
+    "profile_id": "implied by authorized_action_fingerprint; audit metadata only",
+    "merge_method": "folded into authorized_action_fingerprint (squash != merge)",
+    "clearance_receipt_ref": "validated at reservation time, NOT part of key identity (a re-issued receipt must not mint a new key)"
+  },
+  "x-serialization": "canonical, domain-separated SHA-256 -> exec_key.v1:<sha256hex>; becomes execution_idempotency_key in the ledger",
+  "x-maps-onto": "ugence_decision_authority InMemoryExecutionRepository._idempotency keyed by (tenant_id, execution_idempotency_key)"
+}
