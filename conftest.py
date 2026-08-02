@@ -15,6 +15,7 @@ if str(project_root) not in sys.path:
 # path so a source checkout resolves them without an editable install (e.g. the
 # governance_providers contract shims import ugence_governance_contracts).
 for _src in (project_root / "packages" / "governance-contracts" / "src",
-             project_root / "packages" / "capabilities" / "storygraph" / "src"):
+             project_root / "packages" / "capabilities" / "storygraph" / "src",
+             project_root / "packages" / "capabilities" / "decision-authority" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))

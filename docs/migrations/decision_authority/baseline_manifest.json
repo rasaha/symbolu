@@ -1,0 +1,21 @@
+{
+  "api_snapshot_file_sha256": "974936bc79bbe14f46be4ab77f47d2e92d881f71202d64ec7da84834456c7ed5",
+  "api_snapshot_symbol_count": 11,
+  "branch": "claude/decision-authority-canonical-package-migration",
+  "clean": false,
+  "distribution_canonical_target": "ugence-decision-authority",
+  "distribution_legacy": "decision-governance",
+  "freeze": {
+    "components.decision-governance": "1.0.0",
+    "core_tree_hashes.decision_governance": "f38a615970c332c46e6bf3e908ed823729dbdcfc26137871436e853f3120f81c",
+    "manifest_digest": "f318dfd21e693093253efc15785a41beddc575d5a14384502ebd14808e79b148",
+    "public_api_manifests.decision_governance.api": "1b89386992bb9572b82eca40fb36760ab9451c85db76e6ce43d3339c13ad5543"
+  },
+  "head": "8946df9cca9434c234b6a6bac34e8edf75c929f9",
+  "kernel_loc": 8130,
+  "kernel_py_files": 101,
+  "kernel_test_count": 29,
+  "kernel_version": "1.0.0",
+  "namespace_canonical_target": "ugence_decision_authority",
+  "namespace_legacy": "decision_governance"
+}

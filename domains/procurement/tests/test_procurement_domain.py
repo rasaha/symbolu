@@ -67,7 +67,7 @@ def test_recommendation_maps_to_kernel_proposed_outcome(api, request_factory):
                         recommendation=PurchaseRecommendation.APPROVE,
                         generated_by="requester-1")
     assert rec.proposed_outcome is ProposedOutcome.ADVANCE
-    assert rec.__class__.__module__.startswith("decision_governance.")
+    assert rec.__class__.__module__.startswith(("ugence_decision_authority.", "decision_governance."))
 
 
 def test_decision_maps_to_kernel_decision_outcome(api, request_factory):
@@ -77,7 +77,7 @@ def test_decision_maps_to_kernel_decision_outcome(api, request_factory):
     decision = api.decide(case_id=case.decision_case_id,
                           approval=PurchaseApproval.APPROVED, approver="approver-1")
     assert decision.outcome is DecisionOutcome.ADVANCE
-    assert decision.__class__.__module__.startswith("decision_governance.")
+    assert decision.__class__.__module__.startswith(("ugence_decision_authority.", "decision_governance."))
 
 
 def test_outcome_mapping_tables():
@@ -92,7 +92,7 @@ def test_action_mappings_are_kernel_action_mappings():
         "CREATE_PURCHASE_ORDER", "CANCEL_REQUEST",
         "ROUTE_TO_SENIOR_APPROVER", "REQUEST_MORE_INFORMATION"}
     for m in mappings:
-        assert m.__class__.__module__.startswith("decision_governance.")
+        assert m.__class__.__module__.startswith(("ugence_decision_authority.", "decision_governance."))
 
 
 def test_adapters_conform_to_kernel_ports():
