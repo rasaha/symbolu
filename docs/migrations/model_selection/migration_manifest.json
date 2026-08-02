@@ -1,0 +1,85 @@
+{
+  "migration": "Model Selection — product-core separation and canonical-package establishment",
+  "phase": "behavior-preserving structural consolidation (no scoring/policy/behavior change)",
+  "audit_verdict_followed": "READY — separate Model Selection product logic from research evaluation",
+  "repository_state": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_head_at_start": "2a5a8efc3abe91a9ffe9d60a0b8147213e28c2e7",
+    "audit_integrated_via": "PR #1269 (docs/audits/model_selection present on default)",
+    "code_governance_design_integrated_via": ["PR #1268", "PR #1270"],
+    "implementation_branch": "claude/model-selection-core-separation-and-canonical-package",
+    "python": "3.11.15",
+    "prior_art_branch_reviewed": "claude/model-selection-policy-ivha8w",
+    "prior_art_disposition": "rejected for reuse — contains NO canonical package; its model_selection_experiment/policy.py is byte-identical to default; carries only older legacy copies plus unrelated VC/TAP/reviewer commits. Inspected as historical prior art only; no item accepted."
+  },
+  "canonical_package": {
+    "path": "packages/capabilities/model-selection",
+    "namespace": "ugence_model_selection",
+    "distribution": "ugence-model-selection",
+    "version": "0.1.0",
+    "policy_version_preserved": "exec_gate_v1",
+    "dependencies": "Python standard library only (leaf capability; no Governance Contracts dependency)",
+    "core_modules_moved_verbatim": ["gate", "policy", "states", "model", "registry", "reason_codes"],
+    "added": ["__init__.py", "api.py", "version.py", "fingerprint.py"]
+  },
+  "canonical_source_selection": {
+    "selected": "execution_gate",
+    "evidence": "Production-shaped dataclass API with evidence/TTL/criticality; the ONLY implementation with real consumers (control_plane, control_plane_shadow, execution_gate_shadow, governed_inference_pilot); self-contained replay freeze (execution_gate/frozen/replay_v1). model_selection_experiment/pilot/reconciliation are dict-based research engines with a distinct I/O contract — classified research, not merged."
+  },
+  "legacy_compatibility": {
+    "namespace": "execution_gate",
+    "mechanism": "eager sys.modules alias of the six canonical product submodules under the legacy dotted names (object identity preserved); NOT a meta-path import hook; no product logic retained",
+    "retained_research_in_namespace": ["harness.py", "baselines.py", "scenarios.py", "common_io.py", "frozen/replay_v1"]
+  },
+  "consumers_repointed_to_canonical": [
+    "control_plane/adapters.py",
+    "governed_inference_pilot/adapters/execution_gate.py"
+  ],
+  "consumers_kept_on_legacy_surface_as_compat_proof": [
+    "execution_gate_shadow/*",
+    "control_plane_shadow/adapters/execution_gate_adapter.py"
+  ],
+  "research_classified_separate": [
+    "model_selection_experiment",
+    "model_selection_pilot",
+    "model_selection_reconciliation"
+  ],
+  "equivalence": {
+    "harness": "scripts/model_selection_equivalence_capture.py",
+    "before_sha256_16": "e8e86b425628a894",
+    "after_sha256_16": "e8e86b425628a894",
+    "result": "BYTE-IDENTICAL over 11 frozen scenarios (eligibility decisions, selection results, harness.run() pipeline, exceptions, fingerprints)"
+  },
+  "public_api": {
+    "snapshot_tool": "scripts/model_selection_api_snapshot.py",
+    "before_sha256_16": "3780087f866a7967",
+    "after_sha256_16": "3780087f866a7967",
+    "symbols": 51,
+    "classification": "PATCH — identical consumer surface"
+  },
+  "replay_fingerprint": {
+    "verifier": "execution_gate/frozen/replay_v1/verify_frozen.py",
+    "aggregate": "8b05b2da798a6222",
+    "result": "unchanged (frozen artifacts untouched)"
+  },
+  "packaging": {
+    "verifier": "packages/capabilities/model-selection/verify_model_selection_distribution.py",
+    "result": "wheel contents canonical-only (no research/pilot/provider/benchmark); clean-venv install imports ugence_model_selection[.api] from site-packages and runs eligibility + selection + NO_ELIGIBLE_MODEL abstain + deterministic fingerprint with no monorepo path"
+  },
+  "single_implementation_guard": "scripts/check_model_selection_single_impl.py (PASS)",
+  "freeze_and_terminology": {
+    "model_selection_in_platform_freeze": false,
+    "platform_freeze_verifier": "PASS (digest d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6, unchanged)",
+    "platform_freeze_untouched": true,
+    "governance_contracts_untouched": true,
+    "terminology_validator": "PASS"
+  },
+  "honest_status": {
+    "behavior_changed": false,
+    "other_capability_modified": false,
+    "evidence_remains_synthetic": true,
+    "soft_quality_floor_gap_unchanged": true,
+    "real_provider_reliability_claim_established": false,
+    "routing_or_execution_capability_added": false
+  }
+}

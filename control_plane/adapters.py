@@ -12,12 +12,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from execution_gate import gate as eg_gate
-from execution_gate import model as eg_model
-from execution_gate import policy as eg_policy
-from execution_gate import registry as eg_registry
-from execution_gate import states as eg_states
-from execution_gate.states import Evidence, EvidenceSource, EligibilityState
+# Canonical Model Selection product core (was the legacy ``execution_gate`` surface,
+# which now re-exports these same objects for compatibility).
+from ugence_model_selection import gate as eg_gate
+from ugence_model_selection import model as eg_model
+from ugence_model_selection import policy as eg_policy
+from ugence_model_selection import registry as eg_registry
+from ugence_model_selection import states as eg_states
+from ugence_model_selection.states import Evidence, EvidenceSource, EligibilityState
 
 from control_plane.failure_codes import Failure
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from execution_gate.gate import (ExecutionGate, Candidate, Request, Signal, Evidence, EvidenceSource,
-                                  EligibilityState)
+# Canonical Model Selection product core (legacy ``execution_gate.gate`` re-exports these).
+from ugence_model_selection.gate import (ExecutionGate, Candidate, Request, Signal, Evidence,
+                                         EvidenceSource, EligibilityState)
 from .base import AdapterResult
 
 _STAGE = "execution_gate"

@@ -1,0 +1,48 @@
+# Independent distribution for the canonical Ugence Model Selection capability.
+#
+# This is the ONE canonical source tree (``src/ugence_model_selection``) for the
+# deterministic Model Selection policy core: mandatory eligibility (ExecutionGate) and
+# policy-bounded selection (ModelPolicy) over an approved candidate set, with the
+# supporting contracts (reason codes, eligibility states/evidence, request/candidate
+# models, executable registry). It owns NO model invocation, routing, retry, failover,
+# load balancing, action authorization, provider registration, or credential management.
+#
+# Dependency policy: Python standard library ONLY. Model Selection is a leaf capability.
+# It must not depend on applications, domains, the control plane, the AI Control Plane,
+# the optional orchestrator, Agent Runtime, Hybrid LLM, the Governance Provider Framework,
+# concrete providers, the governed-inference pilot, or any research/benchmark harness.
+# Governance Contracts is intentionally NOT a dependency — the live core requires no
+# capability-neutral shared contract.
+#
+# The legacy ``execution_gate`` namespace at the repository root is a logic-free
+# compatibility surface that re-exports this package (object identity preserved).
+#
+# Build:    python -m build packages/capabilities/model-selection
+# Verify:   python packages/capabilities/model-selection/verify_model_selection_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-model-selection"
+dynamic = ["version"]
+description = "Ugence Model Selection — deterministic, policy-bounded selection of an approved model/provider (eligibility + selection); owns no routing or execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["model-selection", "eligibility", "policy", "governance", "ugence"]
+# No runtime dependency: standard library only.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+# Read statically from the version module's literal so the build backend never needs to
+# import the package to resolve the version.
+[tool.setuptools.dynamic]
+version = { attr = "ugence_model_selection.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_model_selection*"]
