@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 from decision_governance.api.audit import audit_namespace, AuditNamespace
-from governance_providers.adapters import (
+from ugence_governance_provider_framework.adapters import (
     ActionGovernanceControlPlaneAdapter, AssertionAssessmentIntegration,
     AssertionLinkedRecordAdapter)
-from governance_providers.contracts import AssertionGovernanceRequest
-from governance_providers.reference import (
+from ugence_governance_provider_framework.contracts import AssertionGovernanceRequest
+from ugence_governance_provider_framework.reference import (
     DeterministicActionGovernanceProvider, DeterministicAssertionProvider)
 
-from .conftest import run_kernel_action_lifecycle
+from kernel_lifecycle import run_kernel_action_lifecycle
 
 
 def _assertion_linked_record():

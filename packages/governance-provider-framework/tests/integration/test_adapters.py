@@ -9,12 +9,12 @@ from decision_governance.api.contracts import (
     AuthorizationOutcome as KAuth, BusinessOutcome as KBiz, TransportStatus as KT)
 from decision_governance.api.ports import (
     ActionControlPlanePort, ExternalExecutionPort)
-from governance_providers.adapters import (
+from ugence_governance_provider_framework.adapters import (
     ActionGovernanceControlPlaneAdapter, AssertionAssessmentIntegration,
     ExternalExecutionAdapter)
-from governance_providers.contracts import (
+from ugence_governance_provider_framework.contracts import (
     AssertionCoverage, AssertionGovernanceRequest, ExecutionBusinessOutcome)
-from governance_providers.reference import (
+from ugence_governance_provider_framework.reference import (
     DeterministicActionGovernanceProvider, DeterministicAssertionProvider,
     DeterministicExecutionProvider)
 
