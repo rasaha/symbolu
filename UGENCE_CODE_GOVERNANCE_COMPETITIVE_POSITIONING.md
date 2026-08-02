@@ -346,14 +346,20 @@ Decision Governance** umbrella that reuses shared capabilities.
 ```text
 1. Platform  — Ugence Decision Governance          (shared foundation)
 2. Product   — Ugence Code Governance              (customer-facing app)
-3. Product components:
+3. Product components (the product-specific layer unique to Code Governance):
      • GitHub Evidence Connector
      • GitHub Execution Provider
      • Code Governance Workflow Service
-     • Code Governance Policy Pack
-     • Code Governance Console
+     • Repository / Code Governance Policy Pack
+     • PR governance state machine
+     • Code-review and approval interface
+     • Evidence / decision reconstruction view
+     • Code Governance Console (surfaces the approval interface + reconstruction view)
      • Competitive Code Adjudication (optional)
 ```
+
+These components **coordinate** the product; they do **not** replace the shared
+authorities (TAP, Decision Authority, ActionGate, ACP, StoryGraph, GPF).
 
 Sell the **product**, not the internal capabilities: an enterprise buys *Ugence Code
 Governance* — it connects to GitHub, collects CI/scanner/review evidence, applies
