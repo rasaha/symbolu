@@ -1,5 +1,25 @@
 # Changelog — ugence-governance-contracts
 
+## [Unreleased] — package hardening (audit follow-up, no contract change)
+
+Bounded packaging/CI/typing/documentation hardening from the live audit
+(`docs/GOVERNANCE_CONTRACTS_LIVE_AUDIT.md`). **No contract field, enum value,
+default, serialization, or authority meaning changed.**
+
+### Added
+- Scoped CI workflow `.github/workflows/governance-contracts-ci.yml` (package
+  suite + GPF compatibility surface, isolated wheel install, platform-freeze).
+- PEP 561 `py.typed` marker (shipped in the wheel via package-data) — the leaf is
+  fully type-annotated.
+- Machine-readable `public_api.json` + `tests/packaging/test_public_api.py`
+  asserting the documented API equals the actual package surface.
+
+### Changed
+- `verify_governance_contracts_distribution.py` now also asserts `py.typed` ships
+  in the wheel and is installed.
+- README: note typing support, the public-API snapshot, and the precise (two-hop)
+  legacy-compatibility mechanism.
+
 ## [0.1.0] — canonical-package extraction
 
 **Physical restructuring and packaging change with ZERO semantic change.** The

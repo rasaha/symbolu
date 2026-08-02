@@ -1,0 +1,203 @@
+{
+  "artifact": "governance_contracts_consumer_matrix",
+  "generated_for": "Governance Contracts live audit",
+  "canonical_package": {
+    "distribution": "ugence-governance-contracts",
+    "namespace": "ugence_governance_contracts",
+    "package_version": "0.1.0",
+    "contract_version": "1.0.0",
+    "path": "packages/governance-contracts"
+  },
+  "import_paths": {
+    "canonical": "ugence_governance_contracts (+ .api curated surface)",
+    "compat_hop_1": "ugence_governance_provider_framework.{errors,lifecycle,metadata,contracts.*} — re-export shims that import the SAME objects from ugence_governance_contracts",
+    "compat_hop_2": "governance_providers.* — a logic-free namespace that aliases every ugence_governance_provider_framework submodule into sys.modules under the legacy dotted name (object identity preserved end to end)",
+    "observed_reality": "Every first-party production consumer imports contract-layer symbols exclusively via the governance_providers.* legacy shim (two hops to the canonical objects). No production consumer imports the canonical ugence_governance_contracts path directly; only the package's own tests, the GPF re-export modules, and a couple of verify scripts do."
+  },
+  "dependency_direction": "consumers -> governance_providers (shim) -> ugence_governance_provider_framework (framework) -> ugence_governance_contracts (leaf). The leaf imports only the Python standard library; it never imports a consumer, a capability, the framework, a product, or Agent Runtime. Direction is acyclic and correct.",
+  "not_consumers": {
+    "note": "These are named in the audit prompt as expected consumers but are NOT consumers of this package. Each owns its own outcome/authority vocabulary; boundary tests forbid them from importing governance_providers / the contracts.",
+    "packages": [
+      {"component": "Decision Authority", "path": "packages/capabilities/decision-authority", "owns": "ProposedOutcome, DecisionOutcome (ADVANCE/HOLD/REJECT/DEFER), AuthorizationOutcome, AuthorityType — human-binding authority semantics", "classification": "COMPONENT_OWNED"},
+      {"component": "Action Clearance", "path": "packages/capabilities/action-clearance", "owns": "ClearanceStatus (CLEAR/HOLD/BLOCK/ESCALATE, least-permissive-wins), SignalStatus, SignalTrustLevel", "classification": "COMPONENT_OWNED"},
+      {"component": "StoryGraph", "path": "packages/capabilities/storygraph", "owns": "its own signal/policy vocabulary", "classification": "COMPONENT_OWNED"},
+      {"component": "Agent Runtime", "path": "packages/runtime/agent-runtime", "owns": "exact-action proposal contract + governance hook interfaces", "classification": "INDEPENDENT — import boundary test explicitly forbids importing governance_providers"},
+      {"component": "Model Selection", "path": "packages/capabilities/model-selection", "owns": "its own Verdict enum", "classification": "COMPONENT_OWNED"}
+    ]
+  },
+  "consumers": [
+    {
+      "component": "governance-provider-framework (GPF)",
+      "path": "packages/governance-provider-framework",
+      "import_path": "ugence_governance_contracts (canonical, direct)",
+      "role": "Re-exports the entire contract surface (errors/lifecycle/metadata/contracts.*) as compatibility modules; declares runtime dependency ugence-governance-contracts>=0.1.0.",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "none — GPF is the canonical direct consumer and the compatibility bridge",
+      "compat_risk": "low",
+      "test_coverage": "packages/governance-provider-framework/tests/{compatibility,boundaries} (44 tests) verify identity re-export and dependency boundaries"
+    },
+    {
+      "component": "tap_provider (TAP assertion-governance adapter)",
+      "path": "tap_provider",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["AssertionCoverage", "AssertionGovernanceRequest", "AssertionGovernanceResult", "BaseProvider", "ProviderCapabilities", "ProviderCompatibility", "ProviderDescriptor", "ProviderHealth", "ProviderKind", "ProviderLifecycleState", "ProviderError", "ProviderConfigurationError", "ProviderProtocolError", "ProviderResultValidationError", "ProviderTimeoutError", "ProviderUnavailableError"],
+      "framework_only_also": false,
+      "semantic_role": "Assertion-governance provider (evidence evaluation)",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional — could switch to canonical import; left on compat path to avoid tree-hash re-baselines",
+      "compat_risk": "low",
+      "test_coverage": "tap_provider/tests/* (conformance, dependency-boundaries, e2e, mapping, registry/health)"
+    },
+    {
+      "component": "actiongate_provider (ActionGate action-governance adapter)",
+      "path": "actiongate_provider",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["ActionGovernanceProvider", "ActionGovernanceRequest", "ActionGovernanceResult", "ActionGovernanceOutcome", "BaseProvider", "ProviderCapabilities", "ProviderCompatibility", "ProviderDescriptor", "ProviderHealth", "ProviderKind", "ProviderLifecycleState", "ProviderError", "ProviderConfigurationError", "ProviderResultValidationError", "ProviderTimeoutError", "ProviderUnavailableError"],
+      "framework_only_also": false,
+      "semantic_role": "Action-governance provider (authorize a prepared action)",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "actiongate_provider/tests/* (conformance, e2e, mapping, registry/health)"
+    },
+    {
+      "component": "baseline_assertion_provider",
+      "path": "baseline_assertion_provider",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["AssertionCoverage", "AssertionGovernanceRequest", "AssertionGovernanceResult", "BaseProvider", "ProviderCapabilities", "ProviderCompatibility", "ProviderConfigurationError", "ProviderDescriptor", "ProviderError", "ProviderHealth", "ProviderKind", "ProviderLifecycleState", "ProviderResultValidationError", "ProviderTimeoutError", "ProviderUnavailableError"],
+      "framework_only_also": false,
+      "semantic_role": "Reference assertion-governance provider",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "baseline_assertion_provider/tests/test_conformance.py"
+    },
+    {
+      "component": "baseline_action_provider",
+      "path": "baseline_action_provider",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["ActionGovernanceOutcome", "ActionGovernanceRequest", "ActionGovernanceResult", "BaseProvider", "ProviderCapabilities", "ProviderCompatibility", "ProviderConfigurationError", "ProviderDescriptor", "ProviderError", "ProviderHealth", "ProviderKind", "ProviderLifecycleState", "ProviderResultValidationError", "ProviderTimeoutError", "ProviderUnavailableError"],
+      "framework_only_also": false,
+      "semantic_role": "Reference action-governance provider",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "baseline_action_provider/tests/test_conformance.py"
+    },
+    {
+      "component": "ai_hiring (product integration)",
+      "path": "ai_hiring",
+      "import_path": "governance_providers.api and governance_providers.contracts (shim)",
+      "symbols": ["ExecutionBusinessOutcome", "ExecutionDispatchRequest", "ExecutionDispatchResult", "ExecutionObservation", "ExternalExecutionProvider", "ActionGovernanceOutcome", "ActionGovernanceRequest", "AssertionCoverage", "AssertionGovernanceRequest", "ProviderError"],
+      "framework_only_also": true,
+      "framework_only_note": "AssertionAssessmentIntegration + Deterministic{Action,Assertion}Provider in validation/lifecycle.py and recommendations/tap_integration.py (framework symbols, not contract-layer)",
+      "semantic_role": "Product wiring across assertion/action/execution provider families",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional; out of scope (product packaging deferred per §19)",
+      "compat_risk": "low",
+      "test_coverage": "ai_hiring/tests/* (h2..h5 review/generation/governance/execution/reconciliation/determinism)"
+    },
+    {
+      "component": "products/code-governance (Code Governance adapters)",
+      "path": "products/code-governance",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["ActionGovernanceOutcome", "ActionGovernanceRequest", "AssertionGovernanceRequest", "ProviderError"],
+      "framework_only_also": false,
+      "semantic_role": "TAP/ActionGate adapters bridging Code Governance into the provider families",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "duplicate_guard": "code-governance tests assert 'class ProviderKind' not in its own source — it deliberately does NOT redefine contract vocabulary",
+      "migration_requirement": "optional; broad code-governance refactor out of scope per §19",
+      "compat_risk": "low",
+      "test_coverage": "products/code-governance/tests/{test_dependency_security.py, test_clearance_determinism_boundaries.py}"
+    },
+    {
+      "component": "ugence_console_api",
+      "path": "ugence_console_api",
+      "import_path": "governance_providers.api (shim; function-local imports)",
+      "symbols": ["ActionGovernanceRequest", "AssertionGovernanceRequest"],
+      "framework_only_also": false,
+      "semantic_role": "Console capability endpoints (action control, truth/evidence)",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "covered by console API suite"
+    },
+    {
+      "component": "enterprise_validation_pilot",
+      "path": "enterprise_validation_pilot",
+      "import_path": "governance_providers.api and governance_providers.contracts (shim)",
+      "symbols": ["AssertionCoverage", "AssertionGovernanceRequest", "ActionGovernanceRequest", "ProviderKind", "ProviderCapabilities", "ProviderCompatibility", "ProviderDescriptor", "ProviderCompatibilityError", "ProviderResolutionError"],
+      "framework_only_also": true,
+      "framework_only_note": "ProviderRegistry, ResolutionRequest/Record, resolve, ProvidersConfiguration, ActionGovernanceControlPlaneAdapter, AssertionAssessmentIntegration (framework)",
+      "semantic_role": "End-to-end composition/validation pilot exercising registry+resolution+contracts",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "enterprise_validation_pilot/tests/{test_composition.py, test_conformance_consumed.py}"
+    },
+    {
+      "component": "comparative_governance_benchmark",
+      "path": "comparative_governance_benchmark",
+      "import_path": "governance_providers.api (shim)",
+      "symbols": ["AssertionGovernanceRequest", "ProviderKind", "ProviderResolutionError"],
+      "framework_only_also": true,
+      "framework_only_note": "ProviderRegistry, ResolutionRequest, resolve, ActionGovernanceControlPlaneAdapter, AssertionAssessmentIntegration (framework)",
+      "semantic_role": "Benchmark strategies over assertion/action provider families",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional; freeze-tracked (core_tree_hashes)",
+      "compat_risk": "low",
+      "test_coverage": "comparative_governance_benchmark suite"
+    },
+    {
+      "component": "provider_heterogeneity_validation",
+      "path": "provider_heterogeneity_validation",
+      "import_path": "governance_providers.api and governance_providers.version (shim)",
+      "symbols": ["AssertionGovernanceRequest"],
+      "framework_only_also": true,
+      "framework_only_note": "ActionGovernanceControlPlaneAdapter, is_contract_compatible, TARGET_KERNEL_MAJOR (framework/version)",
+      "semantic_role": "Heterogeneous-provider selection/resolution validation",
+      "dependency": "required",
+      "duplicates_contract": false,
+      "migration_requirement": "optional",
+      "compat_risk": "low",
+      "test_coverage": "provider_heterogeneity_validation suite"
+    },
+    {
+      "component": "scripts/gpf_equivalence_capture.py",
+      "path": "scripts",
+      "import_path": "governance_providers.version and governance_providers.reference (shim)",
+      "symbols": ["CONTRACT_VERSION"],
+      "framework_only_also": true,
+      "framework_only_note": "TARGET_KERNEL_MAJOR, is_contract_compatible, is_kernel_compatible, Deterministic*Provider (framework)",
+      "semantic_role": "Developer tooling — GPF equivalence capture",
+      "dependency": "optional (tooling)",
+      "duplicates_contract": false,
+      "migration_requirement": "none",
+      "compat_risk": "low",
+      "test_coverage": "n/a (script)"
+    }
+  ],
+  "duplicate_contract_findings": {
+    "canonical_symbol_duplication": "NONE. The contract-layer symbols (ProviderKind, ProviderLifecycleState, ActionGovernanceOutcome, AssertionCoverage, ExecutionBusinessOutcome, the request/result dataclasses, provider protocols, and the error taxonomy) are defined in exactly one place — this package.",
+    "name_collisions_unrelated": [
+      {"name": "FailureClass", "locations": ["agentic/enterprise_ontology/failure_classes.py", "cloud_controller/**/observability/edge_cases.py (x3)"], "verdict": "DIFFERENT SEMANTIC DOMAIN — not a duplicate of the provider-framework FailureClass; no import relationship. Classification: not a duplicate."}
+    ],
+    "component_owned_outcome_vocabularies": [
+      {"name": "ClearanceStatus (CLEAR/HOLD/BLOCK/ESCALATE)", "owner": "action-clearance", "classification": "COMPONENT_OWNED", "policy": "Outcome B — intentional component ownership; distinct authority semantics; do not conflate with ActionGovernanceOutcome."},
+      {"name": "DecisionOutcome (ADVANCE/HOLD/REJECT/DEFER)", "owner": "decision-authority", "classification": "COMPONENT_OWNED", "policy": "Outcome B — human-binding authority; not interchangeable with the neutral provider outcomes."},
+      {"name": "AuthorizationOutcome", "owner": "decision-authority", "classification": "COMPONENT_OWNED", "policy": "Outcome B."}
+    ]
+  },
+  "verdict": "PACKAGE_HARDENING_REQUIRED",
+  "maturity": "IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED"
+}

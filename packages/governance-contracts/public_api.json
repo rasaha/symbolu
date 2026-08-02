@@ -1,0 +1,94 @@
+{
+  "distribution": "ugence-governance-contracts",
+  "namespace": "ugence_governance_contracts",
+  "package_version": "0.1.0",
+  "contract_version": "1.0.0",
+  "curated_api_module": "ugence_governance_contracts.api",
+  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition).",
+  "symbols": {
+    "ActionGovernanceOutcome": {
+      "kind": "enum",
+      "values": ["AUTHORIZED", "AUTHORIZED_WITH_CONSTRAINTS", "DENIED", "INDETERMINATE", "EXPIRED"]
+    },
+    "ActionGovernanceProvider": { "kind": "protocol" },
+    "ActionGovernanceRequest": {
+      "kind": "dataclass",
+      "fields": ["action_type", "requested_parameters", "actor", "authority_context", "target_resource", "policy_refs", "risk_context", "evidence_refs", "decision_refs", "idempotency_key", "correlation_id", "authorization_expired"]
+    },
+    "ActionGovernanceResult": {
+      "kind": "dataclass",
+      "fields": ["outcome", "constraints", "obligations", "expiry", "authority_basis", "reason_codes", "provider_trace_id", "fingerprint"]
+    },
+    "AssertionCoverage": {
+      "kind": "enum",
+      "values": ["SUPPORTED", "UNSUPPORTED", "INDETERMINATE", "CONSTRAINED"]
+    },
+    "AssertionGovernanceProvider": { "kind": "protocol" },
+    "AssertionGovernanceRequest": {
+      "kind": "dataclass",
+      "fields": ["assertion", "assertion_type", "evidence_refs", "source_identity", "policy_refs", "context", "correlation_id"]
+    },
+    "AssertionGovernanceResult": {
+      "kind": "dataclass",
+      "fields": ["coverage", "evidence_coverage", "covered_evidence_refs", "unsupported_elements", "omitted_qualifiers", "constraints", "obligations", "explanation_refs", "provider_trace_id", "fingerprint"]
+    },
+    "BaseProvider": { "kind": "class" },
+    "CONTRACT_VERSION": { "kind": "str" },
+    "ExecutionBusinessOutcome": {
+      "kind": "enum",
+      "values": ["SUCCEEDED", "FAILED", "REJECTED", "PENDING", "DUPLICATE", "UNKNOWN"]
+    },
+    "ExecutionDispatchRequest": {
+      "kind": "dataclass",
+      "fields": ["action_type", "parameters", "idempotency_key", "correlation_id"]
+    },
+    "ExecutionDispatchResult": {
+      "kind": "dataclass",
+      "fields": ["accepted", "external_request_id", "acknowledgement", "pending", "timed_out", "transport_error", "retryable"]
+    },
+    "ExecutionObservation": {
+      "kind": "dataclass",
+      "fields": ["business_outcome", "observed_parameters", "final", "reason", "provider_trace_id", "fingerprint"]
+    },
+    "ExternalExecutionProvider": { "kind": "protocol" },
+    "FailureClass": {
+      "kind": "enum",
+      "values": ["RETRYABLE", "TERMINAL", "INDETERMINATE", "CONFIGURATION", "COMPATIBILITY"]
+    },
+    "Provider": { "kind": "protocol" },
+    "ProviderCapabilities": {
+      "kind": "dataclass",
+      "fields": ["kind", "features", "deterministic"]
+    },
+    "ProviderCompatibility": {
+      "kind": "dataclass",
+      "fields": ["contract_version", "compatible_kernel_majors", "config_schema_version"]
+    },
+    "ProviderCompatibilityError": { "kind": "exception", "failure_class": "COMPATIBILITY" },
+    "ProviderConfigurationError": { "kind": "exception", "failure_class": "CONFIGURATION" },
+    "ProviderDescriptor": {
+      "kind": "dataclass",
+      "fields": ["provider_id", "kind", "implementation_version", "compatibility", "capabilities", "factory", "vendor", "default", "metadata"]
+    },
+    "ProviderError": { "kind": "exception", "failure_class": "TERMINAL" },
+    "ProviderHealth": {
+      "kind": "dataclass",
+      "fields": ["state", "healthy", "detail"]
+    },
+    "ProviderKind": {
+      "kind": "enum",
+      "values": ["ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION"]
+    },
+    "ProviderLifecycleState": {
+      "kind": "enum",
+      "values": ["REGISTERED", "INITIALIZING", "AVAILABLE", "DEGRADED", "UNAVAILABLE", "STOPPING", "STOPPED"]
+    },
+    "ProviderProtocolError": { "kind": "exception", "failure_class": "TERMINAL" },
+    "ProviderRegistrationError": { "kind": "exception", "failure_class": "CONFIGURATION" },
+    "ProviderResolutionError": { "kind": "exception", "failure_class": "CONFIGURATION" },
+    "ProviderResultValidationError": { "kind": "exception", "failure_class": "TERMINAL" },
+    "ProviderTimeoutError": { "kind": "exception", "failure_class": "RETRYABLE" },
+    "ProviderUnavailableError": { "kind": "exception", "failure_class": "RETRYABLE" },
+    "__version__": { "kind": "str" }
+  }
+}

@@ -8,8 +8,11 @@ never have to depend on each other.
 - **Namespace:** `ugence_governance_contracts`
 - **Version:** 0.1.0 · **Contract version:** 1.0.0
 - **Dependencies:** Python standard library only (no third-party, no other Ugence package)
+- **Typing:** fully type-annotated; ships a PEP 561 `py.typed` marker
 - **Ownership / maturity:** extracted verbatim from the frozen `governance_providers`
   contract core; stable, synthetic-neutral, no semantic change.
+- **Public API snapshot:** `public_api.json` (machine-readable; asserted equal to the
+  installed package by `tests/packaging/test_public_api.py`).
 
 ## What's in it
 
@@ -55,8 +58,13 @@ python packages/governance-contracts/verify_governance_contracts_distribution.py
 
 ## Compatibility paths
 
-The neutral contracts previously lived in `governance_providers`. Those paths are
-now **logic-free re-export shims** that resolve to the same objects:
+The neutral contracts previously lived in `governance_providers`. Those paths still
+resolve to the **same objects** (identity preserved), now through a two-hop
+compatibility bridge: the `governance_providers` namespace aliases the Governance
+Provider Framework's submodules, and the framework's `errors`/`lifecycle`/
+`metadata`/`contracts.*` modules re-export from this package. Verified by
+`tests/compatibility/test_legacy_compat.py` importing the real legacy paths and
+asserting object identity:
 
 | Legacy (compatibility period) | Canonical |
 |---|---|

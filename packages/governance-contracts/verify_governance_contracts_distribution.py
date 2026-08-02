@@ -38,6 +38,10 @@ assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
 
+# PEP 561: the installed leaf advertises typing support to consumers.
+import pathlib as _pl
+assert (_pl.Path(g.__file__).resolve().parent / "py.typed").is_file(), "py.typed not installed"
+
 # curated API resolves
 from ugence_governance_contracts.api import (
     ActionGovernanceRequest, ActionGovernanceResult, ActionGovernanceOutcome,
@@ -99,10 +103,13 @@ def main() -> int:
     wheel = _latest(findlinks, "ugence_governance_contracts-*.whl")
     print(f"      built {wheel.name}")
 
-    print("[2/4] assert the wheel bundles no foreign top-level package")
+    print("[2/4] assert the wheel bundles no foreign top-level package + ships py.typed")
     foreign = _foreign_members(wheel)
     assert not foreign, f"wheel bundles foreign packages: {sorted(foreign)}"
-    print("      wheel contains only ugence_governance_contracts/ + dist-info")
+    with zipfile.ZipFile(wheel) as z:
+        names = set(z.namelist())
+    assert "ugence_governance_contracts/py.typed" in names, "wheel is missing py.typed"
+    print("      wheel contains only ugence_governance_contracts/ (+ py.typed) + dist-info")
 
     print("[3/4] create an isolated venv and install ONLY this wheel (--no-index)")
     with tempfile.TemporaryDirectory() as td:
