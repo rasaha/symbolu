@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .agent import AgentDescriptor
 from .events import EVENT_TYPES, RuntimeEvent
+from .proposal import TransitionProposal, compute_fingerprint
 from .results import FailureCategory, RuntimeFailure, RuntimeResult
 from .task import (
     TERMINAL_TASK_STATUSES,
@@ -28,6 +29,8 @@ __all__ = [
     "AgentDescriptor",
     "RuntimeEvent",
     "EVENT_TYPES",
+    "TransitionProposal",
+    "compute_fingerprint",
     "FailureCategory",
     "RuntimeFailure",
     "RuntimeResult",

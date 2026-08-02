@@ -11,6 +11,12 @@ from __future__ import annotations
 from typing import Optional
 
 from .config import AgentRuntimeConfig
+from .governance.decisions import validate_clearance
+from .governance.hooks import (
+    AllowAllGovernanceHook,
+    NoopGovernanceHook,
+    UnconfiguredGovernanceHook,
+)
 from .governance.interfaces import (
     CorrelationContext,
     ExecutionContext,
@@ -18,9 +24,9 @@ from .governance.interfaces import (
     GovernanceEvaluation,
     GovernanceHook,
 )
-from .governance.noop import NoopGovernanceHook
 from .models.agent import AgentDescriptor
 from .models.events import RuntimeEvent
+from .models.proposal import TransitionProposal
 from .models.results import FailureCategory, RuntimeFailure, RuntimeResult
 from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
@@ -131,7 +137,11 @@ __all__ = [
     "GovernanceHook",
     "GovernanceEvaluation",
     "GovernanceDisposition",
+    "TransitionProposal",
+    "UnconfiguredGovernanceHook",
+    "AllowAllGovernanceHook",
     "NoopGovernanceHook",
+    "validate_clearance",
     "ExecutionContext",
     "CorrelationContext",
     # retry

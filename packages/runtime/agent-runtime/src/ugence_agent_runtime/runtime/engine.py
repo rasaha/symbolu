@@ -18,13 +18,10 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from ..config import AgentRuntimeConfig
-from ..governance.decisions import RuntimeDirective, directive_for
-from ..governance.interfaces import (
-    CorrelationContext,
-    ExecutionContext,
-    GovernanceEvaluation,
-)
+from ..governance.decisions import RuntimeDirective, directive_for, validate_clearance
+from ..governance.interfaces import GovernanceEvaluation
 from ..models import events as ev
+from ..models.proposal import TransitionProposal, compute_fingerprint
 from ..models.results import FailureCategory, RuntimeFailure, RuntimeResult
 from ..models.task import TaskInstance, TaskStatus
 from ..models.transitions import check_task_transition, check_workflow_transition
@@ -230,17 +227,31 @@ class AgentRuntime:
             self._set_wf(instance, WorkflowStatus.WAITING, trace, ev.WORKFLOW_WAITING)
             self._checkpoint(instance, trace)
 
+    def _build_proposal(self, instance: WorkflowInstance, ti: TaskInstance) -> TransitionProposal:
+        d = ti.definition
+        return TransitionProposal.build(
+            workflow_id=instance.workflow_id,
+            instance_id=instance.instance_id,
+            task_id=ti.task_id,
+            provider_id=d.provider_id or d.operation,
+            operation=d.operation,
+            arguments=dict(d.arguments),
+            idempotency_key=f"{instance.instance_id}:{ti.task_id}",
+            correlation_id=instance.correlation_id or instance.instance_id,
+        )
+
     def _run_task(self, instance: WorkflowInstance, ti: TaskInstance, trace: RunTrace) -> None:
         self._set_task(instance, ti, TaskStatus.READY, trace, ev.TASK_READY)
-        evaluation = self._evaluate(instance, ti, trace)
-        if evaluation is None:
-            # Non-consequential task: no governance boundary is crossed, so the
-            # runtime continues. This is the ONLY case that skips evaluation; an
-            # absent evaluation for a consequential task never reaches here.
-            directive = RuntimeDirective.CONTINUE
-        else:
+        proposal = self._build_proposal(instance, ti)
+
+        if ti.definition.consequential:
+            evaluation = self._evaluate(proposal, ti, trace)
             directive = directive_for(evaluation)
-            ti.governance_reference = evaluation.evaluation_reference
+            ti.governance_reference = evaluation.binding_reference() if evaluation else None
+        else:
+            # Non-consequential task: no governance boundary is crossed.
+            evaluation = None
+            directive = RuntimeDirective.CONTINUE
 
         if directive is RuntimeDirective.WAIT:  # HOLD
             self._set_task(instance, ti, TaskStatus.WAITING, trace, ev.TASK_WAITING,
@@ -259,62 +270,78 @@ class AgentRuntime:
             return
 
         if directive is RuntimeDirective.STOP:  # BLOCK (or fail-closed unknown)
-            failure = RuntimeFailure(
-                category=FailureCategory.GOVERNANCE_BLOCK,
-                message="governance blocked the transition",
-                task_id=ti.task_id,
-                reason_codes=evaluation.reason_codes if evaluation else (),
-            )
-            self._failures[instance.instance_id].append(failure)
-            ti.failure = failure
-            self._set_task(instance, ti, TaskStatus.FAILED, trace, ev.TASK_FAILED,
-                           disposition="BLOCK")
-            self._set_wf(instance, WorkflowStatus.FAILED, trace, ev.WORKFLOW_FAILED,
-                         reason="governance_block")
-            self._checkpoint(instance, trace)
+            reasons = evaluation.reason_codes if evaluation else ("GOVERNANCE_STOP",)
+            self._fail_task_governance(instance, ti, trace, reasons,
+                                       "governance blocked the transition", disposition="BLOCK")
             return
 
-        # CONTINUE (CLEAR): invoke the provider.
+        # CONTINUE (CLEAR): for consequential tasks, the CLEAR must be bound to the
+        # EXACT proposal before any provider is invoked. Fail closed otherwise.
+        if ti.definition.consequential:
+            permitted, reasons = validate_clearance(evaluation, proposal, self._config.clock())
+            if not permitted:
+                self._fail_task_governance(
+                    instance, ti, trace, reasons,
+                    "governance CLEAR not bound to the exact proposal (fail closed)",
+                    disposition="CLEAR_REJECTED",
+                )
+                return
+
         self._set_task(instance, ti, TaskStatus.RUNNING, trace, ev.TASK_STARTED)
-        self._execute(instance, ti, trace)
+        self._execute(instance, ti, proposal, trace)
+
+    def _fail_task_governance(self, instance, ti, trace, reason_codes, message, *, disposition):
+        failure = RuntimeFailure(
+            category=FailureCategory.GOVERNANCE_BLOCK,
+            message=message,
+            task_id=ti.task_id,
+            reason_codes=tuple(reason_codes),
+        )
+        self._failures[instance.instance_id].append(failure)
+        ti.failure = failure
+        self._set_task(instance, ti, TaskStatus.FAILED, trace, ev.TASK_FAILED,
+                       disposition=disposition, reason_codes=list(reason_codes))
+        self._set_wf(instance, WorkflowStatus.FAILED, trace, ev.WORKFLOW_FAILED,
+                     reason="governance_block")
+        self._checkpoint(instance, trace)
 
     def _evaluate(
-        self, instance: WorkflowInstance, ti: TaskInstance, trace: RunTrace
-    ) -> Optional[GovernanceEvaluation]:
-        if not ti.definition.consequential:
-            return None  # non-consequential: no governance boundary crossing
-        correlation = CorrelationContext(
-            correlation_id=instance.correlation_id or instance.instance_id,
-            instance_id=instance.instance_id,
-        )
-        context = ExecutionContext(
-            workflow_id=instance.workflow_id,
-            instance_id=instance.instance_id,
-            task_id=ti.task_id,
-            operation=ti.definition.operation,
-            correlation=correlation,
-            arguments=dict(ti.definition.arguments),
-        )
+        self, proposal: TransitionProposal, ti: TaskInstance, trace: RunTrace
+    ) -> GovernanceEvaluation:
         trace.emit(ev.GOVERNANCE_EVALUATION_REQUESTED, task_id=ti.task_id,
-                   operation=ti.definition.operation)
-        evaluation = self._config.governance_hook.evaluate(
-            context, "task.execute", self._config.clock()
-        )
+                   operation=proposal.operation, fingerprint=proposal.fingerprint[:12])
+        evaluation = self._config.governance_hook.evaluate(proposal, self._config.clock())
         trace.emit(ev.GOVERNANCE_DISPOSITION_RECEIVED, task_id=ti.task_id,
                    disposition=evaluation.disposition.value,
-                   reason_codes=list(evaluation.reason_codes))
+                   reason_codes=list(evaluation.reason_codes),
+                   fingerprint_bound=(evaluation.proposal_fingerprint == proposal.fingerprint))
         return evaluation
 
-    def _execute(self, instance: WorkflowInstance, ti: TaskInstance, trace: RunTrace) -> None:
+    def _execute(self, instance: WorkflowInstance, ti: TaskInstance,
+                 proposal: TransitionProposal, trace: RunTrace) -> None:
         d = ti.definition
         invocation = ToolInvocation(
-            provider_id=d.provider_id or d.operation,
-            operation=d.operation,
-            arguments=dict(d.arguments),
-            correlation_id=instance.correlation_id,
-            idempotency_key=f"{instance.instance_id}:{ti.task_id}",
+            provider_id=proposal.provider_id,
+            operation=proposal.operation,
+            arguments=dict(proposal.arguments),
+            correlation_id=proposal.correlation_id,
+            idempotency_key=proposal.idempotency_key,
             timeout=d.timeout if d.timeout is not None else self._config.default_timeout,
         )
+        # Exact-action re-check: the invocation must fingerprint-match the proposal
+        # governance evaluated. Any drift fails closed (integrity), never executes.
+        inv_fp = compute_fingerprint(
+            proposal.workflow_id, proposal.instance_id, proposal.task_id,
+            invocation.provider_id, invocation.operation, invocation.arguments,
+            invocation.idempotency_key, proposal.proposal_version,
+        )
+        if inv_fp != proposal.fingerprint:
+            self._fail_task_governance(
+                instance, ti, trace, ("PROPOSAL_INVOCATION_MISMATCH",),
+                "provider invocation does not match the evaluated proposal (fail closed)",
+                disposition="INTEGRITY",
+            )
+            return
         trace.emit(ev.PROVIDER_INVOKED, task_id=ti.task_id, provider_id=invocation.provider_id)
         outcome = execute_with_policy(
             self._config.provider_registry,
