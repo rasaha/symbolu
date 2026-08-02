@@ -134,13 +134,20 @@ def test_no_action_clearance_internals_imported():
                     f"{p} imports Action Clearance internals: {node.module}"
 
 
-# 65-72. no forbidden imports / drivers / providers anywhere in the product
+# 65-72. no forbidden imports / drivers / providers anywhere in the product.
+# stdlib ``sqlite3`` is the sanctioned MVP 1C durable backend and is permitted
+# ONLY inside the ``persistence/`` boundary; external DB drivers / network / infra
+# clients remain forbidden everywhere in the product.
 def test_no_forbidden_imports():
-    forbidden = {"requests", "httpx", "sqlalchemy", "sqlite3", "psycopg2",
-                 "github", "kubernetes", "boto3", "symbolu_robotics", "acp"}
+    forbidden = {"requests", "httpx", "sqlalchemy", "psycopg2", "mysql", "redis",
+                 "kafka", "boto3", "github", "kubernetes", "symbolu_robotics", "acp"}
+    persistence_only = {"sqlite3"}
     for p in _CLEARANCE.rglob("*.py"):
+        in_persistence = "persistence" in p.parts
         for root in _imported_roots(p):
             assert root not in forbidden, f"{p} imports {root}"
+            if root in persistence_only:
+                assert in_persistence, f"{p} imports {root} outside persistence/"
 
 
 def test_no_execution_or_reservation_tokens():
