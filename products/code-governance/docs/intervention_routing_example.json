@@ -1,0 +1,251 @@
+{
+  "$comment": "Default neutral routing table (reason_code -> route). ACTIVE_INCIDENT is classification-dependent (CRITICAL -> OPERATIONS_REVIEW + INCIDENT_COMMANDER/SERVICE_OWNER; else WAIT_FOR_CONDITION). Companies override via InterventionRoutingPolicy.",
+  "incident_routing": {
+    "CRITICAL": {
+      "intervention_type": "OPERATIONS_REVIEW",
+      "authorities": [
+        "INCIDENT_COMMANDER",
+        "SERVICE_OWNER"
+      ],
+      "human": true
+    },
+    "default": {
+      "intervention_type": "WAIT_FOR_CONDITION",
+      "human": false
+    }
+  },
+  "default_routes": {
+    "CLEARANCE_GRANTED": {
+      "intervention_required": false,
+      "intervention_type": "NONE",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "proceed (shadow only; execution disabled)"
+    },
+    "ACTIVE_CHANGE_FREEZE": {
+      "intervention_required": false,
+      "intervention_type": "WAIT_FOR_CONDITION",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "wait for change freeze to lift"
+    },
+    "TARGET_UNAVAILABLE": {
+      "intervention_required": false,
+      "intervention_type": "WAIT_FOR_CONDITION",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "retry when target is available"
+    },
+    "CONSUMPTION_RESERVED": {
+      "intervention_required": false,
+      "intervention_type": "WAIT_FOR_CONDITION",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "wait for reservation to resolve"
+    },
+    "SIGNAL_MISSING": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "supply the missing operational signal"
+    },
+    "SIGNAL_STALE": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "refresh the stale operational signal"
+    },
+    "SIGNAL_EXPIRED": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "refresh the expired operational signal"
+    },
+    "ACTOR_STATUS_UNKNOWN": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "refresh the actor-status signal"
+    },
+    "CONSUMPTION_STATUS_UNKNOWN": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "refresh the consumption signal"
+    },
+    "AUTHORIZATION_STALE": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": false,
+      "recommended_next_action": "refresh authorization-validity or re-authorize"
+    },
+    "AUTHORIZATION_EXPIRED": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "re-authorize the change upstream"
+    },
+    "AUTHORIZATION_NOT_ELIGIBLE": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "re-authorize; ActionGate did not authorize"
+    },
+    "ACTION_FINGERPRINT_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "new authorization + clearance for the exact action"
+    },
+    "TARGET_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "correct target; re-authorize"
+    },
+    "TENANT_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "fix tenant binding; re-authorize"
+    },
+    "SUBJECT_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "fix subject binding; re-authorize"
+    },
+    "POLICY_VERSION_REJECTED": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "re-authorize under the current policy version"
+    },
+    "ACTOR_INVALID": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "restore actor or re-authorize"
+    },
+    "REQUIRED_CONTROL_UNSATISFIED": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "satisfy the required control; re-authorize"
+    },
+    "ALREADY_CONSUMED": {
+      "intervention_required": false,
+      "intervention_type": "NONE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "none \u2014 the authorization was already consumed"
+    },
+    "SIGNAL_UNTRUSTED": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "fix signal provenance/integrity and re-supply"
+    },
+    "SIGNAL_PROVENANCE_MISSING": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "attach signal provenance and re-supply"
+    },
+    "SIGNAL_SOURCE_UNAPPROVED": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "use an approved signal source"
+    },
+    "SIGNAL_ADAPTER_VERSION_UNAPPROVED": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "use an approved adapter version"
+    },
+    "SIGNAL_TRUST_LEVEL_INSUFFICIENT": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "supply a higher-trust signal"
+    },
+    "SIGNAL_CONTENT_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REFRESH_SIGNAL",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "re-supply the signal with a valid content digest"
+    },
+    "SIGNAL_AUTHORIZATION_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "bind the signal to the correct authorization"
+    },
+    "SIGNAL_ACTION_MISMATCH": {
+      "intervention_required": false,
+      "intervention_type": "REAUTHORIZE_CHANGE",
+      "required_authorities": [],
+      "blocking": true,
+      "recommended_next_action": "bind the signal to the exact action"
+    },
+    "SIGNAL_CONFLICT": {
+      "intervention_required": true,
+      "intervention_type": "OPERATIONS_REVIEW",
+      "required_authorities": [
+        "OPERATIONS"
+      ],
+      "blocking": false,
+      "recommended_next_action": "human resolves conflicting signals"
+    },
+    "CONSTRAINT_CONFLICT": {
+      "intervention_required": true,
+      "intervention_type": "EXCEPTION_APPROVAL",
+      "required_authorities": [
+        "RELEASE_MANAGER"
+      ],
+      "blocking": true,
+      "recommended_next_action": "cannot widen authorization; exception approval or re-authorize"
+    },
+    "CONSTRAINT_INTERPRETATION_UNSUPPORTED": {
+      "intervention_required": true,
+      "intervention_type": "OPERATIONS_REVIEW",
+      "required_authorities": [
+        "OPERATIONS"
+      ],
+      "blocking": true,
+      "recommended_next_action": "human resolves uninterpretable constraint"
+    },
+    "CLEARANCE_POLICY_CONFLICT": {
+      "intervention_required": true,
+      "intervention_type": "OPERATIONS_REVIEW",
+      "required_authorities": [
+        "OPERATIONS"
+      ],
+      "blocking": true,
+      "recommended_next_action": "human resolves policy conflict"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$comment": "Deterministic mapping from CodeGovernanceOperationalSnapshot facts to canonical Action Clearance SignalType + normalized value. Only canonical SignalTypes are used.",
+  "mapping": {
+    "authorization_validity": {
+      "signal_type": "AUTHORIZATION_VALIDITY",
+      "value": {
+        "state": "VALID|INVALID|STALE"
+      }
+    },
+    "actor_state": {
+      "signal_type": "ACTOR_STATUS",
+      "value": {
+        "state": "ACTIVE|DISABLED|UNKNOWN"
+      }
+    },
+    "artifact_action_fingerprint(+artifact_target_ref)": {
+      "signal_type": "ARTIFACT_IDENTITY",
+      "value": {
+        "action_fingerprint": "<fp>",
+        "target_ref": "<ref>"
+      }
+    },
+    "policy_accepted": {
+      "signal_type": "POLICY_VALIDITY",
+      "value": {
+        "accepted": "bool"
+      }
+    },
+    "change_freeze_active": {
+      "signal_type": "CHANGE_FREEZE",
+      "value": {
+        "active": "bool"
+      }
+    },
+    "incident_active": {
+      "signal_type": "ACTIVE_INCIDENT",
+      "value": {
+        "active": "bool"
+      }
+    },
+    "target_available": {
+      "signal_type": "TARGET_AVAILABILITY",
+      "value": {
+        "available": "bool"
+      }
+    },
+    "required_control_satisfied": {
+      "signal_type": "REQUIRED_CONTROL",
+      "value": {
+        "satisfied": "bool"
+      }
+    },
+    "consumption_state": {
+      "signal_type": "PRIOR_CONSUMPTION",
+      "value": {
+        "state": "UNUSED|RESERVED|CONSUMED|UNKNOWN"
+      }
+    }
+  },
+  "canonical_signal_types": [
+    "AUTHORIZATION_VALIDITY",
+    "ACTOR_STATUS",
+    "POLICY_VALIDITY",
+    "CHANGE_FREEZE",
+    "ACTIVE_INCIDENT",
+    "ARTIFACT_IDENTITY",
+    "REQUIRED_CONTROL",
+    "TARGET_AVAILABILITY",
+    "PRIOR_CONSUMPTION"
+  ],
+  "binding": [
+    "tenant_id",
+    "subject_ref=repository",
+    "authorization_ref=actiongate_result_fingerprint",
+    "action_fingerprint=prepared_action_fingerprint"
+  ],
+  "integrity": "integrity_digest = TrustedSignal.content_fingerprint (computed via Action Clearance public API)"
+}

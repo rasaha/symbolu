@@ -1,36 +1,21 @@
-# Code Governance — Next Phases (out of scope for MVP 1A)
+# Code Governance — Next Phases (out of scope for MVP 1B)
 
-MVP 1A stops after ActionGate shadow evaluation and chain reconstruction. The
-items below are **not** implemented in this phase and must not be started under
-it. They are recorded so the boundary is explicit.
+MVP 1B stops at shadow Action Clearance evaluation + explainable intervention routing +
+chain reconstruction. The following are **not** implemented and must not be started
+under this phase:
 
-## Enforcement rungs (design §7)
-
-- **MVP 1B — Recommendation.** Publish governance status (check-run + summary);
-  humans keep the existing merge path. No Ugence-driven merge.
-- **MVP 1C — Enforced authorization.** Requires the complete chain, live
-  clearance, exact-artifact binding, and controlled dispatch.
-
-## Deferred components (each a separate, later change)
-
-| Component | Why deferred |
+| Item | Owner / phase |
 |---|---|
-| **Action Clearance** (immediate executability) | evaluated *after* ActionGate; introduced with its own runtime. `ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md` is the future boundary only. |
-| **Execution reservation** | one-time consumption at dispatch; belongs with 1C. |
-| **GitHub Execution Provider** | a GPF-registrable `EXTERNAL_EXECUTION` provider modeled on `actiongate_provider/`; not created here. |
-| **Merge-queue / rebase / deployment** | derived authorization for merge-group artifacts; deployment is a separate optional workflow. |
-| **Change Intelligence analyzers** | mutation/fuzz/taint/complexity/performance engines; product currently consumes external evidence only. |
-| **Production durable store** | append-only hash-chained persistence for the full chain; in-memory reference stores are used in 1A. |
-| **Competitive Code Adjudication** | separate capability package (MVP2); advisory. |
+| Durable, enforcement-grade `ClearanceReceipt` persistence + lifecycle | Workflow Service (later) |
+| Atomic one-time execution **reservation** / `reserve_once` | execution / idempotency ledger |
+| GitHub execution provider (`EXTERNAL_EXECUTION`) | provider (later) |
+| Enforced merge (direct + squash), merge queue, rebase | Code Governance MVP 1C+ |
+| Live operational-signal adapters (identity / incident / change-management / GitHub) | product/integration |
+| Production database | later |
 
-## Invariants the next phases must preserve
-
-- No new `ProviderKind` (reuse `ASSERTION_GOVERNANCE` / `ACTION_GOVERNANCE` /
-  `EXTERNAL_EXECUTION`).
-- No neutral-contract modification; no `cer.v2` unless owned by Decision
-  Authority for a proven need.
-- Dependency direction strictly downward: product → capabilities → neutral
-  contracts; product → connector; product → GPF → GitHub execution provider.
-- The Workflow Service never owns governance authority.
-- "All automated checks passed" must never silently mean "binding approval
-  granted."
+Invariants every later phase must preserve: ActionGate authorization required before
+clearance; Action Clearance never creates authority, broadens, persists durably,
+reserves, or dispatches; CLEAR is never execution; DecisionRecord remains the binding
+decision; no new `ProviderKind`; no neutral-contract change; the canonical Action
+Clearance package stays unmodified; the bare acronym "ACP" never appears in new
+technical surfaces.

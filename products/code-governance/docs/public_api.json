@@ -1,10 +1,12 @@
 {
-  "$comment": "Curated PRODUCT_PUBLIC API of ugence_code_governance 0.1.0 (MVP 1A). Not every internal type is exported.",
-  "distribution": "ugence-code-governance",
-  "namespace": "ugence_code_governance",
+  "$comment": "Code Governance public API after MVP 1B. No execute/merge/dispatch/reserve_once/persist_enforcement_receipt.",
   "version": "0.1.0",
+  "mvp_phase": "1B",
   "execution_enabled": false,
   "top_level_exports": [
+    "ActionClearanceEvaluationRecord",
+    "ActionClearanceShadowAdapter",
+    "AuthorityRole",
     "AuthorizedActor",
     "ChainIncompleteError",
     "ClaimEntry",
@@ -14,7 +16,9 @@
     "ClaimRequirement",
     "ClaimStatus",
     "ClaimType",
+    "CodeGovernanceClearanceProfile",
     "CodeGovernanceError",
+    "CodeGovernanceOperationalSnapshot",
     "CodeGovernanceService",
     "DEFAULT_POLICY",
     "DecisionAuthorityRequiredError",
@@ -26,6 +30,9 @@
     "GovernanceChainRecord",
     "GovernanceRecommendation",
     "GovernedChangeIdentity",
+    "HumanInterventionAssessment",
+    "InterventionRoutingPolicy",
+    "InterventionType",
     "InvalidWorkflowTransitionError",
     "MVP_PHASE",
     "MalformedEventError",
@@ -34,12 +41,15 @@
     "RecommendationDisposition",
     "ReconstructionResult",
     "ReconstructionState",
+    "RepositoryClassification",
     "RepositoryPolicy",
     "RiskTier",
     "ShadowActionEvaluation",
+    "SignalSourceEntry",
     "SignatureVerificationError",
     "StaleEvidenceError",
     "TenantMismatchError",
+    "TrustedSignalSourceProjection",
     "UnsupportedEventError",
     "ValidatorIdentity",
     "ValidatorTrustLevel",
@@ -60,24 +70,31 @@
     "record_authorized_decision",
     "prepare_exact_action",
     "evaluate_action_shadow",
+    "record_operational_snapshot",
+    "build_trusted_signals",
+    "evaluate_action_clearance_shadow",
+    "assess_human_intervention",
     "reconstruct_chain",
     "get_workflow",
     "get_governance_chain",
+    "get_clearance_evaluation",
+    "get_intervention_assessment",
     "execution_status"
   ],
-  "no_execution_methods": [
-    "merge",
-    "execute",
-    "dispatch",
-    "approve",
-    "close",
-    "label"
+  "new_1b_operations": [
+    "record_operational_snapshot",
+    "build_trusted_signals",
+    "evaluate_action_clearance_shadow",
+    "assess_human_intervention",
+    "get_clearance_evaluation",
+    "get_intervention_assessment"
   ],
-  "consumed_public_surfaces": [
-    "ugence_governance_contracts.api",
-    "governance_providers.api",
-    "ugence_decision_authority.api",
-    "tap_provider.api",
-    "actiongate_provider.api"
-  ]
+  "forbidden_methods": [
+    "execute",
+    "merge",
+    "dispatch",
+    "reserve_once",
+    "persist_enforcement_receipt"
+  ],
+  "execution_status": "DISABLED"
 }

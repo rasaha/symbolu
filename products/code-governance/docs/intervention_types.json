@@ -1,0 +1,30 @@
+{
+  "$comment": "Curated product human-intervention vocabulary (no free-form LLM types).",
+  "intervention_types": [
+    "NONE",
+    "WAIT_FOR_CONDITION",
+    "REFRESH_SIGNAL",
+    "REAUTHORIZE_CHANGE",
+    "CODE_OWNER_REVIEW",
+    "SECURITY_REVIEW",
+    "OPERATIONS_REVIEW",
+    "COMPLIANCE_REVIEW",
+    "EXCEPTION_APPROVAL",
+    "BINDING_AUTHORITY_DECISION"
+  ],
+  "authority_roles": [
+    "CODE_OWNER",
+    "SECURITY_REVIEWER",
+    "OPERATIONS",
+    "INCIDENT_COMMANDER",
+    "SERVICE_OWNER",
+    "COMPLIANCE_OFFICER",
+    "RELEASE_MANAGER"
+  ],
+  "default_semantics": {
+    "CLEAR": "no additional human intervention by default",
+    "HOLD": "wait or refresh operational signal; no automatic human by default",
+    "BLOCK": "change / reauthorize; no automatic human by default",
+    "ESCALATE": "human intervention required"
+  }
+}
