@@ -1,0 +1,22 @@
+{
+  "interface": "ugence_agent_runtime.governance.interfaces.GovernanceHook",
+  "description": "Neutral governance-integration boundary owned by the Agent Runtime. The runtime asks whether a consequential transition may proceed and obeys the answer. It never authors policy, binds a decision, or creates authority.",
+  "method": {
+    "name": "evaluate",
+    "signature": "evaluate(context: ExecutionContext, proposed_transition: str, evaluation_time: float) -> GovernanceEvaluation",
+    "evaluation_time": "caller-controlled (runtime supplies its injected clock value)"
+  },
+  "execution_context": ["workflow_id", "instance_id", "task_id", "operation", "correlation", "arguments", "metadata"],
+  "governance_evaluation": ["disposition", "reason_codes", "evaluation_reference", "valid_until", "required_resolution", "correlation_reference", "detail"],
+  "dispositions": ["CLEAR", "HOLD", "BLOCK", "ESCALATE"],
+  "mapping": {
+    "CLEAR": "CONTINUE (invoke provider)",
+    "HOLD": "WAIT (task/workflow WAITING; no authority created; provider not called)",
+    "BLOCK": "STOP (task/workflow FAILED; provider not called)",
+    "ESCALATE": "PAUSE (workflow PAUSED pending external authority/review; provider not called)"
+  },
+  "fail_closed": "A missing evaluation or unrecognized disposition resolves to STOP, never CONTINUE. HOLD and ESCALATE are never converted to CLEAR.",
+  "core_imports_concrete_governance": false,
+  "forbidden_concrete_imports": ["TAP", "Decision Authority", "ActionGate", "Action Clearance", "Code Governance", "StoryGraph", "cer_v0_*"],
+  "default_hook": "ugence_agent_runtime.governance.noop.NoopGovernanceHook (always CLEAR; creates no authority)"
+}

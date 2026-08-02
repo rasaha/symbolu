@@ -1,0 +1,107 @@
+{
+  "workflow_statuses": [
+    "CREATED",
+    "READY",
+    "RUNNING",
+    "PAUSED",
+    "WAITING",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED"
+  ],
+  "task_statuses": [
+    "PENDING",
+    "READY",
+    "RUNNING",
+    "WAITING",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+    "SKIPPED"
+  ],
+  "workflow_transitions": {
+    "CREATED": [
+      "CANCELLED",
+      "READY"
+    ],
+    "READY": [
+      "CANCELLED",
+      "RUNNING"
+    ],
+    "RUNNING": [
+      "CANCELLED",
+      "COMPLETED",
+      "FAILED",
+      "PAUSED",
+      "WAITING"
+    ],
+    "PAUSED": [
+      "CANCELLED",
+      "FAILED",
+      "RUNNING"
+    ],
+    "WAITING": [
+      "CANCELLED",
+      "FAILED",
+      "RUNNING"
+    ],
+    "COMPLETED": [],
+    "FAILED": [],
+    "CANCELLED": []
+  },
+  "task_transitions": {
+    "PENDING": [
+      "CANCELLED",
+      "READY",
+      "SKIPPED"
+    ],
+    "READY": [
+      "CANCELLED",
+      "FAILED",
+      "RUNNING",
+      "WAITING"
+    ],
+    "RUNNING": [
+      "CANCELLED",
+      "COMPLETED",
+      "FAILED",
+      "READY",
+      "WAITING"
+    ],
+    "WAITING": [
+      "CANCELLED",
+      "FAILED",
+      "READY",
+      "RUNNING"
+    ],
+    "COMPLETED": [],
+    "FAILED": [],
+    "CANCELLED": [],
+    "SKIPPED": []
+  },
+  "governance_mapping": {
+    "CLEAR": {
+      "directive": "CONTINUE",
+      "workflow": "RUNNING",
+      "provider_called": true
+    },
+    "HOLD": {
+      "directive": "WAIT",
+      "task": "WAITING",
+      "workflow": "WAITING",
+      "provider_called": false
+    },
+    "BLOCK": {
+      "directive": "STOP",
+      "task": "FAILED",
+      "workflow": "FAILED",
+      "provider_called": false
+    },
+    "ESCALATE": {
+      "directive": "PAUSE",
+      "task": "WAITING",
+      "workflow": "PAUSED",
+      "provider_called": false
+    }
+  }
+}
