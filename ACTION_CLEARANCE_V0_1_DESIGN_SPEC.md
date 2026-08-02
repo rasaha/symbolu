@@ -416,6 +416,16 @@ race handling, and the execution-ledger dependency. [`RISK_REGISTER.md`](docs/de
 [`ROLLBACK.md`](docs/design/action_clearance/ROLLBACK.md), machine-readable
 [`design_decisions.json`](docs/design/action_clearance/design_decisions.json).
 
+**Prerequisite closure (follow-on phase).** The four implementation-prerequisites above (signal
+provenance, receipt persistence, receipt lifecycle, atomic one-time reservation) are closed at the
+interface/contract level in the companion set under
+[`docs/design/action_clearance_prerequisites/`](docs/design/action_clearance_prerequisites/) — see its
+[`PREREQUISITE_CLOSURE_REPORT.md`](docs/design/action_clearance_prerequisites/PREREQUISITE_CLOSURE_REPORT.md)
+and machine-readable
+[`implementation_gate.json`](docs/design/action_clearance_prerequisites/implementation_gate.json). That
+phase concludes the package core may begin while durable atomic execution infrastructure remains an
+enforcement prerequisite.
+
 ---
 
 ## 34–36. Deliverables, machine-readable rules, validation
