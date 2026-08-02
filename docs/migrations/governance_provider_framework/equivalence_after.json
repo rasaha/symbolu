@@ -1,0 +1,984 @@
+{
+  "api_all": [
+    "__version__",
+    "CONTRACT_VERSION",
+    "ProviderKind",
+    "ProviderDescriptor",
+    "ProviderCapabilities",
+    "ProviderCompatibility",
+    "ProviderHealth",
+    "ProviderLifecycleState",
+    "Provider",
+    "BaseProvider",
+    "AssertionGovernanceProvider",
+    "AssertionGovernanceRequest",
+    "AssertionGovernanceResult",
+    "AssertionCoverage",
+    "ActionGovernanceProvider",
+    "ActionGovernanceRequest",
+    "ActionGovernanceResult",
+    "ActionGovernanceOutcome",
+    "ExternalExecutionProvider",
+    "ExecutionDispatchRequest",
+    "ExecutionDispatchResult",
+    "ExecutionObservation",
+    "ExecutionBusinessOutcome",
+    "ProviderRegistry",
+    "resolve",
+    "ResolutionRequest",
+    "ResolutionRecord",
+    "SelectionRule",
+    "ProvidersConfiguration",
+    "ProviderEntry",
+    "ActionGovernanceControlPlaneAdapter",
+    "ExternalExecutionAdapter",
+    "AssertionAssessmentIntegration",
+    "AssertionAssessment",
+    "AssertionLinkedRecordAdapter",
+    "ProviderInvocationLog",
+    "ProviderInvocationRecord",
+    "record_invocation",
+    "ProviderError",
+    "ProviderRegistrationError",
+    "ProviderResolutionError",
+    "ProviderCompatibilityError",
+    "ProviderConfigurationError",
+    "ProviderUnavailableError",
+    "ProviderTimeoutError",
+    "ProviderProtocolError",
+    "ProviderResultValidationError",
+    "FailureClass"
+  ],
+  "api_symbols": {
+    "ActionGovernanceControlPlaneAdapter": {
+      "kind": "class",
+      "name": "ActionGovernanceControlPlaneAdapter"
+    },
+    "ActionGovernanceOutcome": {
+      "kind": "enum",
+      "values": {
+        "AUTHORIZED": "AUTHORIZED",
+        "AUTHORIZED_WITH_CONSTRAINTS": "AUTHORIZED_WITH_CONSTRAINTS",
+        "DENIED": "DENIED",
+        "EXPIRED": "EXPIRED",
+        "INDETERMINATE": "INDETERMINATE"
+      }
+    },
+    "ActionGovernanceProvider": {
+      "kind": "class",
+      "name": "ActionGovernanceProvider"
+    },
+    "ActionGovernanceRequest": {
+      "dataclass_fields": {
+        "action_type": {
+          "has_default": false,
+          "type": "str"
+        },
+        "actor": {
+          "has_default": true,
+          "type": "str"
+        },
+        "authority_context": {
+          "has_default": true,
+          "type": "str"
+        },
+        "authorization_expired": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "correlation_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "decision_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "evidence_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "idempotency_key": {
+          "has_default": true,
+          "type": "str"
+        },
+        "policy_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "requested_parameters": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        },
+        "risk_context": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        },
+        "target_resource": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ActionGovernanceRequest"
+    },
+    "ActionGovernanceResult": {
+      "dataclass_fields": {
+        "authority_basis": {
+          "has_default": true,
+          "type": "str"
+        },
+        "constraints": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "expiry": {
+          "has_default": true,
+          "type": "Optional[datetime]"
+        },
+        "fingerprint": {
+          "has_default": true,
+          "type": "str"
+        },
+        "obligations": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "outcome": {
+          "has_default": false,
+          "type": "ActionGovernanceOutcome"
+        },
+        "provider_trace_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "reason_codes": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ActionGovernanceResult"
+    },
+    "AssertionAssessment": {
+      "dataclass_fields": {
+        "assertion": {
+          "has_default": false,
+          "type": "str"
+        },
+        "assertion_type": {
+          "has_default": false,
+          "type": "str"
+        },
+        "blocked": {
+          "has_default": false,
+          "type": "bool"
+        },
+        "coverage": {
+          "has_default": false,
+          "type": "AssertionCoverage"
+        },
+        "covered_evidence_refs": {
+          "has_default": false,
+          "type": "tuple[str, ...]"
+        },
+        "evidence_coverage": {
+          "has_default": false,
+          "type": "float"
+        },
+        "explanation_refs": {
+          "has_default": false,
+          "type": "tuple[str, ...]"
+        },
+        "finalized": {
+          "has_default": false,
+          "type": "bool"
+        },
+        "fingerprint": {
+          "has_default": false,
+          "type": "str"
+        },
+        "provider_trace_id": {
+          "has_default": false,
+          "type": "str"
+        },
+        "unsupported_elements": {
+          "has_default": false,
+          "type": "tuple[str, ...]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "AssertionAssessment"
+    },
+    "AssertionAssessmentIntegration": {
+      "kind": "class",
+      "name": "AssertionAssessmentIntegration"
+    },
+    "AssertionCoverage": {
+      "kind": "enum",
+      "values": {
+        "CONSTRAINED": "CONSTRAINED",
+        "INDETERMINATE": "INDETERMINATE",
+        "SUPPORTED": "SUPPORTED",
+        "UNSUPPORTED": "UNSUPPORTED"
+      }
+    },
+    "AssertionGovernanceProvider": {
+      "kind": "class",
+      "name": "AssertionGovernanceProvider"
+    },
+    "AssertionGovernanceRequest": {
+      "dataclass_fields": {
+        "assertion": {
+          "has_default": false,
+          "type": "str"
+        },
+        "assertion_type": {
+          "has_default": true,
+          "type": "str"
+        },
+        "context": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        },
+        "correlation_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "evidence_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "policy_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "source_identity": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "AssertionGovernanceRequest"
+    },
+    "AssertionGovernanceResult": {
+      "dataclass_fields": {
+        "constraints": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "coverage": {
+          "has_default": false,
+          "type": "AssertionCoverage"
+        },
+        "covered_evidence_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "evidence_coverage": {
+          "has_default": true,
+          "type": "float"
+        },
+        "explanation_refs": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "fingerprint": {
+          "has_default": true,
+          "type": "str"
+        },
+        "obligations": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "omitted_qualifiers": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        },
+        "provider_trace_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "unsupported_elements": {
+          "has_default": true,
+          "type": "tuple[str, ...]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "AssertionGovernanceResult"
+    },
+    "AssertionLinkedRecordAdapter": {
+      "kind": "class",
+      "name": "AssertionLinkedRecordAdapter"
+    },
+    "BaseProvider": {
+      "kind": "class",
+      "name": "BaseProvider"
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "1.0.0"
+    },
+    "ExecutionBusinessOutcome": {
+      "kind": "enum",
+      "values": {
+        "DUPLICATE": "DUPLICATE",
+        "FAILED": "FAILED",
+        "PENDING": "PENDING",
+        "REJECTED": "REJECTED",
+        "SUCCEEDED": "SUCCEEDED",
+        "UNKNOWN": "UNKNOWN"
+      }
+    },
+    "ExecutionDispatchRequest": {
+      "dataclass_fields": {
+        "action_type": {
+          "has_default": false,
+          "type": "str"
+        },
+        "correlation_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "idempotency_key": {
+          "has_default": true,
+          "type": "str"
+        },
+        "parameters": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ExecutionDispatchRequest"
+    },
+    "ExecutionDispatchResult": {
+      "dataclass_fields": {
+        "accepted": {
+          "has_default": false,
+          "type": "bool"
+        },
+        "acknowledgement": {
+          "has_default": true,
+          "type": "str"
+        },
+        "external_request_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "pending": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "retryable": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "timed_out": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "transport_error": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ExecutionDispatchResult"
+    },
+    "ExecutionObservation": {
+      "dataclass_fields": {
+        "business_outcome": {
+          "has_default": false,
+          "type": "ExecutionBusinessOutcome"
+        },
+        "final": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "fingerprint": {
+          "has_default": true,
+          "type": "str"
+        },
+        "observed_parameters": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        },
+        "provider_trace_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "reason": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ExecutionObservation"
+    },
+    "ExternalExecutionAdapter": {
+      "kind": "class",
+      "name": "ExternalExecutionAdapter"
+    },
+    "ExternalExecutionProvider": {
+      "kind": "class",
+      "name": "ExternalExecutionProvider"
+    },
+    "FailureClass": {
+      "kind": "enum",
+      "values": {
+        "COMPATIBILITY": "COMPATIBILITY",
+        "CONFIGURATION": "CONFIGURATION",
+        "INDETERMINATE": "INDETERMINATE",
+        "RETRYABLE": "RETRYABLE",
+        "TERMINAL": "TERMINAL"
+      }
+    },
+    "Provider": {
+      "kind": "class",
+      "name": "Provider"
+    },
+    "ProviderCapabilities": {
+      "dataclass_fields": {
+        "deterministic": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "features": {
+          "has_default": true,
+          "type": "frozenset[str]"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "ProviderKind"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderCapabilities"
+    },
+    "ProviderCompatibility": {
+      "dataclass_fields": {
+        "compatible_kernel_majors": {
+          "has_default": true,
+          "type": "frozenset[str]"
+        },
+        "config_schema_version": {
+          "has_default": true,
+          "type": "str"
+        },
+        "contract_version": {
+          "has_default": false,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderCompatibility"
+    },
+    "ProviderCompatibilityError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderConfigurationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderDescriptor": {
+      "dataclass_fields": {
+        "capabilities": {
+          "has_default": false,
+          "type": "ProviderCapabilities"
+        },
+        "compatibility": {
+          "has_default": false,
+          "type": "ProviderCompatibility"
+        },
+        "default": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "factory": {
+          "has_default": false,
+          "type": "Callable[[], object]"
+        },
+        "implementation_version": {
+          "has_default": false,
+          "type": "str"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "ProviderKind"
+        },
+        "metadata": {
+          "has_default": true,
+          "type": "dict[str, str]"
+        },
+        "provider_id": {
+          "has_default": false,
+          "type": "str"
+        },
+        "vendor": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderDescriptor"
+    },
+    "ProviderEntry": {
+      "dataclass_fields": {
+        "contract_version": {
+          "has_default": true,
+          "type": "str"
+        },
+        "default": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "enabled": {
+          "has_default": true,
+          "type": "bool"
+        },
+        "implementation": {
+          "has_default": true,
+          "type": "str"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "ProviderKind"
+        },
+        "provider_id": {
+          "has_default": false,
+          "type": "str"
+        },
+        "secret_refs": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        },
+        "settings": {
+          "has_default": true,
+          "type": "Mapping[str, str]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderEntry"
+    },
+    "ProviderError": {
+      "bases": [
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderHealth": {
+      "dataclass_fields": {
+        "detail": {
+          "has_default": true,
+          "type": "str"
+        },
+        "healthy": {
+          "has_default": false,
+          "type": "bool"
+        },
+        "state": {
+          "has_default": false,
+          "type": "ProviderLifecycleState"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderHealth"
+    },
+    "ProviderInvocationLog": {
+      "kind": "class",
+      "name": "ProviderInvocationLog"
+    },
+    "ProviderInvocationRecord": {
+      "dataclass_fields": {
+        "completed": {
+          "has_default": false,
+          "type": "bool"
+        },
+        "error_class": {
+          "has_default": true,
+          "type": "Optional[str]"
+        },
+        "failure_class": {
+          "has_default": true,
+          "type": "Optional[str]"
+        },
+        "fallback_provider_id": {
+          "has_default": true,
+          "type": "str"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "str"
+        },
+        "operation": {
+          "has_default": false,
+          "type": "str"
+        },
+        "outcome": {
+          "has_default": true,
+          "type": "str"
+        },
+        "provider_id": {
+          "has_default": false,
+          "type": "str"
+        },
+        "trace_id": {
+          "has_default": true,
+          "type": "str"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProviderInvocationRecord"
+    },
+    "ProviderKind": {
+      "kind": "enum",
+      "values": {
+        "ACTION_GOVERNANCE": "ACTION_GOVERNANCE",
+        "ASSERTION_GOVERNANCE": "ASSERTION_GOVERNANCE",
+        "EXTERNAL_EXECUTION": "EXTERNAL_EXECUTION"
+      }
+    },
+    "ProviderLifecycleState": {
+      "kind": "enum",
+      "values": {
+        "AVAILABLE": "AVAILABLE",
+        "DEGRADED": "DEGRADED",
+        "INITIALIZING": "INITIALIZING",
+        "REGISTERED": "REGISTERED",
+        "STOPPED": "STOPPED",
+        "STOPPING": "STOPPING",
+        "UNAVAILABLE": "UNAVAILABLE"
+      }
+    },
+    "ProviderProtocolError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderRegistrationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderRegistry": {
+      "kind": "class",
+      "name": "ProviderRegistry"
+    },
+    "ProviderResolutionError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderResultValidationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderTimeoutError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderUnavailableError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProvidersConfiguration": {
+      "dataclass_fields": {
+        "entries": {
+          "has_default": true,
+          "type": "tuple[ProviderEntry, ...]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ProvidersConfiguration"
+    },
+    "ResolutionRecord": {
+      "dataclass_fields": {
+        "candidate_ids": {
+          "has_default": false,
+          "type": "tuple[str, ...]"
+        },
+        "compatibility": {
+          "has_default": false,
+          "type": "dict[str, bool]"
+        },
+        "failure_reason": {
+          "has_default": true,
+          "type": "str"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "ProviderKind"
+        },
+        "requested_capability": {
+          "has_default": false,
+          "type": "Optional[str]"
+        },
+        "selected_id": {
+          "has_default": false,
+          "type": "Optional[str]"
+        },
+        "selection_rule": {
+          "has_default": false,
+          "type": "SelectionRule"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ResolutionRecord"
+    },
+    "ResolutionRequest": {
+      "dataclass_fields": {
+        "capability": {
+          "has_default": true,
+          "type": "Optional[str]"
+        },
+        "domain_default": {
+          "has_default": true,
+          "type": "Optional[str]"
+        },
+        "global_default": {
+          "has_default": true,
+          "type": "Optional[str]"
+        },
+        "kind": {
+          "has_default": false,
+          "type": "ProviderKind"
+        },
+        "provider_id": {
+          "has_default": true,
+          "type": "Optional[str]"
+        }
+      },
+      "frozen": true,
+      "kind": "class",
+      "name": "ResolutionRequest"
+    },
+    "SelectionRule": {
+      "kind": "enum",
+      "values": {
+        "DOMAIN_DEFAULT": "DOMAIN_DEFAULT",
+        "EXPLICIT_ID": "EXPLICIT_ID",
+        "GLOBAL_DEFAULT": "GLOBAL_DEFAULT",
+        "SINGLE_COMPATIBLE": "SINGLE_COMPATIBLE",
+        "UNRESOLVED": "UNRESOLVED"
+      }
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "record_invocation": {
+      "kind": "function",
+      "signature": "(provider_id: 'str', kind: 'str', operation: 'str', fn: 'Callable[[], T]', *, log: 'Optional[ProviderInvocationLog]' = None, trace_id: 'str' = '') -> 'T'"
+    },
+    "resolve": {
+      "kind": "function",
+      "signature": "(registry: 'ProviderRegistry', request: 'ResolutionRequest') -> 'tuple[Provider, ResolutionRecord]'"
+    }
+  },
+  "contract_version": "1.0.0",
+  "error_mro": {
+    "ProviderCompatibilityError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderConfigurationError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderError": [
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderProtocolError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderRegistrationError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderResolutionError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderResultValidationError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderTimeoutError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ],
+    "ProviderUnavailableError": [
+      "ProviderError",
+      "Exception",
+      "BaseException"
+    ]
+  },
+  "fingerprint_sample": {
+    "empty_dict": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "nested": "87916a5c50f0aa6f3d19b5ee1b2dccd72a36171ddb3e3ec1221c4c93c049ad75"
+  },
+  "framework_version": "0.1.0",
+  "lifecycle_states": [
+    "REGISTERED",
+    "INITIALIZING",
+    "AVAILABLE",
+    "DEGRADED",
+    "UNAVAILABLE",
+    "STOPPING",
+    "STOPPED"
+  ],
+  "lifecycle_transitions": {
+    "AVAILABLE->AVAILABLE": false,
+    "AVAILABLE->DEGRADED": true,
+    "AVAILABLE->INITIALIZING": false,
+    "AVAILABLE->REGISTERED": false,
+    "AVAILABLE->STOPPED": false,
+    "AVAILABLE->STOPPING": true,
+    "AVAILABLE->UNAVAILABLE": true,
+    "DEGRADED->AVAILABLE": true,
+    "DEGRADED->DEGRADED": false,
+    "DEGRADED->INITIALIZING": false,
+    "DEGRADED->REGISTERED": false,
+    "DEGRADED->STOPPED": false,
+    "DEGRADED->STOPPING": true,
+    "DEGRADED->UNAVAILABLE": true,
+    "INITIALIZING->AVAILABLE": true,
+    "INITIALIZING->DEGRADED": false,
+    "INITIALIZING->INITIALIZING": false,
+    "INITIALIZING->REGISTERED": false,
+    "INITIALIZING->STOPPED": false,
+    "INITIALIZING->STOPPING": true,
+    "INITIALIZING->UNAVAILABLE": true,
+    "REGISTERED->AVAILABLE": false,
+    "REGISTERED->DEGRADED": false,
+    "REGISTERED->INITIALIZING": true,
+    "REGISTERED->REGISTERED": false,
+    "REGISTERED->STOPPED": false,
+    "REGISTERED->STOPPING": true,
+    "REGISTERED->UNAVAILABLE": false,
+    "STOPPED->AVAILABLE": false,
+    "STOPPED->DEGRADED": false,
+    "STOPPED->INITIALIZING": false,
+    "STOPPED->REGISTERED": false,
+    "STOPPED->STOPPED": false,
+    "STOPPED->STOPPING": false,
+    "STOPPED->UNAVAILABLE": false,
+    "STOPPING->AVAILABLE": false,
+    "STOPPING->DEGRADED": false,
+    "STOPPING->INITIALIZING": false,
+    "STOPPING->REGISTERED": false,
+    "STOPPING->STOPPED": true,
+    "STOPPING->STOPPING": false,
+    "STOPPING->UNAVAILABLE": false,
+    "UNAVAILABLE->AVAILABLE": false,
+    "UNAVAILABLE->DEGRADED": false,
+    "UNAVAILABLE->INITIALIZING": true,
+    "UNAVAILABLE->REGISTERED": false,
+    "UNAVAILABLE->STOPPED": false,
+    "UNAVAILABLE->STOPPING": true,
+    "UNAVAILABLE->UNAVAILABLE": false
+  },
+  "reference_descriptors": {
+    "action": {
+      "implementation_version": "0.1.0",
+      "kind": "ACTION_GOVERNANCE",
+      "provider_id": "deterministic-action"
+    },
+    "assertion": {
+      "implementation_version": "0.1.0",
+      "kind": "ASSERTION_GOVERNANCE",
+      "provider_id": "deterministic-assertion"
+    },
+    "execution": {
+      "implementation_version": "0.1.0",
+      "kind": "EXTERNAL_EXECUTION",
+      "provider_id": "deterministic-execution"
+    }
+  },
+  "registry": {
+    "duplicate_raises": "ProviderRegistrationError",
+    "registered_ids": [
+      "deterministic-action",
+      "deterministic-assertion",
+      "deterministic-execution"
+    ]
+  },
+  "resolution": {
+    "ACTION_GOVERNANCE": {
+      "provider_id": "deterministic-action",
+      "record_type": "ResolutionRecord"
+    },
+    "ASSERTION_GOVERNANCE": {
+      "provider_id": "deterministic-assertion",
+      "record_type": "ResolutionRecord"
+    },
+    "EXTERNAL_EXECUTION": {
+      "provider_id": "deterministic-execution",
+      "record_type": "ResolutionRecord"
+    }
+  },
+  "target_kernel_major": 1,
+  "version_predicates": {
+    "is_contract_compatible(1.0.0)": true,
+    "is_contract_compatible(2.0.0)": false,
+    "is_kernel_compatible(1.0.0)": true,
+    "is_kernel_compatible(2.0.0)": false
+  }
+}

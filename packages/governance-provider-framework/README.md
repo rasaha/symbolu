@@ -14,17 +14,22 @@ governance providers. It **owns no governance authority**.
 
 ## Authority boundary
 
-The Governance Provider Framework provides **capability-neutral provider
-mechanics**. It does **not** own assertion admissibility, binding-decision
-authority, exact-action authorization, operational clearance, sequence-risk
-judgment, workflow execution, or product composition. It is not a universal
-router, adjudicator, policy engine, orchestrator, execution authority, capability
-authority, product-composition layer, or AI Control Plane. Coordination transfers
-no authority.
+> The Governance Provider Framework provides capability-neutral provider
+> mechanics. It does not own assertion admissibility, binding-decision authority,
+> exact-action authorization, operational clearance, sequence-risk judgment,
+> workflow execution, or product composition.
 
-Concrete providers (TAP for assertion evidence, ActionGate for exact-action
-authorization, the baselines) remain **separate packages** and retain only the
-authority delegated by their bounded capability.
+It is not a universal router, adjudicator, policy engine, orchestrator, execution
+authority, capability authority, product-composition layer, or AI Control Plane.
+Coordination transfers no authority.
+
+> Concrete providers remain separate packages and retain only the authority
+> delegated by their bounded capability.
+
+TAP (assertion evidence and admissibility), ActionGate (exact-action
+authorization), and the baselines remain **separate packages** with their own
+wheels; the framework never instantiates or selects a concrete provider except
+through neutral registration.
 
 ## What's in it
 
