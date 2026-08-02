@@ -221,8 +221,13 @@ It evaluates requirement coverage, correctness/test/security evidence, API
 compatibility, architectural consistency, unnecessary churn, performance effects,
 maintainability, and unresolved risks. Its output is a **recommendation**.
 
-The adjudicator **cannot** approve the merge, waive hard-policy failures, override
-failing tests, authorize execution, or merge code.
+The adjudicator **cannot**: approve a pull request; create a binding business
+decision; waive hard-policy failures; override deterministic evidence (e.g. failing
+tests); authorize a merge; invoke merge execution; authorize deployment; combine or
+inherit any other authority; or become Decision Authority. Its only outputs are the
+five recommendation outcomes above. This is enforced structurally: its output type
+is a recommendation record with no reference to, and no path to producing, a
+`MergeDecisionRecord` or an `ExactChangeAuthorization`.
 
 ### 4.3 Decision Authority — binding merge decision
 
@@ -238,6 +243,14 @@ kernel (v1.0.0) reached via `ugence_decision_authority.api` (legacy
 Request (CER)** — the kernel's existing hand-off object — which is what ActionGate
 authorizes and ACP clears, matching the platform's governed loop
 (Decision → CER → ActionGate → ACP → execution → reconciliation).
+
+> **Provider ≠ Decision Authority.** The GitHub provider *supplies inputs* to
+> Decision Authority — repository identity, pull-request identity, commit SHA,
+> reviews, branch state, CI evidence, merge-operation details — but it does **not**
+> perform authority validation, evidence-completeness checks, segregation of duties,
+> required-approval evaluation, exception/override handling, or the production of the
+> immutable binding merge-decision record. Those remain Decision Authority's, and the
+> provider can neither manufacture nor widen that authority.
 
 ### 4.4 ActionGate — exact-change authorization (`ACTION_GOVERNANCE`)
 
@@ -291,13 +304,16 @@ ACP live clearance
 Execution (merge / deploy)
 ```
 
-An LLM adjudicator must **never** override: failing mandatory tests, prohibited
-dependencies, absent required reviewers, invalid authority, a changed commit SHA,
-a failed security policy, unavailable evidence, or jurisdiction/regulatory
-restrictions. This is enforced structurally — the adjudicator's output type is a
-recommendation object with no path to an authorization, and the pipeline requires
-a `MergeDecisionRecord` from Decision Authority before ActionGate will mint an
-`ExactChangeAuthorization`.
+A preferred adjudicator output must **never** override any of: failing mandatory
+tests, security-policy failures, unavailable required evidence, invalid or missing
+reviewers, segregation-of-duties violations, prohibited dependencies, a changed
+commit SHA, an expired authorization, deployment-freeze windows, active blocking
+incidents, or jurisdiction/regulatory restrictions. This is enforced structurally —
+the adjudicator's output type is a recommendation object with no path to an
+authorization; the pipeline requires a `MergeDecisionRecord` from Decision Authority
+before ActionGate will mint an `ExactChangeAuthorization`; and ACP re-checks the live
+conditions (SHA, CI, security, incident, freeze, expiry) immediately before
+execution.
 
 ---
 
@@ -350,6 +366,29 @@ All records are written to the platform's durable, tamper-evident, hash-chained
 audit store (a shared platform service — see
 [`UGENCE_PRODUCTIZATION_ROADMAP.md`](UGENCE_PRODUCTIZATION_ROADMAP.md) §3) so a
 complete decision chain is reconstructable on demand.
+
+### 6.1 Ownership — these are design concepts, not new contracts (this phase)
+
+The objects above are **design concepts**. This phase adds **nothing** to
+`ugence_governance_contracts` and defines no new frozen types. Several concepts map
+onto types that already exist and are authoritative; duplicating them is prohibited.
+Likely eventual ownership (to be settled by the implementation-readiness audit, not
+here):
+
+| Object | Likely owner | Note |
+|---|---|---|
+| FrozenTaskEnvelope | Competitive Adjudication / workflow layer | new concept |
+| PatchCandidate | Competitive Adjudication | new concept |
+| ValidationEvidenceBundle | Code Governance product/app layer | composes **existing** evidence references, does not replace them |
+| AdjudicationRecommendation | Competitive Adjudication | new concept |
+| MergeDecisionRecord | **Decision Authority** | map onto its existing decision / CER model — do **not** create a parallel record |
+| ExactChangeAuthorization | **ActionGate** | ActionGate's existing authorization representation |
+| OperationalClearanceRecord | **ACP** | ACP's existing clearance representation |
+
+> The implementation-readiness audit must map each conceptual record onto an existing
+> repository type **before** any new contract is introduced. Where a capability
+> already owns a frozen authoritative type, the concept binds to it rather than
+> spawning a duplicate.
 
 ---
 
@@ -424,6 +463,34 @@ Competitive generation only works when independence is preserved:
   alone (anti-gaming — see §16.1).
 - The adjudicator cannot execute the merge.
 - The same model instance must not write, adjudicate, approve, **and** merge.
+
+### 9.1 Candidate-generation orchestration ownership (explicit design decision)
+
+**Candidate-generation orchestration** — the act of producing (or soliciting) one or
+more candidate patches from a `FrozenTaskEnvelope`, in isolated worktrees, and
+handing the validated results downstream — is **deliberately not owned by any
+governance component.** It must **not** be hidden inside the Governance Provider
+Framework, and it is **not** owned by Decision Authority, ActionGate, TAP, ACP,
+StoryGraph, or the GitHub provider. Folding orchestration into any of these would
+collapse the write/validate/approve/execute separation the product exists to
+enforce.
+
+Plausible **future** owners (none implemented in this phase; the choice is left
+open on purpose):
+
+- **Agent Runtime** — the platform's digital execution runtime, the most natural
+  home for supervised, worktree-isolated candidate generation.
+- **Optional Orchestrator** — the bypassable workflow composer in the AI Control
+  Plane (it coordinates but acquires no authority from what it invokes).
+- **A dedicated competitive-development workflow service** — a new, explicitly
+  optional component.
+- **An external coding-agent platform** — Ugence governs candidates produced
+  entirely outside it (the MVP-1 posture: observe candidates arriving as branches/PRs).
+
+Whichever owner is chosen, the governance authorities must remain **separately
+invocable and independently authoritative** — orchestration coordinates them; it
+never speaks for them. In MVP 1 there is no orchestration at all: a human or a
+single external agent produces one PR and Ugence governs it.
 
 ---
 
@@ -591,6 +658,22 @@ patch/incident/rollback outcomes, and regulated-software control mappings.
 > implementation through evidence-based selection, authorized merge, and safe
 > deployment.*
 
+### 15.1 Positioning statements & claim discipline
+
+**Product:** *Ugence Code Governance governs AI-generated and human-written software
+changes from proposal through evidence validation, authorized approval, exact-change
+merge authorization, and safe deployment.*
+
+**Competitive mode:** *Competitive Code Adjudication independently generates or
+receives multiple candidate patches, validates them through deterministic evidence,
+and produces a non-binding recommendation for governed approval.*
+
+**Claim discipline.** Ugence does **not** claim to prove code universally correct.
+What it establishes about an approved change is that it is: **evidence-supported ·
+policy-compliant · approved under declared controls · bound to the exact reviewed
+artifact · reconstructable · operationally cleared.** Marketing and documentation
+must stay within these claims.
+
 ---
 
 ## 16. Recommended additional enhancements
@@ -598,29 +681,52 @@ patch/incident/rollback outcomes, and regulated-software control mappings.
 These are proposed *additions* beyond the base definition. Each is scoped so it can
 be adopted independently; priority is the author's recommendation.
 
-### 16.1 Adjudicator & TAP anti-gaming hardening — **P0**
+### 16.1 Adjudicator & TAP anti-gaming hardening — **P0 (mandatory design constraint)**
 
-AI-authored PRs and their descriptions are untrusted input. Concrete controls:
+These are **not optional niceties** — they are mandatory constraints without which an
+AI can defeat its own governance. AI-authored PRs and their descriptions are
+untrusted input. Concrete controls:
+- **Untrusted content.** Pull-request prose, comments, commit messages, and
+  source-code text are treated as **untrusted content**, never as instructions.
 - **Prompt-injection isolation.** The adjudicator and TAP consume *structured
-  evidence records*, never raw PR prose, commit messages, or code comments as
-  instructions. Untrusted text is passed as data with explicit provenance, never
-  as part of the judging instruction.
+  evidence records*; untrusted text is passed as data with explicit provenance and
+  can never become part of the judging instruction.
 - **Test-tampering detection.** A differential check flags candidates that *weaken
   or delete tests/assertions* to make a claim pass (coverage delta, assertion
   count delta, mutation-score delta on touched code). Emitting a green
   `unit_tests: pass` while removing the test that covered the changed line is a
   contradiction TAP must catch, not admit.
+- **Same-candidate policy-tampering detection.** Detect a candidate that modifies
+  CI configuration, security-scan configuration, or governance/branch-protection
+  policy **within the same change** it is trying to land (feeds StoryGraph's
+  control-erosion pack, §16.3).
+- **No self-governing candidates.** A candidate must not be able to control its own
+  validation policy — the effective policy is resolved from the repository policy
+  pack, never from files the candidate introduces or edits.
 - **Evidence provenance binding.** Every evidence id is signed by the validator
   that produced it; the adjudicator cannot cite evidence that no admitted
   validator emitted.
 
-### 16.2 Supply-chain provenance & attestation — **P0**
+### 16.2 Supply-chain provenance & attestation — **P0 (required before production deployment governance)**
 
-Bind the approved artifact to verifiable provenance, not just a SHA string:
+Bind the approved artifact to verifiable provenance, not just a SHA string. Adopt as
+a **progression**, so the pull-request MVP is not blocked on build infrastructure
+that does not exist yet:
+
+```text
+Pull-request MVP:      exact commit-SHA + admitted-evidence binding   (available now)
+Production deployment: signed build provenance + artifact-digest binding  (MVP 3)
+```
+
+- **MVP 1 (now).** Exact commit-SHA binding plus admitted evidence is sufficient and
+  is what ships first.
 - **Signed commits / verified authorship** required by policy for high-risk paths.
-- **In-toto / SLSA build provenance** and, for MVP3, **container image digest +
-  signature (e.g. cosign)** carried in `OperationalClearanceRecord.deployment_target`
-  so ACP clears the *exact* built artifact, closing the source→build→deploy gap.
+- **Build provenance and image-digest binding (MVP 3).** Container image digest +
+  signature, carried in `OperationalClearanceRecord.deployment_target` so ACP clears
+  the *exact* built artifact, closing the source→build→deploy gap. Frameworks such as
+  **in-toto / SLSA / cosign are candidate mechanisms, not existing implementations** —
+  none is implemented in this repository today, and this document does not claim
+  otherwise.
 - **SBOM diff as first-class evidence.** Dependency changes attach an SBOM delta +
   vulnerability-feed lookup, feeding the `dependency_scan_results` claim.
 
