@@ -1,0 +1,1113 @@
+{
+  "execution_gate.gate": {
+    "CONFIG_EVIDENCE": {
+      "kind": "function",
+      "signature": "(now)"
+    },
+    "Candidate": {
+      "fields": {
+        "context_limit": {
+          "default": "8000",
+          "type": "int"
+        },
+        "developer": {
+          "default": "''",
+          "type": "str"
+        },
+        "family": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "price_in_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "price_out_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "region": {
+          "default": "'global'",
+          "type": "str"
+        },
+        "signals": {
+          "default": "factory:dict",
+          "type": "Dict[str, Signal]"
+        },
+        "structured_output": {
+          "default": "False",
+          "type": "bool"
+        },
+        "tool_use": {
+          "default": "False",
+          "type": "bool"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "ConditionResult": {
+      "fields": {
+        "condition": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "criticality": {
+          "default": "<required>",
+          "type": "Criticality"
+        },
+        "detail": {
+          "default": "''",
+          "type": "str"
+        },
+        "evidence": {
+          "default": "<required>",
+          "type": "Evidence"
+        },
+        "reason": {
+          "default": "<required>",
+          "type": "ReasonCode"
+        },
+        "verdict": {
+          "default": "<required>",
+          "type": "Verdict"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Criticality": {
+      "kind": "enum",
+      "members": {
+        "CRITICAL_GOV": "CRITICAL_GOV",
+        "CRITICAL_OP": "CRITICAL_OP",
+        "OPERATIONAL": "OPERATIONAL"
+      }
+    },
+    "EligibilityDecision": {
+      "fields": {
+        "conditions": {
+          "default": "factory:list",
+          "type": "List[ConditionResult]"
+        },
+        "evaluated_at": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "reasons": {
+          "default": "factory:list",
+          "type": "List[ReasonCode]"
+        },
+        "state": {
+          "default": "<required>",
+          "type": "EligibilityState"
+        },
+        "ttl_seconds": {
+          "default": "0.0",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EligibilityState": {
+      "kind": "enum",
+      "members": {
+        "CONDITIONALLY_ELIGIBLE": "CONDITIONALLY_ELIGIBLE",
+        "ELIGIBLE": "ELIGIBLE",
+        "INDETERMINATE": "INDETERMINATE",
+        "INELIGIBLE": "INELIGIBLE"
+      }
+    },
+    "Evidence": {
+      "fields": {
+        "confidence": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "raw_signal": {
+          "default": "None",
+          "type": "Optional[str]"
+        },
+        "source": {
+          "default": "<required>",
+          "type": "EvidenceSource"
+        },
+        "timestamp": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "ttl_seconds": {
+          "default": "<required>",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EvidenceSource": {
+      "kind": "enum",
+      "members": {
+        "CACHE": "cache",
+        "CONFIG": "config",
+        "LIVE_PROBE": "live_probe",
+        "PROVIDER_DECLARED": "provider_declared",
+        "TELEMETRY": "telemetry"
+      }
+    },
+    "ExecutionGate": {
+      "kind": "class",
+      "methods": {
+        "__init__": "(self, config: 'Optional[GateConfig]' = None)",
+        "evaluate": "(self, cand: 'Candidate', req: 'Request', now: 'float') -> 'EligibilityDecision'"
+      }
+    },
+    "GateConfig": {
+      "fields": {
+        "allow_conditional": {
+          "default": "True",
+          "type": "bool"
+        },
+        "default_latency_limit_ms": {
+          "default": "60000.0",
+          "type": "float"
+        },
+        "indeterminate_on_unknown": {
+          "default": "factory:<lambda>",
+          "type": "Set[str]"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "reliability_floor": {
+          "default": "0.9",
+          "type": "float"
+        },
+        "require_billing": {
+          "default": "False",
+          "type": "bool"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "ReasonCode": {
+      "kind": "enum",
+      "members": {
+        "AUTH_EXPIRED": "AUTH_EXPIRED",
+        "AUTH_INVALID": "AUTH_INVALID",
+        "AUTH_MISSING": "AUTH_MISSING",
+        "BILLING_INACTIVE": "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL": "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED": "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION": "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE": "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED": "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY": "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED": "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED": "MODEL_DISABLED",
+        "MODEL_NOT_FOUND": "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED": "NETWORK_BLOCKED",
+        "OK": "OK",
+        "POLICY_STATE_UNKNOWN": "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED": "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED": "PROVIDER_NOT_APPROVED",
+        "QUOTA_EXHAUSTED": "QUOTA_EXHAUSTED",
+        "RATE_LIMITED": "RATE_LIMITED",
+        "REGION_UNAVAILABLE": "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD": "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE": "TELEMETRY_STALE",
+        "TLS_FAILURE": "TLS_FAILURE"
+      }
+    },
+    "Request": {
+      "fields": {
+        "approved_providers": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "context_tokens": {
+          "default": "1000",
+          "type": "int"
+        },
+        "cost_cap_usd": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "est_output_tokens": {
+          "default": "200",
+          "type": "int"
+        },
+        "features_required": {
+          "default": "factory:set",
+          "type": "Set[str]"
+        },
+        "latency_limit_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "region_allowed": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "request_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "residency_required": {
+          "default": "None",
+          "type": "Optional[str]"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Signal": {
+      "fields": {
+        "evidence": {
+          "default": "<required>",
+          "type": "Evidence"
+        },
+        "reason_hint": {
+          "default": "None",
+          "type": "Optional[str]"
+        },
+        "value": {
+          "default": "<required>",
+          "type": "Any"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Verdict": {
+      "kind": "enum",
+      "members": {
+        "FAIL": "FAIL",
+        "PASS": "PASS",
+        "UNKNOWN": "UNKNOWN"
+      }
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    }
+  },
+  "execution_gate.model": {
+    "Candidate": {
+      "fields": {
+        "context_limit": {
+          "default": "8000",
+          "type": "int"
+        },
+        "developer": {
+          "default": "''",
+          "type": "str"
+        },
+        "family": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "price_in_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "price_out_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "region": {
+          "default": "'global'",
+          "type": "str"
+        },
+        "signals": {
+          "default": "factory:dict",
+          "type": "Dict[str, Signal]"
+        },
+        "structured_output": {
+          "default": "False",
+          "type": "bool"
+        },
+        "tool_use": {
+          "default": "False",
+          "type": "bool"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Evidence": {
+      "fields": {
+        "confidence": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "raw_signal": {
+          "default": "None",
+          "type": "Optional[str]"
+        },
+        "source": {
+          "default": "<required>",
+          "type": "EvidenceSource"
+        },
+        "timestamp": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "ttl_seconds": {
+          "default": "<required>",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "GateConfig": {
+      "fields": {
+        "allow_conditional": {
+          "default": "True",
+          "type": "bool"
+        },
+        "default_latency_limit_ms": {
+          "default": "60000.0",
+          "type": "float"
+        },
+        "indeterminate_on_unknown": {
+          "default": "factory:<lambda>",
+          "type": "Set[str]"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "reliability_floor": {
+          "default": "0.9",
+          "type": "float"
+        },
+        "require_billing": {
+          "default": "False",
+          "type": "bool"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Request": {
+      "fields": {
+        "approved_providers": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "context_tokens": {
+          "default": "1000",
+          "type": "int"
+        },
+        "cost_cap_usd": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "est_output_tokens": {
+          "default": "200",
+          "type": "int"
+        },
+        "features_required": {
+          "default": "factory:set",
+          "type": "Set[str]"
+        },
+        "latency_limit_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "region_allowed": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "request_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "residency_required": {
+          "default": "None",
+          "type": "Optional[str]"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Signal": {
+      "fields": {
+        "evidence": {
+          "default": "<required>",
+          "type": "Evidence"
+        },
+        "reason_hint": {
+          "default": "None",
+          "type": "Optional[str]"
+        },
+        "value": {
+          "default": "<required>",
+          "type": "Any"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    }
+  },
+  "execution_gate.policy": {
+    "EligibilityDecision": {
+      "fields": {
+        "conditions": {
+          "default": "factory:list",
+          "type": "List[ConditionResult]"
+        },
+        "evaluated_at": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "reasons": {
+          "default": "factory:list",
+          "type": "List[ReasonCode]"
+        },
+        "state": {
+          "default": "<required>",
+          "type": "EligibilityState"
+        },
+        "ttl_seconds": {
+          "default": "0.0",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EligibilityState": {
+      "kind": "enum",
+      "members": {
+        "CONDITIONALLY_ELIGIBLE": "CONDITIONALLY_ELIGIBLE",
+        "ELIGIBLE": "ELIGIBLE",
+        "INDETERMINATE": "INDETERMINATE",
+        "INELIGIBLE": "INELIGIBLE"
+      }
+    },
+    "ModelRecord": {
+      "fields": {
+        "billing_tier": {
+          "default": "'unknown'",
+          "type": "str"
+        },
+        "candidate": {
+          "default": "<required>",
+          "type": "Candidate"
+        },
+        "enabled": {
+          "default": "True",
+          "type": "bool"
+        },
+        "evidence_ttl_s": {
+          "default": "900.0",
+          "type": "float"
+        },
+        "exec_status": {
+          "default": "<ExecStatus.DECLARED: 'declared'>",
+          "type": "ExecStatus"
+        },
+        "internal_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "last_failure_reason": {
+          "default": "None",
+          "type": "Optional[ReasonCode]"
+        },
+        "last_failure_ts": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "last_success_ts": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "observed_latency_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "observed_reliability": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "quota_state": {
+          "default": "'unknown'",
+          "type": "str"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "PolicyWeights": {
+      "fields": {
+        "conditional_penalty": {
+          "default": "0.15",
+          "type": "float"
+        },
+        "cost": {
+          "default": "0.5",
+          "type": "float"
+        },
+        "latency": {
+          "default": "0.35",
+          "type": "float"
+        },
+        "quality": {
+          "default": "1.0",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Request": {
+      "fields": {
+        "approved_providers": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "context_tokens": {
+          "default": "1000",
+          "type": "int"
+        },
+        "cost_cap_usd": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "est_output_tokens": {
+          "default": "200",
+          "type": "int"
+        },
+        "features_required": {
+          "default": "factory:set",
+          "type": "Set[str]"
+        },
+        "latency_limit_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "region_allowed": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "request_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "residency_required": {
+          "default": "None",
+          "type": "Optional[str]"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Selection": {
+      "fields": {
+        "abstained": {
+          "default": "<required>",
+          "type": "bool"
+        },
+        "ranked": {
+          "default": "<required>",
+          "type": "List[Tuple[ModelRecord, float]]"
+        },
+        "reason": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "selected": {
+          "default": "<required>",
+          "type": "Optional[ModelRecord]"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    },
+    "select": {
+      "kind": "function",
+      "signature": "(selectable: 'List[Tuple[ModelRecord, EligibilityDecision]]', req: 'Request', quality_of, weights: 'Optional[PolicyWeights]' = None) -> 'Selection'"
+    }
+  },
+  "execution_gate.reason_codes": {
+    "ReasonCode": {
+      "kind": "enum",
+      "members": {
+        "AUTH_EXPIRED": "AUTH_EXPIRED",
+        "AUTH_INVALID": "AUTH_INVALID",
+        "AUTH_MISSING": "AUTH_MISSING",
+        "BILLING_INACTIVE": "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL": "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED": "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION": "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE": "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED": "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY": "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED": "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED": "MODEL_DISABLED",
+        "MODEL_NOT_FOUND": "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED": "NETWORK_BLOCKED",
+        "OK": "OK",
+        "POLICY_STATE_UNKNOWN": "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED": "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED": "PROVIDER_NOT_APPROVED",
+        "QUOTA_EXHAUSTED": "QUOTA_EXHAUSTED",
+        "RATE_LIMITED": "RATE_LIMITED",
+        "REGION_UNAVAILABLE": "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD": "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE": "TELEMETRY_STALE",
+        "TLS_FAILURE": "TLS_FAILURE"
+      }
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    },
+    "normalize_raw": {
+      "kind": "function",
+      "signature": "(signal: 'str') -> 'ReasonCode'"
+    }
+  },
+  "execution_gate.registry": {
+    "Candidate": {
+      "fields": {
+        "context_limit": {
+          "default": "8000",
+          "type": "int"
+        },
+        "developer": {
+          "default": "''",
+          "type": "str"
+        },
+        "family": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "price_in_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "price_out_per_mtok": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "region": {
+          "default": "'global'",
+          "type": "str"
+        },
+        "signals": {
+          "default": "factory:dict",
+          "type": "Dict[str, Signal]"
+        },
+        "structured_output": {
+          "default": "False",
+          "type": "bool"
+        },
+        "tool_use": {
+          "default": "False",
+          "type": "bool"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EligibilityDecision": {
+      "fields": {
+        "conditions": {
+          "default": "factory:list",
+          "type": "List[ConditionResult]"
+        },
+        "evaluated_at": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "reasons": {
+          "default": "factory:list",
+          "type": "List[ReasonCode]"
+        },
+        "state": {
+          "default": "<required>",
+          "type": "EligibilityState"
+        },
+        "ttl_seconds": {
+          "default": "0.0",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "ExecStatus": {
+      "kind": "enum",
+      "members": {
+        "AUTHENTICATED": "authenticated",
+        "DECLARED": "declared",
+        "DISABLED": "disabled",
+        "ENUMERATED": "enumerated",
+        "EXECUTION_VERIFIED": "execution_verified"
+      }
+    },
+    "ExecutableRegistry": {
+      "kind": "class",
+      "methods": {
+        "__init__": "(self, gate: 'Optional[ExecutionGate]' = None)",
+        "evaluate": "(self, req: 'Request', now: 'float') -> 'Tuple[List[Tuple[ModelRecord, EligibilityDecision]], List[Tuple[ModelRecord, EligibilityDecision]]]'",
+        "upsert": "(self, rec: 'ModelRecord')"
+      }
+    },
+    "ExecutionGate": {
+      "kind": "class",
+      "methods": {
+        "__init__": "(self, config: 'Optional[GateConfig]' = None)",
+        "evaluate": "(self, cand: 'Candidate', req: 'Request', now: 'float') -> 'EligibilityDecision'"
+      }
+    },
+    "ModelRecord": {
+      "fields": {
+        "billing_tier": {
+          "default": "'unknown'",
+          "type": "str"
+        },
+        "candidate": {
+          "default": "<required>",
+          "type": "Candidate"
+        },
+        "enabled": {
+          "default": "True",
+          "type": "bool"
+        },
+        "evidence_ttl_s": {
+          "default": "900.0",
+          "type": "float"
+        },
+        "exec_status": {
+          "default": "<ExecStatus.DECLARED: 'declared'>",
+          "type": "ExecStatus"
+        },
+        "internal_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "last_failure_reason": {
+          "default": "None",
+          "type": "Optional[ReasonCode]"
+        },
+        "last_failure_ts": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "last_success_ts": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "observed_latency_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "observed_reliability": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "quota_state": {
+          "default": "'unknown'",
+          "type": "str"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "ReasonCode": {
+      "kind": "enum",
+      "members": {
+        "AUTH_EXPIRED": "AUTH_EXPIRED",
+        "AUTH_INVALID": "AUTH_INVALID",
+        "AUTH_MISSING": "AUTH_MISSING",
+        "BILLING_INACTIVE": "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL": "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED": "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION": "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE": "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED": "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY": "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED": "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED": "MODEL_DISABLED",
+        "MODEL_NOT_FOUND": "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED": "NETWORK_BLOCKED",
+        "OK": "OK",
+        "POLICY_STATE_UNKNOWN": "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED": "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED": "PROVIDER_NOT_APPROVED",
+        "QUOTA_EXHAUSTED": "QUOTA_EXHAUSTED",
+        "RATE_LIMITED": "RATE_LIMITED",
+        "REGION_UNAVAILABLE": "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD": "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE": "TELEMETRY_STALE",
+        "TLS_FAILURE": "TLS_FAILURE"
+      }
+    },
+    "Request": {
+      "fields": {
+        "approved_providers": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "context_tokens": {
+          "default": "1000",
+          "type": "int"
+        },
+        "cost_cap_usd": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "est_output_tokens": {
+          "default": "200",
+          "type": "int"
+        },
+        "features_required": {
+          "default": "factory:set",
+          "type": "Set[str]"
+        },
+        "latency_limit_ms": {
+          "default": "None",
+          "type": "Optional[float]"
+        },
+        "region_allowed": {
+          "default": "None",
+          "type": "Optional[Set[str]]"
+        },
+        "request_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "residency_required": {
+          "default": "None",
+          "type": "Optional[str]"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    }
+  },
+  "execution_gate.states": {
+    "ConditionResult": {
+      "fields": {
+        "condition": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "criticality": {
+          "default": "<required>",
+          "type": "Criticality"
+        },
+        "detail": {
+          "default": "''",
+          "type": "str"
+        },
+        "evidence": {
+          "default": "<required>",
+          "type": "Evidence"
+        },
+        "reason": {
+          "default": "<required>",
+          "type": "ReasonCode"
+        },
+        "verdict": {
+          "default": "<required>",
+          "type": "Verdict"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "Criticality": {
+      "kind": "enum",
+      "members": {
+        "CRITICAL_GOV": "CRITICAL_GOV",
+        "CRITICAL_OP": "CRITICAL_OP",
+        "OPERATIONAL": "OPERATIONAL"
+      }
+    },
+    "EligibilityDecision": {
+      "fields": {
+        "conditions": {
+          "default": "factory:list",
+          "type": "List[ConditionResult]"
+        },
+        "evaluated_at": {
+          "default": "0.0",
+          "type": "float"
+        },
+        "model_id": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "policy_version": {
+          "default": "'exec_gate_v1'",
+          "type": "str"
+        },
+        "provider": {
+          "default": "<required>",
+          "type": "str"
+        },
+        "reasons": {
+          "default": "factory:list",
+          "type": "List[ReasonCode]"
+        },
+        "state": {
+          "default": "<required>",
+          "type": "EligibilityState"
+        },
+        "ttl_seconds": {
+          "default": "0.0",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EligibilityState": {
+      "kind": "enum",
+      "members": {
+        "CONDITIONALLY_ELIGIBLE": "CONDITIONALLY_ELIGIBLE",
+        "ELIGIBLE": "ELIGIBLE",
+        "INDETERMINATE": "INDETERMINATE",
+        "INELIGIBLE": "INELIGIBLE"
+      }
+    },
+    "Evidence": {
+      "fields": {
+        "confidence": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "raw_signal": {
+          "default": "None",
+          "type": "Optional[str]"
+        },
+        "source": {
+          "default": "<required>",
+          "type": "EvidenceSource"
+        },
+        "timestamp": {
+          "default": "<required>",
+          "type": "float"
+        },
+        "ttl_seconds": {
+          "default": "<required>",
+          "type": "float"
+        }
+      },
+      "kind": "dataclass"
+    },
+    "EvidenceSource": {
+      "kind": "enum",
+      "members": {
+        "CACHE": "cache",
+        "CONFIG": "config",
+        "LIVE_PROBE": "live_probe",
+        "PROVIDER_DECLARED": "provider_declared",
+        "TELEMETRY": "telemetry"
+      }
+    },
+    "ReasonCode": {
+      "kind": "enum",
+      "members": {
+        "AUTH_EXPIRED": "AUTH_EXPIRED",
+        "AUTH_INVALID": "AUTH_INVALID",
+        "AUTH_MISSING": "AUTH_MISSING",
+        "BILLING_INACTIVE": "BILLING_INACTIVE",
+        "CONTEXT_TOO_SMALL": "CONTEXT_TOO_SMALL",
+        "COST_LIMIT_EXCEEDED": "COST_LIMIT_EXCEEDED",
+        "DATA_RESIDENCY_VIOLATION": "DATA_RESIDENCY_VIOLATION",
+        "DNS_FAILURE": "DNS_FAILURE",
+        "FEATURE_UNSUPPORTED": "FEATURE_UNSUPPORTED",
+        "FREE_TIER_ONLY": "FREE_TIER_ONLY",
+        "LATENCY_LIMIT_EXCEEDED": "LATENCY_LIMIT_EXCEEDED",
+        "MODEL_DISABLED": "MODEL_DISABLED",
+        "MODEL_NOT_FOUND": "MODEL_NOT_FOUND",
+        "NETWORK_BLOCKED": "NETWORK_BLOCKED",
+        "OK": "OK",
+        "POLICY_STATE_UNKNOWN": "POLICY_STATE_UNKNOWN",
+        "PROVIDER_DEGRADED": "PROVIDER_DEGRADED",
+        "PROVIDER_NOT_APPROVED": "PROVIDER_NOT_APPROVED",
+        "QUOTA_EXHAUSTED": "QUOTA_EXHAUSTED",
+        "RATE_LIMITED": "RATE_LIMITED",
+        "REGION_UNAVAILABLE": "REGION_UNAVAILABLE",
+        "RELIABILITY_BELOW_THRESHOLD": "RELIABILITY_BELOW_THRESHOLD",
+        "TELEMETRY_STALE": "TELEMETRY_STALE",
+        "TLS_FAILURE": "TLS_FAILURE"
+      }
+    },
+    "SOURCE_PRECEDENCE": {
+      "kind": "dict",
+      "repr": "{<EvidenceSource.LIVE_PROBE: 'live_probe'>: 5, <EvidenceSource.TELEMETRY: 'telemetry'>: 4, <EvidenceSource.CACHE: 'cache'>: 3, <EvidenceSource.CONFIG: 'config'>: 2, <EvidenceSource.PROVIDER_DECLARED: 'provider_declared'>: 1}"
+    },
+    "Verdict": {
+      "kind": "enum",
+      "members": {
+        "FAIL": "FAIL",
+        "PASS": "PASS",
+        "UNKNOWN": "UNKNOWN"
+      }
+    },
+    "annotations": {
+      "kind": "_Feature",
+      "repr": "_Feature((3, 7, 0, 'beta', 1), None, 16777216)"
+    }
+  }
+}
