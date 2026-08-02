@@ -1,0 +1,73 @@
+{
+  "$comment": "Reviewer protocol vocabularies (MVP 1F). Preferred protocol: independent initial assessment BEFORE the Ugence result is revealed; non-blinded reviews are labelled and independent agreement is not claimed.",
+  "review_modes": [
+    "BLINDED_INITIAL_THEN_REVEALED",
+    "REVIEW_NOT_BLINDED"
+  ],
+  "status_assessment": [
+    "AGREE",
+    "TOO_STRICT",
+    "TOO_LENIENT",
+    "WRONG_STATUS",
+    "INSUFFICIENT_INFORMATION"
+  ],
+  "intervention_assessment": [
+    "CORRECT_INTERVENTION",
+    "UNNECESSARY_INTERVENTION",
+    "MISSING_INTERVENTION",
+    "WRONG_INTERVENTION_TYPE",
+    "WRONG_REQUIRED_AUTHORITY",
+    "NOT_APPLICABLE"
+  ],
+  "root_cause": [
+    "POLICY_CONFIGURATION",
+    "SOURCE_DATA",
+    "SOURCE_FRESHNESS",
+    "SOURCE_CONFLICT",
+    "ADAPTER_FAILURE",
+    "CHANGE_IDENTITY",
+    "AUTHORITY_MAPPING",
+    "INTERVENTION_ROUTING",
+    "REVIEWER_INTERPRETATION",
+    "PRODUCT_LOGIC",
+    "INSUFFICIENT_EVIDENCE",
+    "OTHER_CURATED"
+  ],
+  "incremental_value": [
+    "VALUE_BEYOND_CI_CONFIRMED",
+    "DUPLICATES_EXISTING_CONTROL",
+    "PARTIALLY_USEFUL",
+    "NOT_USEFUL",
+    "UNDETERMINED"
+  ],
+  "incremental_value_labels": [
+    "EXISTING_CI_ALREADY_CAUGHT",
+    "GITHUB_RULE_ALREADY_CAUGHT",
+    "MANUAL_REVIEW_ALREADY_CAUGHT",
+    "UGENCE_UNIQUE_SIGNAL",
+    "UGENCE_EARLIER_DETECTION",
+    "UGENCE_BETTER_ROUTING",
+    "UGENCE_BETTER_AUDITABILITY",
+    "NO_INCREMENTAL_VALUE",
+    "UNDETERMINED"
+  ],
+  "unique_value_labels_require_evidence": [
+    "UGENCE_UNIQUE_SIGNAL",
+    "UGENCE_EARLIER_DETECTION"
+  ],
+  "actual_outcome": [
+    "MERGED_LATER",
+    "MERGED_UNCHANGED",
+    "MERGED_AFTER_CODE_CHANGE",
+    "MERGED_AFTER_EVIDENCE_REFRESH",
+    "MERGED_AFTER_REAUTHORIZATION",
+    "MERGED_AFTER_HUMAN_EXCEPTION",
+    "WAITED_FOR_CHANGE_WINDOW",
+    "BLOCKED_BY_EXISTING_CONTROL",
+    "ABANDONED",
+    "REVERTED_LATER",
+    "INCIDENT_ASSOCIATED",
+    "NO_ACTION",
+    "UNKNOWN"
+  ]
+}

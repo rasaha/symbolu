@@ -1,0 +1,62 @@
+{
+  "$comment": "MVP 1F acceptance scenarios for the bounded shadow-pilot validation study. Mapped to tests/test_pilot_study.py and tests/test_pilot_study_demo.py. Execution remains DISABLED; supplied/synthetic results are never counted as live enterprise evidence; no unsupported statistics; calibration never changes policy; no verdict enables execution.",
+  "mvp_phase": "1F",
+  "execution_status": "DISABLED",
+  "evidence_status": "IMPLEMENTED_AND_OFFLINE_VERIFIED",
+  "live_pilot": "LIVE_PILOT_NOT_RUN",
+  "groups": [
+    {"area": "manifest + freeze", "scenarios": [
+      "valid bounded manifest admitted", "wildcard tenant rejected", "empty repo scope rejected",
+      "missing end date rejected", "unbounded sample rejected", "missing reviewer protocol rejected",
+      "missing evidence class rejected", "execution-enabled config rejected",
+      "manifest fingerprint deterministic", "pre-pilot freeze binds all versions",
+      "freeze fingerprint deterministic", "changed policy requires amendment or new revision"]},
+    {"area": "evidence classification", "scenarios": [
+      "live GitHub classified correctly", "supplied snapshots not live", "historical replay classified",
+      "synthetic controls excluded from live metrics", "mixed evidence preserves every class",
+      "evidence classification in metrics"]},
+    {"area": "candidate selection", "scenarios": [
+      "explicit PR list deterministic", "repository allowlist enforced", "branch allowlist enforced",
+      "excluded reason persisted", "maximum count enforced", "duplicate deduplicated",
+      "already-evaluated excluded", "selection fingerprint deterministic"]},
+    {"area": "reviewer protocol", "scenarios": [
+      "independent initial assessment preserved", "non-blinded review labelled",
+      "annotation bound to exact revision", "unique-value claim requires evidence reference",
+      "disagreement categories curated", "multiple reviewers preserved independently",
+      "annotation fingerprint deterministic"]},
+    {"area": "metrics + analysis", "scenarios": [
+      "denominators reported", "reviewer disagreement rate correct",
+      "possible unnecessary + missed counts", "no unsupported accuracy metric",
+      "cohort metrics separated", "before/after amendment separated",
+      "unique-value case requires evidence"]},
+    {"area": "calibration", "scenarios": [
+      "recommendation binds supporting evaluations", "recommendation does not change policy",
+      "replay uses persisted facts only, no external call", "replay original preserved + labelled",
+      "replay records policy candidate fingerprint"]},
+    {"area": "adverse cases", "scenarios": [
+      "possible false CLEAR listed individually", "possible unnecessary BLOCK listed individually",
+      "source conflict case listed individually", "security finding case listed individually",
+      "unresolved adverse case blocks readiness"]},
+    {"area": "security", "scenarios": [
+      "credential leak -> SAFETY_OR_INTEGRITY_BLOCKED", "integrity failure -> SAFETY_OR_INTEGRITY_BLOCKED",
+      "write-boundary violation -> SAFETY_OR_INTEGRITY_BLOCKED", "clean boundary verification",
+      "manifest mismatch detected"]},
+    {"area": "checkpoints", "scenarios": [
+      "pre-pilot checkpoint valid", "checkpoint deterministic", "reports feedback coverage",
+      "critical failure recommends STOP", "unresolved adverse recommends PAUSE",
+      "checkpoint execution disabled"]},
+    {"area": "evidence pack", "scenarios": [
+      "deterministic", "verifies offline", "missing artifact fails", "modified artifact fails",
+      "credential-like value fails", "execution-disabled marker required", "unknown version rejected"]},
+    {"area": "readiness verdict", "scenarios": [
+      "insufficient live evidence offline", "recurring policy disagreement -> calibration required",
+      "no incremental value -> product value not proven", "ready requires no unresolved false CLEAR",
+      "verdict does not enable execution", "verdict includes evidence refs + limitations"]},
+    {"area": "boundaries", "scenarios": [
+      "Action Clearance unchanged", "no execution/write surface", "original clearance immutable by annotation",
+      "supplied snapshot never counted as live", "execution disabled everywhere"]},
+    {"area": "offline demo", "scenarios": [
+      "24-artifact study demo runs deterministically",
+      "no live metrics; INSUFFICIENT_LIVE_EVIDENCE; LIVE_PILOT_NOT_RUN; execution disabled"]}
+  ]
+}

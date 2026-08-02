@@ -1,0 +1,35 @@
+{
+  "$comment": "Calibration recommendation (MVP 1F). A proposal bound to supporting evaluations; it never changes active policy. Replay uses persisted facts only, performs no external call, never overwrites originals, and is labelled HISTORICAL_REPLAY.",
+  "adjustments": [
+    "NO_CHANGE",
+    "SIGNAL_REQUIREMENT_CHANGE",
+    "FRESHNESS_WINDOW_CHANGE",
+    "TRUST_THRESHOLD_CHANGE",
+    "STATUS_PRECEDENCE_CHANGE",
+    "INTERVENTION_ROUTING_CHANGE",
+    "AUTHORITY_MAPPING_CHANGE",
+    "COHORT_SPECIFIC_POLICY",
+    "ADAPTER_REPAIR",
+    "MORE_EVIDENCE_REQUIRED"
+  ],
+  "amendment_reasons": [
+    "POLICY_DEFECT",
+    "SOURCE_CONFIGURATION_DEFECT",
+    "ADAPTER_DEFECT",
+    "REVIEW_PROTOCOL_DEFECT",
+    "SECURITY_REQUIREMENT",
+    "SCOPE_REDUCTION",
+    "OPERATOR_ERROR"
+  ],
+  "recommendation_fields": [
+    "recommendation_id",
+    "pilot_id",
+    "affected_policy_ref",
+    "supporting_evaluations",
+    "problem_category",
+    "proposed_adjustment",
+    "expected_effect",
+    "adjustment_risk",
+    "requires_new_pilot_revision"
+  ]
+}
