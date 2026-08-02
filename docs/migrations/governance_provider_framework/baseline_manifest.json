@@ -1,0 +1,67 @@
+{
+  "phase": "governance_provider_framework canonical-package migration \u2014 pre-migration baseline",
+  "captured_at_commit": "ed7387f4576bf111c7f5544958dfb30bbe524906",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_head": "ed7387f4 (Merge PR #1266)",
+  "migration_branch": "claude/gpf-canonical-package-migration-y3qoew",
+  "python": "3.11.15",
+  "framework": {
+    "package": "governance_providers",
+    "version": "0.1.0",
+    "contract_version": "1.0.0",
+    "non_test_loc": 1442,
+    "test_loc": 587,
+    "non_test_modules": 29,
+    "test_files": 9,
+    "tests": 42
+  },
+  "hashes_before": {
+    "core_tree_hash[governance_providers]": "ab12c0260bd9d49fdda37264aa1ad74e3b880bdc1b3bdfd303ae023e6c43cd2b",
+    "governance_providers.api snapshot (computed)": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
+    "governance_providers.api.json (file sha256)": "d4266914126b56baa0efc2dd73325a514248f17139b502e275993a95593b45a6",
+    "equivalence_capture_sha256": "a8e3e7e9f47a9bb74ac794e8d2f89189ac49192745d02a311b1ea603045db4f5"
+  },
+  "freeze_before": {
+    "manifest_digest": "6fb6d6c8b02538e7b002c404b3b3a9a0aadd88ce4670369538c995b5b0487cf7",
+    "substantive_digest": "477407149049968ed12eec71044a913dfc4dbbb8cf23327ea9eec5614d759bf0",
+    "freeze_commit": "5ae4f70",
+    "verifier": "PASS"
+  },
+  "baseline_suites": {
+    "platform_freeze.verify": "PASS (substantive 477407\u2026)",
+    "terminology_validator": "PASS",
+    "governance_providers": 42,
+    "tap_provider": 38,
+    "actiongate_provider": 30,
+    "governance-contracts": 45,
+    "decision-authority": 79,
+    "storygraph": 316,
+    "baseline_assertion_provider+baseline_action_provider": 10,
+    "ai_hiring": 778,
+    "enterprise_validation_pilot": 164,
+    "provider_heterogeneity_validation": 51,
+    "comparative_governance_benchmark": 56,
+    "platform_freeze/tests": "19 passed, 2 PRE-EXISTING failures",
+    "dependency_direction_report": "passed (0 violations)"
+  },
+  "pre_existing_failures": [
+    "platform_freeze/tests/test_freeze.py::test_classify_change_reports_evidence \u2014 classify returns 'UNCLASSIFIED' (stale tooling unit assumption; unrelated to this migration)",
+    "platform_freeze/tests/test_freeze.py::test_hiring_baseline_discovery \u2014 asserts hiring does NOT use provider framework, but a prior phase wired it (stale tooling unit assumption; unrelated)"
+  ],
+  "current_distribution": {
+    "name": "dgm-provider-framework",
+    "version": "0.1.0",
+    "visibility": "PRIVATE",
+    "layout": "symlink governance_providers -> ../../governance_providers",
+    "runtime_deps": [
+      "decision-governance==1.0.0",
+      "ugence-governance-contracts>=0.1.0"
+    ],
+    "sibling_provider_wheels_depending_on_it": [
+      "dgm-tap-provider",
+      "dgm-actiongate-provider",
+      "dgm-baseline-assertion-provider",
+      "dgm-baseline-action-provider"
+    ]
+  }
+}

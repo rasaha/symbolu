@@ -35,7 +35,7 @@
   "core_tree_hashes": {
     "actiongate_provider": "f40f0cf3c390486026d50a53e6bbe14f0d499e57147bd8a736c32d107e12f8dc",
     "decision_governance": "3e98d8dbbc2a5737a8f66c701653ac00b674a6c7c9336a582331d45a667485d0",
-    "governance_providers": "ab12c0260bd9d49fdda37264aa1ad74e3b880bdc1b3bdfd303ae023e6c43cd2b",
+    "governance_providers": "9ec688e64fcd8f3c37f7f91d63751123ffa56d761d5f34ed64af4cd65517e9c3",
     "tap_provider": "4209eb875af9e2f9b7a703f37c8c884313cfcf3d1e3387406cd010bc1c66d074"
   },
   "core_trees": [
@@ -191,7 +191,7 @@
       "statement": "Frozen package dependency direction remains acyclic."
     }
   ],
-  "manifest_digest": "6fb6d6c8b02538e7b002c404b3b3a9a0aadd88ce4670369538c995b5b0487cf7",
+  "manifest_digest": "bd346cb2a50889668e38851958b566dcf867a4d5693bef4e575886c72454808f",
   "platform_name": "Decision Governance Platform",
   "platform_version": "1.0.0",
   "public_api_manifests": {

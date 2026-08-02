@@ -3,15 +3,15 @@ from __future__ import annotations
 
 import pytest
 
-from governance_providers.contracts import (
+from ugence_governance_provider_framework.contracts import (
     ActionGovernanceProvider, AssertionGovernanceProvider, ExternalExecutionProvider)
-from governance_providers.metadata import ProviderKind
-from governance_providers.errors import (
+from ugence_governance_provider_framework.metadata import ProviderKind
+from ugence_governance_provider_framework.errors import (
     ProviderCompatibilityError, ProviderRegistrationError, ProviderResolutionError)
-from governance_providers.registry import ProviderRegistry
-from governance_providers.metadata import (
+from ugence_governance_provider_framework.registry import ProviderRegistry
+from ugence_governance_provider_framework.metadata import (
     ProviderCapabilities, ProviderCompatibility, ProviderDescriptor)
-from governance_providers.reference import (
+from ugence_governance_provider_framework.reference import (
     DeterministicActionGovernanceProvider, DeterministicAssertionProvider)
 
 

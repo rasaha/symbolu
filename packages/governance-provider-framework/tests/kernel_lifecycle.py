@@ -1,24 +1,12 @@
-"""Shared fixtures for the governance-provider framework tests."""
+"""Kernel-lifecycle integration helper (shared by the integration tests).
+
+Drives the full Decision Authority kernel governance chain through a provider-backed
+control plane and linked-record adapter. Extracted verbatim from the pre-migration
+``governance_providers/tests/conftest.py`` (no behaviour change); relocated to an
+importable module so the subdivided test tree can share it.
+"""
 
 from __future__ import annotations
-
-import pytest
-
-from governance_providers.registry import ProviderRegistry
-from governance_providers.reference import (
-    DeterministicActionGovernanceProvider,
-    DeterministicAssertionProvider,
-    DeterministicExecutionProvider,
-)
-
-
-@pytest.fixture
-def registry():
-    reg = ProviderRegistry()
-    reg.register(DeterministicAssertionProvider().descriptor())
-    reg.register(DeterministicActionGovernanceProvider().descriptor())
-    reg.register(DeterministicExecutionProvider().descriptor())
-    return reg
 
 
 def run_kernel_action_lifecycle(*, control_plane, linked_record):

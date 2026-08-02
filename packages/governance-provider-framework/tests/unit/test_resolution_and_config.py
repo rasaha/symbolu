@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import pytest
 
-from governance_providers.metadata import ProviderKind
-from governance_providers.resolution import ResolutionRequest, SelectionRule, resolve
-from governance_providers.errors import ProviderResolutionError, ProviderConfigurationError
-from governance_providers.configuration import ProvidersConfiguration
-from governance_providers.registry import ProviderRegistry
-from governance_providers.reference import DeterministicActionGovernanceProvider
+from ugence_governance_provider_framework.metadata import ProviderKind
+from ugence_governance_provider_framework.resolution import ResolutionRequest, SelectionRule, resolve
+from ugence_governance_provider_framework.errors import ProviderResolutionError, ProviderConfigurationError
+from ugence_governance_provider_framework.configuration import ProvidersConfiguration
+from ugence_governance_provider_framework.registry import ProviderRegistry
+from ugence_governance_provider_framework.reference import DeterministicActionGovernanceProvider
 
 
 def test_explicit_id(registry):

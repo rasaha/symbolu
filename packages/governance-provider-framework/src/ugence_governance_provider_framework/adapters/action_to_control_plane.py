@@ -3,29 +3,63 @@
 Preserves authorization outcome, constraints, obligations, expiry, and authority
 basis. Provider failures are normalized at this boundary to a fail-safe
 ``INDETERMINATE`` authorization — a vendor exception never leaks into the kernel.
+
+The Decision Authority kernel is an **optional** dependency: this module imports
+without it (class defined, signatures intact); the kernel is loaded lazily the
+first time an adapter is invoked. Absent the optional dependency, invocation
+raises a precise ``ModuleNotFoundError`` naming the ``[adapters]`` extra.
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
 
-from decision_governance.api.common import Clock, IdFactory, new_id, utc_now
-from decision_governance.api.contracts import (
-    ActionAuthorizationResponse,
-    AuthorizationOutcome as KernelAuthorizationOutcome,
-)
-
 from ..contracts import ActionGovernanceRequest
 from ..contracts.action import ActionGovernanceOutcome, ActionGovernanceProvider
 from ..errors import ProviderError
+from ._kernel import require_decision_authority
 
-_OUTCOME_MAP = {
-    ActionGovernanceOutcome.AUTHORIZED: KernelAuthorizationOutcome.AUTHORIZED,
-    ActionGovernanceOutcome.AUTHORIZED_WITH_CONSTRAINTS: KernelAuthorizationOutcome.AUTHORIZED_WITH_CONSTRAINTS,
-    ActionGovernanceOutcome.DENIED: KernelAuthorizationOutcome.DENIED,
-    ActionGovernanceOutcome.INDETERMINATE: KernelAuthorizationOutcome.INDETERMINATE,
-    ActionGovernanceOutcome.EXPIRED: KernelAuthorizationOutcome.EXPIRED,
-}
+_KERNEL: dict | None = None
+
+
+def _kernel() -> dict:
+    """Lazily load and cache the optional kernel symbols + the frozen outcome map.
+
+    Raises the precise optional-dependency error if Decision Authority is absent.
+    """
+    global _KERNEL
+    if _KERNEL is None:
+        require_decision_authority()
+        from decision_governance.api.common import new_id, utc_now
+        from decision_governance.api.contracts import (
+            ActionAuthorizationResponse,
+            AuthorizationOutcome as KernelAuthorizationOutcome,
+        )
+        _KERNEL = {
+            "new_id": new_id,
+            "utc_now": utc_now,
+            "ActionAuthorizationResponse": ActionAuthorizationResponse,
+            "AuthorizationOutcome": KernelAuthorizationOutcome,
+            "OUTCOME_MAP": {
+                ActionGovernanceOutcome.AUTHORIZED: KernelAuthorizationOutcome.AUTHORIZED,
+                ActionGovernanceOutcome.AUTHORIZED_WITH_CONSTRAINTS:
+                    KernelAuthorizationOutcome.AUTHORIZED_WITH_CONSTRAINTS,
+                ActionGovernanceOutcome.DENIED: KernelAuthorizationOutcome.DENIED,
+                ActionGovernanceOutcome.INDETERMINATE: KernelAuthorizationOutcome.INDETERMINATE,
+                ActionGovernanceOutcome.EXPIRED: KernelAuthorizationOutcome.EXPIRED,
+            },
+        }
+    return _KERNEL
+
+
+def _default_new_id(*args, **kwargs):
+    """Default id factory — delegates to the kernel's ``new_id`` (lazily loaded)."""
+    return _kernel()["new_id"](*args, **kwargs)
+
+
+def _default_clock(*args, **kwargs):
+    """Default clock — delegates to the kernel's ``utc_now`` (lazily loaded)."""
+    return _kernel()["utc_now"](*args, **kwargs)
 
 
 class ActionGovernanceControlPlaneAdapter:
@@ -33,13 +67,16 @@ class ActionGovernanceControlPlaneAdapter:
 
     def __init__(self, provider: ActionGovernanceProvider, *,
                  validity: timedelta = timedelta(hours=1),
-                 id_factory: IdFactory = new_id, clock: Clock = utc_now) -> None:
+                 id_factory: IdFactory = _default_new_id, clock: Clock = _default_clock) -> None:
         self._provider = provider
         self._validity = validity
         self._new_id = id_factory
         self._clock = clock
 
     def authorize(self, action_request, cer) -> ActionAuthorizationResponse:
+        k = _kernel()
+        KernelAuthorizationOutcome = k["AuthorizationOutcome"]
+        ActionAuthorizationResponse = k["ActionAuthorizationResponse"]
         now = self._clock()
         req = ActionGovernanceRequest(
             action_type=action_request.action_type,
@@ -54,7 +91,7 @@ class ActionGovernanceControlPlaneAdapter:
             authorization_expired=cer.expires_at is not None and cer.expires_at < now)
         try:
             result = self._provider.authorize(req)
-            outcome = _OUTCOME_MAP[result.outcome]
+            outcome = k["OUTCOME_MAP"][result.outcome]
             constraints, obligations = result.constraints, result.obligations
             authority_basis = result.authority_basis
             reason_codes = result.reason_codes or (outcome.value,)

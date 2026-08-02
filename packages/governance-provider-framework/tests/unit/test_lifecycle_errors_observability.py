@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import pytest
 
-from governance_providers.lifecycle import (
+from ugence_governance_provider_framework.lifecycle import (
     ProviderLifecycleState, is_legal_transition)
-from governance_providers.errors import (
+from ugence_governance_provider_framework.errors import (
     FailureClass, ProviderError, ProviderTimeoutError, ProviderUnavailableError)
-from governance_providers.observability import (
+from ugence_governance_provider_framework.observability import (
     ProviderInvocationLog, record_invocation)
-from governance_providers.reference import DeterministicActionGovernanceProvider
-from governance_providers.contracts import ActionGovernanceRequest
+from ugence_governance_provider_framework.reference import DeterministicActionGovernanceProvider
+from ugence_governance_provider_framework.contracts import ActionGovernanceRequest
 
 
 def test_legal_and_illegal_transitions():

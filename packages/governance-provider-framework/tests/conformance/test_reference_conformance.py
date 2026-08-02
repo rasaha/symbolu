@@ -1,12 +1,12 @@
 """Reference providers pass the shared conformance kits (by kind)."""
 from __future__ import annotations
 
-from governance_providers.conformance import (
+from ugence_governance_provider_framework.conformance import (
     run_action_provider_conformance, run_assertion_provider_conformance,
     run_execution_provider_conformance)
-from governance_providers.contracts import (
+from ugence_governance_provider_framework.contracts import (
     ActionGovernanceOutcome, AssertionCoverage, ExecutionBusinessOutcome)
-from governance_providers.reference import (
+from ugence_governance_provider_framework.reference import (
     DeterministicActionGovernanceProvider, DeterministicAssertionProvider,
     DeterministicExecutionProvider)
 
@@ -29,14 +29,14 @@ def test_execution_conformance():
 def test_reference_action_paths():
     p = DeterministicActionGovernanceProvider(denied=frozenset({"D"}), constrained=frozenset({"C"}))
     p.initialize()
-    from governance_providers.contracts import ActionGovernanceRequest
+    from ugence_governance_provider_framework.contracts import ActionGovernanceRequest
     assert p.authorize(ActionGovernanceRequest("OK")).outcome is ActionGovernanceOutcome.AUTHORIZED
     assert p.authorize(ActionGovernanceRequest("D")).outcome is ActionGovernanceOutcome.DENIED
     assert p.authorize(ActionGovernanceRequest("C")).outcome is ActionGovernanceOutcome.AUTHORIZED_WITH_CONSTRAINTS
 
 
 def test_reference_assertion_paths():
-    from governance_providers.contracts import AssertionGovernanceRequest
+    from ugence_governance_provider_framework.contracts import AssertionGovernanceRequest
     for cov in AssertionCoverage:
         p = DeterministicAssertionProvider(coverage=cov); p.initialize()
         r = p.evaluate(AssertionGovernanceRequest("x", evidence_refs=("e",)))
@@ -44,7 +44,7 @@ def test_reference_assertion_paths():
 
 
 def test_reference_execution_paths():
-    from governance_providers.contracts import ExecutionDispatchRequest
+    from ugence_governance_provider_framework.contracts import ExecutionDispatchRequest
     p = DeterministicExecutionProvider(
         transport_failing=frozenset({"F"}), timing_out=frozenset({"T"}),
         outcomes={"R": ExecutionBusinessOutcome.REJECTED}); p.initialize()

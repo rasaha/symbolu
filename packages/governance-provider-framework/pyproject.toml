@@ -1,0 +1,52 @@
+# Independent distribution for the canonical Ugence Governance Provider Framework.
+#
+# This is the ONE canonical source tree (``src/ugence_governance_provider_framework``)
+# for the capability-neutral Governance Provider Framework: provider registration,
+# resolution, configuration, lifecycle, health, metadata, observability,
+# fingerprinting, versioning, conformance kits, reference providers, and the
+# kernel-bound adapters. It owns NO governance authority.
+#
+# Dependency policy (framework core):
+#   * ugence-governance-contracts  — the neutral contract leaf (the ONLY hard dep)
+#   * Python standard library
+# The kernel-bound ``adapters`` (and therefore the ``.api`` aggregator, which
+# re-exports them) depend on the Decision Authority kernel facade. That dependency
+# is OPTIONAL (extra ``adapters``) so the core installs and imports without
+# Decision Authority — the framework core never acquires a mandatory dependency on
+# a bounded capability. The legacy ``governance_providers`` namespace at the
+# repository root is a logic-free compatibility shim that re-exports this package.
+#
+# Build:    python -m build packages/governance-provider-framework
+# Verify:   python packages/governance-provider-framework/verify_governance_provider_framework_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-governance-provider-framework"
+dynamic = ["version"]
+description = "Ugence Governance Provider Framework — capability-neutral provider mechanics (registry, resolution, lifecycle, conformance); owns no governance authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "provider", "framework", "registry", "ugence"]
+# Core hard dependency: the neutral contract leaf only. No capability, product,
+# platform, console, or research package. No third-party runtime dependency.
+dependencies = ["ugence-governance-contracts>=0.1.0"]
+
+[project.optional-dependencies]
+# The kernel-bound adapters (and the ``.api`` aggregator that re-exports them)
+# require the Decision Authority kernel facade. Optional, so the core is usable
+# without Decision Authority installed.
+adapters = ["decision-governance==1.0.0"]
+test = ["pytest>=7.0"]
+
+# Read statically from the version module's literal so the build backend never
+# needs to import the package to resolve the version.
+[tool.setuptools.dynamic]
+version = { attr = "ugence_governance_provider_framework.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_governance_provider_framework*"]

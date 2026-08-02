@@ -3,43 +3,84 @@
 Preserves the transport/business-outcome split. Provider failures are normalized:
 a dispatch failure becomes a transport failure; an observation failure becomes an
 UNKNOWN business outcome. No vendor exception leaks into the kernel.
+
+The Decision Authority kernel is an **optional** dependency: this module imports
+without it (class defined, signatures intact); the kernel is loaded lazily the
+first time an adapter is invoked. Absent the optional dependency, invocation
+raises a precise ``ModuleNotFoundError`` naming the ``[adapters]`` extra.
 """
 
 from __future__ import annotations
 
-from decision_governance.api.common import Clock, IdFactory, new_id, utc_now
-from decision_governance.api.contracts import (
-    BusinessOutcome as KernelBusinessOutcome,
-    Finality,
-    RetryClassification,
-    TransportStatus,
-)
-from decision_governance.api.ports import ExternalDispatchResponse, ExternalStatusResponse
-
 from ..contracts import ExecutionDispatchRequest
 from ..contracts.execution import ExecutionBusinessOutcome, ExternalExecutionProvider
 from ..errors import ProviderError
+from ._kernel import require_decision_authority
 
-_OUTCOME_MAP = {
-    ExecutionBusinessOutcome.SUCCEEDED: KernelBusinessOutcome.SUCCEEDED,
-    ExecutionBusinessOutcome.FAILED: KernelBusinessOutcome.FAILED,
-    ExecutionBusinessOutcome.REJECTED: KernelBusinessOutcome.REJECTED,
-    ExecutionBusinessOutcome.PENDING: KernelBusinessOutcome.UNKNOWN,
-    ExecutionBusinessOutcome.DUPLICATE: KernelBusinessOutcome.DUPLICATE,
-    ExecutionBusinessOutcome.UNKNOWN: KernelBusinessOutcome.UNKNOWN,
-}
+_KERNEL: dict | None = None
+
+
+def _kernel() -> dict:
+    """Lazily load and cache the optional kernel symbols + the frozen outcome map.
+
+    Raises the precise optional-dependency error if Decision Authority is absent.
+    """
+    global _KERNEL
+    if _KERNEL is None:
+        require_decision_authority()
+        from decision_governance.api.common import new_id, utc_now
+        from decision_governance.api.contracts import (
+            BusinessOutcome as KernelBusinessOutcome,
+            Finality,
+            RetryClassification,
+            TransportStatus,
+        )
+        from decision_governance.api.ports import ExternalDispatchResponse, ExternalStatusResponse
+        _KERNEL = {
+            "new_id": new_id,
+            "utc_now": utc_now,
+            "BusinessOutcome": KernelBusinessOutcome,
+            "Finality": Finality,
+            "RetryClassification": RetryClassification,
+            "TransportStatus": TransportStatus,
+            "ExternalDispatchResponse": ExternalDispatchResponse,
+            "ExternalStatusResponse": ExternalStatusResponse,
+            "OUTCOME_MAP": {
+                ExecutionBusinessOutcome.SUCCEEDED: KernelBusinessOutcome.SUCCEEDED,
+                ExecutionBusinessOutcome.FAILED: KernelBusinessOutcome.FAILED,
+                ExecutionBusinessOutcome.REJECTED: KernelBusinessOutcome.REJECTED,
+                ExecutionBusinessOutcome.PENDING: KernelBusinessOutcome.UNKNOWN,
+                ExecutionBusinessOutcome.DUPLICATE: KernelBusinessOutcome.DUPLICATE,
+                ExecutionBusinessOutcome.UNKNOWN: KernelBusinessOutcome.UNKNOWN,
+            },
+        }
+    return _KERNEL
+
+
+def _default_new_id(*args, **kwargs):
+    """Default id factory — delegates to the kernel's ``new_id`` (lazily loaded)."""
+    return _kernel()["new_id"](*args, **kwargs)
+
+
+def _default_clock(*args, **kwargs):
+    """Default clock — delegates to the kernel's ``utc_now`` (lazily loaded)."""
+    return _kernel()["utc_now"](*args, **kwargs)
 
 
 class ExternalExecutionAdapter:
     """Implements ``ExternalExecutionPort`` over an :class:`ExternalExecutionProvider`."""
 
     def __init__(self, provider: ExternalExecutionProvider, *,
-                 id_factory: IdFactory = new_id, clock: Clock = utc_now) -> None:
+                 id_factory: IdFactory = _default_new_id, clock: Clock = _default_clock) -> None:
         self._provider = provider
         self._new_id = id_factory
         self._clock = clock
 
     def dispatch(self, intent) -> ExternalDispatchResponse:
+        k = _kernel()
+        TransportStatus = k["TransportStatus"]
+        RetryClassification = k["RetryClassification"]
+        ExternalDispatchResponse = k["ExternalDispatchResponse"]
         req = ExecutionDispatchRequest(
             action_type=intent.action_type,
             parameters=dict(getattr(intent, "authorized_parameters", {})),
@@ -69,9 +110,13 @@ class ExternalExecutionAdapter:
             retry_classification=RetryClassification.IDEMPOTENT_SAFE)
 
     def query_status(self, external_request_id: str) -> ExternalStatusResponse:
+        k = _kernel()
+        KernelBusinessOutcome = k["BusinessOutcome"]
+        Finality = k["Finality"]
+        ExternalStatusResponse = k["ExternalStatusResponse"]
         try:
             obs = self._provider.observe(external_request_id=external_request_id)
-            outcome = _OUTCOME_MAP[obs.business_outcome]
+            outcome = k["OUTCOME_MAP"][obs.business_outcome]
             observed = dict(obs.observed_parameters)
             final = obs.final
             reasons = (obs.reason,) if obs.reason else ()
