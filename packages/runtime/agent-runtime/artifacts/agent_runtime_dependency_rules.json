@@ -1,0 +1,48 @@
+{
+  "distribution": "ugence-agent-runtime",
+  "namespace": "ugence_agent_runtime",
+  "policy": "The core package is domain-neutral and stdlib-only. It imports only the Python standard library and itself.",
+  "allowed": [
+    "python-standard-library",
+    "ugence_agent_runtime.*"
+  ],
+  "forbidden_top_level_imports": [
+    "ugence_code_governance",
+    "code_governance",
+    "actiongate",
+    "action_gate",
+    "ugence_action_clearance",
+    "action_clearance",
+    "tap_provider",
+    "decision_authority",
+    "ugence_decision_authority",
+    "storygraph",
+    "ugence_storygraph",
+    "symbolu_robotics",
+    "robotics",
+    "cer_v0_1",
+    "cer_v0_2",
+    "cer_v0_3",
+    "agentic",
+    "agent_runtime_migration",
+    "agent_runtime_v2",
+    "control_plane",
+    "ugence_console_api",
+    "apps",
+    "applications",
+    "products",
+    "numpy",
+    "torch"
+  ],
+  "prohibited_edges": [
+    "ugence-agent-runtime -> Code Governance",
+    "ugence-agent-runtime -> product packages",
+    "ugence-agent-runtime -> robotics",
+    "ugence-agent-runtime -> concrete governance implementations",
+    "ugence-agent-runtime -> application entry points",
+    "ugence-agent-runtime -> monorepo test fixtures",
+    "ugence-agent-runtime -> any third-party runtime dependency"
+  ],
+  "enforced_by": "tests/test_import_boundaries.py",
+  "dependency_direction": "applications -> optional integration adapters -> ugence-agent-runtime -> neutral contracts (stdlib)"
+}

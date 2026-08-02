@@ -1,0 +1,25 @@
+{
+  "event_types": [
+    "RUNTIME_CREATED",
+    "WORKFLOW_CREATED",
+    "WORKFLOW_STARTED",
+    "TASK_READY",
+    "TASK_STARTED",
+    "GOVERNANCE_EVALUATION_REQUESTED",
+    "GOVERNANCE_DISPOSITION_RECEIVED",
+    "PROVIDER_INVOKED",
+    "PROVIDER_COMPLETED",
+    "TASK_COMPLETED",
+    "TASK_FAILED",
+    "TASK_WAITING",
+    "WORKFLOW_PAUSED",
+    "WORKFLOW_RESUMED",
+    "WORKFLOW_WAITING",
+    "WORKFLOW_COMPLETED",
+    "WORKFLOW_FAILED",
+    "WORKFLOW_CANCELLED",
+    "CHECKPOINT_COMMITTED",
+    "RECOVERY_PERFORMED"
+  ],
+  "notes": "Deterministic; monotonic seq, not a timestamp. No credentials, raw prompts, secret args, or full provider responses by default."
+}

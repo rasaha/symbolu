@@ -1,0 +1,36 @@
+{
+  "interface": "ugence_agent_runtime.providers.interfaces.Provider",
+  "description": "A provider executes a runtime-requested operation AFTER all required runtime and external governance checks have completed. Neutral: no vendor coupling.",
+  "provider_attributes": ["provider_id", "version"],
+  "method": {
+    "name": "execute",
+    "input": "ToolInvocation",
+    "output": "ToolResult"
+  },
+  "tool_invocation": {
+    "provider_id": "str",
+    "operation": "str",
+    "arguments": "dict",
+    "correlation_id": "Optional[str]",
+    "idempotency_key": "Optional[str] (runtime supplies '{instance_id}:{task_id}')",
+    "timeout": "Optional[float]",
+    "metadata": "dict"
+  },
+  "tool_result": {
+    "provider_id": "str",
+    "operation": "str",
+    "ok": "bool",
+    "output": "Optional[Any] (opaque to the runtime)",
+    "error": "Optional[str]",
+    "failure_category": "Optional[str]",
+    "metadata": "dict"
+  },
+  "failure_signaling": {
+    "expected_failure": "return ToolResult(ok=False, ...)",
+    "retriable_error": "raise ProviderExecutionError(retriable=True)",
+    "fatal_error": "raise ProviderExecutionError(retriable=False)",
+    "unknown_exception": "wrapped by the runtime; never surfaced raw"
+  },
+  "neutrality": "No OpenAI/Anthropic/GitHub/cloud/database specifics. Concrete providers live outside this package.",
+  "new_provider_kind_introduced": false
+}

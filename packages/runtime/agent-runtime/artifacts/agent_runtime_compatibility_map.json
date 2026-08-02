@@ -1,0 +1,26 @@
+{
+  "aliases": {
+    "ugence_agent_runtime.compat.Runtime": "ugence_agent_runtime.api.AgentRuntime",
+    "ugence_agent_runtime.compat.Workflow": "ugence_agent_runtime.api.WorkflowDefinition",
+    "ugence_agent_runtime.compat.WorkflowRun": "ugence_agent_runtime.api.WorkflowInstance",
+    "ugence_agent_runtime.compat.Task": "ugence_agent_runtime.api.TaskDefinition",
+    "ugence_agent_runtime.compat.TaskRun": "ugence_agent_runtime.api.TaskInstance",
+    "ugence_agent_runtime.compat.WorkflowCheckpoint": "ugence_agent_runtime.api.Checkpoint",
+    "ugence_agent_runtime.compat.Registry": "ugence_agent_runtime.api.ProviderRegistry",
+    "ugence_agent_runtime.compat.Result": "ugence_agent_runtime.api.RuntimeResult"
+  },
+  "legacy_import_paths": {
+    "agent_runtime_migration.workflow.Workflow": "ugence_agent_runtime.api.WorkflowDefinition",
+    "agent_runtime_migration.workflow.Checkpoint": "ugence_agent_runtime.api.Checkpoint",
+    "agent_runtime_migration.runtime.runtime.AgentRuntime": "ugence_agent_runtime.api.AgentRuntime",
+    "agent_runtime_migration.tools.registry.ToolRegistry": "ugence_agent_runtime.api.ProviderRegistry",
+    "agent_runtime_migration.tracing.events.RuntimeEvent": "ugence_agent_runtime.models.events.RuntimeEvent"
+  },
+  "classification": {
+    "ugence_agent_runtime.compat.*": "TEMPORARY_COMPATIBILITY_REEXPORT",
+    "agent_runtime_migration.workflow.*": "DEPRECATED",
+    "agent_runtime_migration.control_plane.*": "INTERNAL_UNSUPPORTED_IMPORT",
+    "agent_runtime_migration.proposal.*": "INTERNAL_UNSUPPORTED_IMPORT"
+  },
+  "notes": "Aliases are identity-preserving; no duplicate implementation. Legacy package retained, not deleted."
+}

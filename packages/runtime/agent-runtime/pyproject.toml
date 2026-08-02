@@ -1,0 +1,43 @@
+# Independent distribution for the domain-neutral Ugence Agent Runtime.
+#
+# The Agent Runtime is a domain-neutral coordination capability: it drives
+# agent/workflow execution state, task and workflow lifecycle, provider and tool
+# invocation, retry/timeout/cancellation, checkpoints and durable recovery, and a
+# neutral governance-integration boundary. It COORDINATES execution; it never
+# creates governance authority, authors policy, authorizes actions, or mints
+# execution clearance. It is provider-neutral, product-neutral, and imports no
+# concrete governance implementation.
+#
+# Build:  python -m build packages/runtime/agent-runtime
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-runtime"
+dynamic = ["version"]
+description = "Ugence Agent Runtime — domain-neutral coordination of agent/workflow execution state, task lifecycle, provider invocation, retry/timeout/cancellation, checkpoints, durable recovery, and a neutral governance-integration boundary."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["agent-runtime", "workflow", "orchestration", "coordination", "governance-neutral", "ugence"]
+# The Agent Runtime core depends ONLY on the Python standard library. It is a
+# domain-neutral coordination capability: no third-party runtime dependency, and
+# no dependency on any Ugence product, capability, provider, robotics, governance
+# implementation, persistence backend, or LLM/agent framework. Concrete governance
+# and provider integrations live in separate optional packages.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_runtime.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_agent_runtime = ["py.typed"]
