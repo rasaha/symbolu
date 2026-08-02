@@ -60,6 +60,47 @@ def _cmd_health(args) -> int:
     return 0
 
 
+def _cmd_study_validate(args) -> int:
+    from ..pilot_study.manifest import PilotStudyManifest, validate_study_manifest
+    from ..pilot_study.errors import StudyManifestError
+    data = json.loads(Path(args.manifest).read_text())
+    try:
+        m = PilotStudyManifest(
+            manifest_id=data["manifest_id"], manifest_version=data["manifest_version"],
+            pilot_id=data["pilot_id"], tenant_id=data["tenant_id"],
+            allowed_repositories=tuple(data.get("allowed_repositories", ())),
+            allowed_branches=tuple(data.get("allowed_branches", ())),
+            pilot_start_date=data.get("pilot_start_date", ""),
+            pilot_end_date=data.get("pilot_end_date", ""),
+            maximum_evaluations=int(data.get("maximum_evaluations", 0)),
+            target_sample_count=int(data.get("target_sample_count", 0)),
+            selection_method=data.get("selection_method", ""),
+            evaluation_profile_ref=data.get("evaluation_profile_ref", ""),
+            policy_version=data.get("policy_version", ""),
+            adapter_registry_version=data.get("adapter_registry_version", ""),
+            intervention_routing_version=data.get("intervention_routing_version", ""),
+            reviewer_role_allowlist=tuple(data.get("reviewer_role_allowlist", ())),
+            reviewer_refs=tuple(data.get("reviewer_refs", ())),
+            evidence_classes_permitted=tuple(data.get("evidence_classes_permitted", ())),
+            minimum_reviewer_feedback_target=int(data.get("minimum_reviewer_feedback_target", 0)),
+            reviewer_protocol_ref=data.get("reviewer_protocol_ref", ""))
+        validate_study_manifest(m)
+    except (StudyManifestError, KeyError, ValueError) as exc:
+        print(json.dumps({"valid": False, "error": str(exc)}))
+        return 1
+    print(json.dumps({"valid": True, "manifest_fingerprint": m.manifest_fingerprint,
+                      "pilot_id": m.pilot_id, "execution_status": "DISABLED"}))
+    return 0
+
+
+def _cmd_evidence_pack_verify(args) -> int:
+    from ..pilot_study.evidence_pack import verify_pilot_evidence_pack
+    pack = json.loads(Path(args.pack).read_text())
+    v = verify_pilot_evidence_pack(pack)
+    print(json.dumps({"ok": v.ok, "issues": list(v.issues)}))
+    return 0 if v.ok else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cg-pilot", description="Code Governance pilot operator")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -68,6 +109,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_val.add_argument("--config", required=True, help="path to a JSON deployment config")
     sub.add_parser("security-scan", help="static read-only security scan of the adapter+operator boundary")
     sub.add_parser("health", help="operator health banner")
+    # MVP 1F — study subcommands
+    p_sv = sub.add_parser("study-validate", help="validate a pilot study manifest (JSON)")
+    p_sv.add_argument("--manifest", required=True, help="path to a JSON study manifest")
+    p_ev = sub.add_parser("evidence-pack-verify", help="verify a pilot evidence pack offline (JSON)")
+    p_ev.add_argument("--pack", required=True, help="path to a JSON evidence pack")
     return parser
 
 
@@ -76,6 +122,8 @@ _DISPATCH = {
     "validate": _cmd_validate,
     "security-scan": _cmd_security_scan,
     "health": _cmd_health,
+    "study-validate": _cmd_study_validate,
+    "evidence-pack-verify": _cmd_evidence_pack_verify,
 }
 
 
