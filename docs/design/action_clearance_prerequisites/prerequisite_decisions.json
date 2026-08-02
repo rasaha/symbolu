@@ -1,0 +1,152 @@
+{
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Canonical decision ledger closing the four Action Clearance implementation-prerequisites. Extends docs/design/action_clearance/design_decisions.json without reopening any merged decision.",
+  "starting_point": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_head": "154b24b94024d7780bdf3b2b11d5a17a450941a8",
+    "default_head_subject": "Merge pull request #1277",
+    "prerequisite_branch": "claude/action-clearance-prerequisite-closure-zaey43",
+    "prerequisite_branch_note": "environment-mandated; prompt-suggested name was claude/action-clearance-prerequisite-closure",
+    "python_version": "3.11.15",
+    "action_clearance_design_status": "integrated (PR #1276 merged; #1274, #1275 ancestors)",
+    "later_commit_semantics_change": "none (PR #1277 touched only Code Governance change-intelligence docs)",
+    "platform_freeze_substantive_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6",
+    "platform_freeze_unchanged": true,
+    "robotics_local_freeze_combined_digest": "8f8660e293308cf94c983a26a2ae69c9",
+    "robotics_local_freeze_unchanged": true,
+    "robotics_module_hashes_matched": "13/13",
+    "action_clearance_package_exists": false
+  },
+  "closure_classes": ["CLOSED_BY_EXISTING_REPOSITORY_CAPABILITY", "CLOSED_BY_NEW_PRODUCT_INTERFACE", "CLOSED_BY_FUTURE_ADAPTER_CONTRACT", "OPEN_IMPLEMENTATION_DECISION", "DESIGN_BLOCKER"],
+  "blocking_classes": ["PACKAGE_CORE_BLOCKER", "SHADOW_INTEGRATION_BLOCKER", "ENFORCEMENT_BLOCKER", "PRODUCTION_BLOCKER"],
+  "decisions": [
+    {
+      "id": "PA-1",
+      "prerequisite": "A_trusted_signal_provenance",
+      "selected_option": "Additive SignalProvenance projection; MVP integrity Level 1 (trusted-ingestion digest); evaluator built to check L1/L2/L3, required level is policy",
+      "rejected_options": ["require public-key signatures for MVP", "add provenance fields to the frozen TrustedSignal neutral core", "let the evaluator verify signatures against a live key service"],
+      "rationale": "No producer-key infrastructure exists today and shadow never executes; Level 1 + approved-adapter registry is sufficient and the only level the repo can satisfy now. Raising to L2/L3 for enforcement/high-risk needs no contract change.",
+      "owner": "security/platform + Action Clearance package",
+      "implementation_stage": "package core (evaluate) / shadow (adapters) / enforcement (L2+)",
+      "blocking_classification": "SHADOW_INTEGRATION_BLOCKER (adapters); ENFORCEMENT_BLOCKER (L2/L3)",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["TRUSTED_SIGNAL_PROVENANCE.md", "trusted_signal_provenance.schema.json", "docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md", "OPEN_QUESTIONS.md Q3"]
+    },
+    {
+      "id": "PA-2",
+      "prerequisite": "A_signal_source_registry",
+      "selected_option": "Platform integration layer owns the mutable registry; evaluator consumes an immutable versioned source-trust projection read-only",
+      "rejected_options": ["Action Clearance package owns a mutable registry", "no registry (trust every adapter)"],
+      "rationale": "Owning a mutable registry would reintroduce nondeterminism and turn the package into an integration-management system, violating the scope discipline.",
+      "owner": "platform integration + Workflow Service",
+      "implementation_stage": "shadow",
+      "blocking_classification": "SHADOW_INTEGRATION_BLOCKER",
+      "closure": "CLOSED_BY_FUTURE_ADAPTER_CONTRACT",
+      "source_refs": ["SIGNAL_SOURCE_REGISTRY.md"]
+    },
+    {
+      "id": "PA-3",
+      "prerequisite": "A_fingerprints",
+      "selected_option": "Three fingerprint domains: signal_content_fingerprint, signal_provenance_fingerprint, signal_bundle_fingerprint over the merged action_clearance SHA-256 pattern; bundle sorted by signal_id",
+      "rejected_options": ["single signal fingerprint", "new hash algorithm"],
+      "rationale": "Content and provenance must be independently verifiable and auditable; bundle composes content fingerprints so omission/reorder changes identity.",
+      "owner": "Action Clearance package",
+      "implementation_stage": "package core",
+      "blocking_classification": "PACKAGE_CORE (satisfied)",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["SIGNAL_NORMALIZATION_AND_DIGESTS.md", "SIGNAL_FRESHNESS_AND_CONFLICTS.md", "docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md"]
+    },
+    {
+      "id": "PB-1",
+      "prerequisite": "B_receipt_persistence_interface",
+      "selected_option": "ClearanceReceiptRepository protocol owned by the Workflow Service; Action Clearance package defines only the receipt schema and reference requirements; no concrete DB dependency",
+      "rejected_options": ["dedicated Action Clearance receipt repository in the package", "Decision Authority storage", "package depends on a concrete database"],
+      "rationale": "Matches the merged persistence boundary; keeps the package dependency floor at ugence-governance-contracts; preserves the authority boundary.",
+      "owner": "Code Governance Workflow Service",
+      "implementation_stage": "shadow (in-memory) / enforcement (durable)",
+      "blocking_classification": "ENFORCEMENT_BLOCKER (durable backend)",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["RECEIPT_PERSISTENCE_INTERFACE.md", "CLEARANCE_RECEIPT_SCHEMA.md", "clearance_receipt.schema.json", "OPEN_QUESTIONS.md Q2"]
+    },
+    {
+      "id": "PB-2",
+      "prerequisite": "B_persistence_guarantees",
+      "selected_option": "Shadow/recommendation guarantees satisfied by the existing append-only in-memory pattern; enforcement guarantees (durable, optimistic concurrency, access control, atomic supersession) require a durable backend",
+      "rejected_options": ["require full production hardening for shadow", "no durability for enforcement"],
+      "rationale": "Stages durability so package core can begin before enforcement-grade persistence exists.",
+      "owner": "Workflow Service",
+      "implementation_stage": "staged by mode",
+      "blocking_classification": "ENFORCEMENT_BLOCKER (durable set)",
+      "closure": "CLOSED_BY_EXISTING_REPOSITORY_CAPABILITY (shadow set) + OPEN_IMPLEMENTATION_DECISION (durable backend)",
+      "source_refs": ["RECEIPT_PERSISTENCE_GUARANTEES.md", "EXISTING_EXECUTION_REPOSITORY_ASSESSMENT.md"]
+    },
+    {
+      "id": "PC-1",
+      "prerequisite": "C_receipt_lifecycle",
+      "selected_option": "Five-state lifecycle (ISSUED/EXPIRED/SUPERSEDED/REVOKED/INVALIDATED); expiry derived from valid_until; append-only events; immutable body; evaluator never mutates receipts; CONSUMED/EXECUTING/EXECUTED/FAILED excluded",
+      "rejected_options": ["store consumption/execution states on the receipt", "mutable receipt body", "evaluator mutates stored receipts", "persisted-only expiry with a background mutator"],
+      "rationale": "Separates transient evaluator status from durable lifecycle; keeps consumption in the execution ledger; derived expiry avoids a background mutator.",
+      "owner": "Workflow Service",
+      "implementation_stage": "shadow / enforcement",
+      "blocking_classification": "SHADOW_INTEGRATION_BLOCKER (wiring)",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["RECEIPT_LIFECYCLE.md", "UPSTREAM_INVALIDATION_EVENTS.md", "RECEIPT_SUPERSESSION.md", "receipt_lifecycle_events.schema.json", "docs/design/action_clearance/STATE_MACHINE.md"]
+    },
+    {
+      "id": "PC-2",
+      "prerequisite": "C_supersession_lineage",
+      "selected_option": "lineage_key = (tenant_id, authorization_ref, authorized_action_fingerprint, target_ref, profile_id); policy_version NOT in the key but is a supersession trigger; changed action fingerprint => new lineage, never silent replacement",
+      "rejected_options": ["include policy_version in lineage key", "allow action-fingerprint change to supersede silently"],
+      "rationale": "Lineage identifies what is cleared; policy is an evaluation property. A changed action is a different action requiring new/renewed authorization.",
+      "owner": "Workflow Service",
+      "implementation_stage": "shadow / enforcement",
+      "blocking_classification": "SHADOW_INTEGRATION_BLOCKER",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["RECEIPT_SUPERSESSION.md"]
+    },
+    {
+      "id": "PD-1",
+      "prerequisite": "D_execution_key",
+      "selected_option": "execution_key = (tenant_id, authorization_ref, authorized_action_fingerprint, target_ref, operation); maps onto existing execution_idempotency_key",
+      "rejected_options": ["include clearance_receipt_ref in the key", "include profile_id/merge_method in the key"],
+      "rationale": "Key must identify the authorized action (stable across a re-issued receipt), not the clearance evaluation; merge_method already folds into the action fingerprint.",
+      "owner": "execution",
+      "implementation_stage": "enforcement",
+      "blocking_classification": "ENFORCEMENT_BLOCKER",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
+      "source_refs": ["EXECUTION_KEY.md", "execution_key.schema.json", "docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md"]
+    },
+    {
+      "id": "PD-2",
+      "prerequisite": "D_atomic_reservation",
+      "selected_option": "reserve_once(...) contract with 8-value result; exactly one ACQUIRED per key; uncertain outcomes require reconciliation before reuse; extend the existing ExecutionRepository port; add a durable atomic backend",
+      "rejected_options": ["reuse lookup_by_execution_idempotency_key + create_execution_intent as-is (check-then-act, race-prone)", "put one-time-use in the clearance core", "select a specific database now"],
+      "rationale": "The existing repository provides only check-then-insert idempotency, not atomic reserve-once; the atomic property is the P0 enforcement prerequisite. Backend is deferred to keep semantics database-neutral.",
+      "owner": "execution",
+      "implementation_stage": "enforcement (P0)",
+      "blocking_classification": "ENFORCEMENT_BLOCKER",
+      "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE (contract) + EXTEND_BEHIND_EXISTING_INTERFACE (port); backend OPEN_IMPLEMENTATION_DECISION",
+      "source_refs": ["EXECUTION_RESERVATION_CONTRACT.md", "EXECUTION_RESERVATION_STATE_MACHINE.md", "execution_reservation.schema.json", "EXISTING_EXECUTION_REPOSITORY_ASSESSMENT.md", "OPEN_QUESTIONS.md Q4"]
+    },
+    {
+      "id": "PD-3",
+      "prerequisite": "D_dispatch_observation_linkage",
+      "selected_option": "Product execution envelope (reusing ExecutionIntent pattern) carries receipt/authorization/action refs; neutral contracts unchanged",
+      "rejected_options": ["add clearance_receipt_ref to the neutral ExecutionDispatchRequest", "modify neutral contracts"],
+      "rationale": "Neutral contracts deliberately exclude product concepts; ExecutionIntent already carries authorization_id/cer_id/idempotency_key/content_hash.",
+      "owner": "execution",
+      "implementation_stage": "enforcement",
+      "blocking_classification": "ENFORCEMENT_BLOCKER",
+      "closure": "CLOSED_BY_FUTURE_ADAPTER_CONTRACT",
+      "source_refs": ["DISPATCH_OBSERVATION_LINKAGE.md", "RECEIPT_RECONSTRUCTION.md"]
+    }
+  ],
+  "existing_repository_reuse": {
+    "ExecutionRepository/InMemoryExecutionRepository": "EXTEND_BEHIND_EXISTING_INTERFACE (add reserve_once + durable backend; check-then-insert only today)",
+    "neutral_execution_contracts": "REUSE_AS_IS (no new ProviderKind)",
+    "ExecutionIntent/ReconciliationResult/outcome_enums": "REUSE_WITH_ADAPTER / REUSE_AS_IS",
+    "ai_hiring_execution_repo": "REFERENCE_ONLY"
+  },
+  "verdict": "ACTION CLEARANCE PREREQUISITES PARTIALLY CLOSED — package core may begin, enforcement prerequisites remain"
+}

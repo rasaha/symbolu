@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance_prerequisites/execution_reservation.schema.json",
+  "title": "ExecutionReservation + reserve_once contract (Action Clearance prerequisites)",
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Product execution envelope + atomic reserve-once contract. Defines semantics only; selects no database. Neutral contracts are unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reservation_id", "execution_key", "clearance_receipt_ref", "authorization_ref", "action_fingerprint", "state", "created_at", "reservation_ttl"],
+  "properties": {
+    "reservation_id": {"type": "string"},
+    "execution_key": {"type": "string", "description": "Canonical serialization exec_key.v1:<sha256hex>."},
+    "clearance_receipt_ref": {"type": "string", "description": "acr_<result_fingerprint>."},
+    "authorization_ref": {"type": "string"},
+    "action_fingerprint": {"type": "string"},
+    "target_ref": {"type": "string"},
+    "operation": {"type": "string"},
+    "state": {"type": "string", "enum": ["AVAILABLE", "RESERVED", "DISPATCHED", "OBSERVED_SUCCESS", "OBSERVED_FAILURE", "OUTCOME_UNCERTAIN", "RECONCILED_SUCCESS", "RECONCILED_FAILURE", "RELEASED"]},
+    "created_at": {"type": "string"},
+    "reservation_ttl": {"type": "string", "description": "Bound on RESERVED (pre-dispatch)."},
+    "dispatch_deadline": {"type": ["string", "null"]},
+    "lease_expires_at": {"type": ["string", "null"]},
+    "dispatch_request_id": {"type": ["string", "null"]},
+    "provider_operation_id": {"type": ["string", "null"]},
+    "observation_ref": {"type": ["string", "null"]},
+    "reconciliation_ref": {"type": ["string", "null"]}
+  },
+  "x-reserve-once": {
+    "signature": "reserve_once(execution_key, clearance_receipt_ref, expected_authorization_ref, expected_action_fingerprint, reservation_ttl) -> ReservationResult",
+    "result_set": ["ACQUIRED", "ALREADY_RESERVED", "ALREADY_DISPATCHED", "ALREADY_COMPLETED", "CONFLICT", "INVALID_RECEIPT", "EXPIRED_CLEARANCE", "STALE_AUTHORIZATION"],
+    "atomic_property": "At most one caller may acquire an executable reservation for the same execution key; exactly one returns ACQUIRED under concurrency."
+  },
+  "x-validation-before-acquired": {
+    "inside_atomic_transaction": ["uniqueness insert on execution_key (no prior reservation/completion)", "durable state read deciding ACQUIRED vs ALREADY_*"],
+    "preconditions_no_toctou": ["receipt exists", "receipt body intact (recomputed result_fingerprint == receipt_id)", "status CLEAR", "lifecycle permits execution (ISSUED)", "not expired (t <= valid_until)", "authorization matches expected", "action fingerprint matches expected", "target and operation match", "tenant matches"],
+    "where_supported": ["upstream authorization still valid (atomic verification)"]
+  },
+  "x-uncertain-outcome-rule": "A timed-out caller does not imply the action did not occur. OUTCOME_UNCERTAIN requires reconciliation before reuse; never auto-released. RECONCILED_SUCCESS permanently prevents duplicate execution; RECONCILED_FAILURE may permit controlled retry per policy.",
+  "x-backend-neutral-semantics": ["atomic conditional insert", "unique execution key", "durable state", "linearizable-or-equivalent reservation decision", "tenant isolation", "idempotent reads/retries", "reconciliation-safe updates"],
+  "x-backend-decision": "OPEN_IMPLEMENTATION_DECISION (enforcement blocker): SQL uniqueness+transaction | CAS document store | append-only event store w/ unique key | distributed lock + durable record | in-memory (tests only). No backend implemented in this phase."
+}

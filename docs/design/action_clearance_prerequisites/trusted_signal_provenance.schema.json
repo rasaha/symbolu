@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance_prerequisites/trusted_signal_provenance.schema.json",
+  "title": "SignalProvenance (Action Clearance prerequisites)",
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Additive provenance/integrity projection over the merged TrustedSignal. Consumed (never fetched) by the deterministic evaluator; signature/MAC verification for L2/L3 happens at the ingestion boundary before evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signal_id",
+    "signal_type",
+    "tenant_id",
+    "subject_ref",
+    "source_id",
+    "source_kind",
+    "captured_at",
+    "normalized_value",
+    "content_digest",
+    "provenance_ref",
+    "ingestion_boundary"
+  ],
+  "properties": {
+    "signal_id": {"type": "string", "description": "Stable id within the bundle."},
+    "signal_type": {"type": "string", "description": "Which current-state fact is asserted."},
+    "tenant_id": {"type": "string", "x-trust": "must equal request.tenant_id"},
+    "subject_ref": {"type": "string", "x-trust": "must bind to the action identity"},
+    "authorization_ref": {"type": ["string", "null"], "description": "Authorization the signal relates to; null for global signals."},
+    "action_fingerprint": {"type": ["string", "null"], "description": "Exact action the signal relates to; null for non-action-scoped signals."},
+    "source_id": {"type": "string", "description": "Emitting source instance id."},
+    "source_kind": {"type": "string", "examples": ["identity_provider", "incident_system", "change_management", "github_adapter", "execution_ledger", "policy_authority", "target_adapter"]},
+    "adapter_id": {"type": "string", "description": "Adapter that normalized the fact (adapter extension)."},
+    "adapter_version": {"type": "string", "description": "Adapter build/version; must be in approved_versions."},
+    "captured_at": {"type": "string", "description": "Source observation time (canonical form; no core clock read)."},
+    "valid_until": {"type": ["string", "null"], "description": "Freshness bound; required for time-bounded types."},
+    "normalized_value": {"description": "Deterministic normalized state."},
+    "content_digest": {"type": "string", "description": "signal_content_fingerprint over the canonicalized content."},
+    "provenance_ref": {"type": "string", "x-trust": "audited"},
+    "ingestion_boundary": {"type": "string", "description": "Trust boundary that admitted the signal."},
+    "policy_refs": {"type": "array", "items": {"type": "string"}, "description": "Policy/version(s) admitting this source for this signal type."},
+    "signature_ref": {"type": ["string", "null"], "description": "MAC/signature envelope reference; required only for integrity Level 2/3."}
+  },
+  "x-integrity-levels": {
+    "L1_trusted_ingestion_digest": ["approved adapter_id", "deterministic normalization", "content_digest", "controlled ingestion_boundary"],
+    "L2_keyed_authentication": ["L1", "MAC/service-authenticated envelope (signature_ref)", "key rotation + verifier identity"],
+    "L3_signed_signal": ["producer signature", "verifiable key identity (KID)", "durable signature evidence"]
+  },
+  "x-required-level-by-mode": {
+    "mvp_shadow": "L1",
+    "recommendation": "L1 core; L2 for PRIOR_CONSUMPTION and AUTHORIZATION_VALIDITY",
+    "enforced_execution": "L2 minimum; L3 where a producer key exists",
+    "high_risk_domains": "L3"
+  },
+  "x-condition-handling": {
+    "missing_provenance": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED", "fail_closed": true},
+    "unknown_source": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED"},
+    "unapproved_adapter": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED"},
+    "adapter_version_mismatch": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED"},
+    "digest_mismatch": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED"},
+    "tenant_mismatch": {"status": "BLOCK", "reason": "TENANT_MISMATCH"},
+    "subject_mismatch": {"status": "BLOCK", "reason": "SUBJECT_MISMATCH"},
+    "authorization_mismatch": {"status": "BLOCK", "reason": "SUBJECT_MISMATCH"},
+    "signal_replay": {"behavior": "dedup by (signal_id, content_digest); identical fingerprint; no new trust"},
+    "expired_signal": {"status": "HOLD", "reason": "SIGNAL_STALE"},
+    "stale_signal": {"status": "HOLD", "reason": "SIGNAL_STALE", "policy_may_elevate": "BLOCK"},
+    "conflicting_signals": {"status": "ESCALATE", "reason": "SIGNAL_CONFLICT"},
+    "source_unavailable": {"status": "HOLD", "reason": "SIGNAL_MISSING", "fail_closed": true}
+  }
+}

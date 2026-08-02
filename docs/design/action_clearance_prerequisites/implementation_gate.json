@@ -1,0 +1,40 @@
+{
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Machine-readable package-start gate with explicit boolean conditions. All package_core_conditions TRUE => package core (Phases A-C) may begin. Enforcement remains gated on the enforcement_blockers.",
+  "package_core_conditions": {
+    "signal_provenance_model_stable": true,
+    "signal_fingerprint_rules_stable": true,
+    "receipt_schema_stable": true,
+    "receipt_repository_owner_selected": true,
+    "receipt_lifecycle_semantics_stable": true,
+    "execution_key_stable": true,
+    "atomic_reservation_semantics_stable": true,
+    "existing_repository_reuse_decision_recorded": true,
+    "no_authority_boundary_ambiguous": true
+  },
+  "package_core_may_begin": true,
+  "package_core_blockers": [],
+  "shadow_integration_blockers": [
+    {"id": "SIB-1", "item": "signal adapters emitting Level-1 provenance", "owner": "integration", "future_pr": "PR-7"},
+    {"id": "SIB-2", "item": "receipt lifecycle/invalidation wiring in Workflow Service", "owner": "workflow_service", "future_pr": "PR-6"},
+    {"id": "SIB-3", "item": "source-trust projection cadence/versioning", "owner": "integration/platform", "future_pr": "PR-7"}
+  ],
+  "enforcement_blockers": [
+    {"id": "EB-1", "item": "durable atomic reserve_once backend", "priority": "P0", "owner": "execution", "future_pr": "PR-9", "acceptance": "exactly one ACQUIRED under concurrency; scenarios 26-38 green on a durable store"},
+    {"id": "EB-2", "item": "durable ClearanceReceiptRepository backend", "priority": "P1", "owner": "workflow_service", "future_pr": "PR-8", "acceptance": "durable, tenant-isolated, read-after-write, optimistic concurrency"},
+    {"id": "EB-3", "item": "L2/L3 signal integrity (keyed/signed)", "priority": "P1", "owner": "security/platform", "future_pr": "adapter PR", "acceptance": "keyed/signed envelope verified at ingestion for gated signal types"},
+    {"id": "EB-4", "item": "uncertain-outcome reconciliation wiring", "priority": "P1", "owner": "execution", "future_pr": "PR-10", "acceptance": "OUTCOME_UNCERTAIN never auto-released; reconcile before reuse"}
+  ],
+  "production_blockers": [
+    {"id": "PB-1", "item": "tamper-evident hash-chained store", "owner": "platform persistence"},
+    {"id": "PB-2", "item": "L3 producer signatures + key service", "owner": "platform"}
+  ],
+  "future_out_of_first_profile": [
+    {"id": "F-1", "item": "merge-queue derived authorization", "phase": "I", "owner": "code_governance"},
+    {"id": "F-2", "item": "rebase exact-tree binding", "phase": "I", "owner": "code_governance"}
+  ],
+  "enforced_execution_may_begin": false,
+  "enforced_execution_precondition": "EB-1 AND EB-2 resolved (durable atomic reservation backend AND durable receipt store)",
+  "verdict": "ACTION CLEARANCE PREREQUISITES PARTIALLY CLOSED — package core may begin, enforcement prerequisites remain"
+}
