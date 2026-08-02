@@ -1,0 +1,97 @@
+{
+  "$comment": "Machine-readable risk-adaptive evidence profiles, non-compensatory gate model, and validator->claim mapping for the Code Change Intelligence evidence layer. Documentation-only. Companion to CHANGE_INTELLIGENCE_EVIDENCE_LAYER.md. Change Intelligence validators are PRODUCT evidence producers, not governance authorities; outputs flow through AssertionGovernanceRequest.evidence_refs into TAP and the existing authority chain. No new ProviderKind and no frozen-contract change.",
+  "authoritative_source": "UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md v0.2 (§4.1, §9.2, §10, §16.1, §16.2, §16.3); this audit",
+  "positioning": "UGC governs (forces + admits + authorizes) detection; it does not itself detect. Detection = independent evidence producers.",
+  "risk_tiers": {
+    "LOW": {
+      "examples": ["documentation", "comments", "internal renaming"],
+      "required_evidence": ["build", "unit_tests", "static_checks", "basic_bloat_delta"]
+    },
+    "MEDIUM": {
+      "examples": ["feature logic", "API changes", "new dependencies", "performance-sensitive paths"],
+      "required_evidence": ["LOW", "differential_or_property_tests", "dependency_delta", "performance_delta", "public_api_delta"]
+    },
+    "HIGH": {
+      "examples": ["authentication", "authorization", "payments", "data deletion", "cryptography", "governance policy", "deployment controls", "credentials", "safety boundaries"],
+      "required_evidence": ["MEDIUM", "mutation_testing", "fuzz_testing", "static_security_dataflow", "independent_reviewer", "security_approval", "explicit_human_authority"],
+      "modes": ["competitive_validation_mode_eligible", "storygraph_escalation_applies"]
+    }
+  },
+  "non_compensatory_gates": {
+    "principle": "Do not average evidence into one score. TAP emits per-claim coverage (AssertionCoverage), not a blended number; mandatory gates live in policy + Workflow Service + Decision Authority + ActionGate.",
+    "caveat": "AssertionGovernanceResult.evidence_coverage is a per-claim float (contracts/assertion.py:44) and MUST NOT be used as a compensatory quality score.",
+    "gates": [
+      {"condition": "required evidence missing", "outcome": "INCOMPLETE_OR_ESCALATE", "enforced_by": "Workflow Service (policy)", "workflow_state": "EVIDENCE_PENDING|ESCALATED"},
+      {"condition": "critical validator failed", "outcome": "DENY", "enforced_by": "Decision Authority (policy)", "workflow_state": "DENIED"},
+      {"condition": "evidence bound to old head SHA", "outcome": "STALE", "enforced_by": "Workflow Service (re-entry)", "workflow_state": "SUPERSEDED"},
+      {"condition": "bloat budget exceeded", "outcome": "JUSTIFICATION_REQUIRED_OR_DENY", "enforced_by": "policy -> Decision Authority", "workflow_state": "DECISION_PENDING|DENIED"},
+      {"condition": "security approval missing", "outcome": "DECISION_PENDING", "enforced_by": "Decision Authority", "workflow_state": "DECISION_PENDING"},
+      {"condition": "untrusted/unpinned validator", "outcome": "INADMISSIBLE", "enforced_by": "TAP admission + provenance binding", "workflow_state": "EVIDENCE_PENDING"},
+      {"condition": "unsigned evidence manifest", "outcome": "INADMISSIBLE", "enforced_by": "Workflow Service", "workflow_state": "EVIDENCE_PENDING"},
+      {"condition": "unauthorized reviewer", "outcome": "DENY", "enforced_by": "Decision Authority (SoD/roles)", "workflow_state": "DENIED"},
+      {"condition": "all mandatory evidence admitted", "outcome": "PROCEED", "enforced_by": "-", "workflow_state": "APPROVED"}
+    ],
+    "default": "fail_closed"
+  },
+  "detection_methods": [
+    {"method": "differential_testing", "catches": "behavioral divergence in refactors/optimizations/rewrites/parsers/serializers", "oracle": "old vs new impl (replacements only)", "claim": "new==old on corpus", "limit": "no oracle for greenfield"},
+    {"method": "property_based_testing", "catches": "invariant violations", "oracle": "invariants", "claim": "invariants hold over domain", "limit": "invariant selection is judgment"},
+    {"method": "fuzz_testing", "catches": "boundary/adversarial/malformed inputs", "oracle": "crash/assert/leak", "claim": "no crash over N iters", "limit": "nondeterministic; flake handling"},
+    {"method": "metamorphic_testing", "catches": "relation-preservation without exact oracle", "oracle": "metamorphic relations", "claim": "transform preserves relation", "limit": "domain-specific relations"},
+    {"method": "mutation_testing", "catches": "test suites that merely confirm the implementation (AI self-confirming tests)", "oracle": "injected defects", "claim": "mutation score >= threshold on touched code", "limit": "expensive; scope to sensitive modules"},
+    {"method": "static_dataflow", "catches": "taint/uninitialized/nullability/races/authz-flow/secrets/unsafe-deser/injection", "oracle": "SAST/dataflow tools", "claim": "no critical finding", "limit": "false positives; tool coverage"},
+    {"method": "contract_compatibility", "catches": "broken APIs/schema drift/changed defaults/serialization/exception/event-order/back-compat", "oracle": "API/schema baseline", "claim": "no breaking delta or approved exception", "limit": "needs stable baseline"},
+    {"method": "adversarial_independent_review", "catches": "what automated methods miss", "oracle": "different model or human refuting the patch", "claim": "no blocking issue found", "limit": "independence must be enforced"}
+  ],
+  "bloat_dimensions": [
+    {"dimension": "code_growth", "evidence": "net executable lines; generated-code delta"},
+    {"dimension": "dependency_growth", "evidence": "new direct/transitive packages; package size; SBOM diff"},
+    {"dimension": "duplication", "evidence": "clone / semantic-duplicate detection"},
+    {"dimension": "complexity", "evidence": "cyclomatic/cognitive/nesting delta"},
+    {"dimension": "reachability", "evidence": "added code no production path invokes (ADVISORY — undecidable in general)"},
+    {"dimension": "api_growth", "evidence": "new public types/flags/options/extension points"},
+    {"dimension": "runtime_cost", "evidence": "latency/memory/allocation/I-O/startup delta"},
+    {"dimension": "artifact_size", "evidence": "wheel/bundle/binary/image/container growth"},
+    {"dimension": "architecture_drift", "evidence": "new forbidden dependency edges / layer violations (feeds StoryGraph)"},
+    {"dimension": "configuration_bloat", "evidence": "new switches/env-vars/policy branches"},
+    {"dimension": "test_effectiveness", "evidence": "coverage AND mutation sensitivity (not coverage alone)"},
+    {"dimension": "maintenance_burden", "evidence": "new owners/services/migrations/operational states"}
+  ],
+  "bloat_measurement_rule": "measure the change DELTA, not an arbitrary total-code threshold; compare against per-repository budgets in policy",
+  "ai_change_policy_pack": [
+    "generating agent cannot be the final validating authority",
+    "same-agent tests are not sufficient evidence alone",
+    "an independent validator must challenge the implementation",
+    "generated code must carry provenance",
+    "added dependencies require explicit purpose + alternatives analysis",
+    "large generated patches require decomposition or elevated review",
+    "repair patches are new candidates, fully revalidated",
+    "changes to tests/CI/policies/validators get higher scrutiny",
+    "sensitive code cannot merge solely through AI approvals",
+    "exact approved head/base/merge artifact stays bound through execution"
+  ],
+  "subsystem_components": {
+    "package": "products/code-governance/change_intelligence (proposed)",
+    "role": "PRODUCT evidence producers (no authority)",
+    "maturity": "MISSING (net-new; mostly thin adapters over external tools)",
+    "components": ["risk_classifier", "semantic_regression", "test_intelligence", "security_dataflow", "dependency_supplychain", "bloat_complexity", "architecture_drift", "performance_budget", "provenance_validator", "evidence_manifest"]
+  },
+  "enabling_prerequisites": [
+    {"item": "signed claim manifest", "classification": "PRODUCT_PUBLIC", "gap": "no ClaimManifest type exists (nearest: TAP E5 EvidencePacket)"},
+    {"item": "validator identity + version binding on evidence", "classification": "NEW (product record or neutral field)", "gap": "audit R18 — evidence types lack validator-id/version field"},
+    {"item": "fail-closed non-compensatory gating", "classification": "PRODUCT (policy + Workflow Service)", "gap": "gate logic must not collapse into TAP coverage float"}
+  ],
+  "mvp_priority": [
+    "change-risk classification",
+    "duplicate & dead-code detection (advisory)",
+    "dependency delta",
+    "complexity & public-API delta",
+    "artifact-size & basic performance delta",
+    "differential testing (refactors/replacements)",
+    "mutation adequacy for sensitive modules only",
+    "independent-review requirement for AI-generated patches",
+    "SHA-bound signed evidence manifest with validator identity/version",
+    "fail-closed treatment of missing mandatory evidence"
+  ],
+  "verdict": "Architecturally sound and consistent with the readiness audit. Add Change Intelligence as an upstream product evidence layer feeding evidence_refs -> TAP; make outputs risk-dependent, mandatory, and non-compensatory. No new ProviderKind; no frozen-contract change. Does not alter the overall verdict: CODE GOVERNANCE READY WITH PREREQUISITES."
+}

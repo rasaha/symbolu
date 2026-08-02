@@ -94,6 +94,7 @@ Every fixed boundary in the design was verified against live code — see `PROVI
 | Open questions | `OPEN_QUESTIONS.md` |
 | Rollback | `ROLLBACK.md` |
 | Executive summary | `EXECUTIVE_SUMMARY.md` |
+| Change Intelligence evidence layer (hidden-bug / hidden-bloat detection) | `CHANGE_INTELLIGENCE_EVIDENCE_LAYER.md` · `change_intelligence_evidence_profiles.json` |
 
 ## 5. Central findings
 
