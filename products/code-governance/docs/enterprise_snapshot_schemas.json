@@ -1,0 +1,42 @@
+{
+  "$comment": "Versioned supplied-snapshot schemas (MVP 1D). Non-GitHub sources are supplied, validated snapshots; no live vendor clients. Unknown versions, naive timestamps, expiry, cross-tenant, or unbound action fail closed.",
+  "schemas": {
+    "identity": "code_governance.identity_snapshot.v1",
+    "change_window": "code_governance.change_window_snapshot.v1",
+    "incident": "code_governance.incident_snapshot.v1",
+    "target_health": "code_governance.target_health_snapshot.v1",
+    "control_status": "code_governance.control_status_snapshot.v1"
+  },
+  "common_fields": [
+    "schema_version",
+    "tenant_id",
+    "subject_ref",
+    "source_id",
+    "source_kind",
+    "adapter_version",
+    "captured_at",
+    "valid_until",
+    "facts",
+    "policy_ref",
+    "integrity_digest",
+    "action_fingerprint"
+  ],
+  "identity_allowed_fact_keys": [
+    "account_active",
+    "actor_ref",
+    "authority_scopes",
+    "groups",
+    "roles",
+    "status_category"
+  ],
+  "reject_closed_on": [
+    "unknown schema version",
+    "naive timestamp",
+    "missing tenant/subject",
+    "expired snapshot",
+    "cross-tenant",
+    "action binding mismatch",
+    "tampered integrity digest",
+    "prohibited identity field"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "$comment": "Deterministic, offline-verifiable pilot report (MVP 1D). Unsigned; makes no enforcement-readiness claim.",
+  "report_version": "code_governance.pilot_report.v1",
+  "top_level_keys": [
+    "report_version",
+    "pilot_id",
+    "pilot_version",
+    "tenant_id",
+    "evaluation_window",
+    "repository_scope",
+    "adapter_inventory",
+    "policy_versions",
+    "evaluation_count",
+    "clearance_distribution",
+    "intervention",
+    "adapter_reliability",
+    "freshness_failures",
+    "conflicts",
+    "reviewer_feedback_summary",
+    "possible_error_categories",
+    "reconstruction_complete_rate",
+    "pilot_status",
+    "limitations",
+    "execution_status",
+    "record_inventory",
+    "evaluation_records",
+    "reviewer_feedback",
+    "metrics_fingerprint",
+    "report_fingerprint"
+  ],
+  "offline_verification": [
+    "report fingerprint",
+    "per-record fingerprints",
+    "metric recomputation",
+    "tenant/pilot consistency",
+    "record inventory (missing/unexpected)",
+    "execution-disabled marker"
+  ],
+  "execution_status": "DISABLED"
+}

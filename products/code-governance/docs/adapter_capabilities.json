@@ -1,0 +1,57 @@
+{
+  "$comment": "Read-only adapter capabilities (MVP 1D). Every adapter is strictly read-only and produces data only; none authorizes, approves, merges, executes, or mutates.",
+  "adapters": [
+    {
+      "adapter_id": "cg.github_readonly",
+      "source_kind": "github",
+      "transport": "GET/HEAD only",
+      "produces": [
+        "ARTIFACT_IDENTITY",
+        "TARGET_AVAILABILITY",
+        "REQUIRED_CONTROL"
+      ]
+    },
+    {
+      "adapter_id": "cg.identity_snapshot",
+      "source_kind": "identity",
+      "transport": "supplied-snapshot",
+      "produces": [
+        "ACTOR_STATUS"
+      ]
+    },
+    {
+      "adapter_id": "cg.change_window_snapshot",
+      "source_kind": "change_window",
+      "transport": "supplied-snapshot",
+      "produces": [
+        "CHANGE_FREEZE"
+      ]
+    },
+    {
+      "adapter_id": "cg.incident_snapshot",
+      "source_kind": "incident",
+      "transport": "supplied-snapshot",
+      "produces": [
+        "ACTIVE_INCIDENT"
+      ]
+    },
+    {
+      "adapter_id": "cg.target_health_snapshot",
+      "source_kind": "target_health",
+      "transport": "supplied-snapshot",
+      "produces": [
+        "TARGET_AVAILABILITY"
+      ]
+    },
+    {
+      "adapter_id": "cg.control_status_snapshot",
+      "source_kind": "control_status",
+      "transport": "supplied-snapshot",
+      "produces": [
+        "REQUIRED_CONTROL"
+      ]
+    }
+  ],
+  "read_only": true,
+  "execution_status": "DISABLED"
+}

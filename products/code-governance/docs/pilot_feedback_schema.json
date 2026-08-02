@@ -1,0 +1,41 @@
+{
+  "$comment": "Curated reviewer feedback (MVP 1D). Audit data only; never automatically changes policy or the original clearance result.",
+  "feedback_fields": [
+    "feedback_id",
+    "pilot_id",
+    "tenant_id",
+    "workflow_id",
+    "workflow_revision_id",
+    "reviewer_ref",
+    "reviewer_role",
+    "reviewed_clearance_status",
+    "reviewed_intervention_required",
+    "agreement",
+    "observed_resolution",
+    "false_positive_category",
+    "false_negative_concern",
+    "comment_classification",
+    "submitted_at",
+    "policy_refs"
+  ],
+  "agreement_categories": [
+    "AGREE",
+    "DISAGREE_STATUS",
+    "DISAGREE_INTERVENTION_REQUIRED",
+    "DISAGREE_INTERVENTION_TYPE",
+    "DISAGREE_REQUIRED_AUTHORITY",
+    "INSUFFICIENT_INFORMATION",
+    "SOURCE_DATA_INCORRECT",
+    "POLICY_CONFIGURATION_ISSUE"
+  ],
+  "observed_resolution_categories": [
+    "PROCEEDED_WITHOUT_CHANGE",
+    "WAITED_FOR_CONDITION",
+    "REFRESHED_SIGNAL",
+    "REAUTHORIZED",
+    "CODE_CHANGED",
+    "HUMAN_EXCEPTION_APPROVED",
+    "ABANDONED",
+    "UNKNOWN"
+  ]
+}

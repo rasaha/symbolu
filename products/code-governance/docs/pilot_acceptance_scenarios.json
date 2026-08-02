@@ -1,0 +1,62 @@
+{
+  "$comment": "MVP 1D acceptance scenarios for read-only adapters + shadow pilot. Mapped to tests/test_readonly_adapters.py and tests/test_shadow_pilot.py. Execution remains DISABLED in every scenario; source failures never become positive signals.",
+  "mvp_phase": "1D",
+  "execution_status": "DISABLED",
+  "groups": [
+    {"area": "read-only boundary", "scenarios": [
+      "GET permitted", "HEAD permitted only when configured",
+      "POST/PUT/PATCH/DELETE/OPTIONS/TRACE rejected", "GraphQL mutation rejected (POST)",
+      "unapproved host rejected", "unapproved endpoint rejected",
+      "redirect to unapproved host rejected"]},
+    {"area": "credentials + security", "scenarios": [
+      "credentials used but never returned in a response",
+      "credential values never stored by the backend",
+      "credentials never enter request/result fingerprints",
+      "response-size limit enforced", "content-type validation enforced"]},
+    {"area": "github adapter", "scenarios": [
+      "exact repository/pr/base identity preserved", "head mismatch fails closed (no signal)",
+      "base mismatch fails closed", "failed check normalized to not-satisfied",
+      "facts consistency-classified", "no mutation method exists",
+      "permission minimization documented (read-only)", "result fingerprint stable"]},
+    {"area": "snapshot adapters", "scenarios": [
+      "valid identity admitted", "inactive account -> negative condition",
+      "identity prohibited field rejected", "active freeze -> HOLD input",
+      "critical incident present", "target unavailable present", "required control unsatisfied present",
+      "malformed rejected", "expired rejected", "cross-tenant rejected", "action binding mismatch rejected",
+      "unsupported schema version rejected", "naive timestamp rejected", "tampered digest rejected"]},
+    {"area": "registry + provenance", "scenarios": [
+      "registered adapter approved", "unregistered adapter rejected", "unapproved version rejected",
+      "cross-tenant rejected", "disabled adapter rejected", "over-claimed trust rejected",
+      "provenance fingerprint stable", "registry version recorded in result"]},
+    {"area": "failures + retries", "scenarios": [
+      "timeout -> structured failure", "unauthorized -> structured failure",
+      "rate limit -> structured failure", "non-retryable failure not retried",
+      "transient failure retries within bound", "read-only violation never retried",
+      "source failure never becomes a positive signal"]},
+    {"area": "pilot evaluation", "scenarios": [
+      "CLEAR/HOLD/BLOCK/ESCALATE records persisted", "execution always DISABLED",
+      "non-allowlisted repository rejected", "maximum evaluations enforced",
+      "idempotent identical evaluation", "stale GitHub head marks evaluation stale"]},
+    {"area": "human feedback", "scenarios": [
+      "feedback linked to exact evaluation", "feedback for unknown evaluation rejected",
+      "cross-tenant feedback rejected", "missing reviewer role rejected when required",
+      "feedback does not change the clearance result", "feedback fingerprint deterministic"]},
+    {"area": "metrics", "scenarios": [
+      "status counts correct", "adapter failure rate correct", "stale/conflict rates correct",
+      "reviewer agreement + coverage correct", "insufficient data reported honestly",
+      "no precision/recall fields", "metrics stable for fixed record set",
+      "possible-error categories are 'possible' only", "threshold status meets / does-not-meet",
+      "integrity-failure status"]},
+    {"area": "pilot report", "scenarios": [
+      "report verifies offline", "export deterministic", "modified record fails verification",
+      "missing record fails verification", "unexpected record fails verification",
+      "execution-disabled marker required", "unknown version rejected",
+      "no enforcement-readiness claim"]},
+    {"area": "recovery + persistence", "scenarios": [
+      "pilot records persisted + listed", "pilot lineage integrity-verifiable",
+      "same id + different content rejected"]},
+    {"area": "boundaries", "scenarios": [
+      "pilot requires durable service", "no execution/write surface on runner",
+      "Action Clearance package untouched"]}
+  ]
+}
