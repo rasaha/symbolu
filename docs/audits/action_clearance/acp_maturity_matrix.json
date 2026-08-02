@@ -1,0 +1,49 @@
+{
+  "audit": "ACP maturity & control-implementation assessment",
+  "overall_classification": "SHADOW_ONLY",
+  "supporting_classifications": {
+    "code_quality_of_frozen_core": "PRODUCTION_SHAPED (frozen, deterministic, dependency-clean, well-tested)",
+    "operational_deployment": "SHADOW_ONLY / disabled-by-default / never actuates",
+    "live_path_realism": "LIMITED (single live robotics path runs on a stub planner; no live cluster; authored fixtures)",
+    "governance_product_existence": "MISSING (no Action Clearance Protocol product; discipline split across robotics core + console reimpl + Decision Authority seam)"
+  },
+  "evidence": {
+    "consumers": "3 product subsystems (cer_v0_*) deep-import the core; console reimplements separately",
+    "tests": "112 ACP tests pass (synthetic/authored fixtures; real safety/cloud modules exercised in phase2/3/cloud)",
+    "real_integrations": "real TrajectoryValidator (phase2), real TaskPlanner (phase3), real cloud_controller readiness/policy/safety (cloud) - but no live cluster, no live sensors",
+    "persistence": "in-memory / bounded only; no durable clearance store, no consumption ledger",
+    "external_signals": "trusted-signal evaluation only; no incident system, identity provider, or credential store wired",
+    "operational_use": "none in production; explicit 'no production enforcement recommended'",
+    "failure_handling": "fail-closed pervasive (missing input -> HARD fail / raise)",
+    "replay_evidence": "deterministic rerun asserted 100% across benches; frozen replay in acp/ results",
+    "packaging_discipline": "not yet a package; consumers deep-import unstable .cloud.* surface"
+  },
+  "controls": [
+    {"control": "authorization freshness / temporal expiry", "status": "IMPLEMENTED", "evidence": "authorization.py:124 now_s>expiry_time_s->StaleAuthorizationError; cloud/constraints.py:194; acp_db state-version check"},
+    {"control": "action fingerprint consistency", "status": "IMPLEMENTED", "evidence": "authorization.py:115 candidate.identity!=action_identity->AuthorizationBindingError"},
+    {"control": "current policy / state-version validity", "status": "IMPLEMENTED", "evidence": "authorization.py:118,121 version drift->StaleAuthorizationError; cloud STATE_BINDING_MISMATCH"},
+    {"control": "current environment state (readiness/target availability)", "status": "IMPLEMENTED", "evidence": "cloud/constraints.py:245 via real ReadinessChecker; console cluster_health"},
+    {"control": "change freezes / maintenance windows", "status": "PARTIAL", "evidence": "cloud NO_ACTIVE_FREEZE flag; console change_freeze_active; robotics OperatingMode.MAINTENANCE enum exists but ungated"},
+    {"control": "target availability / dependency health", "status": "IMPLEMENTED", "evidence": "cloud/constraints.py:309 DEPENDENCY_HEALTHY"},
+    {"control": "rate / budget / blast-radius limits", "status": "IMPLEMENTED", "evidence": "cloud/constraints.py:287 BLAST_RADIUS via real SafetyBounds; :268 REPLICA_WITHIN_LIMIT via real PolicyEngine; console error_budget"},
+    {"control": "required checks / rollback availability", "status": "IMPLEMENTED", "evidence": "cloud/constraints.py:326 ROLLBACK_AVAILABLE; acp_db rollback for high-risk"},
+    {"control": "temporal expiry", "status": "IMPLEMENTED", "evidence": "ControlAuthorization.expiry_time_s; cloud freshness; acp_db freshness_s"},
+    {"control": "operational risk / hard admissibility filter", "status": "IMPLEMENTED", "evidence": "action_selection.py:62 non-compensatory hard filter; absence-of-evidence -> inadmissible"},
+    {"control": "actor identity", "status": "MISSING", "evidence": "no actor/principal/RBAC field; explicitly delegated to external ActionGate"},
+    {"control": "credential validity", "status": "MISSING", "evidence": "authorization.py:6-7 disclaims crypto; no credential acquisition"},
+    {"control": "incidents", "status": "MISSING", "evidence": "no incident/alert concept in code (acp_db has NO_MIGRATION_CONFLICT as an incident-analog only)"},
+    {"control": "replay / prior consumption", "status": "MISSING", "evidence": "one-shot is documentation only; no nonce/consumption ledger"},
+    {"control": "duplicate dispatch", "status": "MISSING", "evidence": "no de-dup / in-flight tracking in the core (acp_k8s bench reproduces ActionGate-side only)"},
+    {"control": "predictor reliability (BCVF advisory)", "status": "SHADOW_ONLY", "evidence": "predictor_evidence.py:54-71 advisory-only, never read by selectors"}
+  ],
+  "maturity_scale_positions": {
+    "PRODUCTION_SHAPED": false,
+    "IMPLEMENTED": false,
+    "PARTIAL_PROTOTYPE": true,
+    "SHADOW_ONLY": true,
+    "SIMULATED": true,
+    "DOCUMENTED_ONLY": false,
+    "PLANNED": false,
+    "MISSING": false
+  }
+}

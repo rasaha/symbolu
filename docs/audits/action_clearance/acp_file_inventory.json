@@ -1,0 +1,101 @@
+{
+  "audit": "ACP product-core separation & canonical-package readiness",
+  "phase": "audit-only (documentation)",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_head": "3ec11e4ecbc209eabc69d3c0d8a75ecaa10f6def",
+  "audit_branch": "claude/acp-product-core-separation-audit-qrwlxv",
+  "generated_from": "live repository at default HEAD (verified directly)",
+  "acronym_finding": "\"Action Clearance Protocol\" does not appear anywhere in the repo or git history; \"ACP\" expands to \"Autonomous Control Plane\" (robotics) everywhere in code/docs; the console names the same discipline \"clearance\" (CLEAR/HOLD).",
+  "concepts": [
+    {
+      "id": 1,
+      "name": "Autonomous Control Plane (robotics)",
+      "root": "symbolu_robotics/autonomous_control_plane/",
+      "kind": "live code, frozen V1 core, shadow-only / disabled-by-default",
+      "docs": "acp/ (60 markdown files)"
+    },
+    {
+      "id": 2,
+      "name": "AI Control Plane (product umbrella / unified console plan)",
+      "root": "ACP/ (2 docs), ai_control_plane_v3/ (docs)",
+      "kind": "documentation only; 3-layer stack (Context Minimization + ActionGate + ACP)"
+    },
+    {
+      "id": 3,
+      "name": "Console digital clearance (\"safe right now?\")",
+      "root": "ugence_console_api/capabilities/operational_safety.py, ugence_console_api/models.py",
+      "kind": "live product code; CLEAR/HOLD gate over k8s signals; does NOT import concept #1"
+    },
+    {
+      "id": 4,
+      "name": "ACP DB adapter (acp_db)",
+      "root": "cer_v0_3/acp_db/",
+      "kind": "live shadow domain adapter reusing frozen cloud.compose() of concept #1"
+    }
+  ],
+  "primary_core": {
+    "path": "symbolu_robotics/autonomous_control_plane/",
+    "python_files": 26,
+    "approx_lines": 4890,
+    "core_dependency_floor": "Python standard library only (dataclasses, enum, typing, hashlib, json, math, types, collections)",
+    "frozen": true,
+    "freeze_contract_doc": "acp/ACP_V1_FREEZE.md",
+    "freeze_combined_digest_10_modules": "8f8660e293308cf94c983a26a2ae69c9",
+    "freeze_verified_against_live_code": true,
+    "frozen_core_modules_sha256_16": {
+      "errors.py": "15fb05aaf80a693d",
+      "identity.py": "e156ce50993f191e",
+      "world_state.py": "ec9fb4df86118e25",
+      "constraints.py": "a6d07621689e84a5",
+      "envelopes.py": "6f1e5af0a3c2e75a",
+      "authorization.py": "f3975bb0aeeeba8b",
+      "action_selection.py": "e3b6c4edcdd80199",
+      "decision_trace.py": "fe43773d0ef9a734",
+      "failure_state.py": "d60013db0ce150bd",
+      "interfaces.py": "d4e8a588ad1a640c",
+      "predictor_evidence.py": "49b32162624155eb",
+      "physical_evidence.py": "6d4c0b57d8d57ec3",
+      "__init__.py": "56938a4a4de42611"
+    },
+    "in_platform_freeze": false,
+    "platform_freeze_note": "Nothing under acp/ or symbolu_robotics/autonomous_control_plane/ is in platform/PLATFORM_FREEZE_V1.json; the ACP freeze is a local doc-asserted digest contract only."
+  },
+  "core_modules": {
+    "reusable_core_frozen": [
+      "errors.py", "identity.py", "world_state.py", "constraints.py", "envelopes.py",
+      "authorization.py", "action_selection.py", "decision_trace.py", "failure_state.py", "interfaces.py"
+    ],
+    "robotics_domain_layer": [
+      "predictor_evidence.py", "physical_evidence.py", "constraint_library.py", "adapters.py", "shadow.py",
+      "safety_adapters/candidate_bridge.py", "safety_adapters/live_planner_adapter.py",
+      "safety_adapters/trajectory_adapter.py", "safety_adapters/shadow_planner_hook.py"
+    ],
+    "cloud_domain_layer": [
+      "cloud/envelopes.py", "cloud/outcomes.py", "cloud/constraints.py", "cloud/composition.py", "cloud/adapter.py"
+    ],
+    "tests": [
+      "tests/test_acp_phase0.py", "tests/test_acp_phase1.py", "tests/test_acp_phase2.py",
+      "tests/test_acp_phase3.py", "tests/test_acp_cloud.py"
+    ]
+  },
+  "other_clearance_shaped_locations": [
+    {"path": "ugence_console_api/capabilities/operational_safety.py", "role": "concept #3 digital clearance clear()"},
+    {"path": "ugence_console_api/models.py", "role": "ClearanceVerdict, OperationalSignals DTOs"},
+    {"path": "cer_v0_3/acp_db/safety.py", "role": "concept #4 DB operational-safety evaluator (duplicated freshness/freeze/expiry HARD checks)"},
+    {"path": "decision_governance/actions/control_plane.py", "role": "OfflineDeterministicControlPlane EXPIRED/freshness check (Decision Authority owned)"},
+    {"path": "packages/governance-provider-framework/src/ugence_governance_provider_framework/reference/action.py", "role": "DeterministicActionGovernanceProvider returns EXPIRED on authorization_expired"},
+    {"path": "packages/governance-contracts/src/ugence_governance_contracts/contracts/action.py", "role": "neutral seam: ActionGovernanceOutcome.EXPIRED, authorization_expired, expiry"}
+  ],
+  "shadow_and_bench_dirs": [
+    "robotics_reliability_bench/acp_shadow", "robotics_reliability_bench/acp_shadow2",
+    "robotics_reliability_bench/acp_shadow3", "robotics_reliability_bench/acp_control_plane",
+    "robotics_reliability_bench/acp_k8s_integrated", "robotics_reliability_bench/acp_cloud"
+  ],
+  "unrelated_acp_or_clearance": [
+    {"path": "execution_gate/", "why": "Model Selection product legacy shim (ExecutionGate = model eligibility), UNRELATED to robotics clearance"},
+    {"path": "execution_gate_shadow/", "why": "Model Selection shadow pilot, UNRELATED"},
+    {"path": "control_plane/", "why": "AI-governance pipeline eval (model selection), UNRELATED"},
+    {"path": "control_plane_shadow/", "why": "AI-governance shadow eval, UNRELATED"},
+    {"path": "bounded_shadow_pilot/", "why": "cyber ActionGate customer pilot, ActionGate-family not clearance"}
+  ]
+}

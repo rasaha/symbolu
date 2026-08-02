@@ -1,0 +1,59 @@
+{
+  "audit": "ACP canonical-package migration manifest (PROPOSED - not executed in this phase)",
+  "verdict": "ACP NOT READY - capability remains shadow, experimental, and architecturally unresolved; do not package now",
+  "candidate_package": {
+    "path": "packages/capabilities/action-clearance/",
+    "namespace": "ugence_action_clearance",
+    "distribution": "ugence-action-clearance",
+    "status": "CANDIDATE NAME ONLY - not created in this phase",
+    "template": "packages/capabilities/model-selection (stdlib-only leaf) or governance-provider-framework core (single dep on ugence-governance-contracts)"
+  },
+  "prerequisites_before_any_migration": [
+    "Resolve the authority definition: robotics V1 ACP mints a ControlAuthorization grant (authorizes) while cloud/console ACP explicitly never authorizes. Pick ONE meaning for the product.",
+    "Decide which world the product package serves (robotics core vs console digital clearance vs governance-chain seam) - they do not share code today.",
+    "Factor a neutral clearance kernel out of the robotics-domain envelopes (CanonicalWorldState/Candidate are robotics-shaped).",
+    "Stabilize a real request/result contract: today there is no ClearanceRequest/Result/Status/ReasonCode family; consumers deep-import .cloud.* enums by .value.",
+    "Migrate consumers (cer_v0_*) off deep .cloud.* imports onto a curated public surface.",
+    "Decide one-time-use / consumption ownership (currently no consumption ledger; likely belongs to an execution/idempotency ledger, not ACP).",
+    "Amend or reconcile the ACP V1 local freeze (combined digest 8f8660e293308cf94c983a26a2ae69c9) because converting internal imports to relative imports changes module content and breaks the digest."
+  ],
+  "files_that_would_move_if_ready": {
+    "reusable_core_frozen_10": [
+      "errors.py", "identity.py", "world_state.py", "constraints.py", "envelopes.py",
+      "authorization.py", "action_selection.py", "decision_trace.py", "failure_state.py", "interfaces.py"
+    ],
+    "note": "world_state.py and envelopes.py are robotics-domain-shaped; a governance ACP would need a neutral kernel, so a verbatim move is NOT behavior-neutral for a governance product."
+  },
+  "files_that_stay_behind": {
+    "robotics_domain": ["predictor_evidence.py", "physical_evidence.py", "constraint_library.py", "adapters.py", "shadow.py", "safety_adapters/*"],
+    "cloud_domain_adapter": ["cloud/*"],
+    "domain_adapters": ["cer_v0_3/acp_db/*"],
+    "shadow_benches": ["robotics_reliability_bench/acp_*"],
+    "excluded_by_boundary": ["ActionGate policy", "Decision Authority logic", "provider execution", "incident clients", "credential acquisition", "workflow orchestration", "retry/reconciliation engines"]
+  },
+  "compatibility": {
+    "object_identity_requirement": "cer_v0_* rely on exact enum identity of AuthorizationVerdict/CombinedOutcome/CloudRecommendation and CloudWorldState schema; a move must preserve identity via sys.modules aliasing (as model-selection/decision-authority do).",
+    "mechanism": "logic-free re-export shim at legacy path; NO meta-path hooks, NO duplicated source, NO fallback imports"
+  },
+  "freeze_impact": {
+    "platform_freeze": "NONE - ACP is not in platform/PLATFORM_FREEZE_V1.json",
+    "acp_local_freeze": "AFFECTED - ACP_V1_FREEZE.md per-module SHA-256 digests would change under import rewrites; a freeze amendment or replay re-baseline would be required (out of scope for the audit)."
+  },
+  "byte_identical_feasible": false,
+  "equivalence_standard": "semantic equivalence (deterministic before/after capture of status + reason codes + obligations + fingerprints + exception/expiry behavior), NOT byte-identical, because a governance ACP requires neutralizing robotics-domain envelopes and curating a public surface.",
+  "proposed_phase_sequence": [
+    "P1 skeleton (metadata/version/curated API, no behavior change)",
+    "P2 core source move (verbatim + relative imports) - blocked until neutral kernel + freeze reconciliation",
+    "P3 compatibility surface (legacy re-exports, object identity proof)",
+    "P4 consumer migration (cer_v0_*; retain shadow/research consumers)",
+    "P5 equivalence (before/after capture)",
+    "P6 distribution verification (clean-venv wheel)",
+    "P7 closure (post-merge validation, no policy change)"
+  ],
+  "do_not_absorb": [
+    "ActionGate policy", "Decision Authority logic", "provider execution", "GitHub merge checks",
+    "Kubernetes-specific checks (stay in cloud adapter)", "incident-management clients", "credential acquisition",
+    "workflow orchestration", "retry engines", "reconciliation engines", "Code Governance product state",
+    "Model Selection", "Hybrid LLM"
+  ]
+}

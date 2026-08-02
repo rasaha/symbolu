@@ -1,0 +1,91 @@
+{
+  "audit": "ACP implementation-candidate classification",
+  "selection_criteria": [
+    "real consumer count", "production-shaped API", "deterministic behavior",
+    "stable request/result contract", "test coverage", "dependency direction",
+    "freeze or replay evidence", "identity and lifecycle semantics",
+    "separation from ActionGate and execution", "compatibility with other products"
+  ],
+  "candidates": [
+    {
+      "id": "robotics-core",
+      "path": "symbolu_robotics/autonomous_control_plane/ (10 frozen core modules)",
+      "classification": "PRODUCT_CORE_CANDIDATE",
+      "deterministic": true,
+      "stdlib_only": true,
+      "frozen": true,
+      "real_product_consumers": ["cer_v0_1", "cer_v0_2", "cer_v0_3"],
+      "authority": "narrow/deny only in cloud framing; robotics framing mints a one-shot ControlAuthorization (grant)",
+      "rejected": false,
+      "notes": "Strongest candidate: coherent, frozen, deterministic, dependency-clean. But domain-shaped (robotics/cloud), shadow-only, and consumers deep-import .cloud.* not the frozen top-level API. Neutral clearance kernel is entangled with robotics envelopes."
+    },
+    {
+      "id": "robotics-cloud",
+      "path": "symbolu_robotics/autonomous_control_plane/cloud/",
+      "classification": "PRODUCTION_SHAPED",
+      "deterministic": true,
+      "frozen": false,
+      "real_product_consumers": ["cer_v0_1", "cer_v0_2", "cer_v0_3", "acp_db"],
+      "rejected_as_canonical": true,
+      "rejection_reason": "Cloud/K8s domain adapter (CloudWorldState, blast radius, freeze window) built ON the core; it is the real consumed surface but is domain-specific, not the neutral core."
+    },
+    {
+      "id": "robotics-safety-adapters",
+      "path": "symbolu_robotics/autonomous_control_plane/safety_adapters/",
+      "classification": "SHADOW_IMPLEMENTATION",
+      "frozen": false,
+      "rejected_as_canonical": true,
+      "rejection_reason": "Robotics domain layer (numpy + real trajectory validator); explicitly NOT core, not reused cross-domain."
+    },
+    {
+      "id": "console-clearance",
+      "path": "ugence_console_api/capabilities/operational_safety.py + models.ClearanceVerdict",
+      "classification": "PILOT_IMPLEMENTATION",
+      "deterministic": true,
+      "frozen": false,
+      "real_product_consumers": ["ugence_console_api orchestrator (governed loop Clear stage)"],
+      "authority": "never authorizes (ActionGate decides whether; ACP decides whether now)",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Live product code and the clearest match to the audit's authoritative definition, but 63 lines with hard-coded k8s thresholds (target-specific), no shared code with the robotics core, disposition-only string verdict, no contract type family. A separate reimplementation of the discipline."
+    },
+    {
+      "id": "acp-db",
+      "path": "cer_v0_3/acp_db/",
+      "classification": "PRODUCTION_SHAPED",
+      "deterministic": true,
+      "frozen": false,
+      "reuses": "frozen cloud.compose() unchanged",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Domain adapter over the core for the DB domain; adds its own duplicated freshness/freeze/expiry HARD checks. A consumer/reuse of the core, not the core."
+    },
+    {
+      "id": "reliability-benches",
+      "path": "robotics_reliability_bench/acp_shadow{,2,3}, acp_cloud, acp_k8s_integrated, acp_control_plane",
+      "classification": "SHADOW_IMPLEMENTATION",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Read-only shadow/benchmark harnesses that consume the core; acp_k8s_integrated additionally reproduces ActionGate-side hashing + drift checks for offline determinism (duplicate logic, bench-only)."
+    },
+    {
+      "id": "decision-authority-controlplane",
+      "path": "decision_governance/actions/control_plane.py (OfflineDeterministicControlPlane)",
+      "classification": "UNRELATED_ACP",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Owned by Decision Authority. Enforces CER expiry -> AuthorizationOutcome.EXPIRED. This is the governance-chain clearance/freshness seam, but it lives in Decision Authority (v1.0.0 pydantic package), not in the robotics ACP core; it is the AI Control Plane authorization responsibility per its own docstring."
+    },
+    {
+      "id": "gpf-reference-action-provider",
+      "path": "packages/governance-provider-framework/.../reference/action.py",
+      "classification": "COMPATIBILITY_SURFACE",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Reference ActionGovernanceProvider that honors authorization_expired -> EXPIRED. Demonstrates the neutral seam but is a reference impl, not a clearance product core."
+    },
+    {
+      "id": "governance-contracts-seam",
+      "path": "packages/governance-contracts/.../contracts/action.py",
+      "classification": "DOCUMENTATION_ONLY",
+      "rejected_as_canonical": true,
+      "rejection_reason": "Neutral leaf carries the VOCABULARY (ActionGovernanceOutcome.EXPIRED, authorization_expired, expiry) but no clearance logic. It is the seam a future ACP would consume, not the core itself."
+    }
+  ],
+  "canonical_source_conclusion": "NO_STABLE_PRODUCT_CORE_EXISTS for a governance \"Action Clearance\" product; the strongest physical core (robotics Autonomous Control Plane) is a frozen, shadow-only, robotics/cloud-domain capability whose neutral clearance kernel is not factored out, and it does not span the console-clearance or governance-chain (Decision Authority) framings. Secondary reading: MULTIPLE_PARTIAL_SOURCES_REQUIRE_CONSOLIDATION."
+}

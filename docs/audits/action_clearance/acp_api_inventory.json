@@ -1,0 +1,72 @@
+{
+  "audit": "ACP live public-API inventory",
+  "source": "symbolu_robotics/autonomous_control_plane/ (verified from live code)",
+  "note": "The repository uses domain-specific envelope types, NOT a ClearanceRequest/ClearanceResult family. The request is an implicit (world_state, candidates, candidate_constraints) tuple passed to a selector; the result object is SelectionOutcome.",
+  "request_surface": {
+    "implicit_request": "(CanonicalWorldState, Sequence[CanonicalActionCandidate], Mapping[candidate_id, Sequence[constraint]])",
+    "CanonicalWorldState": {
+      "file": "world_state.py:81",
+      "fields": ["tick:int", "observation_time_s:float", "pose:Pose", "velocity:Velocity", "environment_version:str", "mission_id:str", "freshness:FreshnessSummary", "operating_mode:OperatingMode", "extensions:Mapping[str,str]", "label:str(identity=False)"],
+      "identity": ".version (SHA-256 content hash)"
+    },
+    "CanonicalActionCandidate": {
+      "file": "envelopes.py:44",
+      "fields": ["candidate_id", "action_type:ActionType", "trajectory_ref", "target", "expected_duration_s", "max_speed", "max_accel", "stopping_margin_s", "collision_margin_m", "stability_margin", "goal_progress", "energy_estimate", "origin_state_version", "metadata:Mapping[str,str]", "provenance:str(identity=False)"],
+      "identity": ".identity (SHA-256 content hash)"
+    }
+  },
+  "result_surface": {
+    "SelectionOutcome": {
+      "file": "action_selection.py:55",
+      "fields": ["decision:ActionDecision", "selected:Optional[CanonicalActionCandidate]", "trace:DecisionTrace"]
+    },
+    "ActionDecision_enum": {
+      "file": "envelopes.py:33",
+      "members": ["EXECUTE", "EXECUTE_WITH_CONSTRAINTS", "REPLAN", "REQUEST_MORE_OBSERVATION", "DEGRADE_MODE", "SAFE_STOP", "NO_SAFE_ACTION"]
+    },
+    "DecisionTrace": {
+      "file": "decision_trace.py:40",
+      "fields": ["tick", "decision_id", "world_state_identity", "candidate_ids_considered", "hard_constraints_evaluated", "rejected", "surviving_candidate_ids", "tie_break_sequence", "decision", "selected_candidate_id", "selected_action_identity", "authorization_identity(populated=None by selectors)", "failure_transition", "bcvf_diagnostic"]
+    }
+  },
+  "authorization_surface": {
+    "ControlAuthorization": {
+      "file": "authorization.py:34",
+      "fields": ["decision_id", "action_identity", "world_state_version", "constraint_set_version", "decision:ActionDecision", "issued_time_s", "expiry_time_s", "permitted_constraints:Tuple[str,...]"],
+      "grant_id": "content hash; explicitly NOT a cryptographic signature",
+      "authorizer": "ReferenceControlAuthorizer.authorize(...)",
+      "revalidator": "ReferenceCommitRevalidator.revalidate(...) -> raises StaleAuthorizationError/AuthorizationBindingError, never widens"
+    }
+  },
+  "cloud_surface": {
+    "note": "This is the surface actual external consumers (cer_v0_*) deep-import; NOT re-exported by the frozen top-level __init__.",
+    "CloudRecommendation": {"file": "cloud/outcomes.py", "members": ["PROCEED", "PROCEED_WITH_CONSTRAINTS", "REOBSERVE", "HOLD"]},
+    "AuthorizationVerdict": {"file": "cloud/composition.py", "members": ["DENY", "REQUEST_MORE_EVIDENCE", "SIMULATE_AND_RETRY", "ESCALATE_TO_HUMAN", "ALLOW_WITH_CONSTRAINTS", "ALLOW"], "note": "opaque mirror of ActionGate's six outcomes; ACP does not compute it"},
+    "CombinedOutcome": {"file": "cloud/composition.py", "members": ["PROCEED", "BLOCKED_BY_AUTHORIZATION", "PENDING_AUTHORIZATION", "HELD_BY_ACP"]},
+    "compose": {"file": "cloud/composition.py", "signature": "compose(authorization, acp_recommendation) -> CompositionResult", "invariant": "DENY never overridden; ACP hold never mints authorization"},
+    "CloudWorldState": {"file": "cloud/envelopes.py", "fields_sample": ["cluster", "namespace", "deployment", "resource_version", "generation", "replicas", "readiness_plasticity", "seconds_since_last_action", "dependency_healthy", "freeze_active"]}
+  },
+  "console_surface": {
+    "note": "concept #3 (separate reimplementation; does not import robotics core)",
+    "OperationalSignals": {"file": "ugence_console_api/models.py:107", "fields": ["error_budget_remaining:Optional[float]", "cluster_health:Optional[str]", "change_freeze_active:Optional[bool]"]},
+    "ClearanceVerdict": {"file": "ugence_console_api/models.py:116", "fields": ["disposition:str(CLEAR/HOLD)", "reason_codes:List[str]", "evaluated:Dict[str,str]"]},
+    "clear": {"file": "ugence_console_api/capabilities/operational_safety.py:29", "signature": "clear(signals: OperationalSignals) -> ClearanceVerdict", "reason_codes_sample": ["OPERATIONALLY_SAFE", "CHANGE_FREEZE_ACTIVE", "CLUSTER_UNHEALTHY", "CLUSTER_HEALTH_UNKNOWN", "ERROR_BUDGET_EXHAUSTED", "MISSING_change_freeze", "MISSING_cluster_health", "MISSING_error_budget"]}
+  },
+  "neutral_seam": {
+    "package": "packages/governance-contracts/src/ugence_governance_contracts/contracts/action.py",
+    "ActionGovernanceOutcome": ["AUTHORIZED", "AUTHORIZED_WITH_CONSTRAINTS", "DENIED", "INDETERMINATE", "EXPIRED"],
+    "ActionGovernanceRequest.authorization_expired": "bool=False",
+    "ActionGovernanceResult": ["outcome", "constraints", "obligations", "expiry:Optional[datetime]", "authority_basis", "reason_codes", "provider_trace_id", "fingerprint"]
+  },
+  "anticipated_vs_actual_names": {
+    "ClearanceRequest": "ABSENT (implicit tuple / OperationalSignals / CloudWorldState+CloudActionCandidate)",
+    "ClearanceResult": "ABSENT (SelectionOutcome / ClearanceVerdict / CompositionResult)",
+    "ClearanceStatus": "ABSENT (ActionDecision / CloudRecommendation / disposition string / CombinedOutcome)",
+    "ClearanceReasonCode": "ABSENT (plain str tuples/lists; no enum)",
+    "ClearancePolicy": "ABSENT (ThresholdConstraint sets / CloudConstraintConfig / hard-coded console thresholds)",
+    "CurrentStateSignal": "PARTIAL (CanonicalWorldState / CloudWorldState / OperationalSignals)",
+    "AuthorizationReference": "PARTIAL (ControlAuthorization.action_identity; DecisionTrace.authorization_identity unpopulated)",
+    "ActionFingerprint": "PRESENT (CanonicalActionCandidate.identity; action_identity binding)",
+    "ClearanceFingerprint": "PARTIAL (grant_id content hash; CompositionResult identity)"
+  }
+}
