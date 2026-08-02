@@ -2,7 +2,8 @@
 
 **Phase:** live audit, boundary verification, compatibility & package hardening
 (not a redesign). **Verdict:** `PACKAGE_HARDENING_REQUIRED` (narrow, bounded).
-**Maturity:** `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`.
+**Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` (the scoped GitHub Actions run was
+observed green on PR #1290 — see §14).
 
 This document records the starting live state and the evidence-based findings for
 the `ugence-governance-contracts` package. It was written from the live repository
@@ -345,9 +346,14 @@ verification (this job installs `pydantic`, which the freeze verifier needs).
 > (pydantic) when it is present on the checkout — a dependency outside the
 > contract layer. Scoped as above and reproduced green in a pydantic-free venv.
 
-> CI status is reported honestly: the workflow **file exists and is locally
-> reproduced**, but the GitHub Actions run has not yet been observed. Maturity
-> stays `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` until a green run is seen.
+> CI observed green: the scoped `governance-contracts-ci` run completed with
+> conclusion **success** on both the PR and the branch push for commit
+> `7381e328` (PR #1290) — run
+> <https://github.com/rasaha/symbolu/actions/runs/30759467356> (pull_request) and
+> <https://github.com/rasaha/symbolu/actions/runs/30759465958> (push). Maturity is
+> therefore `IMPLEMENTED_AND_CI_VERIFIED`. (The first run failed on an
+> out-of-scope pydantic dependency and was fixed by scoping the GPF selection; see
+> the note below.)
 
 ---
 
