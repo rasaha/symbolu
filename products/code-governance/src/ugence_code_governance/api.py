@@ -52,6 +52,19 @@ from .persistence.memory import (
     InMemoryRecommendationRepository,
     InMemoryWorkflowRepository,
 )
+from .persistence.audit_bundle import (
+    BundleVerification,
+    export_governance_audit_bundle as _export_bundle,
+    verify_governance_audit_bundle as _verify_bundle,
+)
+from .persistence.durable_reconstruction import (
+    DurableReconstructionResult,
+    reconstruct_from_store,
+)
+from .persistence.journal import DurableWorkflowJournal
+from .persistence.recovery import RecoveryResult, recover_workflow
+from .persistence.schema import PersistenceMode, ReconstructionMode
+from .persistence.sqlite import DurableShadowStore, open_durable_store
 from .policies.profiles import DEFAULT_POLICY, RepositoryPolicy
 from .reconstruction.records import GovernanceChainRecord, chain_id_for
 from .reconstruction.service import ChainReconstructionService, ReconstructionResult
@@ -79,8 +92,29 @@ from ugence_action_clearance import ClearanceStatus  # type: ignore
 class CodeGovernanceService:
     """The product's read-only shadow governance service."""
 
-    def __init__(self, *, policy: Optional[RepositoryPolicy] = None) -> None:
+    def __init__(
+        self,
+        *,
+        policy: Optional[RepositoryPolicy] = None,
+        persistence_mode: PersistenceMode = PersistenceMode.IN_MEMORY_SHADOW,
+        store: Optional[DurableShadowStore] = None,
+        store_path: Optional[str] = None,
+        application_version: str = "0.2.0",
+    ) -> None:
         self._policy = policy or DEFAULT_POLICY
+        # Durable shadow persistence is opt-in and additive. In-memory repositories
+        # remain the source of truth for the live run; the durable journal records
+        # an append-only, integrity-verified audit projection alongside them. It
+        # never changes the execution posture, which stays DISABLED.
+        self._persistence_mode = persistence_mode
+        self._durable: Optional[DurableWorkflowJournal] = None
+        self._store: Optional[DurableShadowStore] = None
+        if (persistence_mode is PersistenceMode.DURABLE_SHADOW
+                or store is not None or store_path is not None):
+            self._store = store or open_durable_store(
+                store_path or ":memory:", application_version=application_version)
+            self._durable = DurableWorkflowJournal(self._store)
+            self._persistence_mode = PersistenceMode.DURABLE_SHADOW
         self._evidence_repo = InMemoryEvidenceRepository()
         self._claim_repo = InMemoryClaimManifestRepository()
         self._rec_repo = InMemoryRecommendationRepository()
@@ -158,6 +192,8 @@ class CodeGovernanceService:
             return self._runs[key].change
         self._runs[key] = run
         self._current_head[run.workflow_id] = change.head_sha
+        if self._durable is not None:
+            self._durable.on_change_identity(run, tenant_id, at=captured_at)
         # The immutable WorkflowRevision snapshot is persisted once, at a terminal
         # state (SHADOW_COMPLETE or a fail-closed terminal). Intermediate reads use
         # the live run via get_workflow().
@@ -177,6 +213,8 @@ class CodeGovernanceService:
                 run.transition(WorkflowState.EVIDENCE_PENDING, at=record.captured_at)
             if record.evidence_id not in run.evidence_ids:
                 run.evidence_ids.append(record.evidence_id)
+                if self._durable is not None:
+                    self._durable.on_evidence(run, tenant_id, record, at=record.captured_at)
         return record
 
     # --- 3. claim manifest ----------------------------------------------
@@ -202,6 +240,8 @@ class CodeGovernanceService:
         run.policy_refs = (manifest.policy_ref,)
         self._scr(tenant_id, revision_id)["manifest"] = manifest
         self._scr(tenant_id, revision_id)["risk_tier"] = risk_tier
+        if self._durable is not None:
+            self._durable.on_claim_manifest(run, tenant_id, manifest, risk_tier, at=captured_at)
         return manifest
 
     # --- 4. non-compensatory claim evaluation ---------------------------
@@ -219,8 +259,13 @@ class CodeGovernanceService:
             # Fail closed — mandatory gate not satisfied.
             run.transition(WorkflowState.CLAIMS_INCOMPLETE, at=when)
             self._persist_snapshot(run)
+            if self._durable is not None:
+                self._durable.on_claim_evaluation(run, tenant_id, evaluation, at=when,
+                                                  failed_closed=True)
         else:
             run.transition(WorkflowState.CLAIMS_EVALUATED, at=when)
+            if self._durable is not None:
+                self._durable.on_claim_evaluation(run, tenant_id, evaluation, at=when)
         scr["evaluation"] = evaluation
         return evaluation
 
@@ -236,6 +281,8 @@ class CodeGovernanceService:
         run.tap_result_fingerprints = tuple(r.result_fingerprint for r in tap_eval.results)
         run.transition(WorkflowState.ASSERTIONS_EVALUATED, at=at or run.updated_at)
         scr["tap_eval"] = tap_eval
+        if self._durable is not None:
+            self._durable.on_assertions(run, tenant_id, tap_eval, at=at or run.updated_at)
         return tap_eval
 
     # --- 6. advisory recommendation -------------------------------------
@@ -274,6 +321,8 @@ class CodeGovernanceService:
         run.recommendation_id = rec.recommendation_id
         run.recommendation_fingerprint = rec.fingerprint
         scr["recommendation"] = rec
+        if self._durable is not None:
+            self._durable.on_recommendation(run, tenant_id, rec, at=created_at)
         return rec
 
     # --- 7. explicit authorized decision --------------------------------
@@ -296,6 +345,8 @@ class CodeGovernanceService:
         if actor is None:
             run.transition(WorkflowState.DECISION_REQUIRED, at=at)
             self._persist_snapshot(run)
+            if self._durable is not None:
+                self._durable.on_fail_closed(run, tenant_id, at=at)
             raise DecisionAuthorityRequiredError(
                 "a binding decision requires an explicit authorized actor")
         record = self._kernel.record_authorized_decision(
@@ -307,11 +358,15 @@ class CodeGovernanceService:
             self._persist_snapshot(run)
             self._scr(tenant_id, revision_id)["decision"] = record
             self._scr(tenant_id, revision_id)["actor"] = actor
+            if self._durable is not None:
+                self._durable.on_decision(run, tenant_id, record, at=at, failed_closed=True)
             return record
         run.decision_record_id = record.decision_id
         run.transition(WorkflowState.DECISION_RECORDED, at=at)
         self._scr(tenant_id, revision_id)["decision"] = record
         self._scr(tenant_id, revision_id)["actor"] = actor
+        if self._durable is not None:
+            self._durable.on_decision(run, tenant_id, record, at=at)
         return record
 
     # --- 8. CER binding + prepared exact action -------------------------
@@ -365,6 +420,8 @@ class CodeGovernanceService:
         run.prepared_action_fingerprint = action.fingerprint
         run.transition(WorkflowState.ACTION_PREPARED, at=at)
         scr["prepared_action"] = action
+        if self._durable is not None:
+            self._durable.on_prepared_action(run, tenant_id, cer, action, at=at)
         return action
 
     # --- 9. ActionGate shadow evaluation + chain finalization -----------
@@ -385,6 +442,8 @@ class CodeGovernanceService:
         run.action_result_fingerprint = evaluation.result_fingerprint
         run.transition(WorkflowState.ACTION_EVALUATED, at=at)
         scr["shadow_eval"] = evaluation
+        if self._durable is not None:
+            self._durable.on_action_shadow(run, tenant_id, evaluation, at=at)
         if finalize:
             # MVP 1A path: build + persist the reconstructable governance chain.
             self._finalize_chain(tenant_id, revision_id, at=at)
@@ -412,6 +471,8 @@ class CodeGovernanceService:
         scr["projection"] = projection
         scr["clearance_profile"] = profile
         run.transition(WorkflowState.CLEARANCE_PENDING, at=at)
+        if self._durable is not None:
+            self._durable.on_operational_snapshot(run, tenant_id, snapshot, at=at)
 
     def build_trusted_signals(self, tenant_id: str, revision_id: str):
         """Build canonical TrustedSignals from the recorded snapshot (public op)."""
@@ -467,6 +528,8 @@ class CodeGovernanceService:
                 policy_refs=(profile.policy_ref,))
             self._store_clearance(tenant_id, run, record, at=evaluation_time)
             run.transition(WorkflowState.CLEARANCE_EVALUATED, at=evaluation_time)
+            if self._durable is not None:
+                self._durable.on_clearance_evaluation(run, tenant_id, record, at=evaluation_time)
             return record
 
         # Eligible -> build signals + canonical request, evaluate.
@@ -476,6 +539,8 @@ class CodeGovernanceService:
             run.clearance_stage_state = ActionClearanceStatus.INPUT_INCOMPLETE.value
             run.transition(WorkflowState.CLEARANCE_INPUT_INCOMPLETE, at=evaluation_time)
             self._persist_snapshot(run)
+            if self._durable is not None:
+                self._durable.on_fail_closed(run, tenant_id, at=evaluation_time)
             raise
 
         adapter = self._clearance_adapter
@@ -493,6 +558,8 @@ class CodeGovernanceService:
             run.clearance_stage_state = ActionClearanceStatus.EVALUATION_ERROR.value
             run.transition(WorkflowState.CLEARANCE_EVALUATION_ERROR, at=evaluation_time)
             self._persist_snapshot(run)
+            if self._durable is not None:
+                self._durable.on_fail_closed(run, tenant_id, at=evaluation_time)
             raise
 
         record = ActionClearanceEvaluationRecord(
@@ -518,6 +585,8 @@ class CodeGovernanceService:
         scr["clearance_result"] = result
         self._store_clearance(tenant_id, run, record, at=evaluation_time)
         run.transition(WorkflowState.CLEARANCE_EVALUATED, at=evaluation_time)
+        if self._durable is not None:
+            self._durable.on_clearance_evaluation(run, tenant_id, record, at=evaluation_time)
         return record
 
     def _store_clearance(self, tenant_id: str, run: WorkflowRun,
@@ -567,6 +636,8 @@ class CodeGovernanceService:
         run.intervention_assessment_ref = assessment.assessment_id
         run.human_intervention_required = bool(assessment.required)
         run.transition(WorkflowState.INTERVENTION_ASSESSED, at=at)
+        if self._durable is not None:
+            self._durable.on_intervention(run, tenant_id, assessment, at=at)
         self._finalize_chain(tenant_id, revision_id, at=at)
         return assessment
 
@@ -644,11 +715,54 @@ class CodeGovernanceService:
         if missing:
             run.transition(WorkflowState.CHAIN_INCOMPLETE, at=at)
             self._persist_snapshot(run)
+            if self._durable is not None:
+                self._durable.on_fail_closed(run, tenant_id, at=at)
             return
         self._chain_repo.put(chain)
         run.chain_id = cid
         run.transition(WorkflowState.SHADOW_COMPLETE, at=at)
         self._persist_snapshot(run)
+        if self._durable is not None:
+            payload = self._durable_chain_payload(run, cid, cev, hia)
+            self._durable.on_finalized(run, tenant_id, cid, at=at, chain_payload=payload)
+
+    def _durable_chain_payload(
+        self, run: WorkflowRun, chain_id: str,
+        cev: Optional[ActionClearanceEvaluationRecord],
+        hia: Optional[HumanInterventionAssessment],
+    ) -> Dict[str, Any]:
+        """Build the canonical, data-minimized GOVERNANCE_CHAIN durable payload.
+
+        This is a reference/linkage projection: identifiers, content hashes, and
+        the execution-disabled marker — never re-issued authority. Its keys are the
+        contract shared with durable reconstruction and the audit bundle.
+        """
+        acs = (cev.stage_state.value if cev
+               else ActionClearanceStatus.NOT_EVALUATED.value)
+        return {
+            "chain_id": chain_id,
+            "execution_status": "DISABLED",
+            "repository": run.change.repository,
+            "pull_request_number": run.change.pull_request_number,
+            "base_sha": run.change.base_sha,
+            "head_sha": run.change.head_sha,
+            "change_fingerprint": run.change.fingerprint,
+            "evidence_refs": list(run.evidence_ids),
+            "claim_manifest_ref": run.claim_manifest_id or "",
+            "claim_manifest_fingerprint": run.claim_manifest_fingerprint or "",
+            "decision_record_id": run.decision_record_id or "",
+            "cer_id": run.cer_id or "",
+            "cer_content_hash": run.cer_content_hash or "",
+            "prepared_action_ref": run.prepared_action_fingerprint or "",
+            "action_result_fingerprint": run.action_result_fingerprint or "",
+            "action_clearance_status": acs,
+            "clearance_evaluation_ref": (cev.record_id if cev else ""),
+            "clearance_request_fingerprint": (cev.clearance_request_fingerprint if cev else ""),
+            "clearance_status": (cev.clearance_status if cev else ""),
+            "intervention_assessment_ref": (hia.assessment_id if hia else ""),
+            "human_intervention_required": (bool(hia.required) if hia else False),
+            "policy_refs": list(run.policy_refs),
+        }
 
     # --- 10. reconstruction ---------------------------------------------
     def reconstruct_chain(self, tenant_id: str, revision_id: str) -> ReconstructionResult:
@@ -677,8 +791,79 @@ class CodeGovernanceService:
         return self._chain_repo.get(tenant_id, chain_id)
 
     def execution_status(self) -> str:
-        """Execution is disabled in MVP 1A. Always returns ``DISABLED``."""
+        """Execution is disabled. Always returns ``DISABLED`` in every phase."""
         return ExecutionStatus.DISABLED.value
+
+    # --- MVP 1C: durable shadow persistence surface ---------------------
+    @property
+    def persistence_mode(self) -> PersistenceMode:
+        return self._persistence_mode
+
+    @property
+    def durable_store(self) -> Optional[DurableShadowStore]:
+        """The durable shadow store, or ``None`` in in-memory mode."""
+        return self._store
+
+    def _require_durable(self) -> DurableShadowStore:
+        if self._store is None:
+            raise RecordNotFoundError(
+                "durable persistence is not enabled (IN_MEMORY_SHADOW mode)")
+        return self._store
+
+    def resume_workflow(
+        self,
+        tenant_id: str,
+        revision_id: str,
+        *,
+        current_identity: Optional[Mapping[str, str]] = None,
+    ) -> RecoveryResult:
+        """Restart-safe recovery of a workflow revision from the durable store.
+
+        Recovery is advisory: it verifies integrity, reports the last committed
+        stage and staleness, and never performs an external call or an automatic
+        transition. Execution stays ``DISABLED``.
+        """
+        store = self._require_durable()
+        return recover_workflow(store, tenant_id, revision_id,
+                                current_identity=current_identity)
+
+    def reconstruct_chain_from_store(
+        self,
+        tenant_id: str,
+        revision_id: str,
+        *,
+        mode: ReconstructionMode = ReconstructionMode.STORED_PROJECTION_ONLY,
+        current_head_sha: Optional[str] = None,
+        resolver=None,
+    ) -> DurableReconstructionResult:
+        """Integrity-verified governance-chain reconstruction from the durable store."""
+        store = self._require_durable()
+        return reconstruct_from_store(
+            store, tenant_id, revision_id, mode=mode,
+            current_head_sha=current_head_sha, resolver=resolver)
+
+    def export_governance_audit_bundle(
+        self, tenant_id: str, revision_id: str, *, workflow_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Export a deterministic, offline-verifiable audit bundle for one revision."""
+        store = self._require_durable()
+        if workflow_id is None:
+            index = store.get_index(tenant_id, revision_id)
+            if index is None:
+                raise RecordNotFoundError(
+                    f"no durable workflow revision {revision_id}")
+            workflow_id = index["workflow_id"]
+        return _export_bundle(store, tenant_id, workflow_id, revision_id)
+
+    @staticmethod
+    def verify_governance_audit_bundle(bundle: Mapping[str, Any]) -> BundleVerification:
+        """Verify an exported audit bundle entirely offline (no store connection)."""
+        return _verify_bundle(bundle)
+
+    def close(self) -> None:
+        """Close the durable store, if any. Safe to call in in-memory mode."""
+        if self._store is not None:
+            self._store.close()
 
 
 __all__ = ["CodeGovernanceService"]

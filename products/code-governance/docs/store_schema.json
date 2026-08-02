@@ -1,0 +1,67 @@
+{
+  "$comment": "Durable shadow store schema for Code Governance MVP 1C. DURABLE_SHADOW_REFERENCE \u2014 an append-only, hash-linked, integrity-verified local sqlite3 audit store. NOT a production enforcement store or an authoritative execution-consumption ledger.",
+  "store_schema_version": "code_governance.shadow_store.v1",
+  "serialization_version": "code_governance.shadow_serialization.v1",
+  "fingerprint_domain_version": "v1",
+  "classification": "DURABLE_SHADOW_REFERENCE",
+  "genesis": "cg-shadow:genesis",
+  "backend": "stdlib sqlite3 (WAL); no external database",
+  "execution_status": "DISABLED",
+  "fingerprint_domains": {
+    "payload": "cg.shadow.payload.v1",
+    "envelope": "cg.shadow.envelope.v1",
+    "event": "cg.shadow.event.v1",
+    "bundle": "cg.shadow.bundle.v1"
+  },
+  "tables": {
+    "store_meta": [
+      "key",
+      "value"
+    ],
+    "records": [
+      "tenant_id",
+      "record_id",
+      "record_type",
+      "schema_version",
+      "workflow_id",
+      "workflow_revision_id",
+      "created_at",
+      "canonical_payload",
+      "payload_fingerprint",
+      "previous_record_fingerprint",
+      "envelope_fingerprint"
+    ],
+    "events": [
+      "tenant_id",
+      "event_id",
+      "workflow_id",
+      "workflow_revision_id",
+      "previous_event_fingerprint",
+      "from_state",
+      "to_state",
+      "event_type",
+      "referenced_record_ids",
+      "occurred_at",
+      "event_fingerprint",
+      "seq"
+    ],
+    "workflow_index": [
+      "tenant_id",
+      "workflow_revision_id",
+      "workflow_id",
+      "current_state",
+      "chain_id",
+      "last_event_fingerprint",
+      "updated_at"
+    ]
+  },
+  "immutability": {
+    "records": "append-only (BEFORE UPDATE/DELETE triggers RAISE ABORT)",
+    "events": "append-only (BEFORE UPDATE/DELETE triggers RAISE ABORT)",
+    "put_if_absent": "identical re-commit is idempotent; differing content collides"
+  },
+  "integrity": {
+    "record": "payload_fingerprint + envelope_fingerprint (domain-separated SHA-256)",
+    "event_chain": "previous_event_fingerprint links each event; first links to GENESIS"
+  }
+}

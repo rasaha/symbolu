@@ -1,0 +1,33 @@
+{
+  "$comment": "Restart-recovery vocabulary (MVP 1C). Recovery is advisory: no external call, no automatic transition, execution stays DISABLED. Recovery is NOT execution reconciliation.",
+  "recovery_statuses": [
+    "RECOVERED_COMPLETE",
+    "RECOVERED_PENDING",
+    "RECOVERED_STALE",
+    "RECOVERED_BLOCKED",
+    "INCOMPLETE_TRANSACTION_ROLLED_BACK",
+    "INTEGRITY_FAILURE",
+    "SCHEMA_INCOMPATIBLE",
+    "REFERENCE_MISSING",
+    "TENANT_MISMATCH"
+  ],
+  "reconstruction_modes": [
+    "STORED_PROJECTION_ONLY",
+    "VERIFY_WITH_SUPPLIED_RESOLVER"
+  ],
+  "reconstruction_states": [
+    "COMPLETE",
+    "INCOMPLETE",
+    "STALE",
+    "INTEGRITY_FAILURE",
+    "TENANT_MISMATCH",
+    "REFERENCE_MISMATCH",
+    "EVENT_CHAIN_BROKEN",
+    "SCHEMA_INCOMPATIBLE"
+  ],
+  "requires_explicit_action": [
+    "RECOVERED_PENDING",
+    "RECOVERED_STALE"
+  ],
+  "execution_status_after_recovery": "DISABLED"
+}

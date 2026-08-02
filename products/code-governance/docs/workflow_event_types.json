@@ -1,0 +1,9 @@
+{
+  "$comment": "Append-only workflow-event journal types (shadow only). Each event is hash-linked to the previous event.",
+  "event_types": [
+    "STAGE_COMMITTED",
+    "STAGE_FAILED_CLOSED",
+    "REVISION_SUPERSEDED"
+  ],
+  "genesis": "cg-shadow:genesis"
+}

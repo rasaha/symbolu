@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ugence-code-governance"
-version = "0.1.0"
-description = "Ugence Code Governance — shadow governance workflow and reconstructable governance chain for source-control changes (MVP 1A, read-only, non-enforcing)."
+version = "0.2.0"
+description = "Ugence Code Governance — shadow governance workflow, reconstructable governance chain, and durable shadow audit persistence for source-control changes (MVP 1C, read-only, non-enforcing, execution disabled)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
