@@ -36,16 +36,26 @@ Authority"), the migration:
 2. Declares `decision-governance` as an **optional** distribution dependency
    (extra `adapters`), **not** a core runtime dependency. The only hard runtime
    dependency of the canonical core is `ugence-governance-contracts`.
-3. Leaves the top-level `__init__` importing only `.version` (as today), so
+3. Leaves the top-level `__init__` importing only `.version`, so
    `import ugence_governance_provider_framework` and the pure-core submodules
    (`registry`, `resolution`, `configuration`, `observability`, `fingerprint`,
    `version`, `conformance`, `reference`, and the contract shims) import **without**
    Decision Authority present.
-4. Preserves the existing "adapters bleed": `…/api` and `…/adapters` still import
-   the kernel facade, so importing `.api` still requires the `adapters` extra —
-   **unchanged behaviour** vs the pre-migration `governance_providers.api`. No
-   authority moves; the API snapshot stays byte-identical.
+4. **Optional-dependency boundary correction (PR-validation phase).** The three
+   adapters now load Decision Authority **lazily** — module-level kernel imports
+   (and the frozen `_OUTCOME_MAP`) moved into a cached `_kernel()` loader, and the
+   `__init__` id/clock defaults became lazy wrappers. A centralized
+   `adapters/_kernel.py::require_decision_authority()` raises a precise error
+   naming `ugence-governance-provider-framework[adapters]` (and only for the
+   specific absence of Decision Authority; unrelated import errors propagate).
+   Consequently `…/adapters` **and** the `…/api` aggregator now import without
+   Decision Authority; only *invoking* an adapter requires the extra. This is
+   stricter than the pre-migration `governance_providers.api` (which pulled the
+   kernel at import) and is an import-boundary change only.
 
-**No adapter behaviour is changed during classification or relocation.** The core
-is importable without importing Decision Authority (proved in the distribution
-verifier, isolated-env test 3).
+**No adapter behaviour changes when the `adapters` extra is installed** — public
+class names, method signatures, fields, enums, errors, and outcomes are unchanged,
+the frozen `governance_providers.api` snapshot stays byte-identical (`98dd0264…`),
+and the behavioural fingerprint is unchanged (`a8e3e7e9…`). The core AND the public
+API are importable without Decision Authority (proved in the distribution verifier
+and `tests/boundaries/test_optional_adapter_dependency.py`).

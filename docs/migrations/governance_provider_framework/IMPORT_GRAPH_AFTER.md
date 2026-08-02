@@ -27,10 +27,16 @@ Verified directly:
   `actiongate_provider`, or any bounded capability. (`conformance/common.py`
   contains the string `"decision_governance"` in an AST boundary check only; the
   package `__init__` mentions it in a docstring only.)
-- Only the three `adapters/*` modules import `decision_governance.api`.
+- Only the three `adapters/*` modules reference `decision_governance.api`, and they
+  do so **lazily** (at invocation) via the cached `_kernel()` loader and
+  `adapters/_kernel.py::require_decision_authority()` — no module-level kernel
+  import remains.
 - `import ugence_governance_provider_framework` (top level) imports only `.version`
-  (+ the contracts bootstrap) — no kernel pull. Proven in a clean venv WITHOUT
-  Decision Authority: core imports; `.adapters`/`.api` raise `ImportError`.
+  (+ the contracts bootstrap). **Optional-dependency boundary correction:** `.api`
+  and `.adapters` now also import WITHOUT Decision Authority. Proven in a clean venv
+  WITHOUT Decision Authority: core, `.adapters`, and `.api` all import; only
+  *invoking* a kernel-bound adapter raises a precise `ModuleNotFoundError` naming
+  `ugence-governance-provider-framework[adapters]`.
 
 ## Dependency direction (correct, acyclic — unchanged)
 

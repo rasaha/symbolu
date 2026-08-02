@@ -15,12 +15,17 @@ namespace remains available and behaves identically.
   whole tree (top-level and deep imports).
 - **Legacy `dgm-provider-framework` distribution** is now a **compatibility shell**
   depending on `ugence-governance-provider-framework[adapters]` (no duplicated source).
-- **Decision Authority dependency is optional.** The core (`registry`, `resolution`,
-  `configuration`, `observability`, `fingerprint`, `version`, `conformance`,
-  `reference`, contract shims) installs and imports without Decision Authority. The
-  kernel-bound `adapters` and the `.api` aggregator need the `adapters` extra —
-  identical to the pre-migration behaviour where importing `governance_providers.api`
-  pulled the kernel.
+- **Decision Authority dependency is optional (boundary correction).** The three
+  kernel-bound adapters load Decision Authority **lazily** (at invocation), so the
+  framework core AND the canonical public API `...api` — including the adapter
+  symbols — import without Decision Authority installed. Only *invoking* a
+  kernel-bound adapter requires the `adapters` extra; without it, invocation raises
+  a precise error naming `ugence-governance-provider-framework[adapters]`. With the
+  extra installed, adapter behaviour is byte-for-byte identical. (This is stricter
+  than the pre-migration `governance_providers.api`, which pulled the kernel at
+  import; the correction is an import-boundary change only — no governance,
+  authority, signature, field, enum, error, or serialization change, and the frozen
+  API snapshot is byte-identical.)
 
 ## For consumers — nothing is required
 

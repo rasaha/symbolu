@@ -25,14 +25,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
 
-from decision_governance.api.ports import (
-    BLOCKED_METADATA_KEY,
-    FINALIZED_STATUS,
-    LinkedRecordSnapshot,
-)
-
 from ..contracts import AssertionGovernanceRequest, AssertionGovernanceResult
 from ..contracts.assertion import AssertionCoverage, AssertionGovernanceProvider
+from ._kernel import require_decision_authority
 
 
 @dataclass(frozen=True)
@@ -79,6 +74,9 @@ class AssertionAssessmentIntegration:
         assessment: AssertionAssessment, *, tenant_id: str, record_type: str,
         record_id: str, subject_ref: str, version: int = 1,
     ) -> LinkedRecordSnapshot:
+        require_decision_authority()
+        from decision_governance.api.ports import (
+            BLOCKED_METADATA_KEY, FINALIZED_STATUS, LinkedRecordSnapshot)
         metadata: dict[str, str] = {
             "evidence_coverage": f"{assessment.evidence_coverage:.2f}",
             "assertion_trace": assessment.provider_trace_id,

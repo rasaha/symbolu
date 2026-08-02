@@ -50,25 +50,34 @@ through neutral registration.
 ## Installation
 
 ```bash
-pip install ugence-governance-provider-framework            # core (registry, resolution, …)
-pip install ugence-governance-provider-framework[adapters]  # + kernel-bound adapters and .api
+pip install ugence-governance-provider-framework            # framework (core + importable adapters)
+pip install ugence-governance-provider-framework[adapters]  # + Decision Authority kernel (to invoke adapters)
 ```
 
-The **core** installs and imports without Decision Authority:
+The framework — including the canonical public API **and** the kernel-bound adapter
+symbols — imports without Decision Authority installed:
 
 ```python
-import ugence_governance_provider_framework                       # ok, no kernel
-from ugence_governance_provider_framework.registry import ProviderRegistry   # ok
-from ugence_governance_provider_framework.resolution import resolve          # ok
+import ugence_governance_provider_framework                 # ok, no kernel
+import ugence_governance_provider_framework.api             # ok, no kernel
+from ugence_governance_provider_framework.api import (
+    ProviderRegistry, resolve, ProviderDescriptor,
+    ActionGovernanceControlPlaneAdapter,                    # importable without the kernel
+)
 ```
 
-The kernel-bound adapters and the aggregated public API require the `adapters`
-extra (Decision Authority kernel facade):
+Decision Authority is an **optional** dependency: only *invoking* a kernel-bound
+adapter needs it. Without the `adapters` extra installed, invoking one raises a
+precise, actionable error:
 
 ```python
-from ugence_governance_provider_framework.api import ProviderRegistry, resolve, \
-    ActionGovernanceControlPlaneAdapter   # requires [adapters]
+adapter = ActionGovernanceControlPlaneAdapter(provider)
+adapter.authorize(action_request, cer)
+# ModuleNotFoundError: ... requires the optional Decision Authority dependency ...
+#   pip install "ugence-governance-provider-framework[adapters]"
 ```
+
+Installing the `adapters` extra restores full, byte-for-byte adapter behavior.
 
 ## Usage sketch
 

@@ -61,13 +61,33 @@ Commit sequence (small, reviewable, not squashed):
 
 ## Adapter classification (the principal boundary issue)
 
-All three modules importing `decision_governance.api` are
+All three modules referencing `decision_governance.api` are
 **GENERIC_FRAMEWORK_ADAPTER** — capability-neutral kernel ports with no
 `tap`/`actiongate` coupling (grep-verified). Full table in
 `ADAPTER_CLASSIFICATION.md`. Resolution: kept in the framework (preferred outcome
 #1), physically isolated in `adapters/`, with `decision-governance` declared an
 **optional** distribution extra so the core never acquires a mandatory dependency
-on a bounded capability. No adapter behaviour changed.
+on a bounded capability. Adapter behaviour is unchanged when the extra is
+installed.
+
+### Optional-dependency boundary correction (PR-validation phase)
+
+To make Decision Authority genuinely optional at the import boundary, the three
+adapters now load the kernel **lazily**: module-level kernel imports and the frozen
+`_OUTCOME_MAP` moved into a cached `_kernel()` loader; the `__init__` id/clock
+defaults became lazy delegating wrappers; a centralized
+`adapters/_kernel.py::require_decision_authority()` raises a precise
+`ModuleNotFoundError` naming `ugence-governance-provider-framework[adapters]` (only
+for the specific absence of Decision Authority — unrelated import errors propagate).
+As a result the canonical public API `ugence_governance_provider_framework.api` —
+including the adapter symbols — imports **without** Decision Authority; only
+*invoking* an adapter requires the extra. This is an import-boundary correction
+only: public class names, method signatures, fields, enums, errors, serialization,
+and adapter behaviour with the extra installed are unchanged; the frozen
+`governance_providers.api` snapshot stays byte-identical (`98dd0264…`) and the
+behavioural fingerprint is unchanged (`a8e3e7e9…`). Proven by
+`tests/boundaries/test_optional_adapter_dependency.py` and the distribution
+verifier's core-only scenario.
 
 ## Public API — before and after
 
@@ -89,7 +109,7 @@ on a bounded capability. No adapter behaviour changed.
 | Suite | Baseline | Final | Note |
 |---|---|---|---|
 | Framework (behavioural) | 42 | 42 | preserved verbatim; relocated into unit/conformance/integration |
-| Framework package total | — | 80 | +38 new: strengthened boundaries, packaging, and legacy-namespace identity |
+| Framework package total | — | 84 | +42 new: strengthened boundaries, packaging, legacy-namespace identity, and the optional-adapter dependency boundary |
 | tap_provider | 38 | 38 | via shim |
 | actiongate_provider | 30 | 30 | via shim |
 | baselines (assertion+action) | 10 | 10 | via shim |
@@ -140,7 +160,7 @@ runs six isolated venv scenarios (no monorepo path). All pass:
 | Scenario | Result |
 |---|---|
 | Canonical wheel builds; bundles only its namespace, no tests, no providers | ✔ |
-| **1/3.** canonical wheel only — core installs (contracts only), registry/resolution/conformance run; `.api`/`.adapters` require the optional kernel; **Decision Authority NOT pulled/installed** | ✔ |
+| **1/3.** canonical wheel only — core installs (contracts only); `.api` **and** `.adapters` import; registry/resolution/conformance run; invoking a kernel-bound adapter raises the precise `[adapters]` error; **Decision Authority NOT pulled/installed** | ✔ |
 | **4.** canonical wheel `[adapters]` — full 48-symbol public API + adapters + resolve | ✔ |
 | **2.** legacy `dgm-provider-framework` wheel — `governance_providers` resolves to the SAME objects as canonical | ✔ |
 | **5.** `dgm-tap-provider` runs against the installed canonical framework | ✔ |
@@ -201,10 +221,11 @@ The migration is `git`-reversible with no loss of API, history, or compatibility
   `governance_providers` name via the shim (zero edits), per the Governance
   Contracts precedent. Migrating consumers to `ugence_governance_provider_framework`
   is a later, separate change.
-- **Deferred adapter/SDK-runtime split.** `adapters/` is physically isolated and
-  the kernel dep is optional, enabling a later `sdk`(pure) + `runtime`(kernel-bound)
-  two-distribution split with no second migration — not performed now (one variable
-  at a time).
+- **Deferred adapter/SDK-runtime split.** `adapters/` is physically isolated, the
+  kernel dep is optional, and the adapters load Decision Authority lazily so the
+  public API imports without it. A later `sdk`(pure) + `runtime`(kernel-bound)
+  **two-distribution** split is therefore possible with no second migration — the
+  packaging split itself is not performed now.
 - **Deferred contract refinements.** The documented (do-not-act) gaps — neutral
   observability-record base, shared conformance-report base, GC ownership of
   `CONTRACT_VERSION` — remain future, additive, versioned work.

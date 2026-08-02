@@ -79,13 +79,20 @@ prov, rec = resolve(reg, ResolutionRequest(kind=ProviderKind.ASSERTION_GOVERNANC
 assert prov.descriptor().provider_id == "deterministic-assertion", prov
 # fingerprint determinism preserved
 assert fingerprint({"a": 1}) == fingerprint({"a": 1})
-# Decision Authority is NOT installed; the kernel-bound seam requires the extra.
+# Decision Authority is NOT installed.
 assert importlib.util.find_spec("decision_governance") is None, "DA should be absent"
+# The canonical public API AND the kernel-bound adapters IMPORT without Decision
+# Authority (the dependency is optional); only INVOKING an adapter needs the extra.
+import ugence_governance_provider_framework.api as _api
+assert len(_api.__all__) == 48, len(_api.__all__)
+import ugence_governance_provider_framework.adapters  # imports fine without DA
+from ugence_governance_provider_framework.api import ActionGovernanceControlPlaneAdapter
+_adapter = ActionGovernanceControlPlaneAdapter(DeterministicActionGovernanceProvider())
 try:
-    import ugence_governance_provider_framework.adapters  # noqa
-    raise SystemExit("adapters imported without Decision Authority present")
-except ImportError:
-    pass
+    _adapter.authorize(object(), object())
+    raise SystemExit("adapter invoked without Decision Authority present")
+except ModuleNotFoundError as _e:
+    assert "ugence-governance-provider-framework[adapters]" in str(_e), str(_e)
 # contracts leaf present; NO capability/provider/app bundled or pulled
 assert importlib.util.find_spec("ugence_governance_contracts") is not None
 for mod in ("tap_provider", "actiongate_provider", "ai_hiring", "domains",

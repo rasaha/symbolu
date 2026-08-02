@@ -14,10 +14,18 @@ compatibility.**
   (history-preserving `git mv`). One physical implementation only.
 - Canonical distribution `ugence-governance-provider-framework`; canonical
   namespace `ugence_governance_provider_framework`.
-- The Decision Authority kernel dependency is now declared **optional**
-  (extra `adapters`); the framework core installs and imports without it. No code
-  or behaviour changed — only the packaging declaration. Importing `.api`/`.adapters`
-  still requires the kernel facade, exactly as before.
+- The Decision Authority kernel dependency is now **optional** (extra `adapters`).
+  As an optional-dependency **boundary correction** for the new canonical
+  distribution, the three kernel-bound adapters load Decision Authority **lazily**
+  (at invocation), so the framework core AND the canonical public API
+  `ugence_governance_provider_framework.api` — including the adapter symbols —
+  import without Decision Authority installed. Only *invoking* an adapter requires
+  the `adapters` extra; doing so without it raises a precise error naming
+  `ugence-governance-provider-framework[adapters]`. When the extra is installed,
+  adapter behaviour is byte-for-byte identical. This is a packaging/import-boundary
+  correction only — no governance behaviour, authority, public signature, field,
+  enum, error, or serialization changed, and the frozen `governance_providers.api`
+  snapshot remains byte-identical.
 
 ### Preserved (identical)
 - Public API `governance_providers.api` (48 symbols) — snapshot byte-identical.
