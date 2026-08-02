@@ -1,0 +1,117 @@
+{
+  "$comment": "Machine-readable live-contract inventory for the Code Governance implementation-readiness audit. Documentation-only. Fields read directly from source at the audited commit.",
+  "audited_commit": "3ec11e4ecbc209eabc69d3c0d8a75ecaa10f6def",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "authoritative_source": "UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md (v0.2)",
+  "neutral_contracts": {
+    "package": "ugence_governance_contracts",
+    "path": "packages/governance-contracts/src/ugence_governance_contracts",
+    "version": "0.1.0",
+    "contract_version": "1.0.0",
+    "leaf_dependency": "stdlib-only",
+    "provider_kinds": ["ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION"],
+    "new_provider_kind_required": false,
+    "types": {
+      "AssertionGovernanceRequest": {
+        "path": "contracts/assertion.py:26",
+        "fields": ["assertion:str", "assertion_type:str", "evidence_refs:tuple[str,...]", "source_identity:str", "policy_refs:tuple[str,...]", "context:Mapping[str,str]", "correlation_id:str"]
+      },
+      "AssertionGovernanceResult": {
+        "path": "contracts/assertion.py:41",
+        "fields": ["coverage:AssertionCoverage", "evidence_coverage:float", "covered_evidence_refs:tuple[str,...]", "unsupported_elements:tuple[str,...]", "omitted_qualifiers:tuple[str,...]", "constraints:tuple[str,...]", "obligations:tuple[str,...]", "explanation_refs:tuple[str,...]", "provider_trace_id:str", "fingerprint:str"]
+      },
+      "ActionGovernanceRequest": {
+        "path": "contracts/action.py:29",
+        "fields": ["action_type:str", "requested_parameters:Mapping[str,str]", "actor:str", "authority_context:str", "target_resource:str", "policy_refs:tuple[str,...]", "risk_context:Mapping[str,str]", "evidence_refs:tuple[str,...]", "decision_refs:tuple[str,...]", "idempotency_key:str", "correlation_id:str", "authorization_expired:bool"]
+      },
+      "ActionGovernanceResult": {
+        "path": "contracts/action.py:47",
+        "fields": ["outcome:ActionGovernanceOutcome", "constraints:tuple[str,...]", "obligations:tuple[str,...]", "expiry:Optional[datetime]", "authority_basis:str", "reason_codes:tuple[str,...]", "provider_trace_id:str", "fingerprint:str"],
+        "note": "No standalone ExactChangeAuthorization is emitted."
+      },
+      "ExecutionDispatchRequest": {
+        "path": "contracts/execution.py:31",
+        "fields": ["action_type:str", "parameters:Mapping[str,str]", "idempotency_key:str", "correlation_id:str"],
+        "note": "Carries NO governance references (no decision_id/cer_hash/fingerprint/clearance)."
+      },
+      "ExecutionDispatchResult": {
+        "path": "contracts/execution.py:39",
+        "fields": ["accepted:bool", "external_request_id:str", "acknowledgement:str", "pending:bool", "timed_out:bool", "transport_error:str", "retryable:bool"]
+      },
+      "ExecutionObservation": {
+        "path": "contracts/execution.py:54",
+        "fields": ["business_outcome:ExecutionBusinessOutcome", "observed_parameters:Mapping[str,str]", "final:bool", "reason:str", "provider_trace_id:str", "fingerprint:str"]
+      },
+      "ProviderDescriptor": {
+        "path": "metadata.py:60",
+        "fields": ["provider_id:str", "kind:ProviderKind", "implementation_version:str", "compatibility:ProviderCompatibility", "capabilities:ProviderCapabilities", "factory:Callable[[],object]", "vendor:str", "default:bool", "metadata:dict[str,str]"]
+      }
+    }
+  },
+  "decision_authority": {
+    "package": "ugence_decision_authority",
+    "path": "packages/capabilities/decision-authority/src/ugence_decision_authority",
+    "record_base": "DomainModel (frozen=True, extra=forbid) — no open metadata dict",
+    "types": {
+      "DecisionRecord": {
+        "path": "decisions/decision.py:25",
+        "fields": ["decision_id:str", "decision_case_id:str", "tenant_id:str", "decision_type:str", "outcome:DecisionOutcome", "authority_type:AuthorityType", "decided_by:str", "decided_at:datetime", "recommendation_refs:tuple[VersionedRef,...]", "assessment_refs:tuple[VersionedRef,...]", "policy_refs:tuple[VersionedRef,...]", "reason_codes:tuple[ReasonCode,...]", "override_record_id:Optional[str]", "effective_status:EffectiveStatus", "supersedes_decision_id:Optional[str]"],
+        "has_content_hash": false,
+        "note": "Immutability structural (frozen) only; no compute_hash(). AuthorityType has no AI member."
+      },
+      "ContextEnvelopeRecord": {
+        "path": "actions/cer.py:62",
+        "schema_version": "cer.v1",
+        "fields": ["cer_id:str", "tenant_id:str", "decision_case_id:str", "decision_id:str", "action_request_id:str", "action_type:str", "target_system:str", "subject_context:SubjectContext", "authority_context:AuthoritySummary", "policy_context:PolicyContext", "decision_context:DecisionContext", "runtime_constraints:tuple[str,...]", "data_classifications:tuple[str,...]", "permitted_parameters:tuple[str,...]", "prohibited_parameters:tuple[str,...]", "required_controls:tuple[str,...]", "issued_at:datetime", "expires_at:Optional[datetime]", "schema_version:str", "content_hash:str", "correlation_id:str"],
+        "has_content_hash": true,
+        "content_hash_algo": "SHA-256 canonical_hash over governance context",
+        "note": "permitted/prohibited_parameters and required_controls are tuple[str] NAMES, not key->value. No generic metadata/payload dict. Exact SHA VALUES have no typed home here."
+      },
+      "ActionRequest": {
+        "path": "actions/action_request.py:24",
+        "fields": ["action_request_id:str", "tenant_id:str", "decision_case_id:str", "decision_case_version:int", "decision_id:str", "action_type:str", "target_system:str", "subject_refs:tuple[SubjectRef,...]", "requested_parameters:dict[str,str]", "policy_refs:tuple[VersionedRef,...]", "authority_ref:Optional[str]", "action_mapping_ref:VersionedRef", "cer_id:Optional[str]", "status:ActionRequestStatus", "version:int", "request_version_id:str", "created_by:str", "created_at:datetime", "correlation_id:str", "idempotency_key:str", "supersedes_action_request_id:Optional[str]"],
+        "note": "requested_parameters is key->value; CAN carry exact merge-artifact values. No EXECUTED status."
+      },
+      "ActionAuthorizationResponse": {
+        "path": "actions/authorization.py:23",
+        "fields": ["authorization_id:str", "action_request_id:str", "cer_id:str", "outcome:AuthorizationOutcome", "reason_codes:tuple[str,...]", "constraints:tuple[str,...]", "obligations:tuple[str,...]", "authorized_at:datetime", "expires_at:Optional[datetime]", "control_plane_ref:str", "policy_versions:tuple[str,...]", "correlation_id:str", "attempt:int"]
+      },
+      "OverrideRecord": {
+        "path": "decisions/override.py:25",
+        "fields": ["override_id:str", "decision_case_id:str", "tenant_id:str", "final_outcome:DecisionOutcome", "authorized_by:str", "reason_codes:tuple[ReasonCode,...]", "original_recommendation_id:Optional[str]", "original_proposed_outcome:Optional[ProposedOutcome]", "policy_default_outcome:Optional[DecisionOutcome]", "permitting_policy_ref:Optional[VersionedRef]", "notes:str", "created_at:datetime"]
+      },
+      "ExecutionIntent": {
+        "path": "execution/execution_intent.py:24",
+        "fields": ["execution_intent_id:str", "tenant_id:str", "action_request_id:str", "action_request_version:int", "authorization_id:str", "cer_id:str", "action_type:str", "target_system:str", "authorized_parameters:dict[str,str]", "authorization_constraints", "authorization_obligations", "authority_ref", "policy_refs", "correlation_id", "execution_idempotency_key", "created_by", "created_at", "expires_at", "content_hash", "status", "version", "intent_version_id"],
+        "has_content_hash": true,
+        "note": "Sits ABOVE the neutral contract; binds decision/CER/authorization refs."
+      },
+      "ExecutionRecord": {
+        "path": "execution/execution_record.py:24",
+        "fields": ["execution_record_id", "execution_intent_id", "execution_attempt_id", "tenant_id", "external_system", "external_request_id", "external_result_id", "business_outcome", "observed_parameters", "observed_at", "source:OutcomeSource", "evidence_refs", "finality", "reason_codes", "content_hash", "correlation_id"]
+      }
+    },
+    "case_status_states": ["CREATED", "EVIDENCE_ASSEMBLY", "ASSESSMENT_IN_PROGRESS", "READY_FOR_RECOMMENDATION", "RECOMMENDATION_AVAILABLE", "UNDER_REVIEW", "READY_FOR_DECISION", "DECIDED", "SUPERSEDED", "CANCELLED", "CLOSED"],
+    "case_terminal_states": ["SUPERSEDED", "CANCELLED", "CLOSED"],
+    "persistence": "repository PORTS + in-memory reference impls only; NO durable DB shipped in the decision kernel"
+  },
+  "provider_framework": {
+    "package": "ugence_governance_provider_framework",
+    "registry": "in-memory, explicit registration; single default per kind",
+    "resolution_precedence": ["EXPLICIT_ID", "DOMAIN_DEFAULT", "GLOBAL_DEFAULT", "SINGLE_COMPATIBLE", "FAIL"],
+    "tenant_scope_in_resolution": false,
+    "owns_authority_or_policy": false,
+    "fingerprint": "SHA-256 canonical json",
+    "adapters": {
+      "ActionGovernanceControlPlaneAdapter": "adapters/action_to_control_plane.py:65 — neutral ActionGovernanceProvider onto kernel ActionControlPlanePort",
+      "ExternalExecutionAdapter": "adapters/execution_to_external_system.py:70 — neutral ExternalExecutionProvider onto kernel ExternalExecutionPort",
+      "AssertionAssessmentIntegration": "adapters/assertion_integration.py — neutral assertion into assessment (not forced onto a kernel port)"
+    }
+  },
+  "providers_live": {
+    "TAP": {"role": "ASSERTION_GOVERNANCE", "package": "tap_provider", "maturity": "PARTIAL_PROTOTYPE"},
+    "ActionGate": {"role": "ACTION_GOVERNANCE", "package": "actiongate_provider", "maturity": "IMPLEMENTED (shadow-validated adapter)"},
+    "GitHubExecution": {"role": "EXTERNAL_EXECUTION", "package": "providers/github-execution (proposed)", "maturity": "MISSING"},
+    "reference_execution": {"role": "EXTERNAL_EXECUTION", "package": "governance-provider-framework/reference/execution.py", "maturity": "test-double only — the ONLY EXTERNAL_EXECUTION impl present"}
+  }
+}

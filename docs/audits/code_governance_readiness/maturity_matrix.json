@@ -1,0 +1,23 @@
+{
+  "$comment": "Maturity classification per required component. Documentation-only. Classifications: PRODUCTION_SHAPED, IMPLEMENTED, PARTIAL_PROTOTYPE, SHADOW_ONLY, SIMULATED, DOCUMENTED_ONLY, PLANNED, MISSING.",
+  "audited_commit": "3ec11e4ecbc209eabc69d3c0d8a75ecaa10f6def",
+  "components": {
+    "GovernanceProviderFramework": {"maturity": "IMPLEMENTED", "evidence": "84 tests pass; register/resolve/adapt/conformance/observability; owns no authority", "path": "packages/governance-provider-framework"},
+    "GovernanceContracts": {"maturity": "IMPLEMENTED", "evidence": "45 tests pass; three neutral families frozen; leaf stdlib-only", "path": "packages/governance-contracts"},
+    "TAP": {"maturity": "PARTIAL_PROTOTYPE", "evidence": "tap_provider adapter 38 tests pass; truth_assurance_pipeline E1-E5 deterministic on synthetic data; E6/E7 docs-only; no real-model evidence at scale", "path": "tap_provider, truth_assurance_pipeline"},
+    "DecisionAuthority": {"maturity": "IMPLEMENTED", "evidence": "79 tests pass; frozen kernel; DecisionRecord/CER/ActionRequest/Override/ExecutionIntent; repositories are in-memory ports (no durable DB)", "path": "packages/capabilities/decision-authority"},
+    "ActionGate": {"maturity": "IMPLEMENTED", "evidence": "actiongate_provider 30 tests pass; ACTION_GOVERNANCE adapter; shadow-validated against fixtures", "path": "actiongate_provider"},
+    "ACP": {"maturity": "SHADOW_ONLY", "evidence": "design-first; never enforcing; robotics/K8s/db domains only; NO GitHub domain; ClearanceVerdict CLEAR/HOLD; no durable clearance ref", "path": "symbolu_robotics/autonomous_control_plane, ugence_console_api, acp/ (docs)"},
+    "StoryGraph": {"maturity": "IMPLEMENTED", "evidence": "316 tests pass; advisory OBSERVE/ESCALATE/UNAVAILABLE only; own tenant-isolated provider registry; real durable_audit SQLite store", "path": "packages/capabilities/storygraph"},
+    "EvidenceSubsystem": {"maturity": "PARTIAL_PROTOTYPE", "evidence": "content-hash + source provenance present; NO durable evidence store (proven absent); no validator-identity binding; no quarantine/admissibility; no head-SHA invalidation; research code", "path": "evidence_assurance, evidence_obligation, claim_integrity, minimal_evidence_policy"},
+    "DurableAuditStore": {"maturity": "PARTIAL_PROTOTYPE", "evidence": "REAL hash-chained SQLite stores in StoryGraph durable_audit.py and agentic/ledger/governance_audit_store.py (reference-grade); decision kernel audit is in-memory with previous_event_hash RESERVED (unused); no unified cross-capability audit backend", "path": "storygraph/durable_audit.py, agentic/ledger, decision-authority/audit"},
+    "WorkflowInfrastructure": {"maturity": "PLANNED", "evidence": "no durable workflow engine as code; agent_runtime_v2 docs-only; agent_runtime_migration in-memory (no persistence/resume/event-sourcing/webhook); control_plane single-request mock orchestration", "path": "agent_runtime_migration, agent_runtime_v2 (docs), control_plane"},
+    "GitHubEvidenceConnector": {"maturity": "MISSING", "evidence": "no GitHub ingestion code; net-new product connector", "path": "n/a (proposed)"},
+    "GitHubExecutionProvider": {"maturity": "MISSING", "evidence": "no EXTERNAL_EXECUTION GitHub provider; only framework DeterministicExecutionProvider test-double exists", "path": "n/a (proposed providers/github-execution)"},
+    "RepositoryPolicyEngine": {"maturity": "DOCUMENTED_ONLY", "evidence": "POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md exists; StoryGraph policypack compiler is real but domain-specific; no code-governance repo-policy engine", "path": "POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md, storygraph/policypack"},
+    "IdentityIntegration": {"maturity": "PARTIAL_PROTOTYPE", "evidence": "DA ActorIdentity/ActorType + authenticate(); no enterprise OIDC/SSO; no GitHub identity mapping; SoD off by default", "path": "decision-authority/identity"},
+    "CodeGovernanceUI": {"maturity": "DOCUMENTED_ONLY", "evidence": "ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md; no code-governance PR check-run UI", "path": "ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md"},
+    "CompetitiveCodeAdjudication": {"maturity": "MISSING", "evidence": "no patch-pair adjudication capability; reusable analogues only (model-selection Selection contract, comparative_governance_benchmark harness, StoryVerdict, reviewer_ready_pilot AdjudicationResult)", "path": "n/a (proposed packages/capabilities/competitive-adjudication)"},
+    "DeploymentGovernance": {"maturity": "DOCUMENTED_ONLY", "evidence": "MVP3; reuses ACP+ActionGate K8s surface (shadow); no build provenance/digest binding implemented", "path": "roadmap"}
+  }
+}
