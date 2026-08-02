@@ -1,9 +1,14 @@
 # Agent Runtime — Overview
 
-The **Ugence Agent Runtime** is a domain-neutral capability that coordinates the
-execution of agents and workflows. It is packaged as an independent Python
-distribution (`ugence-agent-runtime`, namespace `ugence_agent_runtime`) that builds,
-installs, and runs without importing the monorepo application layer.
+The **Ugence Agent Runtime** is a domain-neutral **execution-coordination kernel** for
+agents and workflows. It is packaged as an independent Python distribution
+(`ugence-agent-runtime`, namespace `ugence_agent_runtime`) that builds, installs, and
+runs without importing the monorepo application layer.
+
+> It is a **newly created kernel**, not a relocation of the legacy
+> `agent_runtime_migration` proposer (which owns planning/reasoning/memory and coexists
+> separately). Maturity: `IMPLEMENTED_AND_OFFLINE_VERIFIED`. See
+> `AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`.
 
 ## What the runtime does
 

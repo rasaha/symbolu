@@ -42,6 +42,12 @@ into the event stream. Governance reason codes are recorded; governance evidence
 
 ## Fail-closed defaults
 
+- The **default** governance hook fails closed: with no adapter configured, consequential
+  transitions are BLOCKed (`GOVERNANCE_NOT_CONFIGURED`). An always-CLEAR hook is never a
+  default (see `AGENT_RUNTIME_GOVERNANCE_INTEGRATION.md`).
+- A CLEAR result executes **only** when bound to the exact proposal (fingerprint +
+  non-empty reference, not expired); otherwise the runtime fails closed and the provider
+  is not called.
 - A missing or unrecognized governance disposition resolves to `STOP`, never `CLEAR`.
 - A corrupt/tampered checkpoint is rejected on recovery.
 - An unknown provider yields a classified `PROVIDER_NOT_FOUND` failure, not execution.

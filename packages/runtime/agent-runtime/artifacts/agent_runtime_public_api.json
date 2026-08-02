@@ -8,6 +8,7 @@
     "AgentRuntime",
     "AgentRuntimeConfig",
     "AgentRuntimeError",
+    "AllowAllGovernanceHook",
     "CancellationError",
     "Checkpoint",
     "CheckpointError",
@@ -41,6 +42,8 @@
     "TaskStatus",
     "ToolInvocation",
     "ToolResult",
+    "TransitionProposal",
+    "UnconfiguredGovernanceHook",
     "WorkflowDefinition",
     "WorkflowInstance",
     "WorkflowStatus",
@@ -52,7 +55,8 @@
     "register_governance_hook",
     "register_provider",
     "resume_workflow",
-    "start_workflow"
+    "start_workflow",
+    "validate_clearance"
   ],
   "functions": [
     "create_runtime",

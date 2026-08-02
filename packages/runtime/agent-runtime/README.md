@@ -1,11 +1,22 @@
 # Ugence Agent Runtime (`ugence-agent-runtime`)
 
-A **domain-neutral coordination runtime** for agent and workflow execution.
+A **domain-neutral execution-coordination kernel** for agent and workflow execution.
 
-The Agent Runtime drives task and workflow lifecycle, invokes providers/tools, and
-applies retry, timeout, cancellation, checkpointing, and durable recovery. Before any
-*consequential* transition it asks an external, neutral **governance boundary** whether
-the transition may proceed, and it obeys the answer.
+> **Scope note.** This is a *newly created coordination kernel*, not a relocation of the
+> legacy `agent_runtime_migration` proposer (which owns planning, reasoning, and memory
+> and remains a separate, coexisting package). The kernel intentionally excludes agent
+> planning/reasoning/memory. See
+> [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
+>
+> **Maturity:** `IMPLEMENTED_AND_OFFLINE_VERIFIED` (plus a scoped CI job). Not
+> live-verified, pilot-validated, enforcement-ready, or production-ready.
+
+The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
+retry, timeout, cancellation, checkpointing, and durable recovery. Before any
+*consequential* transition it constructs an immutable proposal and asks an external,
+neutral **governance boundary** whether that exact proposal may proceed — and it obeys
+the answer. **With no governance adapter configured, consequential transitions fail
+closed.**
 
 > **The runtime coordinates execution. It never creates governance authority, authors
 > policy, authorizes actions, or mints execution clearance.**
@@ -73,14 +84,16 @@ broadening it:
 
 | Disposition | Runtime behavior |
 | --- | --- |
-| `CLEAR` | continue — invoke the provider |
+| `CLEAR` | continue — **only if** the result is bound to the exact proposal (fingerprint + reference, not expired); otherwise fail closed |
 | `HOLD` | task `WAITING`, workflow `WAITING` (no provider call, no authority) |
 | `BLOCK` | task `FAILED`, workflow `FAILED` (no provider call) |
 | `ESCALATE` | task `WAITING`, workflow `PAUSED` (external resolution required) |
 
-The default hook is a neutral no-op (always `CLEAR`); concrete Ugence governance
-adapters live in **separate, optional** packages and are never required to import the
-core.
+The **default** hook (`UnconfiguredGovernanceHook`) **fails closed** — it BLOCKs every
+consequential transition with reason `GOVERNANCE_NOT_CONFIGURED`. An always-CLEAR hook
+(`AllowAllGovernanceHook`) exists only as an explicit, opt-in, documented-unsafe testing
+helper and is never a default. Concrete Ugence governance adapters live in **separate,
+optional** packages and are never required to import the core.
 
 ## Documentation
 
@@ -91,6 +104,8 @@ limitations, and H22 readiness. Machine-readable contracts are in
 
 ## Status
 
-`0.1.0` — first independent distribution. Single-workflow coordination only.
-**Multi-workflow orchestration (H22) is a later feature phase and is not implemented
-here.**
+`0.1.1` — first independent distribution plus the post-merge governance-safety
+correction. Single-workflow coordination only. Maturity:
+`IMPLEMENTED_AND_OFFLINE_VERIFIED`. **Multi-workflow orchestration (H22) is a later
+feature phase and is not implemented here, and must not begin until these corrections
+are validated.**

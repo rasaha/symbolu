@@ -13,18 +13,42 @@ Machine-readable form:
 ```python
 class GovernanceHook(Protocol):
     def evaluate(self,
-                 context: ExecutionContext,
-                 proposed_transition: str,
+                 proposal: TransitionProposal,
                  evaluation_time: float) -> GovernanceEvaluation: ...
 ```
 
-- `ExecutionContext` describes the proposed transition (workflow/instance/task ids,
-  operation, correlation, arguments). It carries **no** credentials and **no** policy.
+- `TransitionProposal` is an **immutable** description of the *exact* intended provider
+  invocation — workflow/instance/task ids, provider id, operation, canonicalized
+  arguments, idempotency key, correlation — plus a deterministic `fingerprint` over
+  those fields. It carries **no** credentials and **no** policy.
 - `evaluation_time` is **caller-controlled**: the runtime passes its injected clock
   value so the runtime (not the hook) owns the logical clock and determinism.
 - `GovernanceEvaluation` returns only what the runtime needs: `disposition`,
-  `reason_codes`, `evaluation_reference`, `valid_until`, `required_resolution`,
+  `proposal_fingerprint`, `reason_codes`, `evaluation_reference`,
+  `authorization_reference`, `clearance_reference`, `valid_until`, `required_resolution`,
   `correlation_reference`.
+
+## Exact-action binding (P0)
+
+A `CLEAR` result permits execution **only** when it is provably about the exact
+proposal. Immediately before invoking a provider the runtime checks, and fails closed
+(provider not called, task/workflow `FAILED`) on any of:
+
+| Reason code | Condition |
+| --- | --- |
+| `GOVERNANCE_CLEAR_MISSING_EVALUATION` | no evaluation returned |
+| `GOVERNANCE_NOT_CLEAR` | disposition is not CLEAR |
+| `GOVERNANCE_CLEAR_MISSING_FINGERPRINT` | evaluation carries no `proposal_fingerprint` |
+| `GOVERNANCE_CLEAR_FINGERPRINT_MISMATCH` | fingerprint ≠ the proposal's |
+| `GOVERNANCE_PROPOSAL_TAMPERED` | the proposal changed after it was built |
+| `GOVERNANCE_CLEAR_MISSING_REFERENCE` | no binding reference (evaluation/authorization/clearance) |
+| `GOVERNANCE_CLEAR_EXPIRED` | `valid_until` is past at the execution check |
+| `GOVERNANCE_CLEAR_CORRELATION_MISMATCH` | correlation reference inconsistent |
+| `PROPOSAL_INVOCATION_MISMATCH` | the built invocation re-fingerprints to a different value |
+
+The runtime **mints none** of these references; governance produces them. The runtime
+proves the permission it consumes applies to the invocation it makes — without importing
+any concrete governance implementation.
 
 ## Disposition vocabulary (preserved, not invented)
 
@@ -58,9 +82,16 @@ They are never required for the core to import. This packaging phase does **not*
 create such an adapter package, because a clean application-level adapter can already
 implement `GovernanceHook` directly.
 
-## Default hook
+## Default hook — fail closed (P0)
 
-The default `NoopGovernanceHook` returns `CLEAR` for every evaluation. It creates no
-authority — it simply expresses "no governance is integrated." Production deployments
-inject a real adapter via `AgentRuntimeConfig(governance_hook=...)` or
-`register_governance_hook(config, hook)`.
+The **default** hook is `UnconfiguredGovernanceHook`, which returns `BLOCK` with reason
+`GOVERNANCE_NOT_CONFIGURED` for every consequential transition. With no governance
+adapter configured, the runtime never treats its own default as permission to execute a
+consequential action. Non-consequential tasks (`consequential=False`) do not cross the
+boundary and run without a hook.
+
+`AllowAllGovernanceHook` returns `CLEAR` bound to the proposal fingerprint. It is an
+**explicit, opt-in, documented-unsafe** testing/simulation helper and is **never** a
+default; `NoopGovernanceHook` is retained only as a deprecated alias (emits
+`DeprecationWarning`). Production deployments inject a real adapter via
+`AgentRuntimeConfig(governance_hook=...)` or `register_governance_hook(config, hook)`.

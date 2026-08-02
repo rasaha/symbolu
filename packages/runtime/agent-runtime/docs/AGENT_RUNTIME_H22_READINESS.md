@@ -4,6 +4,11 @@ This packaging phase ends with a stable, domain-neutral base on which H22
 (Multi-Workflow Orchestration) can be built **without importing application
 internals**. H22 is **not** implemented here.
 
+> **Gate (0.1.1).** H22 must **not** begin until the post-merge corrections — fail-closed
+> default governance, exact-action proposal binding, honest compatibility, and the scoped
+> CI job — are validated. See `AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`. Current
+> maturity is `IMPLEMENTED_AND_OFFLINE_VERIFIED`, not live-verified.
+
 ## Ordering
 
 ```

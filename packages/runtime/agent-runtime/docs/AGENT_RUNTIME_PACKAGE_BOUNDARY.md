@@ -74,9 +74,9 @@ ugence_agent_runtime/
 ├── runtime/          engine, lifecycle, execution, retry, timeout, cancellation, errors
 ├── providers/        neutral provider interface + registry
 ├── persistence/      interfaces, checkpoints, recovery, in-memory reference
-├── governance/       neutral hook interface, disposition mapping, no-op hook
+├── governance/       neutral hook interface, disposition mapping, fail-closed default + unsafe test hook
 ├── observability/    events, tracing, metrics
-├── compat/           identity-preserving compatibility aliases
+├── compat/           migration guidance (honest coexistence; NOT legacy aliases)
 └── py.typed
 ```
 

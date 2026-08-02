@@ -1,22 +1,52 @@
 {
   "interface": "ugence_agent_runtime.governance.interfaces.GovernanceHook",
-  "description": "Neutral governance-integration boundary owned by the Agent Runtime. The runtime asks whether a consequential transition may proceed and obeys the answer. It never authors policy, binds a decision, or creates authority.",
+  "description": "Neutral governance-integration boundary owned by the Agent Runtime. The runtime constructs an immutable TransitionProposal, asks whether that exact proposal may proceed, and obeys the answer. It never authors policy, binds a decision, or creates authority.",
   "method": {
     "name": "evaluate",
-    "signature": "evaluate(context: ExecutionContext, proposed_transition: str, evaluation_time: float) -> GovernanceEvaluation",
+    "signature": "evaluate(proposal: TransitionProposal, evaluation_time: float) -> GovernanceEvaluation",
     "evaluation_time": "caller-controlled (runtime supplies its injected clock value)"
   },
-  "execution_context": ["workflow_id", "instance_id", "task_id", "operation", "correlation", "arguments", "metadata"],
-  "governance_evaluation": ["disposition", "reason_codes", "evaluation_reference", "valid_until", "required_resolution", "correlation_reference", "detail"],
+  "transition_proposal": ["proposal_version", "workflow_id", "instance_id", "task_id", "provider_id", "operation", "arguments (canonicalized)", "idempotency_key", "correlation_id", "fingerprint (sha256)"],
+  "governance_evaluation": ["disposition", "proposal_fingerprint", "reason_codes", "evaluation_reference", "authorization_reference", "clearance_reference", "valid_until", "required_resolution", "correlation_reference", "detail"],
   "dispositions": ["CLEAR", "HOLD", "BLOCK", "ESCALATE"],
   "mapping": {
-    "CLEAR": "CONTINUE (invoke provider)",
+    "CLEAR": "CONTINUE — only if the exact-action clearance check passes",
     "HOLD": "WAIT (task/workflow WAITING; no authority created; provider not called)",
     "BLOCK": "STOP (task/workflow FAILED; provider not called)",
     "ESCALATE": "PAUSE (workflow PAUSED pending external authority/review; provider not called)"
   },
-  "fail_closed": "A missing evaluation or unrecognized disposition resolves to STOP, never CONTINUE. HOLD and ESCALATE are never converted to CLEAR.",
+  "exact_action_binding": {
+    "required_for_clear": [
+      "proposal_fingerprint present",
+      "proposal_fingerprint == proposal.fingerprint",
+      "proposal is intact (unchanged since built)",
+      "at least one non-empty binding reference (evaluation/authorization/clearance)",
+      "valid_until (when set) not expired at the execution check",
+      "correlation_reference (when set) consistent with the proposal"
+    ],
+    "fail_closed_reason_codes": [
+      "GOVERNANCE_CLEAR_MISSING_EVALUATION",
+      "GOVERNANCE_NOT_CLEAR",
+      "GOVERNANCE_CLEAR_MISSING_FINGERPRINT",
+      "GOVERNANCE_CLEAR_FINGERPRINT_MISMATCH",
+      "GOVERNANCE_PROPOSAL_TAMPERED",
+      "GOVERNANCE_CLEAR_MISSING_REFERENCE",
+      "GOVERNANCE_CLEAR_EXPIRED",
+      "GOVERNANCE_CLEAR_CORRELATION_MISMATCH",
+      "PROPOSAL_INVOCATION_MISMATCH"
+    ],
+    "post_clearance_recheck": "The provider invocation is re-fingerprinted immediately before the call; any drift from the evaluated proposal fails closed (never executes)."
+  },
+  "default_hook": {
+    "name": "ugence_agent_runtime.governance.hooks.UnconfiguredGovernanceHook",
+    "behavior": "BLOCK with reason GOVERNANCE_NOT_CONFIGURED — fail closed when no adapter is configured"
+  },
+  "test_only_hook": {
+    "name": "ugence_agent_runtime.governance.hooks.AllowAllGovernanceHook",
+    "behavior": "CLEAR bound to the proposal fingerprint. Explicit, opt-in, UNSAFE for consequential production execution; never a default.",
+    "deprecated_alias": "NoopGovernanceHook (emits DeprecationWarning)"
+  },
   "core_imports_concrete_governance": false,
   "forbidden_concrete_imports": ["TAP", "Decision Authority", "ActionGate", "Action Clearance", "Code Governance", "StoryGraph", "cer_v0_*"],
-  "default_hook": "ugence_agent_runtime.governance.noop.NoopGovernanceHook (always CLEAR; creates no authority)"
+  "runtime_mints_references": false
 }
