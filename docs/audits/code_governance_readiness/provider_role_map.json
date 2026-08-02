@@ -1,0 +1,51 @@
+{
+  "$comment": "GitHub decomposition and provider-role conclusions for Code Governance MVP. Documentation-only.",
+  "authoritative_source": "UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md v0.2 §0-§1, §11",
+  "provider_kinds": ["ASSERTION_GOVERNANCE", "ACTION_GOVERNANCE", "EXTERNAL_EXECUTION"],
+  "new_provider_kind_required": false,
+  "rejected_architecture": "three-GitHub-provider model (GitHub as one provider with descriptors across all three families) — REJECTED in v0.1->v0.2 and NOT reopened",
+  "families": {
+    "ASSERTION_GOVERNANCE": {
+      "provider": "TAP",
+      "package": "tap_provider",
+      "protocol": "AssertionGovernanceProvider.evaluate",
+      "request": "AssertionGovernanceRequest",
+      "result": "AssertionGovernanceResult",
+      "github_role": "NONE — GitHub evidence ingestion is NOT an assertion-governance provider",
+      "maturity": "PARTIAL_PROTOTYPE"
+    },
+    "ACTION_GOVERNANCE": {
+      "provider": "ActionGate",
+      "package": "actiongate_provider",
+      "protocol": "ActionGovernanceProvider.authorize",
+      "request": "ActionGovernanceRequest",
+      "result": "ActionGovernanceResult",
+      "github_role": "NONE — GitHub action construction is a product mapping layer in the Workflow Service, NOT an action-governance provider",
+      "kernel_bridge": "GPF adapters/action_to_control_plane.py -> kernel ActionControlPlanePort",
+      "maturity": "IMPLEMENTED (adapter; shadow-validated)"
+    },
+    "EXTERNAL_EXECUTION": {
+      "provider": "GitHub Execution Provider (NEW, proposed)",
+      "package": "providers/github-execution (proposed)",
+      "protocol": "ExternalExecutionProvider.dispatch/observe/cancel",
+      "request": "ExecutionDispatchRequest",
+      "result": "ExecutionDispatchResult / ExecutionObservation",
+      "github_role": "THE ONLY GitHub governance-provider role proposed for MVP implementation",
+      "kernel_bridge": "GPF adapters/execution_to_external_system.py -> kernel ExternalExecutionPort",
+      "reference_pattern": "actiongate_provider/ (pure offline core + thin BaseProvider adapter + errors/translate + versioned mapping + conformance suite)",
+      "maturity": "MISSING (only the framework DeterministicExecutionProvider test-double exists)"
+    }
+  },
+  "github_evidence_connector": {
+    "disposition": "PRODUCT_CONNECTOR (option 1: normal product adapter / connector package outside GPF)",
+    "owns_authority": false,
+    "is_a_provider": false,
+    "rationale": "It reads GitHub (PR/commit/CI/review/scanner) and emits immutable, provenance-bound evidence refs consumed by TAP. It performs no assertion governance, so it is NOT an ASSERTION_GOVERNANCE provider and must NOT create a new provider family merely to be registered. There is no existing evidence-provider abstraction to reuse (evidence subsystem is neutral research code with no durable store), so it is net-new product code.",
+    "rejected_options": ["existing evidence-provider abstraction (none exists)", "new provider family (would be MAJOR freeze change and conflate roles)"]
+  },
+  "workflow_service": {
+    "disposition": "NEW product package using existing patterns; owns coordination state only, NO authority",
+    "durable_engine_available": false,
+    "note": "No durable workflow engine exists as code (agent_runtime_v2 is docs-only; agent_runtime_migration is in-memory). Workflow Service must supply its own durable state or depend on a to-be-built persistence layer."
+  }
+}
