@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-code-governance"
+version = "0.1.0"
+description = "Ugence Code Governance — shadow governance workflow and reconstructable governance chain for source-control changes (MVP 1A, read-only, non-enforcing)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["code-governance", "governance", "shadow", "assertion-governance", "decision-authority"]
+
+# Code Governance is a commercially independent, architecturally compositional
+# product. It composes shared Ugence capabilities through their PUBLIC surfaces
+# only; it never owns or redefines a neutral governance contract. Direction is
+# strictly downward (product -> capabilities -> neutral contracts).
+dependencies = [
+    "ugence-governance-contracts",
+    "ugence-decision-authority",
+    "dgm-tap-provider",
+    "dgm-actiongate-provider",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_code_governance*"]
+
+[tool.setuptools.package-data]
+ugence_code_governance = ["py.typed"]
