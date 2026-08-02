@@ -22,3 +22,12 @@ through their public APIs and owns no neutral governance contract.
 See `docs/` for the implementation notes, workflow state machine, record model,
 claim-manifest semantics, chain reconstruction, shadow limitations, and next
 phases. Run the offline demo with `python examples/shadow_demo.py`.
+
+The authoritative stage-gate standard for progressing beyond the current
+shadow-pilot state — into the internal live pilot, the external enterprise pilot,
+Phase 2A (enforcement foundation), Phase 2B (controlled merge execution), and
+production rollout — is
+[`docs/CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md`](docs/CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md)
+(machine-readable companion:
+[`artifacts/code_governance_phase_readiness_requirements.json`](artifacts/code_governance_phase_readiness_requirements.json)).
+No gate verdict in that standard enables execution; execution remains disabled.

@@ -6,6 +6,17 @@ is an operational validation phase: it measures the existing shadow product and
 decides whether enforcement *design* is justified. It does not enforce anything.
 Execution remains `DISABLED`.
 
+> **Authoritative stage gates.** The binding, gate-by-gate standard for whether
+> Code Governance may proceed from the current shadow-pilot state into the internal
+> live pilot, the external enterprise pilot, Phase 2A (enforcement foundation),
+> Phase 2B (controlled merge execution), and production rollout lives in
+> [`CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md`](CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md)
+> (machine-readable: [`../artifacts/code_governance_phase_readiness_requirements.json`](../artifacts/code_governance_phase_readiness_requirements.json)).
+> This "Next Phases" note is the informal roadmap; the readiness-requirements
+> document is the standard that decides progression. Phase 2A and Phase 2B are
+> **not** currently approved — the only next authorized activity is provisioning a
+> bounded internal live pilot.
+
 The default evidence status is `IMPLEMENTED_AND_OFFLINE_VERIFIED` and the default
 readiness verdict is `INSUFFICIENT_LIVE_EVIDENCE` (no live pilot was run) — so the
 following remain out of scope and must not be started here:
