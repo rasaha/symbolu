@@ -44,6 +44,15 @@ def main() -> int:
         print(f"built wheel: {wheel.name}")
         print(f"built sdist: {sdists[0].name}")
 
+        # 14: the wheel must contain ONLY the intended top-level package.
+        import zipfile
+
+        with zipfile.ZipFile(wheel) as zf:
+            tops = {n.split("/", 1)[0] for n in zf.namelist()}
+        pkg_tops = {t for t in tops if not t.endswith(".dist-info") and not t.endswith(".data")}
+        assert pkg_tops == {"ugence_agent_runtime"}, f"unexpected top-level in wheel: {pkg_tops}"
+        print(f"wheel top-level packages: {sorted(pkg_tops)}")
+
         # 3: clean virtualenv
         env_dir = tmp / "venv"
         venv.EnvBuilder(with_pip=True).create(env_dir)
@@ -56,7 +65,7 @@ def main() -> int:
         check = (
             "import ugence_agent_runtime as ar;"
             "import ugence_agent_runtime.api as api;"
-            "assert ar.__version__ == '0.1.0', ar.__version__;"
+            "assert ar.__version__ == '0.1.1', ar.__version__;"
             # confirm the import resolves inside site-packages, not the monorepo src
             "assert 'site-packages' in ar.__file__, ar.__file__;"
             "print('import OK', ar.__version__, ar.__file__)"
@@ -68,7 +77,7 @@ def main() -> int:
             "import importlib.metadata as m;"
             "d = m.metadata('ugence-agent-runtime');"
             "assert d['Name'] == 'ugence-agent-runtime', d['Name'];"
-            "assert d['Version'] == '0.1.0', d['Version'];"
+            "assert d['Version'] == '0.1.1', d['Version'];"
             "reqs = m.requires('ugence-agent-runtime') or [];"
             # no mandatory runtime dependency (only optional [test] extras allowed)
             "hard = [r for r in reqs if 'extra' not in r];"
@@ -77,11 +86,18 @@ def main() -> int:
         )
         run([str(py), "-c", meta], cwd=str(tmp))
 
-        # 53: run the package test suite FROM the installed wheel. Copy only the
-        # tests dir into an isolated location (no src/, no monorepo) and run pytest.
+        # 53/55: run the package test suite FROM the installed wheel, in a location
+        # with NO monorepo above it. We copy ONLY the tests dir into the isolated tmp
+        # tree so pytest's rootdir is tmp (not the monorepo) and no monorepo root
+        # conftest is loaded — otherwise the legacy package would leak onto sys.path and
+        # the isolation (and the "no monorepo fixture imported" guarantee) would be void.
+        import shutil
+
+        iso_tests = tmp / "isolated_tests"
+        shutil.copytree(PKG_ROOT / "tests", iso_tests)
         run([str(py), "-m", "pip", "install", "--quiet", "pytest"])
-        run([str(py), "-m", "pytest", str(PKG_ROOT / "tests"), "-q",
-             "-p", "no:cacheprovider"], cwd=str(tmp))
+        run([str(py), "-m", "pytest", str(iso_tests), "-q", "-p", "no:cacheprovider"],
+            cwd=str(tmp))
 
         # run the standalone demo from the installed distribution
         run([str(py), str(PKG_ROOT / "examples" / "agent_runtime_demo.py")], cwd=str(tmp))

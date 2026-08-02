@@ -22,11 +22,11 @@ from ugence_agent_runtime.api import (
     resume_workflow,
 )
 from ugence_agent_runtime.governance.interfaces import (
-    ExecutionContext,
     GovernanceDisposition,
     GovernanceEvaluation,
     GovernanceHook,
 )
+from ugence_agent_runtime.models.proposal import TransitionProposal
 from ugence_agent_runtime.models.workflow import WorkflowStatus
 from ugence_agent_runtime.persistence.in_memory import InMemoryRuntimeStateStore
 from ugence_agent_runtime.providers.interfaces import Provider, ToolInvocation, ToolResult
@@ -57,13 +57,17 @@ class FakeGovernanceHook(GovernanceHook):
         self.disposition = disposition
         self.calls = 0
 
-    def evaluate(self, context: ExecutionContext, proposed_transition: str, evaluation_time: float) -> GovernanceEvaluation:
+    def evaluate(self, proposal: TransitionProposal, evaluation_time: float) -> GovernanceEvaluation:
         self.calls += 1
+        # A real adapter would consult TAP/ActionGate/Action Clearance here. This fake
+        # binds its result to the exact proposal fingerprint and supplies a reference,
+        # so a CLEAR is provably about THIS invocation.
         return GovernanceEvaluation(
             disposition=self.disposition,
+            proposal_fingerprint=proposal.fingerprint,
             reason_codes=(f"DEMO_{self.disposition.value}",),
             evaluation_reference=f"demo-eval-{self.calls}",
-            correlation_reference=context.correlation.correlation_id,
+            correlation_reference=proposal.correlation_id,
         )
 
 
