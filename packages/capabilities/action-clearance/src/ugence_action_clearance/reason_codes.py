@@ -1,0 +1,128 @@
+"""Curated neutral reason-code catalog (design §15).
+
+Reason codes are UPPER_SNAKE, carry no ``ACP``/``AC_`` prefix, and align with the
+Decision-Authority governed-catalog discipline. Every code below is
+``CORE_NEUTRAL``. Profile-specific (e.g. GitHub) and workflow-only reason codes are
+**not** defined here — profiles/adapters and the workflow layer own those; this
+neutral core never invents domain reasons.
+"""
+from __future__ import annotations
+
+from enum import Enum
+
+from .models.enums import ClearanceStatus
+
+
+class ClearanceReasonCode(str, Enum):
+    """The closed catalog of CORE_NEUTRAL clearance reason codes."""
+
+    # positive
+    CLEARANCE_GRANTED = "CLEARANCE_GRANTED"
+
+    # authorization eligibility / validity
+    AUTHORIZATION_NOT_ELIGIBLE = "AUTHORIZATION_NOT_ELIGIBLE"
+    AUTHORIZATION_EXPIRED = "AUTHORIZATION_EXPIRED"
+    AUTHORIZATION_STALE = "AUTHORIZATION_STALE"
+    UPSTREAM_REAUTHORIZATION_REQUIRED = "UPSTREAM_REAUTHORIZATION_REQUIRED"
+
+    # exact-action identity
+    ACTION_FINGERPRINT_MISMATCH = "ACTION_FINGERPRINT_MISMATCH"
+    TARGET_MISMATCH = "TARGET_MISMATCH"
+
+    # actor / policy / operational state
+    ACTOR_INVALID = "ACTOR_INVALID"
+    ACTOR_STATUS_UNKNOWN = "ACTOR_STATUS_UNKNOWN"
+    POLICY_VERSION_REJECTED = "POLICY_VERSION_REJECTED"
+    ACTIVE_CHANGE_FREEZE = "ACTIVE_CHANGE_FREEZE"
+    ACTIVE_INCIDENT = "ACTIVE_INCIDENT"
+    TARGET_UNAVAILABLE = "TARGET_UNAVAILABLE"
+    REQUIRED_CONTROL_UNSATISFIED = "REQUIRED_CONTROL_UNSATISFIED"
+
+    # one-time-use (advisory read from the authoritative ledger)
+    ALREADY_CONSUMED = "ALREADY_CONSUMED"
+    CONSUMPTION_RESERVED = "CONSUMPTION_RESERVED"
+    CONSUMPTION_STATUS_UNKNOWN = "CONSUMPTION_STATUS_UNKNOWN"
+
+    # signals — presence / freshness / trust / binding
+    SIGNAL_MISSING = "SIGNAL_MISSING"
+    SIGNAL_STALE = "SIGNAL_STALE"
+    SIGNAL_EXPIRED = "SIGNAL_EXPIRED"
+    SIGNAL_UNTRUSTED = "SIGNAL_UNTRUSTED"
+    SIGNAL_CONFLICT = "SIGNAL_CONFLICT"
+    SIGNAL_PROVENANCE_MISSING = "SIGNAL_PROVENANCE_MISSING"
+    SIGNAL_SOURCE_UNAPPROVED = "SIGNAL_SOURCE_UNAPPROVED"
+    SIGNAL_ADAPTER_VERSION_UNAPPROVED = "SIGNAL_ADAPTER_VERSION_UNAPPROVED"
+    SIGNAL_TRUST_LEVEL_INSUFFICIENT = "SIGNAL_TRUST_LEVEL_INSUFFICIENT"
+    SIGNAL_CONTENT_MISMATCH = "SIGNAL_CONTENT_MISMATCH"
+    SIGNAL_AUTHORIZATION_MISMATCH = "SIGNAL_AUTHORIZATION_MISMATCH"
+    SIGNAL_ACTION_MISMATCH = "SIGNAL_ACTION_MISMATCH"
+    TENANT_MISMATCH = "TENANT_MISMATCH"
+    SUBJECT_MISMATCH = "SUBJECT_MISMATCH"
+
+    # constraints
+    CONSTRAINT_CONFLICT = "CONSTRAINT_CONFLICT"
+    CONSTRAINT_INTERPRETATION_UNSUPPORTED = "CONSTRAINT_INTERPRETATION_UNSUPPORTED"
+    CLEARANCE_POLICY_CONFLICT = "CLEARANCE_POLICY_CONFLICT"
+
+
+R = ClearanceReasonCode
+S = ClearanceStatus
+
+#: Default status contribution for each reason code (policy may elevate some).
+DEFAULT_STATUS: dict = {
+    R.CLEARANCE_GRANTED: S.CLEAR,
+    R.AUTHORIZATION_NOT_ELIGIBLE: S.BLOCK,
+    R.AUTHORIZATION_EXPIRED: S.BLOCK,
+    R.AUTHORIZATION_STALE: S.HOLD,
+    R.UPSTREAM_REAUTHORIZATION_REQUIRED: S.BLOCK,
+    R.ACTION_FINGERPRINT_MISMATCH: S.BLOCK,
+    R.TARGET_MISMATCH: S.BLOCK,
+    R.ACTOR_INVALID: S.BLOCK,
+    R.ACTOR_STATUS_UNKNOWN: S.HOLD,
+    R.POLICY_VERSION_REJECTED: S.BLOCK,
+    R.ACTIVE_CHANGE_FREEZE: S.HOLD,
+    R.ACTIVE_INCIDENT: S.HOLD,          # policy may elevate to ESCALATE
+    R.TARGET_UNAVAILABLE: S.HOLD,
+    R.REQUIRED_CONTROL_UNSATISFIED: S.BLOCK,
+    R.ALREADY_CONSUMED: S.BLOCK,
+    R.CONSUMPTION_RESERVED: S.HOLD,     # policy may elevate to BLOCK
+    R.CONSUMPTION_STATUS_UNKNOWN: S.HOLD,
+    R.SIGNAL_MISSING: S.HOLD,
+    R.SIGNAL_STALE: S.HOLD,
+    R.SIGNAL_EXPIRED: S.HOLD,
+    R.SIGNAL_UNTRUSTED: S.BLOCK,
+    R.SIGNAL_CONFLICT: S.ESCALATE,
+    R.SIGNAL_PROVENANCE_MISSING: S.BLOCK,
+    R.SIGNAL_SOURCE_UNAPPROVED: S.BLOCK,
+    R.SIGNAL_ADAPTER_VERSION_UNAPPROVED: S.BLOCK,
+    R.SIGNAL_TRUST_LEVEL_INSUFFICIENT: S.BLOCK,
+    R.SIGNAL_CONTENT_MISMATCH: S.BLOCK,
+    R.SIGNAL_AUTHORIZATION_MISMATCH: S.BLOCK,
+    R.SIGNAL_ACTION_MISMATCH: S.BLOCK,
+    R.TENANT_MISMATCH: S.BLOCK,
+    R.SUBJECT_MISMATCH: S.BLOCK,
+    R.CONSTRAINT_CONFLICT: S.ESCALATE,     # policy may configure BLOCK
+    R.CONSTRAINT_INTERPRETATION_UNSUPPORTED: S.ESCALATE,
+    R.CLEARANCE_POLICY_CONFLICT: S.ESCALATE,
+}
+
+#: Every reason code here is CORE_NEUTRAL.
+CLASSIFICATION = {code: "CORE_NEUTRAL" for code in ClearanceReasonCode}
+
+
+def default_status(code: ClearanceReasonCode) -> ClearanceStatus:
+    return DEFAULT_STATUS[code]
+
+
+def canonical_reason_order(codes) -> tuple:
+    """Deterministic reason ordering (alphabetical by value) with dedup."""
+    return tuple(sorted({c for c in codes}, key=lambda c: c.value))
+
+
+__all__ = [
+    "ClearanceReasonCode",
+    "DEFAULT_STATUS",
+    "CLASSIFICATION",
+    "default_status",
+    "canonical_reason_order",
+]
