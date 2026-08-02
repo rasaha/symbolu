@@ -1,0 +1,32 @@
+{
+  "generated_for": "Context Minimization live audit (independent-packaging phase)",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "head_commit": "9496fcf25321dcf1bbfa9a27c19917f34295da16",
+  "classification_legend": [
+    "CANONICAL_CORE", "ACTIONGATE_INTEGRATION", "PRODUCT_INTEGRATION",
+    "EXPERIMENTAL_BENCHMARK", "REAL_MODEL_VALIDATION", "FROZEN_EVIDENCE",
+    "LEGACY_COMPATIBILITY", "DUPLICATED_EQUIVALENT", "DUPLICATED_DIVERGENT",
+    "OUT_OF_SCOPE", "FUTURE_NOT_IMPLEMENTED"
+  ],
+  "subsystems": [
+    {"path": "packages/capabilities/context-minimization/src/ugence_context_minimization", "class": "CANONICAL_CORE", "note": "New canonical stdlib-only leaf: models, protocols, structural + oracle-verified minimize, reasons, errors, fingerprint, policy, api."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/compressor.py", "class": "DUPLICATED_DIVERGENT", "note": "Prototype extractive compressor. Divergent from canonical: unstable repr() signature; structural_compress ignores protected_ids. Kept as frozen coexistence; NOT rewired."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/units.py", "class": "DUPLICATED_DIVERGENT", "note": "SemanticUnit/Context model. Canonical re-implements neutral immutable models; experiment kept for frozen benchmark reproducibility."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/adapter.py", "class": "ACTIONGATE_INTEGRATION", "note": "sys.path bootstraps cyber_security/action_gate_reference + action_gateway; the real gate boundary. Must stay outside core."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/extractor.py", "class": "ACTIONGATE_INTEGRATION", "note": "context->envelope oracle spec builder feeding adapter.evaluate; ActionGate-coupled."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/protected_detector.py", "class": "EXPERIMENTAL_BENCHMARK", "note": "Trainable 5-class protected-span detector (learned weights). Detector-training; excluded from wheel. Core exposes a neutral ProtectionProvider instead."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/extractor_v2.py|structured_extractor.py|semantic_extractor.py|validator_extractor.py|concepts.py|textnorm.py|ablation.py|effects.py|normalize_v2.py|detector.py", "class": "EXPERIMENTAL_BENCHMARK", "note": "Extraction/ablation/effect machinery for the feasibility study; not part of the minimization kernel contract."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/{metrics,naturalistic_metrics,economics,verdict,runner,naturalistic_runner,compressor_bench,task_benchmark,milestone_bench,benchmark_v2,scoring_v2,llm_tasks,llm_tasks_v2}.py", "class": "EXPERIMENTAL_BENCHMARK", "note": "Benchmark harness, metrics, economics, verdict, task proxies. Excluded from wheel."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/{real_llm_bench,real_llm_bench_v2,llm_client,plots,real_llm_plots}.py", "class": "REAL_MODEL_VALIDATION", "note": "Real-LLM harness + transformers/torch client + plotting. Heavy deps; excluded from wheel."},
+    {"path": "experiments/actiongate_context_ablation/actiongate_context_ablation/corpus/**", "class": "EXPERIMENTAL_BENCHMARK", "note": "Authored/naturalistic/held-out corpus + content-hashed manifest. Not shipped."},
+    {"path": "experiments/actiongate_context_ablation/results/**", "class": "FROZEN_EVIDENCE", "note": "Frozen fingerprint sha256:ac4e0692..., corpus manifest, Qwen7B/14B + Mistral7B real-model result dirs, plots. Preserved bit-for-bit; not shipped."},
+    {"path": "experiments/actiongate_context_ablation/tests/test_frozen_invariance.py", "class": "FROZEN_EVIDENCE", "note": "Regression lock on the frozen benchmark surface (fingerprint, system-prompt hash, methods/budgets, corpus manifest). Unchanged."},
+    {"path": "ugence_console_api/capabilities/context_gateway.py", "class": "PRODUCT_INTEGRATION", "note": "Console Agent Gateway. Migrated to import canonical package (structural mode); sys.path hack removed."},
+    {"path": "robotics_reliability_bench/acp_control_plane/context_pipeline.py", "class": "PRODUCT_INTEGRATION", "note": "Robotics bench: full compress() with signed ActionGate policy oracle. Left as coexistence (frozen benchmark); migration deferred to an ActionGate-oracle integration phase."},
+    {"path": "cer_v0_1/control_plane.py|cer_v0_2/control_plane.py|cer_v0_3/control_plane.py", "class": "LEGACY_COMPATIBILITY", "note": "Reference context_minimization only as a string status field (APPLIED/SKIPPED_NO_ACTIONGATE_CONTEXT). No code dependency; not a consumer; not migrated."},
+    {"path": "token_compression/ (README.md, SOURCE_FORMULA_AUDIT.md)", "class": "OUT_OF_SCOPE", "note": "Docs-only research/audit workspace ('ContextGuard' direction). No importable implementation."},
+    {"path": "symbolu_core/providers/**/*filter*.py, simulator/pcam/tq_edge_compressor.py, agentic/agentic_framework/token_budget.py, CTM_plus/**", "class": "OUT_OF_SCOPE", "note": "Name collisions in unrelated domains (candidate-text filters, KV/edge quantization, agent token-budget accounting). NOT context-minimization implementations."},
+    {"path": "protected_equivalence_group contract", "class": "FUTURE_NOT_IMPLEMENTED", "note": "v2 option for 'information represented, not this exact unit' protected-duplicate semantics. Not implemented in v1."},
+    {"path": "ActionGate InvarianceOracle integration package", "class": "FUTURE_NOT_IMPLEMENTED", "note": "A concrete ActionGate-derived oracle packaged as an adapter consuming the canonical core. Deferred; not this phase."}
+  ]
+}

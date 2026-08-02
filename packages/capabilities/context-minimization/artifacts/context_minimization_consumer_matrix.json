@@ -1,0 +1,48 @@
+{
+  "generated_for": "Context Minimization consumer audit",
+  "outcomes_legend": {
+    "A": "migrate now (semantically equivalent, parity tested)",
+    "B": "compatibility adapter (transitional import surface)",
+    "C": "intentional coexistence (frozen benchmark / legacy path)",
+    "NONE": "not a code consumer"
+  },
+  "consumers": [
+    {
+      "name": "Console Agent Gateway",
+      "path": "ugence_console_api/capabilities/context_gateway.py",
+      "uses": "structural dedup only (structural_compress), no oracle",
+      "before": "sys.path.insert(experiments/actiongate_context_ablation) then import actiongate_context_ablation.compressor",
+      "outcome": "A",
+      "action": "Now imports ugence_context_minimization.api.structural_minimize; sys.path hack removed.",
+      "behavior_change": "Hardening: a protected unit is never removed even when a duplicate remains (old structural_compress ignored protected_ids).",
+      "parity_evidence": "tests/compatibility/test_compatibility.py::test_console_structural_path_parity; ugence_console_api/tests/test_governed_loop.py (4 passed, unchanged)."
+    },
+    {
+      "name": "Robotics reliability bench (ACP control plane)",
+      "path": "robotics_reliability_bench/acp_control_plane/context_pipeline.py",
+      "uses": "full compress(ctx, protect_fn, signed_policy, target_reduction) with the signed ActionGate policy as oracle",
+      "before": "sys.path.insert(experiments/...) then import adapter + compressor + units",
+      "outcome": "C",
+      "action": "Left unchanged. Rewiring would alter the frozen benchmark surface + persisted provenance ('actiongate_context_ablation.compressor.compress (unchanged)'). Natural first migration once an ActionGate InvarianceOracle adapter is packaged.",
+      "behavior_change": "none",
+      "parity_evidence": "n/a (not migrated)"
+    },
+    {
+      "name": "CER control planes v0.1 / v0.2 / v0.3",
+      "path": "cer_v0_1/control_plane.py, cer_v0_2/control_plane.py, cer_v0_3/control_plane.py",
+      "uses": "a string status field only: 'APPLIED' | 'SKIPPED_NO_ACTIONGATE_CONTEXT'",
+      "before": "no import; no code dependency",
+      "outcome": "NONE",
+      "action": "No migration. Not a code consumer of the implementation.",
+      "behavior_change": "none",
+      "parity_evidence": "n/a"
+    }
+  ],
+  "non_consumers_verified": [
+    "token_compression/ (docs-only workspace)",
+    "symbolu_core/providers/**/*filter*.py (candidate-text filters — unrelated domain)",
+    "simulator/pcam/tq_edge_compressor.py (KV/edge quantization)",
+    "agentic/agentic_framework/token_budget.py + agent_runtime_migration/runtime/budget.py (agent token-budget accounting)",
+    "CTM_plus/** (INT4/KV compression)"
+  ]
+}

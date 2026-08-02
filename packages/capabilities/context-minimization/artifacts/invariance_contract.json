@@ -1,0 +1,42 @@
+{
+  "contract_version": "1.0.0",
+  "equivalence_rule": "Two contexts are equivalent iff their OracleEvaluation.equivalence_key values are equal. The minimizer treats the key as OPAQUE and never interprets it. Invariance is defined ENTIRELY by the supplied oracle; the package creates no authority.",
+  "fail_closed_conditions": [
+    "missing oracle (oracle mode) -> OracleRequiredError (raised)",
+    "oracle raises -> full fallback (ORACLE_RAISED)",
+    "malformed / empty-key result -> full fallback (ORACLE_RESULT_MALFORMED)",
+    "oracle_id / contract_version drift between calls -> full fallback (ORACLE_CONTRACT_MISMATCH)",
+    "evaluation_time > valid_until -> full fallback (ORACLE_EVALUATION_EXPIRED)",
+    "correlation_id mismatch -> full fallback (CORRELATION_MISMATCH)",
+    "changed key -> restore necessary spans; else full fallback",
+    "unresolved joint effect -> full fallback (JOINT_EFFECT_FALLBACK)",
+    "protection provider fails -> protect everything (PROTECTION_PROVIDER_FAILED)"
+  ],
+  "guarantees_boundary": {
+    "is": [
+      "extractive omission",
+      "equivalence relative to supplied oracle",
+      "structurally lossless dedup (structural mode)"
+    ],
+    "is_not": [
+      "authorization",
+      "context admission",
+      "rewrite/paraphrase/summarize",
+      "retrieval",
+      "model reasoning",
+      "live-enterprise validation"
+    ]
+  },
+  "method": "evaluate(context, *, evaluation_time=None) -> OracleEvaluation",
+  "oracle_evaluation_fields": [
+    "equivalence_key",
+    "oracle_id",
+    "contract_version",
+    "evaluation_ref",
+    "correlation_id",
+    "valid_until",
+    "reason_codes",
+    "metadata"
+  ],
+  "oracle_protocol": "InvarianceOracle"
+}

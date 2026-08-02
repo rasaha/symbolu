@@ -1,0 +1,103 @@
+name: context-minimization-ci
+
+# Scoped CI for the independent ugence-context-minimization leaf package. Runs the
+# package suite (structural + oracle-verified safety, protection, budgets/determinism,
+# public-API agreement, import-boundary), the migrated Console structural parity, the
+# wheel + sdist build with isolated clean-venv install and a product-neutral demo, and
+# platform-freeze verification. Triggered only by changes to the package, its migrated
+# consumer, or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/context-minimization/**"
+      - "ugence_console_api/capabilities/context_gateway.py"
+      - "conftest.py"
+      - ".github/workflows/context-minimization-ci.yml"
+  push:
+    # Feature-branch pushes AND the repository's actual default branch, so a merge
+    # touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/package-context-minimization-**"
+    paths:
+      - "packages/capabilities/context-minimization/**"
+      - "ugence_console_api/capabilities/context_gateway.py"
+      - "conftest.py"
+      - ".github/workflows/context-minimization-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Context Minimization package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Package suite (structural, oracle safety, protection, determinism, boundaries, packaging)
+        run: python -m pytest packages/capabilities/context-minimization/tests -q
+      - name: Artifacts are in sync with the implementation
+        run: |
+          python packages/capabilities/context-minimization/scripts/generate_artifacts.py
+          git diff --exit-code packages/capabilities/context-minimization/artifacts
+
+  console-parity:
+    name: Migrated Console structural parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies (console needs pydantic)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Console context-gateway parity + governed-loop
+        run: |
+          python -m pytest \
+            packages/capabilities/context-minimization/tests/compatibility -q
+          python -m pytest ugence_console_api/tests/test_governed_loop.py -q
+
+  isolated-install:
+    name: Wheel + sdist build + isolated installation + demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build wheel + sdist, install into a clean --no-index venv, run the leaf proof
+        run: python packages/capabilities/context-minimization/scripts/verify_context_minimization_distribution.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

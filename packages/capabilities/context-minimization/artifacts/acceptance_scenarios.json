@@ -1,0 +1,55 @@
+{
+  "contract_version": "1.0.0",
+  "scenarios": [
+    {
+      "expect": "unprotected exact duplicate removed, representative kept",
+      "id": "structural_exact_duplicate",
+      "mode": "STRUCTURAL"
+    },
+    {
+      "expect": "protected duplicate retained",
+      "id": "structural_protected_duplicate",
+      "mode": "STRUCTURAL"
+    },
+    {
+      "expect": "VERIFIED, filler removed",
+      "id": "oracle_invariant_removal",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "RESTORED, necessary span recovered",
+      "id": "oracle_restore",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (JOINT_EFFECT_FALLBACK)",
+      "id": "oracle_joint_fallback",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (ORACLE_RAISED)",
+      "id": "oracle_exception",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (ORACLE_EVALUATION_EXPIRED)",
+      "id": "oracle_expired",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (CORRELATION_MISMATCH)",
+      "id": "oracle_correlation_mismatch",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "uncertain unit retained",
+      "id": "protection_uncertain_retained",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "safest achievable + BUDGET_UNREACHABLE_WITHOUT_PROTECTED",
+      "id": "budget_unreachable",
+      "mode": "ORACLE_VERIFIED"
+    }
+  ]
+}

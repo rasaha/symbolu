@@ -1,0 +1,90 @@
+{
+  "computed_properties": [
+    "achieved_reduction",
+    "equivalence_verified"
+  ],
+  "contract_version": "1.0.0",
+  "fields": [
+    {
+      "name": "context_id",
+      "type": "str"
+    },
+    {
+      "name": "mode",
+      "type": "MinimizationMode"
+    },
+    {
+      "name": "original_ids",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "surviving_ids",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "removed_ids",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "removed_structural",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "removed_extractive",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "restored_ids",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "protected_ids",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "original_tokens",
+      "type": "int"
+    },
+    {
+      "name": "resulting_tokens",
+      "type": "int"
+    },
+    {
+      "name": "requested_reduction",
+      "type": "float"
+    },
+    {
+      "name": "equivalence_status",
+      "type": "EquivalenceStatus"
+    },
+    {
+      "name": "reduced",
+      "type": "bool"
+    },
+    {
+      "name": "fell_back",
+      "type": "bool"
+    },
+    {
+      "name": "reason_codes",
+      "type": "tuple[str, ...]"
+    },
+    {
+      "name": "policy_version",
+      "type": "str"
+    },
+    {
+      "name": "oracle_id",
+      "type": "Optional[str]"
+    },
+    {
+      "name": "oracle_contract_version",
+      "type": "Optional[str]"
+    },
+    {
+      "name": "fingerprint",
+      "type": "str"
+    }
+  ],
+  "type": "MinimizationResult"
+}
