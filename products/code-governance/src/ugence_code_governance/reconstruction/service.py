@@ -51,6 +51,8 @@ class ChainReconstructionService:
         prepared_action_repo: PreparedActionRepository,
         workflow_repo: WorkflowRepository,
         chain_repo: GovernanceChainRepository,
+        clearance_eval_repo=None,
+        intervention_repo=None,
     ) -> None:
         self._evidence = evidence_repo
         self._claims = claim_repo
@@ -58,6 +60,9 @@ class ChainReconstructionService:
         self._actions = prepared_action_repo
         self._workflows = workflow_repo
         self._chains = chain_repo
+        # MVP 1B — shadow clearance evaluation + intervention records (tenant-keyed).
+        self._clearance_evals = clearance_eval_repo if clearance_eval_repo is not None else {}
+        self._interventions = intervention_repo if intervention_repo is not None else {}
 
     def reconstruct(
         self,
@@ -189,6 +194,46 @@ class ChainReconstructionService:
             issues.append("missing ActionGate request/result reference")
         else:
             verified.append("actiongate")
+
+        # MVP 1B — shadow Action Clearance linkage.
+        acs = chain.action_clearance_status.value
+        if acs == "ACTION_CLEARANCE_NOT_EVALUATED":
+            # MVP 1A chain: clearance stage did not run — legitimately complete.
+            verified.append("clearance_not_run")
+        else:
+            cev = self._clearance_evals.get((tenant_id, chain.clearance_evaluation_ref))
+            if cev is None:
+                issues.append("CLEARANCE_REFERENCE_MISSING")
+            else:
+                if cev.tenant_id != tenant_id:
+                    return ReconstructionResult(
+                        ReconstructionState.TENANT_MISMATCH, chain_id,
+                        issues=("clearance evaluation tenant mismatch",))
+                if cev.fingerprint != chain.clearance_evaluation_fingerprint:
+                    return ReconstructionResult(
+                        ReconstructionState.INTEGRITY_FAILURE, chain_id,
+                        issues=("CLEARANCE_FINGERPRINT_MISMATCH",))
+                if cev.prepared_action_fingerprint != chain.prepared_action_ref:
+                    issues.append("SIGNAL_REFERENCE_MISMATCH")
+                # An evaluated (not upstream-denied) clearance requires request/result.
+                if acs == "EVALUATED":
+                    if not chain.clearance_request_fingerprint or not chain.clearance_result_fingerprint:
+                        issues.append("CLEARANCE_REFERENCE_MISSING")
+                    if set(cev.signal_refs) != set(chain.clearance_signal_refs):
+                        issues.append("SIGNAL_REFERENCE_MISMATCH")
+                    else:
+                        verified.append("clearance_evaluated")
+                elif acs == "NOT_EVALUATED_UPSTREAM_NOT_AUTHORIZED":
+                    # Legitimately not evaluated; no fabricated clearance result.
+                    verified.append("clearance_not_evaluated_upstream")
+            # Intervention assessment linkage.
+            hia = self._interventions.get((tenant_id, chain.intervention_assessment_ref))
+            if hia is None:
+                issues.append("INTERVENTION_ASSESSMENT_MISMATCH")
+            elif hia.fingerprint != chain.intervention_assessment_fingerprint:
+                issues.append("INTERVENTION_ASSESSMENT_MISMATCH")
+            else:
+                verified.append("intervention_assessment")
 
         if issues:
             # A base/head mismatch against a known current head is staleness,

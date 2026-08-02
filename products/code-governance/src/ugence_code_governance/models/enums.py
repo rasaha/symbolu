@@ -96,6 +96,10 @@ class WorkflowState(str, Enum):
     CONTEXT_BOUND = "CONTEXT_BOUND"
     ACTION_PREPARED = "ACTION_PREPARED"
     ACTION_EVALUATED = "ACTION_EVALUATED"
+    # MVP 1B — shadow Action Clearance stage (inserted before SHADOW_COMPLETE)
+    CLEARANCE_PENDING = "CLEARANCE_PENDING"
+    CLEARANCE_EVALUATED = "CLEARANCE_EVALUATED"
+    INTERVENTION_ASSESSED = "INTERVENTION_ASSESSED"
     SHADOW_COMPLETE = "SHADOW_COMPLETE"
 
     # terminal / failure states (fail closed)
@@ -106,6 +110,10 @@ class WorkflowState(str, Enum):
     BLOCKED = "BLOCKED"
     ESCALATED = "ESCALATED"
     ERROR = "ERROR"
+    # MVP 1B — fail-closed clearance-stage terminals
+    CLEARANCE_INPUT_INCOMPLETE = "CLEARANCE_INPUT_INCOMPLETE"
+    CLEARANCE_INTEGRITY_FAILURE = "CLEARANCE_INTEGRITY_FAILURE"
+    CLEARANCE_EVALUATION_ERROR = "CLEARANCE_EVALUATION_ERROR"
 
 
 #: States after which no further forward progress is possible in this phase.
@@ -118,6 +126,9 @@ TERMINAL_WORKFLOW_STATES = frozenset({
     WorkflowState.BLOCKED,
     WorkflowState.ESCALATED,
     WorkflowState.ERROR,
+    WorkflowState.CLEARANCE_INPUT_INCOMPLETE,
+    WorkflowState.CLEARANCE_INTEGRITY_FAILURE,
+    WorkflowState.CLEARANCE_EVALUATION_ERROR,
 })
 
 
@@ -140,9 +151,21 @@ class ActionEvaluationMode(str, Enum):
 
 
 class ActionClearanceStatus(str, Enum):
-    """Action Clearance is out of scope for MVP 1A and is explicitly not evaluated."""
+    """Product-owned Action Clearance *stage* state recorded on the chain.
+
+    ``NOT_EVALUATED`` is the MVP 1A default (the clearance stage did not run). MVP
+    1B adds the shadow clearance stage outcomes. These are product coordination
+    states, distinct from the canonical :class:`ClearanceStatus`
+    (CLEAR/HOLD/BLOCK/ESCALATE), which is recorded separately on the evaluation
+    record.
+    """
 
     NOT_EVALUATED = "ACTION_CLEARANCE_NOT_EVALUATED"
+    EVALUATED = "EVALUATED"
+    NOT_EVALUATED_UPSTREAM_NOT_AUTHORIZED = "NOT_EVALUATED_UPSTREAM_NOT_AUTHORIZED"
+    INPUT_INCOMPLETE = "INPUT_INCOMPLETE"
+    INTEGRITY_FAILURE = "INTEGRITY_FAILURE"
+    EVALUATION_ERROR = "EVALUATION_ERROR"
 
 
 class ReconstructionState(str, Enum):

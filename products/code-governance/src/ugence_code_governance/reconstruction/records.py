@@ -51,8 +51,27 @@ class GovernanceChainRecord:
     evaluated_at: datetime
     policy_refs: Tuple[str, ...]
 
-    # Future boundary — explicitly unavailable, never fabricated.
+    # MVP 1B — shadow Action Clearance stage linkage (empty/NOT_EVALUATED in 1A).
     action_clearance_status: ActionClearanceStatus = ActionClearanceStatus.NOT_EVALUATED
+    clearance_evaluation_ref: str = ""
+    clearance_evaluation_fingerprint: str = ""
+    clearance_request_fingerprint: str = ""
+    clearance_result_id: str = ""
+    clearance_result_fingerprint: str = ""
+    clearance_status: str = ""                       # canonical CLEAR/HOLD/BLOCK/ESCALATE
+    clearance_reason_codes: Tuple[str, ...] = ()
+    clearance_signal_refs: Tuple[str, ...] = ()
+    clearance_signal_bundle_fingerprint: str = ""
+    clearance_policy_ref: str = ""
+    clearance_evaluated_at: Optional[datetime] = None
+    clearance_valid_until: Optional[datetime] = None
+    clearance_effective_constraints: Tuple[str, ...] = ()
+    clearance_effective_obligations: Tuple[str, ...] = ()
+    intervention_assessment_ref: str = ""
+    intervention_assessment_fingerprint: str = ""
+    human_intervention_required: bool = False
+    required_authorities: Tuple[str, ...] = ()
+    # Execution remains disabled for every status.
     execution_status: ExecutionStatus = ExecutionStatus.DISABLED
 
     @property
@@ -78,6 +97,16 @@ class GovernanceChainRecord:
                 "action_result_fingerprint": self.action_result_fingerprint,
                 "workflow_mode": self.workflow_mode.value,
                 "action_clearance_status": self.action_clearance_status.value,
+                "clearance_request_fingerprint": self.clearance_request_fingerprint,
+                "clearance_result_fingerprint": self.clearance_result_fingerprint,
+                "clearance_status": self.clearance_status,
+                "clearance_reason_codes": sorted(self.clearance_reason_codes),
+                "clearance_signal_refs": sorted(self.clearance_signal_refs),
+                "clearance_signal_bundle_fingerprint": self.clearance_signal_bundle_fingerprint,
+                "clearance_policy_ref": self.clearance_policy_ref,
+                "intervention_assessment_fingerprint": self.intervention_assessment_fingerprint,
+                "human_intervention_required": self.human_intervention_required,
+                "required_authorities": sorted(self.required_authorities),
                 "execution_status": self.execution_status.value,
             },
         )

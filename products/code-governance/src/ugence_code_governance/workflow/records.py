@@ -72,6 +72,13 @@ class WorkflowRevision:
     action_result_fingerprint: Optional[str] = None
     chain_id: Optional[str] = None
     policy_refs: Tuple[str, ...] = ()
+    # MVP 1B — shadow Action Clearance stage
+    clearance_stage_state: Optional[str] = None
+    clearance_evaluation_ref: Optional[str] = None
+    clearance_result_id: Optional[str] = None
+    clearance_status: Optional[str] = None
+    intervention_assessment_ref: Optional[str] = None
+    human_intervention_required: Optional[bool] = None
 
 
 __all__ = ["WorkflowRevision", "workflow_id_for", "revision_id_for"]
