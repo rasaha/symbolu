@@ -1,0 +1,108 @@
+{
+  "audit": {
+    "name": "Governance Provider Framework — boundary, duplication, packaging, and migration-readiness audit",
+    "phase": "audit-only (no source moves, no API/freeze re-baseline, no behavior change)",
+    "date": "2026-08-02"
+  },
+  "repository_state": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_branch_head": "1a191629b0a9130b4caeac84c3fc245f72ae2c18",
+    "default_branch_head_subject": "Merge pull request #1265 from rasaha/claude/policy-pack-design-spec-w7tltv",
+    "last_known_default_merge": "1517a71cff0e31bcef5d9ae85aae7992135f2c23 (Merge PR #1264 — Decision Authority canonical-package migration)",
+    "known_merge_still_current": false,
+    "known_merge_note": "PR #1265 (policy-pack design spec) merged after #1264; default tip advanced by one merge commit.",
+    "audit_branch": "claude/governance-provider-framework-audit-jzdvbe",
+    "audit_branch_starting_commit": "1a191629b0a9130b4caeac84c3fc245f72ae2c18",
+    "audit_branch_note": "Branch mandated by harness feature-branch requirement; equals latest default tip. Prompt's alternate name (claude/governance-provider-framework-boundary-audit) superseded by the mandatory branch directive.",
+    "working_tree_status": "clean at audit start"
+  },
+  "environment": {
+    "platform": "linux",
+    "python": "3.11.15",
+    "pytest": "9.1.1 (installed into session for the baseline; not a repo dependency)",
+    "installed_dependency_gaps_at_session_start": ["pytest", "pydantic", "numpy"],
+    "gap_resolution": "pytest, pydantic, numpy pip-installed to run the baseline; no repo files changed",
+    "source_checkout_resolution": "root conftest.py places packages/*/src on sys.path; governance_providers/__init__.py bootstraps ugence_governance_contracts; decision_governance/__init__.py bootstraps + aliases ugence_decision_authority"
+  },
+  "integrated_completed_work": {
+    "storygraph_canonical_package": {"integrated": true, "package": "packages/capabilities/storygraph", "namespace": "ugence_storygraph"},
+    "storygraph_documentation_canonicalization": {"integrated": true, "evidence": "docs/migrations/storygraph/STORYGRAPH_CANONICAL_PACKAGE_MIGRATION_REPORT.md"},
+    "governance_contracts_canonical_package": {"integrated": true, "package": "packages/governance-contracts", "namespace": "ugence_governance_contracts"},
+    "terminology_foundation": {"integrated": true, "validator": "scripts/validate_terminology.py", "result": "PASS"},
+    "decision_authority_canonical_package": {"integrated": true, "package": "packages/capabilities/decision-authority", "namespace": "ugence_decision_authority", "legacy_namespace": "decision_governance (identity-preserving shim, removal target 2.0.0)"}
+  },
+  "canonical_namespaces_confirmed": {
+    "ugence_storygraph": "packages/capabilities/storygraph/src/ugence_storygraph",
+    "ugence_governance_contracts": "packages/governance-contracts/src/ugence_governance_contracts",
+    "ugence_decision_authority": "packages/capabilities/decision-authority/src/ugence_decision_authority",
+    "ugence_governance_provider_framework": "DOES NOT EXIST — framework not yet canonically migrated"
+  },
+  "legacy_compatibility_surfaces": {
+    "decision_governance": "shim/alias over ugence_decision_authority (identity preserved)",
+    "governance_providers.errors|lifecycle|metadata|contracts.*": "identity-preserving re-export shims over ugence_governance_contracts (removal target governance_providers 0.2.0)",
+    "composite_threat_detector": "redirect shim over ugence_storygraph (per storygraph migration report)"
+  },
+  "smoke_baseline": {
+    "platform_freeze_verifier": {"command": "python -m platform_freeze.verify", "result": "PASS", "substantive_digest": "477407149049968ed12eec71044a913dfc4dbbb8cf23327ea9eec5614d759bf0"},
+    "terminology_validator": {"command": "python scripts/validate_terminology.py", "result": "PASS", "exit": 0},
+    "tests": {
+      "governance_providers": {"passed": 42, "failed": 0},
+      "tap_provider": {"passed": 38, "failed": 0},
+      "actiongate_provider": {"passed": 30, "failed": 0},
+      "baseline_assertion_provider": {"passed": 5, "failed": 0},
+      "baseline_action_provider": {"passed": 5, "failed": 0},
+      "packages/governance-contracts": {"passed": 45, "failed": 0},
+      "packages/capabilities/storygraph": {"passed": 316, "failed": 0},
+      "packages/capabilities/decision-authority": {"passed": 79, "failed": 0}
+    },
+    "pre_existing_failures": "none observed in the suites run for this audit"
+  },
+  "framework_baseline": {
+    "path": "governance_providers/",
+    "python_files_total": 38,
+    "python_files_non_test": 29,
+    "python_files_test": 9,
+    "loc_total": 2029,
+    "loc_non_test": 1442,
+    "loc_test": 587,
+    "external_consumer_files": 66,
+    "existing_distribution_name": "dgm-provider-framework",
+    "existing_distribution_visibility": "PRIVATE (not published publicly)",
+    "existing_package_version": "0.1.0",
+    "version_source": "governance_providers.version.__version__",
+    "contract_version_published": "1.0.0",
+    "target_kernel_major": 1,
+    "packaging_dir": "packaging/dgm-provider-framework/ (symlink governance_providers -> ../../governance_providers)",
+    "distribution_dependencies": ["decision-governance==1.0.0", "ugence-governance-contracts>=0.1.0"],
+    "public_api_module": "governance_providers.api",
+    "public_api_symbol_count": 47,
+    "public_api_snapshot_hash": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
+    "core_tree_hash": "ab12c0260bd9d49fdda37264aa1ad74e3b880bdc1b3bdfd303ae023e6c43cd2b",
+    "is_frozen_core_tree": true
+  },
+  "freeze_manifest": {
+    "path": "platform/PLATFORM_FREEZE_V1.json",
+    "platform_name": "Decision Governance Platform",
+    "platform_version": "1.0.0",
+    "manifest_digest": "6fb6d6c8b02538e7b002c404b3b3a9a0aadd88ce4670369538c995b5b0487cf7",
+    "freeze_commit": "5ae4f70",
+    "baseline_tests": 1006,
+    "components": {
+      "decision-governance": "1.0.0",
+      "dgm-provider-framework": "0.1.0",
+      "dgm-tap-provider": "0.1.0",
+      "dgm-actiongate-provider": "0.1.0"
+    },
+    "ugence_governance_contracts_frozen_component": false,
+    "core_trees": ["decision_governance", "governance_providers", "actiongate_provider", "tap_provider"],
+    "governance_providers_forbidden_imports": ["actiongate_provider", "tap_provider", "baseline_assertion_provider", "baseline_action_provider", "ai_hiring", "domains", "applications", "platform_freeze"],
+    "provider_invariants": {
+      "F16": "Providers interact through neutral framework contracts.",
+      "F17": "Providers of the same or different families do not invoke one another.",
+      "F18": "Provider resolution is deterministic and auditable.",
+      "F19": "Fallback cannot be used for governance shopping.",
+      "F20": "Frozen package dependency direction remains acyclic."
+    }
+  },
+  "verdict": "READY — migrate one canonical Governance Provider Framework package"
+}
