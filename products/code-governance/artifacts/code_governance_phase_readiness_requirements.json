@@ -1,0 +1,531 @@
+{
+  "$comment": "Machine-readable companion to docs/CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md. Governance-planning standard only. Defines no runtime behavior and enables nothing. Execution remains DISABLED. No gate verdict and no decision record derived from this file creates ActionGate execution authority. Keep synchronized with the Markdown document.",
+  "schema_version": "code_governance.phase_readiness_requirements.v1",
+  "document": "docs/CODE_GOVERNANCE_PHASE_READINESS_REQUIREMENTS.md",
+  "execution_status": "DISABLED",
+  "verified_current_state": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_head": "9ccbc6d419d4b49324a6d69bca2cdd21dd87ea36",
+    "pr_1285_merged": true,
+    "code_governance_version": "0.5.0",
+    "code_governance_phase": "1F",
+    "action_clearance_version": "0.1.0",
+    "action_clearance_contract": "action_clearance.v1",
+    "pilot_operator_capability": "present",
+    "pilot_study_capability": "present",
+    "platform_freeze_substantive_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6",
+    "live_github_pilot_occurred": false,
+    "live_enterprise_signal_pilot_occurred": false,
+    "real_reviewer_annotations_exist": false,
+    "enforcement_code_exists": false,
+    "reserve_once_exists": false,
+    "authoritative_consumption_ledger_exists": false,
+    "github_execution_provider_exists": false,
+    "current_capability": "IMPLEMENTED_AND_OFFLINE_VERIFIED",
+    "current_readiness": "READY_FOR_INTERNAL_LIVE_PILOT_PROVISIONING"
+  },
+  "capability_classifications": [
+    "IMPLEMENTED",
+    "OFFLINE_VERIFIED",
+    "LIVE_GITHUB_VERIFIED",
+    "LIVE_ENTERPRISE_VERIFIED",
+    "HUMAN_REVIEW_VALIDATED",
+    "ENFORCEMENT_READY",
+    "PRODUCTION_READY"
+  ],
+  "classifications_are_non_interchangeable": true,
+  "progression_path": [
+    "Current shadow-pilot platform",
+    "Gate 1 — Internal Live GitHub Pilot Readiness",
+    "Internal Live GitHub Shadow Pilot",
+    "Gate 2 — External Design-Partner Pilot Readiness",
+    "Regulated-Enterprise Shadow Pilot",
+    "Gate 3 — Phase 2A Enforcement-Foundation Readiness",
+    "Phase 2A — Atomic Authorization and Consumption Safety",
+    "Gate 4 — Phase 2B Controlled-Execution Readiness",
+    "Phase 2B — Exact GitHub Merge Enforcement",
+    "Gate 5 — Production-Rollout Readiness",
+    "Bounded Production Deployment"
+  ],
+  "gates": [
+    {
+      "id": "GATE_1",
+      "name": "Internal Live GitHub Pilot Readiness",
+      "required_evidence_classes": ["OFFLINE_VERIFIED"],
+      "mandatory_criteria": {
+        "technical_baseline": [
+          "all Code Governance tests green",
+          "all Action Clearance tests green",
+          "pilot operator and pilot study tests green",
+          "package build and clean install verified",
+          "durable-store integrity verified",
+          "evidence-pack verification working",
+          "credential-leak scanner passing",
+          "read-only security inspection passing",
+          "execution status confirmed disabled"
+        ],
+        "credential_requirements": [
+          "dedicated read-only GitHub credential",
+          "repository-scoped access",
+          "no use of ambient development or MCP credential",
+          "no write permission",
+          "external credential reference",
+          "no credential value in configuration, CLI, logs, reports, durable records, exceptions, or evidence packs"
+        ],
+        "scope_requirements": [
+          "one explicit tenant",
+          "one repository",
+          "one branch",
+          "fixed candidate limit",
+          "fixed start and end date",
+          "fixed concurrency limit",
+          "fixed stop conditions",
+          "fixed policy version",
+          "fixed adapter version",
+          "fixed reviewer protocol"
+        ],
+        "human_requirements": [
+          "named pilot operator",
+          "at least one real human reviewer",
+          "reviewer role documented",
+          "reviewer protocol frozen",
+          "reviewer feedback must not be simulated"
+        ],
+        "safety_requirements": [
+          "durable kill switch",
+          "pause, stop, and abort conditions",
+          "restart must not auto-resume",
+          "no GitHub mutation API",
+          "no execution provider",
+          "no reservation",
+          "no consumption ledger"
+        ]
+      },
+      "allowed_verdicts": [
+        "READY_FOR_INTERNAL_LIVE_PILOT",
+        "INTERNAL_PILOT_PROVISIONING_INCOMPLETE",
+        "INTERNAL_PILOT_SAFETY_BLOCKED"
+      ],
+      "permitted_next_activity": "Run bounded internal live GitHub shadow pilot",
+      "prohibited_activity": [
+        "any GitHub write",
+        "enforcement work",
+        "external customer data"
+      ],
+      "required_signoff_roles": [
+        "Code Governance technical owner",
+        "Security reviewer",
+        "Pilot operator"
+      ],
+      "exit_criteria": [
+        "successful live read-only GitHub collection",
+        "exact repository and PR binding",
+        "exact head-SHA binding",
+        "stale-head behavior",
+        "deterministic candidate selection",
+        "successful durable persistence",
+        "successful restart recovery",
+        "no automatic external call on recovery",
+        "real reviewer packet generation",
+        "real reviewer annotation collection",
+        "verified evidence pack",
+        "zero credential leaks",
+        "zero GitHub mutations",
+        "zero unexplained integrity failures",
+        "execution disabled throughout"
+      ],
+      "snapshot_backed_pilot_proves": [
+        "GitHub integration",
+        "workflow operation",
+        "exact-change binding",
+        "auditability",
+        "operator safety"
+      ],
+      "snapshot_backed_pilot_does_not_prove": [
+        "enterprise-source reliability",
+        "regulated-customer value",
+        "cross-system governance value",
+        "readiness for enforcement"
+      ]
+    },
+    {
+      "id": "GATE_2",
+      "name": "External Regulated-Enterprise Pilot Readiness",
+      "required_evidence_classes": ["LIVE_GITHUB_VERIFIED", "HUMAN_REVIEW_VALIDATED"],
+      "mandatory_criteria": {
+        "product_readiness": [
+          "internal live pilot completed",
+          "internal defects resolved",
+          "operator runbook validated",
+          "credential rotation tested",
+          "recovery tested",
+          "closeout tested",
+          "evidence pack reviewed",
+          "known limitations documented"
+        ],
+        "customer_scope": [
+          "one regulated or payment-sensitive design partner",
+          "one or two repositories",
+          "GitHub Enterprise or equivalent supported environment",
+          "explicitly approved pilot owner",
+          "security, risk, compliance, or change-management stakeholder",
+          "clear data-handling agreement",
+          "defined pilot start and end",
+          "defined success and stop criteria"
+        ],
+        "live_enterprise_sources": [
+          "prefer at least one genuinely live non-GitHub source",
+          "identity or access status",
+          "incident state",
+          "release freeze or change window",
+          "target health",
+          "mandatory control status",
+          "supplied snapshots remain separately classified"
+        ],
+        "reviewer_requirements": [
+          "real domain reviewers",
+          "documented reviewer authority",
+          "conflict-of-interest handling",
+          "blinded initial assessment where practical",
+          "no mock reviewer feedback"
+        ],
+        "governance_requirements": [
+          "fixed policy version",
+          "fixed intervention-routing version",
+          "amendment process",
+          "no silent policy tuning",
+          "clear customer data minimization",
+          "no automatic policy learning"
+        ]
+      },
+      "allowed_verdicts": [
+        "READY_FOR_EXTERNAL_SHADOW_PILOT",
+        "EXTERNAL_PILOT_PREREQUISITES_INCOMPLETE",
+        "EXTERNAL_PILOT_SECURITY_OR_DATA_BLOCKED"
+      ],
+      "permitted_next_activity": "Run bounded external regulated-enterprise shadow pilot",
+      "prohibited_activity": [
+        "enforcement work",
+        "automatic policy tuning",
+        "reporting supplied snapshots as live enterprise evidence"
+      ],
+      "required_signoff_roles": [
+        "Product owner",
+        "Security reviewer",
+        "Compliance or risk reviewer",
+        "Design-partner representative"
+      ],
+      "exit_criteria": [
+        "live GitHub evaluation count",
+        "live enterprise-signal evaluation count",
+        "supplied-snapshot evaluation count",
+        "reviewer-feedback coverage",
+        "CLEAR/HOLD/BLOCK/ESCALATE distribution",
+        "possible unnecessary interventions",
+        "possible missed interventions",
+        "wrong-authority findings",
+        "source failures",
+        "stale-signal rate",
+        "source conflicts",
+        "identity mismatches",
+        "adverse cases",
+        "policy defects",
+        "adapter defects",
+        "incremental value beyond GitHub and CI",
+        "operational reliability",
+        "audit reconstruction completeness",
+        "credential and integrity results"
+      ],
+      "reporting_rules": [
+        "no unsupported universal accuracy thresholds",
+        "report numerators, denominators, missing data, evidence classes, reviewer protocol, and limitations",
+        "no precision/recall/accuracy without a defensible protocol"
+      ]
+    },
+    {
+      "id": "GATE_3",
+      "name": "Phase 2A Enforcement-Foundation Readiness",
+      "required_evidence_classes": ["LIVE_ENTERPRISE_VERIFIED", "HUMAN_REVIEW_VALIDATED"],
+      "product_value_gate": {
+        "requirement": "credible incremental value beyond existing controls demonstrated with evidence references",
+        "any_of": [
+          "governance condition missed by existing CI",
+          "exact-SHA approval protection not already guaranteed by existing controls",
+          "useful cross-system operational context",
+          "correct authority routing not provided by the existing workflow",
+          "earlier detection of a governance problem",
+          "reduction of unnecessary specialist review",
+          "stronger audit reconstruction",
+          "improved oversight of explicitly identified AI-assisted changes"
+        ],
+        "duplicated_github_rule_counts_as_value": false,
+        "verdict_when_no_value": "PRODUCT_VALUE_NOT_PROVEN"
+      },
+      "mandatory_criteria": {
+        "live_evidence": [
+          "external live pilot completed or explicitly justified equivalent",
+          "sufficient real reviewer evidence",
+          "at least some credible incremental value",
+          "source reliability understood",
+          "policy disagreements categorized",
+          "no unresolved serious possible false CLEAR",
+          "no unresolved integrity or credential concern"
+        ],
+        "architecture_readiness": [
+          "exact authorized action model stable",
+          "ActionGate authorization binding stable",
+          "Action Clearance result model stable",
+          "exact repository, PR, base SHA, head SHA, merge method, and expiry binding defined",
+          "durable receipt requirements documented",
+          "cancellation and expiry semantics defined",
+          "concurrency model documented",
+          "crash-recovery model documented"
+        ],
+        "governance_approval": [
+          "security review completed",
+          "architecture review completed",
+          "product-value review completed",
+          "pilot evidence reviewed",
+          "explicit written approval to begin enforcement-foundation design"
+        ]
+      },
+      "allowed_verdicts": [
+        "READY_FOR_ENFORCEMENT_FOUNDATION",
+        "PILOT_CALIBRATION_REQUIRED",
+        "PRODUCT_VALUE_NOT_PROVEN",
+        "INSUFFICIENT_LIVE_EVIDENCE",
+        "SAFETY_OR_INTEGRITY_BLOCKED"
+      ],
+      "only_verdict_permitting_next_phase": "READY_FOR_ENFORCEMENT_FOUNDATION",
+      "permitted_next_activity": "Begin Phase 2A enforcement-foundation design and implementation",
+      "prohibited_activity": [
+        "GitHub merge dispatch",
+        "GitHub pull-request mutation",
+        "deployment execution",
+        "broad execution-provider framework",
+        "automatic enforcement rollout"
+      ],
+      "required_signoff_roles": [
+        "Product owner",
+        "Code Governance technical owner",
+        "Security reviewer",
+        "Enforcement architecture reviewer"
+      ],
+      "phase_2a_permitted_scope": [
+        "durable enforcement-grade clearance receipt",
+        "atomic reserve_once",
+        "one-time authorization reservation",
+        "authoritative consumption ledger",
+        "expiry and cancellation",
+        "concurrency protection",
+        "crash recovery",
+        "execution reconciliation model",
+        "tamper-evident authoritative records"
+      ],
+      "phase_2a_must_not_implement": [
+        "GitHub merge dispatch",
+        "GitHub pull-request mutation",
+        "deployment execution",
+        "broad execution-provider framework",
+        "automatic enforcement rollout"
+      ]
+    },
+    {
+      "id": "GATE_4",
+      "name": "Phase 2B Controlled-Execution Readiness",
+      "required_evidence_classes": ["ENFORCEMENT_READY"],
+      "mandatory_criteria": [
+        "Phase 2A completed",
+        "atomic reservation proven under concurrency",
+        "duplicate consumption impossible under tested conditions",
+        "crash recovery proven",
+        "reconciliation proven",
+        "authorization expiry enforced",
+        "cancellation enforced",
+        "receipt and ledger integrity verified",
+        "security review completed",
+        "threat model completed",
+        "narrow GitHub credential strategy approved",
+        "exact merge operation defined",
+        "exact merge method bound",
+        "pre-dispatch live clearance required",
+        "post-dispatch outcome reconciliation defined",
+        "kill switch tested",
+        "rollback and incident procedure documented"
+      ],
+      "allowed_verdicts": [
+        "READY_FOR_CONTROLLED_EXECUTION",
+        "ENFORCEMENT_FOUNDATION_INCOMPLETE",
+        "EXECUTION_SECURITY_BLOCKED",
+        "EXECUTION_RECONCILIATION_BLOCKED"
+      ],
+      "permitted_next_activity": "Create bounded GitHub execution provider and run a controlled canary",
+      "prohibited_activity": [
+        "organization-wide rollout",
+        "multiple source-control providers",
+        "automatic deployments",
+        "arbitrary GitHub mutations",
+        "issue modification",
+        "label modification",
+        "reviewer assignment",
+        "free-form agent actions",
+        "bypass of branch protection"
+      ],
+      "required_signoff_roles": [
+        "Product owner",
+        "Security reviewer",
+        "Enforcement architecture reviewer",
+        "Production operations owner"
+      ],
+      "phase_2b_permitted_initial_scope": [
+        "one tenant",
+        "one repository",
+        "one protected branch",
+        "explicit allowlisted PRs",
+        "exact head SHA",
+        "one approved merge method",
+        "explicit authorized actor",
+        "final Action Clearance check",
+        "atomic reservation before dispatch",
+        "immediate result reconciliation",
+        "durable execution receipt",
+        "kill switch",
+        "canary rollout"
+      ]
+    },
+    {
+      "id": "GATE_5",
+      "name": "Production-Rollout Readiness",
+      "required_evidence_classes": ["PRODUCTION_READY"],
+      "mandatory_criteria": [
+        "successful controlled-execution canary",
+        "no duplicate execution",
+        "no unauthorized execution",
+        "no unexplained reservation inconsistency",
+        "reconciliation completeness",
+        "acceptable operational reliability",
+        "tested credential rotation",
+        "tested kill switch",
+        "tested disaster recovery",
+        "tested audit export",
+        "incident response runbook",
+        "tenant isolation review",
+        "customer security review",
+        "capacity and concurrency review",
+        "data-retention policy",
+        "support ownership",
+        "monitoring and alerting",
+        "change-management approval"
+      ],
+      "allowed_verdicts": [
+        "READY_FOR_BOUNDED_PRODUCTION",
+        "CONTINUE_CANARY",
+        "PRODUCTION_SAFETY_BLOCKED",
+        "PRODUCTION_OPERATIONS_INCOMPLETE"
+      ],
+      "permitted_next_activity": "Bounded production deployment",
+      "prohibited_activity": [
+        "unbounded rollout",
+        "multi-provider expansion",
+        "automatic deployment"
+      ],
+      "required_signoff_roles": [
+        "Product owner",
+        "Security reviewer",
+        "Production operations owner",
+        "Compliance or risk reviewer"
+      ]
+    }
+  ],
+  "mandatory_stop_conditions": [
+    "credential leak",
+    "GitHub write outside an explicitly approved execution phase",
+    "unexplained store-integrity failure",
+    "cross-tenant exposure",
+    "manifest or policy fingerprint mismatch",
+    "unresolved serious possible false CLEAR",
+    "reviewer feedback fabrication",
+    "synthetic evidence reported as live",
+    "supplied snapshot reported as live enterprise evidence",
+    "failure to bind the exact head SHA",
+    "inability to reconstruct the audit chain",
+    "unauthorized policy change during a pilot",
+    "missing kill switch",
+    "execution-enabled state in a shadow phase",
+    "reservation or consumption ambiguity",
+    "duplicate execution risk",
+    "missing reconciliation"
+  ],
+  "signoff_roles": [
+    "Product owner",
+    "Code Governance technical owner",
+    "Security reviewer",
+    "Pilot operator",
+    "Customer or design-partner representative",
+    "Domain reviewer",
+    "Compliance or risk reviewer",
+    "Enforcement architecture reviewer",
+    "Production operations owner"
+  ],
+  "signoff_clarifications": [
+    "assignment is not approval",
+    "reviewer feedback is not a binding DecisionRecord",
+    "technical test completion is not product approval",
+    "a readiness verdict must identify who approved progression"
+  ],
+  "readiness_evidence_matrix": [
+    {"id": "G1-SEC-001", "gate": "GATE_1", "evidence_class": "OFFLINE_VERIFIED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G1-OPS-001", "gate": "GATE_1", "evidence_class": "OFFLINE_VERIFIED", "blocking_severity": "BLOCKER", "status": "MET", "evidence_reference": "suite 441 passed/2 skipped; freeze digest d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6"},
+    {"id": "G1-OPS-002", "gate": "GATE_1", "evidence_class": "OFFLINE_VERIFIED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G1-HUM-001", "gate": "GATE_1", "evidence_class": "HUMAN_REVIEW_VALIDATED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G1-SAFE-001", "gate": "GATE_1", "evidence_class": "OFFLINE_VERIFIED", "blocking_severity": "BLOCKER", "status": "MET", "evidence_reference": "MVP 1E operator tests"},
+    {"id": "G2-LIVE-001", "gate": "GATE_2", "evidence_class": "LIVE_GITHUB_VERIFIED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G2-LIVE-002", "gate": "GATE_2", "evidence_class": "LIVE_ENTERPRISE_VERIFIED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G2-VAL-001", "gate": "GATE_2", "evidence_class": "attestation", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G3-EVID-001", "gate": "GATE_3", "evidence_class": "HUMAN_REVIEW_VALIDATED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G3-VAL-001", "gate": "GATE_3", "evidence_class": "LIVE_VERIFIED", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G3-ARCH-001", "gate": "GATE_3", "evidence_class": "design_review", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G4-ATOMIC-001", "gate": "GATE_4", "evidence_class": "ENFORCEMENT_READY", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G4-EXEC-001", "gate": "GATE_4", "evidence_class": "security_review", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null},
+    {"id": "G5-PROD-001", "gate": "GATE_5", "evidence_class": "PRODUCTION_READY", "blocking_severity": "BLOCKER", "status": "NOT_MET", "evidence_reference": null}
+  ],
+  "phase_decision_record_template": {
+    "fields": [
+      "Decision ID",
+      "Gate",
+      "Decision date",
+      "Current phase",
+      "Requested next phase",
+      "Evidence reviewed",
+      "Evidence status",
+      "Unresolved risks",
+      "Exceptions",
+      "Approvers",
+      "Decision",
+      "Conditions",
+      "Expiry or re-review date",
+      "Decision fingerprint"
+    ],
+    "allowed_decisions": [
+      "APPROVE_PROGRESSION",
+      "APPROVE_WITH_CONDITIONS",
+      "HOLD_FOR_EVIDENCE",
+      "REQUIRE_CALIBRATION",
+      "REJECT_PROGRESSION",
+      "SAFETY_BLOCK"
+    ],
+    "constraint": "A decision record must not itself create ActionGate execution authority."
+  },
+  "current_readiness_verdict": {
+    "current_capability": "IMPLEMENTED_AND_OFFLINE_VERIFIED",
+    "current_readiness": "READY_FOR_INTERNAL_LIVE_PILOT_PROVISIONING",
+    "current_blocker": "Dedicated read-only credential, explicit pilot authorization, bounded live configuration, and real reviewer participation are not yet supplied.",
+    "not_currently_ready_for": [
+      "External enterprise validation",
+      "Phase 2A enforcement foundation",
+      "Phase 2B controlled execution",
+      "Production rollout"
+    ],
+    "ready_for_enforcement_foundation": false
+  }
+}
