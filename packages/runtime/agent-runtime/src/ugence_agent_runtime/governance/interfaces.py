@@ -71,10 +71,13 @@ class GovernanceEvaluation:
     act on beyond continue/wait/stop.
 
     For a CLEAR result to permit execution, the runtime requires ``proposal_fingerprint``
-    to match the exact proposal AND at least one non-empty binding reference
-    (``evaluation_reference``, ``authorization_reference``, or ``clearance_reference``).
+    to match the exact proposal (correlation is part of that fingerprint), at least one
+    non-empty binding reference (``evaluation_reference``, ``authorization_reference``, or
+    ``clearance_reference``), and — when the proposal carries a correlation id — a
+    ``correlation_reference`` equal to it (missing or mismatched correlation fails closed).
     ``valid_until`` (when set) is checked against the runtime clock immediately before
-    provider invocation.
+    provider invocation with **inclusive** expiry: at ``now == valid_until`` the clearance
+    is already expired and cannot authorize invocation.
     """
 
     disposition: GovernanceDisposition

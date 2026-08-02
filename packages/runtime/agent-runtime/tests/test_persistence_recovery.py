@@ -86,7 +86,7 @@ def test_running_state_requires_explicit_continuation():  # check 34
     cp = Checkpoint.of(
         _instance_with(wf, {"t": TaskStatus.RUNNING}, WorkflowStatus.RUNNING),
         runtime_id="agent-runtime",
-        runtime_version="0.1.1",
+        runtime_version="0.1.2",
     )
     ss.save(cp)
     rt = create_runtime(AgentRuntimeConfig(state_store=ss))
@@ -102,7 +102,7 @@ def test_cancelled_state_remains_cancelled():  # check 36
     cp = Checkpoint.of(
         _instance_with(wf, {"t": TaskStatus.CANCELLED}, WorkflowStatus.CANCELLED),
         runtime_id="agent-runtime",
-        runtime_version="0.1.1",
+        runtime_version="0.1.2",
     )
     ss.save(cp)
     rt = create_runtime(AgentRuntimeConfig(state_store=ss))
@@ -116,12 +116,12 @@ def test_corrupted_checkpoint_fails_closed():  # check 37
     cp = Checkpoint.of(
         _instance_with(wf, {"t": TaskStatus.COMPLETED}, WorkflowStatus.COMPLETED),
         runtime_id="agent-runtime",
-        runtime_version="0.1.1",
+        runtime_version="0.1.2",
     )
     # Tamper with the payload without recomputing the digest.
     tampered = Checkpoint.from_dict({**cp.to_dict(), "status": "RUNNING"})
     with pytest.raises(RecoveryError):
-        recover_instance(tampered, wf, "agent-runtime", "0.1.1")
+        recover_instance(tampered, wf, "agent-runtime", "0.1.2")
 
 
 def test_configuration_mismatch_reported():  # check 38
@@ -133,7 +133,7 @@ def test_configuration_mismatch_reported():  # check 38
         runtime_version="9.9.9",  # different version
     )
     ss.save(cp)
-    rt = create_runtime(AgentRuntimeConfig(state_store=ss, runtime_version="0.1.1"))
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, runtime_version="0.1.2"))
     result = recover_runtime(rt, cp.instance_id, wf)
     assert result.config_mismatch is True
 

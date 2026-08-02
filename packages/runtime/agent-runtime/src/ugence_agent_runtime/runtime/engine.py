@@ -320,20 +320,24 @@ class AgentRuntime:
     def _execute(self, instance: WorkflowInstance, ti: TaskInstance,
                  proposal: TransitionProposal, trace: RunTrace) -> None:
         d = ti.definition
+        # Re-materialize arguments as a FRESH mutable structure only now, after
+        # clearance validation — the frozen proposal identity is never handed out.
         invocation = ToolInvocation(
             provider_id=proposal.provider_id,
             operation=proposal.operation,
-            arguments=dict(proposal.arguments),
+            arguments=proposal.materialize_arguments(),
             correlation_id=proposal.correlation_id,
             idempotency_key=proposal.idempotency_key,
             timeout=d.timeout if d.timeout is not None else self._config.default_timeout,
         )
         # Exact-action re-check: the invocation must fingerprint-match the proposal
-        # governance evaluated. Any drift fails closed (integrity), never executes.
+        # governance evaluated — across workflow/instance/task/provider/operation/
+        # canonical arguments/idempotency key/correlation id/proposal version. Any
+        # drift fails closed (integrity), never executes.
         inv_fp = compute_fingerprint(
             proposal.workflow_id, proposal.instance_id, proposal.task_id,
             invocation.provider_id, invocation.operation, invocation.arguments,
-            invocation.idempotency_key, proposal.proposal_version,
+            invocation.idempotency_key, invocation.correlation_id, proposal.proposal_version,
         )
         if inv_fp != proposal.fingerprint:
             self._fail_task_governance(

@@ -13,8 +13,16 @@ on:
       - "agent_runtime_migration/**"
       - ".github/workflows/agent-runtime-ci.yml"
   push:
+    # Run on feature-branch pushes AND on the repository's actual default branch, so
+    # the merged result on the default branch receives a recorded CI run (a PR merge
+    # that touches the package matches the paths filter below).
     branches:
+      - "claude/setup-symbolu-monorepo-**"
       - "claude/package-agent-runtime-independently**"
+    paths:
+      - "packages/runtime/agent-runtime/**"
+      - "agent_runtime_migration/**"
+      - ".github/workflows/agent-runtime-ci.yml"
 
 defaults:
   run:

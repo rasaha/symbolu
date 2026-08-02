@@ -21,6 +21,12 @@ class InvalidTransitionError(AgentRuntimeError):
     """An attempted task/workflow state change is not permitted by the state machine."""
 
 
+class ProposalError(AgentRuntimeError):
+    """A transition proposal is malformed — e.g. it carries an argument value that is
+    not a supported, deterministically canonicalizable type. Fails closed rather than
+    relying on unstable ``repr()`` output for identity."""
+
+
 class ProviderNotFoundError(AgentRuntimeError):
     """A task references a provider id that is not registered."""
 

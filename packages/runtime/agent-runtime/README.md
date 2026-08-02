@@ -46,7 +46,7 @@ neutral contracts and utilities
 
 ```bash
 python -m build packages/runtime/agent-runtime
-pip install dist/ugence_agent_runtime-0.1.0-py3-none-any.whl
+pip install dist/ugence_agent_runtime-0.1.2-py3-none-any.whl
 ```
 
 The core has **no third-party dependencies** — it is stdlib-only. Importing it is
@@ -104,8 +104,10 @@ limitations, and H22 readiness. Machine-readable contracts are in
 
 ## Status
 
-`0.1.1` — first independent distribution plus the post-merge governance-safety
-correction. Single-workflow coordination only. Maturity:
-`IMPLEMENTED_AND_OFFLINE_VERIFIED`. **Multi-workflow orchestration (H22) is a later
-feature phase and is not implemented here, and must not begin until these corrections
-are validated.**
+`0.1.2` — first independent distribution, plus the post-merge governance-safety
+correction (0.1.1) and exact-action contract hardening (0.1.2: deeply immutable proposal
+identity, correlation-in-fingerprint with mandatory binding, inclusive expiry).
+Single-workflow coordination only. Maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`
+(promoted to `IMPLEMENTED_AND_CI_VERIFIED` once the scoped GitHub Actions run is observed
+passing). **Multi-workflow orchestration (H22) is a later feature phase, not implemented
+here, and must not begin until these corrections are validated.**

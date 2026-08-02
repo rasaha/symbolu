@@ -7,8 +7,9 @@ independent distribution starts at 0.1.0. See docs/AGENT_RUNTIME_OVERVIEW.md.
 """
 from __future__ import annotations
 
-# 0.1.1 — post-merge governance-safety correction: fail-closed default governance,
-# exact-action proposal-fingerprint binding, honest compatibility coexistence.
-__version__ = "0.1.1"
+# 0.1.2 — exact-action contract hardening: deeply immutable proposal identity,
+# correlation folded into the fingerprint with mandatory binding, inclusive expiry.
+# (0.1.1 added fail-closed default governance and exact-action fingerprint binding.)
+__version__ = "0.1.2"
 
 VERSION = __version__
