@@ -1,46 +1,68 @@
-"""Compatibility checks (section 24, checks 47-50)."""
-from __future__ import annotations
+"""Honest coexistence checks (P0-3).
 
-import warnings
+The legacy runtime and the kernel are DIFFERENT implementations. These tests prove
+that honestly, rather than asserting invented same-package aliases.
+
+Tests that import the actual legacy path are skipped when ``agent_runtime_migration``
+is not importable (e.g. when this suite runs from the installed wheel outside the
+monorepo). In the monorepo (and in the scoped CI job) they run and assert coexistence.
+"""
+from __future__ import annotations
 
 import pytest
 
-from ugence_agent_runtime import api
-from ugence_agent_runtime import compat
+from ugence_agent_runtime import api, compat
 
 
-def test_supported_old_aliases_still_work():  # check 47
-    for alias in ("Runtime", "Workflow", "Task", "Result", "Registry"):
-        obj = compat.resolve(alias)
-        assert obj is not None
+def test_migration_map_targets_are_honest():  # check 12
+    # Every mapped "new" target (when present) points into the kernel package; entries
+    # with no kernel equivalent are classified as excluded / legacy-integration-only.
+    for legacy, entry in compat.MIGRATION_MAP.items():
+        new = entry["new"]
+        if new is None:
+            assert entry["classification"] in (
+                "INTENTIONALLY_EXCLUDED",
+                "LEGACY_INTEGRATION_ONLY",
+                "PRESENT_CHANGED",
+            )
+        else:
+            assert str(new).startswith("ugence_agent_runtime.")
 
 
-def test_compat_aliases_reference_new_implementation():  # check 48
-    assert compat.resolve("Runtime") is api.AgentRuntime
-    assert compat.resolve("Workflow") is api.WorkflowDefinition
-    assert compat.resolve("WorkflowRun") is api.WorkflowInstance
-    assert compat.resolve("Task") is api.TaskDefinition
-    assert compat.resolve("WorkflowCheckpoint") is api.Checkpoint
-    assert compat.resolve("Registry") is api.ProviderRegistry
-    assert compat.resolve("Result") is api.RuntimeResult
+def test_classification_accessible():
+    assert compat.classify("agent_runtime_migration.runtime.runtime.AgentRuntime") == "PRESENT_CHANGED"
+    assert compat.classify("agent_runtime_migration.planning") == "INTENTIONALLY_EXCLUDED"
+    assert compat.new_target("agent_runtime_migration.planning") is None
 
 
-def test_no_duplicate_runtime_implementation():  # check 49
-    # Every compatibility alias IS the canonical object (identity), so the compat
-    # layer holds no second implementation of the runtime.
-    from ugence_agent_runtime.compat import _DEPRECATED
-
-    for alias, canonical in _DEPRECATED.items():
-        assert compat.resolve(alias) is getattr(api, canonical)
+def test_no_invented_legacy_identity_aliases():  # check 11 (negative)
+    # The compat module must NOT re-export a `Runtime`/`Workflow` alias that pretends
+    # the kernel object is the legacy object.
+    for banned in ("Runtime", "Workflow", "WorkflowRun", "Task", "resolve"):
+        assert not hasattr(compat, banned), f"compat should not expose {banned!r}"
 
 
-def test_deprecation_warning_emitted():  # check 50
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        _ = compat.Workflow  # triggers module __getattr__
-    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+def test_legacy_and_kernel_runtimes_are_distinct_implementations():  # check 11, 12
+    # Import the ACTUAL legacy path. Skip cleanly when the legacy package (or its heavy
+    # transitive deps) is absent — e.g. the isolated-wheel run, or a minimal CI image.
+    legacy_mod = pytest.importorskip("agent_runtime_migration.runtime.runtime")
+    LegacyRuntime = legacy_mod.AgentRuntime
+
+    kernel_runtime = api.AgentRuntime
+    # They are genuinely different classes/implementations — not the same object.
+    assert LegacyRuntime is not kernel_runtime
+    assert LegacyRuntime.__module__ != kernel_runtime.__module__
+    # And their constructor contracts differ (legacy requires an executor keyword).
+    import inspect
+
+    legacy_params = set(inspect.signature(LegacyRuntime.__init__).parameters)
+    kernel_params = set(inspect.signature(kernel_runtime.__init__).parameters)
+    assert "executor" in legacy_params
+    assert "executor" not in kernel_params
+    assert "config" in kernel_params
 
 
-def test_compatibility_map_points_at_canonical_targets():
-    for old, new in compat.COMPATIBILITY_MAP.items():
-        assert new.startswith("ugence_agent_runtime.")
+def test_legacy_runtime_still_importable_and_untouched():
+    # The legacy package remains present (not deleted). Skip when unavailable.
+    legacy_mod = pytest.importorskip("agent_runtime_migration.runtime.runtime")
+    assert hasattr(legacy_mod, "AgentRuntime")

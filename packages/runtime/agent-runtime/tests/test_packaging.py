@@ -15,7 +15,7 @@ from ugence_agent_runtime import api
 
 def test_version_accessible():  # check 7
     assert isinstance(ugence_agent_runtime.__version__, str)
-    assert ugence_agent_runtime.__version__ == "0.1.0"
+    assert ugence_agent_runtime.__version__ == "0.1.1"
 
 
 def test_py_typed_shipped():  # check 5
