@@ -50,10 +50,15 @@ jobs:
       - name: Package suite (contract, serialization, packaging, legacy compat)
         run: python -m pytest packages/governance-contracts/tests -q
       - name: Provider-framework compatibility surface (re-exports these contracts)
+        # Scoped to the contract-re-export identity + the import-direction boundary.
+        # The optional-adapter test (test_optional_adapter_dependency.py) exercises
+        # GPF's Decision Authority kernel adapter (needs pydantic) and is owned by
+        # GPF's own CI — it is not a governance-contracts concern, so it is excluded
+        # to keep this a stdlib-only contract-layer workflow.
         run: |
           python -m pytest \
             packages/governance-provider-framework/tests/compatibility \
-            packages/governance-provider-framework/tests/boundaries -q
+            packages/governance-provider-framework/tests/boundaries/test_dependency_boundaries.py -q
 
   isolated-install:
     name: Wheel build + isolated installation verification

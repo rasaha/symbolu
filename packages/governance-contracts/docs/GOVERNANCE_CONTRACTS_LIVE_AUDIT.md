@@ -331,8 +331,19 @@ added; neither exercises this package). This is the one substantive gap.
 established agent-runtime pattern), path-filtered to the package + its
 compatibility surfaces (`packages/governance-provider-framework/**`,
 `governance_providers/**`) + the workflow file, on PRs and on default-branch
-pushes. Jobs: (1) package suite + GPF compatibility/boundary tests; (2) wheel/sdist
-build + isolated clean-venv install proof; (3) platform-freeze verification.
+pushes. Jobs: (1) package suite + GPF contract re-export identity
+(`tests/compatibility`) and the import-direction boundary
+(`tests/boundaries/test_dependency_boundaries.py`) — the GPF optional-adapter
+test that drives the Decision Authority kernel (needs `pydantic`) is **excluded**
+as a GPF-owned concern, keeping this a stdlib-only contract-layer workflow;
+(2) wheel/sdist build + isolated clean-venv install proof; (3) platform-freeze
+verification (this job installs `pydantic`, which the freeze verifier needs).
+
+> First CI observation: the initial push run failed because the package-suite job
+> ran the *entire* GPF `tests/boundaries` directory, whose
+> `test_optional_adapter_dependency.py` imports the Decision Authority kernel
+> (pydantic) when it is present on the checkout — a dependency outside the
+> contract layer. Scoped as above and reproduced green in a pydantic-free venv.
 
 > CI status is reported honestly: the workflow **file exists and is locally
 > reproduced**, but the GitHub Actions run has not yet been observed. Maturity
