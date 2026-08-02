@@ -209,10 +209,13 @@ def test_platform_wires_governance_from_the_kernel():
         p.action_authorization_service, p.execution_service, p.reconciliation_service,
         p.compensation_service,
     ):
-        assert type(svc).__module__.startswith("decision_governance."), type(svc).__module__
-    assert type(p.audit_service).__module__.startswith("decision_governance.")
+        assert type(svc).__module__.startswith(
+            ("ugence_decision_authority.", "decision_governance.")), type(svc).__module__
+    assert type(p.audit_service).__module__.startswith(
+        ("ugence_decision_authority.", "decision_governance."))
     for repo in (p.decision_case_repo, p.action_request_repo, p.execution_repo):
-        assert type(repo).__module__.startswith("decision_governance."), type(repo).__module__
+        assert type(repo).__module__.startswith(
+            ("ugence_decision_authority.", "decision_governance.")), type(repo).__module__
     # Hiring services remain hiring-owned.
     for svc in (p.evaluation_service, p.assessment_service, p.rubric_service):
         assert type(svc).__module__.startswith("ai_hiring."), type(svc).__module__

@@ -1,8 +1,15 @@
-# Independent distribution for the Decision Governance Middleware kernel.
+# COMPATIBILITY distribution for the legacy ``decision-governance`` wheel name.
 #
-# The ./decision_governance entry is a SYMLINK to the canonical
-# ../../decision_governance package — there is exactly one source tree; this
-# distribution packages it directly (no copy is maintained).
+# The bounded kernel was migrated to the canonical capability package
+# ``ugence-decision-authority`` (``packages/capabilities/decision-authority``).
+# The ./decision_governance entry is a SYMLINK to the root ``decision_governance``
+# compatibility shim — a logic-free namespace that re-exports the canonical
+# package. This distribution therefore ships NO implementation of its own; it
+# exists only so existing ``decision-governance`` dependency declarations keep
+# resolving. It depends on the canonical wheel, which carries the implementation.
+#
+# Transitional: pinned to the frozen contract version 1.0.0. Removal/review target
+# tracked with the ``decision_governance`` shim (2.0.0).
 #
 # Build with:  python -m build packaging/decision-governance
 [build-system]
@@ -11,19 +18,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "decision-governance"
-dynamic = ["version"]
-description = "Decision Governance Middleware (DGM) — domain-neutral governance kernel."
+version = "1.0.0"
+description = "Decision Governance (compatibility distribution) — re-exports ugence-decision-authority."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
-dependencies = ["pydantic>=2.0.0"]
+# No implementation here: the canonical package carries the kernel (and pydantic).
+dependencies = ["ugence-decision-authority"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
-
-[tool.setuptools.dynamic]
-version = { attr = "decision_governance.version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]

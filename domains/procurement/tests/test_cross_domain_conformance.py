@@ -36,14 +36,14 @@ def test_both_platforms_wire_identical_kernel_service_classes():
         h = type(getattr(hiring, attr))
         p = type(getattr(procurement, attr))
         assert h is p, f"{attr}: hiring={h!r} procurement={p!r}"
-        assert h.__module__.startswith("decision_governance."), attr
+        assert h.__module__.startswith(("ugence_decision_authority.", "decision_governance.")), attr
 
 
 def test_both_platforms_reuse_the_kernel_audit_service():
     hiring = hiring_app.build_in_memory_platform()
     procurement = procurement_app.build_in_memory_platform()
     assert type(hiring.audit_service) is type(procurement.audit_service)
-    assert type(hiring.audit_service).__module__.startswith("decision_governance.")
+    assert type(hiring.audit_service).__module__.startswith(("ugence_decision_authority.", "decision_governance."))
 
 
 def test_domains_supply_only_adapters_not_engines():
@@ -56,8 +56,8 @@ def test_domains_supply_only_adapters_not_engines():
     assert type(procurement.supplier_adapter).__module__.startswith("domains.procurement.")
     # …but the authorization/execution *services* are kernel-owned.
     assert type(procurement.action_authorization_service).__module__.startswith(
-        "decision_governance.")
-    assert type(procurement.execution_service).__module__.startswith("decision_governance.")
+        ("ugence_decision_authority.", "decision_governance."))
+    assert type(procurement.execution_service).__module__.startswith(("ugence_decision_authority.", "decision_governance."))
 
 
 def test_procurement_executes_the_shared_governance_lifecycle():
