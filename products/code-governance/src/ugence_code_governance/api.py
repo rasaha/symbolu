@@ -865,5 +865,27 @@ class CodeGovernanceService:
         if self._store is not None:
             self._store.close()
 
+    # --- MVP 1D: read-only pilot support --------------------------------
+    def pilot_change_context(self, tenant_id: str, revision_id: str) -> Dict[str, Any]:
+        """Return the exact governed-change identity a read-only adapter binds to.
+
+        Read-only projection for the shadow pilot; it authorizes nothing and
+        exposes no credential. ``authorization_fingerprint`` is the ActionGate
+        shadow-authorization result fingerprint (never a merge credential).
+        """
+        run = self._run(tenant_id, revision_id)
+        change = run.change
+        return {
+            "workflow_id": run.workflow_id,
+            "repository": change.repository,
+            "pull_request_number": change.pull_request_number,
+            "base_sha": change.base_sha,
+            "head_sha": change.head_sha,
+            "target_branch": change.target_branch,
+            "change_fingerprint": change.fingerprint,
+            "prepared_action_fingerprint": run.prepared_action_fingerprint or "",
+            "authorization_fingerprint": run.action_result_fingerprint or "",
+        }
+
 
 __all__ = ["CodeGovernanceService"]
