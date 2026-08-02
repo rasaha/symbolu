@@ -69,6 +69,7 @@ CLEAR_REJECTED_FINGERPRINT_MISMATCH = "GOVERNANCE_CLEAR_FINGERPRINT_MISMATCH"
 CLEAR_REJECTED_PROPOSAL_TAMPERED = "GOVERNANCE_PROPOSAL_TAMPERED"
 CLEAR_REJECTED_NO_REFERENCE = "GOVERNANCE_CLEAR_MISSING_REFERENCE"
 CLEAR_REJECTED_EXPIRED = "GOVERNANCE_CLEAR_EXPIRED"
+CLEAR_REJECTED_MISSING_CORRELATION = "GOVERNANCE_CLEAR_MISSING_CORRELATION"
 CLEAR_REJECTED_CORRELATION = "GOVERNANCE_CLEAR_CORRELATION_MISMATCH"
 
 
@@ -101,15 +102,21 @@ def validate_clearance(
     if not evaluation.binding_reference():
         reasons.append(CLEAR_REJECTED_NO_REFERENCE)
 
-    if evaluation.valid_until is not None and now > evaluation.valid_until:
+    # Inclusive expiration: at the exact valid_until instant the clearance is expired
+    # and cannot authorize invocation (now >= valid_until, not now > valid_until).
+    if evaluation.valid_until is not None and now >= evaluation.valid_until:
         reasons.append(CLEAR_REJECTED_EXPIRED)
 
-    if (
-        evaluation.correlation_reference is not None
-        and proposal.correlation_id is not None
-        and evaluation.correlation_reference != proposal.correlation_id
-    ):
-        reasons.append(CLEAR_REJECTED_CORRELATION)
+    # Correlation is part of exact-action identity (it is fingerprinted). When the
+    # proposal carries a correlation id, the CLEAR result MUST echo the same id:
+    # missing or mismatched correlation fails closed. When the proposal has no
+    # correlation id (the runtime always sets one; this covers external callers), no
+    # correlation binding is required.
+    if proposal.correlation_id is not None:
+        if evaluation.correlation_reference is None:
+            reasons.append(CLEAR_REJECTED_MISSING_CORRELATION)
+        elif evaluation.correlation_reference != proposal.correlation_id:
+            reasons.append(CLEAR_REJECTED_CORRELATION)
 
     if reasons:
         return False, tuple(reasons)

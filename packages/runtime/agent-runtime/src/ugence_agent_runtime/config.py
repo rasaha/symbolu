@@ -48,7 +48,7 @@ class _SequentialIdGenerator:
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     runtime_id: str = "agent-runtime"
-    runtime_version: str = "0.1.1"
+    runtime_version: str = "0.1.2"
     max_concurrent_tasks: int = 1
     default_timeout: Optional[float] = None
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
