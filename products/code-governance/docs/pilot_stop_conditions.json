@@ -1,0 +1,26 @@
+{
+  "$comment": "Stop-condition classification (MVP 1E). A breach never enables execution or changes policy.",
+  "kinds": [
+    "PAUSE_CONDITION",
+    "STOP_CONDITION",
+    "ABORT_CONDITION"
+  ],
+  "abort_conditions": [
+    "integrity_failure",
+    "credential_leak",
+    "write_boundary_violation",
+    "unexpected_github_host",
+    "durable_store_health_failure"
+  ],
+  "stop_conditions": [
+    "artifact_mismatch_rate",
+    "source_failure_rate",
+    "unexplained_escalation_rate",
+    "maximum_evaluations_reached",
+    "pilot_end_time_reached",
+    "operator_stop_request"
+  ],
+  "pause_conditions": [
+    "reviewer_safety_concern"
+  ]
+}

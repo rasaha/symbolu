@@ -1,0 +1,39 @@
+{
+  "$comment": "Reviewer work queue (MVP 1E). Operational coordination only; assignment is not approval; never mutates the original intervention assessment.",
+  "statuses": [
+    "OPEN",
+    "ASSIGNED",
+    "ACKNOWLEDGED",
+    "FEEDBACK_RECORDED",
+    "CLOSED",
+    "STALE",
+    "CANCELLED"
+  ],
+  "priorities": [
+    "HIGH",
+    "MEDIUM",
+    "LOW"
+  ],
+  "fields": [
+    "queue_item_id",
+    "pilot_id",
+    "tenant_id",
+    "workflow_id",
+    "workflow_revision_id",
+    "head_sha",
+    "clearance_status",
+    "intervention_types",
+    "required_authorities",
+    "reason_codes",
+    "created_at",
+    "priority",
+    "assignment_status",
+    "assigned_reviewer_ref",
+    "assigned_reviewer_role",
+    "acknowledged_at",
+    "resolved_at",
+    "feedback_ref"
+  ],
+  "changed_head_marks_stale": true,
+  "assignment_is_not_approval": true
+}

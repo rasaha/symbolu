@@ -1,0 +1,27 @@
+{
+  "$comment": "Operator-level operational metrics (MVP 1E). Separate from clearance-quality metrics; not one blended score.",
+  "metrics": [
+    "lifecycle_status",
+    "evaluations_attempted",
+    "evaluations_completed",
+    "evaluations_skipped",
+    "evaluations_stale",
+    "adapter_calls",
+    "adapter_successes",
+    "adapter_failures",
+    "adapter_retries",
+    "rate_limit_events",
+    "timeouts",
+    "integrity_failures",
+    "preflight_failures",
+    "review_queue_size",
+    "feedback_completion_rate",
+    "average_collection_duration_s",
+    "average_evaluation_duration_s",
+    "last_successful_collection_at",
+    "last_successful_evaluation_at",
+    "stop_condition_activations",
+    "kill_switch_activations"
+  ],
+  "execution_status": "DISABLED"
+}

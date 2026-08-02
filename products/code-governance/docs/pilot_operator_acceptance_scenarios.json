@@ -1,0 +1,59 @@
+{
+  "$comment": "MVP 1E acceptance scenarios for the pilot operator. Mapped to tests/test_pilot_operator_config.py, tests/test_pilot_operator_security.py, tests/test_pilot_operator_runtime.py, and tests/test_pilot_operator_demo.py. Execution remains DISABLED in every scenario.",
+  "mvp_phase": "1E",
+  "execution_status": "DISABLED",
+  "groups": [
+    {"area": "configuration", "count": 12, "scenarios": [
+      "valid bounded config admitted", "empty repository allowlist rejected", "wildcard tenant rejected",
+      "unrestricted repositories rejected", "unrestricted branches rejected", "inline credential rejected",
+      "unbounded evaluation count rejected", "unbounded concurrency rejected", "unsupported schema rejected",
+      "config fingerprint deterministic", "credential value excluded from fingerprint", "write-scope credential rejected"]},
+    {"area": "lifecycle", "count": 12, "scenarios": [
+      "DRAFT->READY", "READY->ACTIVE", "ACTIVE->PAUSED", "PAUSED->ACTIVE requires explicit call",
+      "ACTIVE->STOPPING", "STOPPING->COMPLETED", "COMPLETED cannot restart", "ABORTED cannot restart",
+      "no automatic DRAFT->ACTIVE", "INTEGRITY_FAILURE cannot restart", "events append-only + survive restart",
+      "illegal transition rejected"]},
+    {"area": "preflight", "count": 6, "scenarios": [
+      "valid read-only config passes", "execution-disabled check present", "no-write-capable-api check",
+      "credential value never in result", "read-only permissions pass", "performs no mutation"]},
+    {"area": "static security scan", "count": 11, "scenarios": [
+      "direct HTTP client detected", "POST detected", "PATCH detected", "GraphQL mutation detected",
+      "merge endpoint detected", "write scope detected", "execution-provider import detected",
+      "reserve_once detected", "valid GET-only adapter passes", "AST ignores documentation-only words",
+      "real adapter+operator boundary scans clean"]},
+    {"area": "credential isolation", "count": 8, "scenarios": [
+      "absent from durable store", "absent from logs", "absent from metrics", "absent from report",
+      "absent from audit bundle", "absent from request+result fingerprints", "absent from exceptions",
+      "credential reference never inlines a value"]},
+    {"area": "scheduling", "count": 9, "scenarios": [
+      "run-once evaluates one eligible revision", "non-allowlisted repo/branch skipped",
+      "batch + count bounds enforced", "concurrency upper bound enforced", "paused performs no collection",
+      "kill switch prevents new collection", "clearing kill switch does not restart",
+      "selection deterministic + no background daemon", "changed head creates stale result"]},
+    {"area": "recovery", "count": 7, "scenarios": [
+      "active recovers requiring confirmation", "paused recovers paused", "completed recovers completed",
+      "no GitHub call during recovery", "config mismatch blocks resume", "kill-switch state survives restart",
+      "integrity failure prevents readiness"]},
+    {"area": "health + stop conditions", "count": 8, "scenarios": [
+      "healthy operator reports HEALTHY", "store integrity failure reports INTEGRITY_FAILURE",
+      "max evaluation count -> stop condition", "write-boundary -> abort condition",
+      "credential-leak -> abort condition", "pause condition not marked completed",
+      "critical security event aborts pilot", "stop reason durably preserved"]},
+    {"area": "reviewer queue", "count": 6, "scenarios": [
+      "ESCALATE creates queue item", "HOLD does not by default", "required authority preserved",
+      "assignment respects role allowlist + is not approval", "feedback links to queue item",
+      "queue survives restart"]},
+    {"area": "logging + data minimization", "count": 5, "scenarios": [
+      "structured logs have correlation fields", "logs contain no credential",
+      "secret-like keys normalized + redacted", "token_count not treated as credential",
+      "prohibited payload dropped"]},
+    {"area": "closeout + reporting", "count": 4, "scenarios": [
+      "closeout stops new evaluations", "report verifies offline + disabled",
+      "unresolved queue inventory included", "closeout does not enable enforcement"]},
+    {"area": "boundaries", "count": 4, "scenarios": [
+      "Action Clearance package unchanged", "no write/execution surface on operator",
+      "execution remains disabled everywhere", "operator requires durable service"]},
+    {"area": "offline demo", "count": 2, "scenarios": [
+      "24-step operator demo runs deterministically", "credential persisted nowhere; execution disabled"]}
+  ]
+}
