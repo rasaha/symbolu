@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance/action_clearance_request.schema.json",
+  "title": "ClearanceRequest (Action Clearance)",
+  "status": "PROPOSED",
+  "version": "action_clearance.design.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Input to the deterministic evaluator. Carries no credentials and no executable provider commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "tenant_id", "evaluation_time", "authorization", "action", "signals", "policy"],
+  "x-fingerprint": {"name": "request_fingerprint", "domain": "request", "includes": "all fields below"},
+  "properties": {
+    "request_id": {"type": "string", "x-required": true, "x-fingerprinted": true, "x-identity": "caller-supplied"},
+    "tenant_id": {"type": "string", "x-required": true, "x-fingerprinted": true},
+    "correlation_id": {"type": ["string", "null"], "x-required": false, "x-fingerprinted": true},
+    "workflow_id": {"type": ["string", "null"], "x-required": false, "x-fingerprinted": true},
+    "evaluation_time": {"type": "string", "x-required": true, "x-fingerprinted": true, "x-owner": "caller (trusted time; no core clock)"},
+    "authorization": {
+      "type": "object",
+      "x-required": true,
+      "additionalProperties": false,
+      "required": ["authorization_ref", "authorization_result_fingerprint", "authorization_outcome", "authorization_issued_at", "authorization_expires_at", "authorization_constraints", "authorization_obligations", "decision_record_ref", "context_envelope_ref", "context_envelope_hash", "authorized_actor_basis"],
+      "properties": {
+        "authorization_ref": {"type": "string", "x-fingerprinted": true, "x-owner": "ActionGate"},
+        "authorization_result_fingerprint": {"type": "string", "x-fingerprinted": true, "x-owner": "ActionGate", "description": "ActionGovernanceResult.fingerprint"},
+        "authorization_outcome": {"type": "string", "enum": ["AUTHORIZED", "AUTHORIZED_WITH_CONSTRAINTS"], "x-fingerprinted": true, "x-trust": "only these two are eligible; DENIED/INDETERMINATE/EXPIRED => NON_RETRYABLE_ERROR"},
+        "authorization_issued_at": {"type": "string", "x-fingerprinted": true},
+        "authorization_expires_at": {"type": "string", "x-fingerprinted": true, "x-trust": "bounds clearance.valid_until"},
+        "authorization_constraints": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "authorization_obligations": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "decision_record_ref": {"type": "string", "x-fingerprinted": true, "x-owner": "Decision Authority", "x-evaluated": "audit-only"},
+        "context_envelope_ref": {"type": "string", "x-fingerprinted": true, "x-owner": "Decision Authority", "description": "cer_id"},
+        "context_envelope_hash": {"type": "string", "x-fingerprinted": true, "x-owner": "Decision Authority", "x-evaluated": "structural (CER content_hash match)"},
+        "authorized_actor_basis": {"type": "string", "x-fingerprinted": true, "x-evaluated": "carried; actor status via signal"},
+        "override_ref": {"type": ["string", "null"], "x-fingerprinted": true},
+        "supersedes_ref": {"type": ["string", "null"], "x-fingerprinted": true}
+      }
+    },
+    "action": {
+      "type": "object",
+      "x-required": true,
+      "additionalProperties": false,
+      "required": ["authorized_action_fingerprint", "action_type", "target_ref", "operation"],
+      "x-fingerprint": {"name": "action_fingerprint", "domain": "action"},
+      "properties": {
+        "authorized_action_fingerprint": {"type": "string", "x-fingerprinted": true, "x-trust": "re-verified; mismatch => ACTION_FINGERPRINT_MISMATCH/BLOCK"},
+        "action_type": {"type": "string", "x-fingerprinted": true},
+        "target_ref": {"type": "string", "x-fingerprinted": true},
+        "operation": {"type": "string", "x-fingerprinted": true},
+        "action_governance_request_ref": {"type": ["string", "null"], "x-fingerprinted": true}
+      }
+    },
+    "signals": {
+      "type": "object",
+      "x-required": true,
+      "additionalProperties": false,
+      "required": ["signals", "required_signal_types"],
+      "x-fingerprint": {"name": "signal_bundle_fingerprint", "domain": "signal_bundle"},
+      "properties": {
+        "signals": {"type": "array", "items": {"$ref": "trusted_signal.schema.json"}, "x-fingerprinted": true},
+        "required_signal_types": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true, "x-trust": "missing mandatory type => fail closed (HOLD)"}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "x-required": true,
+      "additionalProperties": false,
+      "required": ["policy_refs", "required_control_refs", "profile_id"],
+      "properties": {
+        "policy_refs": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true, "x-owner": "policy authority"},
+        "required_control_refs": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "profile_id": {"type": "string", "x-fingerprinted": true, "examples": ["github_exact_merge"]},
+        "max_clearance_lifetime_s": {"type": ["integer", "null"], "x-fingerprinted": true},
+        "clock_skew_tolerance_s": {"type": ["integer", "null"], "x-fingerprinted": true, "x-trust": "widens freshness only, never expiry"}
+      }
+    }
+  },
+  "x-prohibited": ["credentials", "executable provider commands"]
+}
