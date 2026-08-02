@@ -1,0 +1,47 @@
+{
+  "$comment": "Proposed machine-readable exact merge-artifact identity tuple for Code Governance MVP 1C. Documentation-only; defines a PRODUCT-INTERNAL representation, not a new neutral contract.",
+  "authoritative_source": "UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md v0.2 §4.6",
+  "classification": "PRODUCT_INTERNAL",
+  "carried_by": {
+    "value_binding": "ActionGovernanceRequest.requested_parameters (Mapping[str,str]) and ActionRequest.requested_parameters (dict[str,str])",
+    "constraint_naming": "ContextEnvelopeRecord.permitted_parameters / prohibited_parameters / required_controls (tuple[str] names)",
+    "integrity": "product ExactChangeAuthorization envelope content hash + CER.content_hash + ActionGovernanceResult.fingerprint",
+    "note": "The CER has no typed field for exact SHA VALUES; values ride in the (key->value) parameter maps and are frozen into the product envelope hash. The CER names which parameter keys are permitted and which controls are required."
+  },
+  "merge_identity_tuple": {
+    "repository": {"type": "string", "example": "owner/repo", "required": true},
+    "pull_request": {"type": "integer", "required": true},
+    "source_head_sha": {"type": "string", "sha": "git-oid", "required": true},
+    "base_sha": {"type": "string", "sha": "git-oid", "required": true},
+    "target_branch": {"type": "string", "required": true},
+    "merge_method": {"type": "enum", "values": ["merge", "squash", "rebase", "merge_queue"], "required": true},
+    "expected_merge_tree_digest": {"type": "string", "sha": "git-tree-oid", "required_for": ["merge", "squash"], "note": "expected resulting tree; primary exact-artifact binding"},
+    "expected_result_commit": {"type": "string", "sha": "git-oid", "required": false, "note": "recorded at reconciliation, not always pre-authorizable (rebase)"},
+    "merge_group_sha": {"type": "string", "sha": "git-oid", "required_for": ["merge_queue"], "note": "the queue-produced merge-group artifact; receives its own re-validation + ACP clearance"},
+    "required_check_set": {"type": "array", "items": "string", "required": true},
+    "policy_version": {"type": "string", "note": "policy_id:version; carried as VersionedRef in DecisionRecord.policy_refs / CER.policy_context", "required": true},
+    "decision_record_id": {"type": "string", "required": true},
+    "cer_id": {"type": "string", "required": true},
+    "cer_content_hash": {"type": "string", "sha": "sha-256", "required": true},
+    "authorization_expiry": {"type": "datetime", "required": true},
+    "authorization_single_use": {"type": "boolean", "default": true}
+  },
+  "merge_mode_feasibility": {
+    "merge_commit": {"exact_preauthorization": "SUPPORTED", "binding": "base_sha + head_sha + merge_method + expected_merge_tree_digest -> resulting merge commit reconciled"},
+    "squash": {"exact_preauthorization": "SUPPORTED", "binding": "base_sha + head_sha + squash + expected_resulting_tree -> resulting commit reconciled"},
+    "rebase": {"exact_preauthorization": "SUPPORTED_WITH_ADDITIONAL_RECONCILIATION", "rationale": "GitHub rewrites commits; per-commit SHAs are not knowable pre-merge, but the expected resulting TREE can be computed and bound, with post-merge reconciliation of rewritten commit ids. MVP recommendation: recommendation-only OR supported-with-reconciliation; NOT exact-commit-SHA preauthorization."},
+    "merge_queue": {"exact_preauthorization": "SUPPORTED_VIA_TWO_STEP", "flow": ["authorize queue entry", "GitHub creates merge-group SHA", "validate merge group (re-run required checks)", "ACP clears exact merge-group artifact", "execute/allow queue merge", "reconcile resulting commit"], "authorization_treatment": "the original PR DecisionRecord remains the binding decision, but a DERIVED authorization (new CER + ActionGovernanceRequest bound to the merge_group_sha) is required for the merge-group artifact"}
+  },
+  "invalidation_rules": {
+    "new_commit_pushed": "INVALIDATE (head SHA changed) -> re-enter VALIDATION_COMPLETE/CANDIDATES_GENERATED",
+    "force_push": "INVALIDATE (head/base changed)",
+    "base_branch_advanced": "INVALIDATE if merge base moved -> re-validate merge tree",
+    "policy_changed": "INVALIDATE (policy_version mismatch) -> re-decide",
+    "required_check_changed": "INVALIDATE required_check_set -> re-validate",
+    "approval_dismissed": "INVALIDATE decision authority basis -> re-approve",
+    "merge_method_changed": "INVALIDATE (bound parameter changed) -> re-authorize",
+    "merge_group_regenerated": "INVALIDATE merge-group derived authorization -> re-validate + re-clear",
+    "authorization_expired": "INVALIDATE (CER.expires_at / authorization expiry) -> AUTHORIZATION_EXPIRED",
+    "incident_or_freeze_activated": "BLOCK at ACP clearance -> CLEARANCE_DENIED"
+  }
+}
