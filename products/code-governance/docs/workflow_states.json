@@ -1,0 +1,162 @@
+{
+  "$comment": "Deterministic Workflow Service state machine for Code Governance MVP 1A (shadow). PRODUCT_INTERNAL.",
+  "mode": "SHADOW",
+  "owner": "Code Governance Workflow Service (owns coordination, no governance authority)",
+  "fail_closed": true,
+  "forward_path": [
+    "RECEIVED",
+    "IDENTITY_BOUND",
+    "EVIDENCE_PENDING",
+    "EVIDENCE_COMPLETE",
+    "CLAIMS_EVALUATED",
+    "ASSERTIONS_EVALUATED",
+    "DECISION_PENDING",
+    "DECISION_RECORDED",
+    "CONTEXT_BOUND",
+    "ACTION_PREPARED",
+    "ACTION_EVALUATED",
+    "SHADOW_COMPLETE"
+  ],
+  "terminal_states": [
+    "SHADOW_COMPLETE",
+    "STALE_ARTIFACT",
+    "CLAIMS_INCOMPLETE",
+    "DECISION_REQUIRED",
+    "CHAIN_INCOMPLETE",
+    "BLOCKED",
+    "ESCALATED",
+    "ERROR"
+  ],
+  "transitions": {
+    "RECEIVED": [
+      "ERROR",
+      "IDENTITY_BOUND"
+    ],
+    "IDENTITY_BOUND": [
+      "ERROR",
+      "EVIDENCE_PENDING",
+      "STALE_ARTIFACT"
+    ],
+    "EVIDENCE_PENDING": [
+      "CLAIMS_INCOMPLETE",
+      "ERROR",
+      "EVIDENCE_COMPLETE",
+      "EVIDENCE_PENDING",
+      "STALE_ARTIFACT"
+    ],
+    "EVIDENCE_COMPLETE": [
+      "CLAIMS_EVALUATED",
+      "CLAIMS_INCOMPLETE",
+      "ERROR"
+    ],
+    "CLAIMS_EVALUATED": [
+      "ASSERTIONS_EVALUATED",
+      "BLOCKED",
+      "CLAIMS_INCOMPLETE",
+      "ERROR"
+    ],
+    "ASSERTIONS_EVALUATED": [
+      "CHAIN_INCOMPLETE",
+      "DECISION_PENDING",
+      "ERROR"
+    ],
+    "DECISION_PENDING": [
+      "BLOCKED",
+      "DECISION_RECORDED",
+      "DECISION_REQUIRED",
+      "ERROR",
+      "ESCALATED"
+    ],
+    "DECISION_RECORDED": [
+      "CONTEXT_BOUND",
+      "ERROR"
+    ],
+    "CONTEXT_BOUND": [
+      "ACTION_PREPARED",
+      "ERROR"
+    ],
+    "ACTION_PREPARED": [
+      "ACTION_EVALUATED",
+      "ERROR"
+    ],
+    "ACTION_EVALUATED": [
+      "CHAIN_INCOMPLETE",
+      "ERROR",
+      "SHADOW_COMPLETE"
+    ],
+    "SHADOW_COMPLETE": [],
+    "STALE_ARTIFACT": [],
+    "CLAIMS_INCOMPLETE": [],
+    "DECISION_REQUIRED": [],
+    "CHAIN_INCOMPLETE": [],
+    "BLOCKED": [],
+    "ESCALATED": [],
+    "ERROR": []
+  },
+  "state_ownership": {
+    "RECEIVED": {
+      "owner": "Workflow Service",
+      "entry": "event ingested",
+      "fail": "malformed -> reject, no state"
+    },
+    "IDENTITY_BOUND": {
+      "owner": "Workflow Service",
+      "entry": "GovernedChangeIdentity bound",
+      "fail": "stale head -> STALE_ARTIFACT"
+    },
+    "EVIDENCE_PENDING": {
+      "owner": "Workflow Service",
+      "entry": "first current-head evidence admitted",
+      "fail": "stale evidence not admitted"
+    },
+    "EVIDENCE_COMPLETE": {
+      "owner": "Workflow Service",
+      "entry": "Claim Manifest built",
+      "fail": "-"
+    },
+    "CLAIMS_EVALUATED": {
+      "owner": "Workflow Service (policy)",
+      "entry": "mandatory gate satisfied",
+      "fail": "mandatory incomplete -> CLAIMS_INCOMPLETE"
+    },
+    "ASSERTIONS_EVALUATED": {
+      "owner": "TAP (via WS)",
+      "entry": "per-claim assertion results recorded",
+      "fail": "missing TAP result -> CHAIN_INCOMPLETE later"
+    },
+    "DECISION_PENDING": {
+      "owner": "Workflow Service",
+      "entry": "decision requested",
+      "fail": "no authorized actor -> DECISION_REQUIRED"
+    },
+    "DECISION_RECORDED": {
+      "owner": "Decision Authority",
+      "entry": "authorized actor recorded DecisionRecord",
+      "fail": "deny -> BLOCKED"
+    },
+    "CONTEXT_BOUND": {
+      "owner": "Decision Authority (CER)",
+      "entry": "cer.v1 ContextEnvelopeRecord bound",
+      "fail": "-"
+    },
+    "ACTION_PREPARED": {
+      "owner": "Workflow Service",
+      "entry": "PreparedMergeAction built",
+      "fail": "-"
+    },
+    "ACTION_EVALUATED": {
+      "owner": "ActionGate (shadow, via WS)",
+      "entry": "ActionGovernanceResult recorded SHADOW_ONLY",
+      "fail": "-"
+    },
+    "SHADOW_COMPLETE": {
+      "owner": "Workflow Service",
+      "entry": "complete chain reconstructable",
+      "fail": "missing link -> CHAIN_INCOMPLETE"
+    }
+  },
+  "relationship_to_design_rungs": {
+    "MVP_1A": "Shadow \u2014 machine runs to SHADOW_COMPLETE; no AUTHORIZATION_ISSUED/CLEARANCE/DISPATCH/MERGE",
+    "canonical_design_states_doc": "docs/audits/code_governance_readiness/STATE_MACHINE.md"
+  }
+}

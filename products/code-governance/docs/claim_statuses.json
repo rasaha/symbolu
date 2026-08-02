@@ -1,0 +1,43 @@
+{
+  "$comment": "Per-claim state semantics (merged design). NOT a single blended quality score.",
+  "claim_statuses": {
+    "SATISFIED": "claim met by admissible current-head evidence",
+    "FAILED": "validator reported a blocking failure",
+    "INCOMPLETE": "required evidence not yet present/finished",
+    "UNSUPPORTED": "claim family not supported by supplied evidence",
+    "STALE": "evidence bound to a superseded head SHA",
+    "CONFLICTING": "contradictory evidence",
+    "NOT_APPLICABLE": "claim does not apply to this change"
+  },
+  "satisfying_statuses": [
+    "SATISFIED",
+    "NOT_APPLICABLE"
+  ],
+  "claim_types": [
+    "BUILD",
+    "UNIT_TEST",
+    "STATIC_ANALYSIS",
+    "SECURITY",
+    "DEPENDENCY_DELTA",
+    "ARCHITECTURE_DELTA",
+    "PUBLIC_API_DELTA",
+    "ARTIFACT_SIZE_DELTA",
+    "COMPLEXITY_DELTA",
+    "DIFFERENTIAL_TEST",
+    "PROPERTY_TEST",
+    "MUTATION_ADEQUACY",
+    "PERFORMANCE_BUDGET",
+    "INDEPENDENT_REVIEW"
+  ],
+  "risk_tiers": [
+    "LOW",
+    "MEDIUM",
+    "HIGH"
+  ],
+  "validator_trust_levels": [
+    "TRUSTED",
+    "UNVERIFIED",
+    "UNTRUSTED"
+  ],
+  "non_compensatory": "A required claim that is missing/stale/failed/conflicting/unsupported/inadmissible cannot be compensated by optional claims or by any aggregate coverage score."
+}

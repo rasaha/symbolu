@@ -1,0 +1,113 @@
+{
+  "$comment": "Product record inventory for Code Governance MVP 1A. All product records are immutable and tenant-bound.",
+  "product_records": [
+    {
+      "record": "GovernedChangeIdentity",
+      "module": "models.change_identity",
+      "immutable": true,
+      "content_addressed": true,
+      "authorization": false,
+      "note": "exact change identity; never an authorization"
+    },
+    {
+      "record": "EvidenceRecord",
+      "module": "evidence.records",
+      "immutable": true,
+      "content_addressed": true,
+      "note": "validator evidence bound to exact head SHA; content digest"
+    },
+    {
+      "record": "ClaimManifest",
+      "module": "claims.manifest",
+      "immutable": true,
+      "content_addressed": true,
+      "note": "order-independent fingerprint; per-claim entries"
+    },
+    {
+      "record": "ClaimEntry",
+      "module": "claims.manifest",
+      "immutable": true,
+      "content_addressed": true
+    },
+    {
+      "record": "EvidenceReference",
+      "module": "claims.manifest",
+      "immutable": true
+    },
+    {
+      "record": "ValidatorIdentity",
+      "module": "claims.manifest",
+      "immutable": true
+    },
+    {
+      "record": "GovernanceRecommendation",
+      "module": "governance.recommendation",
+      "immutable": true,
+      "binding": false,
+      "note": "advisory; never a DecisionRecord"
+    },
+    {
+      "record": "PreparedMergeAction",
+      "module": "governance.prepared_action",
+      "immutable": true,
+      "authorization": false,
+      "note": "exact proposed action to ActionGate; not ExactChangeAuthorization"
+    },
+    {
+      "record": "ShadowActionEvaluation",
+      "module": "governance.actiongate_adapter",
+      "immutable": true,
+      "mode": "SHADOW_ONLY"
+    },
+    {
+      "record": "TapAssertionResult",
+      "module": "governance.tap_adapter",
+      "immutable": true
+    },
+    {
+      "record": "WorkflowRevision",
+      "module": "workflow.records",
+      "immutable": true,
+      "note": "one lineage -> many head/base revisions"
+    },
+    {
+      "record": "GovernanceChainRecord",
+      "module": "reconstruction.records",
+      "immutable": true,
+      "content_addressed": true,
+      "note": "reconstructable chain; ACTION_CLEARANCE_NOT_EVALUATED / EXECUTION_DISABLED"
+    }
+  ],
+  "reused_upstream_records": [
+    {
+      "record": "DecisionRecord",
+      "package": "ugence_decision_authority",
+      "reuse": "verbatim; no MergeDecisionRecord created"
+    },
+    {
+      "record": "ContextEnvelopeRecord",
+      "package": "ugence_decision_authority",
+      "schema_version": "cer.v1",
+      "reuse": "verbatim; no cer.v2"
+    },
+    {
+      "record": "AssertionGovernanceRequest/Result",
+      "package": "ugence_governance_contracts",
+      "reuse": "verbatim (TAP)"
+    },
+    {
+      "record": "ActionGovernanceRequest/Result",
+      "package": "ugence_governance_contracts",
+      "reuse": "verbatim (ActionGate)"
+    }
+  ],
+  "persistence": "in-memory tenant-isolated immutable reference stores (NOT a production durable store)",
+  "repositories": [
+    "EvidenceRepository",
+    "ClaimManifestRepository",
+    "RecommendationRepository",
+    "PreparedActionRepository",
+    "WorkflowRepository",
+    "GovernanceChainRepository"
+  ]
+}
