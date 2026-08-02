@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance_prerequisites/receipt_lifecycle_events.schema.json",
+  "title": "ClearanceReceipt lifecycle event (Action Clearance prerequisites)",
+  "status": "PROPOSED",
+  "version": "action_clearance.prerequisites.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Append-only lifecycle event for a ClearanceReceipt. The receipt body is immutable; effective lifecycle is derived from these events plus time. Authored only by the Workflow Service; the evaluator never mutates receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "receipt_id", "sequence", "event_type", "occurred_at", "owner"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "receipt_id": {"type": "string", "description": "acr_<result_fingerprint> the event applies to."},
+    "sequence": {"type": "integer", "minimum": 0, "description": "Monotonic per-receipt ordering; deterministic lifecycle."},
+    "event_type": {"type": "string", "enum": ["ISSUED", "EXPIRED", "SUPERSEDED", "REVOKED", "INVALIDATED"]},
+    "occurred_at": {"type": "string", "description": "Wall-clock / provider event time used for deterministic ordering."},
+    "owner": {"type": "string", "enum": ["workflow_service", "audit_process", "derived_read_time"]},
+    "trigger": {"type": "string", "description": "What caused the transition."},
+    "superseding_ref": {"type": ["string", "null"], "description": "Successor receipt_id for SUPERSEDED."},
+    "upstream_ref": {"type": ["string", "null"], "description": "Authoritative upstream event for REVOKED/INVALIDATED."},
+    "reason": {"type": ["string", "null"]}
+  },
+  "x-state-rules": {
+    "ISSUED": {"trigger": "CLEAR result persisted", "owner": "workflow_service", "body_changes": false, "execution_permitted": "yes within valid_until"},
+    "EXPIRED": {"trigger": "evaluation/dispatch time > valid_until", "owner": "derived_read_time", "body_changes": false, "execution_permitted": "no", "note": "authoritative check is derived; event is optional audit marker"},
+    "SUPERSEDED": {"trigger": "newer clearance for same lineage", "owner": "workflow_service", "body_changes": false, "execution_permitted": "no; use successor"},
+    "REVOKED": {"trigger": "authoritative upstream invalidation", "owner": "workflow_service", "body_changes": false, "execution_permitted": "no; reauthorize"},
+    "INVALIDATED": {"trigger": "chain or integrity failure", "owner": "workflow_service", "body_changes": false, "execution_permitted": "no"}
+  },
+  "x-excluded-from-receipt-lifecycle": ["CONSUMED", "EXECUTING", "EXECUTED", "FAILED"],
+  "x-excluded-rationale": "Consumption/dispatch/observation states belong to execution reservation and observation records (ExecutionStatus/BusinessOutcome), never to the clearance receipt."
+}
