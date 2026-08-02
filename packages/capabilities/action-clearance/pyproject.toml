@@ -1,0 +1,41 @@
+# Independent distribution for the canonical Action Clearance capability.
+#
+# Action Clearance is a low-level, domain-neutral, deterministic capability: given
+# an already-authorized exact action and a bundle of trusted current-state signals,
+# it decides whether that action remains operationally CLEAR immediately before
+# execution. It NEVER creates authority, broadens authorization, dispatches,
+# persists, or reserves one-time execution.
+#
+# Build:  python -m build packages/capabilities/action-clearance
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-action-clearance"
+dynamic = ["version"]
+description = "Ugence Action Clearance — deterministic, domain-neutral evaluation of whether an already-authorized exact action remains operationally clear immediately before execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["governance", "action-clearance", "deterministic", "clearance", "ugence"]
+# Action Clearance depends ONLY on the Python standard library. It is a low-level
+# leaf capability: no third-party runtime dependency, and no dependency on any
+# other Ugence capability, product, provider, robotics, or execution package. It
+# speaks the neutral ActionGovernance outcome vocabulary by value (plain strings),
+# never by importing the contract package.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_action_clearance.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_action_clearance*"]
+
+[tool.setuptools.package-data]
+ugence_action_clearance = ["py.typed"]
