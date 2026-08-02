@@ -1,0 +1,1238 @@
+{
+  "module": "governance_providers.api",
+  "symbols": {
+    "ActionGovernanceControlPlaneAdapter": {
+      "kind": "class",
+      "methods": {
+        "authorize": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "action_request"
+            },
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "cer"
+            }
+          ],
+          "signature": "(self, action_request, cer) -> 'ActionAuthorizationResponse'"
+        }
+      }
+    },
+    "ActionGovernanceOutcome": {
+      "kind": "enum",
+      "values": {
+        "AUTHORIZED": "AUTHORIZED",
+        "AUTHORIZED_WITH_CONSTRAINTS": "AUTHORIZED_WITH_CONSTRAINTS",
+        "DENIED": "DENIED",
+        "EXPIRED": "EXPIRED",
+        "INDETERMINATE": "INDETERMINATE"
+      }
+    },
+    "ActionGovernanceProvider": {
+      "kind": "protocol",
+      "methods": {
+        "authorize": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGovernanceRequest') -> 'ActionGovernanceResult'"
+        },
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "ActionGovernanceRequest": {
+      "fields": {
+        "action_type": {
+          "annotation": "str",
+          "required": true
+        },
+        "actor": {
+          "annotation": "str",
+          "required": false
+        },
+        "authority_context": {
+          "annotation": "str",
+          "required": false
+        },
+        "authorization_expired": {
+          "annotation": "bool",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "decision_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "idempotency_key": {
+          "annotation": "str",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "requested_parameters": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "risk_context": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "target_resource": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGovernanceResult": {
+      "fields": {
+        "authority_basis": {
+          "annotation": "str",
+          "required": false
+        },
+        "constraints": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "expiry": {
+          "annotation": "Optional[datetime]",
+          "required": false
+        },
+        "fingerprint": {
+          "annotation": "str",
+          "required": false
+        },
+        "obligations": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "outcome": {
+          "annotation": "ActionGovernanceOutcome",
+          "required": true
+        },
+        "provider_trace_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "AssertionAssessment": {
+      "fields": {
+        "assertion": {
+          "annotation": "str",
+          "required": true
+        },
+        "assertion_type": {
+          "annotation": "str",
+          "required": true
+        },
+        "blocked": {
+          "annotation": "bool",
+          "required": true
+        },
+        "coverage": {
+          "annotation": "AssertionCoverage",
+          "required": true
+        },
+        "covered_evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": true
+        },
+        "evidence_coverage": {
+          "annotation": "float",
+          "required": true
+        },
+        "explanation_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": true
+        },
+        "finalized": {
+          "annotation": "bool",
+          "required": true
+        },
+        "fingerprint": {
+          "annotation": "str",
+          "required": true
+        },
+        "provider_trace_id": {
+          "annotation": "str",
+          "required": true
+        },
+        "unsupported_elements": {
+          "annotation": "tuple[str, ...]",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "AssertionAssessmentIntegration": {
+      "kind": "class",
+      "methods": {
+        "assess": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'AssertionGovernanceRequest') -> 'AssertionAssessment'"
+        },
+        "to_linked_record_snapshot": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "assessment"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "tenant_id"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "record_type"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "record_id"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "subject_ref"
+            },
+            {
+              "has_default": true,
+              "kind": "KEYWORD_ONLY",
+              "name": "version"
+            }
+          ],
+          "signature": "(assessment: 'AssertionAssessment', *, tenant_id: 'str', record_type: 'str', record_id: 'str', subject_ref: 'str', version: 'int' = 1) -> 'LinkedRecordSnapshot'"
+        }
+      }
+    },
+    "AssertionCoverage": {
+      "kind": "enum",
+      "values": {
+        "CONSTRAINED": "CONSTRAINED",
+        "INDETERMINATE": "INDETERMINATE",
+        "SUPPORTED": "SUPPORTED",
+        "UNSUPPORTED": "UNSUPPORTED"
+      }
+    },
+    "AssertionGovernanceProvider": {
+      "kind": "protocol",
+      "methods": {
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "evaluate": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'AssertionGovernanceRequest') -> 'AssertionGovernanceResult'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "AssertionGovernanceRequest": {
+      "fields": {
+        "assertion": {
+          "annotation": "str",
+          "required": true
+        },
+        "assertion_type": {
+          "annotation": "str",
+          "required": false
+        },
+        "context": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "policy_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "source_identity": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "AssertionGovernanceResult": {
+      "fields": {
+        "constraints": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "coverage": {
+          "annotation": "AssertionCoverage",
+          "required": true
+        },
+        "covered_evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "evidence_coverage": {
+          "annotation": "float",
+          "required": false
+        },
+        "explanation_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "fingerprint": {
+          "annotation": "str",
+          "required": false
+        },
+        "obligations": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "omitted_qualifiers": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "provider_trace_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "unsupported_elements": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "AssertionLinkedRecordAdapter": {
+      "kind": "class",
+      "methods": {
+        "get_record": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "tenant_id"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "record_type"
+            },
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "record_id"
+            },
+            {
+              "has_default": true,
+              "kind": "KEYWORD_ONLY",
+              "name": "version"
+            }
+          ],
+          "signature": "(self, *, tenant_id: 'str', record_type: 'str', record_id: 'str', version: 'Optional[int]' = None) -> 'Optional[LinkedRecordSnapshot]'"
+        },
+        "register": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "record_id"
+            },
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "snapshot"
+            }
+          ],
+          "signature": "(self, record_id: 'str', snapshot: 'LinkedRecordSnapshot') -> 'None'"
+        }
+      }
+    },
+    "BaseProvider": {
+      "kind": "class",
+      "methods": {
+        "degrade": {
+          "params": [
+            {
+              "has_default": true,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "detail"
+            }
+          ],
+          "signature": "(self, detail: 'str' = '') -> 'None'"
+        },
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "mark_unavailable": {
+          "params": [
+            {
+              "has_default": true,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "detail"
+            }
+          ],
+          "signature": "(self, detail: 'str' = '') -> 'None'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "1.0.0"
+    },
+    "ExecutionBusinessOutcome": {
+      "kind": "enum",
+      "values": {
+        "DUPLICATE": "DUPLICATE",
+        "FAILED": "FAILED",
+        "PENDING": "PENDING",
+        "REJECTED": "REJECTED",
+        "SUCCEEDED": "SUCCEEDED",
+        "UNKNOWN": "UNKNOWN"
+      }
+    },
+    "ExecutionDispatchRequest": {
+      "fields": {
+        "action_type": {
+          "annotation": "str",
+          "required": true
+        },
+        "correlation_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "idempotency_key": {
+          "annotation": "str",
+          "required": false
+        },
+        "parameters": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ExecutionDispatchResult": {
+      "fields": {
+        "accepted": {
+          "annotation": "bool",
+          "required": true
+        },
+        "acknowledgement": {
+          "annotation": "str",
+          "required": false
+        },
+        "external_request_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "pending": {
+          "annotation": "bool",
+          "required": false
+        },
+        "retryable": {
+          "annotation": "bool",
+          "required": false
+        },
+        "timed_out": {
+          "annotation": "bool",
+          "required": false
+        },
+        "transport_error": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ExecutionObservation": {
+      "fields": {
+        "business_outcome": {
+          "annotation": "ExecutionBusinessOutcome",
+          "required": true
+        },
+        "final": {
+          "annotation": "bool",
+          "required": false
+        },
+        "fingerprint": {
+          "annotation": "str",
+          "required": false
+        },
+        "observed_parameters": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "provider_trace_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "reason": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ExternalExecutionAdapter": {
+      "kind": "class",
+      "methods": {
+        "dispatch": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "intent"
+            }
+          ],
+          "signature": "(self, intent) -> 'ExternalDispatchResponse'"
+        },
+        "query_status": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "external_request_id"
+            }
+          ],
+          "signature": "(self, external_request_id: 'str') -> 'ExternalStatusResponse'"
+        }
+      }
+    },
+    "ExternalExecutionProvider": {
+      "kind": "protocol",
+      "methods": {
+        "cancel": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "external_request_id"
+            }
+          ],
+          "signature": "(self, *, external_request_id: 'str') -> 'bool'"
+        },
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "dispatch": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ExecutionDispatchRequest') -> 'ExecutionDispatchResult'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "observe": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "KEYWORD_ONLY",
+              "name": "external_request_id"
+            }
+          ],
+          "signature": "(self, *, external_request_id: 'str') -> 'ExecutionObservation'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "FailureClass": {
+      "kind": "enum",
+      "values": {
+        "COMPATIBILITY": "COMPATIBILITY",
+        "CONFIGURATION": "CONFIGURATION",
+        "INDETERMINATE": "INDETERMINATE",
+        "RETRYABLE": "RETRYABLE",
+        "TERMINAL": "TERMINAL"
+      }
+    },
+    "Provider": {
+      "kind": "protocol",
+      "methods": {
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "ProviderCapabilities": {
+      "fields": {
+        "deterministic": {
+          "annotation": "bool",
+          "required": false
+        },
+        "features": {
+          "annotation": "frozenset[str]",
+          "required": false
+        },
+        "kind": {
+          "annotation": "ProviderKind",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {
+        "supports_feature": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "feature"
+            }
+          ],
+          "signature": "(self, feature: 'str') -> 'bool'"
+        }
+      }
+    },
+    "ProviderCompatibility": {
+      "fields": {
+        "compatible_kernel_majors": {
+          "annotation": "frozenset[str]",
+          "required": false
+        },
+        "config_schema_version": {
+          "annotation": "str",
+          "required": false
+        },
+        "contract_version": {
+          "annotation": "str",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ProviderCompatibilityError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderConfigurationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderDescriptor": {
+      "fields": {
+        "capabilities": {
+          "annotation": "ProviderCapabilities",
+          "required": true
+        },
+        "compatibility": {
+          "annotation": "ProviderCompatibility",
+          "required": true
+        },
+        "default": {
+          "annotation": "bool",
+          "required": false
+        },
+        "factory": {
+          "annotation": "Callable[[], object]",
+          "required": true
+        },
+        "implementation_version": {
+          "annotation": "str",
+          "required": true
+        },
+        "kind": {
+          "annotation": "ProviderKind",
+          "required": true
+        },
+        "metadata": {
+          "annotation": "dict[str, str]",
+          "required": false
+        },
+        "provider_id": {
+          "annotation": "str",
+          "required": true
+        },
+        "vendor": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ProviderEntry": {
+      "fields": {
+        "contract_version": {
+          "annotation": "str",
+          "required": false
+        },
+        "default": {
+          "annotation": "bool",
+          "required": false
+        },
+        "enabled": {
+          "annotation": "bool",
+          "required": false
+        },
+        "implementation": {
+          "annotation": "str",
+          "required": false
+        },
+        "kind": {
+          "annotation": "ProviderKind",
+          "required": true
+        },
+        "provider_id": {
+          "annotation": "str",
+          "required": true
+        },
+        "secret_refs": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "settings": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ProviderError": {
+      "bases": [
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderHealth": {
+      "fields": {
+        "detail": {
+          "annotation": "str",
+          "required": false
+        },
+        "healthy": {
+          "annotation": "bool",
+          "required": true
+        },
+        "state": {
+          "annotation": "ProviderLifecycleState",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ProviderInvocationLog": {
+      "kind": "class",
+      "methods": {
+        "all": {
+          "params": [],
+          "signature": "(self) -> 'tuple[ProviderInvocationRecord, ...]'"
+        },
+        "append": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "record"
+            }
+          ],
+          "signature": "(self, record: 'ProviderInvocationRecord') -> 'None'"
+        }
+      }
+    },
+    "ProviderInvocationRecord": {
+      "fields": {
+        "completed": {
+          "annotation": "bool",
+          "required": true
+        },
+        "error_class": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "failure_class": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "fallback_provider_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "kind": {
+          "annotation": "str",
+          "required": true
+        },
+        "operation": {
+          "annotation": "str",
+          "required": true
+        },
+        "outcome": {
+          "annotation": "str",
+          "required": false
+        },
+        "provider_id": {
+          "annotation": "str",
+          "required": true
+        },
+        "trace_id": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ProviderKind": {
+      "kind": "enum",
+      "values": {
+        "ACTION_GOVERNANCE": "ACTION_GOVERNANCE",
+        "ASSERTION_GOVERNANCE": "ASSERTION_GOVERNANCE",
+        "EXTERNAL_EXECUTION": "EXTERNAL_EXECUTION"
+      }
+    },
+    "ProviderLifecycleState": {
+      "kind": "enum",
+      "values": {
+        "AVAILABLE": "AVAILABLE",
+        "DEGRADED": "DEGRADED",
+        "INITIALIZING": "INITIALIZING",
+        "REGISTERED": "REGISTERED",
+        "STOPPED": "STOPPED",
+        "STOPPING": "STOPPING",
+        "UNAVAILABLE": "UNAVAILABLE"
+      }
+    },
+    "ProviderProtocolError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderRegistrationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderRegistry": {
+      "kind": "class",
+      "methods": {
+        "deregister": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "provider_id"
+            }
+          ],
+          "signature": "(self, provider_id: 'str') -> 'None'"
+        },
+        "find_by_capability": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "kind"
+            },
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "feature"
+            }
+          ],
+          "signature": "(self, kind: 'ProviderKind', feature: 'str') -> 'tuple[ProviderDescriptor, ...]'"
+        },
+        "get_descriptor": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "provider_id"
+            }
+          ],
+          "signature": "(self, provider_id: 'str') -> 'ProviderDescriptor'"
+        },
+        "get_provider": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "provider_id"
+            }
+          ],
+          "signature": "(self, provider_id: 'str') -> 'Provider'"
+        },
+        "health": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "provider_id"
+            }
+          ],
+          "signature": "(self, provider_id: 'str') -> 'ProviderHealth'"
+        },
+        "is_compatible": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "descriptor"
+            }
+          ],
+          "signature": "(self, descriptor: 'ProviderDescriptor') -> 'bool'"
+        },
+        "list_by_kind": {
+          "params": [
+            {
+              "has_default": true,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "kind"
+            }
+          ],
+          "signature": "(self, kind: 'Optional[ProviderKind]' = None) -> 'tuple[ProviderDescriptor, ...]'"
+        },
+        "register": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "descriptor"
+            }
+          ],
+          "signature": "(self, descriptor: 'ProviderDescriptor') -> 'ProviderDescriptor'"
+        },
+        "shutdown_all": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "validate": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "ProviderResolutionError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderResultValidationError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderTimeoutError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProviderUnavailableError": {
+      "bases": [
+        "ProviderError",
+        "Exception",
+        "BaseException"
+      ],
+      "kind": "exception"
+    },
+    "ProvidersConfiguration": {
+      "fields": {
+        "entries": {
+          "annotation": "tuple[ProviderEntry, ...]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {
+        "by_kind": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "kind"
+            }
+          ],
+          "signature": "(self, kind: 'ProviderKind') -> 'tuple[ProviderEntry, ...]'"
+        },
+        "default_for": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "kind"
+            }
+          ],
+          "signature": "(self, kind: 'ProviderKind')"
+        },
+        "from_mapping": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "data"
+            }
+          ],
+          "signature": "(data: 'Mapping') -> \"'ProvidersConfiguration'\""
+        },
+        "validate": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "ResolutionRecord": {
+      "fields": {
+        "candidate_ids": {
+          "annotation": "tuple[str, ...]",
+          "required": true
+        },
+        "compatibility": {
+          "annotation": "dict[str, bool]",
+          "required": true
+        },
+        "failure_reason": {
+          "annotation": "str",
+          "required": false
+        },
+        "kind": {
+          "annotation": "ProviderKind",
+          "required": true
+        },
+        "requested_capability": {
+          "annotation": "Optional[str]",
+          "required": true
+        },
+        "selected_id": {
+          "annotation": "Optional[str]",
+          "required": true
+        },
+        "selection_rule": {
+          "annotation": "SelectionRule",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ResolutionRequest": {
+      "fields": {
+        "capability": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "domain_default": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "global_default": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "kind": {
+          "annotation": "ProviderKind",
+          "required": true
+        },
+        "provider_id": {
+          "annotation": "Optional[str]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "SelectionRule": {
+      "kind": "enum",
+      "values": {
+        "DOMAIN_DEFAULT": "DOMAIN_DEFAULT",
+        "EXPLICIT_ID": "EXPLICIT_ID",
+        "GLOBAL_DEFAULT": "GLOBAL_DEFAULT",
+        "SINGLE_COMPATIBLE": "SINGLE_COMPATIBLE",
+        "UNRESOLVED": "UNRESOLVED"
+      }
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "record_invocation": {
+      "kind": "function",
+      "params": [
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "provider_id"
+        },
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "kind"
+        },
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "operation"
+        },
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "fn"
+        },
+        {
+          "has_default": true,
+          "kind": "KEYWORD_ONLY",
+          "name": "log"
+        },
+        {
+          "has_default": true,
+          "kind": "KEYWORD_ONLY",
+          "name": "trace_id"
+        }
+      ],
+      "signature": "(provider_id: 'str', kind: 'str', operation: 'str', fn: 'Callable[[], T]', *, log: 'Optional[ProviderInvocationLog]' = None, trace_id: 'str' = '') -> 'T'"
+    },
+    "resolve": {
+      "kind": "function",
+      "params": [
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "registry"
+        },
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "request"
+        }
+      ],
+      "signature": "(registry: 'ProviderRegistry', request: 'ResolutionRequest') -> 'tuple[Provider, ResolutionRecord]'"
+    }
+  }
+}

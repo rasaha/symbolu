@@ -1,0 +1,69 @@
+# Governance Provider Framework — pre-migration test manifest
+# Captured at commit ed7387f4 on branch claude/gpf-canonical-package-migration-y3qoew
+
+## Framework tests (governance_providers/tests) — 42 collected, 42 passed
+
+governance_providers/tests/test_adapters.py::test_action_adapter_conforms_and_maps
+governance_providers/tests/test_adapters.py::test_action_adapter_normalizes_provider_failure
+governance_providers/tests/test_adapters.py::test_assertion_integration_is_not_execution
+governance_providers/tests/test_adapters.py::test_assertion_optional_linked_record_projection
+governance_providers/tests/test_adapters.py::test_execution_adapter_conforms_and_maps
+governance_providers/tests/test_contracts_and_registry.py::test_ambiguous_default_rejected
+governance_providers/tests/test_contracts_and_registry.py::test_contracts_are_distinct_protocols
+governance_providers/tests/test_contracts_and_registry.py::test_deregister
+governance_providers/tests/test_contracts_and_registry.py::test_duplicate_registration_rejected
+governance_providers/tests/test_contracts_and_registry.py::test_incompatible_contract_version_rejected
+governance_providers/tests/test_contracts_and_registry.py::test_incompatible_kernel_major_rejected
+governance_providers/tests/test_contracts_and_registry.py::test_registry_discovery
+governance_providers/tests/test_contracts_and_registry.py::test_three_distinct_kinds
+governance_providers/tests/test_dependency_boundaries.py::test_framework_consumes_only_public_kernel_api
+governance_providers/tests/test_dependency_boundaries.py::test_framework_imports_standalone_without_cycles_or_monorepo_paths
+governance_providers/tests/test_dependency_boundaries.py::test_framework_never_imports_consuming_layers_or_products
+governance_providers/tests/test_dependency_boundaries.py::test_generic_contracts_have_no_domain_terms
+governance_providers/tests/test_dependency_boundaries.py::test_kernel_never_imports_the_framework
+governance_providers/tests/test_fixtures.py::test_action_provider_drives_kernel_to_reconciled
+governance_providers/tests/test_fixtures.py::test_assertion_feeds_assessment_not_execution
+governance_providers/tests/test_lifecycle_errors_observability.py::test_error_failure_classes
+governance_providers/tests/test_lifecycle_errors_observability.py::test_legal_and_illegal_transitions
+governance_providers/tests/test_lifecycle_errors_observability.py::test_observability_records_success_and_failure
+governance_providers/tests/test_lifecycle_errors_observability.py::test_provider_lifecycle_flow
+governance_providers/tests/test_packaging.py::test_build_packages_canonical_via_symlink
+governance_providers/tests/test_packaging.py::test_distribution_metadata_and_dependency
+governance_providers/tests/test_packaging.py::test_single_canonical_source
+governance_providers/tests/test_reference_conformance.py::test_action_conformance
+governance_providers/tests/test_reference_conformance.py::test_assertion_conformance
+governance_providers/tests/test_reference_conformance.py::test_execution_conformance
+governance_providers/tests/test_reference_conformance.py::test_reference_action_paths
+governance_providers/tests/test_reference_conformance.py::test_reference_assertion_paths
+governance_providers/tests/test_reference_conformance.py::test_reference_execution_paths
+governance_providers/tests/test_resolution_and_config.py::test_ambiguous_never_guesses
+governance_providers/tests/test_resolution_and_config.py::test_config_parse_and_defaults
+governance_providers/tests/test_resolution_and_config.py::test_config_rejects_contradictory_defaults
+governance_providers/tests/test_resolution_and_config.py::test_config_rejects_unknown_kind
+governance_providers/tests/test_resolution_and_config.py::test_explicit_id
+governance_providers/tests/test_resolution_and_config.py::test_explicit_missing_fails
+governance_providers/tests/test_resolution_and_config.py::test_global_default_marker
+governance_providers/tests/test_resolution_and_config.py::test_resolution_record_has_candidates
+governance_providers/tests/test_resolution_and_config.py::test_single_compatible
+
+## Framework-consumer & sibling suites (baseline, all green unless noted)
+governance_providers ............................. 42 passed
+tap_provider ..................................... 38 passed
+actiongate_provider .............................. 30 passed
+baseline_assertion_provider+baseline_action_provider  10 passed
+packages/governance-contracts .................... 45 passed
+packages/capabilities/decision-authority ......... 79 passed
+packages/capabilities/storygraph ................. 316 passed
+ai_hiring ........................................ 778 passed
+enterprise_validation_pilot ...................... 164 passed
+provider_heterogeneity_validation ................ 51 passed
+comparative_governance_benchmark ................. 56 passed
+platform_freeze/tests ............................ 19 passed, 2 PRE-EXISTING failures
+
+## Pre-existing failures (NOT caused by this migration; not fixed per scope §24)
+platform_freeze/tests/test_freeze.py::test_classify_change_reports_evidence
+platform_freeze/tests/test_freeze.py::test_hiring_baseline_discovery
+
+## Platform verifier / validators
+python -m platform_freeze.verify ................. PASS (substantive 477407…)
+scripts/validate_terminology.py .................. PASS
