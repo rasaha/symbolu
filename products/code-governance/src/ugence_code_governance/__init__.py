@@ -1,4 +1,4 @@
-"""Ugence Code Governance — shadow governance product (MVP 1A).
+"""Ugence Code Governance — shadow governance product (MVP 1C).
 
 Read-only and non-enforcing. This package proves the shadow governance path:
 
@@ -9,8 +9,13 @@ Read-only and non-enforcing. This package proves the shadow governance path:
     ActionGate shadow evaluation -> reconstructable governance chain ->
     shadow recommendation only.
 
-Execution is disabled. There is no GitHub write path, no merge credential, no
-Action Clearance, and no execution provider in this phase.
+Execution is disabled. There is no GitHub write path, no merge credential, and no
+execution provider in this phase. MVP 1B adds a shadow Action Clearance stage with
+explainable human-intervention routing. MVP 1C adds an **opt-in** durable shadow
+audit store (append-only, hash-linked, integrity-verified SQLite), restart-safe
+recovery, integrity-verified reconstruction, and offline-verifiable audit bundles.
+The durable store is a ``DURABLE_SHADOW_REFERENCE`` audit projection — never an
+authoritative execution-consumption ledger.
 
 This ``__init__`` exposes an *intentional* public API — not every internal type.
 Internal modules remain importable for advanced/test use but are not part of the
@@ -85,6 +90,24 @@ from .clearance import (
     TrustedSignalSourceProjection,
 )
 
+# --- MVP 1C: durable shadow persistence (opt-in) -------------------------
+from .persistence import (
+    BundleVerification,
+    DurableReconstructionResult,
+    DurableReconstructionState,
+    DurableShadowStore,
+    DurableStoreConfig,
+    PersistenceMode,
+    RecordType,
+    ReconstructionMode,
+    RecoveryResult,
+    RecoveryStatus,
+    STORE_CLASSIFICATION,
+    STORE_SCHEMA_VERSION,
+    WorkflowEventType,
+    open_durable_store,
+)
+
 # --- errors --------------------------------------------------------------
 from .errors import (
     ChainIncompleteError,
@@ -152,6 +175,21 @@ __all__ = [
     "InterventionRoutingPolicy",
     "InterventionType",
     "AuthorityRole",
+    # MVP 1C — durable shadow persistence
+    "PersistenceMode",
+    "DurableShadowStore",
+    "DurableStoreConfig",
+    "open_durable_store",
+    "RecordType",
+    "WorkflowEventType",
+    "RecoveryStatus",
+    "RecoveryResult",
+    "ReconstructionMode",
+    "DurableReconstructionState",
+    "DurableReconstructionResult",
+    "BundleVerification",
+    "STORE_SCHEMA_VERSION",
+    "STORE_CLASSIFICATION",
     # errors
     "CodeGovernanceError",
     "DecisionAuthorityRequiredError",
