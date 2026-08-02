@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance/action_clearance_result.schema.json",
+  "title": "ClearanceResult & ClearanceReceipt (Action Clearance)",
+  "status": "PROPOSED",
+  "version": "action_clearance.design.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. ClearanceResult is the deterministic evaluator output; ClearanceReceipt is the durable product record persisted by the workflow layer.",
+  "type": "object",
+  "$defs": {
+    "ClearanceStatus": {
+      "type": "string",
+      "enum": ["CLEAR", "HOLD", "BLOCK", "ESCALATE"],
+      "x-precedence": "BLOCK > ESCALATE > HOLD > CLEAR (least-permissive-wins)",
+      "x-semantics": {
+        "CLEAR": {"execute": true, "retry": "n/a", "fresh_request": false, "human": false, "reauth": false, "authorization_valid": true},
+        "HOLD": {"execute": false, "retry": true, "fresh_request": true, "human": false, "reauth": false, "authorization_valid": true},
+        "BLOCK": {"execute": false, "retry": false, "fresh_request": "after fix", "human": false, "reauth": "if AUTHORIZATION_EXPIRED", "authorization_valid": "valid-but-not-clear unless expired"},
+        "ESCALATE": {"execute": false, "retry": false, "fresh_request": "after resolution", "human": true, "reauth": "possibly", "authorization_valid": true}
+      }
+    },
+    "ClearanceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "authorization_ref", "authorized_action_fingerprint", "status", "reason_codes", "effective_constraints", "obligations", "evaluated_at", "valid_until", "policy_refs", "signal_refs", "request_fingerprint", "result_fingerprint"],
+      "x-fingerprint": {"name": "result_fingerprint", "domain": "result", "includes": "all fields below", "id": "result_id = 'acr_' + result_fingerprint"},
+      "properties": {
+        "request_id": {"type": "string", "x-fingerprinted": true},
+        "authorization_ref": {"type": "string", "x-fingerprinted": true},
+        "authorized_action_fingerprint": {"type": "string", "x-fingerprinted": true},
+        "status": {"$ref": "#/$defs/ClearanceStatus", "x-fingerprinted": true},
+        "reason_codes": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true, "x-trust": "canonically ordered before fingerprint; order does not change result_fingerprint"},
+        "effective_constraints": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true, "x-invariant": "= authorization_constraints INTERSECT clearance_constraints (narrowing-only)"},
+        "obligations": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true, "x-invariant": "SUPERSET of authorization_obligations"},
+        "evaluated_at": {"type": "string", "x-fingerprinted": true, "x-owner": "= request.evaluation_time (no core clock)"},
+        "valid_until": {"type": "string", "x-fingerprinted": true, "x-invariant": "<= authorization.expires_at AND <= min(required-signal valid_until) AND <= evaluated_at + max_clearance_lifetime_s"},
+        "policy_refs": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "signal_refs": {"type": "array", "items": {"type": "string"}, "x-fingerprinted": true},
+        "request_fingerprint": {"type": "string", "x-fingerprinted": true},
+        "result_fingerprint": {"type": "string", "x-fingerprinted": false, "description": "the digest itself"}
+      }
+    },
+    "ClearanceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "receipt_id", "issued_at", "receipt_state"],
+      "x-owner": "Workflow Service (NOT the evaluator)",
+      "properties": {
+        "result": {"$ref": "#/$defs/ClearanceResult"},
+        "receipt_id": {"type": "string", "x-fingerprinted": false, "x-note": "may be a UUID; EXCLUDED from result_fingerprint"},
+        "issued_at": {"type": "string", "x-fingerprinted": false, "x-note": "wall clock; EXCLUDED"},
+        "receipt_state": {"type": "string", "enum": ["ISSUED", "EXPIRED", "SUPERSEDED", "REVOKED_BY_UPSTREAM_CHANGE"], "x-fingerprinted": false, "x-note": "EXCLUDED"},
+        "workflow_id": {"type": ["string", "null"], "x-fingerprinted": false},
+        "correlation_id": {"type": ["string", "null"], "x-fingerprinted": false},
+        "superseded_by": {"type": ["string", "null"], "x-fingerprinted": false, "x-note": "EXCLUDED"},
+        "dispatch_linkage_ref": {"type": ["string", "null"], "x-fingerprinted": false, "x-owner": "execution ledger", "x-note": "EXCLUDED"}
+      }
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/ClearanceResult"},
+    {"$ref": "#/$defs/ClearanceReceipt"}
+  ]
+}

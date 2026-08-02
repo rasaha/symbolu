@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.design/action_clearance/trusted_signal.schema.json",
+  "title": "TrustedSignal (Action Clearance)",
+  "status": "PROPOSED",
+  "version": "action_clearance.design.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. A normalized, immutable current-state signal received (never fetched) by the Action Clearance evaluator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signal_id",
+    "signal_type",
+    "tenant_id",
+    "subject_ref",
+    "source_ref",
+    "source_kind",
+    "captured_at",
+    "status",
+    "value",
+    "provenance_ref"
+  ],
+  "properties": {
+    "signal_id": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "adapter",
+      "description": "Stable id within the bundle."
+    },
+    "signal_type": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "adapter",
+      "enum": [
+        "AUTHORIZATION_VALIDITY",
+        "ACTOR_STATUS",
+        "POLICY_VALIDITY",
+        "CHANGE_FREEZE",
+        "ACTIVE_INCIDENT",
+        "ARTIFACT_IDENTITY",
+        "REQUIRED_CONTROL",
+        "TARGET_AVAILABILITY",
+        "PRIOR_CONSUMPTION"
+      ]
+    },
+    "tenant_id": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "identity/workflow context",
+      "x-trust": "must equal request.tenant_id"
+    },
+    "subject_ref": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "adapter",
+      "x-trust": "must bind to the action identity"
+    },
+    "source_ref": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "source system"
+    },
+    "source_kind": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "source system",
+      "examples": ["identity_provider", "incident_system", "change_management", "github_adapter", "execution_ledger", "policy_authority", "target_adapter"]
+    },
+    "captured_at": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "source system",
+      "description": "Caller/adapter-supplied observation time (canonical form; no core clock read)."
+    },
+    "valid_until": {
+      "type": ["string", "null"],
+      "x-required": "conditional:time_bounded_types",
+      "x-fingerprinted": true,
+      "x-owner": "source system",
+      "description": "Freshness bound. Required for policy-marked time-bounded signal types; missing bound on a required time-bounded signal => fail closed."
+    },
+    "status": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "enum": ["PRESENT", "ABSENT", "UNKNOWN"],
+      "description": "Structural liveness of the signal; UNKNOWN on a required signal => fail closed (HOLD)."
+    },
+    "value": {
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "source system",
+      "description": "Normalized scalar/struct state (deterministic after normalization)."
+    },
+    "provenance_ref": {
+      "type": "string",
+      "x-required": "core",
+      "x-fingerprinted": true,
+      "x-owner": "adapter",
+      "x-trust": "audited"
+    },
+    "integrity_digest": {
+      "type": ["string", "null"],
+      "x-required": "conditional:trust_required_types",
+      "x-fingerprinted": true,
+      "x-owner": "source system",
+      "x-trust": "required for trust-required signals; missing/invalid => SIGNAL_UNTRUSTED => BLOCK"
+    },
+    "policy_ref": {
+      "type": ["string", "null"],
+      "x-required": "adapter",
+      "x-fingerprinted": true,
+      "x-owner": "policy authority"
+    }
+  },
+  "x-condition-handling": {
+    "signal_missing": {"status": "HOLD", "reason": "SIGNAL_MISSING", "fail_closed": true},
+    "signal_stale": {"status": "HOLD", "reason": "SIGNAL_STALE", "policy_may_elevate": "BLOCK"},
+    "signal_expired": {"status": "HOLD", "reason": "SIGNAL_STALE"},
+    "signal_contradictory": {"status": "ESCALATE", "reason": "SIGNAL_CONFLICT"},
+    "signal_untrusted": {"status": "BLOCK", "reason": "SIGNAL_UNTRUSTED"},
+    "source_unavailable": {"status": "HOLD", "reason": "SIGNAL_MISSING", "fail_closed": true},
+    "tenant_mismatch": {"status": "BLOCK", "reason": "TENANT_MISMATCH"},
+    "subject_mismatch": {"status": "BLOCK", "reason": "SUBJECT_MISMATCH"}
+  }
+}

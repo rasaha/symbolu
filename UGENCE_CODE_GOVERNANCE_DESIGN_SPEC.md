@@ -406,6 +406,12 @@ to perform now?*
 > clearance result; the implementation-readiness audit maps it onto ACP's existing
 > representation rather than defining a new contract here.
 
+> **Cross-reference.** The neutral capability that performs this live operational
+> clearance is specified in [`ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md`](ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md)
+> (namespace `ugence_action_clearance`; clear-only; consumes the GitHub exact-merge
+> profile). Its full design lives under `docs/design/action_clearance/`; it is not
+> duplicated here.
+
 ### 4.6 Bind the governed artifact, not just the source SHA — **P0**
 
 The approved **source** SHA alone is insufficient, because the code that actually

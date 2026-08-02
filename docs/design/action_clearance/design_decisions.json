@@ -1,0 +1,64 @@
+{
+  "status": "PROPOSED",
+  "version": "action_clearance.design.v0.1",
+  "description": "Design artifact, NOT a committed runtime contract. Canonical decision ledger for Action Clearance v0.1. Each decision references the companion doc that details it.",
+  "invariant": "Action Clearance may preserve, narrow, defer, escalate, or block an existing authorization. It may never create authority, broaden authorization, replace ActionGate, dispatch execution, or own the authoritative consumption ledger.",
+  "starting_point": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_head": "3d9f73c9b244f058b63a1666ce389a0fbebf8376",
+    "design_branch": "claude/action-clearance-v0-1-design-9u4745",
+    "python_version": "3.11.15",
+    "code_governance_audit_status": "integrated (PR #1274)",
+    "action_clearance_audit_status": "integrated (PR #1275)",
+    "platform_freeze_substantive_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6",
+    "robotics_local_freeze_combined_digest": "8f8660e293308cf94c983a26a2ae69c9"
+  },
+  "naming": {
+    "capability": "Action Clearance",
+    "namespace": "ugence_action_clearance",
+    "distribution": "ugence-action-clearance",
+    "package_directory": "packages/capabilities/action-clearance",
+    "contract_policy_version": "action_clearance.v1",
+    "fingerprint_domain_tag": "action_clearance",
+    "bare_acp_prohibited_in": ["package names", "import paths", "public class names", "public type names", "reason-code prefixes", "persistent record names", "new technical doc headings"],
+    "robotics_alias": "NONE (no alias, re-export, or object identity with symbolu_robotics.autonomous_control_plane)",
+    "doc": "TERMINOLOGY_AND_NAMING.md"
+  },
+  "decisions": [
+    {"id": "D1", "topic": "authority", "decision": "clear-only; never mints authorization; robotics grant-minting NOT reused", "resolves": "audit R1", "doc": "AUTHORITY_BOUNDARY.md"},
+    {"id": "D2", "topic": "monotonicity", "decision": "clearance permissions SUBSET-OF authorized; effective_constraints = A INTERSECT C; conflict => ESCALATE/BLOCK; missing rule => fail closed", "doc": "MONOTONICITY_AND_CONSTRAINTS.md"},
+    {"id": "D3", "topic": "served_world", "decision": "domain-neutral core + profiles; first profile github_exact_merge", "resolves": "audit R3", "doc": "GITHUB_MERGE_PROFILE.md"},
+    {"id": "D4", "topic": "contract_family", "decision": "new Clearance* family (ClearanceRequest/ClearanceResult/ClearanceReceipt/ClearanceStatus/ClearanceReasonCode/TrustedSignal) that CONSUMES the neutral ActionGovernance* seam via a projection", "resolves": "audit R2", "doc": "REQUEST_CONTRACT.md"},
+    {"id": "D5", "topic": "result_states", "decision": "four statuses CLEAR/HOLD/BLOCK/ESCALATE; STALE/EXPIRED/INCOMPLETE/CONFLICT/UNTRUSTED are reason codes; DENY not used; precedence BLOCK>ESCALATE>HOLD>CLEAR", "doc": "STATUS_AND_REASON_SEMANTICS.md"},
+    {"id": "D6", "topic": "result_vs_receipt", "decision": "ClearanceResult = deterministic evaluator output; ClearanceReceipt = durable workflow record; storage metadata excluded from result_fingerprint", "doc": "RESULT_AND_RECEIPT_CONTRACT.md"},
+    {"id": "D7", "topic": "identity_strategy", "decision": "caller-supplied request_id + content-addressed result_id = 'acr_' + result_fingerprint; no core UUID/clock", "doc": "RESULT_AND_RECEIPT_CONTRACT.md"},
+    {"id": "D8", "topic": "time", "decision": "caller-supplied evaluation_time; valid_until <= authorization.expires_at and <= min(required-signal valid_until) and <= evaluated_at+max_lifetime; strict expiry; skew != expiry; boundary-at-expiry = expired", "doc": "TIME_AND_FRESHNESS.md"},
+    {"id": "D9", "topic": "determinism", "decision": "canonical JSON + SHA-256 domain-separated fingerprints (action/request/signal_bundle/result); no random/clock/network/env/mutable-global/unordered-reason", "doc": "DETERMINISM_AND_FINGERPRINTS.md"},
+    {"id": "D10", "topic": "persistence", "decision": "core persists nothing; Workflow Service persists ClearanceReceipt; execution/idempotency ledger persists reservation/consumption/dispatch/observation", "doc": "PERSISTENCE_BOUNDARY.md"},
+    {"id": "D11", "topic": "one_time_use", "decision": "downstream execution/idempotency ledger; replay_key = (tenant, authorization_ref, action_fingerprint, target, operation); Action Clearance receives prior-consumption as a signal; race => atomic reservation, one wins other DUPLICATE", "resolves": "audit R8/R9", "doc": "ONE_TIME_USE_AND_REPLAY.md"},
+    {"id": "D12", "topic": "actiongate_integration", "decision": "consume a minimal authorization projection + refs/fingerprints; only AUTHORIZED/AUTHORIZED_WITH_CONSTRAINTS eligible; denials never clearable; workflow layer invokes both", "doc": "ACTIONGATE_INTEGRATION.md"},
+    {"id": "D13", "topic": "decision_cer_integration", "decision": "reference DecisionRecord id, cer_id, CER content_hash, policy_refs, actor basis, override/supersession by id/hash only; no SoD re-run; no DA import; no duplicate decision record", "doc": "DECISION_AND_CER_INTEGRATION.md"},
+    {"id": "D14", "topic": "gpf", "decision": "directly-invoked capability; NO new ProviderKind; adapters registered/resolved by product/workflow layer, not GPF", "resolves": "audit R10", "doc": "GPF_RELATIONSHIP.md"},
+    {"id": "D15", "topic": "github_profile", "decision": "bind governed artifact (CG v0.2 sec 4.6); MVP direct+squash; rebase DEFERRED; merge-queue clears exact merge_group_sha in Phase I", "doc": "GITHUB_MERGE_PROFILE.md"},
+    {"id": "D16", "topic": "profile_extensibility", "decision": "narrowing-only, constrained typed extension interface (no open plugin); profiles add signal types, reason codes, identity fields, narrowing policy; may not add a status or broaden", "doc": "PROFILE_EXTENSIBILITY.md"},
+    {"id": "D17", "topic": "package", "decision": "packages/capabilities/action-clearance src-layout; recommended dep ugence-governance-contracts>=0.1.0 (stdlib-only leaf fallback); never upward on CG/robotics/console/execution/incident/identity/workflow/Model Selection/Hybrid LLM/DA", "doc": "PACKAGE_BOUNDARY.md"},
+    {"id": "D18", "topic": "existing_disposition", "decision": "robotics = SEPARATE_CAPABILITY/NOT_A_SOURCE_MOVE/NO_COMPATIBILITY_ALIAS/LOCAL_FREEZE_UNCHANGED; console = BEHAVIORAL_REFERENCE/POTENTIAL_FUTURE_CONSUMER; acp_db = future profile; no runtime migration now", "doc": "EXISTING_IMPLEMENTATION_DISPOSITION.md"},
+    {"id": "D19", "topic": "versioning", "decision": "distribution 0.1.0; contract action_clearance.v1; no compatibility promise to robotics imports", "doc": "VERSIONING.md"}
+  ],
+  "reason_code_classification": {
+    "CORE_NEUTRAL": ["CLEARANCE_GRANTED", "AUTHORIZATION_EXPIRED", "AUTHORIZATION_STALE", "ACTION_FINGERPRINT_MISMATCH", "TARGET_MISMATCH", "ACTOR_INVALID", "ACTOR_STATUS_UNKNOWN", "POLICY_VERSION_REJECTED", "ACTIVE_CHANGE_FREEZE", "ACTIVE_INCIDENT", "TARGET_UNAVAILABLE", "REQUIRED_CONTROL_UNSATISFIED", "ALREADY_CONSUMED", "SIGNAL_MISSING", "SIGNAL_STALE", "SIGNAL_UNTRUSTED", "SIGNAL_CONFLICT", "TENANT_MISMATCH", "SUBJECT_MISMATCH", "CONSTRAINT_CONFLICT", "CLEARANCE_POLICY_CONFLICT"],
+    "PROFILE_SPECIFIC": ["GITHUB_HEAD_SHA_CHANGED", "GITHUB_BASE_ADVANCED", "GITHUB_MERGE_TREE_MISMATCH", "GITHUB_MERGE_GROUP_MISMATCH", "GITHUB_MERGE_METHOD_CHANGED", "GITHUB_TARGET_BRANCH_MISMATCH", "GITHUB_REQUIRED_CHECK_PENDING", "GITHUB_REQUIRED_CHECK_FAILED", "GITHUB_APPROVAL_WITHDRAWN"],
+    "ADAPTER_SPECIFIC": ["<adapter sub-reasons carried in an extension map>"],
+    "WORKFLOW_ONLY": ["DISPATCH_DUPLICATE", "RECEIPT_SUPERSEDED"],
+    "UNNECESSARY": ["DENY", "ACP_*"]
+  },
+  "failure_classification": ["RESULT", "RETRYABLE_ERROR", "NON_RETRYABLE_ERROR", "ESCALATION", "UPSTREAM_REAUTHORIZATION_REQUIRED"],
+  "open_prerequisites": [
+    {"id": "Q2", "topic": "ClearanceReceipt persistence owner", "priority": "P1", "doc": "PERSISTENCE_BOUNDARY.md"},
+    {"id": "Q3", "topic": "signal provenance/integrity mechanism", "priority": "P1", "doc": "THREAT_MODEL.md"},
+    {"id": "Q4", "topic": "one-time-use ledger owner + atomic reservation contract", "priority": "P0-execution", "doc": "ONE_TIME_USE_AND_REPLAY.md"},
+    {"id": "Q6", "topic": "merge-queue derived-authorization flow", "priority": "P1", "doc": "GITHUB_MERGE_PROFILE.md"},
+    {"id": "Q7", "topic": "rebase support decision", "priority": "P1", "doc": "GITHUB_MERGE_PROFILE.md"}
+  ],
+  "verdict": "ACTION CLEARANCE V0.1 DESIGN READY WITH PREREQUISITES"
+}
