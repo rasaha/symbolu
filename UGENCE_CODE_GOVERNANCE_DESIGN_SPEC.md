@@ -9,6 +9,11 @@ is changed by this document.
 [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 and the
 [`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
+**Competitive landscape & market positioning** (how Ugence differs from CodeRabbit,
+Copilot, Snyk, GitHub Rulesets, Harness, etc., and which tools are evidence
+producers rather than competitors) are intentionally **out of scope here** and live
+in [`UGENCE_CODE_GOVERNANCE_COMPETITIVE_POSITIONING.md`](UGENCE_CODE_GOVERNANCE_COMPETITIVE_POSITIONING.md)
+(with a one-page [`UGENCE_CODE_GOVERNANCE_BATTLECARD.md`](UGENCE_CODE_GOVERNANCE_BATTLECARD.md)).
 
 > **One-line positioning.** *Ugence Code Governance governs AI-generated and
 > human-written software changes from proposal through validation, approval,
