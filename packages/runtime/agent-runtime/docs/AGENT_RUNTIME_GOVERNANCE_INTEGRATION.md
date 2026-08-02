@@ -17,10 +17,14 @@ class GovernanceHook(Protocol):
                  evaluation_time: float) -> GovernanceEvaluation: ...
 ```
 
-- `TransitionProposal` is an **immutable** description of the *exact* intended provider
-  invocation — workflow/instance/task ids, provider id, operation, canonicalized
-  arguments, idempotency key, correlation — plus a deterministic `fingerprint` over
-  those fields. It carries **no** credentials and **no** policy.
+- `TransitionProposal` is a **deeply immutable** description of the *exact* intended
+  provider invocation — workflow/instance/task ids, provider id, operation, deeply-frozen
+  canonical arguments, idempotency key, and correlation id — plus a deterministic
+  `fingerprint` over **all** of those fields (correlation id included). Arguments are
+  recursively frozen at construction (read-only mappings / tuples / frozensets); an
+  unsupported argument type fails closed with `ProposalError`. A governance hook cannot
+  mutate proposal identity; provider arguments are re-materialized as a fresh mutable
+  structure only after clearance. It carries **no** credentials and **no** policy.
 - `evaluation_time` is **caller-controlled**: the runtime passes its injected clock
   value so the runtime (not the hook) owns the logical clock and determinism.
 - `GovernanceEvaluation` returns only what the runtime needs: `disposition`,
@@ -42,9 +46,15 @@ proposal. Immediately before invoking a provider the runtime checks, and fails c
 | `GOVERNANCE_CLEAR_FINGERPRINT_MISMATCH` | fingerprint ≠ the proposal's |
 | `GOVERNANCE_PROPOSAL_TAMPERED` | the proposal changed after it was built |
 | `GOVERNANCE_CLEAR_MISSING_REFERENCE` | no binding reference (evaluation/authorization/clearance) |
-| `GOVERNANCE_CLEAR_EXPIRED` | `valid_until` is past at the execution check |
-| `GOVERNANCE_CLEAR_CORRELATION_MISMATCH` | correlation reference inconsistent |
-| `PROPOSAL_INVOCATION_MISMATCH` | the built invocation re-fingerprints to a different value |
+| `GOVERNANCE_CLEAR_EXPIRED` | `now >= valid_until` at the execution check (**inclusive** expiry) |
+| `GOVERNANCE_CLEAR_MISSING_CORRELATION` | proposal has a correlation id but the CLEAR carries none |
+| `GOVERNANCE_CLEAR_CORRELATION_MISMATCH` | correlation reference ≠ the proposal's |
+| `PROPOSAL_INVOCATION_MISMATCH` | the built invocation re-fingerprints (incl. correlation) to a different value |
+
+Correlation is **exact-action identity**, not loose metadata: it is folded into the
+fingerprint, so changing only the correlation id yields a different proposal, and a CLEAR
+must echo the proposal's correlation id (mandatory when present). Expiry is **inclusive**:
+at the exact `valid_until` instant the clearance is already expired.
 
 The runtime **mints none** of these references; governance produces them. The runtime
 proves the permission it consumes applies to the invocation it makes — without importing

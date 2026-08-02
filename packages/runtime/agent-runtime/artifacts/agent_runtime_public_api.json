@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-agent-runtime",
   "namespace": "ugence_agent_runtime",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "entry_point": "ugence_agent_runtime.api",
   "symbols": [
     "AgentDescriptor",
@@ -22,6 +22,7 @@
     "IntegrityError",
     "InvalidTransitionError",
     "NoopGovernanceHook",
+    "ProposalError",
     "Provider",
     "ProviderExecutionError",
     "ProviderNotFoundError",

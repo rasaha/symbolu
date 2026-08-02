@@ -6,7 +6,9 @@
     "signature": "evaluate(proposal: TransitionProposal, evaluation_time: float) -> GovernanceEvaluation",
     "evaluation_time": "caller-controlled (runtime supplies its injected clock value)"
   },
-  "transition_proposal": ["proposal_version", "workflow_id", "instance_id", "task_id", "provider_id", "operation", "arguments (canonicalized)", "idempotency_key", "correlation_id", "fingerprint (sha256)"],
+  "transition_proposal": ["proposal_version", "workflow_id", "instance_id", "task_id", "provider_id", "operation", "arguments (deeply frozen, canonicalized)", "idempotency_key", "correlation_id", "fingerprint (sha256)"],
+  "fingerprint_fields": ["proposal_version", "workflow_id", "instance_id", "task_id", "provider_id", "operation", "arguments (canonical)", "idempotency_key", "correlation_id"],
+  "proposal_immutability": "Arguments are recursively frozen at construction (read-only mappings, tuples, frozensets); scalars only otherwise. Unsupported argument types fail closed with ProposalError. Provider-invocation arguments are re-materialized as a fresh mutable structure only after clearance validation. A governance hook cannot mutate proposal identity.",
   "governance_evaluation": ["disposition", "proposal_fingerprint", "reason_codes", "evaluation_reference", "authorization_reference", "clearance_reference", "valid_until", "required_resolution", "correlation_reference", "detail"],
   "dispositions": ["CLEAR", "HOLD", "BLOCK", "ESCALATE"],
   "mapping": {
@@ -18,12 +20,14 @@
   "exact_action_binding": {
     "required_for_clear": [
       "proposal_fingerprint present",
-      "proposal_fingerprint == proposal.fingerprint",
+      "proposal_fingerprint == proposal.fingerprint (correlation is part of the fingerprint)",
       "proposal is intact (unchanged since built)",
       "at least one non-empty binding reference (evaluation/authorization/clearance)",
-      "valid_until (when set) not expired at the execution check",
-      "correlation_reference (when set) consistent with the proposal"
+      "valid_until (when set) not reached — inclusive: now < valid_until required",
+      "when proposal has a correlation id: correlation_reference present AND equal to it"
     ],
+    "expiry_semantics": "inclusive — reject when now >= valid_until",
+    "correlation_binding": "mandatory when the proposal has a correlation id; missing or mismatched fails closed. When correlation id is absent, no correlation binding is required.",
     "fail_closed_reason_codes": [
       "GOVERNANCE_CLEAR_MISSING_EVALUATION",
       "GOVERNANCE_NOT_CLEAR",
@@ -32,6 +36,7 @@
       "GOVERNANCE_PROPOSAL_TAMPERED",
       "GOVERNANCE_CLEAR_MISSING_REFERENCE",
       "GOVERNANCE_CLEAR_EXPIRED",
+      "GOVERNANCE_CLEAR_MISSING_CORRELATION",
       "GOVERNANCE_CLEAR_CORRELATION_MISMATCH",
       "PROPOSAL_INVOCATION_MISMATCH"
     ],

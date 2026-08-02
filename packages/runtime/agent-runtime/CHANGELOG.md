@@ -3,6 +3,33 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.1.2 — exact-action contract hardening
+
+Corrects three remaining gaps in the exact-action governance contract. Bounded
+contract-hardening only — not H22, not a governance-integration phase.
+
+### Changed (contract)
+- **Deeply immutable proposal identity (A).** `TransitionProposal` arguments are now
+  recursively frozen at construction (read-only mappings, tuples, frozensets); the
+  proposal no longer retains caller-owned mutable structures by reference, and a hook
+  cannot mutate proposal arguments. Unsupported argument types fail closed with
+  `ProposalError` instead of relying on `repr()`. Provider-invocation arguments are
+  re-materialized as a fresh mutable structure only after clearance validation.
+- **Correlation is fingerprinted identity (B).** `compute_fingerprint` now includes
+  `correlation_id`; changing only the correlation id changes the fingerprint. When a
+  proposal carries a correlation id, a CLEAR result must echo it — missing
+  (`GOVERNANCE_CLEAR_MISSING_CORRELATION`) or mismatched
+  (`GOVERNANCE_CLEAR_CORRELATION_MISMATCH`) correlation fails closed. The provider
+  invocation's correlation is revalidated in the exact-action re-fingerprint check.
+- **Inclusive expiry (C).** Clearance is rejected when `now >= valid_until` (previously
+  `now > valid_until`); at the exact expiry instant the clearance is expired.
+
+### Added
+- `ProposalError`; `TransitionProposal.materialize_arguments()`; contract-hardening test
+  suite (immutability, correlation binding, inclusive expiry).
+- CI workflow now also triggers on the default branch (path-filtered) so a merge that
+  touches the package receives a recorded run.
+
 ## 0.1.1 — post-merge governance-safety & fidelity correction
 
 Corrects issues found after 0.1.0 merged (PR #1287). This is a bounded correction
