@@ -1,0 +1,32 @@
+{
+  "$comment": "Enforcement-readiness verdicts (MVP 1F). A deterministic decision framework, not an automatic switch. NO verdict enables execution. No single numerical score.",
+  "verdicts": [
+    "READY_FOR_ENFORCEMENT_DESIGN",
+    "PILOT_CALIBRATION_REQUIRED",
+    "PRODUCT_VALUE_NOT_PROVEN",
+    "INSUFFICIENT_LIVE_EVIDENCE",
+    "SAFETY_OR_INTEGRITY_BLOCKED"
+  ],
+  "evidence_status": [
+    "IMPLEMENTED",
+    "OFFLINE_VERIFIED",
+    "LIVE_GITHUB_VERIFIED",
+    "LIVE_ENTERPRISE_SIGNAL_VERIFIED",
+    "REVIEWER_FEEDBACK_COLLECTED",
+    "NOT_RUN",
+    "INSUFFICIENT_EVIDENCE"
+  ],
+  "ready_requires": [
+    "zero credential leaks",
+    "zero write-boundary violations",
+    "zero unexplained integrity failures",
+    "complete audit reconstruction",
+    "adequate reviewer-feedback coverage",
+    "no unresolved serious possible false CLEAR",
+    "acceptable source reliability",
+    "credible incremental value beyond CI",
+    "bounded understood disagreements",
+    "explicit limitations recorded"
+  ],
+  "execution_status": "DISABLED"
+}

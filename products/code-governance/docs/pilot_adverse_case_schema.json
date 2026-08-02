@@ -1,0 +1,26 @@
+{
+  "$comment": "Adverse-case inventory (MVP 1F). Each case is individually reviewable, never hidden inside an aggregate; an unresolved case can block readiness.",
+  "kinds": [
+    "POSSIBLE_FALSE_CLEAR",
+    "POSSIBLE_UNNECESSARY_BLOCK",
+    "POSSIBLE_UNNECESSARY_ESCALATE",
+    "MISSED_AUTHORITY_REQUIREMENT",
+    "STALE_HEAD_MISS",
+    "SOURCE_CONFLICT_MISHANDLING",
+    "POLICY_AMENDMENT_AFTER_START",
+    "REVIEWER_SAFETY_CONCERN",
+    "INTEGRITY_ANOMALY",
+    "CREDENTIAL_OR_BOUNDARY_CONCERN"
+  ],
+  "fields": [
+    "case_id",
+    "pilot_id",
+    "kind",
+    "workflow_revision_id",
+    "evidence_class",
+    "detail",
+    "supporting_refs",
+    "resolved",
+    "serious"
+  ]
+}

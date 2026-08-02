@@ -1,0 +1,21 @@
+{
+  "$comment": "Evidence classes (MVP 1F). Synthetic/supplied/replay results are NEVER aggregated into a metric presented as live enterprise performance.",
+  "evidence_classes": [
+    "LIVE_GITHUB_METADATA",
+    "LIVE_ENTERPRISE_SIGNAL",
+    "SUPPLIED_ENTERPRISE_SNAPSHOT",
+    "HISTORICAL_REPLAY",
+    "SYNTHETIC_CONTROL",
+    "REVIEWER_FEEDBACK",
+    "OPERATIONAL_OBSERVATION"
+  ],
+  "live_classes": [
+    "LIVE_GITHUB_METADATA",
+    "LIVE_ENTERPRISE_SIGNAL"
+  ],
+  "non_live_classes": [
+    "HISTORICAL_REPLAY",
+    "SYNTHETIC_CONTROL",
+    "SUPPLIED_ENTERPRISE_SNAPSHOT"
+  ]
+}

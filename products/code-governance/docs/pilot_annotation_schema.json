@@ -1,0 +1,29 @@
+{
+  "$comment": "Append-only reviewer annotation (MVP 1F). Bound to the exact workflow revision + head SHA; never modifies the original clearance/intervention record; a unique-value claim requires an evidence reference.",
+  "fields": [
+    "annotation_id",
+    "pilot_id",
+    "evaluation_id",
+    "tenant_id",
+    "workflow_id",
+    "workflow_revision_id",
+    "head_sha",
+    "reviewer_ref",
+    "reviewer_role",
+    "review_mode",
+    "evidence_class",
+    "initial_reviewer_status",
+    "ugence_clearance_status",
+    "status_assessment",
+    "intervention_assessment",
+    "required_authority_correct",
+    "incremental_value",
+    "incremental_value_labels",
+    "root_cause_categories",
+    "actual_outcome",
+    "would_ci_have_detected",
+    "unique_value_evidence_ref",
+    "note_classification",
+    "created_at"
+  ]
+}

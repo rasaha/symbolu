@@ -1,0 +1,15 @@
+{
+  "$comment": "Pilot cohorts (MVP 1F). Assignment is evidence-based and explainable; AI-generated code is never inferred from style or speculation.",
+  "cohorts": [
+    "ROUTINE_LOW_RISK",
+    "SENSITIVE_CODE_PATH",
+    "AI_GENERATED_OR_AI_ASSISTED",
+    "STALE_HEAD_OR_REVISED_CHANGE",
+    "MISSING_OR_STALE_EVIDENCE",
+    "ACTIVE_CHANGE_RESTRICTION",
+    "INCIDENT_OR_OPERATIONAL_RISK",
+    "AUTHORITY_OR_SEPARATION_OF_DUTIES",
+    "CONFLICTING_SOURCE_SIGNALS",
+    "CONTROL_GROUP"
+  ]
+}

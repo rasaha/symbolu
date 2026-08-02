@@ -1,13 +1,14 @@
-# Code Governance — Next Phases (out of scope for MVP 1E)
+# Code Governance — Next Phases (out of scope for MVP 1F)
 
-MVP 1E makes the 1D read-only pilot **deployable and operable** — a
-security-bounded pilot operator with lifecycle controls, credential isolation,
-preflight, observability, a reviewer queue, restart recovery, a kill switch, and
-closeout — against a narrowly allowlisted GitHub environment. It changes how a
-read-only pilot is *operated*, not what the product is allowed to do. Execution
-remains `DISABLED`.
+MVP 1F runs, annotates, analyzes, and closes out a **bounded shadow-pilot
+validation** and produces an evidence-based **enforcement-readiness verdict**. It
+is an operational validation phase: it measures the existing shadow product and
+decides whether enforcement *design* is justified. It does not enforce anything.
+Execution remains `DISABLED`.
 
-The following are **not** implemented and must not be started under this phase:
+The default evidence status is `IMPLEMENTED_AND_OFFLINE_VERIFIED` and the default
+readiness verdict is `INSUFFICIENT_LIVE_EVIDENCE` (no live pilot was run) — so the
+following remain out of scope and must not be started here:
 
 | Item | Owner / phase |
 |---|---|
@@ -15,38 +16,35 @@ The following are **not** implemented and must not be started under this phase:
 | Authoritative authorization-consumption ledger | later |
 | GitHub execution provider + write permissions + merge credential | provider (later) |
 | Merge / deployment enforcement | later |
-| Automatic policy learning / feedback-driven policy change | later (human-driven, separately authorized) |
-| Live non-GitHub enterprise clients | product/integration (read-only) |
-| Broad multi-tenant SaaS control plane / network control API | later (only with an established secure service pattern) |
-| Signed-producer adapter attestation (trust level 3) | later |
-| External database | later |
+| Automatic policy change from reviewer feedback | later (human-driven, separately authorized) |
+| Broad analytics platform / external production database | later |
+| GitHub checks/status writes | later (only under an explicit enforcement mandate) |
+| Live enterprise-system clients (beyond read-only GitHub) | product/integration (read-only) |
 | Production-enforcement-readiness certification | later |
 
-## What a future enforcement phase would build on this foundation
+## What a future enforcement-design phase would require first
 
-1E provides the deployable, observable, credential-isolated, recoverable operator
-substrate an enforcement phase would sit behind. An enforcement phase would add —
-**separately, and without weakening any 1E boundary** — a reservation primitive,
-an authoritative consumption ledger, a real GitHub execution provider behind
-explicit write credentials, and merge/deployment enforcement, each behind its own
-authority and credential boundary. Reviewer feedback and pilot metrics inform, but
-never automatically drive, such a change.
+Enforcement design should begin only when a real bounded pilot yields
+`READY_FOR_ENFORCEMENT_DESIGN`: zero credential leaks, zero write-boundary
+violations, zero unexplained integrity failures, complete audit reconstruction,
+adequate reviewer-feedback coverage, no unresolved serious possible false CLEAR,
+acceptable source reliability, credible incremental value beyond GitHub/CI, bounded
+understood disagreements, and explicit limitations. Even then, that verdict
+authorizes *design work* — never execution.
 
 ## Invariants every later phase must preserve
 
 - `execution_status()` stays `DISABLED` until an explicit, separately-authorized
-  execution phase; the operator never gains a write path or a write permission.
-- Adapters supply conditions only; the operator coordinates but owns no authority,
-  issues no binding decision, and never approves/merges/executes.
-- Startup and resume require explicit operator actions; recovery performs no
-  external call automatically and never auto-resumes an ACTIVE pilot.
-- Reviewer assignment is not approval; reviewer feedback never changes policy
-  automatically; a successful pilot never enables enforcement.
-- Credentials are externally supplied and never persisted; only governance-relevant
-  data is collected.
+  execution phase; no verdict, metric, or pilot result enables execution.
+- Adapters supply conditions only; the operator coordinates; the study measures.
+  None issues a binding decision, approves, merges, or executes.
+- Evidence classes are never conflated; supplied snapshots and synthetic scenarios
+  are never presented as live enterprise evidence.
+- Reviewer agreement is not absolute ground truth; small-sample findings are not
+  overstated; no precision/recall/accuracy without a defensible protocol.
+- Calibration recommendations never change policy automatically; replay never
+  overwrites originals and makes no external call.
 - No new `ProviderKind`; no neutral-contract change; the canonical Action Clearance
   package, ActionGate, TAP, Decision Authority, GPF, StoryGraph, and robotics ACP
-  stay unmodified.
-- No fabricated live-pilot evidence: results are labeled IMPLEMENTED /
-  OFFLINE_VERIFIED / LIVE_SMOKE_VERIFIED / PILOT_DATA_COLLECTED / NOT_RUN honestly.
+  stay unmodified. No external production database. Credentials are never persisted.
 - The bare acronym "ACP" never appears in new technical surfaces.

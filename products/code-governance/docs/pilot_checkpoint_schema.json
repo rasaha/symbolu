@@ -1,0 +1,30 @@
+{
+  "$comment": "Pilot checkpoint (MVP 1F). A checkpoint decision never enables enforcement; critical safety failures recommend STOP.",
+  "kinds": [
+    "PRE_PILOT",
+    "EARLY_CHECKPOINT",
+    "MIDPOINT",
+    "PRE_CLOSEOUT",
+    "FINAL"
+  ],
+  "recommendations": [
+    "CONTINUE",
+    "PAUSE",
+    "STOP"
+  ],
+  "fields": [
+    "pilot_id",
+    "tenant_id",
+    "kind",
+    "lifecycle_state",
+    "evaluations_completed",
+    "feedback_coverage",
+    "source_failure_rate",
+    "disagreement_categories",
+    "unresolved_adverse_cases",
+    "security_status",
+    "integrity_status",
+    "recommendation",
+    "execution_status"
+  ]
+}
