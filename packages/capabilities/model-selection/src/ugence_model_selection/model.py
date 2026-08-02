@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Set
 
-from execution_gate.states import Evidence
+from .states import Evidence
 
 
 @dataclass
