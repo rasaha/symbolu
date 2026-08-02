@@ -1,0 +1,86 @@
+{
+  "audit": "ACP consumer / import graph",
+  "core": "symbolu_robotics.autonomous_control_plane (concept #1)",
+  "real_product_consumers": {
+    "count_subsystems": 3,
+    "count_files": 13,
+    "subsystems": [
+      {
+        "name": "cer_v0_1",
+        "files": [
+          "cer_v0_1/control_plane.py:28 (from ...cloud.adapter import CloudShadowAdapter)",
+          "cer_v0_1/control_plane.py:29 (from ...cloud.composition import AuthorizationVerdict)",
+          "cer_v0_1/spec.py:167,195,219 (from ...cloud.envelopes import CloudWorldState ...)",
+          "cer_v0_1/conformance/runner.py:182-183 (cloud composition + adapter)",
+          "cer_v0_1/_paths.py:6 (sys.path shim)"
+        ]
+      },
+      {
+        "name": "cer_v0_2",
+        "files": [
+          "cer_v0_2/control_plane.py:24-25 (cloud.adapter + cloud.composition)",
+          "cer_v0_2/conformance/runner.py:188 (cloud composition + adapter)",
+          "cer_v0_2/profiles/rollout.py:79 / scale.py:53 / _common.py:55 (cloud.envelopes)"
+        ]
+      },
+      {
+        "name": "cer_v0_3",
+        "files": [
+          "cer_v0_3/control_plane.py:30 (from ...cloud.composition import AuthorizationVerdict)",
+          "cer_v0_3/acp_db/adapter.py:20 (cloud.composition: AuthorizationVerdict, CombinedOutcome, CompositionResult, compose)",
+          "cer_v0_3/acp_db/adapter.py:23 / safety.py:30 (cloud.outcomes: CloudRecommendation)",
+          "cer_v0_3/conformance/cross_domain.py:228 (cloud composition + outcomes)"
+        ]
+      }
+    ],
+    "import_style": "deep imports of .cloud.* (and .safety_adapters.*); the frozen top-level __init__ __all__ does NOT re-export cloud",
+    "serialization_relied_upon": "enum .value strings of AuthorizationVerdict / CombinedOutcome / CloudRecommendation / CloudValidity; CloudWorldState/CloudActionCandidate field schema; compose() semantics"
+  },
+  "shadow_bench_consumers": {
+    "count_files": 8,
+    "dirs": [
+      "robotics_reliability_bench/acp_cloud",
+      "robotics_reliability_bench/acp_k8s_integrated",
+      "robotics_reliability_bench/acp_shadow",
+      "robotics_reliability_bench/acp_shadow2",
+      "robotics_reliability_bench/acp_shadow3"
+    ]
+  },
+  "test_boundary_consumers": {
+    "count_files": 6,
+    "positive": [
+      "cer_v0_1/tests/test_e2e_governance.py:85",
+      "cer_v0_2/tests/test_governance_and_compat.py:72",
+      "cer_v0_3/tests/test_backward_compat.py",
+      "robotics_reliability_bench/acp_control_plane/test_control_plane.py",
+      "robotics_reliability_bench/acp_k8s_integrated/test_integrated.py"
+    ],
+    "negative_guard": "packages/capabilities/storygraph/tests/compatibility/test_dependencies.py:25 (asserts storygraph does NOT import acp / autonomous_control_plane / symbolu_robotics)"
+  },
+  "console_clearance_concept3": {
+    "core_imports_of_robotics": 0,
+    "note": "ugence_console_api references the string 'autonomous_control_plane' only as a display label / registry key (registry.py:63, orchestrator.py:103, app.py:67). ClearanceVerdict is defined and consumed only within ugence_console_api.",
+    "internal_consumers": [
+      "ugence_console_api/orchestrator.py:98-105 (Clear stage calls operational_safety.clear)",
+      "ugence_console_api/app.py (POST /v1/actions/clear)"
+    ]
+  },
+  "governance_chain_clearance_seam": {
+    "note": "The EXPIRED/freshness seam for the governance chain is owned elsewhere, not by the robotics core.",
+    "owners": [
+      "decision_governance/actions/control_plane.py (OfflineDeterministicControlPlane -> AuthorizationOutcome.EXPIRED)",
+      "packages/governance-provider-framework/.../reference/action.py (EXPIRED on authorization_expired)",
+      "packages/governance-provider-framework/.../adapters/action_to_control_plane.py (computes authorization_expired from cer.expires_at < now)"
+    ]
+  },
+  "dependency_graph_text": [
+    "symbolu_robotics.autonomous_control_plane (CORE, concept #1)",
+    "  <- cer_v0_1 / cer_v0_2 / cer_v0_3 (PRODUCT, deep-import .cloud.*)",
+    "  <- cer_v0_3/acp_db (concept #4; reuses frozen compose())",
+    "  <- robotics_reliability_bench/acp_* (SHADOW / BENCH)",
+    "  <- cer tests, acp_control_plane/test, acp_k8s_integrated/test (TEST)",
+    "  (storygraph test_dependencies.py asserts NO edge)",
+    "ugence_console_api (concept #3, digital clearance) -- NO import of robotics core",
+    "ACP/ + ai_control_plane_v3/ (concept #2, AI Control Plane) -- DOCS ONLY"
+  ]
+}
