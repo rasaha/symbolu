@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from governance_providers.api import ProviderHealth
+from ugence_governance_provider_framework.api import ProviderHealth
 
 from ..configuration import TapSettings
 from ..provider import TAPProvider

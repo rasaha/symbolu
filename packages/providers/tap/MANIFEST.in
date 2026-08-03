@@ -1,0 +1,7 @@
+include README.md CHANGELOG.md MIGRATION.md LICENSE
+include src/ugence_tap_provider/py.typed
+recursive-include docs *.md
+graft artifacts
+prune tests
+global-exclude __pycache__/*
+global-exclude *.py[cod]

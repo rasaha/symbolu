@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from governance_providers.api import AssertionCoverage, AssertionGovernanceResult
+from ugence_governance_provider_framework.api import AssertionCoverage, AssertionGovernanceResult
 
 from ..core import TapEvaluationResult, TapOutcome
 from .controls import encode_constraints, encode_obligations

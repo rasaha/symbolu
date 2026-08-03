@@ -16,7 +16,7 @@ failure become SUPPORTED.
 
 from __future__ import annotations
 
-from governance_providers.api import (
+from ugence_governance_provider_framework.api import (
     ProviderConfigurationError,
     ProviderError,
     ProviderProtocolError,

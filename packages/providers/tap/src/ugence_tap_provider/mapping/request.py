@@ -17,7 +17,7 @@ only references cross the boundary.
 
 from __future__ import annotations
 
-from governance_providers.api import AssertionGovernanceRequest
+from ugence_governance_provider_framework.api import AssertionGovernanceRequest
 
 from ..core import TapEvaluationRequest, TapEvidenceItem
 

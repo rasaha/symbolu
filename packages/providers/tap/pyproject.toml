@@ -1,0 +1,86 @@
+# Independent distribution for the canonical Ugence TAP assertion-governance provider.
+#
+# This is the ONE canonical source tree (``src/ugence_tap_provider``) for the TAP
+# provider: the vendor assertion-governance engine core plus the neutral
+# ``AssertionGovernanceProvider`` adapter (request/result mapping, error
+# translation, fail-safe policy, configuration, health, observability, and
+# conformance). TAP evaluates assertion *support* only — it owns NO authorization
+# or execution authority.
+#
+# Dependency policy (TAP core):
+#   * ugence-governance-provider-framework — the neutral provider framework whose
+#     ``.api`` surface TAP consumes (the ONLY hard dependency).
+#   * Python standard library.
+# The TAP *core* (``core/``, ``client/``) imports neither the framework nor the
+# kernel. The Decision Authority kernel is reached ONLY through the framework's
+# optional assessment-integration adapter, so it is an OPTIONAL extra
+# (``decision-authority``) — TAP never acquires a mandatory kernel dependency.
+# TAP does NOT depend on ActionGate: TAP and ActionGate are independent peer
+# providers. Remote mode uses the in-process client abstraction and adds no
+# third-party HTTP dependency.
+#
+# The legacy ``tap_provider`` namespace (root of the repo) is a logic-free
+# compatibility facade that re-exports this package.
+#
+# Build:  python -m build packages/providers/tap
+# Verify: python packages/providers/tap/scripts/verify_tap_provider_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-tap-provider"
+dynamic = ["version"]
+description = "Ugence TAP — an assertion-governance provider evaluating whether a material assertion is supported by supplied evidence. Deterministic, offline core; owns no authorization or execution authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["assertion", "governance", "provider", "evidence", "tap", "ugence"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Core hard dependency: the neutral provider framework only. No kernel, no
+# ActionGate, no AI Hiring, no model SDK, no web framework, no database driver,
+# no cloud client.
+dependencies = ["ugence-governance-provider-framework>=0.1.0"]
+
+[project.optional-dependencies]
+# The assessment-integration path (AssertionAssessmentIntegration) is a framework
+# adapter bound to the Decision Authority kernel; opt in via the framework's own
+# ``adapters`` extra so TAP does not re-decide the framework's kernel wiring.
+decision-authority = ["ugence-governance-provider-framework[adapters]>=0.1.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+all = ["ugence-governance-provider-framework[adapters]>=0.1.0"]
+
+[project.scripts]
+ugence-tap-provider = "ugence_tap_provider.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/providers/tap/docs"
+
+# Read statically from the version module's literal so the build backend never
+# needs to import the package to resolve the version.
+[tool.setuptools.dynamic]
+version = { attr = "ugence_tap_provider.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_tap_provider*"]
+
+[tool.setuptools.package-data]
+ugence_tap_provider = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
