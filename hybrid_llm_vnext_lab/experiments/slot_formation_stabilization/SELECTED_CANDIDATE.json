@@ -1,0 +1,181 @@
+{
+  "selected": "CR1",
+  "classification": "CANDIDATE_SELECTED",
+  "winner_scorecard": {
+    "arm": "CR1",
+    "forming": {
+      "3": true,
+      "6": true,
+      "7": true
+    },
+    "n_forming": 3,
+    "rescued_nonformers": [
+      3,
+      7
+    ],
+    "seed6_formed": true,
+    "needle_d96": {
+      "3": {
+        "S": 1.0,
+        "A+": 0.016666666666666666
+      },
+      "6": {
+        "S": 0.8333333333333334,
+        "A+": 0.016666666666666666
+      },
+      "7": {
+        "S": 0.9666666666666667,
+        "A+": 0.0
+      }
+    },
+    "S_minus_Aplus_d96": {
+      "3": 0.9833,
+      "6": 0.8167,
+      "7": 0.9667
+    },
+    "min_margin": 0.8167,
+    "median_margin": 0.9667,
+    "mean_margin": 0.9222,
+    "ppl_mean_S256": 136.91,
+    "ppl_mean_Aplus256": 144.97,
+    "ppl_ok": true,
+    "param_ok": true,
+    "causal_by_forming_seed": {
+      "3": true,
+      "6": true,
+      "7": true
+    },
+    "causal_all_forming": true,
+    "distance_d16": {
+      "3": {
+        "S": 1.0,
+        "A+": 0.025
+      },
+      "6": {
+        "S": 0.55,
+        "A+": 0.016666666666666666
+      },
+      "7": {
+        "S": 0.9916666666666667,
+        "A+": 0.0
+      }
+    },
+    "distance_d220": {
+      "3": {
+        "S": 1.0,
+        "A+": 0.008333333333333333
+      },
+      "6": {
+        "S": 0.625,
+        "A+": 0.016666666666666666
+      },
+      "7": {
+        "S": 0.9583333333333334,
+        "A+": 0.0
+      }
+    },
+    "eligibility": {
+      "e1_forms_ge2": true,
+      "e2_rescues_nonformer": true,
+      "e3_seed6_ok": true,
+      "e4_ppl": true,
+      "e5_causal": true,
+      "e6_no_nxn": true,
+      "e7_param_match": true,
+      "e8_no_phase_kda_mla": true
+    },
+    "eligible": true
+  },
+  "tie_detected": false,
+  "tie_note": "clear winner",
+  "selection_trace": [
+    {
+      "arm": "CR1",
+      "n_forming": 3,
+      "rescued": [
+        3,
+        7
+      ],
+      "min_margin": 0.8167,
+      "median_margin": 0.9667,
+      "ppl": 136.91,
+      "simplicity_rank": 4,
+      "sort_key": [
+        "-3",
+        "-2",
+        "-0.8167",
+        "-0.9667",
+        "136.91",
+        "4",
+        "CR1"
+      ]
+    },
+    {
+      "arm": "R1",
+      "n_forming": 2,
+      "rescued": [
+        7
+      ],
+      "min_margin": -0.0083,
+      "median_margin": 0.225,
+      "ppl": 119.01,
+      "simplicity_rank": 3,
+      "sort_key": [
+        "-2",
+        "-1",
+        "0.0083",
+        "-0.225",
+        "119.01",
+        "3",
+        "R1"
+      ]
+    }
+  ],
+  "combination_prohibition": "single candidate only; no cross-family combination this phase.",
+  "candidate_config": {
+    "id": "CR1",
+    "family": "3_scaffold",
+    "desc": "curriculum + temporary alignment",
+    "slot_lr": 0.002,
+    "slot_warmup": 60,
+    "nonslot_lr": 0.002,
+    "nonslot_warmup": 60,
+    "orthogonal_keys": false,
+    "curriculum": true,
+    "alignment": true
+  },
+  "candidate_config_note": "CR1 = curriculum (boundaries 300/700/1200; final 500 steps original) + temporary write-read alignment (lambda 0.10 -> 0 by step 600; label-free; no inference-time op). Within-Family-3 combination, pre-registered. No cross-family combination.",
+  "preregistration_hashes": {
+    "ACCEPTANCE_GATES.json": "4bbd5d5940d30f4a99fb3f2a540a220725cf30bfe02aabf7954221d2e149158e",
+    "EXPERIMENT_MATRIX.json": "cab332daebc8c27d933462e7569aaee7b5fbe9184d16456030f9e16c1d038014",
+    "SELECTION_RULE.json": "5e8f350478b21aac46c93a41abce18af40cd5317cdff98f07b6552a1270c7d1b"
+  },
+  "frozen_config_hashes": {
+    "experiments/phase_lc/results/abc.json": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "hybrid_llm_vnext_lab/artifacts/five_seed_results_run1.json": "87dd642b04e955a1057acea61feb0ab7e3f9efe8f1b26b3ca13da21312f52ae3",
+    "hybrid_llm_vnext_lab/artifacts/five_seed_classification_run1.json": "25aa469863e45de7b52bf1ebe7fb7bea729cf090f7f67bb60ce91b5d46fe354a",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py": "5e95a1a17925d3935ea991c4019e3a0a94a5b481cabc5a0211e53aa2b0c6918b",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py": "51b94840786e28b1529db9470eff4a7dc01a991edfb149b55d8ec77c18a30dc2",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py": "e836b9e1e47cf7f948333e14083a402b71409fa95da05f05f18f2343032cd7a2",
+    "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py": "86d7065735cc917d868e850d57771175d9de61acbf62f3f7351f7462ebe9fe8a",
+    "experiments/phase_lc/tasks.py": "806e2445990f9c9676ddc585c98aea97d7fffc73c53ce292ed14f6011e69d05c",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json": "1833db22587fffd33abbc379afeeb93d720f45a1b73bbaccc3c76dfc7fb59afa"
+  },
+  "stage_b_plan": {
+    "seeds": [
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "arms": [
+      "A+",
+      "B0",
+      "CR1"
+    ],
+    "steps": 1200,
+    "no_tuning": true
+  },
+  "selected_sha256": null
+}
