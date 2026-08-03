@@ -6,3 +6,6 @@
 results/**/checkpoints/
 results/**/*.pt
 raw_traces/
+
+# transient run log
+results/run.log

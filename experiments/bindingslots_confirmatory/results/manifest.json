@@ -1,0 +1,38 @@
+{
+  "schema": "bindingslots_confirmatory/run_manifest/v1",
+  "code_commit": "1886363bdabf76fafb926263f7ed76d75e7dbff2",
+  "frozen_cr1_config_sha256": "ce4d93ea311da931c30a845b4437b45b5cb1d287c2e8bd1a03ce7d8054957f70",
+  "classifier_sha256": "c7710d2d72482007fe98bed49e2790fe1058c3d7a53ecfa0c608d3351782b2d0",
+  "fresh_seeds": [
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "arms": [
+    "A+",
+    "B0",
+    "CR1"
+  ],
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "torch": "2.2.2+cu121",
+    "cuda_available": false,
+    "num_threads": 4,
+    "fp": "fp32"
+  },
+  "abc_json_sha256_before": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_json_sha256_after": null,
+  "restart_events": [
+    {
+      "event": "orchestrator_start",
+      "ts_monotonic": 1765.542
+    }
+  ],
+  "seed_arm_status": {
+    "A+_seed13": "complete"
+  }
+}
