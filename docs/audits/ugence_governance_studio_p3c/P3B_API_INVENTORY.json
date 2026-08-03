@@ -1,0 +1,18 @@
+{
+  "api_contract_version": "governance_studio.api.v1",
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "total_operations": 23,
+  "consumed_by_p3c": [
+    "get_health", "get_ready", "get_version",
+    "list_scenarios", "get_scenario", "get_scenario_workflow",
+    "get_scenario_registry", "get_scenario_eligibility", "explain_eligibility"
+  ],
+  "excluded_p3d_operations": [
+    "get_scenario_ranking", "get_scenario_plan", "export_scenario", "scenario_what_if",
+    "validate_workflow", "adapt_workflow", "compare_adaptations",
+    "evaluate_eligibility", "evaluate_ranking", "compose_workforce",
+    "explain_ranking", "explain_plan", "replay_plan", "compare_plans"
+  ],
+  "generation_tool": "openapi-typescript@7",
+  "generated_artifact": "src/generated/api.ts (+ openapi.hash.json)"
+}
