@@ -17,17 +17,19 @@ export default {
           0: "#f5f7fa",
           1: "#c7cedb",
           2: "#8b95a7",
-          3: "#5c6678",
+          3: "#727d90",
         },
         state: {
-          eligible: "#1f9d6b",
-          ineligible: "#c2453a",
-          indeterminate: "#c08a2e",
-          invalid: "#7a5cd0",
-          authority: "#2f6fb0",
-          review: "#b06fb0",
-          governance: "#3a8f96",
-          deterministic: "#6b7280",
+          // Brightened to meet WCAG 2.2 AA on the app's dark tinted surfaces
+          // (verified by scripts/verify-contrast.mjs).
+          eligible: "#3ecf8e",
+          ineligible: "#f0685c",
+          indeterminate: "#d9a441",
+          invalid: "#a78bfa",
+          authority: "#5aa2e0",
+          review: "#cf8ccf",
+          governance: "#4fc4cd",
+          deterministic: "#8b95a7",
         },
       },
       fontFamily: {
