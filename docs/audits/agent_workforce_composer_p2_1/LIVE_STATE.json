@@ -1,0 +1,37 @@
+{
+  "phase": "Agent Workforce Composer P2.1 — Compiler workflow_ir.v2 Compatibility Adapter",
+  "repository": "rasaha/symbolu",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "db10adad0c4f02ecc52f99c820b6419f25b436e5",
+  "working_branch": "claude/awc-p2-1-compiler-v2-adapter",
+  "working_tree_clean_at_branch_creation": true,
+  "active_p2_1_pr": false,
+  "prerequisites": {
+    "pr_1308_awc_p1": {"merged": true, "merge_commit": "d1cfad24777ae0bbd49f7be4a699786fed1ffb3b"},
+    "pr_1310_awc_p2": {"merged": true, "merge_commit": "0f5a461fb6714a4c55637d29e488814a2fe1a646"},
+    "pr_1312_governance_studio_p3a": {"merged": true, "merge_commit": "8f19d17bba08864af81b2369aacf8102dea3a582"},
+    "pr_1314_pwc_p2": {"merged": true, "merge_commit": "40d19b83"},
+    "pr_1316_pwc_p2_version_correction": {"merged": true, "merge_commit": "db10adad0c4f02ecc52f99c820b6419f25b436e5"}
+  },
+  "compiler": {
+    "distribution_version": "0.2.0", "product_version": "0.2.0",
+    "supported_contracts": ["workflow_ir.v1", "workflow_ir.v2"],
+    "workflow_ir_v1_digest_identity": "0.1.0", "workflow_ir_v2_digest_identity": "0.2.0"
+  },
+  "awc": {
+    "distribution_version_before": "0.2.0", "distribution_version_after": "0.2.1",
+    "product_version_before": "0.2.0", "product_version_after": "0.2.1",
+    "contracts_preserved": ["awc.v1", "awc.composition.v1"],
+    "new_adapter_contract": "awc.compiler_adapter.v2",
+    "public_api_before": 93, "public_api_after": 109
+  },
+  "baselines": {
+    "awc_tests_before": "158 passed", "awc_tests_after": "203 passed",
+    "governance_studio_p3a": "94 passed", "compiler_tests": "153 passed, 1 skipped",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "equivalence_result": {
+    "procurement": "SEMANTICALLY_EQUIVALENT", "customer_support": "SEMANTICALLY_EQUIVALENT",
+    "cybersecurity_success": "SEMANTICALLY_EQUIVALENT", "cybersecurity_no_feasible_team": "SEMANTICALLY_EQUIVALENT"
+  }
+}

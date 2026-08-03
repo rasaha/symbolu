@@ -1,0 +1,13 @@
+{
+  "schema": "awc.p2_1.v2_adapter_mapping.v1",
+  "mappings": [
+    {"compiler_field": "semantic_purpose", "awc_target": "role_name", "transformation": "verbatim; overlay override", "unknown": "node label/kind", "conflict": "overlay override tracked", "fingerprint_participation": "role_fingerprint (v2 differs from v1)"},
+    {"compiler_field": "semantic_description", "awc_target": "role_description", "transformation": "verbatim", "unknown": "output_contract", "conflict": "overlay override", "fingerprint_participation": "role_fingerprint"},
+    {"compiler_field": "required_capability_refs", "awc_target": "required_capabilities", "transformation": "union with reduced-overlay specialist, sorted", "unknown": "overlay-only", "conflict": "none (union)", "fingerprint_participation": "role_fingerprint; PLANNING-relevant"},
+    {"compiler_field": "human_review_requirement", "awc_target": "human_review_requirement", "transformation": "OR with overlay (strengthen only)", "unknown": "false", "conflict": "OVERLAY_REMOVES_HUMAN_REVIEW fail-closed", "fingerprint_participation": "role_fingerprint; PLANNING-relevant"},
+    {"compiler_field": "authority_disposition", "awc_target": "authority_context.authority_disposition", "transformation": "from base_ir node (identical to v1)", "unknown": "advisory", "conflict": "never broadened by overlay", "fingerprint_participation": "role_fingerprint; PLANNING-relevant"},
+    {"compiler_field": "dependency_semantics", "awc_target": "RoleDependencyGraph", "transformation": "map by dependency kind; role->role only", "unknown": "skip non-agent endpoint", "conflict": "n/a", "fingerprint_participation": "graph_fingerprint (envelope only)"},
+    {"compiler_field": "provenance", "awc_target": "Provenance.notes + source_kind", "transformation": "preserve compiler contract/rule/version", "unknown": "compiler_contract only", "conflict": "adapter provenance distinguishable", "fingerprint_participation": "role_fingerprint (v2 differs)"}
+  ],
+  "deferred": ["data_classification_refs", "permission_intent_refs", "required_tool_refs"]
+}

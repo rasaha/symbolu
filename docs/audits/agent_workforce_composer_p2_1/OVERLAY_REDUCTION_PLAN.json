@@ -1,0 +1,9 @@
+{
+  "schema": "awc.p2_1.overlay_reduction.v1",
+  "remove_from_required_overlay": ["role_name", "role_description", "human_review_requirement"],
+  "adapter_stops_injecting": ["functional_base_capability(evidence_extraction)"],
+  "retain_as_enterprise_policy": ["required_capabilities(domain_specialist)","optional_capabilities","required_tools","prohibited_tools","domain_requirements","data_classification","residency_constraints","provider_constraints","deployment_constraints","required_permissions","prohibited_permissions","authority_ceiling","required_audit_capabilities","required_security_classification","required_evidence_classes","state_requirement","minimum_quality_constraint","maximum_latency_constraint","maximum_cost_constraint","model_requirement_refs","fallback_policy_ref","evidence_refs","policy_refs"],
+  "defer": ["data_classification(source-declared)","permission_intent","required_tools(source-declared)"],
+  "monotonic_rules": {"may_narrow": true, "may_strengthen": true, "may_add_review": true, "may_broaden_authority": false, "may_remove_human_review": false, "may_erase_governance_boundary": false},
+  "p3a_scenarios_removed_fields": {"all": ["role_name"]}
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "awc.p2_1.v1_adapter_behavior.v1",
+  "v1_adapter_modified": false,
+  "v1_dispatch_fingerprint_matches_direct": true,
+  "p3a_v1_plan_fingerprints": {
+    "procurement": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+    "note": "reproduced byte-for-byte; matches frozen P3A expected outputs"
+  },
+  "awc_p1_p2_suite": "158 passed (unchanged)"
+}
