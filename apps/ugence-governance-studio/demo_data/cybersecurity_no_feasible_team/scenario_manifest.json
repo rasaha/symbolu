@@ -1,0 +1,56 @@
+{
+  "awc_composition_contract_version": "awc.composition.v1",
+  "awc_contract_version": "awc.v1",
+  "awc_version": "0.2.0",
+  "demonstration": {
+    "expected_plan_state": "NO_FEASIBLE_TEAM",
+    "headline": "NO_FEASIBLE_TEAM: only one approved provider is cleared to level 4",
+    "shows_no_fallback_available": false,
+    "shows_no_feasible_team": true,
+    "shows_non_greedy_selection": false
+  },
+  "digests": {
+    "composition_policy_digest": "sha256:a82fbdc145e9150db649ec995d26fdf25d7239d52c2febd6eef953b1aa02a598",
+    "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+    "enterprise_policy_digest": "sha256:dcf404aab453713ba4e8407d21e2610827e93068c34e34b8417d9370a3293f9e",
+    "fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+    "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "registry_snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9",
+    "workflow_adaptation_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a"
+  },
+  "expected_fingerprints": {
+    "adaptation_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a",
+    "composition_fingerprint": "sha256:e4a441ea03ecf05b959e65c869c8ac7fcd6b69439826e4b30247396da63f8769",
+    "expected_plan_fingerprint": "sha256:e4d7ebd1f69b20e94d12162d7db5b881a2fc8c050db9fd14c158478aaefb147b",
+    "plan_fingerprint": "sha256:e4d7ebd1f69b20e94d12162d7db5b881a2fc8c050db9fd14c158478aaefb147b",
+    "plan_id": "plan::1642abd9bb2d5e0c",
+    "plan_state": "NO_FEASIBLE_TEAM",
+    "replay_fingerprint": "sha256:cde148a4259aba329bc6914ec51d06734fd33f5c956f3e76aef7dcde4b2981b5",
+    "workflow_eligibility_fingerprint": "sha256:17055bc22cbee319263269b118e547ab1fc0ab190b6acb22f75635dd71eba6cb"
+  },
+  "expected_output_files": {
+    "adaptation.json": "271816480b29f0dd31ee68490875114ad334997ccdead35f04425453806cc0d8",
+    "agent_team_plan.json": "b26ec2bf8b3b78aa5f57c51c99b8c9e28a9a5d591386118435a1ad6196f244b4",
+    "composition.json": "6efa7f4891ca7d142d59c067093c7ae0c4692d33d78678a026721cc67807c399",
+    "eligibility.json": "d35ddd283a5ba12550b8effadf99f34c54e23a4064558780458af3556ba95a2c",
+    "fingerprints.json": "580e6f8ee75decaab380914b8a8d364f163bce79fc7de1bece278e6eebd65908",
+    "ranking.json": "f8dbc8c2eaae5c80e5ec3cebedadb1990bd30f9b1930936c5b77b8d4c2d34c27",
+    "replay_record.json": "e6547174bcee9c49c3506424b10f86026fb1863d8ef254ea1fa68589f1f28edd"
+  },
+  "input_files": {
+    "agent_registry_snapshot.json": "5818788b525eb0ab5242acd0abde878e65ce205b9f808f4785b2cbcba1991112",
+    "compiled_workflow.json": "82c0a7cde7b33f6a5fa2bfbe3fc641f1dfc3985503cea98f1c4628366383a85c",
+    "composition_policy.json": "d0c1069516a6a099ac589dbcea5bf5378603d9d0fc8e2d21fec175212f99097e",
+    "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+    "enterprise_agent_policy.json": "b0eda6d06ed5ad8d91c2dd86c7383ee98c706d7af3587953533bcb81cb1df43e",
+    "enterprise_role_overlay.json": "066dedb09b91fae1cca4f0f798d6d79bb12f5017253861a6196393b858fbe734",
+    "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+    "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+    "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb"
+  },
+  "logical_time": 1000000.0,
+  "scenario_id": "cybersecurity_no_feasible_team",
+  "schema": "governance_studio.scenario_manifest.v1",
+  "synthetic": true
+}

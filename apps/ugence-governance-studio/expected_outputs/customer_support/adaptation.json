@@ -1,0 +1,338 @@
+{
+  "adaptation_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e",
+  "contract_version": "awc.v1",
+  "diagnostics": [],
+  "node_dispositions": [
+    {
+      "disposition": "AI_AGENT_ELIGIBLE",
+      "is_agent_role": true,
+      "node_id": "sup_triage",
+      "reason_codes": [
+        "advisory_evidence_work"
+      ],
+      "role_id": "role::sup_triage",
+      "source_node_kind": "EVIDENCE_REQUIREMENT"
+    },
+    {
+      "disposition": "AI_AGENT_ELIGIBLE",
+      "is_agent_role": true,
+      "node_id": "sup_retrieval",
+      "reason_codes": [
+        "advisory_evidence_work"
+      ],
+      "role_id": "role::sup_retrieval",
+      "source_node_kind": "EVIDENCE_REQUIREMENT"
+    },
+    {
+      "disposition": "AI_AGENT_ELIGIBLE",
+      "is_agent_role": true,
+      "node_id": "sup_draft",
+      "reason_codes": [
+        "advisory_evidence_work"
+      ],
+      "role_id": "role::sup_draft",
+      "source_node_kind": "EVIDENCE_REQUIREMENT"
+    },
+    {
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "is_agent_role": false,
+      "node_id": "sup_escalation_decision",
+      "reason_codes": [
+        "human_authority_type:HUMAN_REVIEWER"
+      ],
+      "role_id": "",
+      "source_node_kind": "AUTHORITY_CHECK"
+    },
+    {
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "is_agent_role": false,
+      "node_id": "sup_human_approval",
+      "reason_codes": [
+        "human_authority_node:APPROVAL_GATE"
+      ],
+      "role_id": "",
+      "source_node_kind": "APPROVAL_GATE"
+    },
+    {
+      "disposition": "NO_AI_AGENT_REQUIRED",
+      "is_agent_role": false,
+      "node_id": "sup_terminal",
+      "reason_codes": [
+        "structural_kind:TERMINAL_OUTCOME"
+      ],
+      "role_id": "",
+      "source_node_kind": "TERMINAL_OUTCOME"
+    }
+  ],
+  "non_agent_dispositions": [
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "HUMAN_REVIEWER",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "DECISION_AUTHORITY",
+      "contract_version": "awc.v1",
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "fingerprint": "sha256:2618d259f76941c99e0474215f4ad1b5c1956d4737b30241917cf145e0a85da9",
+      "human_review_required": true,
+      "node_id": "sup_escalation_decision",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_escalation_decision",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "human_authority_type:HUMAN_REVIEWER"
+      ],
+      "source_capability": "DECISION_AUTHORITY",
+      "source_node_kind": "AUTHORITY_CHECK",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "HUMAN_APPROVER",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "DECISION_AUTHORITY",
+      "contract_version": "awc.v1",
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "fingerprint": "sha256:6b7ab72b6b87f28a24d30c2bec3b2e853d2da24be27c6c131d6a97b7f0258faa",
+      "human_review_required": true,
+      "node_id": "sup_human_approval",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_human_approval",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "human_authority_node:APPROVAL_GATE"
+      ],
+      "source_capability": "DECISION_AUTHORITY",
+      "source_node_kind": "APPROVAL_GATE",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "COMPILER",
+      "contract_version": "awc.v1",
+      "disposition": "NO_AI_AGENT_REQUIRED",
+      "fingerprint": "sha256:3847d511fd7646681520dad517feb8083c313c459a0a79001f96c87305d36f1f",
+      "human_review_required": false,
+      "node_id": "sup_terminal",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_terminal",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "structural_kind:TERMINAL_OUTCOME"
+      ],
+      "source_capability": "COMPILER",
+      "source_node_kind": "TERMINAL_OUTCOME",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    }
+  ],
+  "ok": true,
+  "role_requirements": [
+    {
+      "authority_ceiling": 0,
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "contract_version": "awc.v1",
+      "data_classification": "",
+      "deployment_constraints": [],
+      "domain_requirements": [],
+      "evidence_refs": [],
+      "fallback_policy_ref": "",
+      "human_review_requirement": false,
+      "input_contract_refs": [],
+      "maximum_cost_constraint": null,
+      "maximum_latency_constraint": null,
+      "minimum_quality_constraint": null,
+      "model_requirement_refs": [],
+      "optional_capabilities": [],
+      "output_contract_refs": [
+        "ticket_class"
+      ],
+      "policy_refs": [],
+      "prohibited_permissions": [],
+      "prohibited_tools": [],
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_triage",
+        "synthetic": true
+      },
+      "provider_constraints": [],
+      "required_audit_capabilities": [],
+      "required_capabilities": [
+        "evidence_extraction",
+        "support_triage"
+      ],
+      "required_evidence_classes": [
+        "MEASURED"
+      ],
+      "required_permissions": [
+        "read_context"
+      ],
+      "required_security_classification": 0,
+      "required_tools": [],
+      "residency_constraints": [],
+      "role_description": "ticket_class",
+      "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+      "role_id": "role::sup_triage",
+      "role_name": "support triage",
+      "source_node_id": "sup_triage",
+      "source_node_kind": "EVIDENCE_REQUIREMENT",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "state_requirement": "",
+      "workflow_id": "gs_support",
+      "workflow_version": 1
+    },
+    {
+      "authority_ceiling": 0,
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "contract_version": "awc.v1",
+      "data_classification": "",
+      "deployment_constraints": [],
+      "domain_requirements": [],
+      "evidence_refs": [],
+      "fallback_policy_ref": "",
+      "human_review_requirement": false,
+      "input_contract_refs": [
+        "ticket_class"
+      ],
+      "maximum_cost_constraint": null,
+      "maximum_latency_constraint": null,
+      "minimum_quality_constraint": null,
+      "model_requirement_refs": [],
+      "optional_capabilities": [],
+      "output_contract_refs": [
+        "retrieved_context"
+      ],
+      "policy_refs": [],
+      "prohibited_permissions": [],
+      "prohibited_tools": [],
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_retrieval",
+        "synthetic": true
+      },
+      "provider_constraints": [],
+      "required_audit_capabilities": [],
+      "required_capabilities": [
+        "evidence_extraction",
+        "knowledge_retrieval"
+      ],
+      "required_evidence_classes": [
+        "MEASURED"
+      ],
+      "required_permissions": [
+        "read_context"
+      ],
+      "required_security_classification": 0,
+      "required_tools": [],
+      "residency_constraints": [],
+      "role_description": "retrieved_context",
+      "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+      "role_id": "role::sup_retrieval",
+      "role_name": "customer knowledge retrieval",
+      "source_node_id": "sup_retrieval",
+      "source_node_kind": "EVIDENCE_REQUIREMENT",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "state_requirement": "",
+      "workflow_id": "gs_support",
+      "workflow_version": 1
+    },
+    {
+      "authority_ceiling": 0,
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "contract_version": "awc.v1",
+      "data_classification": "",
+      "deployment_constraints": [],
+      "domain_requirements": [],
+      "evidence_refs": [],
+      "fallback_policy_ref": "",
+      "human_review_requirement": false,
+      "input_contract_refs": [
+        "retrieved_context"
+      ],
+      "maximum_cost_constraint": null,
+      "maximum_latency_constraint": null,
+      "minimum_quality_constraint": null,
+      "model_requirement_refs": [],
+      "optional_capabilities": [],
+      "output_contract_refs": [
+        "draft_response"
+      ],
+      "policy_refs": [],
+      "prohibited_permissions": [],
+      "prohibited_tools": [],
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_draft",
+        "synthetic": true
+      },
+      "provider_constraints": [],
+      "required_audit_capabilities": [],
+      "required_capabilities": [
+        "evidence_extraction",
+        "response_drafting"
+      ],
+      "required_evidence_classes": [
+        "MEASURED"
+      ],
+      "required_permissions": [
+        "read_context"
+      ],
+      "required_security_classification": 0,
+      "required_tools": [],
+      "residency_constraints": [],
+      "role_description": "draft_response",
+      "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+      "role_id": "role::sup_draft",
+      "role_name": "customer response drafting",
+      "source_node_id": "sup_draft",
+      "source_node_kind": "EVIDENCE_REQUIREMENT",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "state_requirement": "",
+      "workflow_id": "gs_support",
+      "workflow_version": 1
+    }
+  ],
+  "source_contract_version": "workflow_ir.v1",
+  "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+  "workflow_identity": "gs_support",
+  "workflow_version": 1
+}

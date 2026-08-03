@@ -1,0 +1,38 @@
+{
+  "sup_draft": {
+    "required_capabilities": [
+      "response_drafting"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "role_name": "customer response drafting"
+  },
+  "sup_retrieval": {
+    "required_capabilities": [
+      "knowledge_retrieval"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "role_name": "customer knowledge retrieval"
+  },
+  "sup_triage": {
+    "required_capabilities": [
+      "support_triage"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "role_name": "support triage"
+  }
+}
