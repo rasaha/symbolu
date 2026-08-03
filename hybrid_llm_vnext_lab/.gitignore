@@ -1,5 +1,6 @@
 # Neural run outputs are large and per-run; curated final results are committed explicitly.
 experiments/neural_slots_only/artifacts/*/
+experiments/five_seed_slots/artifacts/*/
 experiments/reproduce_legacy_slots/../../artifacts/neural_reproduction/*/
 artifacts/neural_reproduction/*/
 __pycache__/
