@@ -1,0 +1,18 @@
+{
+  "count": 11,
+  "names": [
+    "API_CONTRACT_VERSION",
+    "ApiError",
+    "ApiResponse",
+    "ApiSettings",
+    "AwcOrchestrationService",
+    "ScenarioCatalog",
+    "ScenarioService",
+    "VERSION",
+    "__version__",
+    "create_app",
+    "version_info"
+  ],
+  "public_api_version": "governance_studio.api.v1",
+  "sha256": "048959f37285a09068ac81d16aec6f12706b4db83876ca9fac1e291bd7f72930"
+}
