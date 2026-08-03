@@ -1,0 +1,23 @@
+{
+  "behavioral_equivalence": {
+    "before_hash_namespace_normalized": "62f7c0ebb2c89267391ef2d3549ad5660f84645d413cb1623e430bdeaf07d511",
+    "after_canonical_hash_namespace_normalized": "62f7c0ebb2c89267391ef2d3549ad5660f84645d413cb1623e430bdeaf07d511",
+    "after_legacy_hash_namespace_normalized": "62f7c0ebb2c89267391ef2d3549ad5660f84645d413cb1623e430bdeaf07d511",
+    "before_eq_after_canonical": true,
+    "before_eq_after_legacy": true,
+    "verdict": "BEHAVIORALLY_EQUIVALENT",
+    "raw_before_capture_sha256": "ed920e8571cce56be5bd37c6414e192af4e0c27f3e6b8b9d8bcf0d876fc6e3d0",
+    "raw_after_legacy_capture_sha256": "ed920e8571cce56be5bd37c6414e192af4e0c27f3e6b8b9d8bcf0d876fc6e3d0",
+    "note": "before == after_legacy is byte-identical (same 'tap_provider' namespace label). after_canonical differs only in the 'namespace' label field."
+  },
+  "api_equivalence": {
+    "before_api_dot_surface_snapshot_sha256": "64d0ddeab819afd2f667e734b315f42f33a4ff01e4ae02cf881a49954cd44f09",
+    "after_api_dot_surface_snapshot_sha256": "08a21a5d9786f7678d487307c1c55c52fd1f060568e5963824caa56c0e75bc89",
+    "api_dot_surface_symbols_byte_identical": true,
+    "export_count_before": 32,
+    "export_count_after": 32,
+    "only_delta": "additive top-level helper 'version_info' on the module (not on the .api surface)",
+    "classification": "PATCH_EQUIVALENT for .api surface; MINOR_COMPATIBLE overall (additive version_info)",
+    "legacy_canonical_object_identity": "IDENTICAL (proven: modules, classes, deep imports, __all__)"
+  }
+}

@@ -1,0 +1,749 @@
+{
+  "edges": [
+    {
+      "module": "ugence_tap_provider/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/__init__.py",
+      "imported": ".version",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/__main__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/__main__.py",
+      "imported": ".cli",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..version",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..provider",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..configuration",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..client",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..observability",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..health",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..conformance",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..errors",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/api/__init__.py",
+      "imported": "..mapping",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "json",
+      "root": "json",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "sys",
+      "root": "sys",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".version",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".api",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".configuration",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".configuration",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": ".core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/cli.py",
+      "imported": "ugence_governance_provider_framework",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/client/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/client/__init__.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/client/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "..client",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "..observability",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/configuration/__init__.py",
+      "imported": "..provider",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "..configuration",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "..errors",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/conformance/__init__.py",
+      "imported": "..mapping",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "hashlib",
+      "root": "hashlib",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "json",
+      "root": "json",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "enum",
+      "root": "enum",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/core/__init__.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/errors/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/errors/__init__.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/errors/__init__.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "..configuration",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "..provider",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/health/__init__.py",
+      "imported": "..version",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/__init__.py",
+      "imported": ".request",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/__init__.py",
+      "imported": ".result",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/__init__.py",
+      "imported": ".controls",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/controls.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/controls.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/request.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/request.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/request.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": "hashlib",
+      "root": "hashlib",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": "json",
+      "root": "json",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": "..core",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/mapping/result.py",
+      "imported": ".controls",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/observability/__init__.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/observability/__init__.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/observability/__init__.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": "typing",
+      "root": "typing",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": "ugence_governance_provider_framework.api",
+      "root": "ugence_governance_provider_framework",
+      "class": "UGENCE_GOVERNANCE_FRAMEWORK",
+      "ownership": "ugence-governance-provider-framework",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": ".client",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": ".errors",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": ".mapping",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": ".observability",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/provider.py",
+      "imported": ".version",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    },
+    {
+      "module": "ugence_tap_provider/version.py",
+      "imported": "__future__",
+      "root": "__future__",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/version.py",
+      "imported": "importlib.metadata",
+      "root": "importlib",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/version.py",
+      "imported": "dataclasses",
+      "root": "dataclasses",
+      "class": "STDLIB",
+      "ownership": "n/a",
+      "relative": false
+    },
+    {
+      "module": "ugence_tap_provider/version.py",
+      "imported": ".mapping",
+      "root": "ugence_tap_provider",
+      "class": "TAP_INTERNAL",
+      "ownership": "self",
+      "relative": true
+    }
+  ],
+  "summary": {
+    "STDLIB": 37,
+    "TAP_INTERNAL": 45,
+    "UGENCE_GOVERNANCE_FRAMEWORK": 10
+  },
+  "edge_count": 92,
+  "external_roots": [
+    "ugence_governance_provider_framework"
+  ]
+}

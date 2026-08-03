@@ -1,0 +1,814 @@
+{
+  "api": {
+    "module": "<tap>.api",
+    "symbols": {
+      "CONTRACT_VERSION": {
+        "kind": "constant",
+        "value": "1.0.0"
+      },
+      "InProcessTapClient": {
+        "kind": "class",
+        "methods": {
+          "evaluate": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "request"
+              }
+            ],
+            "signature": "(self, request: 'TapEvaluationRequest') -> 'TapEvaluationResult'"
+          },
+          "ping": {
+            "params": [],
+            "signature": "(self) -> 'bool'"
+          },
+          "policy_version": {
+            "params": [],
+            "signature": "(self) -> 'str'"
+          }
+        }
+      },
+      "KNOWN_CONSTRAINT_TYPES": {
+        "kind": "constant",
+        "value": "['allowed_scope', 'approved_wording', 'maximum_confidence', 'metric_limitation', 'population_limitation', 'prohibited_wording', 'required_attribution', 'required_qualifier', 'temporal_limitation']"
+      },
+      "KNOWN_OBLIGATION_TYPES": {
+        "kind": "constant",
+        "value": "['include_citation', 'include_uncertainty_disclosure', 'log_evidence_provenance', 'obtain_additional_evidence', 'request_human_review', 'retain_source_attribution']"
+      },
+      "MAPPING_VERSION": {
+        "kind": "constant",
+        "value": "tap-map-1"
+      },
+      "RemoteTapClient": {
+        "kind": "class",
+        "methods": {
+          "evaluate": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "request"
+              }
+            ],
+            "signature": "(self, request: 'TapEvaluationRequest') -> 'TapEvaluationResult'"
+          },
+          "ping": {
+            "params": [],
+            "signature": "(self) -> 'bool'"
+          },
+          "policy_version": {
+            "params": [],
+            "signature": "(self) -> 'str'"
+          }
+        }
+      },
+      "TAPProvider": {
+        "kind": "class",
+        "methods": {
+          "degrade": {
+            "params": [
+              {
+                "has_default": true,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "detail"
+              }
+            ],
+            "signature": "(self, detail: 'str' = '') -> 'None'"
+          },
+          "descriptor": {
+            "params": [],
+            "signature": "(self) -> 'ProviderDescriptor'"
+          },
+          "evaluate": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "request"
+              }
+            ],
+            "signature": "(self, request: 'AssertionGovernanceRequest') -> 'AssertionGovernanceResult'"
+          },
+          "health": {
+            "params": [],
+            "signature": "(self) -> 'ProviderHealth'"
+          },
+          "initialize": {
+            "params": [],
+            "signature": "(self) -> 'None'"
+          },
+          "mark_unavailable": {
+            "params": [
+              {
+                "has_default": true,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "detail"
+              }
+            ],
+            "signature": "(self, detail: 'str' = '') -> 'None'"
+          },
+          "shutdown": {
+            "params": [],
+            "signature": "(self) -> 'None'"
+          }
+        }
+      },
+      "TARGET_FRAMEWORK_VERSION": {
+        "kind": "constant",
+        "value": "0.1.0"
+      },
+      "TARGET_KERNEL_VERSION": {
+        "kind": "constant",
+        "value": "1.0.0"
+      },
+      "TapClient": {
+        "kind": "protocol",
+        "methods": {
+          "evaluate": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "request"
+              }
+            ],
+            "signature": "(self, request: 'TapEvaluationRequest') -> 'TapEvaluationResult'"
+          },
+          "ping": {
+            "params": [],
+            "signature": "(self) -> 'bool'"
+          },
+          "policy_version": {
+            "params": [],
+            "signature": "(self) -> 'str'"
+          }
+        }
+      },
+      "TapConformanceReport": {
+        "fields": {
+          "results": {
+            "annotation": "list[CheckResult]",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {
+          "summary": {
+            "params": [],
+            "signature": "(self) -> 'str'"
+          }
+        }
+      },
+      "TapConstraint": {
+        "fields": {
+          "type": {
+            "annotation": "str",
+            "required": true
+          },
+          "value": {
+            "annotation": "str",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapEngine": {
+        "kind": "class",
+        "methods": {
+          "evaluate": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "request"
+              }
+            ],
+            "signature": "(self, request: 'TapEvaluationRequest') -> 'TapEvaluationResult'"
+          }
+        }
+      },
+      "TapEvaluationRequest": {
+        "fields": {
+          "assertion": {
+            "annotation": "str",
+            "required": true
+          },
+          "assertion_type": {
+            "annotation": "Optional[str]",
+            "required": false
+          },
+          "context": {
+            "annotation": "Mapping[str, object]",
+            "required": false
+          },
+          "correlation_id": {
+            "annotation": "str",
+            "required": false
+          },
+          "evidence": {
+            "annotation": "tuple[TapEvidenceItem, ...]",
+            "required": false
+          },
+          "policy_references": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "source_identity": {
+            "annotation": "str",
+            "required": false
+          },
+          "trace_id": {
+            "annotation": "str",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapEvaluationResult": {
+        "fields": {
+          "constraints": {
+            "annotation": "tuple[TapConstraint, ...]",
+            "required": false
+          },
+          "covered_evidence_ids": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "evidence_coverage": {
+            "annotation": "Optional[float]",
+            "required": false
+          },
+          "fingerprint": {
+            "annotation": "str",
+            "required": false
+          },
+          "obligations": {
+            "annotation": "tuple[TapObligation, ...]",
+            "required": false
+          },
+          "omitted_qualifiers": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "outcome": {
+            "annotation": "TapOutcome",
+            "required": true
+          },
+          "reason_codes": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "supported_components": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "trace_id": {
+            "annotation": "str",
+            "required": false
+          },
+          "unsupported_components": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapEvidenceClass": {
+        "kind": "enum",
+        "values": {
+          "DERIVED": "derived",
+          "DIRECT": "direct",
+          "HISTORICAL": "historical",
+          "HUMAN_PROVIDED": "human_provided",
+          "MODEL_GENERATED": "model_generated",
+          "POLICY": "policy"
+        }
+      },
+      "TapEvidenceItem": {
+        "fields": {
+          "authority": {
+            "annotation": "str",
+            "required": false
+          },
+          "content": {
+            "annotation": "str",
+            "required": false
+          },
+          "effective_period": {
+            "annotation": "str",
+            "required": false
+          },
+          "evidence_class": {
+            "annotation": "TapEvidenceClass",
+            "required": false
+          },
+          "evidence_id": {
+            "annotation": "str",
+            "required": true
+          },
+          "fingerprint": {
+            "annotation": "str",
+            "required": false
+          },
+          "provenance": {
+            "annotation": "str",
+            "required": false
+          },
+          "source_reference": {
+            "annotation": "str",
+            "required": false
+          },
+          "source_type": {
+            "annotation": "str",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {
+          "with_fingerprint": {
+            "params": [],
+            "signature": "(self) -> \"'TapEvidenceItem'\""
+          }
+        }
+      },
+      "TapHealthReport": {
+        "fields": {
+          "available": {
+            "annotation": "bool",
+            "required": true
+          },
+          "configuration_valid": {
+            "annotation": "bool",
+            "required": true
+          },
+          "evaluator_ready": {
+            "annotation": "bool",
+            "required": true
+          },
+          "evidence_resolver_ready": {
+            "annotation": "bool",
+            "required": true
+          },
+          "policy_available": {
+            "annotation": "bool",
+            "required": true
+          },
+          "protocol_compatible": {
+            "annotation": "bool",
+            "required": true
+          },
+          "provider_health": {
+            "annotation": "ProviderHealth",
+            "required": true
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapInvocationLog": {
+        "kind": "class",
+        "methods": {
+          "all": {
+            "params": [],
+            "signature": "(self) -> 'tuple[TapInvocationRecord, ...]'"
+          },
+          "append": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "record"
+              }
+            ],
+            "signature": "(self, record: 'TapInvocationRecord') -> 'None'"
+          }
+        }
+      },
+      "TapInvocationRecord": {
+        "fields": {
+          "compatible": {
+            "annotation": "bool",
+            "required": true
+          },
+          "completed": {
+            "annotation": "bool",
+            "required": true
+          },
+          "duration_ms": {
+            "annotation": "Optional[float]",
+            "required": false
+          },
+          "error_class": {
+            "annotation": "Optional[str]",
+            "required": false
+          },
+          "evidence_count": {
+            "annotation": "int",
+            "required": false
+          },
+          "evidence_coverage": {
+            "annotation": "Optional[float]",
+            "required": false
+          },
+          "failure_class": {
+            "annotation": "Optional[str]",
+            "required": false
+          },
+          "fingerprint": {
+            "annotation": "str",
+            "required": false
+          },
+          "mapping_version": {
+            "annotation": "str",
+            "required": true
+          },
+          "mode": {
+            "annotation": "str",
+            "required": true
+          },
+          "outcome": {
+            "annotation": "str",
+            "required": false
+          },
+          "policy_version": {
+            "annotation": "str",
+            "required": false
+          },
+          "provider_id": {
+            "annotation": "str",
+            "required": true
+          },
+          "provider_version": {
+            "annotation": "str",
+            "required": true
+          },
+          "trace_id": {
+            "annotation": "str",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapObligation": {
+        "fields": {
+          "type": {
+            "annotation": "str",
+            "required": true
+          },
+          "value": {
+            "annotation": "str",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapOutcome": {
+        "kind": "enum",
+        "values": {
+          "CONSTRAINED": "CONSTRAINED",
+          "INDETERMINATE": "INDETERMINATE",
+          "SUPPORTED": "SUPPORTED",
+          "UNKNOWN": "UNKNOWN",
+          "UNSUPPORTED": "UNSUPPORTED"
+        }
+      },
+      "TapRule": {
+        "fields": {
+          "constraints": {
+            "annotation": "tuple[TapConstraint, ...]",
+            "required": false
+          },
+          "evidence_coverage": {
+            "annotation": "Optional[float]",
+            "required": false
+          },
+          "obligations": {
+            "annotation": "tuple[TapObligation, ...]",
+            "required": false
+          },
+          "omitted_qualifiers": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "outcome": {
+            "annotation": "TapOutcome",
+            "required": true
+          },
+          "reason_codes": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "supported_components": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          },
+          "unsupported_components": {
+            "annotation": "tuple[str, ...]",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {}
+      },
+      "TapSettings": {
+        "fields": {
+          "contract_version": {
+            "annotation": "str",
+            "required": false
+          },
+          "default": {
+            "annotation": "bool",
+            "required": false
+          },
+          "endpoint": {
+            "annotation": "str",
+            "required": false
+          },
+          "evidence_resolution": {
+            "annotation": "str",
+            "required": false
+          },
+          "fail_safe": {
+            "annotation": "bool",
+            "required": false
+          },
+          "mode": {
+            "annotation": "str",
+            "required": false
+          },
+          "policy_bundle": {
+            "annotation": "str",
+            "required": false
+          },
+          "provider_id": {
+            "annotation": "str",
+            "required": false
+          },
+          "secret_refs": {
+            "annotation": "Mapping[str, str]",
+            "required": false
+          }
+        },
+        "kind": "class",
+        "methods": {
+          "from_settings": {
+            "params": [
+              {
+                "has_default": false,
+                "kind": "POSITIONAL_OR_KEYWORD",
+                "name": "settings"
+              },
+              {
+                "has_default": true,
+                "kind": "KEYWORD_ONLY",
+                "name": "provider_id"
+              },
+              {
+                "has_default": true,
+                "kind": "KEYWORD_ONLY",
+                "name": "default"
+              }
+            ],
+            "signature": "(settings: 'Mapping[str, object]', *, provider_id: 'str' = 'tap', default: 'bool' = True) -> \"'TapSettings'\""
+          },
+          "validate": {
+            "params": [],
+            "signature": "(self) -> 'None'"
+          }
+        }
+      },
+      "__version__": {
+        "kind": "constant",
+        "value": "0.1.0"
+      },
+      "build_tap_provider": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "engine"
+          },
+          {
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "settings"
+          },
+          {
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "invocation_log"
+          },
+          {
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "transport_fail"
+          }
+        ],
+        "signature": "(engine: 'Optional[TapEngine]' = None, *, settings: 'Optional[TapSettings]' = None, invocation_log: 'Optional[TapInvocationLog]' = None, transport_fail: 'Optional[str]' = None) -> 'TAPProvider'"
+      },
+      "check_health": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "provider"
+          },
+          {
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "settings"
+          }
+        ],
+        "signature": "(provider: 'TAPProvider', settings: 'TapSettings') -> 'TapHealthReport'"
+      },
+      "indeterminate_result": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "reason"
+          },
+          {
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "trace_id"
+          }
+        ],
+        "signature": "(*, reason: 'str', trace_id: 'str' = '') -> 'AssertionGovernanceResult'"
+      },
+      "map_request": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "request"
+          },
+          {
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "evidence_resolution"
+          }
+        ],
+        "signature": "(request: 'AssertionGovernanceRequest', *, evidence_resolution: 'str' = 'caller_supplied') -> 'TapEvaluationRequest'"
+      },
+      "map_result": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "result"
+          }
+        ],
+        "signature": "(result: 'TapEvaluationResult') -> 'AssertionGovernanceResult'"
+      },
+      "run_tap_conformance": {
+        "kind": "function",
+        "params": [],
+        "signature": "() -> 'TapConformanceReport'"
+      },
+      "translate_error": {
+        "kind": "function",
+        "params": [
+          {
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "exc"
+          }
+        ],
+        "signature": "(exc: 'Exception') -> 'ProviderError'"
+      }
+    }
+  },
+  "deep_modules": {
+    "api": {
+      "all": [
+        "CONTRACT_VERSION",
+        "InProcessTapClient",
+        "KNOWN_CONSTRAINT_TYPES",
+        "KNOWN_OBLIGATION_TYPES",
+        "MAPPING_VERSION",
+        "RemoteTapClient",
+        "TAPProvider",
+        "TARGET_FRAMEWORK_VERSION",
+        "TARGET_KERNEL_VERSION",
+        "TapClient",
+        "TapConformanceReport",
+        "TapConstraint",
+        "TapEngine",
+        "TapEvaluationRequest",
+        "TapEvaluationResult",
+        "TapEvidenceClass",
+        "TapEvidenceItem",
+        "TapHealthReport",
+        "TapInvocationLog",
+        "TapInvocationRecord",
+        "TapObligation",
+        "TapOutcome",
+        "TapRule",
+        "TapSettings",
+        "__version__",
+        "build_tap_provider",
+        "check_health",
+        "indeterminate_result",
+        "map_request",
+        "map_result",
+        "run_tap_conformance",
+        "translate_error"
+      ],
+      "importable": true
+    },
+    "client": {
+      "all": [],
+      "importable": true
+    },
+    "configuration": {
+      "all": [
+        "TapSettings",
+        "build_tap_provider"
+      ],
+      "importable": true
+    },
+    "conformance": {
+      "all": [
+        "CheckResult",
+        "TapConformanceReport",
+        "run_tap_conformance"
+      ],
+      "importable": true
+    },
+    "core": {
+      "all": [],
+      "importable": true
+    },
+    "errors": {
+      "all": [
+        "translate_error"
+      ],
+      "importable": true
+    },
+    "health": {
+      "all": [
+        "TapHealthReport",
+        "check"
+      ],
+      "importable": true
+    },
+    "mapping": {
+      "all": [
+        "KNOWN_CONSTRAINT_TYPES",
+        "KNOWN_OBLIGATION_TYPES",
+        "MAPPING_VERSION",
+        "encode_constraints",
+        "encode_obligations",
+        "indeterminate_result",
+        "map_request",
+        "map_result"
+      ],
+      "importable": true
+    },
+    "mapping.controls": {
+      "all": [],
+      "importable": true
+    },
+    "mapping.request": {
+      "all": [],
+      "importable": true
+    },
+    "mapping.result": {
+      "all": [],
+      "importable": true
+    },
+    "observability": {
+      "all": [
+        "TapInvocationLog",
+        "TapInvocationRecord"
+      ],
+      "importable": true
+    },
+    "provider": {
+      "all": [],
+      "importable": true
+    },
+    "version": {
+      "all": [],
+      "importable": true
+    }
+  },
+  "top_level_all": [
+    "__version__",
+    "version_info"
+  ],
+  "top_level_version": "0.1.0"
+}

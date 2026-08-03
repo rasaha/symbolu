@@ -1,0 +1,47 @@
+{
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "a3dfb69ef952e72c4a9c8e77d92b558b30ffec76",
+  "working_branch": "claude/tap-provider-canonical-migration-42p9ip",
+  "latest_merged_prerequisite_pr": {
+    "number": 1296,
+    "title": "package: extract AI Hiring as an independent distribution",
+    "state": "merged",
+    "merged_at": "2026-08-03T05:41:35Z",
+    "merge_into": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF"
+  },
+  "python_version": "3.11.15",
+  "tap_implementation_version": "0.1.0",
+  "private_distribution": {
+    "name": "dgm-tap-provider",
+    "version": "0.1.0"
+  },
+  "canonical_packages_live": {
+    "ugence-governance-contracts": "0.1.0",
+    "ugence-governance-provider-framework": "0.1.0",
+    "ugence-decision-authority": "1.0.0",
+    "ugence-ai-hiring": "present (0.1.0 distribution)"
+  },
+  "baseline_tests": {
+    "suite": "tap_provider/tests",
+    "count": 38,
+    "result": "passed"
+  },
+  "baseline_private_wheel": {
+    "filename": "dgm_tap_provider-0.1.0-py3-none-any.whl",
+    "sha256": "b47890b0cf9151967d2faa280fc05f6287bafd3e2a043dafeb0117ec94a962cd"
+  },
+  "baseline_api_snapshot_file": {
+    "path": "platform/api-snapshots/tap_provider.api.json",
+    "sha256": "07d4aaaaba3d1e3b6c80083a76527daeda2eb7322e8bcb5faab66add23f42e4a"
+  },
+  "baseline_public_api_export_count": 32,
+  "baseline_public_api_snapshot_hash": "64d0ddeab819afd2f667e734b315f42f33a4ff01e4ae02cf881a49954cd44f09",
+  "baseline_behavioral_capture_hash": "ed920e8571cce56be5bd37c6414e192af4e0c27f3e6b8b9d8bcf0d876fc6e3d0",
+  "platform_freeze_baseline_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6",
+  "existing_runtime_dependencies_pre_migration": [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0"
+  ],
+  "existing_public_api_exports": 32,
+  "baseline_failures": "none (38/38 passed; freeze PASS; private wheel builds)"
+}
