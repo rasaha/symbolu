@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-ai-hiring",
   "canonical_import": "ugence_ai_hiring",
-  "distribution_version": "0.1.0",
+  "distribution_version": "0.1.1",
   "product_version": "0.6.0",
   "top_level_public_api": {
     "HiringPlatform": "type",
