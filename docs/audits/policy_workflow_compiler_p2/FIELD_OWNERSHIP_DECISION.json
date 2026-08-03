@@ -1,0 +1,12 @@
+{
+  "schema": "policy_workflow_compiler.field_ownership_decision.v1",
+  "source_requirements": "apps/ugence-governance-studio/docs/COMPILER_VS_OVERLAY_OWNERSHIP.md",
+  "full_trace": "P3A_FIELD_RESOLUTION.json",
+  "field_count": 37,
+  "outcome_summary": {"COMPILER_EMITTED": 14, "CORRECTLY_REMAINS_OVERLAY": 19, "DEFERRED": 3, "AWC_DERIVED": 1, "RUNTIME_DERIVED": 0, "UNRESOLVED": 0},
+  "temporary_overlay_fields_eliminated": ["role_name", "role_description", "human_review_requirement", "required_capabilities(functional_base)", "input_contract_refs(typed)", "output_contract_refs(typed)"],
+  "kept_out_of_compiler": ["provider_constraints","residency_constraints","deployment_constraints","required_security_classification","required_audit_capabilities","authority_ceiling","required_permissions(ceiling)","prohibited_permissions","minimum_quality_constraint","maximum_latency_constraint","maximum_cost_constraint","required_tools(allowlist)","prohibited_tools","domain_requirements","model_requirement_refs","fallback_policy_ref","evidence_refs","policy_refs","state_requirement"],
+  "deferred_slots_source_declaration_only": ["data_classification","required_permissions(intent)","required_tools"],
+  "runtime_derived_fields": [],
+  "unresolved_fields": []
+}

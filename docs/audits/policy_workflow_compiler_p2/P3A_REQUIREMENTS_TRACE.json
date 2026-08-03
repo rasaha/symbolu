@@ -1,0 +1,16 @@
+{
+  "schema": "policy_workflow_compiler.p3a_requirements_trace.v1",
+  "source": "apps/ugence-governance-studio/docs/COMPILER_VS_OVERLAY_OWNERSHIP.md",
+  "field_resolution": "P3A_FIELD_RESOLUTION.json",
+  "compiler_additions": [
+    {"addition": "node semantic purpose + description", "traces_to": "P3A: role_name/role_description should be compiler-emitted", "p2_artifact": "WorkflowNodeSemantics.semantic_purpose/semantic_description"},
+    {"addition": "functional capability requirement", "traces_to": "P3A: required_capabilities base (evidence_extraction) should be compiler-emitted", "p2_artifact": "CapabilityRequirement source=NODE_KIND_MAPPING"},
+    {"addition": "typed input/output contract refs", "traces_to": "P3A limitation: contracts are opaque strings", "p2_artifact": "DataContractRef / NodeInputRequirement / NodeOutputDeclaration"},
+    {"addition": "dependency semantics", "traces_to": "P3A: downstream must not reconstruct dependencies from display order", "p2_artifact": "WorkflowDependencySemantics"},
+    {"addition": "authority + human-review semantics", "traces_to": "P3A: authority_context / human_review_requirement compiler-owned", "p2_artifact": "role_relevance + HumanReviewRequirement + authority_disposition"},
+    {"addition": "policy provenance", "traces_to": "P3A: provenance compiler-owned", "p2_artifact": "PolicyProvenanceRef with derivation_class"},
+    {"addition": "release validation", "traces_to": "compiler owns release structural/semantic/authority/digest integrity", "p2_artifact": "CompiledReleaseValidator"}
+  ],
+  "scenarios_covered": ["procurement", "customer_support", "cybersecurity_success", "cybersecurity_no_feasible_team"],
+  "note": "no_feasible_team is an AWC planning outcome, not a compiler concern; the compiler enriches the graph identically and the release validates VALID"
+}

@@ -1,0 +1,18 @@
+{
+  "decision": "OPTION_B_WORKFLOW_IR_V2",
+  "distribution_version_bumped": false,
+  "distribution_version": "0.1.0",
+  "product_version": "0.2.0",
+  "rationale_distribution_hold": "compiler_distribution_version is an input to the v1 release logical digest; holding it at 0.1.0 preserves byte-stable v1 fingerprints",
+  "contract_versions": ["workflow_ir.v1", "workflow_ir.v2"],
+  "v1_readable": true,
+  "v1_fingerprints_byte_stable": true,
+  "v1_release_digest_pin": "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd265822c3550ad9938158a",
+  "v1_ir_digest_pin": "sha256:169ad24c09e45ac7176a75a2708ff4687085f2f8f878990862542df0c20ca1e1",
+  "unknown_version_fails_closed": true,
+  "v2_never_mislabeled_as_v1": true,
+  "upgrade_utility": "upgrade_workflow_ir / CLI upgrade-v1",
+  "upgrade_lossless": true,
+  "upgrade_invents_values": false,
+  "v2_fingerprint_definition": "v2 logical_digest over base_ir_digest + all enriched fields, excluding the stored fingerprint slot"
+}
