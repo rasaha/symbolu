@@ -1,0 +1,247 @@
+{
+  "phase": "AI Hiring — Canonical TAP and ActionGate Dependency Normalization",
+  "scope": "packages/products/ai-hiring",
+  "search_terms": [
+    "dgm-tap-provider", "dgm-actiongate-provider", "tap_provider", "actiongate_provider",
+    "tap_legacy_adapter", "actiongate_legacy_adapter", "LegacyProviderUnavailable",
+    "tap_legacy", "actiongate_legacy"
+  ],
+  "classification_legend": [
+    "AI_HIRING_RUNTIME_DEPENDENCY", "AI_HIRING_OPTIONAL_EXTRA", "AI_HIRING_CANONICAL_ADAPTER",
+    "AI_HIRING_COMPATIBILITY_MODULE", "TEST", "DOCUMENTATION", "VERSION_METADATA",
+    "PACKAGING_VERIFIER", "CI", "PLATFORM_FREEZE", "EXTERNAL_CONSUMER",
+    "HISTORICAL_EVIDENCE", "UNRELATED"
+  ],
+  "occurrences": [
+    {
+      "path": "pyproject.toml",
+      "symbol": "[project.optional-dependencies] tap",
+      "before": "tap = [\"dgm-tap-provider\"]",
+      "after": "tap = [\"ugence-tap-provider>=0.1.0\"]",
+      "classification": "AI_HIRING_OPTIONAL_EXTRA",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "extra name unchanged; resolves canonical distribution",
+      "migration_disposition": "MIGRATED"
+    },
+    {
+      "path": "pyproject.toml",
+      "symbol": "[project.optional-dependencies] actiongate",
+      "before": "actiongate = [\"dgm-actiongate-provider\"]",
+      "after": "actiongate = [\"ugence-actiongate-provider>=0.1.0\"]",
+      "classification": "AI_HIRING_OPTIONAL_EXTRA",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "extra name unchanged; resolves canonical distribution",
+      "migration_disposition": "MIGRATED"
+    },
+    {
+      "path": "src/ugence_ai_hiring/integrations/tap_adapter.py",
+      "symbol": "load_tap_provider_cls / from ugence_tap_provider.provider import TAPProvider",
+      "before": "(new module)",
+      "after": "from ugence_tap_provider.provider import TAPProvider (lazy)",
+      "classification": "AI_HIRING_CANONICAL_ADAPTER",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "same builders; canonical class identity",
+      "migration_disposition": "ADDED_CANONICAL"
+    },
+    {
+      "path": "src/ugence_ai_hiring/integrations/actiongate_adapter.py",
+      "symbol": "load_actiongate_provider_cls / from ugence_actiongate_provider.provider import ActionGateProvider",
+      "before": "(new module)",
+      "after": "from ugence_actiongate_provider.provider import ActionGateProvider (lazy)",
+      "classification": "AI_HIRING_CANONICAL_ADAPTER",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "same builders; canonical class identity",
+      "migration_disposition": "ADDED_CANONICAL"
+    },
+    {
+      "path": "src/ugence_ai_hiring/integrations/tap_legacy_adapter.py",
+      "symbol": "module body",
+      "before": "concrete adapter importing `tap_provider.provider.TAPProvider` lazily",
+      "after": "logic-free facade re-exporting ugence_ai_hiring.integrations.tap_adapter (object identity preserved)",
+      "classification": "AI_HIRING_COMPATIBILITY_MODULE",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "compatibility import path preserved; identical callables",
+      "migration_disposition": "CONVERTED_TO_FACADE"
+    },
+    {
+      "path": "src/ugence_ai_hiring/integrations/actiongate_legacy_adapter.py",
+      "symbol": "module body",
+      "before": "concrete adapter importing `actiongate_provider.provider.ActionGateProvider` lazily",
+      "after": "logic-free facade re-exporting ugence_ai_hiring.integrations.actiongate_adapter (object identity preserved)",
+      "classification": "AI_HIRING_COMPATIBILITY_MODULE",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "compatibility import path preserved; identical callables",
+      "migration_disposition": "CONVERTED_TO_FACADE"
+    },
+    {
+      "path": "src/ugence_ai_hiring/integrations/__init__.py",
+      "symbol": "LegacyProviderUnavailable",
+      "before": "class LegacyProviderUnavailable(ImportError)",
+      "after": "class ProviderUnavailable(ImportError); LegacyProviderUnavailable = ProviderUnavailable (identity-preserving alias)",
+      "classification": "AI_HIRING_COMPATIBILITY_MODULE",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "exception name + behavior preserved; neutral alias added",
+      "migration_disposition": "ALIAS_ADDED"
+    },
+    {
+      "path": "src/ugence_ai_hiring/version.py",
+      "symbol": "_OPTIONAL_INTEGRATIONS['tap_legacy']",
+      "before": "\"tap_legacy\": \"tap_provider\"",
+      "after": "\"tap_legacy\": \"ugence_tap_provider\"",
+      "classification": "VERSION_METADATA",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "schema key retained; probed module now canonical",
+      "migration_disposition": "MIGRATED_PROBE"
+    },
+    {
+      "path": "src/ugence_ai_hiring/version.py",
+      "symbol": "_OPTIONAL_INTEGRATIONS['actiongate_legacy']",
+      "before": "\"actiongate_legacy\": \"actiongate_provider\"",
+      "after": "\"actiongate_legacy\": \"ugence_actiongate_provider\"",
+      "classification": "VERSION_METADATA",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "schema key retained; probed module now canonical",
+      "migration_disposition": "MIGRATED_PROBE"
+    },
+    {
+      "path": "tests/integrations/test_canonical_adapters.py",
+      "symbol": "canonical adapter + identity + fail-closed tests",
+      "before": "(new)",
+      "after": "targets ugence_tap_provider / ugence_actiongate_provider",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "ADDED"
+    },
+    {
+      "path": "tests/integrations/test_legacy_adapters.py",
+      "symbol": "compatibility-path tests",
+      "before": "probed tap_provider / actiongate_provider",
+      "after": "probes canonical namespaces; asserts legacy-path returns canonical classes",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "UPDATED"
+    },
+    {
+      "path": "tests/packaging/test_dependency_boundaries.py",
+      "symbol": "AST boundary sets",
+      "before": "LEGACY_COMPAT_ROOTS = {tap_provider, actiongate_provider} allowed in integrations",
+      "after": "CANONICAL_PROVIDER_ROOTS allowed only in integrations; legacy namespaces forbidden everywhere",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "UPDATED"
+    },
+    {
+      "path": "tests/packaging/test_provider_dependency_metadata.py",
+      "symbol": "pyproject + wheel METADATA assertions",
+      "before": "(new)",
+      "after": "extras canonical; no dgm-* requirement; not core; version 0.1.1",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "ADDED"
+    },
+    {
+      "path": "tests/packaging/test_determinism.py",
+      "symbol": "distribution_version assertion",
+      "before": "== 0.1.0",
+      "after": "== 0.1.1",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "UPDATED"
+    },
+    {
+      "path": "tests/test_h2_boundary.py, test_h3_boundary.py, test_h4_boundary.py, test_h5_boundary.py, test_h6_boundary.py",
+      "symbol": "forbidden-import checks for ('tap_provider','actiongate_provider')",
+      "before": "assert H-phase modules never import the legacy namespaces",
+      "after": "unchanged — H-phase modules never imported concrete providers and still do not",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "core boundary unchanged",
+      "migration_disposition": "UNCHANGED"
+    },
+    {
+      "path": "tests/test_h2_generation.py",
+      "symbol": "test_tap_provider_failure_is_fail_safe",
+      "before": "fail-safe assertion-provider test (reference provider)",
+      "after": "unchanged",
+      "classification": "TEST",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "UNCHANGED"
+    },
+    {
+      "path": "docs/TAP_ACTIONGATE_DEPENDENCY_BOUNDARY.md",
+      "symbol": "boundary documentation",
+      "before": "documented dgm-* legacy-compatibility extras and pre-registered migration",
+      "after": "documents canonical extras/adapters; dgm-* no longer AI Hiring deps",
+      "classification": "DOCUMENTATION",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "UPDATED"
+    },
+    {
+      "path": "docs/PROVIDER_DEPENDENCY_MIGRATION.md",
+      "symbol": "migration guide",
+      "before": "(new)",
+      "after": "before/after install, canonical imports, preserved compatibility imports",
+      "classification": "DOCUMENTATION",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "ADDED"
+    },
+    {
+      "path": "scripts/verify_ai_hiring_distribution.py",
+      "symbol": "clean-install matrix + wheel METADATA audit",
+      "before": "single clean-install check",
+      "after": "core/tap/actiongate/combined/legacy-deployment matrix; canonical Requires-Dist audit; no dgm-* requirement",
+      "classification": "PACKAGING_VERIFIER",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "EXTENDED"
+    },
+    {
+      "path": ".github/workflows/ai-hiring-package-ci.yml",
+      "symbol": "CI jobs",
+      "before": "package-suite + isolated-distribution + monorepo + freeze",
+      "after": "+ behavioral-equivalence job; provider srcs on source PYTHONPATH; verifier PYTHONPATH-free",
+      "classification": "CI",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "n/a",
+      "migration_disposition": "EXTENDED"
+    },
+    {
+      "path": "platform/PLATFORM_FREEZE_V1.json",
+      "symbol": "components.dgm-tap-provider / dgm-actiongate-provider, core_tree_hashes, conformance_hashes",
+      "before": "provider/kernel freeze fields",
+      "after": "UNCHANGED — this phase touches no frozen tree; freeze substantive digest identical",
+      "classification": "PLATFORM_FREEZE",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "freeze must remain green with no field changes",
+      "migration_disposition": "UNCHANGED"
+    },
+    {
+      "path": "packaging/dgm-tap-provider, packaging/dgm-actiongate-provider",
+      "symbol": "compatibility distributions",
+      "before": "re-export canonical providers",
+      "after": "UNCHANGED — remain usable for old deployments; not AI Hiring deps",
+      "classification": "EXTERNAL_CONSUMER",
+      "runtime_behavior_changes": false,
+      "compatibility_requirement": "legacy deployment compatibility preserved",
+      "migration_disposition": "UNCHANGED"
+    }
+  ],
+  "summary": {
+    "production_legacy_optional_extras_before": 2,
+    "production_legacy_optional_extras_after": 0,
+    "production_concrete_legacy_imports_before": 2,
+    "production_concrete_legacy_imports_after": 0,
+    "production_canonical_adapter_modules_after": 2,
+    "compatibility_facades_preserved": 2,
+    "version_metadata_probes_migrated": 2,
+    "legacy_dgm_requirements_in_final_wheel_metadata": 0
+  }
+}
