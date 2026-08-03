@@ -20,12 +20,31 @@ package (211 source files, 1,428 import edges).
 | Root | Classification | Migration decision |
 |---|---|---|
 | `pydantic` | DECLARED_RUNTIME_DEPENDENCY | keep (hard dep, `>=2`) |
-| `ugence_decision_authority` | UGENCE_PACKAGE_DEPENDENCY | depend on `ugence-decision-authority>=1.0.0` |
-| `ugence_governance_provider_framework` | UGENCE_PACKAGE_DEPENDENCY | depend on `ugence-governance-provider-framework>=0.1.0` |
+| `ugence_decision_authority` | UGENCE_PACKAGE_DEPENDENCY / NEUTRAL_CONTRACT | depend on `ugence-decision-authority>=1.0.0` |
+| `ugence_governance_provider_framework` | UGENCE_PACKAGE_DEPENDENCY / NEUTRAL_CONTRACT | depend on `ugence-governance-provider-framework>=0.1.0` |
 | `fastapi` | DECLARED_OPTIONAL_DEPENDENCY | keep behind the `api` extra (imported lazily) |
+| `tap_provider` | LEGACY_COMPATIBILITY_DEPENDENCY | `integrations/tap_legacy_adapter.py` only, lazy; `tap` extra → `dgm-tap-provider` |
+| `actiongate_provider` | LEGACY_COMPATIBILITY_DEPENDENCY | `integrations/actiongate_legacy_adapter.py` only, lazy; `actiongate` extra → `dgm-actiongate-provider` |
 
 `ugence-governance-contracts` is a transitive dependency of the two Ugence
 packages above and is also declared directly for explicitness.
+
+## TAP / ActionGate dependency boundary
+| Reference | Classification |
+|---|---|
+| Neutral governance ports/protocols (`ActionGovernanceProvider`, `AssertionGovernanceProvider`, `ActionControlPlanePort`, `ExternalExecutionPort`) used by the core | **NEUTRAL_CONTRACT** |
+| `tap` / `actiongate` optional extras | **OPTIONAL_INTEGRATION** |
+| `tap_provider` / `actiongate_provider` imports inside `integrations/*_legacy_adapter.py` (lazy) | **LEGACY_COMPATIBILITY_DEPENDENCY** |
+| Any `tap_provider` / `actiongate_provider` reference in the **core** (outside `integrations/`) | **FORBIDDEN_CORE_DEPENDENCY** (count: **0**) |
+| Legacy providers exercised by compatibility tests only when importable | **TEST_ONLY** |
+
+**Core import requires concrete TAP/ActionGate:** **No.** The core interacts with
+the control plane exclusively through neutral protocols; concrete providers are
+dependency-injected. The isolated `integrations/` adapters lazy-import the legacy
+providers and fail closed (`LegacyProviderUnavailable`) when the optional
+distribution is absent. Enforced by
+`tests/packaging/test_dependency_boundaries.py::test_concrete_tap_actiongate_only_in_integrations`
+and `tests/integrations/test_legacy_adapters.py`.
 
 ## Hidden / forbidden dependencies
 - **Repository-internal hidden dependencies found: 0.** No import of `symbolu`,

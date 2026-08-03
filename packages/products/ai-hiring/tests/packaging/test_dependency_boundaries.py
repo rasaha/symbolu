@@ -40,7 +40,6 @@ FORBIDDEN_ROOTS = {
     # Legacy compat namespaces — the core must import the CANONICAL packages,
     # not the repo-root shims (which do not ship in the wheel):
     "decision_governance", "governance_providers",
-    "actiongate_provider", "tap_provider",
     # Vendor model SDKs:
     "openai", "anthropic", "mistralai", "transformers", "torch",
     "google", "cohere", "llama_cpp",
@@ -50,6 +49,18 @@ FORBIDDEN_ROOTS = {
     # Numerics the wheel must not require:
     "numpy",
 }
+
+# Concrete legacy TAP / ActionGate providers. Classification:
+# LEGACY_COMPATIBILITY_DEPENDENCY — permitted ONLY inside the isolated, optional
+# ``integrations/`` subpackage (lazy-imported there); FORBIDDEN_CORE_DEPENDENCY
+# everywhere else in the package.
+LEGACY_COMPAT_ROOTS = {"tap_provider", "actiongate_provider"}
+
+INTEGRATIONS_DIR = PKG_ROOT / "integrations"
+
+
+def _is_integrations(path: pathlib.Path) -> bool:
+    return INTEGRATIONS_DIR in path.parents
 
 
 def _iter_module_files():
@@ -77,10 +88,32 @@ def _imported_roots(path: pathlib.Path):
 def test_no_forbidden_imports_anywhere_in_core():
     offenders = {}
     for path in _iter_module_files():
-        bad = _imported_roots(path) & FORBIDDEN_ROOTS
+        roots = _imported_roots(path)
+        bad = set(roots & FORBIDDEN_ROOTS)
+        # Concrete legacy providers are FORBIDDEN in the core; permitted only in
+        # the isolated optional integrations/ subpackage.
+        if not _is_integrations(path):
+            bad |= roots & LEGACY_COMPAT_ROOTS
         if bad:
             offenders[str(path.relative_to(SRC_ROOT))] = sorted(bad)
     assert not offenders, f"forbidden imports found in core: {offenders}"
+
+
+def test_concrete_tap_actiongate_only_in_integrations():
+    """The concrete TAP/ActionGate providers are referenced ONLY in integrations/.
+
+    Enforces the addendum boundary: tap_provider / actiongate_provider are a
+    LEGACY_COMPATIBILITY_DEPENDENCY confined to the optional adapter subpackage,
+    never a core dependency.
+    """
+    leaks = {}
+    for path in _iter_module_files():
+        if _is_integrations(path):
+            continue
+        hit = _imported_roots(path) & LEGACY_COMPAT_ROOTS
+        if hit:
+            leaks[str(path.relative_to(SRC_ROOT))] = sorted(hit)
+    assert not leaks, f"concrete TAP/ActionGate referenced outside integrations/: {leaks}"
 
 
 def test_all_third_party_imports_are_audited():
@@ -90,8 +123,13 @@ def test_all_third_party_imports_are_audited():
     stdlib = set(getattr(sys, "stdlib_module_names", set()))
     unexpected = {}
     for path in _iter_module_files():
+        allowed = set(ALLOWED_RUNTIME_ROOTS)
+        # Legacy providers are an audited LEGACY_COMPATIBILITY_DEPENDENCY only in
+        # the integrations/ subpackage.
+        if _is_integrations(path):
+            allowed |= LEGACY_COMPAT_ROOTS
         for root in _imported_roots(path):
-            if root in stdlib or root in ALLOWED_RUNTIME_ROOTS:
+            if root in stdlib or root in allowed:
                 continue
             # __future__ and common builtins-adjacent roots
             if root in {"__future__"}:

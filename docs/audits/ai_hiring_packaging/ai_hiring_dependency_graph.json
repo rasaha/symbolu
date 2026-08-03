@@ -1,21 +1,73 @@
 {
   "canonical_package": "ugence_ai_hiring",
-  "src_files_scanned": 211,
-  "import_edges": 1428,
+  "src_files_scanned": 214,
+  "import_edges": 1440,
   "classification_summary": {
-    "STDLIB": 459,
-    "INTERNAL_RELATIVE": 770,
-    "UGENCE_PACKAGE_DEPENDENCY": 111,
+    "STDLIB": 464,
+    "INTERNAL_RELATIVE": 774,
+    "UGENCE_PACKAGE_DEPENDENCY": 112,
     "DECLARED_RUNTIME_DEPENDENCY": 40,
     "DECLARED_OPTIONAL_DEPENDENCY": 7,
-    "INTERNAL_ABSOLUTE": 41
+    "INTERNAL_ABSOLUTE": 41,
+    "LEGACY_COMPATIBILITY_DEPENDENCY": 2
   },
   "external_roots": {
+    "actiongate_provider": "LEGACY_COMPATIBILITY_DEPENDENCY",
     "fastapi": "DECLARED_OPTIONAL_DEPENDENCY",
     "pydantic": "DECLARED_RUNTIME_DEPENDENCY",
+    "tap_provider": "LEGACY_COMPATIBILITY_DEPENDENCY",
     "ugence_decision_authority": "UGENCE_PACKAGE_DEPENDENCY",
     "ugence_governance_provider_framework": "UGENCE_PACKAGE_DEPENDENCY"
   },
   "forbidden_import_count": 0,
-  "unknown_third_party": []
+  "unknown_third_party": [],
+  "tap_actiongate_classification": {
+    "neutral_ports_and_contracts": {
+      "roots": [
+        "ugence_governance_provider_framework",
+        "ugence_decision_authority"
+      ],
+      "classification": "NEUTRAL_CONTRACT",
+      "note": "core interacts with the control plane only through neutral ActionGovernanceProvider/AssertionGovernanceProvider protocols and the kernel's ActionControlPlanePort/ExternalExecutionPort"
+    },
+    "optional_extras": {
+      "extras": [
+        "tap",
+        "actiongate"
+      ],
+      "classification": "OPTIONAL_INTEGRATION"
+    },
+    "concrete_legacy_providers": {
+      "roots": [
+        "tap_provider",
+        "actiongate_provider"
+      ],
+      "distributions": [
+        "dgm-tap-provider",
+        "dgm-actiongate-provider"
+      ],
+      "classification_in_core": "FORBIDDEN_CORE_DEPENDENCY",
+      "classification_in_integrations": "LEGACY_COMPATIBILITY_DEPENDENCY",
+      "references": [
+        {
+          "module": "ugence_ai_hiring/integrations/actiongate_legacy_adapter.py",
+          "root": "actiongate_provider",
+          "classification": "LEGACY_COMPATIBILITY_DEPENDENCY",
+          "lazy": true
+        },
+        {
+          "module": "ugence_ai_hiring/integrations/tap_legacy_adapter.py",
+          "root": "tap_provider",
+          "classification": "LEGACY_COMPATIBILITY_DEPENDENCY",
+          "lazy": true
+        }
+      ],
+      "loaded": "lazily, inside integrations/ adapter functions only"
+    },
+    "tests": {
+      "classification": "TEST_ONLY",
+      "note": "compatibility tests exercise the legacy providers only when importable; otherwise skipped/fail-closed"
+    },
+    "core_import_requires_concrete_tap_actiongate": false
+  }
 }

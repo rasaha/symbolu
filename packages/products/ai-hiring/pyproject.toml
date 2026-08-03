@@ -51,6 +51,14 @@ dependencies = [
 # Each extra maps to code that actually exists. Extras that would require a
 # concrete production adapter not shipped here are intentionally NOT defined.
 api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+# Optional legacy control-plane adapters (ugence_ai_hiring.integrations.*). The
+# core NEVER requires these; they bridge the current TAP / ActionGate providers
+# onto the neutral governance protocols. These are TEMPORARY LEGACY-COMPATIBILITY
+# dependencies, not canonical ownership: a later dependency-only PR migrates
+# dgm-tap-provider -> ugence-tap-provider and dgm-actiongate-provider ->
+# ugence-actiongate-provider once those canonical packages exist.
+tap = ["dgm-tap-provider"]
+actiongate = ["dgm-actiongate-provider"]
 dev = ["pytest>=7.0", "build>=1.0"]
 all = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 

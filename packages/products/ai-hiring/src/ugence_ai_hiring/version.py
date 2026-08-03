@@ -47,6 +47,9 @@ RELEASE_CLASSIFICATION = "PACKAGE_READY_FOR_CONTROLLED_PILOT"
 # / its governance-kernel dependency), so they are NOT listed here.
 _OPTIONAL_INTEGRATIONS = {
     "api": "fastapi",
+    # Optional legacy control-plane adapters (temporary compatibility deps).
+    "tap_legacy": "tap_provider",
+    "actiongate_legacy": "actiongate_provider",
 }
 
 # Runtime dependencies whose versions we surface for provenance/debugging.

@@ -1,6 +1,11 @@
 {
   "package_tests": [
     {
+      "test_file": "integrations/test_legacy_adapters.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
       "test_file": "packaging/test_compatibility_facade.py",
       "classification": "NEW_PACKAGE_TEST",
       "test_count": 6
@@ -8,7 +13,7 @@
     {
       "test_file": "packaging/test_dependency_boundaries.py",
       "classification": "NEW_PACKAGE_TEST",
-      "test_count": 4
+      "test_count": 5
     },
     {
       "test_file": "packaging/test_determinism.py",
@@ -491,10 +496,10 @@
       "test_count": 10
     }
   ],
-  "package_test_files": 98,
-  "package_test_count": 754,
-  "new_package_tests": 24,
-  "migrated_tests": 730,
+  "package_test_files": 99,
+  "package_test_count": 761,
+  "new_package_tests": 25,
+  "migrated_tests": 736,
   "monorepo_integration_tests": [
     {
       "test_file": "ai_hiring/tests/test_direct_kernel_adoption.py",
@@ -511,17 +516,26 @@
   ],
   "monorepo_integration_count": 29,
   "collected_counts_authoritative": {
-    "note": "pytest-collected case counts (include parametrization); the per-file counts above are static def counts.",
+    "note": "pytest-collected case counts. Source context skips 6 facade tests (monorepo shadows the wheel facade); installed-wheel context runs them but skips 2 legacy TAP/ActionGate compatibility tests (legacy providers absent in the clean env).",
     "baseline_monorepo_ai_hiring": 778,
-    "package_total": 773,
+    "package_total_collected": 780,
+    "source_context": {
+      "passed": 774,
+      "skipped": 6
+    },
+    "installed_wheel_context": {
+      "passed": 778,
+      "skipped": 2
+    },
     "migrated_behavioral": 749,
-    "new_packaging_tests": 24,
-    "new_packaging_breakdown": {
-      "compatibility (test_compatibility_facade.py)": 6,
-      "governance_invariants (test_governance_invariants.py)": 7,
-      "dependency_boundaries (test_dependency_boundaries.py)": 4,
-      "import_isolation (test_import_isolation.py)": 3,
-      "determinism (test_determinism.py)": 4
+    "new_packaging_and_integration_tests": 31,
+    "new_tests_breakdown": {
+      "compatibility_facade": 6,
+      "governance_invariants": 7,
+      "dependency_boundaries": 5,
+      "import_isolation": 3,
+      "determinism": 4,
+      "legacy_tap_actiongate_integrations": 6
     },
     "monorepo_integration_kept_in_monorepo": 29
   }
