@@ -1,0 +1,109 @@
+{
+"metadata": {
+"scenario_id": "procurement",
+"title": "Procurement Sourcing Workforce",
+"domain": "procurement",
+"description": "Non-greedy agent team selection under provider concentration limits.",
+"workflow_contract_version": "workflow_ir.v1",
+"fixture_version": "0.2.0",
+"expected_plan_state": "COMPLETE",
+"synthetic_data": true,
+"supported_operations": [
+"adapt",
+"eligibility",
+"ranking",
+"composition",
+"plan",
+"permissions",
+"fallback",
+"explanations",
+"replay",
+"compare",
+"what-if",
+"export"
+]
+},
+"manifest": {
+"awc_composition_contract_version": "awc.composition.v1",
+"awc_contract_version": "awc.v1",
+"awc_version": "0.2.0",
+"demonstration": {
+"expected_plan_state": "COMPLETE",
+"headline": "non-greedy team selection under provider concentration",
+"shows_no_fallback_available": true,
+"shows_no_feasible_team": false,
+"shows_non_greedy_selection": true
+},
+"digests": {
+"composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+"eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+"enterprise_policy_digest": "sha256:6c5c763c40bcbe870a6e989f155e2b5d49161e84772ff44fa0c691375fb3fdc3",
+"fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+"permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+"ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+"registry_snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+"workflow_adaptation_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a"
+},
+"expected_fingerprints": {
+"adaptation_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a",
+"composition_fingerprint": "sha256:781802c3023ed48eab1517acce72522362bd2b50ce5a703236ddba5bd5b19fd0",
+"expected_plan_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+"plan_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+"plan_id": "plan::a403d4bf91a614b5",
+"plan_state": "COMPLETE",
+"replay_fingerprint": "sha256:fd6eac98696dd176b1eaf6122516b85a60044017a847526fa77866f03e382cdc",
+"workflow_eligibility_fingerprint": "sha256:e17946312df282916b8885b251d2dde6ac47a9b457355c5d1f4c743ae0da2833"
+},
+"expected_output_files": {
+"adaptation.json": "0c3f5e6a9657d4a9f5f75a004a21a9e1c899b0ba4d15a7dabb6b6d7a267358d8",
+"agent_team_plan.json": "f39694b069afcd2764cec6e3e553a302d58f655e6eb9ce416d93522f1265b054",
+"composition.json": "f06309ffd9588b9522f2e0d54bd9e73363bda57e987cdb6e4fa9fd16c2040a10",
+"eligibility.json": "c4127d8738058f89c403c1c159333c24df397724b9afbc5cb01ff12f9cbd46bc",
+"fingerprints.json": "d0916a5c796ba450c284c3eab5395e142a41316c379a1a16834f9ce08c6eb65b",
+"ranking.json": "0e095ff6c7b678064625a247a5bcc9492b00dfc2de31ba6573523572cf059afd",
+"replay_record.json": "d4238e36933c5f1c453dc4c1321a88691a6e869ad1bfaf5c1648046121c13ba1"
+},
+"input_files": {
+"agent_registry_snapshot.json": "d4729e33c6e4cf5e6c6de273c935aa9e10a3cbdaac38fa0efb762096645c8676",
+"compiled_workflow.json": "07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d",
+"composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
+"eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+"enterprise_agent_policy.json": "991782f49cbd359c5acac0553adebffea54d2f210b0b64f02e9a72e889a80bdc",
+"enterprise_role_overlay.json": "9348ec250714676bf15ae791ba84cc3f8bed567e34bfbc3c8fc0ee1ae22593d6",
+"fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+"permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+"ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb"
+},
+"logical_time": 1000000.0,
+"scenario_id": "procurement",
+"schema": "governance_studio.scenario_manifest.v1",
+"synthetic": true
+},
+"workflow_identity": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a",
+"narrative": "non-greedy team selection under provider concentration",
+"input_artifacts": [
+"agent_registry_snapshot.json",
+"compiled_workflow.json",
+"composition_policy.json",
+"eligibility_policy.json",
+"enterprise_agent_policy.json",
+"enterprise_role_overlay.json",
+"fallback_policy.json",
+"permission_policy.json",
+"ranking_policy.json"
+],
+"expected_outputs": [
+"adaptation.json",
+"agent_team_plan.json",
+"composition.json",
+"eligibility.json",
+"fingerprints.json",
+"ranking.json",
+"replay_record.json"
+],
+"maturity_labels": {
+"synthetic": true,
+"planning_only": true
+},
+"synthetic_data_notice": "Synthetic demonstration data \u2014 planning only; no agent execution."
+}

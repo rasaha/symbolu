@@ -1,0 +1,482 @@
+{
+"roles": [
+{
+"role_id": "role::sec_incident_correlation",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible_agent_ids": [
+"agent_incident_correlation@1.0.0"
+],
+"eliminated_agent_ids": [
+"agent_google_threat@1.0.0",
+"agent_openai_threat@1.0.0",
+"agent_threat_analysis@2.0.0"
+],
+"indeterminate_agent_ids": [],
+"explanation": {
+"role_id": "role::sec_incident_correlation",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible": [
+"agent_incident_correlation@1.0.0"
+],
+"eliminated": [
+[
+"agent_google_threat@1.0.0",
+[
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+]
+],
+[
+"agent_openai_threat@1.0.0",
+[
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+]
+],
+[
+"agent_threat_analysis@2.0.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+]
+],
+"indeterminate": [],
+"narrative": [
+"role role::sec_incident_correlation: HAS_ELIGIBLE_AGENT",
+"evaluated 4 agent(s); 1 eligible, 3 eliminated, 0 indeterminate",
+"  - agent_google_threat@1.0.0 eliminated: SECURITY_CLASSIFICATION_INSUFFICIENT",
+"  - agent_openai_threat@1.0.0 eliminated: SECURITY_CLASSIFICATION_INSUFFICIENT",
+"  - agent_threat_analysis@2.0.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+]
+},
+"agents": [
+{
+"agent_id": "agent_google_threat",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:incident_correlation",
+"capability_evidence:evidence_extraction",
+"capability_evidence:incident_correlation",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "security_classification",
+"verdict": "FAIL",
+"reason": "SECURITY_CLASSIFICATION_INSUFFICIENT",
+"criticality": "CRITICAL_GOV",
+"detail": "security 3 < required 4"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+],
+"evidence_refs": [
+"ev::agent_google_threat::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_google_threat::1.0.0::incident_correlation::MEASURED",
+"ev::agent_google_threat::1.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:ab133d3d3c8c0aa7c9c8681541162ffee91e22b9866a213cfda5aaf1d76a32f6"
+},
+{
+"agent_id": "agent_incident_correlation",
+"agent_version": "1.0.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:incident_correlation",
+"capability_evidence:evidence_extraction",
+"capability_evidence:incident_correlation",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_incident_correlation::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_incident_correlation::1.0.0::incident_correlation::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:5200379a158b99a51bfea7729b41b043510ad2feffa0436a0d2a9838ddac6faf"
+},
+{
+"agent_id": "agent_openai_threat",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:incident_correlation",
+"capability_evidence:evidence_extraction",
+"capability_evidence:incident_correlation",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "security_classification",
+"verdict": "FAIL",
+"reason": "SECURITY_CLASSIFICATION_INSUFFICIENT",
+"criticality": "CRITICAL_GOV",
+"detail": "security 2 < required 4"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+],
+"evidence_refs": [
+"ev::agent_openai_threat::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_openai_threat::1.0.0::incident_correlation::MEASURED",
+"ev::agent_openai_threat::1.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:0654fb1418e0f203c89fb05cae3af128743f82237416858af1b28d6e16c663e5"
+},
+{
+"agent_id": "agent_threat_analysis",
+"agent_version": "2.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:incident_correlation",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'incident_correlation'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_threat_analysis::2.0.0::evidence_extraction::MEASURED",
+"ev::agent_threat_analysis::2.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:7cb5a302b45e7c5bfce36aec716e93a20cfba22cfc74aefb8e5a10c94d204df6"
+}
+],
+"report_fingerprint": "sha256:ece0d20ca6b375e6f3f0dcf499cf9a59890c748dd921b0db671af24ba9ef3591"
+},
+{
+"role_id": "role::sec_threat_analysis",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible_agent_ids": [
+"agent_threat_analysis@2.0.0"
+],
+"eliminated_agent_ids": [
+"agent_google_threat@1.0.0",
+"agent_incident_correlation@1.0.0",
+"agent_openai_threat@1.0.0"
+],
+"indeterminate_agent_ids": [],
+"explanation": {
+"role_id": "role::sec_threat_analysis",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible": [
+"agent_threat_analysis@2.0.0"
+],
+"eliminated": [
+[
+"agent_google_threat@1.0.0",
+[
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+]
+],
+[
+"agent_incident_correlation@1.0.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_openai_threat@1.0.0",
+[
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+]
+]
+],
+"indeterminate": [],
+"narrative": [
+"role role::sec_threat_analysis: HAS_ELIGIBLE_AGENT",
+"evaluated 4 agent(s); 1 eligible, 3 eliminated, 0 indeterminate",
+"  - agent_google_threat@1.0.0 eliminated: SECURITY_CLASSIFICATION_INSUFFICIENT",
+"  - agent_incident_correlation@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_openai_threat@1.0.0 eliminated: SECURITY_CLASSIFICATION_INSUFFICIENT"
+]
+},
+"agents": [
+{
+"agent_id": "agent_google_threat",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:threat_analysis",
+"capability_evidence:evidence_extraction",
+"capability_evidence:threat_analysis",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "security_classification",
+"verdict": "FAIL",
+"reason": "SECURITY_CLASSIFICATION_INSUFFICIENT",
+"criticality": "CRITICAL_GOV",
+"detail": "security 3 < required 4"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+],
+"evidence_refs": [
+"ev::agent_google_threat::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_google_threat::1.0.0::incident_correlation::MEASURED",
+"ev::agent_google_threat::1.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:693cc85210777f624562648751819d495f986b6a68ec0fbd709e35830f17aed7"
+},
+{
+"agent_id": "agent_incident_correlation",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:threat_analysis",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'threat_analysis'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_incident_correlation::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_incident_correlation::1.0.0::incident_correlation::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:7379396182fe9022a29702295e3f905a91753ccd71e17e5a6e4c8057139b5e10"
+},
+{
+"agent_id": "agent_openai_threat",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:threat_analysis",
+"capability_evidence:evidence_extraction",
+"capability_evidence:threat_analysis",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "security_classification",
+"verdict": "FAIL",
+"reason": "SECURITY_CLASSIFICATION_INSUFFICIENT",
+"criticality": "CRITICAL_GOV",
+"detail": "security 2 < required 4"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"SECURITY_CLASSIFICATION_INSUFFICIENT"
+],
+"evidence_refs": [
+"ev::agent_openai_threat::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_openai_threat::1.0.0::incident_correlation::MEASURED",
+"ev::agent_openai_threat::1.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:31759eabcb2a72f62d20931cfc4be8e53b79de1f6f3605663c834eaaa29ba051"
+},
+{
+"agent_id": "agent_threat_analysis",
+"agent_version": "2.0.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:threat_analysis",
+"capability_evidence:evidence_extraction",
+"capability_evidence:threat_analysis",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_threat_analysis::2.0.0::evidence_extraction::MEASURED",
+"ev::agent_threat_analysis::2.0.0::threat_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_security_infeasible_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:b5ed04872938514be29291c329f3191c6b933abe0aea8bdc39f201890074d2c6"
+}
+],
+"report_fingerprint": "sha256:b299b6b83ef16452e141e195553f0a2950f2cacd5c88d3281d65af9a3070f3f1"
+}
+]
+}

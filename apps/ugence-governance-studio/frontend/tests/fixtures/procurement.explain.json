@@ -1,0 +1,900 @@
+{
+"roles": [
+{
+"role_id": "role::proc_recommendation",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible_agent_ids": [
+"agent_procurement_recommendation@1.2.0"
+],
+"eliminated_agent_ids": [
+"agent_general_analyst@1.0.0",
+"agent_india_procurement@1.0.0",
+"agent_procurement_risk@2.1.0",
+"agent_supplier_evidence@1.4.0"
+],
+"indeterminate_agent_ids": [],
+"explanation": {
+"role_id": "role::proc_recommendation",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible": [
+"agent_procurement_recommendation@1.2.0"
+],
+"eliminated": [
+[
+"agent_general_analyst@1.0.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_india_procurement@1.0.0",
+[
+"MISSING_REQUIRED_CAPABILITY",
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+]
+],
+[
+"agent_procurement_risk@2.1.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_supplier_evidence@1.4.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+]
+],
+"indeterminate": [],
+"narrative": [
+"role role::proc_recommendation: HAS_ELIGIBLE_AGENT",
+"evaluated 5 agent(s); 1 eligible, 4 eliminated, 0 indeterminate",
+"  - agent_general_analyst@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_india_procurement@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY, RESIDENCY_MISMATCH, DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"  - agent_procurement_risk@2.1.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_supplier_evidence@1.4.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+]
+},
+"agents": [
+{
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_recommendation",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_recommendation'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:885e4fa520a53df32e044992de8048f90df5585c462eeb09eb479d775575657d"
+},
+{
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_recommendation",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_recommendation'"
+},
+{
+"condition": "residency",
+"verdict": "FAIL",
+"reason": "RESIDENCY_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "agent residency 'IN' not permitted"
+},
+{
+"condition": "deployment",
+"verdict": "FAIL",
+"reason": "DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "deployment environment 'cloud_in' not permitted"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY",
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+],
+"evidence_refs": [
+"ev::agent_india_procurement::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_india_procurement::1.0.0::procurement_risk_analysis::MEASURED",
+"ev::agent_india_procurement::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:3aa564d3141fc356562f20738fd5fdec004873996c4d137093f460262304acc5"
+},
+{
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:procurement_recommendation",
+"capability_evidence:evidence_extraction",
+"capability_evidence:procurement_recommendation",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:e9ab8582754a154d048fdbe3d67260d85e61a89b52c0236dd79b2239284c0cb9"
+},
+{
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_recommendation",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_recommendation'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:a95bcc2d46bc68af76b21875626f416eb7ab7cb87d3ba9cfc66bc423d558d463"
+},
+{
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_recommendation",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_recommendation'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+"ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:8e7231d2a41ebc212573b787b3089fa7a554be38c61756d567fb323ce076544d"
+}
+],
+"report_fingerprint": "sha256:db24161d99f3792cf91450b6817db74f5237cefa34733b54c54fc9cf828b88fb"
+},
+{
+"role_id": "role::proc_supplier_evidence",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible_agent_ids": [
+"agent_general_analyst@1.0.0",
+"agent_supplier_evidence@1.4.0"
+],
+"eliminated_agent_ids": [
+"agent_india_procurement@1.0.0",
+"agent_procurement_recommendation@1.2.0",
+"agent_procurement_risk@2.1.0"
+],
+"indeterminate_agent_ids": [],
+"explanation": {
+"role_id": "role::proc_supplier_evidence",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible": [
+"agent_general_analyst@1.0.0",
+"agent_supplier_evidence@1.4.0"
+],
+"eliminated": [
+[
+"agent_india_procurement@1.0.0",
+[
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+]
+],
+[
+"agent_procurement_recommendation@1.2.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_procurement_risk@2.1.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+]
+],
+"indeterminate": [],
+"narrative": [
+"role role::proc_supplier_evidence: HAS_ELIGIBLE_AGENT",
+"evaluated 5 agent(s); 2 eligible, 3 eliminated, 0 indeterminate",
+"  - agent_india_procurement@1.0.0 eliminated: RESIDENCY_MISMATCH, DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"  - agent_procurement_recommendation@1.2.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_procurement_risk@2.1.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+]
+},
+"agents": [
+{
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:supplier_evidence_collection",
+"capability_evidence:evidence_extraction",
+"capability_evidence:supplier_evidence_collection",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:21eb639d6d589a57d0c8e82607d6ea358f37f88e844d648fa62ba870428f669c"
+},
+{
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:supplier_evidence_collection",
+"capability_evidence:evidence_extraction",
+"capability_evidence:supplier_evidence_collection",
+"input_contract",
+"output_contract",
+"provider",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "residency",
+"verdict": "FAIL",
+"reason": "RESIDENCY_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "agent residency 'IN' not permitted"
+},
+{
+"condition": "deployment",
+"verdict": "FAIL",
+"reason": "DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "deployment environment 'cloud_in' not permitted"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+],
+"evidence_refs": [
+"ev::agent_india_procurement::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_india_procurement::1.0.0::procurement_risk_analysis::MEASURED",
+"ev::agent_india_procurement::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:d2b36ac14f6a46c7a8b79090abff5f1045ec1517431f05d13caa55074250165c"
+},
+{
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:supplier_evidence_collection",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'supplier_evidence_collection'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:b8d2f87fd0c51a10eb953c4e3c84cdc9242179e2a4b3567a24cac0b275182ecc"
+},
+{
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:supplier_evidence_collection",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'supplier_evidence_collection'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:bf2d06f5fcbfeafcd53ab8989430386ca0a71ff33dfcf36e0aec7ffe3f780f9e"
+},
+{
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:supplier_evidence_collection",
+"capability_evidence:evidence_extraction",
+"capability_evidence:supplier_evidence_collection",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+"ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:d713785682b3f37fa8990d5190b2b9472e974a30fb8f30dbf28cbb26f6c21824"
+}
+],
+"report_fingerprint": "sha256:04654212dc1977a639ac683b181ef4cc25b901575eb8b128b2a93e5aaf0b0e98"
+},
+{
+"role_id": "role::proc_supplier_risk",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible_agent_ids": [
+"agent_procurement_risk@2.1.0"
+],
+"eliminated_agent_ids": [
+"agent_general_analyst@1.0.0",
+"agent_india_procurement@1.0.0",
+"agent_procurement_recommendation@1.2.0",
+"agent_supplier_evidence@1.4.0"
+],
+"indeterminate_agent_ids": [],
+"explanation": {
+"role_id": "role::proc_supplier_risk",
+"outcome": "HAS_ELIGIBLE_AGENT",
+"eligible": [
+"agent_procurement_risk@2.1.0"
+],
+"eliminated": [
+[
+"agent_general_analyst@1.0.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_india_procurement@1.0.0",
+[
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+]
+],
+[
+"agent_procurement_recommendation@1.2.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+],
+[
+"agent_supplier_evidence@1.4.0",
+[
+"MISSING_REQUIRED_CAPABILITY"
+]
+]
+],
+"indeterminate": [],
+"narrative": [
+"role role::proc_supplier_risk: HAS_ELIGIBLE_AGENT",
+"evaluated 5 agent(s); 1 eligible, 4 eliminated, 0 indeterminate",
+"  - agent_general_analyst@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_india_procurement@1.0.0 eliminated: RESIDENCY_MISMATCH, DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"  - agent_procurement_recommendation@1.2.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+"  - agent_supplier_evidence@1.4.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+]
+},
+"agents": [
+{
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_risk_analysis",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_risk_analysis'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:7fc97148e9c068ce09e2da4f71d6eefb4b991cb3273882c40f304b3037003d31"
+},
+{
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:procurement_risk_analysis",
+"capability_evidence:evidence_extraction",
+"capability_evidence:procurement_risk_analysis",
+"input_contract",
+"output_contract",
+"provider",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "residency",
+"verdict": "FAIL",
+"reason": "RESIDENCY_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "agent residency 'IN' not permitted"
+},
+{
+"condition": "deployment",
+"verdict": "FAIL",
+"reason": "DEPLOYMENT_ENVIRONMENT_MISMATCH",
+"criticality": "CRITICAL_GOV",
+"detail": "deployment environment 'cloud_in' not permitted"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"RESIDENCY_MISMATCH",
+"DEPLOYMENT_ENVIRONMENT_MISMATCH"
+],
+"evidence_refs": [
+"ev::agent_india_procurement::1.0.0::evidence_extraction::MEASURED",
+"ev::agent_india_procurement::1.0.0::procurement_risk_analysis::MEASURED",
+"ev::agent_india_procurement::1.0.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:402e6197cbf7c4dc07b0fded5c95f68f7c69ba37347fb131eddb53061e09da71"
+},
+{
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_risk_analysis",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_risk_analysis'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:e17d11c3c0fb87a32026f203ba6d44d4d2fbf76673b8ae940eeb01cc5547c396"
+},
+{
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"state": "ELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_presence:procurement_risk_analysis",
+"capability_evidence:evidence_extraction",
+"capability_evidence:procurement_risk_analysis",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [],
+"unknown_conditions": [],
+"elimination_reasons": [],
+"evidence_refs": [
+"ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+"ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:f5ba945f3f8a971ebfc9b192a0bcc8ff8f51eb4deb89901ab3b4b954830aa2a2"
+},
+{
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"state": "INELIGIBLE",
+"passed_conditions": [
+"input_integrity",
+"pinned_versions",
+"agent_status",
+"profile_validity",
+"agent_version",
+"capability_presence:evidence_extraction",
+"capability_evidence:evidence_extraction",
+"input_contract",
+"output_contract",
+"provider",
+"residency",
+"deployment",
+"security_classification",
+"audit_capability",
+"permissions",
+"authority_ceiling",
+"cost_hard_limit",
+"latency_hard_limit",
+"quality_floor"
+],
+"failed_conditions": [
+{
+"condition": "capability_presence:procurement_risk_analysis",
+"verdict": "FAIL",
+"reason": "MISSING_REQUIRED_CAPABILITY",
+"criticality": "CRITICAL_OP",
+"detail": "agent does not claim capability 'procurement_risk_analysis'"
+}
+],
+"unknown_conditions": [],
+"elimination_reasons": [
+"MISSING_REQUIRED_CAPABILITY"
+],
+"evidence_refs": [
+"ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+"ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+],
+"policy_refs": [
+"gs_procurement_enterprise_policy",
+"gs_eligibility_policy"
+],
+"result_fingerprint": "sha256:fa8fd4b6a2f6bfa89523f7ea593188196d098370a1350a8af5472fd86a46e14f"
+}
+],
+"report_fingerprint": "sha256:4e439d15a4a02a4de56af36c6529de943b979ec996bdd4e9c7de4195bfead0e2"
+}
+]
+}

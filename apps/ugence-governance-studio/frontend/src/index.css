@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-surface-0 text-ink-1 font-sans antialiased;
+}
+
+/* Visible focus for keyboard users everywhere (§24). */
+:focus-visible {
+  outline: 2px solid #6aa9ff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Respect reduced-motion (§24). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.skip-link {
+  @apply sr-only;
+}
+.skip-link:focus {
+  @apply not-sr-only fixed left-3 top-3 z-50 rounded bg-surface-3 px-3 py-2 text-ink-0;
+}

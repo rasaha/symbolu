@@ -1,0 +1,634 @@
+{
+"scenario_id": "procurement",
+"workflow_identity": "gs_procurement",
+"workflow_version": 1,
+"contract_version": "workflow_ir.v1",
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"ir_version": "workflow_ir.v1",
+"nodes": [
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "DECISION_RULE",
+"label": "request schema validation",
+"node_id": "proc_request_validation",
+"output_contract": "validated_request",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [
+"validated_request"
+],
+"kind": "EVIDENCE_REQUIREMENT",
+"label": "supplier evidence collection",
+"node_id": "proc_supplier_evidence",
+"output_contract": "supplier_evidence",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [
+"supplier_evidence"
+],
+"kind": "EVIDENCE_REQUIREMENT",
+"label": "supplier-risk analysis",
+"node_id": "proc_supplier_risk",
+"output_contract": "supplier_risk_report",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [
+"supplier_risk_report"
+],
+"kind": "EVIDENCE_REQUIREMENT",
+"label": "procurement recommendation drafting",
+"node_id": "proc_recommendation",
+"output_contract": "recommendation_draft",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "HUMAN_APPROVER",
+"disposition": "AUTHORITATIVE",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "APPROVAL_GATE",
+"label": "binding approval",
+"node_id": "proc_binding_approval",
+"output_contract": "",
+"owning_capability": "DECISION_AUTHORITY",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "AUTHORITATIVE",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "ACTION_CONSTRAINT",
+"label": "purchase action authorization",
+"node_id": "proc_purchase_auth",
+"output_contract": "",
+"owning_capability": "ACTION_GATE",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "AUTHORITATIVE",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "ACTION_CLEARANCE_REQUIREMENT",
+"label": "commit-time clearance",
+"node_id": "proc_commit_clearance",
+"output_contract": "",
+"owning_capability": "ACTION_CLEARANCE",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "AUDIT_EMISSION",
+"label": "audit emission",
+"node_id": "proc_audit",
+"output_contract": "",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "TERMINAL_OUTCOME",
+"label": "terminal outcome",
+"node_id": "proc_terminal",
+"output_contract": "",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+}
+],
+"edges": [
+{
+"edge_id": "edge_0",
+"kind": "NEXT",
+"order": 0,
+"source_id": "proc_request_validation",
+"target_id": "proc_supplier_evidence"
+},
+{
+"edge_id": "edge_1",
+"kind": "NEXT",
+"order": 1,
+"source_id": "proc_supplier_evidence",
+"target_id": "proc_supplier_risk"
+},
+{
+"edge_id": "edge_2",
+"kind": "NEXT",
+"order": 2,
+"source_id": "proc_supplier_risk",
+"target_id": "proc_recommendation"
+},
+{
+"edge_id": "edge_3",
+"kind": "NEXT",
+"order": 3,
+"source_id": "proc_recommendation",
+"target_id": "proc_binding_approval"
+},
+{
+"edge_id": "edge_4",
+"kind": "NEXT",
+"order": 4,
+"source_id": "proc_binding_approval",
+"target_id": "proc_purchase_auth"
+},
+{
+"edge_id": "edge_5",
+"kind": "NEXT",
+"order": 5,
+"source_id": "proc_purchase_auth",
+"target_id": "proc_commit_clearance"
+},
+{
+"edge_id": "edge_6",
+"kind": "NEXT",
+"order": 6,
+"source_id": "proc_commit_clearance",
+"target_id": "proc_audit"
+},
+{
+"edge_id": "edge_7",
+"kind": "NEXT",
+"order": 7,
+"source_id": "proc_audit",
+"target_id": "proc_terminal"
+}
+],
+"structural_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"node_dispositions": [
+{
+"node_id": "proc_request_validation",
+"source_node_kind": "DECISION_RULE",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:DECISION_RULE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "proc_supplier_evidence",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"disposition": "AI_AGENT_ELIGIBLE",
+"reason_codes": [
+"advisory_evidence_work"
+],
+"role_id": "role::proc_supplier_evidence",
+"is_agent_role": true
+},
+{
+"node_id": "proc_supplier_risk",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"disposition": "AI_AGENT_ELIGIBLE",
+"reason_codes": [
+"advisory_evidence_work"
+],
+"role_id": "role::proc_supplier_risk",
+"is_agent_role": true
+},
+{
+"node_id": "proc_recommendation",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"disposition": "AI_AGENT_ELIGIBLE",
+"reason_codes": [
+"advisory_evidence_work"
+],
+"role_id": "role::proc_recommendation",
+"is_agent_role": true
+},
+{
+"node_id": "proc_binding_approval",
+"source_node_kind": "APPROVAL_GATE",
+"disposition": "HUMAN_AUTHORITY_REQUIRED",
+"reason_codes": [
+"human_authority_node:APPROVAL_GATE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "proc_purchase_auth",
+"source_node_kind": "ACTION_CONSTRAINT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_GATE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "proc_commit_clearance",
+"source_node_kind": "ACTION_CLEARANCE_REQUIREMENT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_CLEARANCE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "proc_audit",
+"source_node_kind": "AUDIT_EMISSION",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:AUDIT_EMISSION"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "proc_terminal",
+"source_node_kind": "TERMINAL_OUTCOME",
+"disposition": "NO_AI_AGENT_REQUIRED",
+"reason_codes": [
+"structural_kind:TERMINAL_OUTCOME"
+],
+"role_id": "",
+"is_agent_role": false
+}
+],
+"role_requirements": [
+{
+"contract_version": "awc.v1",
+"role_id": "role::proc_supplier_evidence",
+"workflow_id": "gs_procurement",
+"workflow_version": 1,
+"source_node_id": "proc_supplier_evidence",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"role_name": "supplier evidence collection",
+"role_description": "supplier_evidence",
+"required_capabilities": [
+"evidence_extraction",
+"supplier_evidence_collection"
+],
+"input_contract_refs": [
+"validated_request"
+],
+"output_contract_refs": [
+"supplier_evidence"
+],
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_supplier_evidence",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"optional_capabilities": [],
+"required_tools": [],
+"prohibited_tools": [],
+"domain_requirements": [],
+"data_classification": "confidential",
+"residency_constraints": [],
+"provider_constraints": [],
+"deployment_constraints": [],
+"required_permissions": [
+"read_context"
+],
+"prohibited_permissions": [],
+"authority_ceiling": 0,
+"required_audit_capabilities": [],
+"required_security_classification": 0,
+"required_evidence_classes": [
+"MEASURED"
+],
+"state_requirement": "",
+"human_review_requirement": false,
+"minimum_quality_constraint": null,
+"maximum_latency_constraint": null,
+"maximum_cost_constraint": null,
+"model_requirement_refs": [],
+"fallback_policy_ref": "",
+"evidence_refs": [],
+"policy_refs": [],
+"role_fingerprint": "sha256:157d3514752580650ca8dcc4e59ab664bd56d0efa682f99284f249f2f397d754"
+},
+{
+"contract_version": "awc.v1",
+"role_id": "role::proc_supplier_risk",
+"workflow_id": "gs_procurement",
+"workflow_version": 1,
+"source_node_id": "proc_supplier_risk",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"role_name": "procurement risk analysis",
+"role_description": "supplier_risk_report",
+"required_capabilities": [
+"evidence_extraction",
+"procurement_risk_analysis"
+],
+"input_contract_refs": [
+"supplier_evidence"
+],
+"output_contract_refs": [
+"supplier_risk_report"
+],
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_supplier_risk",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"optional_capabilities": [],
+"required_tools": [],
+"prohibited_tools": [],
+"domain_requirements": [],
+"data_classification": "confidential",
+"residency_constraints": [],
+"provider_constraints": [],
+"deployment_constraints": [],
+"required_permissions": [
+"read_context"
+],
+"prohibited_permissions": [],
+"authority_ceiling": 0,
+"required_audit_capabilities": [],
+"required_security_classification": 0,
+"required_evidence_classes": [
+"MEASURED"
+],
+"state_requirement": "",
+"human_review_requirement": false,
+"minimum_quality_constraint": null,
+"maximum_latency_constraint": null,
+"maximum_cost_constraint": null,
+"model_requirement_refs": [],
+"fallback_policy_ref": "",
+"evidence_refs": [],
+"policy_refs": [],
+"role_fingerprint": "sha256:f3cd69dfaac86aa41e1399acff897003c2ff387ee169e7139ca369efaea890fd"
+},
+{
+"contract_version": "awc.v1",
+"role_id": "role::proc_recommendation",
+"workflow_id": "gs_procurement",
+"workflow_version": 1,
+"source_node_id": "proc_recommendation",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"role_name": "procurement recommendation",
+"role_description": "recommendation_draft",
+"required_capabilities": [
+"evidence_extraction",
+"procurement_recommendation"
+],
+"input_contract_refs": [
+"supplier_risk_report"
+],
+"output_contract_refs": [
+"recommendation_draft"
+],
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_recommendation",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"optional_capabilities": [],
+"required_tools": [],
+"prohibited_tools": [],
+"domain_requirements": [],
+"data_classification": "",
+"residency_constraints": [],
+"provider_constraints": [],
+"deployment_constraints": [],
+"required_permissions": [
+"read_context"
+],
+"prohibited_permissions": [],
+"authority_ceiling": 0,
+"required_audit_capabilities": [],
+"required_security_classification": 0,
+"required_evidence_classes": [
+"MEASURED"
+],
+"state_requirement": "",
+"human_review_requirement": false,
+"minimum_quality_constraint": null,
+"maximum_latency_constraint": null,
+"maximum_cost_constraint": null,
+"model_requirement_refs": [],
+"fallback_policy_ref": "",
+"evidence_refs": [],
+"policy_refs": [],
+"role_fingerprint": "sha256:098123ab3dc107cd12eeaee30af48bd9a8d98c74a78ba4488dbd62c665bf172f"
+}
+],
+"non_agent_dispositions": [
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_request_validation",
+"source_node_kind": "DECISION_RULE",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:DECISION_RULE"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_request_validation",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:14b1749a9f73b5b75b148a7c2d294c12e8fcf2913f373b0ce748a5922c809603"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_binding_approval",
+"source_node_kind": "APPROVAL_GATE",
+"disposition": "HUMAN_AUTHORITY_REQUIRED",
+"reason_codes": [
+"human_authority_node:APPROVAL_GATE"
+],
+"canonical_owner": "DECISION_AUTHORITY",
+"authority_context": {
+"owning_capability": "DECISION_AUTHORITY",
+"authority_disposition": "AUTHORITATIVE",
+"authority_type": "HUMAN_APPROVER",
+"public_contract_target": ""
+},
+"source_capability": "DECISION_AUTHORITY",
+"human_review_required": true,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_binding_approval",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:5c3a4cc4e278a6f89e23879d4fd664ee5785345a3956964f43f91e4cf4fe38f5"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_purchase_auth",
+"source_node_kind": "ACTION_CONSTRAINT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_GATE"
+],
+"canonical_owner": "ACTION_GATE",
+"authority_context": {
+"owning_capability": "ACTION_GATE",
+"authority_disposition": "AUTHORITATIVE",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "ACTION_GATE",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_purchase_auth",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:939f47c7d9fcbfd9630ec8ebe41ac5e567fc4e0cecffb066ceb212464fec86b9"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_commit_clearance",
+"source_node_kind": "ACTION_CLEARANCE_REQUIREMENT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_CLEARANCE"
+],
+"canonical_owner": "ACTION_CLEARANCE",
+"authority_context": {
+"owning_capability": "ACTION_CLEARANCE",
+"authority_disposition": "AUTHORITATIVE",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "ACTION_CLEARANCE",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_commit_clearance",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:a7cc273c9094da7237e035e4f0dbc2136fb97cc45159b2a07a149319f5f02c4b"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_audit",
+"source_node_kind": "AUDIT_EMISSION",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:AUDIT_EMISSION"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_audit",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:4e955d48dbf06c139540dd5594038cb33d84fa450e4f2afe28a84b7d3c55af7a"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_procurement",
+"node_id": "proc_terminal",
+"source_node_kind": "TERMINAL_OUTCOME",
+"disposition": "NO_AI_AGENT_REQUIRED",
+"reason_codes": [
+"structural_kind:TERMINAL_OUTCOME"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_procurement@v1:proc_terminal",
+"notes": ""
+},
+"source_package_digest": "sha256:179d78b8396339d2650ccad4af2865458c00749990c1a8a5d09b2f4ae62811e8",
+"fingerprint": "sha256:b2dbc476e4eb37ca90ca71b909bc0d5d4bd0fb7a2848b987a142c1fa881000c5"
+}
+],
+"adaptation_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a"
+}

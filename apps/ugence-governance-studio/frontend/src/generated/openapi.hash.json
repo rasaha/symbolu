@@ -1,0 +1,40 @@
+{
+  "source_openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "api_contract_version": "governance_studio.api.v1",
+  "required_operations": [
+    "get_health",
+    "get_ready",
+    "get_version",
+    "list_scenarios",
+    "get_scenario",
+    "get_scenario_workflow",
+    "get_scenario_registry",
+    "get_scenario_eligibility",
+    "explain_eligibility"
+  ],
+  "operation_ids": [
+    "adapt_workflow",
+    "compare_adaptations",
+    "compare_plans",
+    "compose_workforce",
+    "evaluate_eligibility",
+    "evaluate_ranking",
+    "explain_eligibility",
+    "explain_plan",
+    "explain_ranking",
+    "export_scenario",
+    "get_health",
+    "get_ready",
+    "get_scenario",
+    "get_scenario_eligibility",
+    "get_scenario_plan",
+    "get_scenario_ranking",
+    "get_scenario_registry",
+    "get_scenario_workflow",
+    "get_version",
+    "list_scenarios",
+    "replay_plan",
+    "scenario_what_if",
+    "validate_workflow"
+  ]
+}
