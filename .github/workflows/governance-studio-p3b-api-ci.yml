@@ -1,0 +1,109 @@
+name: governance-studio-p3b-api-ci
+
+# Path-scoped: only run when the Governance Studio backend, its contracts, the
+# AWC capability, the compiler, or this workflow change. No secrets; no external
+# model APIs; no deployment; no frontend.
+on:
+  push:
+    paths:
+      - "apps/ugence-governance-studio/backend/**"
+      - "apps/ugence-governance-studio/contracts/**"
+      - "apps/ugence-governance-studio/docs/**"
+      - "packages/capabilities/agent-workforce-composer/**"
+      - "packages/tooling/policy-workflow-compiler/**"
+      - "platform_freeze/**"
+      - ".github/workflows/governance-studio-p3b-api-ci.yml"
+  pull_request:
+    paths:
+      - "apps/ugence-governance-studio/backend/**"
+      - "apps/ugence-governance-studio/contracts/**"
+      - "packages/capabilities/agent-workforce-composer/**"
+      - "packages/tooling/policy-workflow-compiler/**"
+      - ".github/workflows/governance-studio-p3b-api-ci.yml"
+
+env:
+  PYTHONPATH: >-
+    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src
+  BACKEND: apps/ugence-governance-studio/backend
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps (no secrets, no model APIs)
+        run: pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest build
+
+      - name: p3a-regression
+        run: python -m pytest apps/ugence-governance-studio/tests -q
+
+      - name: awc-integration
+        run: python -m pytest packages/capabilities/agent-workforce-composer -q
+
+      - name: compiler-contract-compatibility
+        run: |
+          python -c "import ugence_agent_workforce_composer.api as a; \
+          assert set(a.SUPPORTED_COMPILER_CONTRACTS)=={'workflow_ir.v1','workflow_ir.v2'}, a.SUPPORTED_COMPILER_CONTRACTS; \
+          assert a.__version__=='0.2.1', a.__version__; print('compiler contracts OK')"
+
+      - name: api-unit-suite
+        run: python -m pytest $BACKEND/tests -q
+
+      - name: scenario-endpoint-suite
+        run: python -m pytest $BACKEND/tests/test_scenarios.py -q
+
+      - name: v1-v2-adaptation-suite
+        run: python -m pytest $BACKEND/tests/test_workflows.py -q
+
+      - name: eligibility-ranking-suite
+        run: python -m pytest $BACKEND/tests/test_eligibility_ranking.py -q
+
+      - name: composition-permission-fallback-suite
+        run: python -m pytest $BACKEND/tests/test_composition.py $BACKEND/tests/test_explanations.py -q
+
+      - name: replay-comparison-suite
+        run: python -m pytest $BACKEND/tests/test_replay_comparison.py -q
+
+      - name: what-if-suite
+        run: python -m pytest $BACKEND/tests/test_whatif.py -q
+
+      - name: security-boundary-suite
+        run: python -m pytest $BACKEND/tests/test_security.py $BACKEND/tests/test_validation.py $BACKEND/tests/test_architecture.py -q
+
+      - name: network-isolation
+        run: python -m pytest $BACKEND/tests/test_security.py::test_no_external_network_during_domain_evaluation -q
+
+      - name: determinism
+        run: python -m pytest $BACKEND/tests/test_determinism.py $BACKEND/tests/test_concurrency.py -q
+
+      - name: openapi-freeze
+        run: python $BACKEND/scripts/verify_openapi.py
+
+      - name: public-api-freeze
+        run: python $BACKEND/scripts/public_api_snapshot.py
+
+      - name: terminology
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          root = pathlib.Path("apps/ugence-governance-studio/backend/src")
+          banned = ["permission granted", "access granted", "authorized to execute"]
+          bad = []
+          for p in root.rglob("*.py"):
+              t = p.read_text().lower()
+              for b in banned:
+                  if b in t:
+                      bad.append((p.name, b))
+          if bad:
+              print("terminology violations:", bad); sys.exit(1)
+          print("terminology OK")
+          PY
+
+      - name: isolated-distribution
+        run: python $BACKEND/scripts/verify_distribution.py
+
+      - name: platform-freeze
+        run: python -m platform_freeze.verify
