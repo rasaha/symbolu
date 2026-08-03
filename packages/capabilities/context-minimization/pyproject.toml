@@ -1,0 +1,42 @@
+# Independent distribution for the canonical Context Minimization capability.
+#
+# Context Minimization is a low-level, domain-neutral, deterministic capability:
+# given an already-assembled context, it reduces it by EXTRACTIVE omission while
+# preserving a caller-defined equivalence condition, failing closed when equivalence
+# cannot be established. It NEVER creates authority, admits context, rewrites,
+# paraphrases, summarizes, retrieves, or executes. It imports ONLY the Python
+# standard library — never ActionGate, a product, a model, or a tokenizer.
+#
+# Build:  python -m build packages/capabilities/context-minimization
+# Verify: python packages/capabilities/context-minimization/scripts/verify_context_minimization_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-context-minimization"
+dynamic = ["version"]
+description = "Ugence Context Minimization — deterministic, domain-neutral, extractive context reduction that preserves a caller-defined equivalence condition and fails closed."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["context", "minimization", "deterministic", "extractive", "ugence"]
+# A leaf capability: NO third-party runtime dependency, and no dependency on any
+# other Ugence capability, product, provider, robotics, model, or experiment. The
+# neutral invariance oracle is injected by the caller (see docs/INVARIANCE_CONTRACT.md);
+# a concrete ActionGate-derived oracle lives OUTSIDE this package.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_context_minimization.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_context_minimization*"]
+
+[tool.setuptools.package-data]
+ugence_context_minimization = ["py.typed"]

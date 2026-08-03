@@ -1,30 +1,32 @@
 """Agent Gateway adapter — Context Minimization ("what may enter").
 
-Wraps the module's deterministic, lossless ``structural_compress`` (drops exact
-duplicate spans / redundant facts, keeps one representative) — a real path in the
-Context Minimization codebase that needs no trained detector. The full
-authorization-preserving compressor (with a fitted protection detector) is the
-productization upgrade.
+Wraps the canonical, independently-packaged Context Minimization capability
+(``ugence-context-minimization``) — specifically its deterministic, structurally
+lossless ``structural_minimize`` (drops exact-duplicate spans / declared redundancy
+sets, keeps one representative). This is the STRUCTURAL mode: it needs no invariance
+oracle. The full oracle-verified, authorization-preserving path (``minimize_context``
+with a concrete ActionGate-derived oracle) is the productization upgrade and lives
+outside this console adapter.
+
+Migration note: this adapter previously imported the experimental
+``actiongate_context_ablation`` package via a ``sys.path`` hack. It now imports the
+canonical distribution directly. A behavioural hardening comes with that move — a
+PROTECTED unit is never removed, even when a duplicate copy would otherwise make it
+droppable (the old experimental ``structural_compress`` ignored the protected set).
 """
 
 from __future__ import annotations
 
-import os
-import sys
-
 from ..models import ContextUnit, MinimizeResult
-
-# The module lives under experiments/ as a nested package; expose it on sys.path.
-_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_PKG_PATH = os.path.join(_ROOT, "experiments", "actiongate_context_ablation")
 
 _available = True
 _reason = ""
 try:  # fail-safe import — a missing module degrades, never crashes the app.
-    if _PKG_PATH not in sys.path:
-        sys.path.insert(0, _PKG_PATH)
-    from actiongate_context_ablation import compressor as _cm  # type: ignore
-    from actiongate_context_ablation.units import SemanticUnit  # type: ignore
+    from ugence_context_minimization.api import (
+        Context as _Context,
+        ContextUnit as _CanonUnit,
+        structural_minimize as _structural_minimize,
+    )
 except Exception as exc:  # noqa: BLE001
     _available = False
     _reason = f"{type(exc).__name__}: {exc}"
@@ -35,29 +37,38 @@ def available() -> tuple[bool, str]:
 
 
 def minimize(units: list[ContextUnit]) -> MinimizeResult:
-    """Structurally compress the admitted context, protecting flagged units."""
+    """Structurally minimize the admitted context, protecting flagged units."""
     if not _available:
         raise RuntimeError(f"context_minimization unavailable: {_reason}")
 
-    ctx_units = tuple(
-        SemanticUnit(
-            id=u.id, source_type="state_fact", text=u.text,
-            redundancy_set=u.redundancy_set,
-        )
-        for u in units
+    ctx = _Context(
+        id="console-ctx",
+        units=tuple(
+            _CanonUnit(
+                id=u.id, text=u.text, source_type="state_fact",
+                redundancy_set=u.redundancy_set, protected=u.protected,
+            )
+            for u in units
+        ),
     )
-    ctx = _cm.Context(
-        id="console-ctx", base={"tool": "console", "verb": "admit", "target": []},
-        units=ctx_units, data_origin="authored-fixture",
+    protected_ids = [u.id for u in units if u.protected]
+    result = _structural_minimize(ctx, protected_ids=protected_ids)
+    removed = set(result.removed_ids)
+    kept = set(result.surviving_ids)
+    # Losslessness: every removed unit is a duplicate of a fact still represented —
+    # either an exact-text duplicate of a surviving span or a surviving redundancy set.
+    surviving_texts = {" ".join(u.text.lower().split()) for u in units if u.id in kept}
+    surviving_rsets = {u.redundancy_set for u in units if u.id in kept and u.redundancy_set}
+    lossless = all(
+        " ".join(u.text.lower().split()) in surviving_texts
+        or u.redundancy_set in surviving_rsets
+        for u in units if u.id in removed
     )
-    protected_ids = frozenset(u.id for u in units if u.protected)
-    kept, removed = _cm.structural_compress(ctx, protected_ids)
-    kept_set = set(kept)
-    # Losslessness: every removed unit is a duplicate of a fact still represented.
-    lossless = all(u.id in kept_set or u.redundancy_set is not None
-                   for u in units if u.id in set(removed))
     return MinimizeResult(
-        kept_ids=list(kept), removed_ids=list(removed),
-        total_units=len(units), removed_units=len(removed),
-        protected_ids=sorted(protected_ids), lossless=lossless,
+        kept_ids=list(result.surviving_ids),
+        removed_ids=list(result.removed_ids),
+        total_units=len(units),
+        removed_units=len(result.removed_ids),
+        protected_ids=sorted(result.protected_ids),
+        lossless=lossless,
     )

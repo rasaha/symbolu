@@ -1,0 +1,109 @@
+{
+  "generated_for": "Fidelity comparison: experimental prototype -> canonical package",
+  "status_legend": [
+    "PRESENT_EQUIVALENT", "PRESENT_HARDENED", "PRESENT_CHANGED",
+    "EXPERIMENT_ONLY", "ACTIONGATE_ADAPTER_ONLY", "INTENTIONALLY_EXCLUDED",
+    "MISSING_REQUIRED", "DEPRECATED"
+  ],
+  "entries": [
+    {
+      "capability": "structural dedup (exact-duplicate + redundancy-set collapse)",
+      "experiment": "compressor.structural_compress(ctx, protected_ids)",
+      "canonical": "structural.deduplicate_context / structural_minimize",
+      "status": "PRESENT_HARDENED",
+      "old_behavior": "protected_ids argument accepted but IGNORED; a protected duplicate could be removed if another copy remained.",
+      "new_behavior": "protected units never removed; dedup applies only to unprotected units; two protected duplicates both retained (v1 contract).",
+      "reason": "Correctness: honor the protected-span invariant in every path.",
+      "compatibility_impact": "Console consumer gains protected-duplicate retention; verified by parity + governed-loop tests.",
+      "test_evidence": "tests/protection/test_protection.py; tests/structural/test_structural.py; tests/compatibility"
+    },
+    {
+      "capability": "extractive selection to a target reduction",
+      "experiment": "compressor.extractive_select (source-type prior + filler hints, lowest-importance first)",
+      "canonical": "oracle._extractive_select + policy.MinimizationPolicy.removal_key",
+      "status": "PRESENT_EQUIVALENT",
+      "old_behavior": "same ordering heuristic (filler hint, source rank, larger span first, id tie-break).",
+      "new_behavior": "same, generalized into a versioned/fingerprinted policy; adds absolute token_budget.",
+      "reason": "Separate safety from optimization; make ordering auditable.",
+      "compatibility_impact": "none (ordering preserved).",
+      "test_evidence": "tests/determinism/test_budgets_determinism.py"
+    },
+    {
+      "capability": "equivalence signature",
+      "experiment": "compressor.signature() — repr()-based tuple over ActionGate envelope + decision outputs, computed inside the compressor",
+      "canonical": "OracleEvaluation.equivalence_key — opaque, oracle-owned, versioned; compared by equality only",
+      "status": "PRESENT_CHANGED",
+      "old_behavior": "reducer builds an unstable repr()-based signature from ActionGate internals.",
+      "new_behavior": "reducer compares an opaque key the oracle supplies; core never parses ActionGate structures or constructs authority.",
+      "reason": "Stability + decoupling: no repr()/dict-ordering instability, no ActionGate import in the core.",
+      "compatibility_impact": "ActionGate equivalence must be supplied by an integration oracle (out of scope this phase); experiment keeps its own signature (frozen).",
+      "test_evidence": "tests/oracle/test_oracle_verified.py (contract drift, correlation, expiry, malformed)"
+    },
+    {
+      "capability": "fail-closed restoration + fallback",
+      "experiment": "compressor._necessary + compress() restore/fallback",
+      "canonical": "oracle._necessary + minimize_context restore/JOINT_EFFECT_FALLBACK",
+      "status": "PRESENT_HARDENED",
+      "old_behavior": "restore individually-necessary spans; else full fallback.",
+      "new_behavior": "same, plus explicit fail-closed on oracle raise/malformed/expired/correlation/contract-drift, and uncertain-necessity restoration.",
+      "reason": "Enumerate and test every uncertainty path toward retention.",
+      "compatibility_impact": "none (strictly more conservative).",
+      "test_evidence": "tests/oracle/test_oracle_verified.py"
+    },
+    {
+      "capability": "unit / context model",
+      "experiment": "units.SemanticUnit / Context (frozen dataclass, regex token count, ActionGate 'base'/'contrib' fields)",
+      "canonical": "models.ContextUnit / Context (frozen, read-only metadata, caller/injected/default token counts, no ActionGate fields)",
+      "status": "PRESENT_CHANGED",
+      "old_behavior": "unit carries ActionGate contrib fragments and a fixed source-type taxonomy.",
+      "new_behavior": "neutral model with no ActionGate coupling; open source_type; protected flag; provenance.",
+      "reason": "Neutrality: the core must not encode ActionGate spec shapes.",
+      "compatibility_impact": "adapters map their own fields into ContextUnit.",
+      "test_evidence": "smoke + tests across suite"
+    },
+    {
+      "capability": "protected-span detector (learned model)",
+      "experiment": "protected_detector.py (trainable 5-class logistic regression)",
+      "canonical": "ProtectionProvider protocol + ProtectionResult (neutral interface)",
+      "status": "INTENTIONALLY_EXCLUDED",
+      "old_behavior": "in-repo learned detector trained on gate-derived labels.",
+      "new_behavior": "core defines the neutral interface; a concrete detector is a caller/adapter concern.",
+      "reason": "No model/training in the leaf; no detector-training code in the wheel.",
+      "compatibility_impact": "callers inject protection.",
+      "test_evidence": "tests/protection/test_protection.py"
+    },
+    {
+      "capability": "ActionGate oracle adapter",
+      "experiment": "adapter.py + extractor.py (real gate)",
+      "canonical": "n/a (out of core)",
+      "status": "ACTIONGATE_ADAPTER_ONLY",
+      "old_behavior": "compressor calls extractor.extract_and_eval -> adapter.evaluate (real ActionGate).",
+      "new_behavior": "an ActionGate InvarianceOracle adapter would live outside the core; not built this phase.",
+      "reason": "Boundary: core imports no ActionGate.",
+      "compatibility_impact": "deferred integration.",
+      "test_evidence": "n/a"
+    },
+    {
+      "capability": "benchmark harness / corpus / real-model clients / plots / RunPod",
+      "experiment": "compressor_bench, real_llm_bench(_v2), llm_client, corpus/**, results/**, runpod/**, plots",
+      "canonical": "n/a",
+      "status": "EXPERIMENT_ONLY",
+      "old_behavior": "frozen feasibility study + real-model validation evidence.",
+      "new_behavior": "kept in the experiment as frozen evidence; not shipped in the wheel.",
+      "reason": "Do not package benchmark results/weights/corpora; preserve frozen fingerprints.",
+      "compatibility_impact": "none.",
+      "test_evidence": "experiments/.../tests/test_frozen_invariance.py (unchanged)"
+    },
+    {
+      "capability": "result model + reason codes + fingerprint",
+      "experiment": "compressor.CompressResult (surviving/removed/restored/fell_back/invariant)",
+      "canonical": "models.MinimizationResult + reasons.ALL_REASON_CODES + fingerprint.result_fingerprint",
+      "status": "PRESENT_HARDENED",
+      "old_behavior": "dataclass result with booleans; no reason codes or fingerprint.",
+      "new_behavior": "richer audit result with equivalence status, deterministic reason codes, oracle identity, and a domain-separated fingerprint.",
+      "reason": "Auditability + determinism.",
+      "compatibility_impact": "additive.",
+      "test_evidence": "tests/determinism, artifacts/minimization_result_schema.json"
+    }
+  ]
+}
