@@ -1,0 +1,49 @@
+{
+  "allowed_deployment_environments": [
+    "cloud",
+    "on_prem_us"
+  ],
+  "allowed_providers": [
+    "anthropic",
+    "openai",
+    "google",
+    "internal"
+  ],
+  "allowed_residencies": [
+    "US"
+  ],
+  "allowed_tools": [],
+  "approved_agent_versions": [],
+  "contract_version": "awc.v1",
+  "fail_closed_on_unknown": true,
+  "forbidden_agent_versions": [],
+  "forbidden_providers": [],
+  "forbidden_tools": [
+    "shell_exec"
+  ],
+  "human_review_triggers": [],
+  "maximum_authority_scope": 2,
+  "maximum_cost_hard_limit": 50.0,
+  "maximum_latency_hard_limit": 10000.0,
+  "maximum_permission_scope": [
+    "read_context",
+    "write_draft",
+    "call_tool"
+  ],
+  "minimum_evidence_freshness_seconds": null,
+  "minimum_quality_hard_limit": 0.5,
+  "minimum_security_classification": 2,
+  "policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+  "policy_id": "gs_support_enterprise_policy",
+  "policy_version": "1.0",
+  "required_audit_capabilities": [
+    "trace"
+  ],
+  "required_evidence_classes": [
+    "MEASURED"
+  ],
+  "required_isolation": "",
+  "required_residencies": [
+    "US"
+  ]
+}

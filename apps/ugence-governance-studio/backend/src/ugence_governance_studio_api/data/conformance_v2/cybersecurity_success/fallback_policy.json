@@ -1,0 +1,15 @@
+{
+  "composition_contract_version": "awc.composition.v1",
+  "maximum_fallback_depth": 2,
+  "minimum_fallback_rank_quality_bp": 0,
+  "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+  "policy_id": "gs_fallback_policy",
+  "policy_version": "1.0",
+  "prefer_failure_domain_diversity": true,
+  "prefer_provider_diversity": true,
+  "require_authority_equivalence": true,
+  "require_contract_equivalence": true,
+  "require_permission_feasibility": true,
+  "require_residency_equivalence": true,
+  "require_security_equivalence": false
+}

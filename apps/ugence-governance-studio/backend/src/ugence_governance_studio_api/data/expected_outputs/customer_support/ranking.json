@@ -1,0 +1,871 @@
+[
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 2,
+    "excluded_candidate_count": 4,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_response_drafting",
+        "agent_version": "2.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+              "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+              "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.93 → 9300bp × 2000bp = 1860bp",
+            "metric": "quality",
+            "normalized_bp": 9300,
+            "raw_value": "0.93",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1860
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=700.0 → 8600bp × 1500bp = 1290bp",
+            "metric": "latency",
+            "normalized_bp": 8600,
+            "raw_value": "700.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1290
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.0 → 8000bp × 1000bp = 800bp",
+            "metric": "cost",
+            "normalized_bp": 8000,
+            "raw_value": "2.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 800
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:a7ded94715bdaf62dd5c9a53984336ed904b43fca0c4528871e1e3a91b684759",
+        "evidence_refs": [
+          "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+          "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:9503714c1df403d711020d36584be783292750f309ef1274384c8340b8c9d574",
+        "role_id": "role::sup_draft",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7759",
+          "5000",
+          "9090",
+          "9000",
+          "8000",
+          "8600",
+          "anthropic",
+          "agent_response_drafting",
+          "2.0.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7759
+      },
+      {
+        "agent_id": "agent_multilingual_support",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.88 → 8800bp × 2000bp = 1760bp",
+            "metric": "quality",
+            "normalized_bp": 8800,
+            "raw_value": "0.88",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1760
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=900.0 → 8200bp × 1500bp = 1230bp",
+            "metric": "latency",
+            "normalized_bp": 8200,
+            "raw_value": "900.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1230
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.2 → 7800bp × 1000bp = 780bp",
+            "metric": "cost",
+            "normalized_bp": 7800,
+            "raw_value": "2.2",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 780
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:d8ef379f4d9de751a9a5e8af645cbb3a4aabd01ce05cebfd353e58d288d56bc5",
+        "evidence_refs": [
+          "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 2,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:df5bf590515b99b6423671fc7e17e8556f2d2c18201a6ba73790b44b40f95d87",
+        "role_id": "role::sup_draft",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7579",
+          "5000",
+          "9090",
+          "9000",
+          "7800",
+          "8200",
+          "openai",
+          "agent_multilingual_support",
+          "1.0.0"
+        ],
+        "tie_group": 2,
+        "total_score": 7579
+      }
+    ],
+    "ranking_fingerprint": "sha256:c246a67bf0a37dd37324977eb8f0439609d4a656de21af8db99effdf767ab0e1",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+    "role_id": "role::sup_draft",
+    "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+  },
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 3,
+    "excluded_candidate_count": 3,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_knowledge_retrieval",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.92 → 9200bp × 2000bp = 1840bp",
+            "metric": "quality",
+            "normalized_bp": 9200,
+            "raw_value": "0.92",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1840
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=650.0 → 8700bp × 1500bp = 1305bp",
+            "metric": "latency",
+            "normalized_bp": 8700,
+            "raw_value": "650.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1305
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=1.8 → 8200bp × 1000bp = 820bp",
+            "metric": "cost",
+            "normalized_bp": 8200,
+            "raw_value": "1.8",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 820
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:aff76b58d3225c3f6b64b06e96876f84d717c4544760c558fe8c4aad0da4f503",
+        "evidence_refs": [
+          "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:f85feed649d4afdf445661e3b272efd22d19762a0dee3e76b9f9f96deda65cff",
+        "role_id": "role::sup_retrieval",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7774",
+          "5000",
+          "9090",
+          "9000",
+          "8200",
+          "8700",
+          "openai",
+          "agent_knowledge_retrieval",
+          "1.0.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7774
+      },
+      {
+        "agent_id": "agent_multilingual_support",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.88 → 8800bp × 2000bp = 1760bp",
+            "metric": "quality",
+            "normalized_bp": 8800,
+            "raw_value": "0.88",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1760
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=900.0 → 8200bp × 1500bp = 1230bp",
+            "metric": "latency",
+            "normalized_bp": 8200,
+            "raw_value": "900.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1230
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.2 → 7800bp × 1000bp = 780bp",
+            "metric": "cost",
+            "normalized_bp": 7800,
+            "raw_value": "2.2",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 780
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:834edefea963c871a3ae525576299c9c62861500b7cc52cc7b40e1d361664e70",
+        "evidence_refs": [
+          "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 2,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:ec01af646ded92ef02ee17f755e8f85fbff6922612bf611a3ea029ec75102b58",
+        "role_id": "role::sup_retrieval",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7579",
+          "5000",
+          "9090",
+          "9000",
+          "7800",
+          "8200",
+          "openai",
+          "agent_multilingual_support",
+          "1.0.0"
+        ],
+        "tie_group": 2,
+        "total_score": 7579
+      },
+      {
+        "agent_id": "agent_general_analyst",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.85 → 8500bp × 2000bp = 1700bp",
+            "metric": "quality",
+            "normalized_bp": 8500,
+            "raw_value": "0.85",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1700
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=850.0 → 8300bp × 1500bp = 1245bp",
+            "metric": "latency",
+            "normalized_bp": 8300,
+            "raw_value": "850.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1245
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.5 → 7500bp × 1000bp = 750bp",
+            "metric": "cost",
+            "normalized_bp": 7500,
+            "raw_value": "2.5",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 750
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:90e129386e9cd87b49715e31a105adbe1aefd5d41fed65019e00116a4e42edb9",
+        "evidence_refs": [
+          "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 3,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:11096f0baeab4a51b3460ac9e1f8b0bb3c01b353e89460d077ac673d773c3fda",
+        "role_id": "role::sup_retrieval",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7504",
+          "5000",
+          "9090",
+          "9000",
+          "7500",
+          "8300",
+          "openai",
+          "agent_general_analyst",
+          "1.0.0"
+        ],
+        "tie_group": 3,
+        "total_score": 7504
+      }
+    ],
+    "ranking_fingerprint": "sha256:e74c43ddc52b0dbc8354f0252f0ff2d9e2133aae6598db6987b7f54248e826a5",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+    "role_id": "role::sup_retrieval",
+    "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+  },
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 2,
+    "excluded_candidate_count": 4,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_support_triage",
+        "agent_version": "1.1.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+              "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+              "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.94 → 9400bp × 2000bp = 1880bp",
+            "metric": "quality",
+            "normalized_bp": 9400,
+            "raw_value": "0.94",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1880
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=600.0 → 8800bp × 1500bp = 1320bp",
+            "metric": "latency",
+            "normalized_bp": 8800,
+            "raw_value": "600.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1320
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=1.5 → 8500bp × 1000bp = 850bp",
+            "metric": "cost",
+            "normalized_bp": 8500,
+            "raw_value": "1.5",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 850
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:e1d7518c4013d5b0808dcea37fcd282866468231946c90a55f88000e1edeaa89",
+        "evidence_refs": [
+          "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+          "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:4c8cc6ac5e691ed968970f297e3ac8a0a220a307edcee2eecd31731de63b64e9",
+        "role_id": "role::sup_triage",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7859",
+          "5000",
+          "9090",
+          "9000",
+          "8500",
+          "8800",
+          "anthropic",
+          "agent_support_triage",
+          "1.1.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7859
+      },
+      {
+        "agent_id": "agent_multilingual_support",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.88 → 8800bp × 2000bp = 1760bp",
+            "metric": "quality",
+            "normalized_bp": 8800,
+            "raw_value": "0.88",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1760
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=900.0 → 8200bp × 1500bp = 1230bp",
+            "metric": "latency",
+            "normalized_bp": 8200,
+            "raw_value": "900.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1230
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.2 → 7800bp × 1000bp = 780bp",
+            "metric": "cost",
+            "normalized_bp": 7800,
+            "raw_value": "2.2",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 780
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:8e5cfebd00c9c34a1dd72480155d021f859b0a1d7cde64209d24bfb3fd78b271",
+        "evidence_refs": [
+          "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 2,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:7e73dda04f46863a4c0860b398ed0e86632b8dcc6b93028b41450c257051578e",
+        "role_id": "role::sup_triage",
+        "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+        "tie_break_values": [
+          "7579",
+          "5000",
+          "9090",
+          "9000",
+          "7800",
+          "8200",
+          "openai",
+          "agent_multilingual_support",
+          "1.0.0"
+        ],
+        "tie_group": 2,
+        "total_score": 7579
+      }
+    ],
+    "ranking_fingerprint": "sha256:70ca15c4ea787f654be6ad94e90086d72fe3c44bfb58c820b29002607098049b",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+    "role_id": "role::sup_triage",
+    "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+  }
+]

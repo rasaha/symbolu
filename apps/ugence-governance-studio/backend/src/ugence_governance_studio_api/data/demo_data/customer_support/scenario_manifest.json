@@ -1,0 +1,56 @@
+{
+  "awc_composition_contract_version": "awc.composition.v1",
+  "awc_contract_version": "awc.v1",
+  "awc_version": "0.2.0",
+  "demonstration": {
+    "expected_plan_state": "COMPLETE",
+    "headline": "clean feasible support team; cyber specialist eliminated, not mis-assigned",
+    "shows_no_fallback_available": false,
+    "shows_no_feasible_team": false,
+    "shows_non_greedy_selection": false
+  },
+  "digests": {
+    "composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+    "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+    "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+    "fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+    "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "registry_snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+    "workflow_adaptation_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e"
+  },
+  "expected_fingerprints": {
+    "adaptation_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e",
+    "composition_fingerprint": "sha256:7d59c25794cd07ac01e21b4e374714550a48681e7a2c6fdfb50ab43aba981d6d",
+    "expected_plan_fingerprint": "sha256:16ca0146d69f1dc9862496cf6b935dfbb469e51132c03f90fc748d1794e68ae8",
+    "plan_fingerprint": "sha256:16ca0146d69f1dc9862496cf6b935dfbb469e51132c03f90fc748d1794e68ae8",
+    "plan_id": "plan::00ea7809a04c6622",
+    "plan_state": "COMPLETE",
+    "replay_fingerprint": "sha256:b970b87a2690a64ea838759980c9ce7e1a5938091082ddd90ed663c45cde4db4",
+    "workflow_eligibility_fingerprint": "sha256:023e6dd3eebb3851cdfc769fc1aa66c652c36cfe1b2d27c27b3a7743009aca67"
+  },
+  "expected_output_files": {
+    "adaptation.json": "497a4ac9ddc04795520197d22f34a3a0a0e77c8f9f1d3597ef48677db4540d5f",
+    "agent_team_plan.json": "9fc52f6619dadb700eae87a3a2ba33721fb24778c57abc4400f804a96319301c",
+    "composition.json": "f50626265f34f3a1cf84f9b8f657f6765b7403a94ae1e97c4bc9bbd8526af2bf",
+    "eligibility.json": "7d2c21feebb62242fde43b6447d663b35c2875683f70157addde7c7d19564fac",
+    "fingerprints.json": "dd5b84ec911e1310f1e37d13794f320f93dd8fe210730b6f131d3a7335cd8178",
+    "ranking.json": "a89918b2c9a273c08af1c562ad218d64cb4ddb538ffa85812abf4267039ff81a",
+    "replay_record.json": "ef29a1ead0240557a2a8c88219a2b32ae58f788f5a54507f7363549f457e7610"
+  },
+  "input_files": {
+    "agent_registry_snapshot.json": "7fb071b01a73abfe1c844eeeede3cc735ad3ef84fc1a762bd024c7e4ca95e82b",
+    "compiled_workflow.json": "5db92121a1d916ec4c2d90a7772b8185de69f2f3772048c7b2d36f812a003ba2",
+    "composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
+    "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+    "enterprise_agent_policy.json": "426bd391d6d5fc21bfe1b1aa8971e72d529620565c485687c167f5a071831e89",
+    "enterprise_role_overlay.json": "313e765ca5211ef4ff1a9159a099f14d5eb0dae4e3eb42805e425f3a3e0a9a9c",
+    "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+    "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+    "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb"
+  },
+  "logical_time": 1000000.0,
+  "scenario_id": "customer_support",
+  "schema": "governance_studio.scenario_manifest.v1",
+  "synthetic": true
+}

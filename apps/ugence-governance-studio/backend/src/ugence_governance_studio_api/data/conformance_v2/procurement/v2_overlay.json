@@ -1,0 +1,37 @@
+{
+  "proc_recommendation": {
+    "required_capabilities": [
+      "procurement_recommendation"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  },
+  "proc_supplier_evidence": {
+    "data_classification": "confidential",
+    "required_capabilities": [
+      "supplier_evidence_collection"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  },
+  "proc_supplier_risk": {
+    "data_classification": "confidential",
+    "required_capabilities": [
+      "procurement_risk_analysis"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  }
+}

@@ -1,0 +1,514 @@
+[
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 1,
+    "excluded_candidate_count": 4,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_procurement_recommendation",
+        "agent_version": "1.2.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+              "ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+              "ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.94 → 9400bp × 2000bp = 1880bp",
+            "metric": "quality",
+            "normalized_bp": 9400,
+            "raw_value": "0.94",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1880
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=1000.0 → 8000bp × 1500bp = 1200bp",
+            "metric": "latency",
+            "normalized_bp": 8000,
+            "raw_value": "1000.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1200
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=3.0 → 7000bp × 1000bp = 700bp",
+            "metric": "cost",
+            "normalized_bp": 7000,
+            "raw_value": "3.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 700
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:e9ab8582754a154d048fdbe3d67260d85e61a89b52c0236dd79b2239284c0cb9",
+        "evidence_refs": [
+          "ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+          "ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:ee747cb74827360747cbbc821e080e150abaee7aff513704659549ba8f879175",
+        "role_id": "role::proc_recommendation",
+        "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+        "tie_break_values": [
+          "7589",
+          "5000",
+          "9090",
+          "9000",
+          "7000",
+          "8000",
+          "anthropic",
+          "agent_procurement_recommendation",
+          "1.2.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7589
+      }
+    ],
+    "ranking_fingerprint": "sha256:268861cf99bde0a1ce5af3b42f104bdac4917185da6ca5616331177ff3ff8282",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:098123ab3dc107cd12eeaee30af48bd9a8d98c74a78ba4488dbd62c665bf172f",
+    "role_id": "role::proc_recommendation",
+    "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545"
+  },
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 2,
+    "excluded_candidate_count": 3,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_supplier_evidence",
+        "agent_version": "1.4.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+              "ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+              "ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.96 → 9600bp × 2000bp = 1920bp",
+            "metric": "quality",
+            "normalized_bp": 9600,
+            "raw_value": "0.96",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1920
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=700.0 → 8600bp × 1500bp = 1290bp",
+            "metric": "latency",
+            "normalized_bp": 8600,
+            "raw_value": "700.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1290
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.0 → 8000bp × 1000bp = 800bp",
+            "metric": "cost",
+            "normalized_bp": 8000,
+            "raw_value": "2.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 800
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:d713785682b3f37fa8990d5190b2b9472e974a30fb8f30dbf28cbb26f6c21824",
+        "evidence_refs": [
+          "ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+          "ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:f641d47d28d1548d810389adad745f30898577c2b8e15b38104ed6048aeea416",
+        "role_id": "role::proc_supplier_evidence",
+        "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+        "tie_break_values": [
+          "7819",
+          "5000",
+          "9090",
+          "9000",
+          "8000",
+          "8600",
+          "anthropic",
+          "agent_supplier_evidence",
+          "1.4.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7819
+      },
+      {
+        "agent_id": "agent_general_analyst",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.9 → 9000bp × 2000bp = 1800bp",
+            "metric": "quality",
+            "normalized_bp": 9000,
+            "raw_value": "0.9",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1800
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=850.0 → 8300bp × 1500bp = 1245bp",
+            "metric": "latency",
+            "normalized_bp": 8300,
+            "raw_value": "850.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1245
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.5 → 7500bp × 1000bp = 750bp",
+            "metric": "cost",
+            "normalized_bp": 7500,
+            "raw_value": "2.5",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 750
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:21eb639d6d589a57d0c8e82607d6ea358f37f88e844d648fa62ba870428f669c",
+        "evidence_refs": [
+          "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 2,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:987402ff2adf1b38514d9c4af5ce80f16f9d4c92fad2f302e1e77e658090a897",
+        "role_id": "role::proc_supplier_evidence",
+        "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+        "tie_break_values": [
+          "7604",
+          "5000",
+          "9090",
+          "9000",
+          "7500",
+          "8300",
+          "openai",
+          "agent_general_analyst",
+          "1.0.0"
+        ],
+        "tie_group": 2,
+        "total_score": 7604
+      }
+    ],
+    "ranking_fingerprint": "sha256:6f6aef2bdb264307c142c74f98f3c74cc05a00d3484ad6ede489e00c16dbfa92",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:157d3514752580650ca8dcc4e59ab664bd56d0efa682f99284f249f2f397d754",
+    "role_id": "role::proc_supplier_evidence",
+    "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545"
+  },
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 1,
+    "excluded_candidate_count": 4,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_procurement_risk",
+        "agent_version": "2.1.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+              "ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+              "ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.95 → 9500bp × 2000bp = 1900bp",
+            "metric": "quality",
+            "normalized_bp": 9500,
+            "raw_value": "0.95",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1900
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=900.0 → 8200bp × 1500bp = 1230bp",
+            "metric": "latency",
+            "normalized_bp": 8200,
+            "raw_value": "900.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1230
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=3.0 → 7000bp × 1000bp = 700bp",
+            "metric": "cost",
+            "normalized_bp": 7000,
+            "raw_value": "3.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 700
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=3.0 → 6000bp × 500bp = 300bp",
+            "metric": "security",
+            "normalized_bp": 6000,
+            "raw_value": "3.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 300
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:f5ba945f3f8a971ebfc9b192a0bcc8ff8f51eb4deb89901ab3b4b954830aa2a2",
+        "evidence_refs": [
+          "ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+          "ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:939418047fa9c8e3163a4bc0d3e42771ab90ce263b395b843b98f80c8b073142",
+        "role_id": "role::proc_supplier_risk",
+        "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+        "tie_break_values": [
+          "7639",
+          "5000",
+          "9090",
+          "9000",
+          "7000",
+          "8200",
+          "anthropic",
+          "agent_procurement_risk",
+          "2.1.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7639
+      }
+    ],
+    "ranking_fingerprint": "sha256:7dd835daa7814ac565e75fdee9a79c8f1bd1b267697a289c81ee0a840e8e107a",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:f3cd69dfaac86aa41e1399acff897003c2ff387ee169e7139ca369efaea890fd",
+    "role_id": "role::proc_supplier_risk",
+    "snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545"
+  }
+]
