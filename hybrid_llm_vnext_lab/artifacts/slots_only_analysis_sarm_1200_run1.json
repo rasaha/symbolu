@@ -1,0 +1,37 @@
+{
+  "A_needle96_per_seed": [
+    0.025,
+    0.0,
+    0.016666666666666666
+  ],
+  "S_needle96_per_seed": [
+    0.075,
+    0.25,
+    0.2
+  ],
+  "Aplus_needle96_per_seed": [
+    0.025,
+    0.0,
+    0.016666666666666666
+  ],
+  "S_minus_A_mean": 0.1611,
+  "S_minus_Aplus_mean": 0.1611,
+  "forming_seed_index": 1,
+  "S_forming": 0.25,
+  "ablation_seed0": {
+    "baseline": 0.25,
+    "slots_off": 0.016666666666666666,
+    "randomized_address": 0.0,
+    "shuffle_values": 0.0,
+    "write_gate_zero": 0.016666666666666666,
+    "slot_keys_randomized": 0.11666666666666667
+  },
+  "relational_means": {
+    "binding_k2": 0.0611,
+    "supersession_current": 0.0444,
+    "source": 0.1,
+    "multihop": 0.0583
+  },
+  "verdict": "PROVISIONALLY_SUPPORTED (H1 S>A every seed; H2 slots-off collapses; H3 address collapses; H4 Phase-independence = YES)",
+  "ready_for_five_seed_validation": true
+}

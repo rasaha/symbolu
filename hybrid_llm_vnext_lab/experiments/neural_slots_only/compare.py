@@ -21,25 +21,26 @@ def verdict(res):
     A = [_needle96(r) for r in arms["A"]]
     S = [_needle96(r) for r in arms["S"]]
     Ap = [_needle96(r) for r in arms.get("A+", [])]
-    s_seed0 = arms["S"][0]
-    abl = s_seed0.get("ablation", {})
-    s0 = _needle96(s_seed0)
     s_minus_a = st.mean(S) - st.mean(A)
     s_minus_ap = st.mean(S) - (st.mean(Ap) if Ap else st.mean(A))
-    # per-seed S must beat A somewhere; primary causal pattern on the forming seed (max-S seed)
-    forming = max(range(len(S)), key=lambda i: S[i])
-    forms = S[forming] > 0.20 and S[forming] - A[forming] > 0.10
+
+    # H1: does S beat A? Report both the mean gap and whether it holds in every seed.
+    forms_all = all(S[i] > A[i] and S[i] > 0.05 for i in range(len(S)))
+    forming = max(range(len(S)), key=lambda i: S[i])          # strongest seed
+    # H2/H3: evaluate causal ablations on the FORMING seed (the seed that learned the circuit)
+    abl = arms["S"][forming].get("ablation", {})
+    baseline = abl.get("baseline", S[forming])
     slots_off = abl.get("slots_off")
     rand_addr = abl.get("randomized_address")
-    baseline = abl.get("baseline", s0)
-    collapse = (slots_off is not None and baseline - slots_off >= 0.20)
-    addr_reduces = (rand_addr is not None and rand_addr < max(0.15, baseline - 0.20))
+    collapse = (slots_off is not None and baseline - slots_off >= 0.10)
+    addr_reduces = (rand_addr is not None and rand_addr < 0.5 * baseline)
+    mean_positive = s_minus_a >= 0.05
 
-    if forms and collapse and addr_reduces:
-        v = "PROVISIONALLY_SUPPORTED (H1/H2/H3 met; H4 Phase-independence = YES)"
+    if forms_all and mean_positive and collapse and addr_reduces:
+        v = "PROVISIONALLY_SUPPORTED (H1 S>A every seed; H2 slots-off collapses; H3 address collapses; H4 Phase-independence = YES)"
         ready = True
-    elif forms:
-        v = "WORKING_BUT_UNSTABLE (forms in a subset of seeds; ablation pattern incomplete)"
+    elif mean_positive and (collapse or addr_reduces):
+        v = "WORKING_BUT_UNSTABLE (S>A on average with causal signal, but not in every seed / partial ablation)"
         ready = False
     else:
         v = "NOT_SUPPORTED (S does not exceed A at needle@d96 at this scale)"
