@@ -1,0 +1,11 @@
+{
+  "run_id": "fiveseed_run1",
+  "seeds": "3,4,5,6,7",
+  "steps": 1200,
+  "wall_s": 7214.4,
+  "command": "/usr/local/bin/python3 /home/user/symbolu/hybrid_llm_vnext_lab/experiments/neural_slots_only/run.py --run-id fiveseed_fiveseed_run1 --seeds 3,4,5,6,7 --steps 1200",
+  "source_commit": "25c48a192e31607904d4a570b0e166fa89412edf",
+  "preregistration_sha256": "1833db22587fffd33abbc379afeeb93d720f45a1b73bbaccc3c76dfc7fb59afa",
+  "result_sha256": "87dd642b04e955a1057acea61feb0ab7e3f9efe8f1b26b3ca13da21312f52ae3",
+  "frozen_abc_sha256_unchanged": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482"
+}

@@ -20,9 +20,14 @@ Byte-identical extraction of (1).
 
 ## 3. Slots-only trained arm — S (window + incubated slots, **no Phase**)
 The decisive Phase-independent learning test.
-- **Maturity:** `PROVISIONALLY_SUPPORTED` — S−A = +0.161 needle@d96, S>A in all 3 seeds, slots-off /
-  randomized-address ablations collapse it, benefit is structural (S = S vs A+). **H4
-  (Phase-independence) = YES.** Relational (H5) near chance. `READY_FOR_FIVE_SEED_VALIDATION`.
+- **3-seed (seeds 0–2):** `PROVISIONALLY_SUPPORTED` — S−A = +0.161, all 3 formed, causal, structural.
+  H4 (Phase-independence) = YES.
+- **5-seed holdout (seeds 3–7):** **`PARTIALLY_STABLE` → `NOT_READY_FOR_KDA_VALIDATION`.** Only
+  **3/5 formed** (0.000/0.283/0.408/0.075/0.042) — below the pre-registered ≥4/5 bar. Every other gate
+  passes (causal collapse on all forming seeds; PPL S 117.8 < A+ 139.8; S beats A+; distance-robust),
+  so the effect is real and causal *when it forms* but **formation is unreliable (~60%)**. Failed
+  seeds are not distinguishable by slot diagnostics → optimization/init sensitivity. Next step:
+  failure analysis, NOT KDA. (See the five-seed validation report.)
 
 ## 4. Streaming bounded neural slots — `hybrid_llm_vnext_lab/src/binding_slots/bounded_binding_slots.py::BoundedBindingSlots`
 Dynamic keys, cosine-threshold match, discrete allocation/eviction, version/source metadata.
