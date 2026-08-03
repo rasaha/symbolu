@@ -1,0 +1,35 @@
+{
+  "audit": "agent_workforce_composer_p1",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "913300210e639df96b4c5123297221dcdb4b3c59",
+  "working_branch": "claude/agent-workforce-composer-p1-54g1d0",
+  "prs": {
+    "1303": {"title": "tooling: implement structured Policy-Pack workflow compiler MVP",
+             "state": "merged", "merge_commit": "96afb58a5792b4d80225f81406abf8fcfe0eec4f"},
+    "1305": {"title": "Add Agent Workforce Composer design specification (spec-only)",
+             "state": "merged", "merge_commit": "0fa80fe4146478aa452ae40eed12e234683e645e"},
+    "1306": {"title": "architecture: reconcile Agent Workforce Composer with H16 and compiler contracts",
+             "state": "merged", "merge_commit": "913300210e639df96b4c5123297221dcdb4b3c59"}
+  },
+  "platform_freeze": {
+    "manifest": "platform/PLATFORM_FREEZE_V1.json",
+    "substantive_digest_before": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "substantive_digest_after": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "status": "PASS_UNCHANGED"
+  },
+  "phase0_artifacts": {
+    "adr": "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md",
+    "boundaries": "docs/architecture/agent_workforce_composer_boundaries.json",
+    "audit_set": "docs/audits/agent_workforce_composer_phase0/",
+    "decision": "OPTION_A_CANONICALIZE_INTO_AWC"
+  },
+  "compiler_contract": {
+    "distribution": "ugence-policy-workflow-compiler",
+    "namespace": "ugence_policy_workflow_compiler",
+    "ir_version": "workflow_ir.v1", "node_kinds": 14, "edge_kinds": 9, "implemented": true
+  },
+  "preconditions": {
+    "awc_package_absent_before_p1": true,
+    "no_active_p1_pr_before_this": true
+  }
+}

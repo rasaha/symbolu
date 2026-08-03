@@ -1,0 +1,25 @@
+{
+  "source": "packages/tooling/policy-workflow-compiler",
+  "public_module": "ugence_policy_workflow_compiler.api",
+  "consumed_contracts": [
+    "CompiledReleasePackage", "ReleaseManifest", "WorkflowIR", "WorkflowNode",
+    "WorkflowEdge", "NodeKind", "EdgeKind", "AuthorityDisposition", "CapabilityId",
+    "CapabilityManifest"
+  ],
+  "ir_version": "workflow_ir.v1",
+  "node_kinds": ["EVIDENCE_REQUIREMENT","EVIDENCE_ADMISSIBILITY","DECISION_RULE",
+    "AUTHORITY_CHECK","APPROVAL_GATE","SEGREGATION_OF_DUTIES_GATE","PROHIBITED_CONDITION",
+    "EXCEPTION_BRANCH","OVERRIDE_GATE","ACTION_CONSTRAINT","SEQUENCE_RISK_CHECK",
+    "ACTION_CLEARANCE_REQUIREMENT","AUDIT_EMISSION","TERMINAL_OUTCOME"],
+  "edge_kinds": ["NEXT","ON_PASS","ON_FAIL","ON_MISSING","ON_EXCEPTION","ON_OVERRIDE",
+    "ON_ESCALATE","ON_DENY","ON_INDETERMINATE"],
+  "workflow_node_fields": ["node_id","kind","owning_capability","authority_type",
+    "disposition","public_contract_target","input_object_ids","output_contract",
+    "failure_behavior","audit_requirements","label"],
+  "authority_disposition": ["ADVISORY","AUTHORITATIVE"],
+  "capability_ids": ["TAP","DECISION_AUTHORITY","ACTION_GATE","ACTION_CLEARANCE",
+    "STORYGRAPH","MODEL_SELECTION","OPTIONAL_ORCHESTRATOR","COMPILER"],
+  "seam": "data-only (serialized workflow_ir.v1 dict/JSON); AWC does NOT import the compiler in core code",
+  "structural_digest_field": "CompiledReleasePackage.structural_digest",
+  "supported_ir_versions_in_awc": ["workflow_ir.v1"]
+}

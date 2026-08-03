@@ -1,0 +1,23 @@
+{
+  "package_path": "packages/capabilities/agent-workforce-composer",
+  "distribution": "ugence-agent-workforce-composer",
+  "namespace": "ugence_agent_workforce_composer",
+  "distribution_version": "0.1.0",
+  "product_version": "0.1.0",
+  "contract_version": "awc.v1",
+  "modules": {
+    "__init__.py": 40, "version.py": 170, "canonical.py": 89, "contracts.py": 192,
+    "reasons.py": 75, "fingerprint.py": 39, "workflow.py": 182, "adapter.py": 414,
+    "agents.py": 260, "policy.py": 99, "eligibility.py": 631, "fixtures.py": 366,
+    "api.py": 107, "cli.py": 220
+  },
+  "public_api_count": 48,
+  "test_count": 84,
+  "docs": ["README.md","CHANGELOG.md","LICENSE","docs/ARCHITECTURE.md",
+    "docs/OBJECT_MODEL.md","docs/COMPILER_ADAPTER.md","docs/ELIGIBILITY_POLICY.md",
+    "docs/EVIDENCE_AND_PROVENANCE.md","docs/AUTHORITY_BOUNDARY.md",
+    "docs/H16_CANONICALIZATION_STATUS.md","docs/ASSURANCE.md",
+    "docs/KNOWN_LIMITATIONS.md","docs/NEXT_PHASES.md"],
+  "verifier": "verify_agent_workforce_composer_distribution.py",
+  "ci": ".github/workflows/agent-workforce-composer-p1-ci.yml"
+}
