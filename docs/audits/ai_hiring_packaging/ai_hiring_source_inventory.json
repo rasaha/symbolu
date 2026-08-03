@@ -1,0 +1,44 @@
+{
+  "canonical_source_tree": "ai_hiring/",
+  "canonical_selection_rationale": "ai_hiring/ contains the concrete implementation (302 .py files across 30 subpackages). domains/hiring and applications/ai_hiring are thin re-export/composition layers that IMPORT from ai_hiring; ai_hiring/__init__ documents itself as the historical implementation retained for import stability. Selection was made by import-direction analysis, not directory name.",
+  "duplicate_or_stale_sources": [
+    {
+      "path": "domains/hiring/",
+      "role": "canonical hiring-domain re-export surface (imports ai_hiring.*)",
+      "classification": "RE_EXPORT_SURFACE"
+    },
+    {
+      "path": "applications/ai_hiring/",
+      "role": "composition root (imports domains.hiring + decision_governance)",
+      "classification": "COMPOSITION_ROOT"
+    }
+  ],
+  "public_imports": [
+    "ai_hiring.HiringPlatform",
+    "ai_hiring.build_in_memory_platform",
+    "ai_hiring.__version__"
+  ],
+  "product_version_source_of_truth": "ai_hiring/product/version.py (PRODUCT_VERSION='0.6.0')",
+  "release_manifest_source_of_truth": "docs/ai-hiring/release/RELEASE_MANIFEST.md",
+  "cli_surfaces": [
+    "python -m ai_hiring.product (version|demo|report|verify)"
+  ],
+  "entry_points_before_extraction": "none declared in root pyproject (module-run CLI only)",
+  "downstream_consumers_of_ai_hiring_import": {
+    "count": 6,
+    "files": [
+      "applications/ai_hiring/platform.py",
+      "domains/hiring/__init__.py",
+      "domains/hiring/adapters.py",
+      "domains/hiring/errors.py",
+      "domains/hiring/repositories.py",
+      "domains/hiring/services.py"
+    ],
+    "classification": "KEEP_COMPATIBILITY_IMPORT (monorepo composition/domain layers; unchanged this PR)"
+  },
+  "tests_importing_ai_hiring": "ai_hiring/tests/ (95 files, 778 tests)",
+  "governance_dependencies": [
+    "decision_governance -> ugence_decision_authority",
+    "governance_providers -> ugence_governance_provider_framework"
+  ]
+}

@@ -1,0 +1,112 @@
+name: ai-hiring-package-ci
+
+# Scoped CI for the independent ugence-ai-hiring product distribution. Runs the
+# migrated + new package suite (governance-boundary, dependency-boundary,
+# import-isolation, compatibility-facade, determinism, packaging), the wheel +
+# sdist build with an isolated clean-venv install, out-of-root import, CLI
+# verify/demo, wheel-content audit, reproducible-wheel comparison, the existing
+# monorepo AI Hiring tests, and platform-freeze verification. No network-dependent
+# integrations run. Triggered only by changes to the package, the historical
+# ai_hiring source, its docs, or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/products/ai-hiring/**"
+      - "ai_hiring/**"
+      - "docs/ai-hiring/**"
+      - "conftest.py"
+      - ".github/workflows/ai-hiring-package-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/ai-hiring-independent-package**"
+    paths:
+      - "packages/products/ai-hiring/**"
+      - "ai_hiring/**"
+      - "docs/ai-hiring/**"
+      - "conftest.py"
+      - ".github/workflows/ai-hiring-package-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: AI Hiring package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+      - name: Package suite (migrated behavioral + governance/dependency/isolation/compat/determinism/packaging)
+        env:
+          # The canonical package src plus the audited Ugence dependency srcs
+          # (the repo conftest also adds the latter for source checkouts).
+          PYTHONPATH: >-
+            packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
+        run: python -m pytest packages/products/ai-hiring/tests -q
+      - name: Provenance/metadata validation (version metadata, production_certified is False)
+        env:
+          PYTHONPATH: >-
+            packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
+        run: |
+          python -m ugence_ai_hiring version
+          python -c "import ugence_ai_hiring as u; assert u.version_info().production_certified is False, 'must not be production certified'"
+
+  isolated-distribution:
+    name: Wheel + sdist build, clean install, out-of-root import, CLI, reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build, clean-install, out-of-root import, CLI verify/demo, wheel audit, reproducible-wheel comparison
+        run: python packages/products/ai-hiring/scripts/verify_ai_hiring_distribution.py
+
+  monorepo-regression:
+    name: Existing monorepo AI Hiring tests (unchanged source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Original ai_hiring suite still passes (facade conversion deferred)
+        run: python -m pytest ai_hiring/tests -q
+
+  freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

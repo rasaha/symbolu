@@ -1,0 +1,542 @@
+{
+  "package_tests": [
+    {
+      "test_file": "integrations/test_legacy_adapters.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "packaging/test_compatibility_facade.py",
+      "classification": "NEW_PACKAGE_TEST",
+      "test_count": 6
+    },
+    {
+      "test_file": "packaging/test_dependency_boundaries.py",
+      "classification": "NEW_PACKAGE_TEST",
+      "test_count": 5
+    },
+    {
+      "test_file": "packaging/test_determinism.py",
+      "classification": "NEW_PACKAGE_TEST",
+      "test_count": 4
+    },
+    {
+      "test_file": "packaging/test_governance_invariants.py",
+      "classification": "NEW_PACKAGE_TEST",
+      "test_count": 7
+    },
+    {
+      "test_file": "packaging/test_import_isolation.py",
+      "classification": "NEW_PACKAGE_TEST",
+      "test_count": 3
+    },
+    {
+      "test_file": "test_action_request_authorization.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_action_request_binding.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_action_request_cer.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_action_request_contracts.py",
+      "classification": "MIGRATED",
+      "test_count": 14
+    },
+    {
+      "test_file": "test_action_request_lifecycle_audit.py",
+      "classification": "MIGRATED",
+      "test_count": 15
+    },
+    {
+      "test_file": "test_archive_safety.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_assessment_api.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_assessment_audit.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_assessment_authorization.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_assessment_conflicts.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_assessment_contracts.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_assessment_lifecycle.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_assessment_uncertainty.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_assessment_workspace.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_audit_chain.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_audit_completeness.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_capability_registry.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_capability_versioning.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_conflicts.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_conformance.py",
+      "classification": "MIGRATED",
+      "test_count": 1
+    },
+    {
+      "test_file": "test_decision_case_audit_api.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_decision_case_authority.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_decision_case_contracts.py",
+      "classification": "MIGRATED",
+      "test_count": 15
+    },
+    {
+      "test_file": "test_decision_case_lifecycle.py",
+      "classification": "MIGRATED",
+      "test_count": 11
+    },
+    {
+      "test_file": "test_decision_case_separation.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_decision_case_validation.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_domain_models.py",
+      "classification": "MIGRATED",
+      "test_count": 18
+    },
+    {
+      "test_file": "test_duplicate_semantics.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_end_to_end_foundation.py",
+      "classification": "MIGRATED",
+      "test_count": 2
+    },
+    {
+      "test_file": "test_evidence_binding.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_evidence_ingestion.py",
+      "classification": "MIGRATED",
+      "test_count": 13
+    },
+    {
+      "test_file": "test_evidence_rules.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_execution_binding.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_execution_contracts.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_execution_dispatch.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_execution_reconciliation.py",
+      "classification": "MIGRATED",
+      "test_count": 15
+    },
+    {
+      "test_file": "test_execution_security_audit.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_extraction_status.py",
+      "classification": "MIGRATED",
+      "test_count": 11
+    },
+    {
+      "test_file": "test_fail_closed_evidence.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_h1_applications.py",
+      "classification": "MIGRATED",
+      "test_count": 12
+    },
+    {
+      "test_file": "test_h1_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h1_candidates.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h1_intake.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_h1_reconstruction.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h1_requisitions.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_h2_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h2_generation.py",
+      "classification": "MIGRATED",
+      "test_count": 12
+    },
+    {
+      "test_file": "test_h2_reconstruction.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h2_review.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h2_synthesis.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_h3_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h3_governance.py",
+      "classification": "MIGRATED",
+      "test_count": 12
+    },
+    {
+      "test_file": "test_h3_reconstruction.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h3_views.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h4_authorization.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_h4_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_h4_compensation.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h4_execution.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_h4_proposal.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_h4_reconciliation.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h4_reconstruction.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h5_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h5_determinism.py",
+      "classification": "MIGRATED",
+      "test_count": 3
+    },
+    {
+      "test_file": "test_h5_failure_injection.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_h5_fairness.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h5_performance.py",
+      "classification": "MIGRATED",
+      "test_count": 2
+    },
+    {
+      "test_file": "test_h5_reconstruction.py",
+      "classification": "MIGRATED",
+      "test_count": 4
+    },
+    {
+      "test_file": "test_h5_scenarios.py",
+      "classification": "MIGRATED",
+      "test_count": 13
+    },
+    {
+      "test_file": "test_h5_shadow_pilot.py",
+      "classification": "MIGRATED",
+      "test_count": 3
+    },
+    {
+      "test_file": "test_h6_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_h6_product.py",
+      "classification": "MIGRATED",
+      "test_count": 18
+    },
+    {
+      "test_file": "test_lineage.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_lineage_integrity.py",
+      "classification": "MIGRATED",
+      "test_count": 11
+    },
+    {
+      "test_file": "test_missing_evidence.py",
+      "classification": "MIGRATED",
+      "test_count": 5
+    },
+    {
+      "test_file": "test_normalization.py",
+      "classification": "MIGRATED",
+      "test_count": 11
+    },
+    {
+      "test_file": "test_observation_validation.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_operational_kernel_extraction.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_quarantine.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_quarantine_non_leakage.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_reason_codes.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_recommendation_decision_boundary.py",
+      "classification": "MIGRATED",
+      "test_count": 13
+    },
+    {
+      "test_file": "test_reconstruction_integrity.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_resource_limits.py",
+      "classification": "MIGRATED",
+      "test_count": 9
+    },
+    {
+      "test_file": "test_rubric_validation.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_rubric_workflow.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_scoring_scales.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    },
+    {
+      "test_file": "test_search.py",
+      "classification": "MIGRATED",
+      "test_count": 8
+    },
+    {
+      "test_file": "test_search_authorization.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_structured_limits.py",
+      "classification": "MIGRATED",
+      "test_count": 15
+    },
+    {
+      "test_file": "test_tenant_isolation.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_uncertainty.py",
+      "classification": "MIGRATED",
+      "test_count": 6
+    },
+    {
+      "test_file": "test_versioning.py",
+      "classification": "MIGRATED",
+      "test_count": 7
+    },
+    {
+      "test_file": "test_workflow_transitions.py",
+      "classification": "MIGRATED",
+      "test_count": 10
+    }
+  ],
+  "package_test_files": 99,
+  "package_test_count": 761,
+  "new_package_tests": 25,
+  "migrated_tests": 736,
+  "monorepo_integration_tests": [
+    {
+      "test_file": "ai_hiring/tests/test_direct_kernel_adoption.py",
+      "classification": "MONOREPO_INTEGRATION",
+      "test_count": 18,
+      "reason": "asserts monorepo compat/domains/applications layout; stays in monorepo, not shipped in the independent wheel"
+    },
+    {
+      "test_file": "ai_hiring/tests/test_kernel_extraction.py",
+      "classification": "MONOREPO_INTEGRATION",
+      "test_count": 11,
+      "reason": "asserts monorepo compat/domains/applications layout; stays in monorepo, not shipped in the independent wheel"
+    }
+  ],
+  "monorepo_integration_count": 29,
+  "collected_counts_authoritative": {
+    "note": "pytest-collected case counts. Source context skips 6 facade tests (monorepo shadows the wheel facade); installed-wheel context runs them but skips 2 legacy TAP/ActionGate compatibility tests (legacy providers absent in the clean env).",
+    "baseline_monorepo_ai_hiring": 778,
+    "package_total_collected": 780,
+    "source_context": {
+      "passed": 774,
+      "skipped": 6
+    },
+    "installed_wheel_context": {
+      "passed": 778,
+      "skipped": 2
+    },
+    "migrated_behavioral": 749,
+    "new_packaging_and_integration_tests": 31,
+    "new_tests_breakdown": {
+      "compatibility_facade": 6,
+      "governance_invariants": 7,
+      "dependency_boundaries": 5,
+      "import_isolation": 3,
+      "determinism": 4,
+      "legacy_tap_actiongate_integrations": 6
+    },
+    "monorepo_integration_kept_in_monorepo": 29
+  }
+}

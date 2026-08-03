@@ -1,0 +1,50 @@
+{
+  "method": "Each historical claim classified against the live repository.",
+  "claims": [
+    {
+      "claim": "PACKAGE_READY_FOR_CONTROLLED_PILOT",
+      "status": "LIVE_VERIFIED",
+      "evidence": "ai_hiring/product/version.py STABILITY='pre-1.0 / controlled-pilot'; RELEASE_MANIFEST readiness classification; retained for the independent package only after its own build+clean-install gates passed."
+    },
+    {
+      "claim": "778 AI Hiring tests passed",
+      "status": "LIVE_VERIFIED",
+      "evidence": "python -m pytest ai_hiring/tests -> 778 collected, 778 passed (rerun this phase)."
+    },
+    {
+      "claim": "917 integrated tests passed",
+      "status": "DOCUMENTED_NOT_RERUN",
+      "evidence": "Full monorepo integrated suite not rerun in this scoped extraction phase; reported as historical. Package-scoped total this phase: 773 package tests + 778 monorepo ai_hiring tests."
+    },
+    {
+      "claim": "bit-for-bit reproducible wheel",
+      "status": "LIVE_VERIFIED",
+      "evidence": "ugence_ai_hiring-0.1.0-py3-none-any.whl built twice with SOURCE_DATE_EPOCH pinned -> identical sha256 5d7c96028b657d093cc54deeac536bb5a6ad9c67453ad3d73219338705a6fd88 (independent wheel). Historical claim referred to the monorepo wheel."
+    },
+    {
+      "claim": "clean-environment install verified",
+      "status": "LIVE_VERIFIED",
+      "evidence": "Fresh venv wheel/sdist/editable installs; import + CLI + full test suite run from outside the repo."
+    },
+    {
+      "claim": "no vendor AI SDK dependency",
+      "status": "LIVE_VERIFIED",
+      "evidence": "AST dependency scan: 0 imports of openai/anthropic/mistralai/torch/transformers; core deps are pydantic + 2 Ugence packages."
+    },
+    {
+      "claim": "no production certification",
+      "status": "LIVE_VERIFIED",
+      "evidence": "version_info().production_certified == False (hard-coded); asserted by CLI verify and tests."
+    },
+    {
+      "claim": "human-only binding employment decisions",
+      "status": "LIVE_VERIFIED",
+      "evidence": "Decision model_validator pins actor_type=HUMAN; decision_boundary.assert_* enforced; covered by migrated + new governance tests."
+    },
+    {
+      "claim": "AI recommendations are advisory only",
+      "status": "LIVE_VERIFIED",
+      "evidence": "Recommendation model pins actor_type=AI; advisory workflow; covered by migrated tests."
+    }
+  ]
+}
