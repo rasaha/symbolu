@@ -1,0 +1,31 @@
+{
+  "audit": "agent_workforce_composer_p2",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "4f01064df44187dd1ab6f9ecc411eba29dc06476",
+  "working_branch": "claude/agent-workforce-composer-p2-54g1d0",
+  "prs": {
+    "1303": {"state": "merged", "merge_commit": "96afb58a5792b4d80225f81406abf8fcfe0eec4f"},
+    "1305": {"state": "merged", "merge_commit": "0fa80fe4146478aa452ae40eed12e234683e645e"},
+    "1306": {"state": "merged", "merge_commit": "913300210e639df96b4c5123297221dcdb4b3c59"},
+    "1308": {"state": "merged", "merge_commit": "d1cfad24777ae0bbd49f7be4a699786fed1ffb3b",
+             "title": "capability: implement Agent Workforce Composer P1 eligibility"}
+  },
+  "p1_baseline": {
+    "package": "packages/capabilities/agent-workforce-composer",
+    "distribution": "ugence-agent-workforce-composer", "namespace": "ugence_agent_workforce_composer",
+    "distribution_version": "0.1.0", "contract_version": "awc.v1",
+    "tests_passing": 84, "public_api_count": 48,
+    "public_api_sha256": "01e0f96248fe4905c90db8ca949088a8d6b0056a9c0216df25c78709e8fd60b7"
+  },
+  "platform_freeze": {
+    "substantive_digest_before": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "status": "PASS"
+  },
+  "preconditions": {
+    "p1_present": true, "no_p2_modules_present": true,
+    "no_active_p2_pr": true, "working_tree_clean_at_branch_creation": true
+  },
+  "target": {"distribution_version": "0.2.0", "product_version": "0.2.0",
+             "new_contract_version": "awc.composition.v1",
+             "preserved_contracts": ["awc.v1", "workflow_ir.v1"]}
+}

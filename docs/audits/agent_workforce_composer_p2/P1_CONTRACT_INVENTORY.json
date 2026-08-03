@@ -1,0 +1,26 @@
+{
+  "consumed_p1_public_api": [
+    "adapt_compiled_workflow","CompilerWorkflowAdapter","CompilerAdaptationResult",
+    "WorkflowRoleRequirement","NonAgentDisposition","AgentProfile","AgentCapability",
+    "AgentCapabilityEvidence","AgentRegistrySnapshot","EnterpriseAgentPolicy",
+    "EligibilityPolicy","evaluate_registry_for_role","evaluate_workflow_eligibility",
+    "AgentEligibilityResult","RoleEligibilityReport","EligibilityState","EvidenceClass",
+    "EliminationReason","version_info"
+  ],
+  "role_eligibility_report_fields": ["role_id","workflow_id","snapshot_digest",
+    "enterprise_policy_digest","eligibility_policy_digest","results","eligible_agent_ids",
+    "eliminated_agent_ids","indeterminate_agent_ids","outcome","report_fingerprint"],
+  "agent_eligibility_result_fields": ["role_id","agent_id","agent_version","state",
+    "elimination_reasons","role_fingerprint","profile_fingerprint","policy_digest",
+    "result_fingerprint","snapshot_digest"],
+  "eligible_state": "EligibilityState.ELIGIBLE",
+  "agent_profile_ranking_fields": ["provider_id","agent_type","residency",
+    "deployment_environment","security_classification","latency_evidence","cost_evidence",
+    "quality_evidence","reliability_evidence","audit_capabilities","requested_permissions",
+    "maximum_authority_scope","model_requirement_refs","supported_tools",
+    "input_contracts","output_contracts"],
+  "evidence_precedence": {"OBSERVED": 3, "MEASURED": 2, "DECLARED": 1},
+  "preserved_contract_versions": ["awc.v1", "workflow_ir.v1"],
+  "p1_fixtures": ["procurement","support","security"],
+  "p1_registry_agents": 17
+}
