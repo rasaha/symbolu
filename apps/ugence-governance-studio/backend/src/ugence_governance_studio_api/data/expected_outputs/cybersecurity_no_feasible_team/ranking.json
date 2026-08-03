@@ -1,0 +1,264 @@
+[
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 1,
+    "excluded_candidate_count": 3,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_incident_correlation",
+        "agent_version": "1.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_incident_correlation::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_incident_correlation::1.0.0::incident_correlation::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_incident_correlation::1.0.0::evidence_extraction::MEASURED",
+              "ev::agent_incident_correlation::1.0.0::incident_correlation::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.95 → 9500bp × 2000bp = 1900bp",
+            "metric": "quality",
+            "normalized_bp": 9500,
+            "raw_value": "0.95",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1900
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=800.0 → 8400bp × 1500bp = 1260bp",
+            "metric": "latency",
+            "normalized_bp": 8400,
+            "raw_value": "800.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1260
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.0 → 8000bp × 1000bp = 800bp",
+            "metric": "cost",
+            "normalized_bp": 8000,
+            "raw_value": "2.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 800
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=4.0 → 8000bp × 500bp = 400bp",
+            "metric": "security",
+            "normalized_bp": 8000,
+            "raw_value": "4.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 400
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:5200379a158b99a51bfea7729b41b043510ad2feffa0436a0d2a9838ddac6faf",
+        "evidence_refs": [
+          "ev::agent_incident_correlation::1.0.0::evidence_extraction::MEASURED",
+          "ev::agent_incident_correlation::1.0.0::incident_correlation::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:3eeb276eb70838597610afc693948dbfd17af4b8872475ce424144e71014f295",
+        "role_id": "role::sec_incident_correlation",
+        "snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9",
+        "tie_break_values": [
+          "7869",
+          "5000",
+          "9090",
+          "9000",
+          "8000",
+          "8400",
+          "anthropic",
+          "agent_incident_correlation",
+          "1.0.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7869
+      }
+    ],
+    "ranking_fingerprint": "sha256:84c07bb24a56b2d922b674ca12e0fa5d8f3aaf74bc2e9b4db4795045e136cf32",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:5082d8c66a94bbc411980eb60084a64e866ad2c65dfcdfef817509560769fbd6",
+    "role_id": "role::sec_incident_correlation",
+    "snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9"
+  },
+  {
+    "composition_contract_version": "awc.composition.v1",
+    "eligible_candidate_count": 1,
+    "excluded_candidate_count": 3,
+    "ranked_candidates": [
+      {
+        "agent_id": "agent_threat_analysis",
+        "agent_version": "2.0.0",
+        "composition_contract_version": "awc.composition.v1",
+        "criterion_results": [
+          {
+            "criterion": "evidence_strength",
+            "evidence_refs": [
+              "ev::agent_threat_analysis::2.0.0::evidence_extraction::MEASURED",
+              "ev::agent_threat_analysis::2.0.0::threat_analysis::MEASURED"
+            ],
+            "explanation": "evidence_strength=2.0 → 5000bp × 2000bp = 1000bp",
+            "metric": "evidence_strength",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1000
+          },
+          {
+            "criterion": "evidence_freshness",
+            "evidence_refs": [
+              "ev::agent_threat_analysis::2.0.0::evidence_extraction::MEASURED",
+              "ev::agent_threat_analysis::2.0.0::threat_analysis::MEASURED"
+            ],
+            "explanation": "evidence_freshness=0.9090909090909091 → 9090bp × 1000bp = 909bp",
+            "metric": "evidence_freshness",
+            "normalized_bp": 9090,
+            "raw_value": "0.9090909090909091",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 909
+          },
+          {
+            "criterion": "measured_quality",
+            "evidence_refs": [],
+            "explanation": "quality=0.96 → 9600bp × 2000bp = 1920bp",
+            "metric": "quality",
+            "normalized_bp": 9600,
+            "raw_value": "0.96",
+            "weight_bp": 2000,
+            "weighted_contribution_bp": 1920
+          },
+          {
+            "criterion": "observed_reliability",
+            "evidence_refs": [],
+            "explanation": "reliability=0.99 → 9000bp × 1500bp = 1350bp",
+            "metric": "reliability",
+            "normalized_bp": 9000,
+            "raw_value": "0.99",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1350
+          },
+          {
+            "criterion": "latency_headroom",
+            "evidence_refs": [],
+            "explanation": "latency=800.0 → 8400bp × 1500bp = 1260bp",
+            "metric": "latency",
+            "normalized_bp": 8400,
+            "raw_value": "800.0",
+            "weight_bp": 1500,
+            "weighted_contribution_bp": 1260
+          },
+          {
+            "criterion": "cost_efficiency",
+            "evidence_refs": [],
+            "explanation": "cost=2.0 → 8000bp × 1000bp = 800bp",
+            "metric": "cost",
+            "normalized_bp": 8000,
+            "raw_value": "2.0",
+            "weight_bp": 1000,
+            "weighted_contribution_bp": 800
+          },
+          {
+            "criterion": "security_headroom",
+            "evidence_refs": [],
+            "explanation": "security=4.0 → 8000bp × 500bp = 400bp",
+            "metric": "security",
+            "normalized_bp": 8000,
+            "raw_value": "4.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 400
+          },
+          {
+            "criterion": "audit_strength",
+            "evidence_refs": [],
+            "explanation": "audit=2.0 → 5000bp × 500bp = 250bp",
+            "metric": "audit",
+            "normalized_bp": 5000,
+            "raw_value": "2.0",
+            "weight_bp": 500,
+            "weighted_contribution_bp": 250
+          }
+        ],
+        "eligibility_result_fingerprint": "sha256:b5ed04872938514be29291c329f3191c6b933abe0aea8bdc39f201890074d2c6",
+        "evidence_refs": [
+          "ev::agent_threat_analysis::2.0.0::evidence_extraction::MEASURED",
+          "ev::agent_threat_analysis::2.0.0::threat_analysis::MEASURED"
+        ],
+        "policy_refs": [
+          "gs_ranking_policy"
+        ],
+        "rank": 1,
+        "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+        "result_fingerprint": "sha256:ba72fbebdabe2e58189498d40effad5dc2d986c79b7d378ca3caae8135d43533",
+        "role_id": "role::sec_threat_analysis",
+        "snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9",
+        "tie_break_values": [
+          "7889",
+          "5000",
+          "9090",
+          "9000",
+          "8000",
+          "8400",
+          "anthropic",
+          "agent_threat_analysis",
+          "2.0.0"
+        ],
+        "tie_group": 1,
+        "total_score": 7889
+      }
+    ],
+    "ranking_fingerprint": "sha256:6e42b651fbaaf21e00937a3cdc964ebbe3b7cad7a328008a1c802fc0d2c38338",
+    "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+    "role_fingerprint": "sha256:8962f0fe623b81dcb3e4e61774a90bacb558398dfa8e049591e6b634f7891f67",
+    "role_id": "role::sec_threat_analysis",
+    "snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9"
+  }
+]

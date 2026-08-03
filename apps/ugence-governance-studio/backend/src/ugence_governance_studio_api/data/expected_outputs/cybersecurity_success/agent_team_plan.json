@@ -1,0 +1,669 @@
+{
+  "compiler_source_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+  "composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+  "created_at": 1000000.0,
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:f0ce7dead307cd2d333b504bb0d6b0b8f7e70b4edc25beb50b486cff630bd8a6",
+  "fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+  "governance_boundary_refs": [
+    "sec_action_boundary",
+    "sec_human_escalation",
+    "sec_sequence_risk"
+  ],
+  "human_review_requirements": [],
+  "non_agent_dispositions": [
+    {
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "STORYGRAPH",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "STORYGRAPH",
+      "contract_version": "awc.v1",
+      "disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+      "fingerprint": "sha256:3fc84ef1cfd9e5fd8e359d436700e28fe6ad47f4f2e899c0b291209e90077177",
+      "human_review_required": false,
+      "node_id": "sec_sequence_risk",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_security@v1:sec_sequence_risk",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "advisory_governance_owner:STORYGRAPH"
+      ],
+      "source_capability": "STORYGRAPH",
+      "source_node_kind": "SEQUENCE_RISK_CHECK",
+      "source_package_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+      "workflow_id": "gs_security"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "HUMAN_APPROVER",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "DECISION_AUTHORITY",
+      "contract_version": "awc.v1",
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "fingerprint": "sha256:3ac21d34a8ff090f0b0b9ae52d6303d3265d33bd02d893b2e7c7992819955b16",
+      "human_review_required": true,
+      "node_id": "sec_human_escalation",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_security@v1:sec_human_escalation",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "human_authority_node:OVERRIDE_GATE"
+      ],
+      "source_capability": "DECISION_AUTHORITY",
+      "source_node_kind": "OVERRIDE_GATE",
+      "source_package_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+      "workflow_id": "gs_security"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "",
+        "owning_capability": "ACTION_GATE",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "ACTION_GATE",
+      "contract_version": "awc.v1",
+      "disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+      "fingerprint": "sha256:b134f44a5b4f5d078f94b4d425586a2084fb9b7b72c6d319a905533eb2939846",
+      "human_review_required": false,
+      "node_id": "sec_action_boundary",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_security@v1:sec_action_boundary",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "authoritative_governance_owner:ACTION_GATE"
+      ],
+      "source_capability": "ACTION_GATE",
+      "source_node_kind": "ACTION_CONSTRAINT",
+      "source_package_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+      "workflow_id": "gs_security"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "COMPILER",
+      "contract_version": "awc.v1",
+      "disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+      "fingerprint": "sha256:afe4bd37e1d6cb0fde30087af9ca5f14bb523544e26ac1d2bab668d87f7b19a9",
+      "human_review_required": false,
+      "node_id": "sec_audit",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_security@v1:sec_audit",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "deterministic_kind:AUDIT_EMISSION"
+      ],
+      "source_capability": "COMPILER",
+      "source_node_kind": "AUDIT_EMISSION",
+      "source_package_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+      "workflow_id": "gs_security"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "COMPILER",
+      "contract_version": "awc.v1",
+      "disposition": "NO_AI_AGENT_REQUIRED",
+      "fingerprint": "sha256:76f617c08cd5e99dbeb5dc8216056d3ebf8ffb492d2ad91c5017193a085c20b9",
+      "human_review_required": false,
+      "node_id": "sec_terminal",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_security@v1:sec_terminal",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "structural_kind:TERMINAL_OUTCOME"
+      ],
+      "source_capability": "COMPILER",
+      "source_node_kind": "TERMINAL_OUTCOME",
+      "source_package_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+      "workflow_id": "gs_security"
+    }
+  ],
+  "permission_bound_proposals": [
+    {
+      "agent_id": "agent_security_evidence",
+      "agent_version": "1.2.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:a2ccf3e4c9c622d201dd586b1021a91c0350f1c91a0bce9261a3c284c803efc3",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:96bfaca4f57860f6cd4bc4598e5056a492325918ac9f24e2691efa53b7015d04",
+      "role_id": "role::sec_evidence_collection"
+    },
+    {
+      "agent_id": "agent_incident_correlation",
+      "agent_version": "1.0.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:927ca6a21793d77bf83492ae87d3bc10f1ecedf99027cff7f4c688c816afddd6",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:5c328c86d96ff9a71f562b7b128acc821108672956135eebc227d3386c656cc6",
+      "role_id": "role::sec_incident_correlation"
+    },
+    {
+      "agent_id": "agent_security_recommendation",
+      "agent_version": "1.1.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:2423896677ea555ca0a16a83f59f587da2e4eafdef20786b080a80c28d666f1c",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:10cb13cdff9ec62e73381e38a05909a56e51df687913427f176a9c67729cf8c5",
+      "role_id": "role::sec_recommendation"
+    },
+    {
+      "agent_id": "agent_threat_analysis",
+      "agent_version": "2.0.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:ce05b025fa2ae2835b6f444abf045978a223ad27ef59e0f377944728ec4c0831",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:c5a7677c9091775edbf72aaad89f3f98358c32cab8b93bfb2b72162a8324e899",
+      "role_id": "role::sec_threat_analysis"
+    }
+  ],
+  "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+  "plan_contract_version": "awc.composition.v1",
+  "plan_fingerprint": "sha256:9be9cf67e0a07b2cda0eae33a2a507740d549a7cb7422e43292f7d997944be98",
+  "plan_id": "plan::6db166d196926a39",
+  "plan_state": "COMPLETE",
+  "provenance": {
+    "notes": "",
+    "source_kind": "p2_composition",
+    "source_ref": "",
+    "synthetic": true
+  },
+  "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "registry_snapshot_digest": "sha256:2462616dc1297b6c2e6e003fe59b3c11e9042a2cdc771bc7559450b2ed198b67",
+  "registry_snapshot_id": "gs_security_success_registry",
+  "role_assignments": [
+    {
+      "assignment_explanation": "selected rank #1 score 7739bp; provider anthropic",
+      "assignment_fingerprint": "sha256:21f7cad4dfc2830bcaa6620ca822a053f50d75283082397d2822560f17ea66a6",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:0d2867269e2c693a9984f1cd9fbae84067b51ce663c3e23a13096d9691f0fc9d",
+      "fallback_plan_ref": "sha256:83e3d60a86a5127541c706c3e93163642edfea51884cd1216d80ce3667e0bf90",
+      "primary_agent_id": "agent_security_evidence",
+      "primary_agent_version": "1.2.0",
+      "proposed_permission_bound_ref": "sha256:a2ccf3e4c9c622d201dd586b1021a91c0350f1c91a0bce9261a3c284c803efc3",
+      "rank_result_fingerprint": "sha256:862dadced1ccaafd9850a3efbc48529549b80fc78bb7c07aa527edea44759be5",
+      "required_interface_refs": [
+        "incident_evidence"
+      ],
+      "role_id": "role::sec_evidence_collection",
+      "total_score": 7739
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7639bp; provider openai",
+      "assignment_fingerprint": "sha256:754c2ce4ce2bdabb5616cc35b7cd0faa790172478036e14c8e583b702f92b851",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:c26c7cb835ea1b3c94b659ffa293b83bdea90711437bdf92b2ff342da7fefca6",
+      "fallback_plan_ref": "sha256:f35227ec06e4f5637fbeaf2d58d755f017bc4bd5f16973f0f157473365caa333",
+      "primary_agent_id": "agent_incident_correlation",
+      "primary_agent_version": "1.0.0",
+      "proposed_permission_bound_ref": "sha256:927ca6a21793d77bf83492ae87d3bc10f1ecedf99027cff7f4c688c816afddd6",
+      "rank_result_fingerprint": "sha256:cf9064299f889d4d0592d5e398e20e09f9e781c30d3d487b7b72b5093d1d7a6a",
+      "required_interface_refs": [
+        "correlated_incident",
+        "threat_assessment"
+      ],
+      "role_id": "role::sec_incident_correlation",
+      "total_score": 7639
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7654bp; provider openai",
+      "assignment_fingerprint": "sha256:a6bcd0e6e82d286bb5d898a4734b68123eff6f581b26ac0b5a52dbc547a8055f",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:273940f52958e4e00bc7c440fb6f433f69483db668a163b6ad8f6c9bfb92cd1f",
+      "fallback_plan_ref": "sha256:6c435198a9f27add274ed9786db45290b5e8e7a8b895f6d92f6b29d373f54c6e",
+      "primary_agent_id": "agent_security_recommendation",
+      "primary_agent_version": "1.1.0",
+      "proposed_permission_bound_ref": "sha256:2423896677ea555ca0a16a83f59f587da2e4eafdef20786b080a80c28d666f1c",
+      "rank_result_fingerprint": "sha256:c1b720fd04f809be00e9eaf775e435060436360d1b89f6323f6251477c56eabc",
+      "required_interface_refs": [
+        "correlated_incident"
+      ],
+      "role_id": "role::sec_recommendation",
+      "total_score": 7654
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7694bp; provider anthropic",
+      "assignment_fingerprint": "sha256:d91e96b0e6501468cec315864b32c21953b13dcf3c0263cf51a2d117d1b63cb8",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:4de4c20f38ab5601c38fd3381c2e44e24342a655a41e690af8fef2ca50dc7d1a",
+      "fallback_plan_ref": "sha256:d03572828e6f29eb66fbf0792a46004c94b51534ab74b824e04a2655b3a1b434",
+      "primary_agent_id": "agent_threat_analysis",
+      "primary_agent_version": "2.0.0",
+      "proposed_permission_bound_ref": "sha256:ce05b025fa2ae2835b6f444abf045978a223ad27ef59e0f377944728ec4c0831",
+      "rank_result_fingerprint": "sha256:1e6b7896c3b77dffa78c2492d2499ec7e36042c0b2ab9063d52cf49d30344073",
+      "required_interface_refs": [
+        "incident_evidence",
+        "threat_assessment"
+      ],
+      "role_id": "role::sec_threat_analysis",
+      "total_score": 7694
+    }
+  ],
+  "role_fallback_plans": [
+    {
+      "candidates": [
+        {
+          "agent_id": "agent_general_analyst",
+          "agent_version": "1.0.0",
+          "composition_contract_version": "awc.composition.v1",
+          "eligibility_fingerprint": "sha256:3680c4a6ce76b3e533ea2a779c4f05fc8a5aefc1eebda3b7837534989dd5aa9b",
+          "failure_domain_comparison": "different_provider",
+          "fallback_fingerprint": "sha256:7e19c16dfafc37dd53e9eadd85f412db7eec96d22e809725bcd3bc4030863af5",
+          "fallback_order": 1,
+          "permission_bound_ref": "sha256:aa5128feef9bd50b27d91a3a51f52d20e30751a29a786ab0a1fb13356013da54",
+          "rank": 2,
+          "rank_fingerprint": "sha256:97a40531cd365df8cde7fa482cdc0fe056402204d8b0b39f312e71705d564676",
+          "ranking_score": 7559,
+          "selection_reason": "rank #2, score 7559bp, diverse failure domain"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "PARTIAL",
+      "plan_fingerprint": "sha256:83e3d60a86a5127541c706c3e93163642edfea51884cd1216d80ce3667e0bf90",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_security_evidence",
+      "primary_agent_version": "1.2.0",
+      "role_id": "role::sec_evidence_collection"
+    },
+    {
+      "candidates": [],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "NO_FALLBACK_AVAILABLE",
+      "plan_fingerprint": "sha256:f35227ec06e4f5637fbeaf2d58d755f017bc4bd5f16973f0f157473365caa333",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_incident_correlation",
+      "primary_agent_version": "1.0.0",
+      "role_id": "role::sec_incident_correlation"
+    },
+    {
+      "candidates": [],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "NO_FALLBACK_AVAILABLE",
+      "plan_fingerprint": "sha256:6c435198a9f27add274ed9786db45290b5e8e7a8b895f6d92f6b29d373f54c6e",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_security_recommendation",
+      "primary_agent_version": "1.1.0",
+      "role_id": "role::sec_recommendation"
+    },
+    {
+      "candidates": [],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "NO_FALLBACK_AVAILABLE",
+      "plan_fingerprint": "sha256:d03572828e6f29eb66fbf0792a46004c94b51534ab74b824e04a2655b3a1b434",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_threat_analysis",
+      "primary_agent_version": "2.0.0",
+      "role_id": "role::sec_threat_analysis"
+    }
+  ],
+  "search_statistics": {
+    "algorithm": "deterministic_branch_and_bound",
+    "assignments_explored": 2,
+    "assignments_pruned": 0,
+    "feasible_team_count": 1,
+    "max_candidates_per_role": 16,
+    "max_combinations_limit": 100000,
+    "max_roles": 4,
+    "optimality_status": "EXACT_OPTIMUM",
+    "search_space_size": 2,
+    "termination_reason": "exhaustive bounded search complete"
+  },
+  "selection_explanation": {
+    "narrative": [
+      "workflow gs_security: composition COMPLETE, EXACT_OPTIMUM; 4 role(s) assigned, team score 34726bp"
+    ],
+    "role_explanations": [
+      {
+        "candidate_states": [
+          [
+            "agent_security_evidence@1.2.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7739bp"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "SELECTED_FALLBACK",
+            "pre-approved fallback; rank #2"
+          ],
+          [
+            "agent_incident_correlation@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_low_clearance@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY, SECURITY_CLASSIFICATION_INSUFFICIENT"
+          ],
+          [
+            "agent_security_recommendation@1.1.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@2.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sec_evidence_collection",
+        "selected_primary": "agent_security_evidence@1.2.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      },
+      {
+        "candidate_states": [
+          [
+            "agent_incident_correlation@1.0.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7639bp"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_low_clearance@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: SECURITY_CLASSIFICATION_INSUFFICIENT"
+          ],
+          [
+            "agent_security_evidence@1.2.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_security_recommendation@1.1.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@2.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sec_incident_correlation",
+        "selected_primary": "agent_incident_correlation@1.0.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      },
+      {
+        "candidate_states": [
+          [
+            "agent_security_recommendation@1.1.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7654bp"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_incident_correlation@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_low_clearance@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY, SECURITY_CLASSIFICATION_INSUFFICIENT"
+          ],
+          [
+            "agent_security_evidence@1.2.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@2.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sec_recommendation",
+        "selected_primary": "agent_security_recommendation@1.1.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      },
+      {
+        "candidate_states": [
+          [
+            "agent_threat_analysis@2.0.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7694bp"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_incident_correlation@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_low_clearance@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: SECURITY_CLASSIFICATION_INSUFFICIENT"
+          ],
+          [
+            "agent_security_evidence@1.2.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_security_recommendation@1.1.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sec_threat_analysis",
+        "selected_primary": "agent_threat_analysis@2.0.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      }
+    ],
+    "workflow_identity": "gs_security"
+  },
+  "team_constraint_results": [
+    {
+      "constraint": "max_roles_per_agent",
+      "detail": "",
+      "limit_value": "2",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "provider_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/4",
+      "satisfied": true
+    },
+    {
+      "constraint": "failure_domain_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/4",
+      "satisfied": true
+    },
+    {
+      "constraint": "authority_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "1/4",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_provider_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "2",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_deployment_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_cost_ceiling",
+      "detail": "",
+      "limit_value": "50.0",
+      "measured_value": "13.0",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_latency_ceiling",
+      "detail": "",
+      "limit_value": "10000.0",
+      "measured_value": "1050.0",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_reliability_floor",
+      "detail": "",
+      "limit_value": "0.9",
+      "measured_value": "0.99",
+      "satisfied": true
+    },
+    {
+      "constraint": "interface_compatibility",
+      "detail": "",
+      "limit_value": "",
+      "measured_value": "",
+      "satisfied": true
+    }
+  ],
+  "team_objective_results": [
+    {
+      "evidence_refs": [],
+      "explanation": "sum of primary ranking scores",
+      "normalized_value": 30726,
+      "objective": "aggregate_ranking_quality",
+      "raw_value": "30726",
+      "weight": 8000,
+      "weighted_contribution": 30726
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct providers",
+      "normalized_value": 2,
+      "objective": "provider_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct provider failure domains",
+      "normalized_value": 2,
+      "objective": "failure_domain_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    }
+  ],
+  "total_team_score": 34726,
+  "unfilled_roles": [],
+  "workflow_fingerprint": "sha256:9ed3cd67cb3268c6f3346f5d881d747ba6ba729ae7350267ee265bca0c450fc0",
+  "workflow_identity": "gs_security"
+}

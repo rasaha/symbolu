@@ -1,0 +1,20 @@
+{
+  "logical_time": 1000000.0,
+  "scenarios": [
+    {"id": "procurement", "domain": "procurement", "expected_plan_state": "COMPLETE",
+     "workflow_contract_version": "workflow_ir.v1", "v2_conformance": "SEMANTICALLY_EQUIVALENT"},
+    {"id": "customer_support", "domain": "customer_support", "expected_plan_state": "COMPLETE",
+     "workflow_contract_version": "workflow_ir.v1", "v2_conformance": "SEMANTICALLY_EQUIVALENT"},
+    {"id": "cybersecurity_success", "domain": "cybersecurity", "expected_plan_state": "COMPLETE",
+     "workflow_contract_version": "workflow_ir.v1", "v2_conformance": "SEMANTICALLY_EQUIVALENT"},
+    {"id": "cybersecurity_no_feasible_team", "domain": "cybersecurity", "expected_plan_state": "NO_FEASIBLE_TEAM",
+     "workflow_contract_version": "workflow_ir.v1", "v2_conformance": "SEMANTICALLY_EQUIVALENT"}
+  ],
+  "v1_scenarios": 4,
+  "v2_conformance_scenarios": 4,
+  "sources": {
+    "v1_inputs": "apps/ugence-governance-studio/demo_data (bundled read-only)",
+    "expected_outputs": "apps/ugence-governance-studio/expected_outputs (bundled read-only)",
+    "v2_conformance": "packages/capabilities/agent-workforce-composer/conformance/governance_studio_v2 (bundled read-only)"
+  }
+}

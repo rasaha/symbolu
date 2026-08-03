@@ -1,0 +1,35 @@
+{
+  "sup_draft": {
+    "required_capabilities": [
+      "response_drafting"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  },
+  "sup_retrieval": {
+    "required_capabilities": [
+      "knowledge_retrieval"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  },
+  "sup_triage": {
+    "required_capabilities": [
+      "support_triage"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ]
+  }
+}

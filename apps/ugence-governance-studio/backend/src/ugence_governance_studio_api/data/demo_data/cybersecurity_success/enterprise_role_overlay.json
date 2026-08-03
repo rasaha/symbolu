@@ -1,0 +1,54 @@
+{
+  "sec_evidence_collection": {
+    "required_capabilities": [
+      "security_evidence_collection"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "required_security_classification": 4,
+    "role_name": "security evidence collection"
+  },
+  "sec_incident_correlation": {
+    "required_capabilities": [
+      "incident_correlation"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "required_security_classification": 4,
+    "role_name": "incident correlation"
+  },
+  "sec_recommendation": {
+    "required_capabilities": [
+      "security_recommendation"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "required_security_classification": 4,
+    "role_name": "security recommendation"
+  },
+  "sec_threat_analysis": {
+    "required_capabilities": [
+      "threat_analysis"
+    ],
+    "required_evidence_classes": [
+      "MEASURED"
+    ],
+    "required_permissions": [
+      "read_context"
+    ],
+    "required_security_classification": 4,
+    "role_name": "threat analysis"
+  }
+}

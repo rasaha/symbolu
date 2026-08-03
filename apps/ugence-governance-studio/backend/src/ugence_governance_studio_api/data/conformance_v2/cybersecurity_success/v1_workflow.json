@@ -1,0 +1,205 @@
+{
+  "manifest": {
+    "policy_pack_id": "gs_security",
+    "policy_pack_version": 1,
+    "structural_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5"
+  },
+  "release_metadata": {
+    "synthetic": true
+  },
+  "structural_digest": "sha256:9f1a5a11f249e56d54620d50ae68e3a2323f6e1e2c53a50cbc2321ad8e909ac5",
+  "workflow_ir": {
+    "edges": [
+      {
+        "edge_id": "edge_0",
+        "kind": "NEXT",
+        "order": 0,
+        "source_id": "sec_evidence_collection",
+        "target_id": "sec_threat_analysis"
+      },
+      {
+        "edge_id": "edge_1",
+        "kind": "NEXT",
+        "order": 1,
+        "source_id": "sec_threat_analysis",
+        "target_id": "sec_incident_correlation"
+      },
+      {
+        "edge_id": "edge_2",
+        "kind": "NEXT",
+        "order": 2,
+        "source_id": "sec_incident_correlation",
+        "target_id": "sec_recommendation"
+      },
+      {
+        "edge_id": "edge_3",
+        "kind": "NEXT",
+        "order": 3,
+        "source_id": "sec_recommendation",
+        "target_id": "sec_sequence_risk"
+      },
+      {
+        "edge_id": "edge_4",
+        "kind": "NEXT",
+        "order": 4,
+        "source_id": "sec_sequence_risk",
+        "target_id": "sec_human_escalation"
+      },
+      {
+        "edge_id": "edge_5",
+        "kind": "NEXT",
+        "order": 5,
+        "source_id": "sec_human_escalation",
+        "target_id": "sec_action_boundary"
+      },
+      {
+        "edge_id": "edge_6",
+        "kind": "NEXT",
+        "order": 6,
+        "source_id": "sec_action_boundary",
+        "target_id": "sec_audit"
+      },
+      {
+        "edge_id": "edge_7",
+        "kind": "NEXT",
+        "order": 7,
+        "source_id": "sec_audit",
+        "target_id": "sec_terminal"
+      }
+    ],
+    "ir_version": "workflow_ir.v1",
+    "nodes": [
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "security evidence collection",
+        "node_id": "sec_evidence_collection",
+        "output_contract": "incident_evidence",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "incident_evidence"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "threat analysis",
+        "node_id": "sec_threat_analysis",
+        "output_contract": "threat_assessment",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "threat_assessment"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "incident correlation",
+        "node_id": "sec_incident_correlation",
+        "output_contract": "correlated_incident",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "correlated_incident"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "security recommendation",
+        "node_id": "sec_recommendation",
+        "output_contract": "security_recommendation",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "SEQUENCE_RISK_CHECK",
+        "label": "sequence-risk advisory input",
+        "node_id": "sec_sequence_risk",
+        "output_contract": "sequence_risk_signal",
+        "owning_capability": "STORYGRAPH",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "HUMAN_APPROVER",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "OVERRIDE_GATE",
+        "label": "human escalation",
+        "node_id": "sec_human_escalation",
+        "output_contract": "",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "ACTION_CONSTRAINT",
+        "label": "action authorization boundary",
+        "node_id": "sec_action_boundary",
+        "output_contract": "",
+        "owning_capability": "ACTION_GATE",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "AUDIT_EMISSION",
+        "label": "audit emission",
+        "node_id": "sec_audit",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "TERMINAL_OUTCOME",
+        "label": "terminal outcome",
+        "node_id": "sec_terminal",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      }
+    ],
+    "policy_pack_id": "gs_security",
+    "policy_pack_version": 1,
+    "referenced_capabilities": [
+      "ACTION_GATE",
+      "COMPILER",
+      "DECISION_AUTHORITY",
+      "STORYGRAPH"
+    ]
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "awc_version": "0.2.1",
+  "logical_time": 1000000.0,
+  "scenarios": {
+    "customer_support": {
+      "adaptation_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "plan_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "removed_overlay_fields": {
+        "sup_draft": [
+          "role_name"
+        ],
+        "sup_retrieval": [
+          "role_name"
+        ],
+        "sup_triage": [
+          "role_name"
+        ]
+      },
+      "retained_overlay_fields": [
+        "required_capabilities",
+        "required_evidence_classes",
+        "required_permissions"
+      ],
+      "semantic_equivalence_fingerprint": "sha256:90e78719939baf4e4b5aaff9a186caab5c6831de359851b654c23b15d0403276",
+      "v1_adaptation_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e",
+      "v1_input_digests": {
+        "composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
+        "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+        "enterprise_policy.json": "426bd391d6d5fc21bfe1b1aa8971e72d529620565c485687c167f5a071831e89",
+        "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+        "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+        "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb",
+        "registry.json": "7fb071b01a73abfe1c844eeeede3cc735ad3ef84fc1a762bd024c7e4ca95e82b",
+        "v1_overlay.json": "313e765ca5211ef4ff1a9159a099f14d5eb0dae4e3eb42805e425f3a3e0a9a9c",
+        "v1_workflow.json": "5db92121a1d916ec4c2d90a7772b8185de69f2f3772048c7b2d36f812a003ba2",
+        "v2_overlay.json": "9380a7b6b77af2f86fa71de4936f5c7f15c47a428c6bca76a625ddbd7ee6ad7d",
+        "v2_workflow.json": "b248a4c94d759bab4f94aa907aa5c99488252ec930fd3080e0e8dfe59c684bfc"
+      },
+      "v1_plan_fingerprint": "sha256:16ca0146d69f1dc9862496cf6b935dfbb469e51132c03f90fc748d1794e68ae8",
+      "v1_plan_state": "COMPLETE",
+      "v2_adaptation_fingerprint": "sha256:81da7fdf1893289d167ab442270f94c6514ffab243c4cf7dcf4ad1025d8f4051",
+      "v2_plan_fingerprint": "sha256:62e57a6630430b6603835b79f5d2116316ecd22bf25c62d2cc52df0eec2f9ea8",
+      "v2_plan_state": "COMPLETE"
+    },
+    "cybersecurity_no_feasible_team": {
+      "adaptation_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "plan_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "removed_overlay_fields": {
+        "sec_incident_correlation": [
+          "role_name"
+        ],
+        "sec_threat_analysis": [
+          "role_name"
+        ]
+      },
+      "retained_overlay_fields": [
+        "required_capabilities",
+        "required_evidence_classes",
+        "required_permissions",
+        "required_security_classification"
+      ],
+      "semantic_equivalence_fingerprint": "sha256:587f6b14d759f21927acf5487fd9537bc6f3c2f30412ce4fe36300ee1fa3d43b",
+      "v1_adaptation_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a",
+      "v1_input_digests": {
+        "composition_policy.json": "d0c1069516a6a099ac589dbcea5bf5378603d9d0fc8e2d21fec175212f99097e",
+        "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+        "enterprise_policy.json": "b0eda6d06ed5ad8d91c2dd86c7383ee98c706d7af3587953533bcb81cb1df43e",
+        "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+        "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+        "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb",
+        "registry.json": "5818788b525eb0ab5242acd0abde878e65ce205b9f808f4785b2cbcba1991112",
+        "v1_overlay.json": "066dedb09b91fae1cca4f0f798d6d79bb12f5017253861a6196393b858fbe734",
+        "v1_workflow.json": "82c0a7cde7b33f6a5fa2bfbe3fc641f1dfc3985503cea98f1c4628366383a85c",
+        "v2_overlay.json": "e491993377e37a8e8f1ddb9f2b983673e79f35bf766dc439f16fde602e25a323",
+        "v2_workflow.json": "ffd49ee2045dade79ed3f162b2b24bc0709be8c99a6d099d7668f03c29dfc19a"
+      },
+      "v1_plan_fingerprint": "sha256:e4d7ebd1f69b20e94d12162d7db5b881a2fc8c050db9fd14c158478aaefb147b",
+      "v1_plan_state": "NO_FEASIBLE_TEAM",
+      "v2_adaptation_fingerprint": "sha256:807ccdd4295326d29b52c57fa6e05c6f6295f8d4c0dd74409e294bd670eb3663",
+      "v2_plan_fingerprint": "sha256:e8b69e8fbf7008beab035b652150b6963f61e866b95060598333b5119444889b",
+      "v2_plan_state": "NO_FEASIBLE_TEAM"
+    },
+    "cybersecurity_success": {
+      "adaptation_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "plan_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "removed_overlay_fields": {
+        "sec_evidence_collection": [
+          "role_name"
+        ],
+        "sec_incident_correlation": [
+          "role_name"
+        ],
+        "sec_recommendation": [
+          "role_name"
+        ],
+        "sec_threat_analysis": [
+          "role_name"
+        ]
+      },
+      "retained_overlay_fields": [
+        "required_capabilities",
+        "required_evidence_classes",
+        "required_permissions",
+        "required_security_classification"
+      ],
+      "semantic_equivalence_fingerprint": "sha256:213e62861a1d57f52be81dc1430271f6ba8944b739f54c93954529194088d25b",
+      "v1_adaptation_fingerprint": "sha256:9ed3cd67cb3268c6f3346f5d881d747ba6ba729ae7350267ee265bca0c450fc0",
+      "v1_input_digests": {
+        "composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
+        "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+        "enterprise_policy.json": "93d9770bcf3264f56ea9da557519a7e17de5a2a29074c5b8aeefd999f642a92f",
+        "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+        "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+        "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb",
+        "registry.json": "28ee3fec41ce4114d869f4abf6944148f622b3cd103840016719fd56c527073a",
+        "v1_overlay.json": "e956f8a69c5ac45e9982e20abb31cd158009177e3a72950bde75aa4e0c2a1394",
+        "v1_workflow.json": "7b91af0d7c573cd3aa54e6fb67fd5a09442abbb08e70901c66e88f27b22031b7",
+        "v2_overlay.json": "c994e109f4ef6c6dd369ce33e8591f41cd7da265e2642d5db18da788cb99a0a4",
+        "v2_workflow.json": "b481c4965512b499f4a14352f963a53c8ae7c2c73b5500a078bfec9c48f4a643"
+      },
+      "v1_plan_fingerprint": "sha256:9be9cf67e0a07b2cda0eae33a2a507740d549a7cb7422e43292f7d997944be98",
+      "v1_plan_state": "COMPLETE",
+      "v2_adaptation_fingerprint": "sha256:4937f24808f28558999ac7e1ae7b7b4f83953e27ce9bbacfc92c756e3f43bfe0",
+      "v2_plan_fingerprint": "sha256:70fa19b75cbfae301238cfa1a87d4daf999a0e54bf3160fe0c90a0734dc1ac64",
+      "v2_plan_state": "COMPLETE"
+    },
+    "procurement": {
+      "adaptation_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "plan_equivalence": "SEMANTICALLY_EQUIVALENT",
+      "removed_overlay_fields": {
+        "proc_recommendation": [
+          "role_name"
+        ],
+        "proc_supplier_evidence": [
+          "role_name"
+        ],
+        "proc_supplier_risk": [
+          "role_name"
+        ]
+      },
+      "retained_overlay_fields": [
+        "data_classification",
+        "required_capabilities",
+        "required_evidence_classes",
+        "required_permissions"
+      ],
+      "semantic_equivalence_fingerprint": "sha256:2ef31dc0ba58eb9db1762f89d405c88c48a051bb8e5e1ac0434011a673e6e5d0",
+      "v1_adaptation_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a",
+      "v1_input_digests": {
+        "composition_policy.json": "1fbada6d8c843f034d9695e11a5f73a8e8062bdae29bccfd636b28bc57eee348",
+        "eligibility_policy.json": "cfdeb5506554786a84cc97db8ef6ad2f6f42fa1b55ee10702ad8edfe5d232665",
+        "enterprise_policy.json": "991782f49cbd359c5acac0553adebffea54d2f210b0b64f02e9a72e889a80bdc",
+        "fallback_policy.json": "72de9e3c8613e95ed92996540b545e0bb54d06ffbe2158c13f62e5053187468c",
+        "permission_policy.json": "16fe30346cc883f6fc13719b4413883062113ef5e095d190d2791f1f75a51943",
+        "ranking_policy.json": "4c3736a83422e5c8dfee4b30cf7705773ebfc3089f9943926f4f44bc6d9ac8cb",
+        "registry.json": "d4729e33c6e4cf5e6c6de273c935aa9e10a3cbdaac38fa0efb762096645c8676",
+        "v1_overlay.json": "9348ec250714676bf15ae791ba84cc3f8bed567e34bfbc3c8fc0ee1ae22593d6",
+        "v1_workflow.json": "07a010387450da9323d9612edb84527aa03519da8ea64a2f6bcbc2724bd1d86d",
+        "v2_overlay.json": "6aa07f919d5c929937bae6bca75ef2232f51d627e89f9b9e875bd2a82a0476fa",
+        "v2_workflow.json": "293871efeb7db0c832d93ca0e7f0b32b52bf9530a960af9739375f2280659688"
+      },
+      "v1_plan_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "v1_plan_state": "COMPLETE",
+      "v2_adaptation_fingerprint": "sha256:ae122481859df0797d6cbde0ff2e4d0d41573f64f64a43e829116fb3c962317f",
+      "v2_plan_fingerprint": "sha256:cbbd649664a73e0bce75e425aca8d4d7311ce72b05b48b8d17deea7d336c2071",
+      "v2_plan_state": "COMPLETE"
+    }
+  },
+  "schema": "awc.compiler_v2_conformance.v1"
+}

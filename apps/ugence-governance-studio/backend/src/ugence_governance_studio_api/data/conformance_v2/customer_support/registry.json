@@ -1,0 +1,950 @@
+{
+  "agent_profiles": [
+    {
+      "agent_id": "agent_general_analyst",
+      "agent_type": "analysis",
+      "agent_version": "1.0.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 2.5,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "knowledge_retrieval",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "evidence_extraction",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 850.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "openai",
+      "quality_evidence": 0.85,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 3,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    },
+    {
+      "agent_id": "agent_knowledge_retrieval",
+      "agent_type": "analysis",
+      "agent_version": "1.0.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 1.8,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "knowledge_retrieval",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "evidence_extraction",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 650.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "openai",
+      "quality_evidence": 0.92,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 3,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    },
+    {
+      "agent_id": "agent_multilingual_support",
+      "agent_type": "analysis",
+      "agent_version": "1.0.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 2.2,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "support_triage",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "response_drafting",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "knowledge_retrieval",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "evidence_extraction",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 900.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "openai",
+      "quality_evidence": 0.88,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 3,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    },
+    {
+      "agent_id": "agent_response_drafting",
+      "agent_type": "analysis",
+      "agent_version": "2.0.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 2.0,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "response_drafting",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "evidence_extraction",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 700.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "anthropic",
+      "quality_evidence": 0.93,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 3,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    },
+    {
+      "agent_id": "agent_support_triage",
+      "agent_type": "analysis",
+      "agent_version": "1.1.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 1.5,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "support_triage",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        },
+        {
+          "capability_id": "evidence_extraction",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 600.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "anthropic",
+      "quality_evidence": 0.94,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 3,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    },
+    {
+      "agent_id": "agent_threat_analysis",
+      "agent_type": "analysis",
+      "agent_version": "1.0.0",
+      "audit_capabilities": [
+        "trace",
+        "replay"
+      ],
+      "benchmark_refs": [],
+      "concurrency_constraints": 0,
+      "contract_version": "awc.v1",
+      "cost_evidence": 4.0,
+      "data_access_requirements": [],
+      "declared_capabilities": [
+        {
+          "capability_id": "threat_analysis",
+          "capability_version": "",
+          "category": "",
+          "declared": true,
+          "description": ""
+        }
+      ],
+      "deployment_environment": "cloud",
+      "evidence_refs": [],
+      "failure_mode_refs": [],
+      "input_contracts": [
+        "validated_request",
+        "supplier_evidence",
+        "supplier_risk_report",
+        "ticket_class",
+        "retrieved_context",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident"
+      ],
+      "latency_evidence": 1200.0,
+      "maximum_authority_scope": 1,
+      "measured_capabilities": [],
+      "model_requirement_refs": [],
+      "observed_capabilities": [],
+      "output_contracts": [
+        "supplier_evidence",
+        "supplier_risk_report",
+        "recommendation_draft",
+        "ticket_class",
+        "retrieved_context",
+        "draft_response",
+        "incident_evidence",
+        "threat_assessment",
+        "correlated_incident",
+        "security_recommendation"
+      ],
+      "policy_refs": [],
+      "profile_fingerprint": "",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "provider_id": "anthropic",
+      "quality_evidence": 0.97,
+      "reliability_evidence": 0.99,
+      "requested_permissions": [
+        "read_context"
+      ],
+      "residency": "US",
+      "security_classification": 4,
+      "state_model": "stateless",
+      "status": "ACTIVE",
+      "supported_data_classifications": [
+        "public",
+        "confidential",
+        "restricted"
+      ],
+      "supported_domains": [
+        "procurement",
+        "support",
+        "security"
+      ],
+      "supported_tools": [
+        "web_search"
+      ],
+      "valid_from": 0.0,
+      "valid_until": null
+    }
+  ],
+  "capability_evidence": [
+    {
+      "agent_id": "agent_general_analyst",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_evidence_extraction",
+      "benchmark_version": "1.0",
+      "capability_id": "evidence_extraction",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_general_analyst",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_knowledge_retrieval",
+      "benchmark_version": "1.0",
+      "capability_id": "knowledge_retrieval",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.82
+    },
+    {
+      "agent_id": "agent_knowledge_retrieval",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_evidence_extraction",
+      "benchmark_version": "1.0",
+      "capability_id": "evidence_extraction",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_knowledge_retrieval",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_knowledge_retrieval",
+      "benchmark_version": "1.0",
+      "capability_id": "knowledge_retrieval",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.93
+    },
+    {
+      "agent_id": "agent_multilingual_support",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_evidence_extraction",
+      "benchmark_version": "1.0",
+      "capability_id": "evidence_extraction",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_multilingual_support",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_knowledge_retrieval",
+      "benchmark_version": "1.0",
+      "capability_id": "knowledge_retrieval",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.84
+    },
+    {
+      "agent_id": "agent_multilingual_support",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_response_drafting",
+      "benchmark_version": "1.0",
+      "capability_id": "response_drafting",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.85
+    },
+    {
+      "agent_id": "agent_multilingual_support",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_support_triage",
+      "benchmark_version": "1.0",
+      "capability_id": "support_triage",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.86
+    },
+    {
+      "agent_id": "agent_response_drafting",
+      "agent_version": "2.0.0",
+      "benchmark_id": "bench_evidence_extraction",
+      "benchmark_version": "1.0",
+      "capability_id": "evidence_extraction",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_response_drafting",
+      "agent_version": "2.0.0",
+      "benchmark_id": "bench_response_drafting",
+      "benchmark_version": "1.0",
+      "capability_id": "response_drafting",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.94
+    },
+    {
+      "agent_id": "agent_support_triage",
+      "agent_version": "1.1.0",
+      "benchmark_id": "bench_evidence_extraction",
+      "benchmark_version": "1.0",
+      "capability_id": "evidence_extraction",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_support_triage",
+      "agent_version": "1.1.0",
+      "benchmark_id": "bench_support_triage",
+      "benchmark_version": "1.0",
+      "capability_id": "support_triage",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_support_triage::1.1.0::support_triage::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.95
+    },
+    {
+      "agent_id": "agent_threat_analysis",
+      "agent_version": "1.0.0",
+      "benchmark_id": "bench_threat_analysis",
+      "benchmark_version": "1.0",
+      "capability_id": "threat_analysis",
+      "contract_version": "awc.v1",
+      "dataset_ref": "",
+      "environment_ref": "",
+      "evidence_class": "MEASURED",
+      "evidence_fingerprint": "",
+      "evidence_id": "ev::agent_threat_analysis::1.0.0::threat_analysis::MEASURED",
+      "issuer": "synthetic_benchmark",
+      "measured_at": 900000.0,
+      "measurement_type": "benchmark_score",
+      "provenance": {
+        "notes": "",
+        "source_kind": "synthetic_fixture",
+        "source_ref": "ugence_governance_studio.demo_data",
+        "synthetic": true
+      },
+      "sample_size": 500,
+      "signature_or_digest": "",
+      "threshold_context": "",
+      "unit": "score",
+      "valid_until": 2000000.0,
+      "value": 0.98
+    }
+  ],
+  "contract_version": "awc.v1",
+  "logical_time": 1000000.0,
+  "policy_refs": [],
+  "provenance": {
+    "notes": "",
+    "source_kind": "synthetic_fixture",
+    "source_ref": "ugence_governance_studio.demo_data",
+    "synthetic": true
+  },
+  "registry_version": "governance_studio_demo.v1",
+  "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+  "snapshot_id": "gs_support_registry",
+  "source_refs": [
+    "synthetic_demo"
+  ]
+}

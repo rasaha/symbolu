@@ -1,0 +1,82 @@
+# Independent distribution for the Ugence Governance Studio API (P3B).
+#
+# The Governance Studio API is a deterministic, OFFLINE demonstration API over the
+# merged Agent Workforce Composer v1/v2 compatibility surface. It is a THIN
+# orchestration + serialization layer: it exposes scenario discovery, workflow
+# adaptation, eligibility, ranking, team composition, permission-bound proposals,
+# fallback planning, AgentTeamPlan replay, plan comparison and controlled what-if
+# analysis, and it delegates ALL planning logic to the public
+# ``ugence-agent-workforce-composer`` package.
+#
+# It implements NO independent business logic for adaptation, eligibility,
+# ranking, composition, permission bounding, fallback selection, plan replay or
+# plan comparison. It ships NO frontend, NO authentication, NO database, NO
+# deployment, NO agent execution and NO runtime handoff.
+#
+# Dependency policy: the ONLY domain dependency is the public AWC package. The web
+# framework (FastAPI / Starlette / Uvicorn / pydantic) is a presentation-layer
+# dependency. AWC and the Policy Workflow Compiler source are NEVER bundled into
+# this distribution.
+#
+# Build:  python -m build apps/ugence-governance-studio/backend
+# Verify: python apps/ugence-governance-studio/backend/scripts/verify_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-governance-studio-api"
+dynamic = ["version"]
+description = "Ugence Governance Studio API — deterministic, offline demo API over the merged Agent Workforce Composer v1/v2 planning surface. Thin orchestration only; no frontend, authentication, deployment, agent execution or permission granting. Not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["agent", "workforce", "governance", "api", "planning", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Domain boundary: the public AWC package. Presentation: FastAPI + Uvicorn.
+# No model SDK, no database driver, no cloud/ERP SDK, no runtime package.
+dependencies = [
+    "ugence-agent-workforce-composer>=0.2.1",
+    "pydantic>=2",
+    "fastapi>=0.110",
+    "starlette>=0.36",
+    "uvicorn>=0.27",
+]
+
+[project.optional-dependencies]
+# Test client + build tooling. httpx backs Starlette's TestClient.
+test = ["pytest>=7", "httpx>=0.27"]
+serve = ["uvicorn[standard]>=0.27"]
+
+[project.scripts]
+ugence-governance-studio-api = "ugence_governance_studio_api.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_governance_studio_api.version.VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ugence_governance_studio_api = [
+    "py.typed",
+    "data/demo_data/*/*.json",
+    "data/expected_outputs/MANIFEST.json",
+    "data/expected_outputs/*/*.json",
+    "data/conformance_v2/EQUIVALENCE_MANIFEST.json",
+    "data/conformance_v2/*/*.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
