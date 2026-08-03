@@ -1,0 +1,233 @@
+{
+  "schema": "hybrid_llm_implementation_inventory/v1",
+  "audit_date": "2026-08-03",
+  "repo": "rasaha/symbolu",
+  "head_commit": "69b3bb946e1d540f4e22380b48b9d7a8b463af20",
+  "notes": [
+    "symbolu/phase_transformer.py and symbolu_core/phase_transformer.py are byte-identical except import paths; line citations valid for both.",
+    "git history is a squashed bulk import (all model files added 2026-07-30/31), so 'latest' is reconstructed from in-document version tags and arm ladders, not commit dates.",
+    "Categories: MODEL_ARCHITECTURE, ATTENTION_OR_SEQUENCE_MIXER, MEMORY_SUBSYSTEM, TRAINING_OBJECTIVE, TRAINING_HARNESS, INFERENCE_RUNTIME, MODEL_ROUTER, FRONTIER_HANDOVER, GOVERNANCE_COMPONENT, BENCHMARK_ONLY, DOCUMENTATION_ONLY, LEGACY_OR_SUPERSEDED."
+  ],
+  "components": [
+    {
+      "name": "PhaseAttentionLayer",
+      "aliases": ["Phase core", "Learned Phase-Amplitude Attention", "O(N) Complex Linear Attention", "V2 Euler"],
+      "path": "symbolu/phase_transformer.py:1905-2771",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "complex-valued diagonal linear recurrence (Mamba/RWKV/RetNet class); no softmax",
+      "recurrence": "S_t = cumsum_t(k_t v_t^T) or parallel_ema_scan(kv, gamma); out_t = Re(q_t . S_t)/clamp(a_q * cumsum(a_k), 0.1); k=a_k e^{-i phi_k}, q=a_q e^{+i phi_q}, phi=pi*sin(phi_raw)",
+      "state_shape": "[B,1,H,D_h] complex + [B,1,H,D_h] real normalizer -- BOUNDED, constant in N",
+      "materializes_NxN": false,
+      "decode": "true O(1) recurrent in isolation (forward_chunk / PhaseStateCache)",
+      "train_complexity": "O(N*H*D_h)",
+      "decode_complexity": "O(H*D_h)/token",
+      "checkpoints": "NONE committed",
+      "maturity": "IMPLEMENTED; validated <=2.4e-7 vs lightweight ref; no trained-LM checkpoints",
+      "evidence": "micro-scale PPL/fluency gain (2M params, 3 seeds); NO retrieval; decorative in hybrids",
+      "phase_directive_disposition": "RESEARCH_ONLY / EXCLUDED_FROM_PACKAGING"
+    },
+    {
+      "name": "LightweightPhaseAttention",
+      "aliases": ["canonical research reference"],
+      "path": "symbolu/lightweight_phase/phase_core.py",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "faithful O(N) complex recurrence with explicit bounded PhaseState and register_shape audit guards",
+      "materializes_NxN": false,
+      "decode": "true O(1) streaming state",
+      "maturity": "FROZEN v1.0; 98 tests; equivalence oracle for production Phase",
+      "phase_directive_disposition": "RESEARCH_ONLY / LEGACY_BENCHMARK"
+    },
+    {
+      "name": "BindingCachePhaseState",
+      "aliases": ["Protected-Phase write side", "binding memory writer"],
+      "path": "symbolu/phase_transformer.py:3197-3504",
+      "category": "MEMORY_SUBSYSTEM",
+      "family": "key-side-only complex linear recurrence (accumulate KV into state)",
+      "materializes_NxN": false,
+      "maturity": "IMPLEMENTED; docstring ablation percentages (-50%/~0%) are editorial, not code-derivable",
+      "phase_directive_disposition": "RESEARCH_ONLY / EXCLUDED_FROM_PACKAGING"
+    },
+    {
+      "name": "BindingCacheQuadQuery",
+      "aliases": ["Phase+Quad reader", "quadratic reader", "O(nk) Top-K cache (advertised)"],
+      "path": "symbolu/phase_transformer.py:3507-3775",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "QUADRATIC softmax attention (Q from tokens, K/V from Phase memory) with optional Top-K",
+      "materializes_NxN": true,
+      "nxn_evidence": "line 3686 scores=matmul(Q,K^T) [B,H,N,N]; line 3690-3694 triu(ones(N,N)) mask; line 3712-3713 topk OVER the materialized matrix; line 3731 V_expanded [B,H,N,N,D_h]. Top-K only narrows softmax width, NOT score construction.",
+      "actual_complexity": "O(N^2) time + O(N^2*D_h) memory (docstring 'O(nk)'/'reduces O(n^2) to O(nk)' at 3511/3699/4121 is FALSE as implemented)",
+      "maturity": "IMPLEMENTED; REJECTED by phase_lc A/B/C ladder (violates no-quadratic rule); replaced by BindingSlots",
+      "phase_directive_disposition": "RESEARCH_ONLY / EXCLUDED_FROM_PACKAGING"
+    },
+    {
+      "name": "LocalWindowAttention (production)",
+      "aliases": ["sliding window", "local"],
+      "path": "symbolu/phase_transformer.py:3778-3862",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "windowed causal softmax",
+      "materializes_NxN": true,
+      "nxn_evidence": "line 3838 scores=matmul(Q,K^T) [B,H,N,N] + full N×N windowed mask 3842-3852; contradicts its 'O(n*w)' docstring at 3874",
+      "maturity": "IMPLEMENTED (mislabeled complexity)"
+    },
+    {
+      "name": "LocalAttention (7B local layers)",
+      "aliases": ["local"],
+      "path": "symbolu/phase_transformer.py:5162+",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "windowed attention, 3 backends",
+      "materializes_NxN": "conditional",
+      "nxn_evidence": "flash backend O(n*w) (5248-5253); sdpa/unfold build N×N mask, admitted 'still O(n^2) in mask creation' at 5266",
+      "maturity": "IMPLEMENTED"
+    },
+    {
+      "name": "BindingCacheBlock / BindingCacheTransformer",
+      "aliases": ["protected serial composition"],
+      "path": "symbolu/phase_transformer.py:3865-4113 / 4116-4464",
+      "category": "MODEL_ARCHITECTURE",
+      "family": "per-block additive: local_out (N×N) + memory_state (O(N)) + mem_out (N×N)",
+      "materializes_NxN": true,
+      "decode": "NO KV/state cache; full-prefix replay (forward always runs full [B,N])",
+      "actual_complexity": "O(N^2 * layers); no bounded state",
+      "maturity": "IMPLEMENTED; no committed checkpoints"
+    },
+    {
+      "name": "OntologicalBindingCacheTransformer",
+      "aliases": ["ontological hybrid"],
+      "path": "symbolu/phase_transformer.py:4481",
+      "category": "MODEL_ARCHITECTURE",
+      "family": "BindingCacheTransformer + 32D Sovereign State (Bhava/Kosha/Vritti/Guna)",
+      "maturity": "IMPLEMENTED (static audit only, no retraining run)"
+    },
+    {
+      "name": "HybridAttentionLayer / HybridTransformerBlock / HybridPhaseTransformer",
+      "aliases": ["Hybrid LLM", "hybrid model_type", "flagship"],
+      "path": "symbolu/phase_transformer.py:5892 / 6238 / 6688-7824",
+      "category": "MODEL_ARCHITECTURE",
+      "family": "Protected-Phase serial: x -> Phase -> Local(queries phase out); optional GCT/SlotMemory bolt-on",
+      "materializes_NxN": "conditional (local path)",
+      "decode": "FULL-PREFIX REPLAY when local_layers>0 (default). O(1) recurrent path only for local_layers==0, which NO shipped config uses.",
+      "decode_evidence": "forward_with_cache line 7746-7752: if local_layers>0 -> cache.append_tokens + self.forward(full_input_ids). Config default local_layers=4; 7B uses local_layers=16.",
+      "actual_decode_complexity": "O(prefix_len)/token => O(N^2) to generate N tokens (O(N^3) with sdpa/unfold local backend)",
+      "checkpoints": "NONE committed",
+      "maturity": "IMPLEMENTED; trained via train_unified_llm_clean.py; no committed checkpoints",
+      "phase_directive_disposition": "RESEARCH_ONLY / EXCLUDED_FROM_PACKAGING"
+    },
+    {
+      "name": "SlotMemoryGCT",
+      "aliases": ["slot memory (production)"],
+      "path": "symbolu/phase_transformer.py:8458-10088",
+      "category": "MEMORY_SUBSYSTEM",
+      "family": "bounded content-addressable KV slot memory, competitive EMA write, top-k hard routing (STE), semantic coherence gate",
+      "state_shape": "slot_keys [B,K,D] + slot_vals [B,K,D], K fixed (default 64) -- BOUNDED",
+      "materializes_NxN": false,
+      "supports_overwrite": "soft EMA only",
+      "supports_deletion": false,
+      "supports_supersession": false,
+      "supports_source_identity": false,
+      "maturity": "IMPLEMENTED; training-time module (slots re-init per forward; no decode persistence wired)",
+      "slot_directive_disposition": "independent audit; current evidence supports only fragile single-fact recall"
+    },
+    {
+      "name": "BoundedBindingSlots (clean)",
+      "aliases": ["bounded slots", "auditable slots"],
+      "path": "symbolu/lightweight_phase/binding_slots.py:63-205 ; experiments/phase_lc/models.py:200",
+      "category": "MEMORY_SUBSYSTEM",
+      "family": "bounded content-addressed slots with full metadata",
+      "state_shape": "keys,values,source[B,M],version[B,M],usage[B,M],active[B,M] -- BOUNDED O(M*D)",
+      "materializes_NxN": false,
+      "supports_overwrite": true,
+      "supports_deletion": "hard LRU eviction",
+      "supports_supersession": "version++ on collision-match",
+      "supports_source_identity": true,
+      "maturity": "IMPLEMENTED + hook-verified no-N×N; the only slot impl with source/version/supersession/eviction",
+      "slot_directive_disposition": "candidate auxiliary memory pending multi-seed thresholds"
+    },
+    {
+      "name": "GCT (Gated Coherence Transformer)",
+      "aliases": ["GCTConfig/GCTCoherenceModule/GCTRoutingGate/GCTLadderInsulation/GCTAttentionLayer/GCTTransformer"],
+      "path": "symbolu/phase_transformer.py:10090-10616",
+      "category": "MODEL_ARCHITECTURE",
+      "family": "SEPARATE architecture: O(n^2) softmax + pre-softmax coherence gating + lambda-ladder insulation; NOT Phase, NOT O(n)",
+      "materializes_NxN": true,
+      "maturity": "IMPLEMENTED v1 (design doc March 2026); run_gct_training.sh",
+      "flag": "name misleads: shipped beside Phase/'hybrid' but is a distinct quadratic architecture"
+    },
+    {
+      "name": "hybrid_token_event_attention",
+      "aliases": ["token event attention", "dual-attention Hybrid LLM", "H0-H8 arms"],
+      "path": "experiments/hybrid_token_event_attention/",
+      "category": "ATTENTION_OR_SEQUENCE_MIXER",
+      "family": "token path (Mistral-native) + bounded event path (K<=16 EvidenceRecord slots, softmax); learned (event_attention.py) AND rule-based (deterministic_event_reasoner.py) forms",
+      "phase_used": false,
+      "measured_benefit": "governed event path H3 +0.63 vs vanilla token, +0.38 retrieval-text; event-to-event interaction marginal (+0.017 all/+0.046 relational, under +0.05 bar); deterministic H4=1.000 on oracle",
+      "maturity": "EXECUTED (pure-stdlib autograd, CPU); RM1 real-Mistral harness RESOURCE_BLOCKED"
+    },
+    {
+      "name": "SemanticRouter",
+      "aliases": ["Hybrid LLM #9 (mislabel)", "H-router"],
+      "path": "symbolu/hybrid/router.py, rich_routing.py, prefilter.py, attention.py",
+      "category": "MODEL_ROUTER",
+      "family": "routes a query to internal specialized 7B sub-models by phoneme/ontology signature",
+      "maturity": "IMPLEMENTED"
+    },
+    {
+      "name": "hybrid_handover",
+      "aliases": ["frontier handover", "two-tier deployment", "capability #9"],
+      "path": "agentic/hybrid_handover/",
+      "category": "FRONTIER_HANDOVER",
+      "family": "small-model(O(n) on-prem)->frontier-API handover scaffold with grounding/faithfulness/redaction gates; in-house tier is a DETERMINISTIC RULES stand-in, not a neural model",
+      "benchmark": "SEEB (Sovereign Evidence Extraction Benchmark) v1.0.0",
+      "maturity": "Runnable scaffold; ~427x egress reduction demoed",
+      "flag": "NOT a model architecture"
+    },
+    {
+      "name": "LLM Steering Controller (CRS)",
+      "aliases": ["CRS Controller", "C x R x S"],
+      "path": "LLM_STEERING_CONTROLLER_VC_BRIEF.md (+ CRS code)",
+      "category": "GOVERNANCE_COMPONENT",
+      "family": "deterministic meaning-frame steering + audit layer; explicitly not a smarter model, no weight changes",
+      "maturity": "Doc/brief-led; predictive track parked"
+    },
+    {
+      "name": "Model Selection Policy (MSP)",
+      "aliases": ["model selection", "capability #8"],
+      "path": "model_selection_experiment/, model_selection_pilot/, MODEL_SELECTION_POLICY_ENGINE_SPEC.md, packages/capabilities/model-selection/",
+      "category": "MODEL_ROUTER",
+      "family": "policy engine choosing among APPROVED PROVIDER models by cost/eligibility/regret; not architecture, not handover",
+      "maturity": "EXECUTED (arm F regret 0.016 vs 0.055 baseline); synthetic",
+      "flag": "must NOT be merged with Hybrid LLM (#9)"
+    },
+    {
+      "name": "train_unified_llm.py",
+      "aliases": ["unified trainer (shim)"],
+      "path": "train_unified_llm.py (965 B)",
+      "category": "TRAINING_HARNESS",
+      "family": "thin re-export of symbolu.training.unified.train; create_model dispatches on model_type; DEFAULT model_type='ontological' -> SymbolU12LLMWithBhava, NOT Phase/Hybrid",
+      "maturity": "shim over symbolu_training/training/unified/ + monolith train_unified_llm_clean.py (837 KB)"
+    },
+    {
+      "name": "train_hybrid_7b.py",
+      "aliases": ["7B hybrid recipe"],
+      "path": "train_hybrid_7b.py",
+      "category": "TRAINING_HARNESS",
+      "family": "builds HybridPhaseTransformer unconditionally: 4096x32Lx32H, ff 11008, window 256, local_layers=16",
+      "maturity": "runnable recipe only; NO trained checkpoint verified; decode = full-prefix replay (local_layers=16>0)"
+    },
+    {
+      "name": "phase_lc / lightweight_phase falsification harnesses",
+      "aliases": ["Q/L/R/P/PL ladder", "A/B/C ladder", "staged freeze"],
+      "path": "experiments/phase_lc/, symbolu/lightweight_phase/",
+      "category": "BENCHMARK_ONLY",
+      "family": "matched-param CPU micro-scale (~2M) falsification harnesses; Q/L quadratic baselines, R gated real linear recurrence control, P phase, slots bounded",
+      "maturity": "EXECUTED, 3 seeds; clean shape-audited reference; PROVISIONAL"
+    },
+    {
+      "name": "HYBRID_LLM_VC_BRIEF v1/v2/v3, FALSIFICATION, COMPARATIVE, CLAIM_LEDGER",
+      "aliases": ["investor/falsification docs"],
+      "path": "repo root",
+      "category": "DOCUMENTATION_ONLY",
+      "family": "v1/v2 optimistic (SUPERSEDED by v3); v3 + ledger converge on skeptical reading",
+      "maturity": "DOCS"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "hybrid_llm_decision_matrix/v1",
+  "audit_date": "2026-08-03",
+  "directive": "Phase O(n) is EXCLUDED_FROM_PACKAGING and is NOT scored as a candidate. It appears only as a historical baseline the replacement must outperform or avoid.",
+  "scoring": "Each criterion scored 1-5 (5 best). weighted_total = sum(weight_i * score_i). max = 5*100 = 500.",
+  "weights": {
+    "lm_quality_evidence": 15,
+    "long_context_retrieval_evidence": 12,
+    "relational_binding_evidence": 10,
+    "decode_efficiency": 10,
+    "prefill_training_efficiency": 8,
+    "bounded_memory": 8,
+    "kernel_runtime_maturity": 10,
+    "reproducibility": 7,
+    "low_compute_validation_feasibility": 5,
+    "enterprise_adaptation": 5,
+    "ugence_technical_differentiation": 5,
+    "licensing_ip_risk": 5
+  },
+  "candidates": {
+    "KDA_MLA_hybrid_KimiLinear": {
+      "scores": {"lm_quality_evidence":5,"long_context_retrieval_evidence":5,"relational_binding_evidence":4,"decode_efficiency":5,"prefill_training_efficiency":4,"bounded_memory":4,"kernel_runtime_maturity":5,"reproducibility":5,"low_compute_validation_feasibility":4,"enterprise_adaptation":4,"ugence_technical_differentiation":2,"licensing_ip_risk":5},
+      "weighted_total": 449,
+      "rationale": "Open MIT 48B-A3B checkpoints (5.7T tokens), FLA+vLLM+SGLang kernels, channel-wise gated delta core, MLA preserves exact global path. Low differentiation (adopting public arch)."
+    },
+    "GatedDeltaNet_hybrid_Qwen3Next": {
+      "scores": {"lm_quality_evidence":5,"long_context_retrieval_evidence":4,"relational_binding_evidence":3,"decode_efficiency":4,"prefill_training_efficiency":4,"bounded_memory":4,"kernel_runtime_maturity":5,"reproducibility":5,"low_compute_validation_feasibility":5,"enterprise_adaptation":4,"ugence_technical_differentiation":2,"licensing_ip_risk":5},
+      "weighted_total": 422,
+      "rationale": "Most mature/simplest; production-proven at scale (Qwen3-Next), easiest to train small, default vLLM/SGLang dispatch. Scalar (not channel-wise) gate; slightly weaker retrieval/binding."
+    },
+    "GatedDeltaNet2_hybrid": {
+      "scores": {"lm_quality_evidence":4,"long_context_retrieval_evidence":5,"relational_binding_evidence":5,"decode_efficiency":4,"prefill_training_efficiency":4,"bounded_memory":5,"kernel_runtime_maturity":3,"reproducibility":2,"low_compute_validation_feasibility":4,"enterprise_adaptation":2,"ugence_technical_differentiation":3,"licensing_ip_risk":1},
+      "weighted_total": 376,
+      "rationale": "LATEST; best reported recurrent retrieval + decoupled channel-wise erase/write (best correction/supersession). BUT single 1.3B evidence point, NO released checkpoints, NVIDIA NON-COMMERCIAL license (packaging blocker)."
+    },
+    "Mamba3_hybrid": {
+      "scores": {"lm_quality_evidence":4,"long_context_retrieval_evidence":3,"relational_binding_evidence":2,"decode_efficiency":5,"prefill_training_efficiency":4,"bounded_memory":5,"kernel_runtime_maturity":4,"reproducibility":3,"low_compute_validation_feasibility":4,"enterprise_adaptation":4,"ugence_technical_differentiation":2,"licensing_ip_risk":5},
+      "weighted_total": 374,
+      "rationale": "Complex-valued MIMO SSM, half state/half decode cost, Apache. Weaker in-context recall/binding than delta family (no delta correction)."
+    },
+    "LightningAttention_hybrid_MiniMax": {
+      "scores": {"lm_quality_evidence":4,"long_context_retrieval_evidence":4,"relational_binding_evidence":2,"decode_efficiency":4,"prefill_training_efficiency":4,"bounded_memory":4,"kernel_runtime_maturity":3,"reproducibility":3,"low_compute_validation_feasibility":3,"enterprise_adaptation":3,"ugence_technical_differentiation":2,"licensing_ip_risk":4},
+      "weighted_total": 343,
+      "rationale": "Open M1 hybrid, 1M ctx. Strike: MiniMax-M2 REVERTED to full attention citing production quality gap. Less standardized kernels."
+    },
+    "Conventional_attention_hybrid_SWA_GQA_MLA": {
+      "scores": {"lm_quality_evidence":5,"long_context_retrieval_evidence":5,"relational_binding_evidence":4,"decode_efficiency":2,"prefill_training_efficiency":3,"bounded_memory":1,"kernel_runtime_maturity":5,"reproducibility":5,"low_compute_validation_feasibility":5,"enterprise_adaptation":5,"ugence_technical_differentiation":1,"licensing_ip_risk":5},
+      "weighted_total": 392,
+      "rationale": "Gold-standard quality/retrieval, ubiquitous kernels, trivially reproducible. NOT bounded state (KV grows); no efficiency differentiation. The conservative fallback (Candidate G) if no recurrent candidate passes evidence gates."
+    }
+  },
+  "ranking_balanced": ["KDA_MLA_hybrid_KimiLinear (449)","GatedDeltaNet_hybrid_Qwen3Next (422)","Conventional_attention_hybrid (392)","GatedDeltaNet2_hybrid (376)","Mamba3_hybrid (374)","LightningAttention_hybrid (343)"],
+  "sensitivity_analysis": {
+    "quality_first": {"description":"upweight lm_quality+long_context_retrieval+relational","leaders":["KDA_MLA (14/15)","Conventional (14/15)","GatedDeltaNet2 (14/15)"],"note":"KDA stays co-leader; conventional attention and GDN-2 rise; winner can shift to conventional (fully open) or GDN-2 (license-blocked)."},
+    "efficiency_first": {"description":"upweight decode+prefill+bounded+kernel","leaders":["KDA_MLA (18/20)","Mamba3 (18/20)","GatedDeltaNet (17/20)"],"note":"Conventional attention collapses (11/20, unbounded KV). KDA robust."},
+    "low_compute_first": {"description":"upweight low_compute_feasibility+reproducibility+kernel","leaders":["GatedDeltaNet (15/15)","Conventional (15/15)","KDA_MLA (14/15)"],"note":"GDN wins: reproducible, easiest to train small, default kernels. Favors GDN as the low-compute canonical starting point."},
+    "novelty_first": {"description":"upweight ugence_differentiation + recency","leaders":["GatedDeltaNet2"],"note":"GDN-2 wins on novelty but is BLOCKED by non-commercial license + no checkpoints -> cannot be packaged. Novelty is not decisive."},
+    "enterprise_memory_first": {"description":"upweight enterprise_adaptation+relational+licensing (+ bounded-slot sidecar)","leaders":["Conventional (14/15)","KDA_MLA (13/15)"],"note":"Bounded-slot enterprise-memory sidecar becomes the differentiator over any open backbone; KDA remains top recurrent option."}
+  },
+  "verdict": {
+    "primary": "SELECT_KDA_HYBRID",
+    "canonical_sequence_mixer": "Kimi Delta Attention (KDA) -- channel-wise gated delta-rule linear attention",
+    "fallback_1": "Gated DeltaNet (SELECT_GATED_DELTANET_HYBRID) -- lower-risk, most mature, best low-compute score",
+    "fallback_2": "Conventional attention hybrid (SELECT_CONVENTIONAL_ATTENTION_HYBRID) -- if no recurrent candidate passes evidence gates",
+    "excluded_by_directive": ["RETAIN_CURRENT_PHASE_CORE","MODERNIZE_PHASE_CORE","PHASE_AS_OPTIONAL_AUXILIARY","PHASE_PLUS_DELTA_CORE"],
+    "gdn2_note": "GDN-2 is the mechanism to ADOPT LATER once checkpoints/commercial license exist; its decoupled erase/write is the target capability, but its license and single-point evidence bar it from packaging now.",
+    "topology": "Candidate C (KDA + periodic MLA, 3:1) as canonical core; extensible to Candidate E (+ bounded-slot enterprise-memory sidecar) ONLY if slots pass their independent thresholds.",
+    "full_attention_mechanism": "Multi-head Latent Attention (MLA) as periodic global layer; GQA/SWA acceptable fallback",
+    "layer_ratio": "3:1 (KDA : MLA)",
+    "moe": "OPTIONAL/DEFERRED -- first model dense; MoE is a scaling decision, not core",
+    "packaging_readiness": "REQUIRES_DECISIVE_EXPERIMENT_FIRST"
+  }
+}
