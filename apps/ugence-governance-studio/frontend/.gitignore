@@ -7,3 +7,4 @@ test-results/
 *.local
 .eslintcache
 .vite/
+artifacts/dependency-audit-report.json

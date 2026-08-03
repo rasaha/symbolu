@@ -10,6 +10,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, "..", "src");
 
 const BANNED = [
+  // ranking / selection / assignment language
   "recommended agent",
   "preferred agent",
   "preferred eligible",
@@ -23,6 +24,19 @@ const BANNED = [
   "agent selected",
   "selected agent",
   "assigned agent",
+  // P3D permission-PROPOSAL / granting / provisioning language (C2). P3C displays
+  // permission REQUIREMENTS used during eligibility, never composition-time
+  // proposals or grants. These phrases only appear if that boundary is crossed;
+  // the correct negated banner text ("No permission granting") does not match them.
+  "permission proposal",
+  "proposed permission",
+  "permission-bound proposal",
+  "permission bound proposal",
+  "grant permission",
+  "granting permission to",
+  "provision permission",
+  "permission provisioning",
+  "permission-feasibility",
 ];
 
 function walk(dir) {
