@@ -1,0 +1,268 @@
+{
+  "source_commit": "b760c9e5440bc4572c9f3a197a682b0c95b53ad8",
+  "roots": [
+    "domains/procurement",
+    "applications/procurement"
+  ],
+  "file_count": 32,
+  "non_test_file_count": 24,
+  "test_file_count": 8,
+  "files": [
+    {
+      "path": "applications/procurement/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "eb716dea8446a72d45485737c5cae77f84fdd3017cdaad56895c420230e0e350",
+      "git_blob_sha": "e0793529a43e7550e14204c7c6313ecb5f5582d0",
+      "bytes": 732,
+      "lines": 18
+    },
+    {
+      "path": "applications/procurement/api/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "2aae7c03e431146d0627597013978c53907c4532d4c71a409ceead96cba54140",
+      "git_blob_sha": "ff87c9f0c48dec4d4b28b56f399e61eb83ffb3e1",
+      "bytes": 154,
+      "lines": 4
+    },
+    {
+      "path": "applications/procurement/api/routes.py",
+      "classification": "API_FACADE",
+      "sha256": "684b3f184368e3551ae9fe6d7a4f6f3dab78a4783db8dc7e4e42a881c0a0df01",
+      "git_blob_sha": "18cd7fe5172bfb1ce5e156b3263555ea744f89d9",
+      "bytes": 7397,
+      "lines": 162
+    },
+    {
+      "path": "applications/procurement/configuration.py",
+      "classification": "CONFIGURATION",
+      "sha256": "85bedf7725953dc7e014aeb899fa3ad659c9572e629e23ec0a8a361878e520c9",
+      "git_blob_sha": "9acd976110622fbdbfed66c57eebf96b2bfeccda",
+      "bytes": 1339,
+      "lines": 33
+    },
+    {
+      "path": "applications/procurement/platform.py",
+      "classification": "APPLICATION_COMPOSITION",
+      "sha256": "2c5f889bfd1b881f35817c0529377ee547002cd54f883d0d918d23debc808842",
+      "git_blob_sha": "6eac056f298b701f3010a40b5ea298afcaed4949",
+      "bytes": 8602,
+      "lines": 189
+    },
+    {
+      "path": "domains/procurement/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "476a4a8bd24ae41d964534fe182215ba075ac63a6252c0f7137ae3abd93a98bc",
+      "git_blob_sha": "c75bb747c5002ee07d94c696b7ef0d01286ee870",
+      "bytes": 534,
+      "lines": 11
+    },
+    {
+      "path": "domains/procurement/actions/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "f13727938eb407565de5a5c41a9e4d5cf19704f6d51e1a74a2b744f04cdc064f",
+      "git_blob_sha": "929f23194bb38737fe135528f4f9fa5ee36bc339",
+      "bytes": 729,
+      "lines": 22
+    },
+    {
+      "path": "domains/procurement/actions/mappings.py",
+      "classification": "DOMAIN_CONTRACT",
+      "sha256": "6a5db32a28a4605cde5dd95dd0bd1fb02a6cc15bf724cb98333152aec0c97618",
+      "git_blob_sha": "7c53aea9786c2af639184fab6e6d3148cd6d0855",
+      "bytes": 2896,
+      "lines": 66
+    },
+    {
+      "path": "domains/procurement/adapters/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "20ad78dfb6e22a9b51a573163378607dcb0a06fbb46d05f4a14547cdaa23dcad",
+      "git_blob_sha": "ac72e81a39c9153ad2e49a1976ccaa1f91fae419",
+      "bytes": 171,
+      "lines": 4
+    },
+    {
+      "path": "domains/procurement/adapters/linked_records.py",
+      "classification": "ADAPTER",
+      "sha256": "3ab32c977695605ab54b47f6d45ab8e1d38f706f9da299f6c185eb0ea88ef2c9",
+      "git_blob_sha": "9fb0731730fddf9780a5b883c881a78921431d33",
+      "bytes": 1912,
+      "lines": 54
+    },
+    {
+      "path": "domains/procurement/approvals/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "1aa227b82a39d9722862d33377608548c575620e13545b2dfcaf076aefcd1af8",
+      "git_blob_sha": "ce146a7f70361da5356205e57e78a717977937ea",
+      "bytes": 417,
+      "lines": 15
+    },
+    {
+      "path": "domains/procurement/approvals/mappings.py",
+      "classification": "DOMAIN_CONTRACT",
+      "sha256": "d971c629a6ac1f8f0170f10b51b23f0e974036795ebd4995463295a884cd02db",
+      "git_blob_sha": "dd470e45a0cfa9bd8b8eeaab9f5a6bd66fcf6f21",
+      "bytes": 2089,
+      "lines": 56
+    },
+    {
+      "path": "domains/procurement/errors.py",
+      "classification": "DOMAIN_CONTRACT",
+      "sha256": "b34138ad8532ef8a649add4bf83e0c8a697ecf2cc3c135c6c8719af6538cd991",
+      "git_blob_sha": "182356b0c7fafa3593106dc6d247171ae25cc6c6",
+      "bytes": 1304,
+      "lines": 40
+    },
+    {
+      "path": "domains/procurement/policies/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "d7d8f1f0aa6f8fbb9ddb433e04626c4ae68b830ebd9eb5ba3110a7cd66ba2c22",
+      "git_blob_sha": "5aacdf0911f32720ef362694dc421c11af14f1c3",
+      "bytes": 567,
+      "lines": 16
+    },
+    {
+      "path": "domains/procurement/policies/assessment.py",
+      "classification": "POLICY",
+      "sha256": "0fc238640c5fa0171944bfa47afd4346816c659d111a7d009b91aa9ac27abfc7",
+      "git_blob_sha": "d89f80e462199020755e80f71592c0503be35010",
+      "bytes": 4944,
+      "lines": 142
+    },
+    {
+      "path": "domains/procurement/policies/budget_authority.py",
+      "classification": "POLICY",
+      "sha256": "0e408086a459c120963c3bd6725149003ab43a13d2e6ab6cf38c985f96f9b616",
+      "git_blob_sha": "923e8e8bca1ded896d7a64164f2ac34c622d5722",
+      "bytes": 4412,
+      "lines": 102
+    },
+    {
+      "path": "domains/procurement/policies/policy_adapter.py",
+      "classification": "POLICY",
+      "sha256": "e2e2c4e89b06b5ae20f48ee31c0cf5053a2290108babb15f312e6b3d144f9c40",
+      "git_blob_sha": "1d34bd9a2a4eeeedc2690a754e9e8014d945d81e",
+      "bytes": 1453,
+      "lines": 42
+    },
+    {
+      "path": "domains/procurement/requests/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "109a2f957241b08009e2a877a46d6ef10584ccafd68e62b033228d11ea16db42",
+      "git_blob_sha": "73410d05fbd2a40db8b3f77b5bc5a176faea1946",
+      "bytes": 332,
+      "lines": 14
+    },
+    {
+      "path": "domains/procurement/requests/contracts.py",
+      "classification": "DOMAIN_CONTRACT",
+      "sha256": "5ffc2675402b3dafd6bdca96acaabcad6813a8c0afe6c805e4644ca2874c4d33",
+      "git_blob_sha": "604867ccfcce38b3658333d3a7fc9d2f893fdc8d",
+      "bytes": 3809,
+      "lines": 118
+    },
+    {
+      "path": "domains/procurement/suppliers/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "76725edccd3bce4757d176a60d73efa1ad16fc99bea47711deb90f5878318add",
+      "git_blob_sha": "1acb6cec527788f2cd26f55fc0a79c6220136a80",
+      "bytes": 303,
+      "lines": 8
+    },
+    {
+      "path": "domains/procurement/suppliers/adapter.py",
+      "classification": "ADAPTER",
+      "sha256": "669b549b698367a1f24b81a4958c9d3f6aa5921e67a45bbb4437f0e995ff49dd",
+      "git_blob_sha": "6ebf55c8338881a4556776cf221e5e6dd53d0d68",
+      "bytes": 4629,
+      "lines": 98
+    },
+    {
+      "path": "domains/procurement/suppliers/outcomes.py",
+      "classification": "DOMAIN_CONTRACT",
+      "sha256": "8bd4e40c8e3d3a811225fbd60ceee33c726663f55917a648cf246613d1b1b343",
+      "git_blob_sha": "808982534dce0c450c5beed13c546e4dd96b98d7",
+      "bytes": 1234,
+      "lines": 36
+    },
+    {
+      "path": "domains/procurement/tests/conftest.py",
+      "classification": "TEST",
+      "sha256": "c42cb8ce51cefed628c24319381c8572a4b89640d37cd88e2f8808804e83188d",
+      "git_blob_sha": "d6c5d6ef7bf6b5624be46d3cd1628cccd37340bc",
+      "bytes": 1804,
+      "lines": 63
+    },
+    {
+      "path": "domains/procurement/tests/test_conformance.py",
+      "classification": "TEST",
+      "sha256": "5c2c70716a4bbf8ebf25bee2f7d4b601ee1566c27dea15dfbdbe5da18cf6b0b7",
+      "git_blob_sha": "86c4c3a0dc519a2b31b4c1029f32214351ffc1fc",
+      "bytes": 3114,
+      "lines": 79
+    },
+    {
+      "path": "domains/procurement/tests/test_cross_domain_conformance.py",
+      "classification": "TEST",
+      "sha256": "8a5e4f8f3b3028a8b72ebfbd1c7c4ddd26ab0194d01fea4393d93ccb140041fa",
+      "git_blob_sha": "0ac031361ff8142e5d3800a6d18a148c191a7e84",
+      "bytes": 8654,
+      "lines": 158
+    },
+    {
+      "path": "domains/procurement/tests/test_procurement_authorization.py",
+      "classification": "TEST",
+      "sha256": "3c0cf9ac4fa915d9852a75b0da5252bc921c8540ba5adc44a64ee12cb1308ad5",
+      "git_blob_sha": "c8fd8b0f1e23b927fbc294cc7643470c4825ba71",
+      "bytes": 5040,
+      "lines": 103
+    },
+    {
+      "path": "domains/procurement/tests/test_procurement_domain.py",
+      "classification": "TEST",
+      "sha256": "9fbe89fee3e1eb6e7f9e9269d43b4bb8fbff686d1597940ebd3411a5f9391b83",
+      "git_blob_sha": "825b50188e89ebee803d301de7e4ec8734d1fecc",
+      "bytes": 4828,
+      "lines": 108
+    },
+    {
+      "path": "domains/procurement/tests/test_procurement_e2e.py",
+      "classification": "TEST",
+      "sha256": "b71e8b65d842b877f53294a127fd5f80d3233d361c2aafe851be58fe3c80e00c",
+      "git_blob_sha": "5092c60a8594d546524c5b14fdcb6917f0cddba8",
+      "bytes": 2426,
+      "lines": 53
+    },
+    {
+      "path": "domains/procurement/tests/test_procurement_execution.py",
+      "classification": "TEST",
+      "sha256": "8f4b700eb2e553c1f1ccbe8ff5462c60f2b4c91690816a8ecb6adb498bd47249",
+      "git_blob_sha": "0011389ed23653ec29fd91407e3e53c9831cf311",
+      "bytes": 3332,
+      "lines": 75
+    },
+    {
+      "path": "domains/procurement/tests/test_procurement_reconciliation.py",
+      "classification": "TEST",
+      "sha256": "5b7ac5287c0618d91cb9140a452ca14be853c4cf28385aa24b02de563b0551a9",
+      "git_blob_sha": "217bb88b952141ac36a3b6cfc0559e7b32bbceab",
+      "bytes": 3542,
+      "lines": 71
+    },
+    {
+      "path": "domains/procurement/validation/__init__.py",
+      "classification": "PACKAGE_METADATA",
+      "sha256": "5d4a6b328eb91d7b8354247c636150afbe760f59d5b6b618d459074564e4a3f9",
+      "git_blob_sha": "864f688417cf85665964c0dbcc6d3676ca3eb009",
+      "bytes": 140,
+      "lines": 4
+    },
+    {
+      "path": "domains/procurement/validation/request_validation.py",
+      "classification": "VALIDATION",
+      "sha256": "8a5020fbcc5d9fbb71fac92e4b53e03cc04b02bf07c5ed2f215b43ef6872beb2",
+      "git_blob_sha": "d150c71d87525247b008c92c3ef4a9d68b23b63c",
+      "bytes": 1659,
+      "lines": 43
+    }
+  ]
+}

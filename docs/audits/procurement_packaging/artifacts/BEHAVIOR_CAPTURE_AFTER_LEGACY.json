@@ -1,0 +1,157 @@
+{
+  "capture": {
+    "action_mappings": [
+      {
+        "action_type": "CREATE_PURCHASE_ORDER",
+        "mapping_id": "proc.create_po",
+        "outcome": {
+          "__enum__": "DecisionOutcome",
+          "value": "ADVANCE"
+        },
+        "required": [
+          "amount",
+          "supplier_id",
+          "budget_id"
+        ]
+      },
+      {
+        "action_type": "CANCEL_REQUEST",
+        "mapping_id": "proc.cancel",
+        "outcome": {
+          "__enum__": "DecisionOutcome",
+          "value": "REJECT"
+        },
+        "required": [
+          "request_id"
+        ]
+      },
+      {
+        "action_type": "ROUTE_TO_SENIOR_APPROVER",
+        "mapping_id": "proc.route_senior",
+        "outcome": {
+          "__enum__": "DecisionOutcome",
+          "value": "HOLD"
+        },
+        "required": [
+          "request_id"
+        ]
+      },
+      {
+        "action_type": "REQUEST_MORE_INFORMATION",
+        "mapping_id": "proc.request_info",
+        "outcome": {
+          "__enum__": "DecisionOutcome",
+          "value": "DEFER"
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    ],
+    "assessment_budget_insufficient": {
+      "blocked": false,
+      "failed": [
+        "budget_sufficient"
+      ]
+    },
+    "assessment_valid": {
+      "blocked": false,
+      "checks": [
+        [
+          "budget_exists",
+          true
+        ],
+        [
+          "supplier_exists",
+          true
+        ],
+        [
+          "required_fields_complete",
+          true
+        ],
+        [
+          "justification_present",
+          true
+        ],
+        [
+          "amount_calculated",
+          true
+        ],
+        [
+          "budget_sufficient",
+          true
+        ]
+      ],
+      "status": {
+        "__enum__": "AssessmentStatus",
+        "value": "FINALIZED"
+      },
+      "total_amount": 200000
+    },
+    "audit_event_types": [
+      "ACTION_MAPPING_PUBLISHED",
+      "ACTION_MAPPING_PUBLISHED",
+      "ACTION_MAPPING_PUBLISHED",
+      "ACTION_MAPPING_PUBLISHED",
+      "DECISION_CASE_CREATED",
+      "DECISION_CASE_ASSESSMENT_LINKED",
+      "DECISION_CASE_RECOMMENDATION_ADDED",
+      "DECISION_RECORDED",
+      "ACTION_MAPPING_SELECTED",
+      "ACTION_REQUEST_CREATED",
+      "ACTION_REQUEST_VALIDATED",
+      "CER_CREATED",
+      "CER_BOUND",
+      "ACTION_AUTHORIZATION_SUBMITTED",
+      "ACTION_AUTHORIZATION_GRANTED",
+      "EXECUTION_INTENT_CREATED",
+      "EXECUTION_DISPATCH_SUBMITTED",
+      "EXECUTION_DISPATCH_ACKNOWLEDGED",
+      "EXECUTION_OUTCOME_RECORDED",
+      "EXECUTION_SUCCEEDED",
+      "EXECUTION_RECONCILIATION_STARTED",
+      "EXECUTION_RECONCILED"
+    ],
+    "authorize_above_hard_limit": {
+      "outcome": {
+        "__enum__": "AuthorizationOutcome",
+        "value": "DENIED"
+      }
+    },
+    "authorize_above_threshold": {
+      "constraints": [
+        "senior_approval_required"
+      ],
+      "obligations": [
+        "log_to_audit",
+        "notify_finance"
+      ],
+      "outcome": {
+        "__enum__": "AuthorizationOutcome",
+        "value": "AUTHORIZED_WITH_CONSTRAINTS"
+      }
+    },
+    "authorize_restricted_supplier": {
+      "outcome": {
+        "__enum__": "AuthorizationOutcome",
+        "value": "DENIED"
+      }
+    },
+    "e2e_happy": {
+      "authorization_outcome": "AUTHORIZED",
+      "compensation_required": false,
+      "decision_type": "DecisionRecord",
+      "recommendation_type": "RecommendationRecord",
+      "reconciliation_status": "RECONCILED"
+    },
+    "supplier_outcome_map": {
+      "ACCEPTED": "ACCEPTED",
+      "REJECTED": "REJECTED",
+      "TIMED_OUT": "TIMED_OUT",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "validate_unknown_budget": "BudgetNotKnownError",
+    "validate_unknown_supplier": "SupplierNotKnownError"
+  },
+  "mode": "legacy"
+}

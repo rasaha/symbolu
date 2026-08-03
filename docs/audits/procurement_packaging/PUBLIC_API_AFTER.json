@@ -1,0 +1,557 @@
+{
+  "count": 48,
+  "fingerprints": {
+    "APPROVAL_TO_DECISION": {
+      "kind": "mapping",
+      "size": 3
+    },
+    "AssessmentNotFinalizedError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "AssessmentStatus": {
+      "kind": "enum",
+      "members": [
+        "DRAFT",
+        "FINALIZED"
+      ],
+      "values": [
+        "DRAFT",
+        "FINALIZED"
+      ]
+    },
+    "BudgetAuthorityAdapter": {
+      "kind": "class",
+      "members": [
+        "authorize"
+      ]
+    },
+    "BudgetNotKnownError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "BudgetReference": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "CANCEL_REQUEST": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "CREATE_PURCHASE_ORDER": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DEFAULT_CONFIGURATION": {
+      "kind": "object",
+      "type": "ProcurementConfiguration"
+    },
+    "DomainValidationError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "InMemoryProcurementAssessmentRepository": {
+      "kind": "class",
+      "members": [
+        "add",
+        "get"
+      ]
+    },
+    "PROCUREMENT_DECISION_TYPE": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "PolicyAssessment": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "failed_checks",
+        "from_orm",
+        "is_finalized",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "PolicyCheck": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ProcurementAPI": {
+      "kind": "class",
+      "members": [
+        "authorize",
+        "decide",
+        "dispatch_and_observe",
+        "recommend",
+        "request_action",
+        "run",
+        "submit_and_assess"
+      ]
+    },
+    "ProcurementAssessmentLinkedRecordAdapter": {
+      "kind": "class",
+      "members": [
+        "get_record"
+      ]
+    },
+    "ProcurementAssessmentService": {
+      "kind": "class",
+      "members": [
+        "assess"
+      ]
+    },
+    "ProcurementConfiguration": {
+      "kind": "class",
+      "members": [
+        "approval_threshold",
+        "hard_limit",
+        "known_budgets",
+        "known_suppliers",
+        "restricted_budgets",
+        "restricted_suppliers"
+      ]
+    },
+    "ProcurementError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "ProcurementPlatform": {
+      "kind": "class",
+      "members": [
+        "build_api",
+        "publish_standard_mappings"
+      ]
+    },
+    "ProcurementPolicyAdapter": {
+      "kind": "class",
+      "members": [
+        "grant",
+        "grant_all",
+        "grants",
+        "policy"
+      ]
+    },
+    "ProcurementRequestValidator": {
+      "kind": "class",
+      "members": [
+        "validate"
+      ]
+    },
+    "ProcurementRunResult": {
+      "kind": "class",
+      "members": []
+    },
+    "ProductMaturity": {
+      "kind": "class",
+      "members": [
+        "to_dict"
+      ]
+    },
+    "PurchaseApproval": {
+      "kind": "enum",
+      "members": [
+        "APPROVED",
+        "APPROVED_WITH_CONDITIONS",
+        "REJECTED"
+      ],
+      "values": [
+        "APPROVED",
+        "APPROVED_WITH_CONDITIONS",
+        "REJECTED"
+      ]
+    },
+    "PurchaseItem": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "line_total",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "PurchaseRecommendation": {
+      "kind": "enum",
+      "members": [
+        "APPROVE",
+        "ESCALATE",
+        "NEEDS_REVIEW",
+        "REJECT"
+      ],
+      "values": [
+        "APPROVE",
+        "ESCALATE",
+        "NEEDS_REVIEW",
+        "REJECT"
+      ]
+    },
+    "PurchaseRequest": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "total_amount",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "PurchaseRequestValidationError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "RECOMMENDATION_TO_PROPOSED": {
+      "kind": "mapping",
+      "size": 4
+    },
+    "REQUEST_MORE_INFORMATION": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "ROUTE_TO_SENIOR_APPROVER": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "RequestStatus": {
+      "kind": "enum",
+      "members": [
+        "DRAFT",
+        "SUBMITTED",
+        "WITHDRAWN"
+      ],
+      "values": [
+        "DRAFT",
+        "SUBMITTED",
+        "WITHDRAWN"
+      ]
+    },
+    "SUPPLIER_SYSTEM_TYPE": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "SUPPLIER_TO_BUSINESS": {
+      "kind": "mapping",
+      "size": 4
+    },
+    "SupplierExecutionAdapter": {
+      "kind": "class",
+      "members": [
+        "dispatch",
+        "query_status"
+      ]
+    },
+    "SupplierNotKnownError": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
+    "SupplierOutcome": {
+      "kind": "enum",
+      "members": [
+        "ACCEPTED",
+        "REJECTED",
+        "TIMED_OUT",
+        "UNKNOWN"
+      ],
+      "values": [
+        "ACCEPTED",
+        "REJECTED",
+        "TIMED_OUT",
+        "UNKNOWN"
+      ]
+    },
+    "SupplierReference": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "Urgency": {
+      "kind": "enum",
+      "members": [
+        "EMERGENCY",
+        "EXPEDITED",
+        "ROUTINE"
+      ],
+      "values": [
+        "EMERGENCY",
+        "EXPEDITED",
+        "ROUTINE"
+      ]
+    },
+    "VersionInfo": {
+      "kind": "class",
+      "members": [
+        "build_commit",
+        "to_dict"
+      ]
+    },
+    "all_mappings": {
+      "kind": "function",
+      "parameters": []
+    },
+    "build_in_memory_platform": {
+      "kind": "function",
+      "parameters": [
+        "configuration",
+        "identity_provider"
+      ]
+    },
+    "business_outcome_for": {
+      "kind": "function",
+      "parameters": [
+        "outcome"
+      ]
+    },
+    "decision_outcome_for": {
+      "kind": "function",
+      "parameters": [
+        "approval"
+      ]
+    },
+    "product_maturity": {
+      "kind": "function",
+      "parameters": []
+    },
+    "proposed_outcome_for": {
+      "kind": "function",
+      "parameters": [
+        "recommendation"
+      ]
+    },
+    "version_info": {
+      "kind": "function",
+      "parameters": []
+    }
+  },
+  "module": "ugence_procurement.api",
+  "public_names": [
+    "APPROVAL_TO_DECISION",
+    "AssessmentNotFinalizedError",
+    "AssessmentStatus",
+    "BudgetAuthorityAdapter",
+    "BudgetNotKnownError",
+    "BudgetReference",
+    "CANCEL_REQUEST",
+    "CREATE_PURCHASE_ORDER",
+    "DEFAULT_CONFIGURATION",
+    "DomainValidationError",
+    "InMemoryProcurementAssessmentRepository",
+    "PROCUREMENT_DECISION_TYPE",
+    "PolicyAssessment",
+    "PolicyCheck",
+    "ProcurementAPI",
+    "ProcurementAssessmentLinkedRecordAdapter",
+    "ProcurementAssessmentService",
+    "ProcurementConfiguration",
+    "ProcurementError",
+    "ProcurementPlatform",
+    "ProcurementPolicyAdapter",
+    "ProcurementRequestValidator",
+    "ProcurementRunResult",
+    "ProductMaturity",
+    "PurchaseApproval",
+    "PurchaseItem",
+    "PurchaseRecommendation",
+    "PurchaseRequest",
+    "PurchaseRequestValidationError",
+    "RECOMMENDATION_TO_PROPOSED",
+    "REQUEST_MORE_INFORMATION",
+    "ROUTE_TO_SENIOR_APPROVER",
+    "RequestStatus",
+    "SUPPLIER_SYSTEM_TYPE",
+    "SUPPLIER_TO_BUSINESS",
+    "SupplierExecutionAdapter",
+    "SupplierNotKnownError",
+    "SupplierOutcome",
+    "SupplierReference",
+    "Urgency",
+    "VersionInfo",
+    "all_mappings",
+    "build_in_memory_platform",
+    "business_outcome_for",
+    "decision_outcome_for",
+    "product_maturity",
+    "proposed_outcome_for",
+    "version_info"
+  ]
+}

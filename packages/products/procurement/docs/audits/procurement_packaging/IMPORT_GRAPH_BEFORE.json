@@ -1,0 +1,240 @@
+{
+  "applications/procurement/__init__.py": {
+    "imports": [
+      "__future__",
+      "applications.procurement.configuration",
+      "applications.procurement.platform"
+    ],
+    "external_roots": [
+      "__future__"
+    ]
+  },
+  "applications/procurement/api/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "applications/procurement/api/routes.py": {
+    "imports": [
+      "__future__",
+      "dataclasses",
+      "decision_governance.api.contracts",
+      "decision_governance.api.vocabulary",
+      "domains.procurement.actions",
+      "domains.procurement.approvals",
+      "domains.procurement.requests",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "dataclasses",
+      "decision_governance",
+      "typing"
+    ]
+  },
+  "applications/procurement/configuration.py": {
+    "imports": [
+      "__future__",
+      "dataclasses"
+    ],
+    "external_roots": [
+      "__future__",
+      "dataclasses"
+    ]
+  },
+  "applications/procurement/platform.py": {
+    "imports": [
+      "__future__",
+      "dataclasses",
+      "decision_governance.api.audit",
+      "decision_governance.api.identity",
+      "decision_governance.api.repositories",
+      "decision_governance.api.services",
+      "domains.procurement.actions",
+      "domains.procurement.adapters",
+      "domains.procurement.policies",
+      "domains.procurement.suppliers",
+      "domains.procurement.validation"
+    ],
+    "external_roots": [
+      "__future__",
+      "dataclasses",
+      "decision_governance"
+    ]
+  },
+  "domains/procurement/__init__.py": {
+    "imports": [
+      "__future__"
+    ],
+    "external_roots": [
+      "__future__"
+    ]
+  },
+  "domains/procurement/actions/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/actions/mappings.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.contracts"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance"
+    ]
+  },
+  "domains/procurement/adapters/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/adapters/linked_records.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.ports",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance",
+      "typing"
+    ]
+  },
+  "domains/procurement/approvals/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/approvals/mappings.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.contracts",
+      "enum"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance",
+      "enum"
+    ]
+  },
+  "domains/procurement/errors.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.errors"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance"
+    ]
+  },
+  "domains/procurement/policies/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/policies/assessment.py": {
+    "imports": [
+      "__future__",
+      "datetime",
+      "decision_governance.api.common",
+      "enum",
+      "pydantic",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "datetime",
+      "decision_governance",
+      "enum",
+      "pydantic",
+      "typing"
+    ]
+  },
+  "domains/procurement/policies/budget_authority.py": {
+    "imports": [
+      "__future__",
+      "datetime",
+      "decision_governance.api.common",
+      "decision_governance.api.contracts",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "datetime",
+      "decision_governance",
+      "typing"
+    ]
+  },
+  "domains/procurement/policies/policy_adapter.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.policy"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance"
+    ]
+  },
+  "domains/procurement/requests/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/requests/contracts.py": {
+    "imports": [
+      "__future__",
+      "datetime",
+      "decision_governance.api.common",
+      "decision_governance.api.errors",
+      "enum",
+      "pydantic"
+    ],
+    "external_roots": [
+      "__future__",
+      "datetime",
+      "decision_governance",
+      "enum",
+      "pydantic"
+    ]
+  },
+  "domains/procurement/suppliers/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/suppliers/adapter.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.common",
+      "decision_governance.api.contracts",
+      "decision_governance.api.ports",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance",
+      "typing"
+    ]
+  },
+  "domains/procurement/suppliers/outcomes.py": {
+    "imports": [
+      "__future__",
+      "decision_governance.api.contracts",
+      "enum"
+    ],
+    "external_roots": [
+      "__future__",
+      "decision_governance",
+      "enum"
+    ]
+  },
+  "domains/procurement/validation/__init__.py": {
+    "imports": [],
+    "external_roots": []
+  },
+  "domains/procurement/validation/request_validation.py": {
+    "imports": [
+      "__future__",
+      "typing"
+    ],
+    "external_roots": [
+      "__future__",
+      "typing"
+    ]
+  }
+}
