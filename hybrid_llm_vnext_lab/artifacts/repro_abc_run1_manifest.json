@@ -1,0 +1,17 @@
+{
+  "run_id": "repro_abc_run1",
+  "tag": "repro_slots_1200_repro_abc_run1",
+  "wall_s": 4391.1,
+  "command": "/usr/local/bin/python3 harness_abc.py --arms A,B,C --seeds 0,1,2 --steps 1200 --N 160 --num_slots 32 --target_params 2000000 --tag repro_slots_1200_repro_abc_run1",
+  "cwd": "/home/user/symbolu/experiments/phase_lc",
+  "source_commit": "076a33a839ecfe98bf473132c92d0e9abd017640",
+  "env": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "numpy": "1.26.4"
+  },
+  "original_output_path": "/home/user/symbolu/experiments/phase_lc/results/repro_slots_1200_repro_abc_run1.json",
+  "copied_artifact_path": "/home/user/symbolu/hybrid_llm_vnext_lab/artifacts/neural_reproduction/repro_abc_run1/repro_slots_1200_repro_abc_run1.json",
+  "result_sha256": "b585aa27b72d03b76d7ec1d31c214e95bb4e6ae65e8c7a80b4d037029d637e47",
+  "frozen_abc_sha256_unchanged": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482"
+}

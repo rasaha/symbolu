@@ -1,0 +1,31 @@
+{
+  "schema": "neural_reproduction_live_state/v1",
+  "audit_date": "2026-08-03",
+  "repo": "rasaha/symbolu",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_head": "b6fd6ca50721106958a732dbba88301c00e2fda3",
+  "work_branch": "claude/hybrid-llm-slots-neural-reproduction",
+  "work_base": "b6fd6ca50721106958a732dbba88301c00e2fda3",
+  "working_tree_clean_at_start": true,
+  "pr_1294": {"state": "MERGED", "merged_at": "2026-08-03T03:40:39Z"},
+  "pr_1295": {"state": "MERGED", "merged_at": "2026-08-03T04:12:55Z", "merged_into": "default (b6fd6ca5)"},
+  "lab_present_on_default": true,
+  "verifiers_on_base": {"audit_verifier": "201 checks, 0 failures", "lab_verifier": "42 checks, 0 failures", "stdlib_tests": "36 run, 0 failed"},
+  "abc_json": {
+    "path": "experiments/phase_lc/results/abc.json",
+    "git_blob": "cbcd94f11e1a4b107d63de52fba790551389b5f8",
+    "sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "size_bytes": 23218,
+    "modification_status": "UNMODIFIED (frozen historical artifact; never written by this phase)"
+  },
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "numpy": "1.26.4",
+    "torch_available": true,
+    "install_method": "pip install --extra-index-url https://download.pytorch.org/whl/cpu 'numpy<2' 'torch==2.*'",
+    "note": "torch 2.13.0 matches the historical report's 'torch 2.13 CPU' major.minor. The +cu130 build runs on CPU (no GPU present); execution is CPU fp32, 4 threads.",
+    "cpu_threads": 4
+  },
+  "neural_execution_status": "AVAILABLE (not RESOURCE_BLOCKED). Neural parity executed and PASSED; S-arm training and A/B/C reproduction executed on CPU."
+}

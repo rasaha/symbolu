@@ -1,0 +1,742 @@
+{
+  "config": {
+    "arms": "A,B,C",
+    "seeds": "0,1,2",
+    "steps": 1200,
+    "N": 160,
+    "num_slots": 32,
+    "target_params": 2000000,
+    "tag": "repro_slots_1200_repro_abc_run1"
+  },
+  "vocab": 1291,
+  "corpus_tokens": 55547,
+  "window": 64,
+  "results": {
+    "A": [
+      {
+        "arm": "A",
+        "seed": 0,
+        "params": 2000392,
+        "train_s": 160.3,
+        "eval": {
+          "ppl": {
+            "256": 128.44814155354703,
+            "512": 133.6752404412504
+          },
+          "needle_by_dist": {
+            "16": 0.041666666666666664,
+            "96": 0.025,
+            "220": 0.025
+          },
+          "binding_by_k": {
+            "2": 0.03333333333333333,
+            "4": 0.016666666666666666,
+            "8": 0.041666666666666664
+          },
+          "supersession": {
+            "current_acc": 0.016666666666666666,
+            "stale_error": 0.025
+          },
+          "multihop": 0.016666666666666666,
+          "source": 0.05,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.016666666666666666,
+              "binding_k4": 0.06666666666666667
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.03333333333333333
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.025,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.05
+          }
+        },
+        "resources": {
+          "params": 2000392,
+          "per_token_ms": 0.025029294192790985,
+          "tokens_per_s": 39953.18414883721,
+          "phase_state_floats_per_layer": 0,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 0
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "A",
+        "seed": 1,
+        "params": 2000392,
+        "train_s": 171.4,
+        "eval": {
+          "ppl": {
+            "256": 108.43395224074153,
+            "512": 111.76061146564226
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.0,
+            "4": 0.008333333333333333,
+            "8": 0.025
+          },
+          "supersession": {
+            "current_acc": 0.0,
+            "stale_error": 0.0
+          },
+          "multihop": 0.0,
+          "source": 0.0,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.03333333333333333
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.008333333333333333,
+            "source": 0.0
+          }
+        },
+        "resources": {
+          "params": 2000392,
+          "per_token_ms": 0.02628900110721588,
+          "tokens_per_s": 38038.72181836217,
+          "phase_state_floats_per_layer": 0,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 0
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "A",
+        "seed": 2,
+        "params": 2000392,
+        "train_s": 161.6,
+        "eval": {
+          "ppl": {
+            "256": 117.98414781011795,
+            "512": 123.80858999715083
+          },
+          "needle_by_dist": {
+            "16": 0.016666666666666666,
+            "96": 0.016666666666666666,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.03333333333333333,
+            "4": 0.016666666666666666,
+            "8": 0.03333333333333333
+          },
+          "supersession": {
+            "current_acc": 0.0,
+            "stale_error": 0.0
+          },
+          "multihop": 0.016666666666666666,
+          "source": 0.041666666666666664,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.016666666666666666,
+              "binding_k4": 0.05
+            },
+            "512": {
+              "needle_mid": 0.016666666666666666,
+              "binding_k4": 0.016666666666666666
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.016666666666666666,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.041666666666666664
+          }
+        },
+        "resources": {
+          "params": 2000392,
+          "per_token_ms": 0.027149543166160583,
+          "tokens_per_s": 36833.03228639252,
+          "phase_state_floats_per_layer": 0,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 0
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      }
+    ],
+    "B": [
+      {
+        "arm": "B",
+        "seed": 0,
+        "params": 1999752,
+        "train_s": 263.6,
+        "eval": {
+          "ppl": {
+            "256": 62.44764242983055,
+            "512": 65.04190751315457
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.016666666666666666,
+            "4": 0.025,
+            "8": 0.016666666666666666
+          },
+          "supersession": {
+            "current_acc": 0.016666666666666666,
+            "stale_error": 0.0
+          },
+          "multihop": 0.016666666666666666,
+          "source": 0.058333333333333334,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.03333333333333333
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.03333333333333333
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.025,
+            "source": 0.058333333333333334
+          },
+          "phase_off": {
+            "needle_d96": 0.008333333333333333,
+            "binding_k4": 0.008333333333333333,
+            "source": 0.0
+          }
+        },
+        "resources": {
+          "params": 1999752,
+          "per_token_ms": 0.055436231195926666,
+          "tokens_per_s": 18038.744309037334,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 512
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "B",
+        "seed": 1,
+        "params": 1999752,
+        "train_s": 262.0,
+        "eval": {
+          "ppl": {
+            "256": 59.336571404598324,
+            "512": 62.48664954441707
+          },
+          "needle_by_dist": {
+            "16": 0.008333333333333333,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.0,
+            "4": 0.008333333333333333,
+            "8": 0.025
+          },
+          "supersession": {
+            "current_acc": 0.016666666666666666,
+            "stale_error": 0.008333333333333333
+          },
+          "multihop": 0.03333333333333333,
+          "source": 0.1,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            },
+            "512": {
+              "needle_mid": 0.016666666666666666,
+              "binding_k4": 0.0
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.008333333333333333,
+            "source": 0.1
+          },
+          "phase_off": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0,
+            "source": 0.008333333333333333
+          }
+        },
+        "resources": {
+          "params": 1999752,
+          "per_token_ms": 0.05400246009230614,
+          "tokens_per_s": 18517.674903897063,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 512
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "B",
+        "seed": 2,
+        "params": 1999752,
+        "train_s": 274.9,
+        "eval": {
+          "ppl": {
+            "256": 96.49833386332134,
+            "512": 96.29379328526238
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.008333333333333333,
+            "220": 0.008333333333333333
+          },
+          "binding_by_k": {
+            "2": 0.016666666666666666,
+            "4": 0.008333333333333333,
+            "8": 0.008333333333333333
+          },
+          "supersession": {
+            "current_acc": 0.0,
+            "stale_error": 0.016666666666666666
+          },
+          "multihop": 0.008333333333333333,
+          "source": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.03333333333333333,
+              "binding_k4": 0.016666666666666666
+            },
+            "512": {
+              "needle_mid": 0.016666666666666666,
+              "binding_k4": 0.016666666666666666
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.008333333333333333,
+            "binding_k4": 0.008333333333333333,
+            "source": 0.03333333333333333
+          },
+          "phase_off": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.0,
+            "source": 0.025
+          }
+        },
+        "resources": {
+          "params": 1999752,
+          "per_token_ms": 0.058461353182792664,
+          "tokens_per_s": 17105.31736877991,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 0,
+          "total_bounded_state_floats": 512
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      }
+    ],
+    "C": [
+      {
+        "arm": "C",
+        "seed": 0,
+        "params": 2000492,
+        "train_s": 917.5,
+        "eval": {
+          "ppl": {
+            "256": 87.27702393848848,
+            "512": 91.25141661791596
+          },
+          "needle_by_dist": {
+            "16": 0.5,
+            "96": 0.4666666666666667,
+            "220": 0.475
+          },
+          "binding_by_k": {
+            "2": 0.08333333333333333,
+            "4": 0.0,
+            "8": 0.058333333333333334
+          },
+          "supersession": {
+            "current_acc": 0.03333333333333333,
+            "stale_error": 0.041666666666666664
+          },
+          "multihop": 0.058333333333333334,
+          "source": 0.08333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.4666666666666667,
+              "binding_k4": 0.1
+            },
+            "512": {
+              "needle_mid": 0.48333333333333334,
+              "binding_k4": 0.05
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.4666666666666667,
+            "binding_k4": 0.0,
+            "source": 0.08333333333333333
+          },
+          "phase_off": {
+            "needle_d96": 0.475,
+            "binding_k4": 0.0,
+            "source": 0.08333333333333333
+          },
+          "slots_off": {
+            "needle_d96": 0.016666666666666666,
+            "binding_k4": 0.025,
+            "source": 0.08333333333333333
+          },
+          "slots_randkeys": {
+            "needle_d96": 0.05,
+            "binding_k4": 0.03333333333333333,
+            "source": 0.08333333333333333
+          },
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.14937953650951385,
+              "slot_util_entropy": 1.5204055309295654,
+              "slot_util_max": 0.6567939519882202,
+              "read_addr_max_mean": 0.44138723611831665,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.3216724991798401,
+              "slot_util_entropy": 3.16911244392395,
+              "slot_util_max": 0.09592673182487488,
+              "read_addr_max_mean": 0.290805846452713,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.7791652679443359,
+              "slot_util_entropy": 3.4636292457580566,
+              "slot_util_max": 0.034627776592969894,
+              "read_addr_max_mean": 0.03695341944694519,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.8219636082649231,
+              "slot_util_entropy": 3.463357925415039,
+              "slot_util_max": 0.03498750180006027,
+              "read_addr_max_mean": 0.04373767971992493,
+              "num_slots": 32
+            }
+          ]
+        },
+        "resources": {
+          "params": 2000492,
+          "per_token_ms": 0.09307647123932838,
+          "tokens_per_s": 10743.85380843125,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 4096,
+          "total_bounded_state_floats": 16896
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "C",
+        "seed": 1,
+        "params": 2000492,
+        "train_s": 900.9,
+        "eval": {
+          "ppl": {
+            "256": 83.02468049437127,
+            "512": 87.50441489950252
+          },
+          "needle_by_dist": {
+            "16": 0.0,
+            "96": 0.0,
+            "220": 0.0
+          },
+          "binding_by_k": {
+            "2": 0.008333333333333333,
+            "4": 0.016666666666666666,
+            "8": 0.025
+          },
+          "supersession": {
+            "current_acc": 0.016666666666666666,
+            "stale_error": 0.0
+          },
+          "multihop": 0.016666666666666666,
+          "source": 0.025,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.06666666666666667
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.025
+          },
+          "phase_off": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.016666666666666666
+          },
+          "slots_off": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.1
+          },
+          "slots_randkeys": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.08333333333333333
+          },
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.19174964725971222,
+              "slot_util_entropy": 1.4304367303848267,
+              "slot_util_max": 0.6011574864387512,
+              "read_addr_max_mean": 0.323795884847641,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.46875736117362976,
+              "slot_util_entropy": 3.4608192443847656,
+              "slot_util_max": 0.0400608628988266,
+              "read_addr_max_mean": 0.03870943561196327,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.7589614987373352,
+              "slot_util_entropy": 3.4651193618774414,
+              "slot_util_max": 0.033012013882398605,
+              "read_addr_max_mean": 0.04047458618879318,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.6587713360786438,
+              "slot_util_entropy": 3.459656000137329,
+              "slot_util_max": 0.03906680643558502,
+              "read_addr_max_mean": 0.04851323738694191,
+              "num_slots": 32
+            }
+          ]
+        },
+        "resources": {
+          "params": 2000492,
+          "per_token_ms": 0.10775011032819748,
+          "tokens_per_s": 9280.73295659825,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 4096,
+          "total_bounded_state_floats": 16896
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      },
+      {
+        "arm": "C",
+        "seed": 2,
+        "params": 2000492,
+        "train_s": 870.0,
+        "eval": {
+          "ppl": {
+            "256": 79.7149153355227,
+            "512": 86.37173519661152
+          },
+          "needle_by_dist": {
+            "16": 0.058333333333333334,
+            "96": 0.0,
+            "220": 0.03333333333333333
+          },
+          "binding_by_k": {
+            "2": 0.175,
+            "4": 0.058333333333333334,
+            "8": 0.025
+          },
+          "supersession": {
+            "current_acc": 0.025,
+            "stale_error": 0.025
+          },
+          "multihop": 0.03333333333333333,
+          "source": 0.03333333333333333,
+          "lengthgen": {
+            "256": {
+              "needle_mid": 0.03333333333333333,
+              "binding_k4": 0.13333333333333333
+            },
+            "512": {
+              "needle_mid": 0.0,
+              "binding_k4": 0.0
+            }
+          }
+        },
+        "ablation": {
+          "baseline": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.058333333333333334,
+            "source": 0.03333333333333333
+          },
+          "phase_off": {
+            "needle_d96": 0.0,
+            "binding_k4": 0.075,
+            "source": 0.025
+          },
+          "slots_off": {
+            "needle_d96": 0.041666666666666664,
+            "binding_k4": 0.016666666666666666,
+            "source": 0.03333333333333333
+          },
+          "slots_randkeys": {
+            "needle_d96": 0.008333333333333333,
+            "binding_k4": 0.008333333333333333,
+            "source": 0.041666666666666664
+          },
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.1288280487060547,
+              "slot_util_entropy": 2.8189971446990967,
+              "slot_util_max": 0.23141689598560333,
+              "read_addr_max_mean": 0.19443516433238983,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.2127191722393036,
+              "slot_util_entropy": 3.246518850326538,
+              "slot_util_max": 0.06535668671131134,
+              "read_addr_max_mean": 0.08201511204242706,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.5062063932418823,
+              "slot_util_entropy": 3.4324374198913574,
+              "slot_util_max": 0.048235416412353516,
+              "read_addr_max_mean": 0.04581931605935097,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.5516842007637024,
+              "slot_util_entropy": 3.4623231887817383,
+              "slot_util_max": 0.03824713081121445,
+              "read_addr_max_mean": 0.05899546667933464,
+              "num_slots": 32
+            }
+          ]
+        },
+        "resources": {
+          "params": 2000492,
+          "per_token_ms": 0.10095462203025818,
+          "tokens_per_s": 9905.440482955593,
+          "phase_state_floats_per_layer": 128,
+          "slot_state_floats_per_layer": 4096,
+          "total_bounded_state_floats": 16896
+        },
+        "no_nxn_check": {
+          "phase_builds_NN": false,
+          "slots_builds_NN": false
+        }
+      }
+    ]
+  },
+  "log": [
+    "vocab=1291 corpus_tokens=55547 steps=1200 N=160 slots=32 window=64",
+    "    [A s0] step 0/1200 loss 7.096",
+    "    [A s0] step 240/1200 loss 5.257",
+    "    [A s0] step 480/1200 loss 3.868",
+    "    [A s0] step 720/1200 loss 3.847",
+    "    [A s0] step 960/1200 loss 3.793",
+    "  [A s0] p=2000392 ppl256=128.4 ndl96=0.03 bnd4=0.02 sup=0.02(stale0.03) src=0.05 mhop=0.02 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (177s)",
+    "    [A s1] step 0/1200 loss 7.171",
+    "    [A s1] step 240/1200 loss 5.406",
+    "    [A s1] step 480/1200 loss 4.135",
+    "    [A s1] step 720/1200 loss 2.880",
+    "    [A s1] step 960/1200 loss 4.109",
+    "  [A s1] p=2000392 ppl256=108.4 ndl96=0.00 bnd4=0.01 sup=0.00(stale0.00) src=0.00 mhop=0.00 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (187s)",
+    "    [A s2] step 0/1200 loss 7.160",
+    "    [A s2] step 240/1200 loss 5.346",
+    "    [A s2] step 480/1200 loss 3.846",
+    "    [A s2] step 720/1200 loss 3.995",
+    "    [A s2] step 960/1200 loss 5.125",
+    "  [A s2] p=2000392 ppl256=118.0 ndl96=0.02 bnd4=0.02 sup=0.00(stale0.00) src=0.04 mhop=0.02 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (180s)",
+    "    [B s0] step 0/1200 loss 7.294",
+    "    [B s0] step 240/1200 loss 5.233",
+    "    [B s0] step 480/1200 loss 3.940",
+    "    [B s0] step 720/1200 loss 3.856",
+    "    [B s0] step 960/1200 loss 3.900",
+    "  [B s0] p=1999752 ppl256=62.4 ndl96=0.00 bnd4=0.03 sup=0.02(stale0.00) src=0.06 mhop=0.02 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (286s)",
+    "    [B s1] step 0/1200 loss 7.143",
+    "    [B s1] step 240/1200 loss 5.388",
+    "    [B s1] step 480/1200 loss 4.046",
+    "    [B s1] step 720/1200 loss 2.818",
+    "    [B s1] step 960/1200 loss 4.094",
+    "  [B s1] p=1999752 ppl256=59.3 ndl96=0.00 bnd4=0.01 sup=0.02(stale0.01) src=0.10 mhop=0.03 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (286s)",
+    "    [B s2] step 0/1200 loss 7.280",
+    "    [B s2] step 240/1200 loss 5.363",
+    "    [B s2] step 480/1200 loss 3.843",
+    "    [B s2] step 720/1200 loss 3.930",
+    "    [B s2] step 960/1200 loss 4.914",
+    "  [B s2] p=1999752 ppl256=96.5 ndl96=0.01 bnd4=0.01 sup=0.00(stale0.02) src=0.03 mhop=0.01 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (300s)",
+    "    [C s0] step 0/1200 loss 7.240",
+    "    [C s0] step 240/1200 loss 5.222",
+    "    [C s0] step 480/1200 loss 3.953",
+    "    [C s0] step 720/1200 loss 3.823",
+    "    [C s0] step 960/1200 loss 3.638",
+    "  [C s0] p=2000492 ppl256=87.3 ndl96=0.47 bnd4=0.00 sup=0.03(stale0.04) src=0.08 mhop=0.06 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (1012s)",
+    "    [C s1] step 0/1200 loss 7.125",
+    "    [C s1] step 240/1200 loss 5.387",
+    "    [C s1] step 480/1200 loss 4.055",
+    "    [C s1] step 720/1200 loss 2.731",
+    "    [C s1] step 960/1200 loss 3.956",
+    "  [C s1] p=2000492 ppl256=83.0 ndl96=0.00 bnd4=0.02 sup=0.02(stale0.00) src=0.03 mhop=0.02 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (996s)",
+    "    [C s2] step 0/1200 loss 7.276",
+    "    [C s2] step 240/1200 loss 5.295",
+    "    [C s2] step 480/1200 loss 3.924",
+    "    [C s2] step 720/1200 loss 2.496",
+    "    [C s2] step 960/1200 loss 4.879",
+    "  [C s2] p=2000492 ppl256=79.7 ndl96=0.00 bnd4=0.06 sup=0.03(stale0.03) src=0.03 mhop=0.03 NN={'phase_builds_NN': False, 'slots_builds_NN': False} (966s)"
+  ]
+}

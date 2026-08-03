@@ -1,0 +1,17 @@
+{
+  "forward": {
+    "max_abs_err": 0.0
+  },
+  "grad": {
+    "max_abs_input_grad_err": 0.0
+  },
+  "ablation": {
+    "None": 0.0,
+    "zero": 0.0,
+    "shuffle_val": 0.0,
+    "rand_keys": 0.0
+  },
+  "state_dict": "identical_keys_and_shapes",
+  "classification": "EXACT_PARITY",
+  "note": "measured max forward and gradient error is exactly 0.0 across B in {1,2}, N in {1,8,32,160}, and all ablation modes {None,zero,shuffle_val,rand_keys}; state_dict keys/shapes identical. The incubated class body is byte-identical to the historical one, so with identical weights the outputs are bit-identical (a fortiori NUMERICAL_PARITY within 1e-7)."
+}

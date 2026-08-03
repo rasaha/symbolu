@@ -1,0 +1,380 @@
+{
+  "config": {
+    "check_environment": false,
+    "run_id": "sarm_1200_run1",
+    "seeds": "0,1,2",
+    "steps": 1200,
+    "N": 160,
+    "batch": 16,
+    "num_slots": 32,
+    "target_params": 2000000,
+    "lr": 0.002,
+    "threads": 4
+  },
+  "vocab": 1291,
+  "corpus_tokens": 55547,
+  "corpus_hashes": {
+    "/home/user/symbolu/bounded_shadow_pilot/data/natural_pilot_v1/corpus.json": "dfa196d5d32ab562e69110415912f53312cb1e519d958760b2aaae8d2afc03aa",
+    "/home/user/symbolu/evidence_assurance/data/v1/corpus.json": "4260dd4b766658159c72b7426e0977a19fb3309a1aa4929dc74a437a22997b2b"
+  },
+  "run_id": "sarm_1200_run1",
+  "torch": "2.13.0+cu130",
+  "threads": 4,
+  "deterministic": false,
+  "arms": {
+    "A": [
+      {
+        "seed": 0,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.041666666666666664,
+          "96": 0.025,
+          "220": 0.025
+        },
+        "ppl": {
+          "256": 128.44814155354703,
+          "512": 133.6752404412504
+        },
+        "binding_by_k": {
+          "2": 0.03333333333333333,
+          "4": 0.016666666666666666,
+          "8": 0.041666666666666664
+        },
+        "supersession": {
+          "current_acc": 0.016666666666666666,
+          "stale_error": 0.025
+        },
+        "source": 0.05,
+        "multihop": 0.016666666666666666,
+        "train_s": 183.7
+      },
+      {
+        "seed": 1,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 108.43395224074153,
+          "512": 111.76061146564226
+        },
+        "binding_by_k": {
+          "2": 0.0,
+          "4": 0.008333333333333333,
+          "8": 0.025
+        },
+        "supersession": {
+          "current_acc": 0.0,
+          "stale_error": 0.0
+        },
+        "source": 0.0,
+        "multihop": 0.0,
+        "train_s": 208.9
+      },
+      {
+        "seed": 2,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.016666666666666666,
+          "96": 0.016666666666666666,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 117.98414781011795,
+          "512": 123.80858999715083
+        },
+        "binding_by_k": {
+          "2": 0.03333333333333333,
+          "4": 0.016666666666666666,
+          "8": 0.03333333333333333
+        },
+        "supersession": {
+          "current_acc": 0.0,
+          "stale_error": 0.0
+        },
+        "source": 0.041666666666666664,
+        "multihop": 0.016666666666666666,
+        "train_s": 183.0
+      }
+    ],
+    "S": [
+      {
+        "seed": 0,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.075,
+          "96": 0.075,
+          "220": 0.1
+        },
+        "ppl": {
+          "256": 104.90506382189491,
+          "512": 108.27476247638907
+        },
+        "binding_by_k": {
+          "2": 0.075,
+          "4": 0.025,
+          "8": 0.03333333333333333
+        },
+        "supersession": {
+          "current_acc": 0.075,
+          "stale_error": 0.05
+        },
+        "source": 0.08333333333333333,
+        "multihop": 0.09166666666666666,
+        "train_s": 887.0,
+        "ablation": {
+          "baseline": 0.075,
+          "slots_off": 0.025,
+          "randomized_address": 0.008333333333333333,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.025,
+          "slot_keys_randomized": 0.008333333333333333,
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.10657079517841339,
+              "slot_util_entropy": 3.3177051544189453,
+              "slot_util_max": 0.08219584077596664,
+              "read_addr_max_mean": 0.07561351358890533,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.7642379999160767,
+              "slot_util_entropy": 3.455042839050293,
+              "slot_util_max": 0.04119985178112984,
+              "read_addr_max_mean": 0.05232102423906326,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.7192661166191101,
+              "slot_util_entropy": 3.45824933052063,
+              "slot_util_max": 0.038888972252607346,
+              "read_addr_max_mean": 0.08131097257137299,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.8284052610397339,
+              "slot_util_entropy": 3.45291805267334,
+              "slot_util_max": 0.0495368167757988,
+              "read_addr_max_mean": 0.047880616039037704,
+              "num_slots": 32
+            }
+          ]
+        }
+      },
+      {
+        "seed": 1,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.26666666666666666,
+          "96": 0.25,
+          "220": 0.25833333333333336
+        },
+        "ppl": {
+          "256": 127.22018772071996,
+          "512": 131.88984514549807
+        },
+        "binding_by_k": {
+          "2": 0.075,
+          "4": 0.058333333333333334,
+          "8": 0.03333333333333333
+        },
+        "supersession": {
+          "current_acc": 0.008333333333333333,
+          "stale_error": 0.075
+        },
+        "source": 0.125,
+        "multihop": 0.05,
+        "train_s": 939.1,
+        "ablation": {
+          "baseline": 0.25,
+          "slots_off": 0.016666666666666666,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.016666666666666666,
+          "slot_keys_randomized": 0.11666666666666667,
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.029820099472999573,
+              "slot_util_entropy": 3.2499496936798096,
+              "slot_util_max": 0.09722071886062622,
+              "read_addr_max_mean": 0.059320420026779175,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.7068155407905579,
+              "slot_util_entropy": 3.4580395221710205,
+              "slot_util_max": 0.041644372045993805,
+              "read_addr_max_mean": 0.049111880362033844,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.6591836214065552,
+              "slot_util_entropy": 3.4605934619903564,
+              "slot_util_max": 0.038480244576931,
+              "read_addr_max_mean": 0.0420355498790741,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.6495116353034973,
+              "slot_util_entropy": 3.3857274055480957,
+              "slot_util_max": 0.0848747044801712,
+              "read_addr_max_mean": 0.05616425350308418,
+              "num_slots": 32
+            }
+          ]
+        }
+      },
+      {
+        "seed": 2,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.21666666666666667,
+          "96": 0.2,
+          "220": 0.24166666666666667
+        },
+        "ppl": {
+          "256": 99.80368521548945,
+          "512": 104.86778857783817
+        },
+        "binding_by_k": {
+          "2": 0.03333333333333333,
+          "4": 0.06666666666666667,
+          "8": 0.025
+        },
+        "supersession": {
+          "current_acc": 0.05,
+          "stale_error": 0.10833333333333334
+        },
+        "source": 0.09166666666666666,
+        "multihop": 0.03333333333333333,
+        "train_s": 910.9,
+        "ablation": {
+          "baseline": 0.2,
+          "slots_off": 0.016666666666666666,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.016666666666666666,
+          "slot_keys_randomized": 0.041666666666666664,
+          "slot_diagnostics": [
+            {
+              "slot_write_gate_mean": 0.11001832783222198,
+              "slot_util_entropy": 2.8531577587127686,
+              "slot_util_max": 0.23374493420124054,
+              "read_addr_max_mean": 0.11916991323232651,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.8843057751655579,
+              "slot_util_entropy": 3.439208507537842,
+              "slot_util_max": 0.062316495925188065,
+              "read_addr_max_mean": 0.04849952086806297,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.8340767025947571,
+              "slot_util_entropy": 3.456876277923584,
+              "slot_util_max": 0.0428413450717926,
+              "read_addr_max_mean": 0.04555397108197212,
+              "num_slots": 32
+            },
+            {
+              "slot_write_gate_mean": 0.6190115213394165,
+              "slot_util_entropy": 3.457845687866211,
+              "slot_util_max": 0.039479225873947144,
+              "read_addr_max_mean": 0.04037129878997803,
+              "num_slots": 32
+            }
+          ]
+        }
+      }
+    ],
+    "A+": [
+      {
+        "seed": 0,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.041666666666666664,
+          "96": 0.025,
+          "220": 0.025
+        },
+        "ppl": {
+          "256": 128.44814155354703,
+          "512": 133.6752404412504
+        },
+        "binding_by_k": {
+          "2": 0.03333333333333333,
+          "4": 0.016666666666666666,
+          "8": 0.041666666666666664
+        },
+        "supersession": {
+          "current_acc": 0.016666666666666666,
+          "stale_error": 0.025
+        },
+        "source": 0.05,
+        "multihop": 0.016666666666666666,
+        "train_s": 169.8
+      },
+      {
+        "seed": 1,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 108.43395224074153,
+          "512": 111.76061146564226
+        },
+        "binding_by_k": {
+          "2": 0.0,
+          "4": 0.008333333333333333,
+          "8": 0.025
+        },
+        "supersession": {
+          "current_acc": 0.0,
+          "stale_error": 0.0
+        },
+        "source": 0.0,
+        "multihop": 0.0,
+        "train_s": 181.5
+      },
+      {
+        "seed": 2,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.016666666666666666,
+          "96": 0.016666666666666666,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 117.98414781011795,
+          "512": 123.80858999715083
+        },
+        "binding_by_k": {
+          "2": 0.03333333333333333,
+          "4": 0.016666666666666666,
+          "8": 0.03333333333333333
+        },
+        "supersession": {
+          "current_acc": 0.0,
+          "stale_error": 0.0
+        },
+        "source": 0.041666666666666664,
+        "multihop": 0.016666666666666666,
+        "train_s": 172.2
+      }
+    ]
+  }
+}
