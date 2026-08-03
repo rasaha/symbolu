@@ -62,8 +62,36 @@ def main() -> int:
                   f"ppl256={rec['ppl']['256']:.1f} ({round(time.time()-t0,1)}s)", flush=True)
         rf.write_text(json.dumps({"arm": arm, "records": records}, indent=2))
         print(f"[stageA] wrote {rf}", flush=True)
+        _preserve(args.run_id, arm, out_dir)
     print("[stageA] ALL ARMS COMPLETE", flush=True)
     return 0
+
+
+def _preserve(run_id, arm, out_dir):
+    """Durably commit+push a completed arm's raw results so the compute survives any container
+    reclone. Non-fatal on failure (e.g. transient network); the next arm still proceeds."""
+    import subprocess
+    REPO = "/home/user/symbolu"
+    files = [str(out_dir / f"{arm}_results.json")] + [str(p) for p in out_dir.glob(f"{arm}_seed*.json")]
+    try:
+        subprocess.run(["git", "-C", REPO, "add", "-f", *files], check=False, capture_output=True)
+        msg = f"research(slots): checkpoint Stage A arm {arm} results ({run_id})"
+        r = subprocess.run(["git", "-C", REPO, "commit", "-q", "-m", msg,
+                            "-m", "Automated per-arm durability checkpoint (raw diagnostic-seed results).",
+                            "-m", "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>",
+                            "-m", "Claude-Session: https://claude.ai/code/session_0158cnJzS81RoDfw8ptbnrnn"],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            for _ in range(3):
+                p = subprocess.run(["git", "-C", REPO, "push"], capture_output=True, text=True)
+                if p.returncode == 0:
+                    print(f"[stageA] preserved+pushed {arm}", flush=True); return
+                time.sleep(4)
+            print(f"[stageA] committed {arm} (push failed, will retry next arm)", flush=True)
+        else:
+            print(f"[stageA] preserve {arm}: nothing to commit or commit skipped", flush=True)
+    except Exception as e:
+        print(f"[stageA] preserve {arm} error (non-fatal): {e}", flush=True)
 
 
 if __name__ == "__main__":
