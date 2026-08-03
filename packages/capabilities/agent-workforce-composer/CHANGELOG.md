@@ -3,6 +3,31 @@
 All notable changes to `ugence-agent-workforce-composer` are documented here.
 This project versions the distribution independently of the Ugence platform.
 
+## 0.2.1 — P2.1: Policy Workflow Compiler workflow_ir.v2 compatibility adapter
+
+Additive. Consumes the compiler's enriched `workflow_ir.v2` contract directly while
+keeping the v1 path byte-frozen. The `awc.v1` / `awc.composition.v1` planning
+contracts are UNCHANGED; a new `awc.compiler_adapter.v2` metadata version covers
+adaptation envelopes only.
+
+### Added
+- `adapter_v2` (v2 semantic compatibility adapter) + `compatibility` (explicit
+  contract-version dispatch, `compare_adaptations`, `compare_workforce_plans`).
+- Overlay reduction (`reduce_overlay`) with a monotonic authority/security merge and
+  typed conflict diagnostics; the compiler now supplies role name/description, the
+  functional base capability, human-review classification, dependency semantics and
+  provenance — enterprise policy fields remain external.
+- Committed v1/v2 equivalence conformance fixtures for the four Governance Studio P3A
+  scenarios (all SEMANTICALLY_EQUIVALENT); CLI `adapt-workflow --contract`,
+  `compare-adaptations`, `inspect-overlay-reduction`; extended isolated verifier;
+  scoped CI. Public API 93 -> 109.
+
+### Compatibility
+Eligibility, ranking, composition, permission and fallback algorithms unchanged; v1
+adaptation and plan fingerprints byte-identical; AWC P1/P2 (158) and Governance
+Studio P3A (94) green; platform-freeze digest unchanged. Not implemented: Governance
+Studio API, runtime handoff/execution, H16/H22/Model Selection, pilot/production.
+
 ## [0.2.0] — Agent Workforce Composer P2
 
 Additive composition contract `awc.composition.v1`. P1 (`awc.v1`) contracts,

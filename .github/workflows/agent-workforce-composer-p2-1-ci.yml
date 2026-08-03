@@ -1,0 +1,190 @@
+name: agent-workforce-composer-p2-1-ci
+
+# Scoped CI for Agent Workforce Composer P2.1 (Policy Workflow Compiler
+# workflow_ir.v2 compatibility adapter, overlay reduction, dependency/provenance
+# mapping, deterministic v1/v2 outcome equivalence). Runs the P1/P2 regression, the
+# v1/v2 adapter suites, overlay reduction + authority-boundary, dependency mapping,
+# the four-scenario equivalence harness, import-boundary + public-API freeze, the
+# isolated clean-install distribution verifier, determinism, terminology, and
+# blocking platform-freeze verification. No external models, no runtime, no web app.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p2-1-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/awc-p2-1-**"
+      - "chatgpt/awc-p2-1-**"
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p2-1-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/capabilities/agent-workforce-composer
+  SRC: packages/capabilities/agent-workforce-composer/src
+
+jobs:
+  p1-p2-regression:
+    name: P1/P2 regression + honest maturity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python -m pytest ${{ env.PKG }}/tests/test_p1_compat.py ${{ env.PKG }}/tests/test_adapter.py \
+            ${{ env.PKG }}/tests/test_eligibility.py ${{ env.PKG }}/tests/test_ranking.py \
+            ${{ env.PKG }}/tests/test_composition.py ${{ env.PKG }}/tests/test_plan.py \
+            ${{ env.PKG }}/tests/test_public_api.py -q
+      - name: version 0.2.1 + honest P2.1 maturity
+        env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python - <<'PY'
+          import ugence_agent_workforce_composer as u
+          i = u.version_info().to_dict()
+          assert u.__version__ == "0.2.1" and u.CONTRACT_VERSION == "awc.v1"
+          assert i["composition_contract_version"] == "awc.composition.v1"
+          assert i["compiler_adapter_contract_version"] == "awc.compiler_adapter.v2"
+          for k in ("compiler_workflow_ir_v1_supported","compiler_workflow_ir_v2_supported",
+                    "compiler_v2_adapter_implemented","overlay_reduction_implemented",
+                    "v1_fingerprint_compatibility_verified","v1_v2_equivalence_harness_implemented"):
+              assert i[k] is True, k
+          for k in ("governance_studio_api_implemented","runtime_handoff_implemented",
+                    "runtime_execution_implemented","h16_migration_implemented",
+                    "model_selection_integration_implemented","h22_integration_implemented",
+                    "pilot_validated","production_certified"):
+              assert i[k] is False, k
+          print("maturity honest")
+          PY
+
+  compiler-v1-v2-adapter:
+    name: v1 frozen + v2 semantic adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_adapter.py -q
+
+  overlay-reduction-authority-dependency:
+    name: overlay reduction + authority + dependency mapping
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_adapter.py -q -k "overlay or authority or dependency or non_agent"
+
+  equivalence-suite:
+    name: v1/v2 four-scenario equivalence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_equivalence.py -q
+
+  governance-studio-scenario-migration:
+    name: conformance-fixture regeneration is stable (needs compiler)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/tooling/policy-workflow-compiler
+          pip install -e ${{ env.PKG }}
+      - name: regenerate conformance and assert no drift
+        run: |
+          python ${{ env.PKG }}/conformance/generate_compiler_v2_conformance.py
+          git diff --exit-code ${{ env.PKG }}/conformance/governance_studio_v2 \
+            || (echo "conformance fixtures drifted"; exit 1)
+
+  import-boundary-architecture:
+    name: import-boundary + architecture assertions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_p2_1_boundaries.py ${{ env.PKG }}/tests/test_boundaries.py ${{ env.PKG }}/tests/test_boundaries_p2.py -q
+
+  public-api-freeze:
+    name: Public-API frozen artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python ${{ env.PKG }}/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/capabilities/agent-workforce-composer/artifacts/public_api.json"))
+          assert live == frozen, "public API drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+
+  isolated-distribution:
+    name: Clean-install verifier (wheel/sdist, v1+v2 adapter, cross-process determinism)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install build
+      - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
+
+  terminology:
+    name: Stale-terminology scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          pkg = pathlib.Path("packages/capabilities/agent-workforce-composer")
+          bad = re.compile(r"\b(production[- ]ready|pilot[- ]validated|production[- ]certified)\b", re.I)
+          off = []
+          for md in list(pkg.glob("*.md")) + list((pkg/'docs').glob("*.md")):
+              L = md.read_text(encoding="utf-8").splitlines()
+              for i, line in enumerate(L, 1):
+                  if bad.search(line) and not re.search(r"(false|not |never|no |=false|is False)", " ".join(L[max(0,i-2):i+1]), re.I):
+                      off.append(f"{md}:{i}")
+          if off: print("offenders:", off); sys.exit(1)
+          print("terminology OK")
+          PY
+
+  platform-freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

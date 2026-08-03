@@ -107,3 +107,16 @@ Maturity: `pilot_validated=false`, `production_certified=false`. Workflow
 adaptation and agent eligibility are implemented and locally verified over frozen
 synthetic fixtures; agent ranking, team composition and runtime use remain
 unimplemented.
+
+
+## P2.1 — Compiler workflow_ir.v2 compatibility adapter
+
+AWC now consumes the Policy Workflow Compiler's enriched `workflow_ir.v2` contract
+directly (`adapt_workflow` dispatches explicitly by contract version; the v1 path is
+byte-frozen). The compiler supplies node meaning, functional capability, typed
+contracts, authority / human-review classification, dependency semantics and
+provenance; enterprise deployment policy stays an external overlay; eligibility,
+ranking, composition, permission and fallback algorithms are unchanged. Equivalent
+v1 and v2 inputs produce equivalent workforce plans (SEMANTICALLY_EQUIVALENT). See
+`docs/COMPILER_V2_ADAPTER.md`, `docs/RESULT_EQUIVALENCE.md`,
+`docs/KNOWN_LIMITATIONS_P2_1.md`.
