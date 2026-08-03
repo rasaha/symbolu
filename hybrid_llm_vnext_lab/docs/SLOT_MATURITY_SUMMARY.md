@@ -5,12 +5,13 @@ across them without qualification.
 
 ## 1. Historical neural slots — `experiments/phase_lc/models.py::BindingSlots`
 Soft learned fixed-slot routing with cumulative weighted-average memory (parallel `[B,N,M,D]` scan).
-- **Maturity:** `HISTORICAL_RESULT_ONLY` → reproduction in progress.
-  - A arm reproduced **exactly** (params 2000392; ppl256 128.4/108.4/118.0 vs 128.45/108.43/117.98;
-    needle 0.025/0.000/0.017) inside the S run.
-  - B/C arms + the C slots-off/rand-address/phase-off ablations: A/B/C reproduction executed via the
-    hardened launcher (`repro_abc_run1`); classification recorded in the reproduction report against
-    the pre-registered `REPRODUCTION_ACCEPTANCE.json`.
+- **Maturity:** `HISTORICAL_RESULT_ONLY` → **`EXACT_REPRODUCTION`**.
+  - Full A/B/C reproduced exactly (`repro_abc_run1`, wall 73 min): params exact (A 2000392, B 1999752,
+    C 2000492); ppl A 128.4/108.4/118.0, B 62.4/59.3/96.5, C 87.3/83.0/79.7 (vs 128.45/108.43/117.98,
+    62.45/59.34/96.50, 87.28/83.02/79.71); C needle 0.467/0/0 (historical 0.4667/0/0).
+  - **Causal ablation reproduces exactly** (C seed0): baseline 0.467 → slots_off 0.017, rand-address
+    0.050, phase_off 0.475 (unchanged). See the reproduction report + `REPRODUCTION_ACCEPTANCE.json`.
+  - Frozen `abc.json` never written (sha256 unchanged).
 
 ## 2. Incubated extracted neural class — `hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py::BindingSlots`
 Byte-identical extraction of (1).

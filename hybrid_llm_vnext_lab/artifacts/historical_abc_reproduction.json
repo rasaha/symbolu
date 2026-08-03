@@ -1,0 +1,41 @@
+{
+  "schema": "historical_abc_reproduction/v1",
+  "date": "2026-08-03",
+  "classification": "EXACT_REPRODUCTION",
+  "run_id": "repro_abc_run1",
+  "command": "harness_abc.py --arms A,B,C --seeds 0,1,2 --steps 1200 --N 160 --num_slots 32 --target_params 2000000 --tag repro_slots_1200_repro_abc_run1",
+  "wall_s": 4391,
+  "env": {"python": "3.11.15", "torch": "2.13.0+cu130", "numpy": "1.26.4", "threads": 4, "dtype": "fp32"},
+  "frozen_abc_sha256_before_and_after": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482 (UNCHANGED)",
+  "match_exact": {
+    "config": true,
+    "param_counts": {"A": 2000392, "B": 1999752, "C": 2000492, "saved": {"A": 2000392, "B": 1999752, "C": 2000492}, "match": true},
+    "no_nxn_flags": {"phase_builds_NN": false, "slots_builds_NN": false, "match": true},
+    "vocab": 1291, "corpus_tokens": 55547
+  },
+  "needle_at_d96": {
+    "A": {"reproduced": [0.025, 0.000, 0.017], "saved": [0.025, 0.000, 0.0167]},
+    "B": {"reproduced": [0.000, 0.000, 0.008], "saved": [0.000, 0.000, 0.008]},
+    "C": {"reproduced": [0.467, 0.000, 0.000], "saved": [0.4667, 0.000, 0.000]}
+  },
+  "ppl_at_256": {
+    "A": {"reproduced": [128.4, 108.4, 118.0], "saved": [128.45, 108.43, 117.98]},
+    "B": {"reproduced": [62.4, 59.3, 96.5], "saved": [62.45, 59.34, 96.50]},
+    "C": {"reproduced": [87.3, 83.0, 79.7], "saved": [87.28, 83.02, 79.71]}
+  },
+  "C_causal_ablation_needle_d96": {
+    "seed0": {"baseline": 0.467, "slots_off": 0.017, "randomized_address": 0.050, "phase_off": 0.475,
+              "saved": {"baseline": 0.4667, "slots_off": 0.0167, "randomized_address": 0.050, "phase_off": 0.475}},
+    "seed1": {"baseline": 0.000, "slots_off": 0.000, "randomized_address": 0.000, "phase_off": 0.000},
+    "seed2": {"baseline": 0.000, "slots_off": 0.042, "randomized_address": 0.008, "phase_off": 0.000}
+  },
+  "causal_pattern_reproduced": {
+    "seed0_C_forms": true,
+    "slots_off_collapses": "0.467 -> 0.017 (drop 0.450)",
+    "randomized_address_reduces": "0.467 -> 0.050",
+    "phase_off_preserves_slot_result": "0.467 -> 0.475 (unchanged) — the learned addressable memory, not Phase, carries it",
+    "verdict": "the full causal signature reproduces exactly"
+  },
+  "acceptance": "meets every must_match_exactly and primary_causal_pattern requirement in REPRODUCTION_ACCEPTANCE.json within the pre-registered tolerances; per-seed values are essentially identical (torch 2.13.0 matches historical 2.13, same seeds/threads/code). Classified EXACT_REPRODUCTION.",
+  "excluded": "the report's prose-only 1800-step/1.00 figure (NOT_FOUND) was not a target and was not reproduced."
+}
