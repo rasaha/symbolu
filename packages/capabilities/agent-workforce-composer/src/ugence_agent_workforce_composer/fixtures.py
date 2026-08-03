@@ -164,11 +164,13 @@ def role_overlay() -> Dict[str, Mapping]:
             "required_capabilities": ("risk_analysis",),
             "required_evidence_classes": ("MEASURED",),
             "data_classification": "confidential",
+            "required_permissions": ("read_context",),
         },
         "proc_recommendation": {
             "role_name": "recommendation drafter",
             "required_capabilities": ("recommendation_drafting",),
             "required_evidence_classes": ("MEASURED",),
+            "required_permissions": ("read_context",),
         },
         "sup_classification": {
             "role_name": "support classifier",
@@ -338,7 +340,7 @@ def eligibility_policy() -> EligibilityPolicy:
 # --------------------------------------------------------------------------- #
 
 def run_demo(name: str):
-    """Run the full offline pipeline for a named synthetic workflow.
+    """Run the full offline P1 pipeline for a named synthetic workflow.
 
     Returns ``(adaptation_result, workflow_eligibility_result)``.
     """
@@ -352,6 +354,81 @@ def run_demo(name: str):
     return adaptation, result
 
 
+# --------------------------------------------------------------------------- #
+# P2 default policies (contract awc.composition.v1)
+# --------------------------------------------------------------------------- #
+
+def ranking_policy():
+    from .ranking import AgentRankingPolicy, RankingCriterion
+    from .fingerprint import stamp_fingerprint
+    crits = (
+        RankingCriterion(key="evidence_strength", metric="evidence_strength",
+                         direction="higher_better", lo=1, hi=3, weight_bp=2000),
+        RankingCriterion(key="evidence_freshness", metric="evidence_freshness",
+                         direction="higher_better", lo=0, hi=1, weight_bp=1000),
+        RankingCriterion(key="measured_quality", metric="quality",
+                         direction="higher_better", lo=0, hi=1, weight_bp=2000),
+        RankingCriterion(key="observed_reliability", metric="reliability",
+                         direction="higher_better", lo=0.9, hi=1.0, weight_bp=1500),
+        RankingCriterion(key="latency_headroom", metric="latency",
+                         direction="lower_better", lo=0, hi=5000, weight_bp=1500),
+        RankingCriterion(key="cost_efficiency", metric="cost",
+                         direction="lower_better", lo=0, hi=10, weight_bp=1000),
+        RankingCriterion(key="security_headroom", metric="security",
+                         direction="higher_better", lo=0, hi=5, weight_bp=500),
+        RankingCriterion(key="audit_strength", metric="audit",
+                         direction="higher_better", lo=0, hi=4, weight_bp=500),
+    )
+    return stamp_fingerprint(
+        AgentRankingPolicy(policy_id="synthetic_ranking_policy", policy_version="1.0", criteria=crits),
+        "policy_digest")
+
+
+def team_composition_policy():
+    from .composition import TeamCompositionPolicy
+    from .fingerprint import stamp_fingerprint
+    return stamp_fingerprint(
+        TeamCompositionPolicy(policy_id="synthetic_composition_policy", policy_version="1.0",
+                              provider_concentration_limit_pct=67, maximum_roles_per_agent=2,
+                              minimum_provider_diversity=1, minimum_deployment_diversity=1,
+                              team_cost_hard_ceiling=50.0, team_latency_hard_ceiling=10000.0,
+                              team_reliability_floor=0.9),
+        "policy_digest")
+
+
+def permission_policy():
+    from .permissions import PermissionBoundingPolicy
+    from .fingerprint import stamp_fingerprint
+    return stamp_fingerprint(
+        PermissionBoundingPolicy(policy_id="synthetic_permission_policy", policy_version="1.0",
+                                 governance_owned_permissions=("authorize_purchase", "approve_binding"),
+                                 human_review_permissions=("write_draft",)),
+        "policy_digest")
+
+
+def fallback_policy():
+    from .fallback import AgentFallbackPolicy
+    from .fingerprint import stamp_fingerprint
+    return stamp_fingerprint(
+        AgentFallbackPolicy(policy_id="synthetic_fallback_policy", policy_version="1.0",
+                            maximum_fallback_depth=2, require_security_equivalence=False),
+        "policy_digest")
+
+
+def run_compose_demo(name: str):
+    """Run the full offline P1→P2 pipeline: adapt → eligibility → rank → compose →
+    permission-bound → fallback → AgentTeamPlan. Returns ``(adaptation, plan)``."""
+    from .plan import build_agent_team_plan
+    if name not in WORKFLOWS:
+        raise KeyError(f"unknown demo workflow {name!r}; choose one of {sorted(WORKFLOWS)}")
+    adaptation = adapt_compiled_workflow(WORKFLOWS[name](), role_overlay=role_overlay())
+    plan = build_agent_team_plan(
+        adaptation, registry_snapshot(), enterprise_policy(), eligibility_policy(),
+        ranking_policy(), team_composition_policy(), permission_policy(), fallback_policy(),
+        LOGICAL_TIME)
+    return adaptation, plan
+
+
 __all__ = [
     "LOGICAL_TIME",
     "procurement_workflow",
@@ -363,4 +440,9 @@ __all__ = [
     "enterprise_policy",
     "eligibility_policy",
     "run_demo",
+    "ranking_policy",
+    "team_composition_policy",
+    "permission_policy",
+    "fallback_policy",
+    "run_compose_demo",
 ]

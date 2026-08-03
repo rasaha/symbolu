@@ -76,9 +76,86 @@ from .eligibility import (
     explain_role_report,
 )
 
+# -- P2: ranking ---------------------------------------------------------------
+from .ranking import (
+    AgentRankingPolicy,
+    AgentRankResult,
+    RankingCriterion,
+    RankingCriterionResult,
+    RoleCandidateRanking,
+    rank_eligible_candidates,
+    rank_workflow_candidates,
+)
+
+# -- P2: role dependency graph -------------------------------------------------
+from .dependency import (
+    RoleDependency,
+    RoleDependencyGraph,
+    RoleInterfaceRequirement,
+    build_role_dependency_graph,
+)
+
+# -- P2: failure domains -------------------------------------------------------
+from .failure_domains import FailureDomain, FailureDomainSet, build_failure_domain_set
+
+# -- P2: team composition ------------------------------------------------------
+from .composition import (
+    RoleAssignment,
+    SearchStatistics,
+    TeamCompositionPolicy,
+    TeamCompositionResult,
+    TeamConstraintResult,
+    TeamObjectiveResult,
+    compose_agent_team,
+)
+
+# -- P2: permission bounding ---------------------------------------------------
+from .permissions import (
+    PermissionBoundProposal,
+    PermissionBoundingPolicy,
+    ProposedPermission,
+    propose_permission_bound,
+)
+
+# -- P2: fallback planning -----------------------------------------------------
+from .fallback import (
+    AgentFallbackPolicy,
+    FallbackCandidate,
+    RoleFallbackPlan,
+    TeamFallbackPlan,
+    build_fallback_plan,
+)
+
+# -- P2: plan + replay + diff --------------------------------------------------
+from .composition_contracts import (
+    AgentTeamPlanState,
+    CompositionState,
+    FallbackState,
+    OptimalityStatus,
+    PermissionCategory,
+    SelectionState,
+)
+from .plan import (
+    AgentTeamPlan,
+    AgentTeamPlanDiff,
+    CompositionReplayRecord,
+    TeamSelectionExplanation,
+    build_agent_team_plan,
+    build_replay_record,
+    compare_agent_team_plans,
+    replay_agent_team_plan,
+)
+
 # -- fingerprint + version -----------------------------------------------------
 from .fingerprint import fingerprint
-from .version import CONTRACT_VERSION, VERSION, VersionInfo, __version__, version_info
+from .version import (
+    COMPOSITION_CONTRACT_VERSION,
+    CONTRACT_VERSION,
+    VERSION,
+    VersionInfo,
+    __version__,
+    version_info,
+)
 
 __all__ = [
     # contract vocabulary
@@ -104,4 +181,33 @@ __all__ = [
     # fingerprint + version
     "fingerprint", "version_info", "VersionInfo",
     "CONTRACT_VERSION", "VERSION", "__version__",
+    # -- P2 (contract awc.composition.v1) --
+    "COMPOSITION_CONTRACT_VERSION",
+    # ranking
+    "RankingCriterion", "AgentRankingPolicy", "RankingCriterionResult",
+    "AgentRankResult", "RoleCandidateRanking",
+    "rank_eligible_candidates", "rank_workflow_candidates",
+    # dependency graph
+    "RoleInterfaceRequirement", "RoleDependency", "RoleDependencyGraph",
+    "build_role_dependency_graph",
+    # failure domains
+    "FailureDomain", "FailureDomainSet", "build_failure_domain_set",
+    # composition
+    "TeamCompositionPolicy", "RoleAssignment", "TeamConstraintResult",
+    "TeamObjectiveResult", "SearchStatistics", "TeamCompositionResult",
+    "compose_agent_team",
+    # permission bounding
+    "PermissionBoundingPolicy", "ProposedPermission", "PermissionBoundProposal",
+    "propose_permission_bound",
+    # fallback
+    "AgentFallbackPolicy", "FallbackCandidate", "RoleFallbackPlan", "TeamFallbackPlan",
+    "build_fallback_plan",
+    # plan + replay + diff
+    "AgentTeamPlan", "AgentTeamPlanState", "TeamSelectionExplanation",
+    "CompositionReplayRecord", "AgentTeamPlanDiff",
+    "build_agent_team_plan", "replay_agent_team_plan", "compare_agent_team_plans",
+    "build_replay_record",
+    # P2 enums
+    "SelectionState", "CompositionState", "OptimalityStatus", "FallbackState",
+    "PermissionCategory",
 ]

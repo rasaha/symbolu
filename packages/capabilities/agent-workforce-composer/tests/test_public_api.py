@@ -47,24 +47,35 @@ def test_required_public_surface_present():
     assert required.issubset(set(api.__all__))
 
 
-def test_no_ranking_or_team_surface_leaked():
-    for banned in ("rank_agents", "score_agents", "compose_team", "select_agent",
-                   "AgentTeamPlan", "PolicyWeights", "assign_permissions"):
+def test_no_execution_or_grant_surface_leaked():
+    # P2 migration: ranking/composition/AgentTeamPlan are now deliverables; the
+    # meaningful boundary is that NO execution / granting / scheduling surface leaks.
+    for banned in ("execute_agent", "run_agent", "dispatch", "grant_permission",
+                   "assign_permission", "invoke_model", "schedule_workflow",
+                   "authorize_action", "reassign_agent"):
         assert banned not in api.__all__
 
 
 def test_version_and_contract():
-    assert pkg.__version__ == "0.1.0"
+    # P2: distribution/product moved to 0.2.0; P1 contract awc.v1 preserved; the
+    # additive composition contract is awc.composition.v1.
+    assert pkg.__version__ == "0.2.0"
     assert pkg.CONTRACT_VERSION == "awc.v1"
+    assert pkg.version_info().to_dict()["composition_contract_version"] == "awc.composition.v1"
 
 
 def test_maturity_is_honest():
     info = api.version_info().to_dict()
     for k in ("canonical_object_model_implemented", "compiler_adapter_implemented",
-              "hard_constraint_eligibility_implemented", "deterministic_replay_verified"):
+              "hard_constraint_eligibility_implemented", "deterministic_replay_verified",
+              # P2 capabilities now implemented:
+              "deterministic_ranking_implemented", "agent_ranking_implemented",
+              "team_composition_implemented", "permission_bound_proposal_implemented",
+              "fallback_planning_implemented", "agent_team_plan_implemented"):
         assert info[k] is True, k
-    for k in ("agent_ranking_implemented", "team_composition_implemented",
-              "permission_assignment_implemented", "runtime_handoff_implemented",
-              "h16_migration_implemented", "live_registry_implemented",
-              "pilot_validated", "production_certified"):
+    for k in ("permission_assignment_implemented", "permission_granting_implemented",
+              "runtime_handoff_implemented", "runtime_execution_implemented",
+              "live_availability_implemented", "h16_migration_implemented",
+              "model_selection_integration_implemented", "h22_integration_implemented",
+              "live_registry_implemented", "pilot_validated", "production_certified"):
         assert info[k] is False, k

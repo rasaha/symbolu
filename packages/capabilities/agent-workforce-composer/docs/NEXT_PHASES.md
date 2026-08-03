@@ -22,3 +22,15 @@ explainable, and side-effect-free.
 
 Each remains **unimplemented** in P1; the maturity booleans in `version_info()`
 report this honestly.
+
+## After P2 (next)
+**Ugence Governance Studio — Agent Workforce Composer Eligibility and Composition
+Explorer**: a thin web console, deterministic demo API and private deployment that
+consumes the real P1 + P2 package APIs (eligibility, ranking, composition, plan)
+without reimplementing any logic. Execution and authority remain strictly outside
+that boundary.
+
+Later still: Agent Runtime handoff adapter (narrowing-only), H22 scheduling of
+already-staffed workflows, H16 runtime reconciliation (P4), Model Selection interop
+(refs only), live registry / telemetry-backed evidence, pilot validation, and
+production certification — all currently `false` in `version_info()`.

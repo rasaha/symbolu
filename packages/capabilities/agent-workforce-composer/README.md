@@ -1,19 +1,21 @@
-# Ugence Agent Workforce Composer — P1
+# Ugence Agent Workforce Composer — P1 + P2
 
-Deterministic, **offline** planning capability that answers exactly one question:
+Deterministic, **offline** planning capability. It is **not** a human-hiring
+product and **not** a runtime.
 
-> Which workflow nodes may be performed by AI agents, what capabilities do those
-> roles require, and which registered agents are eligible or ineligible under
-> frozen hard constraints?
-
-It is **not** a human-hiring product and **not** a runtime. This package is
-**P1**: canonical planning objects, a read-only adapter over the Policy Workflow
-Compiler `WorkflowIR`, and deterministic hard-constraint agent eligibility.
+- **P1** answers: which workflow nodes may be performed by AI agents, what
+  capabilities do those roles require, and which registered agents are eligible or
+  ineligible under frozen hard constraints? (adapter + hard-constraint eligibility)
+- **P2** answers, over the P1-eligible sets only: how are eligible agents ranked,
+  which bounded exact multi-role team is optimal under team hard constraints, what
+  least-privilege permission bound is proposed, and what ordered fallbacks apply —
+  producing an immutable **AgentTeamPlan**. P2 **grants nothing, authorizes
+  nothing, schedules nothing, and executes nothing.**
 
 - Distribution: `ugence-agent-workforce-composer`
 - Namespace: `ugence_agent_workforce_composer`
-- Distribution / product version: `0.1.0`
-- Contract version: `awc.v1`
+- Distribution / product version: `0.2.0`
+- Contract versions: `awc.v1` (P1, preserved), `awc.composition.v1` (P2, additive)
 
 ## Pipeline
 
@@ -39,15 +41,35 @@ reason taxonomy · complete candidate accounting · deterministic fingerprints �
 deterministic explanation · replay records · synthetic workflows & registries ·
 independent distribution · offline CLI · tests, docs, CI.
 
-## What P1 does NOT implement
+## P2 pipeline (over P1-eligible sets only)
 
-soft scoring · weighted ranking · winner selection · team composition · permission
-grant construction · fallback-chain selection · runtime handoff · H16 migration ·
-Agent Runtime / H22 adapters · Model Selection invocation · live registration ·
-agent execution. An `ELIGIBLE` result means *only*: no currently evaluated hard
-constraint disqualifies this agent for this role under the pinned inputs. It never
-means selected, recommended, best, authorized, approved for execution, assigned, or
-production-safe. See [`docs/NEXT_PHASES.md`](docs/NEXT_PHASES.md).
+```
+RoleEligibilityReport[]  → AgentRankingPolicy      → RoleCandidateRanking[]
+                         → RoleDependencyGraph
+                         → TeamCompositionPolicy    → bounded exact search
+                         → TeamCompositionResult    (EXACT_OPTIMUM | NO_FEASIBLE_TEAM | SEARCH_SPACE_EXCEEDED)
+                         → PermissionBoundingPolicy → PermissionBoundProposal[]  (least-privilege; proposal only)
+                         → AgentFallbackPolicy      → RoleFallbackPlan[]
+                         → AgentTeamPlan + SelectionExplanation + CompositionReplayRecord
+```
+
+P2 implements: deterministic evidence-backed ranking (integer basis-point scores,
+exactly reconstructable from criterion contributions); a role dependency/interface
+graph; bounded exact team composition (deterministic branch-and-bound, proven
+against a brute-force oracle); least-privilege permission-bound **proposals**;
+offline primary + fallback planning; and the immutable **AgentTeamPlan** with
+selection explanation, replay and diff.
+
+## What this package does NOT implement
+
+permission granting · runtime execution · live availability · runtime fallback /
+reassignment · H16 migration · Agent Runtime / H22 adapters · Model Selection
+invocation · workflow scheduling · large-scale approximate solving · live
+registration · agent execution. An `ELIGIBLE` result and an AgentTeamPlan are
+**proposals** — never selection-for-execution, authorization, permission grant,
+assignment, or production certification. A `PermissionBoundProposal` states: *"This
+is a planning-time permission-bound proposal. It does not grant, authorize,
+provision or execute any permission."* See [`docs/NEXT_PHASES.md`](docs/NEXT_PHASES.md).
 
 ## Install & use
 

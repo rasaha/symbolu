@@ -84,3 +84,45 @@ def test_demo(capsys, name):
     out = json.loads(capsys.readouterr().out)
     assert out["accounting_holds"] is True
     assert out["workflow_fingerprint"].startswith("sha256:")
+
+
+# -- P2 CLI --
+
+def test_rank(capsys, files):
+    wf, reg, ent, elig = files
+    assert main(["rank", wf, reg, ent, elig]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert isinstance(out, list) and out and "ranked_candidates" in out[0]
+
+
+def test_compose_and_explain_and_replay(capsys, files):
+    wf, reg, ent, elig = files
+    assert main(["compose", wf, reg, ent, elig]) == 0
+    r1 = capsys.readouterr().out
+    assert main(["compose", wf, reg, ent, elig]) == 0
+    assert r1 == capsys.readouterr().out          # deterministic
+    plan = json.loads(r1)
+    assert plan["plan_state"] == "COMPLETE" and plan["plan_fingerprint"].startswith("sha256:")
+    assert main(["explain-plan", wf, reg, ent, elig]) == 0
+    assert "role_explanations" in json.loads(capsys.readouterr().out)
+    assert main(["replay-plan", wf, reg, ent, elig]) == 0
+    assert json.loads(capsys.readouterr().out)["reproduced"] is True
+
+
+def test_compare_plans(tmp_path, capsys, files):
+    wf, reg, ent, elig = files
+    assert main(["compose", wf, reg, ent, elig]) == 0
+    plan_json = capsys.readouterr().out
+    a = tmp_path / "a.json"; a.write_text(plan_json)
+    b = tmp_path / "b.json"; b.write_text(plan_json)
+    assert main(["compare-plans", str(a), str(b)]) == 0
+    diff = json.loads(capsys.readouterr().out)
+    assert diff["same_workflow"] is True and diff["assignment_changes"] == []
+
+
+@pytest.mark.parametrize("name", ["procurement", "support", "security"])
+def test_demo_compose(capsys, name):
+    assert main(["demo", name, "--compose"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["plan_fingerprint"].startswith("sha256:")
+    assert out["plan_state"] in ("COMPLETE", "NO_FEASIBLE_TEAM")

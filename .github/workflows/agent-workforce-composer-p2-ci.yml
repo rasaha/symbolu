@@ -1,0 +1,231 @@
+name: agent-workforce-composer-p2-ci
+
+# Scoped CI for Agent Workforce Composer P2 (ranking, bounded exact composition,
+# permission-bound proposals, fallback planning, AgentTeamPlan). Runs the P1
+# regression, the P2 suites (ranking / composition / permission / fallback /
+# plan-replay / exact-search oracle), import-boundary and architecture assertions,
+# the public-API frozen-artifact check, the isolated clean-install distribution
+# verifier, a terminology scan, and platform-freeze verification (blocking).
+# No external model APIs, no live agents, no secrets, no web server.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p2-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/agent-workforce-composer-p2-**"
+      - "chatgpt/awc-p2-**"
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p2-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/capabilities/agent-workforce-composer
+  SRC: packages/capabilities/agent-workforce-composer/src
+
+jobs:
+  p1-regression:
+    name: P1 regression + maturity honesty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python -m pytest ${{ env.PKG }}/tests/test_p1_compat.py ${{ env.PKG }}/tests/test_adapter.py \
+            ${{ env.PKG }}/tests/test_eligibility.py ${{ env.PKG }}/tests/test_evidence.py \
+            ${{ env.PKG }}/tests/test_examples.py ${{ env.PKG }}/tests/test_public_api.py -q
+      - name: version 0.2.0 + honest maturity
+        env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python -m ugence_agent_workforce_composer.cli version
+          python - <<'PY'
+          import ugence_agent_workforce_composer as u
+          assert u.__version__ == "0.2.0" and u.CONTRACT_VERSION == "awc.v1"
+          i = u.version_info().to_dict()
+          assert i["composition_contract_version"] == "awc.composition.v1"
+          for k in ("deterministic_ranking_implemented","team_composition_implemented",
+                    "permission_bound_proposal_implemented","fallback_planning_implemented",
+                    "agent_team_plan_implemented"):
+              assert i[k] is True, k
+          for k in ("permission_granting_implemented","runtime_execution_implemented",
+                    "live_availability_implemented","h16_migration_implemented",
+                    "model_selection_integration_implemented","h22_integration_implemented",
+                    "pilot_validated","production_certified"):
+              assert i[k] is False, k
+          print("maturity honest")
+          PY
+
+  ranking-suite:
+    name: Ranking (determinism, reconstruction, monotonicity, tie-break)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_ranking.py -q
+
+  composition-suite:
+    name: Composition + dependency graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_composition.py ${{ env.PKG }}/tests/test_dependency.py -q
+
+  permission-boundary-suite:
+    name: Permission-bound proposals (least privilege, no grant)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_permissions.py -q
+
+  fallback-suite:
+    name: Fallback planning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_fallback.py -q
+
+  plan-replay-suite:
+    name: AgentTeamPlan + replay + diff + perturbations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_plan.py ${{ env.PKG }}/tests/test_perturbations.py ${{ env.PKG }}/tests/test_cli.py -q
+
+  exact-search-oracle-suite:
+    name: Exact-search brute-force oracle equivalence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest "${{ env.PKG }}/tests/test_composition.py::test_exact_optimum_matches_bruteforce_oracle" -q
+
+  import-boundary-suite:
+    name: Import-boundary integrity (P1 + P2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_boundaries.py ${{ env.PKG }}/tests/test_boundaries_p2.py -q
+
+  public-api-freeze:
+    name: Public-API frozen artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python ${{ env.PKG }}/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/capabilities/agent-workforce-composer/artifacts/public_api.json"))
+          assert live == frozen, "public API drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+
+  isolated-distribution:
+    name: Clean-install verifier (wheel/sdist, CLI, cross-process determinism)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install build
+      - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
+
+  architecture-assertions:
+    name: Architecture assertions (no execution/grant/schedule surface)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python - <<'PY'
+          import ugence_agent_workforce_composer.api as api
+          banned = {"execute_agent","run_agent","dispatch","grant_permission","assign_permission",
+                    "invoke_model","schedule_workflow","authorize_action","reassign_agent"}
+          assert not (banned & set(api.__all__)), banned & set(api.__all__)
+          from ugence_agent_workforce_composer import fixtures
+          _a, plan = fixtures.run_compose_demo("procurement")
+          assert plan.plan_state.value == "COMPLETE"
+          for prop in plan.permission_bound_proposals:
+              assert "does not grant" in prop.notice
+          print("architecture assertions OK")
+          PY
+
+  terminology:
+    name: Stale-terminology scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No premature maturity claims in package docs
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          pkg = pathlib.Path("packages/capabilities/agent-workforce-composer")
+          bad = re.compile(r"\b(production[- ]ready|pilot[- ]validated|production[- ]certified)\b", re.I)
+          hist = re.compile(r"(false|not |never|no |=false|is False)", re.I)
+          offenders = []
+          for md in list(pkg.glob("*.md")) + list((pkg/'docs').glob("*.md")):
+              for i, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
+                  if bad.search(line) and not hist.search(line):
+                      offenders.append(f"{md}:{i}: {line.strip()}")
+          if offenders:
+              print("Stale maturity claims:"); [print("  -", o) for o in offenders]; sys.exit(1)
+          print("terminology OK")
+          PY
+
+  platform-freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
