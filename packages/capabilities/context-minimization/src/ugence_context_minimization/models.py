@@ -250,8 +250,24 @@ class MinimizationResult:
 
     Records exactly what happened and why: which ids survived / were removed
     (structurally vs extractively) / restored, whether the run fell back, and the
-    oracle contract used. ``fingerprint`` is a deterministic digest of the outcome
-    (see :mod:`ugence_context_minimization.fingerprint`).
+    oracle contract used.
+
+    Two fingerprints (v0.1.1), so a single field is never overloaded with two
+    meanings:
+
+    * ``outcome_fingerprint`` — a deterministic digest of the *selected outcome*
+      (surviving/removed/restored/protected ids, token counts, equivalence status,
+      fallback, policy version, oracle identity). It is NOT a complete identity of
+      the request, context contents, or oracle evaluation.
+    * ``run_fingerprint`` — the *complete auditable run identity*: request identity
+      (context contract version, id, correlation, ordered unit content digests,
+      requested reduction, requested token budget, mode, evaluation time), policy
+      identity (version + actual policy fingerprint + token-counter mode), oracle
+      identity (id, contract version, evaluation ref, validity horizon, correlation),
+      and the outcome (including reason codes).
+
+    ``fingerprint`` is a DEPRECATED compatibility alias whose value equals
+    ``outcome_fingerprint`` (byte-identical to the v0.1.0 field).
     """
 
     context_id: str
@@ -265,6 +281,8 @@ class MinimizationResult:
     protected_ids: tuple[str, ...]
     original_tokens: int
     resulting_tokens: int
+    #: The caller's requested fractional reduction in [0, 1], preserved verbatim on
+    #: every result path (v0.1.1 fix — was previously hardcoded to 0.0).
     requested_reduction: float
     equivalence_status: EquivalenceStatus
     reduced: bool
@@ -273,6 +291,13 @@ class MinimizationResult:
     policy_version: str
     oracle_id: Optional[str] = None
     oracle_contract_version: Optional[str] = None
+    #: The caller's requested absolute surviving-token ceiling, if any (v0.1.1).
+    requested_token_budget: Optional[int] = None
+    #: Digest of the selected outcome (see class docstring).
+    outcome_fingerprint: str = ""
+    #: Complete auditable run identity (see class docstring).
+    run_fingerprint: str = ""
+    #: DEPRECATED alias of ``outcome_fingerprint`` (byte-identical to v0.1.0).
     fingerprint: str = ""
 
     @property

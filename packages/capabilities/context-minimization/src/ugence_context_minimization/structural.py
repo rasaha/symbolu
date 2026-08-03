@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from .fingerprint import result_fingerprint
+from .fingerprint import result_fingerprint, run_fingerprint
 from .models import (
     Context,
     EquivalenceStatus,
@@ -113,10 +113,11 @@ def structural_minimize(
     original_tokens = context.total_tokens(token_counter)
     resulting_tokens = sum(context.unit(i).counted_tokens(token_counter) for i in kept)
 
-    codes: list[str] = []
-    codes.append(reasons.STRUCTURAL_DEDUP_APPLIED if removed else reasons.NO_REDUCTION_POSSIBLE)
+    codes: tuple[str, ...] = (
+        reasons.STRUCTURAL_DEDUP_APPLIED if removed else reasons.NO_REDUCTION_POSSIBLE,
+    )
 
-    fp = result_fingerprint(
+    outcome_fp = result_fingerprint(
         context_id=context.id,
         mode=MinimizationMode.STRUCTURAL.value,
         surviving_ids=kept,
@@ -129,6 +130,29 @@ def structural_minimize(
         policy_version=policy.version,
         oracle_id=None,
         oracle_contract_version=None,
+    )
+    # Structural mode consults no oracle: requested_reduction is 0.0 (its request
+    # semantics are "remove provable duplicates"), the oracle block is null, and
+    # evaluation_time is not part of its identity.
+    run_fp = run_fingerprint(
+        context,
+        mode=MinimizationMode.STRUCTURAL.value,
+        requested_reduction=0.0,
+        requested_token_budget=None,
+        evaluation_time=None,
+        policy=policy,
+        token_counter=token_counter,
+        base_eval=None,
+        surviving_ids=kept,
+        removed_structural=removed,
+        removed_extractive=[],
+        restored_ids=[],
+        protected_ids=protected,
+        original_tokens=original_tokens,
+        resulting_tokens=resulting_tokens,
+        equivalence_status=EquivalenceStatus.NOT_EVALUATED.value,
+        fell_back=False,
+        reason_codes=codes,
     )
 
     return MinimizationResult(
@@ -147,9 +171,12 @@ def structural_minimize(
         equivalence_status=EquivalenceStatus.NOT_EVALUATED,
         reduced=bool(removed),
         fell_back=False,
-        reason_codes=tuple(codes),
+        reason_codes=codes,
         policy_version=policy.version,
         oracle_id=None,
         oracle_contract_version=None,
-        fingerprint=fp,
+        requested_token_budget=None,
+        outcome_fingerprint=outcome_fp,
+        run_fingerprint=run_fp,
+        fingerprint=outcome_fp,  # DEPRECATED alias
     )

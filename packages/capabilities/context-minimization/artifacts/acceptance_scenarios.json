@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.0.1",
   "scenarios": [
     {
       "expect": "unprotected exact duplicate removed, representative kept",
@@ -32,12 +32,22 @@
       "mode": "ORACLE_VERIFIED"
     },
     {
-      "expect": "FALLBACK (ORACLE_EVALUATION_EXPIRED)",
-      "id": "oracle_expired",
+      "expect": "FALLBACK at evaluation_time == valid_until (ORACLE_EVALUATION_EXPIRED)",
+      "id": "oracle_expired_inclusive",
       "mode": "ORACLE_VERIFIED"
     },
     {
-      "expect": "FALLBACK (CORRELATION_MISMATCH)",
+      "expect": "FALLBACK (ORACLE_EVALUATION_TIME_REQUIRED)",
+      "id": "oracle_missing_evaluation_time",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (ORACLE_CORRELATION_MISSING)",
+      "id": "oracle_correlation_missing",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "FALLBACK (ORACLE_CORRELATION_MISMATCH)",
       "id": "oracle_correlation_mismatch",
       "mode": "ORACLE_VERIFIED"
     },
@@ -50,6 +60,16 @@
       "expect": "safest achievable + BUDGET_UNREACHABLE_WITHOUT_PROTECTED",
       "id": "budget_unreachable",
       "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "requested_reduction echoes the caller's target on every path",
+      "id": "request_reduction_preserved",
+      "mode": "ORACLE_VERIFIED"
+    },
+    {
+      "expect": "run_fingerprint and outcome_fingerprint are distinct; fingerprint aliases outcome",
+      "id": "two_fingerprints",
+      "mode": "ANY"
     }
   ]
 }

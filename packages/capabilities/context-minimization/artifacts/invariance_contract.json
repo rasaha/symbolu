@@ -1,17 +1,26 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.0.1",
+  "correlation_binding": "When the context carries a non-empty correlation_id, every usable oracle evaluation (baseline, reduced, per-unit restoration, final restored) MUST carry the identical id. Missing and mismatched are distinct, non-collapsed reason codes.",
   "equivalence_rule": "Two contexts are equivalent iff their OracleEvaluation.equivalence_key values are equal. The minimizer treats the key as OPAQUE and never interprets it. Invariance is defined ENTIRELY by the supplied oracle; the package creates no authority.",
+  "expiry_semantics": "Expiry is INCLUSIVE at the exact valid_until instant. A validity horizon with no evaluation_time fails closed; the core never reads a wall clock \u2014 the caller controls evaluation_time for deterministic replay.",
   "fail_closed_conditions": [
     "missing oracle (oracle mode) -> OracleRequiredError (raised)",
     "oracle raises -> full fallback (ORACLE_RAISED)",
-    "malformed / empty-key result -> full fallback (ORACLE_RESULT_MALFORMED)",
+    "malformed result / non-string key / empty oracle identity -> full fallback (ORACLE_RESULT_MALFORMED)",
     "oracle_id / contract_version drift between calls -> full fallback (ORACLE_CONTRACT_MISMATCH)",
-    "evaluation_time > valid_until -> full fallback (ORACLE_EVALUATION_EXPIRED)",
-    "correlation_id mismatch -> full fallback (CORRELATION_MISMATCH)",
+    "evaluation_time >= valid_until (INCLUSIVE) -> full fallback (ORACLE_EVALUATION_EXPIRED)",
+    "valid_until supplied but no evaluation_time -> full fallback (ORACLE_EVALUATION_TIME_REQUIRED)",
+    "context has correlation but evaluation omits it -> full fallback (ORACLE_CORRELATION_MISSING)",
+    "context correlation != evaluation correlation -> full fallback (ORACLE_CORRELATION_MISMATCH)",
     "changed key -> restore necessary spans; else full fallback",
     "unresolved joint effect -> full fallback (JOINT_EFFECT_FALLBACK)",
     "protection provider fails -> protect everything (PROTECTION_PROVIDER_FAILED)"
   ],
+  "fingerprints": {
+    "fingerprint": "DEPRECATED alias of outcome_fingerprint",
+    "outcome_fingerprint": "digest of the selected outcome only (byte-identical to the v0.1.0 field)",
+    "run_fingerprint": "complete run identity: request + policy + oracle + outcome (incl. reason codes)"
+  },
   "guarantees_boundary": {
     "is": [
       "extractive omission",

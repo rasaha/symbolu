@@ -39,8 +39,8 @@ def test_reason_codes_manifest_in_sync():
 
 
 def test_version_and_contract_version():
-    assert api.__version__ == "0.1.0"
-    assert api.CONTRACT_VERSION == "1.0.0"
+    assert api.__version__ == "0.1.1"
+    assert api.CONTRACT_VERSION == "1.0.1"
 
 
 def test_py_typed_ships_in_source_tree():

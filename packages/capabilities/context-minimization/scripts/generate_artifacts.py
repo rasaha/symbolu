@@ -81,14 +81,32 @@ def invariance_contract() -> dict:
         "fail_closed_conditions": [
             "missing oracle (oracle mode) -> OracleRequiredError (raised)",
             "oracle raises -> full fallback (ORACLE_RAISED)",
-            "malformed / empty-key result -> full fallback (ORACLE_RESULT_MALFORMED)",
+            "malformed result / non-string key / empty oracle identity -> full fallback (ORACLE_RESULT_MALFORMED)",
             "oracle_id / contract_version drift between calls -> full fallback (ORACLE_CONTRACT_MISMATCH)",
-            "evaluation_time > valid_until -> full fallback (ORACLE_EVALUATION_EXPIRED)",
-            "correlation_id mismatch -> full fallback (CORRELATION_MISMATCH)",
+            "evaluation_time >= valid_until (INCLUSIVE) -> full fallback (ORACLE_EVALUATION_EXPIRED)",
+            "valid_until supplied but no evaluation_time -> full fallback (ORACLE_EVALUATION_TIME_REQUIRED)",
+            "context has correlation but evaluation omits it -> full fallback (ORACLE_CORRELATION_MISSING)",
+            "context correlation != evaluation correlation -> full fallback (ORACLE_CORRELATION_MISMATCH)",
             "changed key -> restore necessary spans; else full fallback",
             "unresolved joint effect -> full fallback (JOINT_EFFECT_FALLBACK)",
             "protection provider fails -> protect everything (PROTECTION_PROVIDER_FAILED)",
         ],
+        "correlation_binding": (
+            "When the context carries a non-empty correlation_id, every usable oracle "
+            "evaluation (baseline, reduced, per-unit restoration, final restored) MUST "
+            "carry the identical id. Missing and mismatched are distinct, non-collapsed "
+            "reason codes."
+        ),
+        "expiry_semantics": (
+            "Expiry is INCLUSIVE at the exact valid_until instant. A validity horizon "
+            "with no evaluation_time fails closed; the core never reads a wall clock — "
+            "the caller controls evaluation_time for deterministic replay."
+        ),
+        "fingerprints": {
+            "outcome_fingerprint": "digest of the selected outcome only (byte-identical to the v0.1.0 field)",
+            "run_fingerprint": "complete run identity: request + policy + oracle + outcome (incl. reason codes)",
+            "fingerprint": "DEPRECATED alias of outcome_fingerprint",
+        },
         "guarantees_boundary": {
             "is": ["extractive omission", "equivalence relative to supplied oracle",
                    "structurally lossless dedup (structural mode)"],
@@ -114,14 +132,22 @@ def acceptance_scenarios() -> dict:
              "expect": "FALLBACK (JOINT_EFFECT_FALLBACK)"},
             {"id": "oracle_exception", "mode": "ORACLE_VERIFIED",
              "expect": "FALLBACK (ORACLE_RAISED)"},
-            {"id": "oracle_expired", "mode": "ORACLE_VERIFIED",
-             "expect": "FALLBACK (ORACLE_EVALUATION_EXPIRED)"},
+            {"id": "oracle_expired_inclusive", "mode": "ORACLE_VERIFIED",
+             "expect": "FALLBACK at evaluation_time == valid_until (ORACLE_EVALUATION_EXPIRED)"},
+            {"id": "oracle_missing_evaluation_time", "mode": "ORACLE_VERIFIED",
+             "expect": "FALLBACK (ORACLE_EVALUATION_TIME_REQUIRED)"},
+            {"id": "oracle_correlation_missing", "mode": "ORACLE_VERIFIED",
+             "expect": "FALLBACK (ORACLE_CORRELATION_MISSING)"},
             {"id": "oracle_correlation_mismatch", "mode": "ORACLE_VERIFIED",
-             "expect": "FALLBACK (CORRELATION_MISMATCH)"},
+             "expect": "FALLBACK (ORACLE_CORRELATION_MISMATCH)"},
             {"id": "protection_uncertain_retained", "mode": "ORACLE_VERIFIED",
              "expect": "uncertain unit retained"},
             {"id": "budget_unreachable", "mode": "ORACLE_VERIFIED",
              "expect": "safest achievable + BUDGET_UNREACHABLE_WITHOUT_PROTECTED"},
+            {"id": "request_reduction_preserved", "mode": "ORACLE_VERIFIED",
+             "expect": "requested_reduction echoes the caller's target on every path"},
+            {"id": "two_fingerprints", "mode": "ANY",
+             "expect": "run_fingerprint and outcome_fingerprint are distinct; fingerprint aliases outcome"},
         ],
     }
 
