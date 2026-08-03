@@ -20,6 +20,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import ugence_agent_workforce_composer.api as awc
 
 from ..serialization.canonical import sha256_hex
+from ..version import (
+    SUPPORTED_AWC_MAX_EXCLUSIVE,
+    SUPPORTED_AWC_MIN,
+    awc_version_supported,
+)
+
+# Recorded manifest of every bundled fixture's sha256 (packaging protection P2).
+BUNDLED_FIXTURE_MANIFEST = "BUNDLED_FIXTURE_MANIFEST.json"
 
 # Logical time is a pinned property of the frozen scenarios (matches P3A's
 # ``scenario_authoring.LOGICAL_TIME``); it is an input artifact, not runtime state.
@@ -268,6 +276,47 @@ class ScenarioCatalog:
                     problems.append(f"hash mismatch {rel}")
         return (not problems, problems)
 
+    def bundled_fixture_manifest(self) -> dict:
+        """The recorded manifest of every bundled fixture's sha256 (protection P2)."""
+        path = os.path.join(_bundled_data_root(), BUNDLED_FIXTURE_MANIFEST)
+        return _read_json(path)
+
+    def verify_bundled_fixture_manifest(self) -> Tuple[bool, List[str]]:
+        """Verify every bundled fixture file matches its recorded manifest hash.
+
+        This is the runtime ``packaged == recorded`` leg of the three-way drift
+        protection (protection P2). Covers all bundled scenario manifests,
+        workflows, registries, policies, expected outputs, replay records and v2
+        conformance artifacts. The full ``canonical source == packaged ==
+        recorded`` equality is proven by the blocking test / CI verifier (which
+        additionally has the P3A + AWC source trees available).
+        """
+        data_root = _bundled_data_root()
+        manifest = self.bundled_fixture_manifest()
+        files = manifest.get("files", {})
+        problems: List[str] = []
+        if not files:
+            return (False, ["bundled fixture manifest is empty"])
+        for rel, expected_hash in files.items():
+            path = os.path.join(data_root, rel)
+            if not os.path.isfile(path):
+                problems.append(f"missing bundled {rel}")
+                continue
+            with open(path, "rb") as fh:
+                actual = sha256_hex(fh.read())
+            if actual != expected_hash:
+                problems.append(f"bundled hash mismatch {rel}")
+        # Also confirm no extra bundled fixture escaped the manifest.
+        recorded = set(files)
+        for dirpath, _dirs, fnames in os.walk(data_root):
+            for fname in fnames:
+                if fname == BUNDLED_FIXTURE_MANIFEST or not fname.endswith(".json"):
+                    continue
+                rel = os.path.relpath(os.path.join(dirpath, fname), data_root)
+                if rel not in recorded:
+                    problems.append(f"unrecorded bundled fixture {rel}")
+        return (not problems, problems)
+
     def readiness(self) -> dict:
         """Structured readiness result (§7)."""
         checks: Dict[str, Any] = {}
@@ -294,6 +343,24 @@ class ScenarioCatalog:
             "workflow_ir.v1" in awc.SUPPORTED_COMPILER_CONTRACTS
             and "workflow_ir.v2" in awc.SUPPORTED_COMPILER_CONTRACTS
         )
+        # 3b. installed AWC version is within the supported range (protection P1).
+        # Readiness FAILS CLOSED when AWC is outside [SUPPORTED_AWC_MIN, MAX).
+        installed_awc = awc.__version__
+        in_range = awc_version_supported(installed_awc)
+        checks["awc_version_in_supported_range"] = in_range
+        if not in_range:
+            checks["awc_version_error"] = (
+                f"installed AWC {installed_awc} outside supported range "
+                f">={SUPPORTED_AWC_MIN},<{SUPPORTED_AWC_MAX_EXCLUSIVE}"
+            )
+        # 3c. bundled fixtures match their recorded manifest (protection P2).
+        try:
+            bundle_ok, bundle_problems = self.verify_bundled_fixture_manifest()
+        except Exception as exc:  # missing/unreadable bundled manifest
+            bundle_ok, bundle_problems = False, [str(exc)]
+        checks["bundled_fixture_manifest_ok"] = bundle_ok
+        if bundle_problems:
+            checks["bundled_fixture_problems"] = bundle_problems[:10]
         # 4. no mutable external service dependency (constant — API is offline)
         checks["no_external_service_dependency"] = True
         ready = all(v for k, v in checks.items() if isinstance(v, bool))

@@ -1,0 +1,12 @@
+# Reproducible Governance Studio demo environment lock (packaging protection P1).
+#
+# The backend is compatible with the AWC 0.2.x line (pyproject declares
+# >=0.2.1,<0.3.0). This constraints file pins the EXACT tested version so the
+# demo resolves deterministically:
+#
+#     pip install -c apps/ugence-governance-studio/backend/constraints.txt \
+#         apps/ugence-governance-studio/backend
+#
+# Readiness (/ready) fails closed if the installed AWC version is outside the
+# supported range, so an out-of-range resolution can never silently serve.
+ugence-agent-workforce-composer==0.2.1

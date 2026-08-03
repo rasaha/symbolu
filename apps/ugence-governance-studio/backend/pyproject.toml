@@ -47,7 +47,9 @@ classifiers = [
 # Domain boundary: the public AWC package. Presentation: FastAPI + Uvicorn.
 # No model SDK, no database driver, no cloud/ERP SDK, no runtime package.
 dependencies = [
-    "ugence-agent-workforce-composer>=0.2.1",
+    # Bounded to the supported 0.2.x AWC compatibility surface (packaging
+    # protection P1). The reproducible demo env locks ==0.2.1 (constraints.txt).
+    "ugence-agent-workforce-composer>=0.2.1,<0.3.0",
     "pydantic>=2",
     "fastapi>=0.110",
     "starlette>=0.36",
@@ -71,6 +73,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 ugence_governance_studio_api = [
     "py.typed",
+    "data/BUNDLED_FIXTURE_MANIFEST.json",
     "data/demo_data/*/*.json",
     "data/expected_outputs/MANIFEST.json",
     "data/expected_outputs/*/*.json",
