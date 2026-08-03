@@ -1,0 +1,20 @@
+{
+  "phase": "governance_studio_p3c",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "01fdf712cc7353155361dce5e0da16783c1d2017",
+  "prerequisites": {
+    "pr_1318_p3b_api": {"state": "merged", "merge_commit": "f9bbda0d"},
+    "pr_1320_p3b_packaging_protections": {"state": "merged", "merge_commit": "01fdf712"}
+  },
+  "api": {"distribution_version": "0.1.0", "contract": "governance_studio.api.v1",
+          "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"},
+  "awc": {"version": "0.2.1"},
+  "compiler": {"version": "0.2.0"},
+  "protections": {"awc_version_range": ">=0.2.1,<0.3.0", "awc_pin": "==0.2.1",
+                  "readiness_fails_out_of_range": true,
+                  "fixture_three_way_ok": true, "v1_covered": true, "v2_conformance_covered": true},
+  "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+  "frontend": {"path": "apps/ugence-governance-studio/frontend", "name": "@ugence/governance-studio-frontend",
+               "framework": "Vite + React 18 + TypeScript + Tailwind (mirrors apps/console)",
+               "api_type_tool": "openapi-typescript", "generated_operations": 23, "consumed_operations": 9}
+}

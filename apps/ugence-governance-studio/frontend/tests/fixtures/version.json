@@ -1,0 +1,61 @@
+{
+"api_distribution": "ugence-governance-studio-api",
+"api_distribution_version": "0.1.0",
+"api_product_version": "0.1.0",
+"api_contract_version": "governance_studio.api.v1",
+"build_commit": null,
+"build_id": null,
+"maturity": {
+"governance_studio_foundation_implemented": true,
+"deterministic_demo_api_implemented": true,
+"scenario_execution_implemented": true,
+"workflow_ir_v1_supported": true,
+"workflow_ir_v2_supported": true,
+"eligibility_api_implemented": true,
+"ranking_api_implemented": true,
+"composition_api_implemented": true,
+"permission_proposal_api_implemented": true,
+"fallback_api_implemented": true,
+"plan_replay_api_implemented": true,
+"plan_comparison_api_implemented": true,
+"what_if_api_implemented": true,
+"frontend_implemented": false,
+"authentication_implemented": false,
+"private_deployment_implemented": false,
+"runtime_handoff_implemented": false,
+"agent_execution_implemented": false,
+"permission_granting_implemented": false,
+"live_enterprise_data_supported": false,
+"pilot_validated": false,
+"production_certified": false
+},
+"notice": {
+"synthetic_demonstration_data": true,
+"planning_only": true,
+"no_agent_execution": true,
+"no_permission_grant": true,
+"no_business_action_authorization": true
+},
+"awc_distribution": "ugence-agent-workforce-composer",
+"awc_distribution_version": "0.2.1",
+"awc_product_version": "0.2.1",
+"awc_contract_versions": [
+"awc.v1",
+"awc.composition.v1",
+"awc.compiler_adapter.v2"
+],
+"supported_workflow_contracts": [
+"workflow_ir.v1",
+"workflow_ir.v2"
+],
+"supported_awc_range": ">=0.2.1,<0.3.0",
+"pinned_awc_version": "0.2.1",
+"awc_version_supported": true,
+"compiler_distribution": "ugence-policy-workflow-compiler",
+"compiler_distribution_version": null,
+"compiler_dependency": "indirect_via_awc_adapter",
+"compiler_contract_versions": [
+"workflow_ir.v1",
+"workflow_ir.v2"
+]
+}

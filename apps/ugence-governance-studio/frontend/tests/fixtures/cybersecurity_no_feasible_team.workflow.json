@@ -1,0 +1,484 @@
+{
+"scenario_id": "cybersecurity_no_feasible_team",
+"workflow_identity": "gs_security_infeasible",
+"workflow_version": 1,
+"contract_version": "workflow_ir.v1",
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"ir_version": "workflow_ir.v1",
+"nodes": [
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "DECISION_RULE",
+"label": "incident intake validation",
+"node_id": "sec_evidence_intake",
+"output_contract": "incident_evidence",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [
+"incident_evidence"
+],
+"kind": "EVIDENCE_REQUIREMENT",
+"label": "threat analysis",
+"node_id": "sec_threat_analysis",
+"output_contract": "threat_assessment",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [
+"threat_assessment"
+],
+"kind": "EVIDENCE_REQUIREMENT",
+"label": "incident correlation",
+"node_id": "sec_incident_correlation",
+"output_contract": "correlated_incident",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "HUMAN_APPROVER",
+"disposition": "AUTHORITATIVE",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "OVERRIDE_GATE",
+"label": "human escalation",
+"node_id": "sec_human_escalation",
+"output_contract": "",
+"owning_capability": "DECISION_AUTHORITY",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "AUTHORITATIVE",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "ACTION_CONSTRAINT",
+"label": "action authorization boundary",
+"node_id": "sec_action_boundary",
+"output_contract": "",
+"owning_capability": "ACTION_GATE",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "AUDIT_EMISSION",
+"label": "audit emission",
+"node_id": "sec_audit",
+"output_contract": "",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+},
+{
+"audit_requirements": [],
+"authority_type": "",
+"disposition": "ADVISORY",
+"failure_behavior": "BLOCK",
+"input_object_ids": [],
+"kind": "TERMINAL_OUTCOME",
+"label": "terminal outcome",
+"node_id": "sec_terminal",
+"output_contract": "",
+"owning_capability": "COMPILER",
+"public_contract_target": ""
+}
+],
+"edges": [
+{
+"edge_id": "edge_0",
+"kind": "NEXT",
+"order": 0,
+"source_id": "sec_evidence_intake",
+"target_id": "sec_threat_analysis"
+},
+{
+"edge_id": "edge_1",
+"kind": "NEXT",
+"order": 1,
+"source_id": "sec_threat_analysis",
+"target_id": "sec_incident_correlation"
+},
+{
+"edge_id": "edge_2",
+"kind": "NEXT",
+"order": 2,
+"source_id": "sec_incident_correlation",
+"target_id": "sec_human_escalation"
+},
+{
+"edge_id": "edge_3",
+"kind": "NEXT",
+"order": 3,
+"source_id": "sec_human_escalation",
+"target_id": "sec_action_boundary"
+},
+{
+"edge_id": "edge_4",
+"kind": "NEXT",
+"order": 4,
+"source_id": "sec_action_boundary",
+"target_id": "sec_audit"
+},
+{
+"edge_id": "edge_5",
+"kind": "NEXT",
+"order": 5,
+"source_id": "sec_audit",
+"target_id": "sec_terminal"
+}
+],
+"structural_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"node_dispositions": [
+{
+"node_id": "sec_evidence_intake",
+"source_node_kind": "DECISION_RULE",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:DECISION_RULE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "sec_threat_analysis",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"disposition": "AI_AGENT_ELIGIBLE",
+"reason_codes": [
+"advisory_evidence_work"
+],
+"role_id": "role::sec_threat_analysis",
+"is_agent_role": true
+},
+{
+"node_id": "sec_incident_correlation",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"disposition": "AI_AGENT_ELIGIBLE",
+"reason_codes": [
+"advisory_evidence_work"
+],
+"role_id": "role::sec_incident_correlation",
+"is_agent_role": true
+},
+{
+"node_id": "sec_human_escalation",
+"source_node_kind": "OVERRIDE_GATE",
+"disposition": "HUMAN_AUTHORITY_REQUIRED",
+"reason_codes": [
+"human_authority_node:OVERRIDE_GATE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "sec_action_boundary",
+"source_node_kind": "ACTION_CONSTRAINT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_GATE"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "sec_audit",
+"source_node_kind": "AUDIT_EMISSION",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:AUDIT_EMISSION"
+],
+"role_id": "",
+"is_agent_role": false
+},
+{
+"node_id": "sec_terminal",
+"source_node_kind": "TERMINAL_OUTCOME",
+"disposition": "NO_AI_AGENT_REQUIRED",
+"reason_codes": [
+"structural_kind:TERMINAL_OUTCOME"
+],
+"role_id": "",
+"is_agent_role": false
+}
+],
+"role_requirements": [
+{
+"contract_version": "awc.v1",
+"role_id": "role::sec_threat_analysis",
+"workflow_id": "gs_security_infeasible",
+"workflow_version": 1,
+"source_node_id": "sec_threat_analysis",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"role_name": "threat analysis",
+"role_description": "threat_assessment",
+"required_capabilities": [
+"evidence_extraction",
+"threat_analysis"
+],
+"input_contract_refs": [
+"incident_evidence"
+],
+"output_contract_refs": [
+"threat_assessment"
+],
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_threat_analysis",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"optional_capabilities": [],
+"required_tools": [],
+"prohibited_tools": [],
+"domain_requirements": [],
+"data_classification": "",
+"residency_constraints": [],
+"provider_constraints": [],
+"deployment_constraints": [],
+"required_permissions": [
+"read_context"
+],
+"prohibited_permissions": [],
+"authority_ceiling": 0,
+"required_audit_capabilities": [],
+"required_security_classification": 4,
+"required_evidence_classes": [
+"MEASURED"
+],
+"state_requirement": "",
+"human_review_requirement": false,
+"minimum_quality_constraint": null,
+"maximum_latency_constraint": null,
+"maximum_cost_constraint": null,
+"model_requirement_refs": [],
+"fallback_policy_ref": "",
+"evidence_refs": [],
+"policy_refs": [],
+"role_fingerprint": "sha256:8962f0fe623b81dcb3e4e61774a90bacb558398dfa8e049591e6b634f7891f67"
+},
+{
+"contract_version": "awc.v1",
+"role_id": "role::sec_incident_correlation",
+"workflow_id": "gs_security_infeasible",
+"workflow_version": 1,
+"source_node_id": "sec_incident_correlation",
+"source_node_kind": "EVIDENCE_REQUIREMENT",
+"role_name": "incident correlation",
+"role_description": "correlated_incident",
+"required_capabilities": [
+"evidence_extraction",
+"incident_correlation"
+],
+"input_contract_refs": [
+"threat_assessment"
+],
+"output_contract_refs": [
+"correlated_incident"
+],
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_incident_correlation",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"optional_capabilities": [],
+"required_tools": [],
+"prohibited_tools": [],
+"domain_requirements": [],
+"data_classification": "",
+"residency_constraints": [],
+"provider_constraints": [],
+"deployment_constraints": [],
+"required_permissions": [
+"read_context"
+],
+"prohibited_permissions": [],
+"authority_ceiling": 0,
+"required_audit_capabilities": [],
+"required_security_classification": 4,
+"required_evidence_classes": [
+"MEASURED"
+],
+"state_requirement": "",
+"human_review_requirement": false,
+"minimum_quality_constraint": null,
+"maximum_latency_constraint": null,
+"maximum_cost_constraint": null,
+"model_requirement_refs": [],
+"fallback_policy_ref": "",
+"evidence_refs": [],
+"policy_refs": [],
+"role_fingerprint": "sha256:5082d8c66a94bbc411980eb60084a64e866ad2c65dfcdfef817509560769fbd6"
+}
+],
+"non_agent_dispositions": [
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_security_infeasible",
+"node_id": "sec_evidence_intake",
+"source_node_kind": "DECISION_RULE",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:DECISION_RULE"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_evidence_intake",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"fingerprint": "sha256:ce23ee30a2a3656c1994ea5c01b1e279f1c91492148d6e5fce9f3585d4c1c01e"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_security_infeasible",
+"node_id": "sec_human_escalation",
+"source_node_kind": "OVERRIDE_GATE",
+"disposition": "HUMAN_AUTHORITY_REQUIRED",
+"reason_codes": [
+"human_authority_node:OVERRIDE_GATE"
+],
+"canonical_owner": "DECISION_AUTHORITY",
+"authority_context": {
+"owning_capability": "DECISION_AUTHORITY",
+"authority_disposition": "AUTHORITATIVE",
+"authority_type": "HUMAN_APPROVER",
+"public_contract_target": ""
+},
+"source_capability": "DECISION_AUTHORITY",
+"human_review_required": true,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_human_escalation",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"fingerprint": "sha256:b2aede51e4406cf50977987bad9afff948921f461928780e5f3761ece5297e6b"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_security_infeasible",
+"node_id": "sec_action_boundary",
+"source_node_kind": "ACTION_CONSTRAINT",
+"disposition": "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP",
+"reason_codes": [
+"authoritative_governance_owner:ACTION_GATE"
+],
+"canonical_owner": "ACTION_GATE",
+"authority_context": {
+"owning_capability": "ACTION_GATE",
+"authority_disposition": "AUTHORITATIVE",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "ACTION_GATE",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_action_boundary",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"fingerprint": "sha256:d2bb9072a4b50291ea0ca96e372ea00c299deb0ab0030b7d252a748f501f603f"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_security_infeasible",
+"node_id": "sec_audit",
+"source_node_kind": "AUDIT_EMISSION",
+"disposition": "DETERMINISTIC_SERVICE_PREFERRED",
+"reason_codes": [
+"deterministic_kind:AUDIT_EMISSION"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_audit",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"fingerprint": "sha256:a51289d3012fa227624a4519e91e8aa09cbdc4a2d961c2640f1b301545d79444"
+},
+{
+"contract_version": "awc.v1",
+"workflow_id": "gs_security_infeasible",
+"node_id": "sec_terminal",
+"source_node_kind": "TERMINAL_OUTCOME",
+"disposition": "NO_AI_AGENT_REQUIRED",
+"reason_codes": [
+"structural_kind:TERMINAL_OUTCOME"
+],
+"canonical_owner": "COMPILER",
+"authority_context": {
+"owning_capability": "COMPILER",
+"authority_disposition": "ADVISORY",
+"authority_type": "",
+"public_contract_target": ""
+},
+"source_capability": "COMPILER",
+"human_review_required": false,
+"provenance": {
+"source_kind": "compiler_workflow_ir",
+"synthetic": true,
+"source_ref": "gs_security_infeasible@v1:sec_terminal",
+"notes": ""
+},
+"source_package_digest": "sha256:8e911d1d8150c72d115828554b02de4c327013ab7b9b54551286c0af41010587",
+"fingerprint": "sha256:4d9b30e80337f6defd545fbbc0af9ead0b39dbde3764a8c1bc97d9a82bfe6a1e"
+}
+],
+"adaptation_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a"
+}

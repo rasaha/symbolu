@@ -1,0 +1,803 @@
+{
+"registry_snapshot": {
+"contract_version": "awc.v1",
+"snapshot_id": "gs_procurement_registry",
+"registry_version": "governance_studio_demo.v1",
+"logical_time": 1000000.0,
+"agent_profiles": [
+{
+"contract_version": "awc.v1",
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"provider_id": "openai",
+"agent_type": "analysis",
+"status": "ACTIVE",
+"declared_capabilities": [
+{
+"capability_id": "supplier_evidence_collection",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "evidence_extraction",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+}
+],
+"measured_capabilities": [],
+"observed_capabilities": [],
+"supported_domains": [
+"procurement",
+"support",
+"security"
+],
+"supported_tools": [
+"web_search"
+],
+"input_contracts": [
+"validated_request",
+"supplier_evidence",
+"supplier_risk_report",
+"ticket_class",
+"retrieved_context",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident"
+],
+"output_contracts": [
+"supplier_evidence",
+"supplier_risk_report",
+"recommendation_draft",
+"ticket_class",
+"retrieved_context",
+"draft_response",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident",
+"security_recommendation"
+],
+"model_requirement_refs": [],
+"requested_permissions": [
+"read_context"
+],
+"maximum_authority_scope": 1,
+"data_access_requirements": [],
+"supported_data_classifications": [
+"public",
+"confidential",
+"restricted"
+],
+"residency": "US",
+"deployment_environment": "cloud",
+"security_classification": 3,
+"latency_evidence": 850.0,
+"cost_evidence": 2.5,
+"quality_evidence": 0.9,
+"reliability_evidence": 0.99,
+"benchmark_refs": [],
+"failure_mode_refs": [],
+"audit_capabilities": [
+"trace",
+"replay"
+],
+"state_model": "stateless",
+"concurrency_constraints": 0,
+"valid_from": 0.0,
+"valid_until": null,
+"evidence_refs": [],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"profile_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"provider_id": "anthropic",
+"agent_type": "analysis",
+"status": "ACTIVE",
+"declared_capabilities": [
+{
+"capability_id": "supplier_evidence_collection",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "procurement_risk_analysis",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "evidence_extraction",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+}
+],
+"measured_capabilities": [],
+"observed_capabilities": [],
+"supported_domains": [
+"procurement",
+"support",
+"security"
+],
+"supported_tools": [
+"web_search"
+],
+"input_contracts": [
+"validated_request",
+"supplier_evidence",
+"supplier_risk_report",
+"ticket_class",
+"retrieved_context",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident"
+],
+"output_contracts": [
+"supplier_evidence",
+"supplier_risk_report",
+"recommendation_draft",
+"ticket_class",
+"retrieved_context",
+"draft_response",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident",
+"security_recommendation"
+],
+"model_requirement_refs": [],
+"requested_permissions": [
+"read_context"
+],
+"maximum_authority_scope": 1,
+"data_access_requirements": [],
+"supported_data_classifications": [
+"public",
+"confidential",
+"restricted"
+],
+"residency": "IN",
+"deployment_environment": "cloud_in",
+"security_classification": 3,
+"latency_evidence": 800.0,
+"cost_evidence": 2.0,
+"quality_evidence": 0.95,
+"reliability_evidence": 0.99,
+"benchmark_refs": [],
+"failure_mode_refs": [],
+"audit_capabilities": [
+"trace",
+"replay"
+],
+"state_model": "stateless",
+"concurrency_constraints": 0,
+"valid_from": 0.0,
+"valid_until": null,
+"evidence_refs": [],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"profile_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"provider_id": "anthropic",
+"agent_type": "analysis",
+"status": "ACTIVE",
+"declared_capabilities": [
+{
+"capability_id": "procurement_recommendation",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "evidence_extraction",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+}
+],
+"measured_capabilities": [],
+"observed_capabilities": [],
+"supported_domains": [
+"procurement",
+"support",
+"security"
+],
+"supported_tools": [
+"web_search"
+],
+"input_contracts": [
+"validated_request",
+"supplier_evidence",
+"supplier_risk_report",
+"ticket_class",
+"retrieved_context",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident"
+],
+"output_contracts": [
+"supplier_evidence",
+"supplier_risk_report",
+"recommendation_draft",
+"ticket_class",
+"retrieved_context",
+"draft_response",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident",
+"security_recommendation"
+],
+"model_requirement_refs": [],
+"requested_permissions": [
+"read_context"
+],
+"maximum_authority_scope": 1,
+"data_access_requirements": [],
+"supported_data_classifications": [
+"public",
+"confidential",
+"restricted"
+],
+"residency": "US",
+"deployment_environment": "cloud",
+"security_classification": 3,
+"latency_evidence": 1000.0,
+"cost_evidence": 3.0,
+"quality_evidence": 0.94,
+"reliability_evidence": 0.99,
+"benchmark_refs": [],
+"failure_mode_refs": [],
+"audit_capabilities": [
+"trace",
+"replay"
+],
+"state_model": "stateless",
+"concurrency_constraints": 0,
+"valid_from": 0.0,
+"valid_until": null,
+"evidence_refs": [],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"profile_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"provider_id": "anthropic",
+"agent_type": "analysis",
+"status": "ACTIVE",
+"declared_capabilities": [
+{
+"capability_id": "procurement_risk_analysis",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "evidence_extraction",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+}
+],
+"measured_capabilities": [],
+"observed_capabilities": [],
+"supported_domains": [
+"procurement",
+"support",
+"security"
+],
+"supported_tools": [
+"web_search"
+],
+"input_contracts": [
+"validated_request",
+"supplier_evidence",
+"supplier_risk_report",
+"ticket_class",
+"retrieved_context",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident"
+],
+"output_contracts": [
+"supplier_evidence",
+"supplier_risk_report",
+"recommendation_draft",
+"ticket_class",
+"retrieved_context",
+"draft_response",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident",
+"security_recommendation"
+],
+"model_requirement_refs": [],
+"requested_permissions": [
+"read_context"
+],
+"maximum_authority_scope": 1,
+"data_access_requirements": [],
+"supported_data_classifications": [
+"public",
+"confidential",
+"restricted"
+],
+"residency": "US",
+"deployment_environment": "cloud",
+"security_classification": 3,
+"latency_evidence": 900.0,
+"cost_evidence": 3.0,
+"quality_evidence": 0.95,
+"reliability_evidence": 0.99,
+"benchmark_refs": [],
+"failure_mode_refs": [],
+"audit_capabilities": [
+"trace",
+"replay"
+],
+"state_model": "stateless",
+"concurrency_constraints": 0,
+"valid_from": 0.0,
+"valid_until": null,
+"evidence_refs": [],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"profile_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"provider_id": "anthropic",
+"agent_type": "analysis",
+"status": "ACTIVE",
+"declared_capabilities": [
+{
+"capability_id": "supplier_evidence_collection",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+},
+{
+"capability_id": "evidence_extraction",
+"capability_version": "",
+"category": "",
+"description": "",
+"declared": true
+}
+],
+"measured_capabilities": [],
+"observed_capabilities": [],
+"supported_domains": [
+"procurement",
+"support",
+"security"
+],
+"supported_tools": [
+"web_search"
+],
+"input_contracts": [
+"validated_request",
+"supplier_evidence",
+"supplier_risk_report",
+"ticket_class",
+"retrieved_context",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident"
+],
+"output_contracts": [
+"supplier_evidence",
+"supplier_risk_report",
+"recommendation_draft",
+"ticket_class",
+"retrieved_context",
+"draft_response",
+"incident_evidence",
+"threat_assessment",
+"correlated_incident",
+"security_recommendation"
+],
+"model_requirement_refs": [],
+"requested_permissions": [
+"read_context"
+],
+"maximum_authority_scope": 1,
+"data_access_requirements": [],
+"supported_data_classifications": [
+"public",
+"confidential",
+"restricted"
+],
+"residency": "US",
+"deployment_environment": "cloud",
+"security_classification": 3,
+"latency_evidence": 700.0,
+"cost_evidence": 2.0,
+"quality_evidence": 0.96,
+"reliability_evidence": 0.99,
+"benchmark_refs": [],
+"failure_mode_refs": [],
+"audit_capabilities": [
+"trace",
+"replay"
+],
+"state_model": "stateless",
+"concurrency_constraints": 0,
+"valid_from": 0.0,
+"valid_until": null,
+"evidence_refs": [],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"profile_fingerprint": ""
+}
+],
+"capability_evidence": [
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"capability_id": "evidence_extraction",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_evidence_extraction",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_general_analyst::1.0.0::supplier_evidence_collection::MEASURED",
+"agent_id": "agent_general_analyst",
+"agent_version": "1.0.0",
+"capability_id": "supplier_evidence_collection",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.9,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_supplier_evidence_collection",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_india_procurement::1.0.0::evidence_extraction::MEASURED",
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"capability_id": "evidence_extraction",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_evidence_extraction",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_india_procurement::1.0.0::procurement_risk_analysis::MEASURED",
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"capability_id": "procurement_risk_analysis",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_procurement_risk_analysis",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_india_procurement::1.0.0::supplier_evidence_collection::MEASURED",
+"agent_id": "agent_india_procurement",
+"agent_version": "1.0.0",
+"capability_id": "supplier_evidence_collection",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_supplier_evidence_collection",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_procurement_recommendation::1.2.0::evidence_extraction::MEASURED",
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"capability_id": "evidence_extraction",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_evidence_extraction",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_procurement_recommendation::1.2.0::procurement_recommendation::MEASURED",
+"agent_id": "agent_procurement_recommendation",
+"agent_version": "1.2.0",
+"capability_id": "procurement_recommendation",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_procurement_recommendation",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_procurement_risk::2.1.0::evidence_extraction::MEASURED",
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"capability_id": "evidence_extraction",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_evidence_extraction",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_procurement_risk::2.1.0::procurement_risk_analysis::MEASURED",
+"agent_id": "agent_procurement_risk",
+"agent_version": "2.1.0",
+"capability_id": "procurement_risk_analysis",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.96,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_procurement_risk_analysis",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_supplier_evidence::1.4.0::evidence_extraction::MEASURED",
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"capability_id": "evidence_extraction",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.95,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_evidence_extraction",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+},
+{
+"contract_version": "awc.v1",
+"evidence_id": "ev::agent_supplier_evidence::1.4.0::supplier_evidence_collection::MEASURED",
+"agent_id": "agent_supplier_evidence",
+"agent_version": "1.4.0",
+"capability_id": "supplier_evidence_collection",
+"evidence_class": "MEASURED",
+"measurement_type": "benchmark_score",
+"value": 0.97,
+"unit": "score",
+"threshold_context": "",
+"benchmark_id": "bench_supplier_evidence_collection",
+"benchmark_version": "1.0",
+"dataset_ref": "",
+"environment_ref": "",
+"sample_size": 500,
+"measured_at": 900000.0,
+"valid_until": 2000000.0,
+"issuer": "synthetic_benchmark",
+"signature_or_digest": "",
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"evidence_fingerprint": ""
+}
+],
+"source_refs": [
+"synthetic_demo"
+],
+"policy_refs": [],
+"provenance": {
+"source_kind": "synthetic_fixture",
+"synthetic": true,
+"source_ref": "ugence_governance_studio.demo_data",
+"notes": ""
+},
+"snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545"
+}
+}

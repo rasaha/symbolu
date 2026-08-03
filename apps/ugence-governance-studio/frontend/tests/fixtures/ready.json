@@ -1,0 +1,13 @@
+{
+"status": "ready",
+"ready": true,
+"checks": {
+"scenario_manifests_load": true,
+"fixture_hashes_match": true,
+"awc_import_ok": true,
+"supported_contracts_present": true,
+"awc_version_in_supported_range": true,
+"bundled_fixture_manifest_ok": true,
+"no_external_service_dependency": true
+}
+}

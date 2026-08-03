@@ -1,0 +1,100 @@
+{
+"scenarios": [
+{
+"scenario_id": "procurement",
+"title": "Procurement Sourcing Workforce",
+"domain": "procurement",
+"description": "Non-greedy agent team selection under provider concentration limits.",
+"workflow_contract_version": "workflow_ir.v1",
+"fixture_version": "0.2.0",
+"expected_plan_state": "COMPLETE",
+"synthetic_data": true,
+"supported_operations": [
+"adapt",
+"eligibility",
+"ranking",
+"composition",
+"plan",
+"permissions",
+"fallback",
+"explanations",
+"replay",
+"compare",
+"what-if",
+"export"
+]
+},
+{
+"scenario_id": "customer_support",
+"title": "Customer Support Triage & Response",
+"domain": "customer_support",
+"description": "Clean feasible support team; a cyber specialist is eliminated, not mis-assigned.",
+"workflow_contract_version": "workflow_ir.v1",
+"fixture_version": "0.2.0",
+"expected_plan_state": "COMPLETE",
+"synthetic_data": true,
+"supported_operations": [
+"adapt",
+"eligibility",
+"ranking",
+"composition",
+"plan",
+"permissions",
+"fallback",
+"explanations",
+"replay",
+"compare",
+"what-if",
+"export"
+]
+},
+{
+"scenario_id": "cybersecurity_success",
+"title": "Cybersecurity Incident Response (Feasible)",
+"domain": "cybersecurity",
+"description": "Feasible incident-response team; single-holder roles have no fallback.",
+"workflow_contract_version": "workflow_ir.v1",
+"fixture_version": "0.2.0",
+"expected_plan_state": "COMPLETE",
+"synthetic_data": true,
+"supported_operations": [
+"adapt",
+"eligibility",
+"ranking",
+"composition",
+"plan",
+"permissions",
+"fallback",
+"explanations",
+"replay",
+"compare",
+"what-if",
+"export"
+]
+},
+{
+"scenario_id": "cybersecurity_no_feasible_team",
+"title": "Cybersecurity Incident Response (No Feasible Team)",
+"domain": "cybersecurity",
+"description": "NO_FEASIBLE_TEAM: only one approved provider is cleared to clearance level 4.",
+"workflow_contract_version": "workflow_ir.v1",
+"fixture_version": "0.2.0",
+"expected_plan_state": "NO_FEASIBLE_TEAM",
+"synthetic_data": true,
+"supported_operations": [
+"adapt",
+"eligibility",
+"ranking",
+"composition",
+"plan",
+"permissions",
+"fallback",
+"explanations",
+"replay",
+"compare",
+"what-if",
+"export"
+]
+}
+]
+}

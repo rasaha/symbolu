@@ -1,0 +1,10 @@
+{
+  "source_contract": "apps/ugence-governance-studio/contracts/openapi.json",
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "generator": "openapi-typescript",
+  "generated_types": "src/generated/api.ts",
+  "recorded_hash_artifact": "src/generated/openapi.hash.json",
+  "drift_command": "npm run verify:openapi",
+  "envelope_typing": "ApiResponseEnvelope<T> typed from OpenAPI; result payloads are hand-written presentation view-models (documented exception, backend result is Any)",
+  "any_policy": "no `any` for canonical responses; the untyped `result` field is projected via documented view-models in src/api/types.ts"
+}

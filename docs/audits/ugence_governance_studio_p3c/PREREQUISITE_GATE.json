@@ -1,0 +1,29 @@
+{
+  "gate": "GOVERNANCE_STUDIO_P3C prerequisite",
+  "results": {
+    "pr_1318_merged": true,
+    "pr_1320_merged": true,
+    "backend_reports_0_1_0": true,
+    "api_contract_v1": true,
+    "openapi_in_sync": true,
+    "awc_0_2_1": true,
+    "compiler_0_2_0": true,
+    "awc_dependency_bounded_lt_0_3_0": true,
+    "deployment_pin_0_2_1": true,
+    "ready_fails_for_unsupported_awc": true,
+    "fixture_three_way_manifest": true,
+    "manifest_covers_v1_scenarios": true,
+    "manifest_covers_v2_conformance": true,
+    "set_equality_detects_add_remove_extra": true,
+    "hash_equality_all_paths": true,
+    "p3b_suite": "142 passed",
+    "p3a_suite": "94 passed",
+    "awc_suite": "201 passed, 1 skipped",
+    "fixture_bundle_verifier": "in sync (114 files)",
+    "openapi_drift_verifier": "in sync",
+    "platform_freeze": "PASS, digest unchanged",
+    "working_tree_clean": true,
+    "no_existing_p3c_branch_or_frontend": true
+  },
+  "verdict": "PASS"
+}
