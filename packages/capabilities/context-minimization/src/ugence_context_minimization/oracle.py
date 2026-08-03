@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Iterable, Optional, Union
 
 from .errors import InvalidRequestError, OracleRequiredError
-from .fingerprint import result_fingerprint
+from .fingerprint import result_fingerprint, run_fingerprint
 from .models import (
     Context,
     EquivalenceStatus,
@@ -44,18 +44,30 @@ def _validate_eval(
     # (degenerate) equivalence class; a non-string (e.g. None) is malformed.
     if not isinstance(ev.equivalence_key, str):
         return None, reasons.ORACLE_RESULT_MALFORMED
-    if (
-        ev.correlation_id is not None
-        and context.correlation_id is not None
-        and ev.correlation_id != context.correlation_id
-    ):
-        return None, reasons.CORRELATION_MISMATCH
-    if (
-        ev.valid_until is not None
-        and evaluation_time is not None
-        and evaluation_time > ev.valid_until
-    ):
-        return None, reasons.ORACLE_EVALUATION_EXPIRED
+    # Oracle identity must be present and well-formed — a string equivalence key is
+    # not enough to trust the evaluation (v0.1.1).
+    if not isinstance(ev.oracle_id, str) or not ev.oracle_id:
+        return None, reasons.ORACLE_RESULT_MALFORMED
+    if not isinstance(ev.contract_version, str) or not ev.contract_version:
+        return None, reasons.ORACLE_RESULT_MALFORMED
+
+    # Correlation binding (v0.1.1): when the context carries a non-empty correlation
+    # id, every usable evaluation MUST carry the identical id. Missing and mismatched
+    # are distinct, non-collapsed fail-closed reasons.
+    if context.correlation_id:
+        if not ev.correlation_id:
+            return None, reasons.ORACLE_CORRELATION_MISSING
+        if ev.correlation_id != context.correlation_id:
+            return None, reasons.ORACLE_CORRELATION_MISMATCH
+
+    # Expiry (v0.1.1): inclusive at the exact instant, and a supplied validity horizon
+    # with no evaluation_time fails closed rather than being treated as unexpired. The
+    # caller controls evaluation_time; the core never reads a wall clock.
+    if ev.valid_until is not None:
+        if evaluation_time is None:
+            return None, reasons.ORACLE_EVALUATION_TIME_REQUIRED
+        if evaluation_time >= ev.valid_until:
+            return None, reasons.ORACLE_EVALUATION_EXPIRED
     return ev, None
 
 
@@ -170,6 +182,9 @@ def _build_result(
     policy: MinimizationPolicy,
     counter: Optional[TokenCounter],
     base_eval: Optional[OracleEvaluation],
+    requested_reduction: float,
+    requested_token_budget: Optional[int],
+    evaluation_time: Optional[float],
 ) -> MinimizationResult:
     # `surviving` is authoritative; anything not surviving was removed. This keeps
     # restored/fallback ids out of the removed sets automatically.
@@ -186,12 +201,12 @@ def _build_result(
     seen: set[str] = set()
     ordered_codes = tuple(c for c in codes if not (c in seen or seen.add(c)))
 
-    fp = result_fingerprint(
+    outcome_fp = result_fingerprint(
         context_id=context.id,
         mode=mode.value,
         surviving_ids=surviving,
-        removed_structural=[i for i in removed_structural if i in removed],
-        removed_extractive=[i for i in removed_extractive if i in removed],
+        removed_structural=removed_structural,
+        removed_extractive=removed_extractive,
         restored_ids=restored,
         protected_ids=protected,
         equivalence_status=equivalence_status.value,
@@ -200,19 +215,39 @@ def _build_result(
         oracle_id=oracle_id,
         oracle_contract_version=oracle_cv,
     )
+    run_fp = run_fingerprint(
+        context,
+        mode=mode.value,
+        requested_reduction=requested_reduction,
+        requested_token_budget=requested_token_budget,
+        evaluation_time=evaluation_time,
+        policy=policy,
+        token_counter=counter,
+        base_eval=base_eval,
+        surviving_ids=surviving,
+        removed_structural=removed_structural,
+        removed_extractive=removed_extractive,
+        restored_ids=restored,
+        protected_ids=protected,
+        original_tokens=original_tokens,
+        resulting_tokens=resulting_tokens,
+        equivalence_status=equivalence_status.value,
+        fell_back=fell_back,
+        reason_codes=ordered_codes,
+    )
     return MinimizationResult(
         context_id=context.id,
         mode=mode,
         original_ids=context.unit_ids,
         surviving_ids=tuple(surviving),
         removed_ids=tuple(i for i in context.unit_ids if i in removed),
-        removed_structural=tuple(i for i in removed_structural if i in removed),
-        removed_extractive=tuple(i for i in removed_extractive if i in removed),
+        removed_structural=tuple(removed_structural),
+        removed_extractive=tuple(removed_extractive),
         restored_ids=tuple(sorted(restored)),
         protected_ids=tuple(sorted(protected)),
         original_tokens=original_tokens,
         resulting_tokens=resulting_tokens,
-        requested_reduction=0.0,
+        requested_reduction=requested_reduction,
         equivalence_status=equivalence_status,
         reduced=bool(removed),
         fell_back=fell_back,
@@ -220,7 +255,10 @@ def _build_result(
         policy_version=policy.version,
         oracle_id=oracle_id,
         oracle_contract_version=oracle_cv,
-        fingerprint=fp,
+        requested_token_budget=requested_token_budget,
+        outcome_fingerprint=outcome_fp,
+        run_fingerprint=run_fp,
+        fingerprint=outcome_fp,  # DEPRECATED alias, byte-identical to outcome_fingerprint
     )
 
 
@@ -231,6 +269,9 @@ def _fallback(
     policy: MinimizationPolicy,
     counter: Optional[TokenCounter],
     base_eval: Optional[OracleEvaluation],
+    requested_reduction: float,
+    requested_token_budget: Optional[int],
+    evaluation_time: Optional[float],
 ) -> MinimizationResult:
     """Full-context fallback: nothing removed, everything retained."""
     return _build_result(
@@ -247,6 +288,9 @@ def _fallback(
         policy=policy,
         counter=counter,
         base_eval=base_eval,
+        requested_reduction=requested_reduction,
+        requested_token_budget=requested_token_budget,
+        evaluation_time=evaluation_time,
     )
 
 
@@ -281,13 +325,17 @@ def minimize_context(
     if token_budget is not None and token_budget < 0:
         raise InvalidRequestError("token_budget must be >= 0")
 
+    # The caller's request, preserved verbatim on every result path (v0.1.1).
+    req = dict(requested_reduction=target_reduction, requested_token_budget=token_budget,
+               evaluation_time=evaluation_time)
+
     protected, prot_fail = _resolve_protection(context, protection, protected_ids)
 
     # Base evaluation on the FULL context. If it is unusable, fail closed.
     base, base_err = _safe_evaluate(oracle, context, evaluation_time)
     if base_err is not None or base is None:
         return _fallback(context, protected, base_err or reasons.ORACLE_RAISED,
-                         policy, token_counter, None)
+                         policy, token_counter, None, **req)
 
     if prot_fail is not None:
         # Provider failed → protect everything → nothing removable → full context,
@@ -297,7 +345,7 @@ def minimize_context(
             surviving=list(context.unit_ids), removed_structural=[], removed_extractive=[],
             restored=[], protected=protected, equivalence_status=EquivalenceStatus.VERIFIED,
             fell_back=False, codes=[prot_fail, reasons.NO_REDUCTION_POSSIBLE],
-            policy=policy, counter=token_counter, base_eval=base,
+            policy=policy, counter=token_counter, base_eval=base, **req,
         )
 
     codes: list[str] = []
@@ -328,17 +376,17 @@ def minimize_context(
             context, mode=MinimizationMode.ORACLE_VERIFIED, surviving=surviving,
             removed_structural=[], removed_extractive=[], restored=[], protected=protected,
             equivalence_status=EquivalenceStatus.VERIFIED, fell_back=False, codes=codes,
-            policy=policy, counter=token_counter, base_eval=base,
+            policy=policy, counter=token_counter, base_eval=base, **req,
         )
 
     # Stage 3: verify the reduced context.
     red, red_err = _safe_evaluate(oracle, context.with_units(surviving), evaluation_time)
     if red_err is not None or red is None:
         return _fallback(context, protected, red_err or reasons.ORACLE_RAISED,
-                         policy, token_counter, base)
+                         policy, token_counter, base, **req)
     if not _contract_ok(red, base):
         return _fallback(context, protected, reasons.ORACLE_CONTRACT_MISMATCH,
-                         policy, token_counter, base)
+                         policy, token_counter, base, **req)
 
     if red.equivalence_key == base.equivalence_key:
         codes.append(reasons.EQUIVALENCE_VERIFIED)
@@ -346,7 +394,7 @@ def minimize_context(
             context, mode=MinimizationMode.ORACLE_VERIFIED, surviving=surviving,
             removed_structural=removed_struct, removed_extractive=removed_ext, restored=[],
             protected=protected, equivalence_status=EquivalenceStatus.VERIFIED,
-            fell_back=False, codes=codes, policy=policy, counter=token_counter, base_eval=base,
+            fell_back=False, codes=codes, policy=policy, counter=token_counter, base_eval=base, **req,
         )
 
     # Stage 4: restoration of individually-necessary spans.
@@ -364,13 +412,13 @@ def minimize_context(
                 removed_structural=removed_struct, removed_extractive=removed_ext,
                 restored=sorted(nec), protected=protected,
                 equivalence_status=EquivalenceStatus.RESTORED, fell_back=False, codes=codes,
-                policy=policy, counter=token_counter, base_eval=base,
+                policy=policy, counter=token_counter, base_eval=base, **req,
             )
 
     # Stage 5: joint effects unresolved by individual restoration → full fallback.
     codes.append(reasons.JOINT_EFFECT_FALLBACK)
     return _fallback(context, protected, reasons.JOINT_EFFECT_FALLBACK,
-                     policy, token_counter, base)
+                     policy, token_counter, base, **req)
 
 
 def minimize(
