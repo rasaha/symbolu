@@ -1,0 +1,118 @@
+name: governance-studio-p3c-frontend-ci
+
+# Path-scoped: frontend, the frozen contract, the backend it consumes, the
+# canonical + v2 fixtures, the P3C audits and this workflow. No deploy, no
+# secrets, no external model APIs.
+on:
+  push:
+    paths:
+      - "apps/ugence-governance-studio/frontend/**"
+      - "apps/ugence-governance-studio/contracts/openapi.json"
+      - "apps/ugence-governance-studio/backend/**"
+      - "apps/ugence-governance-studio/demo_data/**"
+      - "apps/ugence-governance-studio/expected_outputs/**"
+      - "packages/capabilities/agent-workforce-composer/conformance/**"
+      - "docs/audits/ugence_governance_studio_p3c/**"
+      - ".github/workflows/governance-studio-p3c-frontend-ci.yml"
+  pull_request:
+    paths:
+      - "apps/ugence-governance-studio/frontend/**"
+      - "apps/ugence-governance-studio/contracts/openapi.json"
+      - "apps/ugence-governance-studio/backend/**"
+      - ".github/workflows/governance-studio-p3c-frontend-ci.yml"
+
+env:
+  FE: apps/ugence-governance-studio/frontend
+  PYTHONPATH: >-
+    apps/ugence-governance-studio/backend/src:packages/capabilities/agent-workforce-composer/src:packages/tooling/policy-workflow-compiler/src
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ugence-governance-studio/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/ugence-governance-studio/frontend/package-lock.json
+      - run: npm ci
+
+      - name: openapi-client-freeze
+        run: npm run verify:openapi
+      - name: architecture-boundary
+        run: npm run verify:boundary
+      - name: terminology
+        run: npm run verify:terminology
+      - name: typecheck
+        run: npm run type-check
+      - name: lint
+        run: npm run lint
+      - name: unit-tests
+        run: npx vitest run tests/unit.test.ts tests/client.test.ts
+      - name: component-tests
+        run: npx vitest run tests/screens.test.tsx tests/roles.test.tsx tests/compatibility.test.tsx
+      - name: workflow-graph-suite
+        run: npx vitest run -t "workflow"
+      - name: eligibility-ui-suite
+        run: npx vitest run -t "eligibility matrix"
+      - name: explanation-integrity
+        run: npx vitest run -t "explanation"
+      - name: accessibility-suite
+        run: npx vitest run tests/a11y.test.tsx
+      - name: production-build
+        run: npm run build
+      - name: bundle-report
+        run: du -sh dist && ls -la dist/assets
+      - name: dependency-audit
+        run: npm audit --omit=dev --audit-level=high || echo "audit advisory (non-blocking)"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/ugence-governance-studio/frontend/package-lock.json
+      - name: Install backend + tooling
+        run: |
+          pip install -c apps/ugence-governance-studio/backend/constraints.txt \
+            "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest \
+            apps/ugence-governance-studio/backend
+          pip install -e packages/capabilities/agent-workforce-composer
+
+      - name: p3b-prerequisite
+        run: python -m pytest apps/ugence-governance-studio/backend/tests -q
+
+      - name: awc-version-compatibility
+        run: |
+          python -c "import ugence_agent_workforce_composer.api as a; \
+          assert a.__version__=='0.2.1', a.__version__; \
+          from ugence_governance_studio_api.version import awc_version_supported; \
+          assert awc_version_supported('0.2.1') and not awc_version_supported('0.3.0'); \
+          print('AWC compatibility OK')"
+
+      - name: fixture-bundle-integrity
+        run: python apps/ugence-governance-studio/backend/scripts/verify_fixture_bundle.py
+
+      - name: Install frontend + browser
+        working-directory: apps/ugence-governance-studio/frontend
+        run: |
+          npm ci
+          npm run build
+          npx playwright install --with-deps chromium
+
+      - name: backend-integration + browser-e2e
+        working-directory: apps/ugence-governance-studio/frontend
+        run: npx playwright test
+
+      - name: platform-freeze
+        run: python -m platform_freeze.verify
