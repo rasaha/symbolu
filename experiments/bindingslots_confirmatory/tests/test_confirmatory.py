@@ -274,6 +274,29 @@ def test_retention_seed9_pattern():
     assert RET.classify(seed9, formed_final=False) == "FORMED_THEN_COLLAPSED"
 
 
+def test_committed_results_reconstruct_verdict():
+    """Evidence completeness: if results are committed, the verdict is reconstructible from them
+    alone (no untracked scientific summary needed). Skips cleanly before results exist."""
+    seed_dir = EXP / "results" / "seeds"
+    files = [seed_dir / f"{a}_results.json" for a in ("A+", "B0", "CR1")]
+    if not all(f.exists() for f in files):
+        return  # results not yet produced (RESOURCE_BLOCKED path) — nothing to reconstruct
+    cr1 = {r["seed"]: r for r in json.loads((seed_dir / "CR1_results.json").read_text())["records"]}
+    ap = {r["seed"]: r for r in json.loads((seed_dir / "A+_results.json").read_text())["records"]}
+    b0 = {r["seed"]: r for r in json.loads((seed_dir / "B0_results.json").read_text())["records"]}
+    out = C.classify(cr1, ap, b0)
+    # must equal the committed aggregate verdict
+    agg = json.loads((EXP / "results" / "aggregate_result.json").read_text())
+    assert out["primary_verdict"] == agg["primary_verdict"]
+    assert out["cr1_formation_count"] == agg["cr1_formation_count"]
+    # every seed has the required curated per-seed fields
+    for s in (13, 14, 15, 16, 17):
+        for arm in (cr1, ap, b0):
+            r = arm[s]
+            assert set(r["needle_by_dist"]) == {"16", "96", "220"}
+            assert "ppl" in r and "256" in r["ppl"]
+
+
 def _run_standalone():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = 0
