@@ -1,0 +1,89 @@
+# Independent distribution for the Ugence Procurement product.
+#
+# Ugence Procurement is a governed purchase-approval and authorized-supplier-action
+# product. This wheel ships the product's own deterministic behavior and neutral
+# ports ONLY: purchase-request contracts, deterministic request validation,
+# deterministic policy assessment, advisory recommendation and human-approval
+# vocabulary, decision→action mappings, a control-plane budget-authority adapter,
+# an OFFLINE deterministic supplier execution adapter, the linked-record adapter,
+# an in-memory composition root, a callable API facade, and product verification.
+#
+# It ships NO ERP, marketplace, inventory, accounting, invoice/payment, AI scoring,
+# autonomous purchasing, or production SAP Ariba / Coupa / ServiceNow / Oracle
+# connector, and makes no production, pilot, scale, or compliance claim.
+#
+# Build:  python -m build packages/products/procurement
+# Verify: python -m ugence_procurement verify
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-procurement"
+dynamic = ["version"]
+description = "Ugence Procurement — governed purchase approvals and authorized supplier actions. Deterministic, offline; a governed approval/action vertical, not an ERP or autonomous purchasing system. Not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["procurement", "purchase", "approval", "governance", "decision", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Minimal core: the product's own behavior (pydantic contracts) plus the neutral
+# Decision Authority governance kernel it composes. NO model SDK, NO web framework,
+# NO database driver, NO cloud client, NO ERP SDK. NumPy is deliberately NOT a
+# dependency: no procurement code path imports it.
+dependencies = [
+    "pydantic>=2",
+    "ugence-decision-authority>=1.0.0",
+]
+
+[project.optional-dependencies]
+# Each extra maps to code/behavior that actually exists. Extras that would require a
+# concrete production adapter not shipped here are intentionally NOT defined. In
+# particular there is NO tap / actiongate / ariba / coupa / servicenow extra — those
+# integrations are deferred to the next phase (see docs/NEXT_PHASES.md).
+api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.scripts]
+ugence-procurement = "ugence_procurement.product.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/products/procurement/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_procurement.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+# ``ugence_procurement`` is the canonical implementation. ``domains.procurement`` and
+# ``applications.procurement`` are logic-free compatibility facades shipped so a
+# clean-environment ``import domains.procurement`` / ``import applications.procurement``
+# keeps working. ``namespaces = true`` keeps ``domains`` / ``applications`` as PEP 420
+# namespace packages (no ``__init__.py`` shipped for them), so this wheel never claims
+# ownership of the unrelated ``domains`` / ``applications`` package roots.
+include = ["ugence_procurement*", "domains*", "applications*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+ugence_procurement = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

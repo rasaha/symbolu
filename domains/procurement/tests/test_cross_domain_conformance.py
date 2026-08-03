@@ -52,8 +52,10 @@ def test_domains_supply_only_adapters_not_engines():
     # Control plane + execution adapters are procurement-owned…
     assert isinstance(procurement.budget_authority, BudgetAuthorityAdapter)
     assert isinstance(procurement.supplier_adapter, SupplierExecutionAdapter)
-    assert type(procurement.budget_authority).__module__.startswith("domains.procurement.")
-    assert type(procurement.supplier_adapter).__module__.startswith("domains.procurement.")
+    assert type(procurement.budget_authority).__module__.startswith(
+        ("ugence_procurement.", "domains.procurement."))
+    assert type(procurement.supplier_adapter).__module__.startswith(
+        ("ugence_procurement.", "domains.procurement."))
     # …but the authorization/execution *services* are kernel-owned.
     assert type(procurement.action_authorization_service).__module__.startswith(
         ("ugence_decision_authority.", "decision_governance."))

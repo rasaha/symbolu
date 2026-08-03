@@ -1,0 +1,52 @@
+{
+  "note": "Procurement behavioral tests migrated into the package (canonical imports). test_cross_domain_conformance.py stays in the monorepo (it also imports applications.ai_hiring) and doubles, with the other legacy-path tests, as the legacy compatibility suite.",
+  "source_commit": "b760c9e5440bc4572c9f3a197a682b0c95b53ad8",
+  "migrated": {
+    "test_conformance.py": {
+      "origin": "domains/procurement/tests/test_conformance.py",
+      "origin_sha256": "5c2c70716a4bbf8ebf25bee2f7d4b601ee1566c27dea15dfbdbe5da18cf6b0b7",
+      "current_sha256": "5b381d246795518f03fcabe38e18183a655a172ce433169acef11b0eb3d5d62e",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    },
+    "test_procurement_authorization.py": {
+      "origin": "domains/procurement/tests/test_procurement_authorization.py",
+      "origin_sha256": "3c0cf9ac4fa915d9852a75b0da5252bc921c8540ba5adc44a64ee12cb1308ad5",
+      "current_sha256": "3f749c63ff93c4a95571336005ea32ea08f017ad848d081ed66f0302000083b4",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    },
+    "test_procurement_domain.py": {
+      "origin": "domains/procurement/tests/test_procurement_domain.py",
+      "origin_sha256": "9fbe89fee3e1eb6e7f9e9269d43b4bb8fbff686d1597940ebd3411a5f9391b83",
+      "current_sha256": "cbff8cfad59abc65414fc2da9a01dc58b462e1a8e30fad1a5e7d985f7b070c1c",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    },
+    "test_procurement_e2e.py": {
+      "origin": "domains/procurement/tests/test_procurement_e2e.py",
+      "origin_sha256": "b71e8b65d842b877f53294a127fd5f80d3233d361c2aafe851be58fe3c80e00c",
+      "current_sha256": "f53bf566a3ea65dbc73286fa201125a0078972c2ae281b37facc51e67d403745",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    },
+    "test_procurement_execution.py": {
+      "origin": "domains/procurement/tests/test_procurement_execution.py",
+      "origin_sha256": "8f4b700eb2e553c1f1ccbe8ff5462c60f2b4c91690816a8ecb6adb498bd47249",
+      "current_sha256": "a49028f82d5928775b31ae247280e203f0ef9781f546ae47acc27e8990171374",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    },
+    "test_procurement_reconciliation.py": {
+      "origin": "domains/procurement/tests/test_procurement_reconciliation.py",
+      "origin_sha256": "5b7ac5287c0618d91cb9140a452ca14be853c4cf28385aa24b02de563b0551a9",
+      "current_sha256": "80fc0890881ec463967f1f2d36d8bc49393c2d8e57a93cf17dc5c871d596025d",
+      "classification": "TEST_MIGRATION",
+      "transform": "import-path rewrite to ugence_procurement/ugence_decision_authority"
+    }
+  },
+  "kept_in_monorepo": [
+    "domains/procurement/tests/test_cross_domain_conformance.py (cross-domain; imports applications.ai_hiring)",
+    "domains/procurement/tests/* (all 33 legacy tests retained as the legacy compatibility suite)"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "steps": {
+    "dep_download": {
+      "passed": true,
+      "offline_runtime": true
+    },
+    "wheel_audit": {
+      "passed": true,
+      "problems": [],
+      "has_py_typed": true,
+      "member_count": 39,
+      "namespace_safe": true
+    },
+    "clean_install": {
+      "passed": true
+    },
+    "isolated_imports": {
+      "passed": true
+    },
+    "no_repo_path_leak": {
+      "passed": true
+    },
+    "cli_version": {
+      "passed": true,
+      "distribution_version": "0.1.0"
+    },
+    "cli_verify": {
+      "passed": true,
+      "tail": [
+        "RESULT: PASS"
+      ]
+    },
+    "cli_demo": {
+      "passed": true
+    },
+    "installed_smoke": {
+      "passed": true
+    }
+  },
+  "hashes": {
+    "wheel": {
+      "name": "ugence_procurement-0.1.0-py3-none-any.whl",
+      "sha256": "182deecb3559a1dbdd5ba4c931b695eb7659217081eca6be8903e21686c3ae15"
+    },
+    "sdist": {
+      "name": "ugence_procurement-0.1.0.tar.gz",
+      "sha256": "b3297a45363cadfb0a4e49b3e70fda810b42f9433a011442d956e0df9f0fe3c8"
+    }
+  },
+  "reproducibility": {
+    "wheel_bit_for_bit": true,
+    "sdist_archive_bit_for_bit": false,
+    "sdist_content_reproducible": true
+  },
+  "verdict": "PASS"
+}

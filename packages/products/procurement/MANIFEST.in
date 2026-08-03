@@ -1,0 +1,11 @@
+include README.md CHANGELOG.md LICENSE
+include src/ugence_procurement/py.typed
+recursive-include src/ugence_procurement *.py
+recursive-include src/domains *.py
+recursive-include src/applications *.py
+# Do NOT ship tests, docs, artifacts, or scripts inside the wheel/sdist payload.
+prune tests
+prune docs
+prune artifacts
+prune scripts
+global-exclude __pycache__ *.pyc

@@ -1,0 +1,211 @@
+{
+  "canonical_root": "packages/products/procurement/src/ugence_procurement",
+  "source_commit": "b760c9e5440bc4572c9f3a197a682b0c95b53ad8",
+  "files": {
+    "errors.py": {
+      "origin": "domains/procurement/errors.py",
+      "origin_sha256": "b34138ad8532ef8a649add4bf83e0c8a697ecf2cc3c135c6c8719af6538cd991",
+      "current_sha256": "f65dd136e5355a2dc771c4f3f0214a0af1cd6b1d316a14164c0a8accbb8dfb96",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "requests/__init__.py": {
+      "origin": "domains/procurement/requests/__init__.py",
+      "origin_sha256": "109a2f957241b08009e2a877a46d6ef10584ccafd68e62b033228d11ea16db42",
+      "current_sha256": "109a2f957241b08009e2a877a46d6ef10584ccafd68e62b033228d11ea16db42",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "requests/contracts.py": {
+      "origin": "domains/procurement/requests/contracts.py",
+      "origin_sha256": "5ffc2675402b3dafd6bdca96acaabcad6813a8c0afe6c805e4644ca2874c4d33",
+      "current_sha256": "88ffc57e995961798a182b7f2afa0f598e58c9c70e34afd76d3c5e6c3e3e6c33",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "validation/__init__.py": {
+      "origin": "domains/procurement/validation/__init__.py",
+      "origin_sha256": "5d4a6b328eb91d7b8354247c636150afbe760f59d5b6b618d459074564e4a3f9",
+      "current_sha256": "5d4a6b328eb91d7b8354247c636150afbe760f59d5b6b618d459074564e4a3f9",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "validation/request_validation.py": {
+      "origin": "domains/procurement/validation/request_validation.py",
+      "origin_sha256": "8a5020fbcc5d9fbb71fac92e4b53e03cc04b02bf07c5ed2f215b43ef6872beb2",
+      "current_sha256": "8a5020fbcc5d9fbb71fac92e4b53e03cc04b02bf07c5ed2f215b43ef6872beb2",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "policies/__init__.py": {
+      "origin": "domains/procurement/policies/__init__.py",
+      "origin_sha256": "d7d8f1f0aa6f8fbb9ddb433e04626c4ae68b830ebd9eb5ba3110a7cd66ba2c22",
+      "current_sha256": "d7d8f1f0aa6f8fbb9ddb433e04626c4ae68b830ebd9eb5ba3110a7cd66ba2c22",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "policies/assessment.py": {
+      "origin": "domains/procurement/policies/assessment.py",
+      "origin_sha256": "0fc238640c5fa0171944bfa47afd4346816c659d111a7d009b91aa9ac27abfc7",
+      "current_sha256": "0c43305e177edc900049f23a705e9807d4be57754f33e14d7d664661e3fa4b80",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "policies/budget_authority.py": {
+      "origin": "domains/procurement/policies/budget_authority.py",
+      "origin_sha256": "0e408086a459c120963c3bd6725149003ab43a13d2e6ab6cf38c985f96f9b616",
+      "current_sha256": "a4cc181e2f66503eeb0cb7a764e9caf3ac73a90615558b721ad06c36376c6cf6",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "policies/policy_adapter.py": {
+      "origin": "domains/procurement/policies/policy_adapter.py",
+      "origin_sha256": "e2e2c4e89b06b5ae20f48ee31c0cf5053a2290108babb15f312e6b3d144f9c40",
+      "current_sha256": "6718f6750227dce633adf7ee76588e0520a1ed4cc4dfddcedea4c70d9da51c11",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "approvals/__init__.py": {
+      "origin": "domains/procurement/approvals/__init__.py",
+      "origin_sha256": "1aa227b82a39d9722862d33377608548c575620e13545b2dfcaf076aefcd1af8",
+      "current_sha256": "1aa227b82a39d9722862d33377608548c575620e13545b2dfcaf076aefcd1af8",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "approvals/mappings.py": {
+      "origin": "domains/procurement/approvals/mappings.py",
+      "origin_sha256": "d971c629a6ac1f8f0170f10b51b23f0e974036795ebd4995463295a884cd02db",
+      "current_sha256": "442c44054c8af22ed852cffec542c6dd02e1e9804c7480ad351751408517fb91",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "actions/__init__.py": {
+      "origin": "domains/procurement/actions/__init__.py",
+      "origin_sha256": "f13727938eb407565de5a5c41a9e4d5cf19704f6d51e1a74a2b744f04cdc064f",
+      "current_sha256": "f13727938eb407565de5a5c41a9e4d5cf19704f6d51e1a74a2b744f04cdc064f",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "actions/mappings.py": {
+      "origin": "domains/procurement/actions/mappings.py",
+      "origin_sha256": "6a5db32a28a4605cde5dd95dd0bd1fb02a6cc15bf724cb98333152aec0c97618",
+      "current_sha256": "b461187ce287e6703804c4927531750c805923470b56a0b9f86339371d1ca3af",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "suppliers/__init__.py": {
+      "origin": "domains/procurement/suppliers/__init__.py",
+      "origin_sha256": "76725edccd3bce4757d176a60d73efa1ad16fc99bea47711deb90f5878318add",
+      "current_sha256": "76725edccd3bce4757d176a60d73efa1ad16fc99bea47711deb90f5878318add",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "suppliers/adapter.py": {
+      "origin": "domains/procurement/suppliers/adapter.py",
+      "origin_sha256": "669b549b698367a1f24b81a4958c9d3f6aa5921e67a45bbb4437f0e995ff49dd",
+      "current_sha256": "a84549e357276ba0f1cba605b7d144aacdff29c8012e46e90c91a56d34b6a83c",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "suppliers/outcomes.py": {
+      "origin": "domains/procurement/suppliers/outcomes.py",
+      "origin_sha256": "8bd4e40c8e3d3a811225fbd60ceee33c726663f55917a648cf246613d1b1b343",
+      "current_sha256": "e91ee3a84721decb835cafdf46724f66fdc77847d03d95cb76504846650f99bb",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "adapters/__init__.py": {
+      "origin": "domains/procurement/adapters/__init__.py",
+      "origin_sha256": "20ad78dfb6e22a9b51a573163378607dcb0a06fbb46d05f4a14547cdaa23dcad",
+      "current_sha256": "20ad78dfb6e22a9b51a573163378607dcb0a06fbb46d05f4a14547cdaa23dcad",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "adapters/linked_records.py": {
+      "origin": "domains/procurement/adapters/linked_records.py",
+      "origin_sha256": "3ab32c977695605ab54b47f6d45ab8e1d38f706f9da299f6c185eb0ea88ef2c9",
+      "current_sha256": "57a0e8bc23be5efcdead06859128f3c31a5e1edaa1388b636173e41989552884",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "configuration.py": {
+      "origin": "applications/procurement/configuration.py",
+      "origin_sha256": "85bedf7725953dc7e014aeb899fa3ad659c9572e629e23ec0a8a361878e520c9",
+      "current_sha256": "85bedf7725953dc7e014aeb899fa3ad659c9572e629e23ec0a8a361878e520c9",
+      "classification": "BYTE_IDENTICAL"
+    },
+    "platform.py": {
+      "origin": "applications/procurement/platform.py",
+      "origin_sha256": "2c5f889bfd1b881f35817c0529377ee547002cd54f883d0d918d23debc808842",
+      "current_sha256": "f387eb3e452836a1772cc532f95c0ed0a9921185b1d557f22cc4af9e68407846",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "routes.py": {
+      "origin": "applications/procurement/api/routes.py",
+      "origin_sha256": "684b3f184368e3551ae9fe6d7a4f6f3dab78a4783db8dc7e4e42a881c0a0df01",
+      "current_sha256": "26d620670a74b3866bfb2fd98597f96fc9686518e68695b0b1e4e722fddc6609",
+      "classification": "IMPORT_ONLY_CHANGE"
+    },
+    "__init__.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "8b0bc7e4a1833552f629aea09b2af74423e3979ea8c5c4f466594e1f133d5005",
+      "classification": "NEW_PACKAGING"
+    },
+    "api.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "9e13d8815a5e807387a3984b369c17449b9ae8ff5f854464d22cb0e41ed39547",
+      "classification": "NEW_PACKAGING"
+    },
+    "version.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "623c8f559691630735c0e0f53658e3bbdf65adba4bb8091e7caebc977899662d",
+      "classification": "NEW_PACKAGING"
+    },
+    "py.typed": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "classification": "NEW_PACKAGING"
+    },
+    "__main__.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "b2050788c88a5a4438cc84c9ef1a274ede67f4f3de2f51ca7f9ba09808346842",
+      "classification": "NEW_PACKAGING"
+    },
+    "product/__init__.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "64ed58281ecd0fd3561230de3abfdd393a6609d1fb3858d15b16386aae394dc5",
+      "classification": "NEW_PACKAGING"
+    },
+    "product/version.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "cda2c6e6eebfe46d88e3b8226d733a8c86a1975b0b2854115e3a2a60ac459734",
+      "classification": "NEW_PACKAGING"
+    },
+    "product/cli.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "c138b75d08b351dc9c55b9d66777f4b3a95c2110405799250337ea9144164048",
+      "classification": "NEW_PACKAGING"
+    },
+    "product/demo.py": {
+      "origin": null,
+      "origin_sha256": null,
+      "current_sha256": "b54a97cd56fcea1b1631512ba520845d5b4a172dc5f9099ef6c92fc6cdb0f0b6",
+      "classification": "NEW_PACKAGING"
+    },
+    "domains/procurement/__init__.py": {
+      "origin": "domains/procurement/__init__.py",
+      "origin_sha256": "476a4a8bd24ae41d964534fe182215ba075ac63a6252c0f7137ae3abd93a98bc",
+      "current_sha256": "7460d74909c4570b5bebaa110b2db3689c91cf6ddc74f2a058568b4965b72f79",
+      "classification": "COMPATIBILITY_FACADE"
+    },
+    "applications/procurement/__init__.py": {
+      "origin": "applications/procurement/__init__.py",
+      "origin_sha256": "eb716dea8446a72d45485737c5cae77f84fdd3017cdaad56895c420230e0e350",
+      "current_sha256": "ef0e9618b2ada661a1e23e2f79487fe4c096f2bd0f13ca9e7827f97b1c1adc8c",
+      "classification": "COMPATIBILITY_FACADE"
+    },
+    "applications/procurement/api/__init__.py": {
+      "origin": "applications/procurement/api/__init__.py",
+      "origin_sha256": "2aae7c03e431146d0627597013978c53907c4532d4c71a409ceead96cba54140",
+      "current_sha256": "a8245c5876a1b963f6b74c41d614f9d2b544d2056b4e5f09ff1cde735a854de5",
+      "classification": "COMPATIBILITY_FACADE"
+    }
+  },
+  "classification_counts": {
+    "IMPORT_ONLY_CHANGE": 12,
+    "BYTE_IDENTICAL": 9,
+    "NEW_PACKAGING": 9,
+    "COMPATIBILITY_FACADE": 3
+  },
+  "semantic_change_count": 0
+}

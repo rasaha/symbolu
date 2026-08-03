@@ -22,6 +22,7 @@ for _src in (project_root / "packages" / "governance-contracts" / "src",
              project_root / "packages" / "capabilities" / "decision-authority" / "src",
              project_root / "packages" / "capabilities" / "model-selection" / "src",
              project_root / "packages" / "capabilities" / "context-minimization" / "src",
-             project_root / "packages" / "runtime" / "agent-runtime" / "src"):
+             project_root / "packages" / "runtime" / "agent-runtime" / "src",
+             project_root / "packages" / "products" / "procurement" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))

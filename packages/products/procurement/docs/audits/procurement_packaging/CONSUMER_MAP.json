@@ -1,0 +1,29 @@
+{
+  "search_terms": [
+    "domains.procurement",
+    "applications.procurement",
+    "ProcurementPlatform",
+    "ProcurementAPI",
+    "build_in_memory_platform",
+    "BudgetAuthorityAdapter",
+    "SupplierExecutionAdapter",
+    "ProcurementAssessmentService"
+  ],
+  "consumers": [
+    {
+      "path": "domains/procurement/tests/*.py",
+      "classification": "TEST",
+      "note": "the procurement reference-domain behavioral suite (33 tests); also the legacy compatibility suite after extraction"
+    },
+    {
+      "path": "docs/PROCUREMENT_REFERENCE_DOMAIN.md",
+      "classification": "DOCUMENTATION"
+    },
+    {
+      "path": "docs/DGM_PLATFORM.md",
+      "classification": "DOCUMENTATION"
+    }
+  ],
+  "production_or_application_consumers": [],
+  "note": "No production/application code outside domains/procurement and applications/procurement imports the procurement packages. The only code consumer is the test suite (one cross-domain test also imports applications.ai_hiring)."
+}

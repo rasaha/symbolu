@@ -1,0 +1,112 @@
+{
+  "source_commit": "b760c9e5440bc4572c9f3a197a682b0c95b53ad8",
+  "note": "Union of legacy domains.procurement.* / applications.procurement.* __all__ exports before extraction.",
+  "modules": {
+    "domains.procurement": [
+      "errors"
+    ],
+    "domains.procurement.requests": [
+      "BudgetReference",
+      "PurchaseItem",
+      "PurchaseRequest",
+      "RequestStatus",
+      "SupplierReference",
+      "Urgency"
+    ],
+    "domains.procurement.validation": [
+      "ProcurementRequestValidator"
+    ],
+    "domains.procurement.policies": [
+      "AssessmentStatus",
+      "BudgetAuthorityAdapter",
+      "InMemoryProcurementAssessmentRepository",
+      "PolicyAssessment",
+      "PolicyCheck",
+      "ProcurementAssessmentService",
+      "ProcurementPolicyAdapter"
+    ],
+    "domains.procurement.approvals": [
+      "APPROVAL_TO_DECISION",
+      "PurchaseApproval",
+      "PurchaseRecommendation",
+      "RECOMMENDATION_TO_PROPOSED",
+      "decision_outcome_for",
+      "proposed_outcome_for"
+    ],
+    "domains.procurement.actions": [
+      "CANCEL_REQUEST",
+      "CREATE_PURCHASE_ORDER",
+      "PROCUREMENT_DECISION_TYPE",
+      "REQUEST_MORE_INFORMATION",
+      "ROUTE_TO_SENIOR_APPROVER",
+      "SUPPLIER_SYSTEM_TYPE",
+      "all_mappings",
+      "cancel_request_mapping",
+      "create_purchase_order_mapping",
+      "request_more_information_mapping",
+      "route_to_senior_mapping"
+    ],
+    "domains.procurement.suppliers": [
+      "SUPPLIER_TO_BUSINESS",
+      "SupplierExecutionAdapter",
+      "SupplierOutcome",
+      "business_outcome_for"
+    ],
+    "domains.procurement.adapters": [
+      "ProcurementAssessmentLinkedRecordAdapter"
+    ],
+    "applications.procurement": [
+      "ProcurementConfiguration",
+      "ProcurementPlatform",
+      "build_in_memory_platform"
+    ],
+    "applications.procurement.api": [
+      "ProcurementAPI",
+      "ProcurementRunResult"
+    ]
+  },
+  "all_public_symbols": [
+    "APPROVAL_TO_DECISION",
+    "AssessmentStatus",
+    "BudgetAuthorityAdapter",
+    "BudgetReference",
+    "CANCEL_REQUEST",
+    "CREATE_PURCHASE_ORDER",
+    "InMemoryProcurementAssessmentRepository",
+    "PROCUREMENT_DECISION_TYPE",
+    "PolicyAssessment",
+    "PolicyCheck",
+    "ProcurementAPI",
+    "ProcurementAssessmentLinkedRecordAdapter",
+    "ProcurementAssessmentService",
+    "ProcurementConfiguration",
+    "ProcurementPlatform",
+    "ProcurementPolicyAdapter",
+    "ProcurementRequestValidator",
+    "ProcurementRunResult",
+    "PurchaseApproval",
+    "PurchaseItem",
+    "PurchaseRecommendation",
+    "PurchaseRequest",
+    "RECOMMENDATION_TO_PROPOSED",
+    "REQUEST_MORE_INFORMATION",
+    "ROUTE_TO_SENIOR_APPROVER",
+    "RequestStatus",
+    "SUPPLIER_SYSTEM_TYPE",
+    "SUPPLIER_TO_BUSINESS",
+    "SupplierExecutionAdapter",
+    "SupplierOutcome",
+    "SupplierReference",
+    "Urgency",
+    "all_mappings",
+    "build_in_memory_platform",
+    "business_outcome_for",
+    "cancel_request_mapping",
+    "create_purchase_order_mapping",
+    "decision_outcome_for",
+    "errors",
+    "proposed_outcome_for",
+    "request_more_information_mapping",
+    "route_to_senior_mapping"
+  ]
+}
