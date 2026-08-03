@@ -51,3 +51,20 @@ canonical capabilities still hold decision, approval, authorization, and
 execution authority. Any move toward enterprise deployment would follow the
 maturity gates — pilot validation and production certification — that remain
 `false` today.
+
+## Status update — Phase 2 semantic enrichment is now implemented
+
+The `workflow_ir.v2` semantic-enrichment contract described as future work is
+**implemented** in product 0.2.0 (see `WORKFLOW_IR_V2.md` and the P2 maturity flags
+in `version_info()`). It enriches the workflow description only; it does not bind a
+runtime or execute anything.
+
+### The exact next phase: AWC P2.1
+
+**AWC P2.1 — Policy Workflow Compiler v2 Compatibility Adapter, Overlay Reduction and
+P1/P2 Fingerprint-Preserving Migration.** Update the Agent Workforce Composer to
+consume the enriched `workflow_ir.v2` contract, reduce only the temporary overlay
+fields the compiler now emits (`role_name`, `role_description`,
+`human_review_requirement`, the functional base capability, typed contracts), and
+preserve every enterprise-policy overlay that remains correctly external. That work
+belongs in the AWC package, not here.

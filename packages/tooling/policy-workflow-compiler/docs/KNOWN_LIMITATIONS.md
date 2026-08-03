@@ -50,3 +50,20 @@ other domain or product.
 `pilot_validated=false` and `production_certified=false`. This product has not
 been pilot-validated or production-certified. See `MATURITY.md` for the full set
 of maturity booleans and what each asserts.
+
+## workflow_ir.v2 (Phase 2) limitations
+
+- The functional capability mapping is intentionally small: `EVIDENCE_REQUIREMENT →
+  evidence_extraction`. Domain-specialist capabilities are not invented — they remain
+  enterprise-overlay concerns until a source-policy construct declares them.
+- `data_classification_refs`, `permission_intent_refs`, and `required_tool_refs` have
+  v2 slots but are populated **only** when the source policy declares them; the
+  reference/demo packs do not, so those remain overlay for now (`DEFERRED` in the P3A
+  field trace).
+- `contract_data_version` is emitted but empty for v1-sourced graphs — `workflow_ir.v1`
+  carries no per-contract version. Typed `{contract_id, contract_version}` at the node
+  is a recommended future compiler-contract addition, not implemented here.
+- v2 enrichment is a pure function of the compiled v1 graph. It cannot recover source
+  semantics that the v1 IR does not carry; such values are marked unresolved, never
+  fabricated.
+- The AWC adapter is **not** updated to consume v2 in this phase.

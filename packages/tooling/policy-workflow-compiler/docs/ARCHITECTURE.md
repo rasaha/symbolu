@@ -82,3 +82,7 @@ The compiled package is a set of canonical JSON files: `manifest.json`,
   own output.
 - Metadata-only capability resolution: an optional installation probe never
   imports a provider.
+
+## workflow_ir.v2 (Phase 2)
+
+An additive semantic-enrichment layer (`semantics/` + `validation/release_validator.py`) sits beside the v1 pipeline. It reads a compiled v1 `WorkflowIR` and produces a `WorkflowIRv2` (embedding the unchanged v1 graph). The v1 emission path is untouched. See `WORKFLOW_IR_V2.md`.

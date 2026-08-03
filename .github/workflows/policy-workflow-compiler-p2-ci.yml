@@ -1,0 +1,245 @@
+name: policy-workflow-compiler-p2-ci
+
+# Scoped CI for Policy Workflow Compiler P2 (additive workflow_ir.v2 semantic
+# enrichment: node semantics, capability/contract/dependency extraction, authority
+# and human-review semantics, policy provenance, strict release validation). Runs
+# the P1 regression, the P2 suites, the P3A-requirements conformance, the
+# downstream v1-compatibility check (AWC unchanged), import-boundary + public-API
+# freeze, the isolated clean-install distribution verifier, determinism/replay, a
+# terminology scan, and blocking platform-freeze verification.
+# No external model APIs, no agents, no web server, no Governance Studio app.
+
+on:
+  pull_request:
+    paths:
+      - "packages/tooling/policy-workflow-compiler/**"
+      - ".github/workflows/policy-workflow-compiler-p2-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/policy-workflow-compiler-p2-**"
+      - "chatgpt/policy-workflow-compiler-p2**"
+    paths:
+      - "packages/tooling/policy-workflow-compiler/**"
+      - ".github/workflows/policy-workflow-compiler-p2-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/tooling/policy-workflow-compiler
+  SRC: packages/tooling/policy-workflow-compiler/src
+
+jobs:
+  p1-regression:
+    name: P1 regression + v1 fingerprint stability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python -m pytest ${{ env.PKG }}/tests/test_models.py ${{ env.PKG }}/tests/test_validation.py \
+            ${{ env.PKG }}/tests/test_authority_boundaries.py ${{ env.PKG }}/tests/test_compilation.py \
+            ${{ env.PKG }}/tests/test_assurance.py ${{ env.PKG }}/tests/test_approval.py \
+            ${{ env.PKG }}/tests/test_diff.py ${{ env.PKG }}/tests/test_v2_contract_and_regression.py -q
+      - name: distribution 0.1.0 held, product 0.2.0, honest maturity
+        env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python - <<'PY'
+          from ugence_policy_workflow_compiler.version import DISTRIBUTION_VERSION, version_info
+          i = version_info().to_dict()
+          assert DISTRIBUTION_VERSION == "0.1.0", DISTRIBUTION_VERSION  # preserves v1 digests
+          assert i["product_version"] == "0.2.0"
+          for k in ("workflow_ir_v2_supported","semantic_node_enrichment_implemented",
+                    "capability_requirement_extraction_implemented","typed_contract_references_implemented",
+                    "dependency_semantics_implemented","authority_semantics_implemented",
+                    "human_review_semantics_implemented","policy_provenance_implemented",
+                    "release_validation_implemented","deterministic_replay_verified"):
+              assert i[k] is True, k
+          for k in ("awc_adapter_updated","agent_eligibility_implemented","agent_ranking_implemented",
+                    "team_composition_implemented","runtime_execution_implemented",
+                    "action_authorization_implemented","enterprise_policy_evaluation_implemented",
+                    "pilot_validated","production_certified"):
+              assert i[k] is False, k
+          print("maturity honest")
+          PY
+
+  contract-version-suite:
+    name: Contract versioning (v1/v2, unknown fails closed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_contract_and_regression.py ${{ env.PKG }}/tests/test_v2_release_validation.py -q
+
+  semantic-node-suite:
+    name: Semantic node enrichment + capability + typed contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_node_semantics.py -q
+
+  dependency-authority-provenance-suite:
+    name: Dependency + authority + provenance semantics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_dependencies_authority_provenance.py -q
+
+  release-validation-suite:
+    name: Strict release validation (states + integrity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_release_validation.py -q
+
+  p3a-requirements-trace:
+    name: P3A requirements conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_p3a_conformance.py -q
+
+  determinism-replay:
+    name: Determinism, ordering independence, replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: python -m pytest ${{ env.PKG }}/tests/test_v2_determinism_and_boundaries.py -q
+
+  import-boundary-suite:
+    name: Import-boundary integrity (no AWC/runtime/model-selection leakage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python - <<'PY'
+          import ugence_policy_workflow_compiler.api as api
+          banned = {"eligibility","rank","ranking","compose","team","fallback",
+                    "grant_permission","authorize_action","execute","select_agent"}
+          for n in api.__all__:
+              low = n.lower()
+              assert not any(b in low for b in banned), n
+          # core P2 modules import no downstream Ugence package
+          import pathlib, re
+          root = pathlib.Path("${{ env.SRC }}/ugence_policy_workflow_compiler")
+          bad = re.compile(r"import\s+ugence_agent_workforce_composer|import\s+agent_runtime|import\s+ugence_model_selection|from\s+agentic")
+          for p in (root/"semantics").glob("*.py"):
+              assert not bad.search(p.read_text()), p
+          print("import boundary OK")
+          PY
+
+  public-api-freeze:
+    name: Public-API frozen artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - env: { PYTHONPATH: "${{ env.SRC }}" }
+        run: |
+          python ${{ env.PKG }}/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/tooling/policy-workflow-compiler/artifacts/public_api.json"))
+          assert live == frozen, "public API drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+
+  downstream-v1-compatibility:
+    name: Downstream AWC P1/P2 unchanged (consumes workflow_ir.v1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/tooling/policy-workflow-compiler
+          pip install -e packages/capabilities/agent-workforce-composer
+      - run: python -m pytest packages/capabilities/agent-workforce-composer/tests -q
+
+  isolated-distribution:
+    name: Clean-install verifier (wheel/sdist, CLI v1+v2, cross-process determinism)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install --upgrade pip && pip install build
+      - run: python ${{ env.PKG }}/scripts/verify_policy_workflow_compiler_distribution.py
+
+  terminology:
+    name: Stale-terminology scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No premature maturity claims in package docs
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          pkg = pathlib.Path("packages/tooling/policy-workflow-compiler")
+          bad = re.compile(r"\b(production[- ]ready|pilot[- ]validated|production[- ]certified)\b", re.I)
+          # A maturity phrase is fine when negated on the same line OR the adjacent
+          # line (docs wrap "not\nproduction-certified"); we only flag PREMATURE claims.
+          hist = re.compile(r"(false|not |never|no |=false|is False)", re.I)
+          offenders = []
+          for md in list(pkg.glob("*.md")) + list((pkg/'docs').glob("*.md")):
+              lines = md.read_text(encoding="utf-8").splitlines()
+              for i, line in enumerate(lines, 1):
+                  if not bad.search(line):
+                      continue
+                  window = " ".join(lines[max(0, i-2):i+1])  # prev + current line
+                  if not hist.search(window):
+                      offenders.append(f"{md}:{i}: {line.strip()}")
+          if offenders:
+              print("Stale maturity claims:"); [print("  -", o) for o in offenders]; sys.exit(1)
+          print("terminology OK")
+          PY
+
+  platform-freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

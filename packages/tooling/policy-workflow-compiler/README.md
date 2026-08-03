@@ -82,3 +82,24 @@ validation model, workflow IR, capability registry, authority boundaries,
 assurance generation, audit schema, human approval, determinism, structural diff,
 Procurement reference validation, public API, security & failure model, known
 limitations, maturity, install, migration, rollback, and next phases.
+
+## Phase 2 — Semantic Workflow Enrichment (`workflow_ir.v2`)
+
+An additive `workflow_ir.v2` contract enriches a compiled `workflow_ir.v1` graph
+with role-relevant semantics the compiler legitimately owns: node meaning, role
+relevance, functional capability requirements, typed data contracts, dependency
+semantics, authority / human-review classification, and per-value policy provenance.
+It also adds a strict `CompiledReleaseValidator`.
+
+`workflow_ir.v1` is unchanged and its fingerprints are byte-stable. The distribution
+version is held at `0.1.0` (it feeds the v1 digest); the product version is `0.2.0`.
+
+The compiler still **describes** the governed workflow; it never selects, ranks, or
+assigns agents, never embeds enterprise deployment policy, and never grants or
+executes. Consuming the enriched contract downstream is a separate phase (AWC P2.1).
+
+See `docs/WORKFLOW_IR_V2.md`, `docs/NODE_SEMANTICS.md`,
+`docs/CAPABILITY_REQUIREMENTS.md`, `docs/DATA_CONTRACTS.md`,
+`docs/DEPENDENCY_SEMANTICS.md`, `docs/AUTHORITY_AND_HUMAN_REVIEW.md`,
+`docs/POLICY_PROVENANCE.md`, `docs/RELEASE_VALIDATION.md`,
+`docs/BACKWARD_COMPATIBILITY.md`, and `docs/AWC_CONSUMER_BOUNDARY.md`.
