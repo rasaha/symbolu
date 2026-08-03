@@ -144,7 +144,85 @@ def cmd_replay(args) -> int:
     return 0
 
 
+def _p2_inputs(args):
+    adaptation = adapt_compiled_workflow(_read_json(args.workflow), role_overlay=fixtures.role_overlay())
+    snap = _load_registry(_read_json(args.registry))
+    enterprise, eligibility = _load_policies(_read_json(args.enterprise), _read_json(args.eligibility))
+    return adaptation, snap, enterprise, eligibility
+
+
+def cmd_rank(args) -> int:
+    from .ranking import rank_workflow_candidates
+    adaptation, snap, enterprise, eligibility = _p2_inputs(args)
+    rankings = rank_workflow_candidates(adaptation, snap, enterprise, eligibility,
+                                        fixtures.ranking_policy(), float(args.time))
+    _emit([to_canonical_obj(r) for r in rankings])
+    return 0
+
+
+def _build_plan(args):
+    from .plan import build_agent_team_plan
+    adaptation, snap, enterprise, eligibility = _p2_inputs(args)
+    plan = build_agent_team_plan(
+        adaptation, snap, enterprise, eligibility, fixtures.ranking_policy(),
+        fixtures.team_composition_policy(), fixtures.permission_policy(),
+        fixtures.fallback_policy(), float(args.time))
+    return adaptation, plan
+
+
+def cmd_compose(args) -> int:
+    _adapt, plan = _build_plan(args)
+    _emit(to_canonical_obj(plan))
+    return 0
+
+
+def cmd_explain_plan(args) -> int:
+    _adapt, plan = _build_plan(args)
+    _emit(to_canonical_obj(plan.selection_explanation))
+    return 0
+
+
+def cmd_replay_plan(args) -> int:
+    from .plan import build_replay_record, replay_agent_team_plan
+    adaptation, plan = _build_plan(args)
+    replay = replay_agent_team_plan(
+        adaptation, _load_registry(_read_json(args.registry)),
+        *_load_policies(_read_json(args.enterprise), _read_json(args.eligibility)),
+        fixtures.ranking_policy(), fixtures.team_composition_policy(),
+        fixtures.permission_policy(), fixtures.fallback_policy(), float(args.time),
+        expected=plan)
+    rec = build_replay_record(plan, adaptation, float(args.time),
+                              ("awc.v1", "workflow_ir.v1", "awc.composition.v1"))
+    _emit({"reproduced": replay.plan_fingerprint == plan.plan_fingerprint,
+           "plan_fingerprint": plan.plan_fingerprint, "replay_record": to_canonical_obj(rec)})
+    return 0 if replay.plan_fingerprint == plan.plan_fingerprint else 1
+
+
+def cmd_compare_plans(args) -> int:
+    from .plan import AgentTeamPlan, compare_agent_team_plans
+    a = AgentTeamPlan.model_validate(_read_json(args.plan_a))
+    b = AgentTeamPlan.model_validate(_read_json(args.plan_b))
+    _emit(to_canonical_obj(compare_agent_team_plans(a, b)))
+    return 0
+
+
 def cmd_demo(args) -> int:
+    if getattr(args, "compose", False):
+        adaptation, plan = fixtures.run_compose_demo(args.workflow)
+        _emit({
+            "workflow": args.workflow, "plan_state": plan.plan_state.value,
+            "total_team_score": plan.total_team_score,
+            "optimality_status": plan.search_statistics.optimality_status.value,
+            "plan_fingerprint": plan.plan_fingerprint,
+            "assignments": [{"role_id": a.role_id,
+                             "primary": f"{a.primary_agent_id}@{a.primary_agent_version}",
+                             "score": a.total_score} for a in plan.role_assignments],
+            "unfilled_roles": list(plan.unfilled_roles),
+            "fallbacks": [{"role_id": f.role_id, "state": f.fallback_state.value,
+                           "depth": len(f.candidates)} for f in plan.role_fallback_plans],
+            "search": to_canonical_obj(plan.search_statistics),
+        })
+        return 0
     adaptation, result = fixtures.run_demo(args.workflow)
     summary = {
         "workflow": args.workflow,
@@ -204,8 +282,29 @@ def build_parser() -> argparse.ArgumentParser:
         c.add_argument("--time", type=float, default=LOGICAL_TIME)
         c.set_defaults(func=fn)
 
+    # -- P2 commands --
+    for name, fn, helptext in (
+        ("rank", cmd_rank, "rank P1-eligible candidates per role"),
+        ("compose", cmd_compose, "compose an AgentTeamPlan (bounded exact search)"),
+        ("explain-plan", cmd_explain_plan, "emit the deterministic selection explanation"),
+        ("replay-plan", cmd_replay_plan, "rebuild the plan and verify the fingerprint reproduces"),
+    ):
+        c = sub.add_parser(name, help=helptext)
+        c.add_argument("workflow")
+        c.add_argument("registry")
+        c.add_argument("enterprise")
+        c.add_argument("eligibility")
+        c.add_argument("--time", type=float, default=LOGICAL_TIME)
+        c.set_defaults(func=fn)
+
+    cp = sub.add_parser("compare-plans", help="diff two AgentTeamPlan JSON artifacts")
+    cp.add_argument("plan_a")
+    cp.add_argument("plan_b")
+    cp.set_defaults(func=cmd_compare_plans)
+
     dm = sub.add_parser("demo", help="run a frozen synthetic demo")
     dm.add_argument("workflow", choices=sorted(fixtures.WORKFLOWS))
+    dm.add_argument("--compose", action="store_true", help="run the full P1→P2 composition pipeline")
     dm.set_defaults(func=cmd_demo)
 
     return p

@@ -20,16 +20,21 @@ import importlib.metadata as _md
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-DISTRIBUTION_VERSION = "0.1.0"
+DISTRIBUTION_VERSION = "0.2.0"
 DISTRIBUTION_NAME = "ugence-agent-workforce-composer"
 PRODUCT_NAME = "Ugence Agent Workforce Composer"
-PRODUCT_VERSION = "0.1.0"
+PRODUCT_VERSION = "0.2.0"
 CANONICAL_NAMESPACE = "ugence_agent_workforce_composer"
 
-#: The frozen planning-contract version stamped on canonical objects and results.
+#: The frozen P1 planning-contract version, stamped on P1 canonical objects and
+#: results. UNCHANGED in P2 — P1 object fingerprints are stable for identical inputs.
 CONTRACT_VERSION = "awc.v1"
+
+#: The additive P2 composition-plan contract version, stamped on ranking,
+#: composition, permission-bound, fallback and AgentTeamPlan objects.
+COMPOSITION_CONTRACT_VERSION = "awc.composition.v1"
 
 VERSION = __version__
 
@@ -72,18 +77,29 @@ class VersionInfo:
     product_version: str
     canonical_namespace: str
     contract_version: str
+    composition_contract_version: str
     supported_ir_versions: tuple
     # -- implemented in P1 --
     canonical_object_model_implemented: bool
     compiler_adapter_implemented: bool
     hard_constraint_eligibility_implemented: bool
     deterministic_replay_verified: bool
-    # -- explicitly NOT implemented in P1 --
+    # -- implemented in P2 --
+    deterministic_ranking_implemented: bool
     agent_ranking_implemented: bool
     team_composition_implemented: bool
+    permission_bound_proposal_implemented: bool
+    fallback_planning_implemented: bool
+    agent_team_plan_implemented: bool
+    # -- explicitly NOT implemented --
     permission_assignment_implemented: bool
+    permission_granting_implemented: bool
     runtime_handoff_implemented: bool
+    runtime_execution_implemented: bool
+    live_availability_implemented: bool
     h16_migration_implemented: bool
+    model_selection_integration_implemented: bool
+    h22_integration_implemented: bool
     live_registry_implemented: bool
     pilot_validated: bool
     production_certified: bool
@@ -99,16 +115,26 @@ class VersionInfo:
             "product_version": self.product_version,
             "canonical_namespace": self.canonical_namespace,
             "contract_version": self.contract_version,
+            "composition_contract_version": self.composition_contract_version,
             "supported_ir_versions": list(self.supported_ir_versions),
             "canonical_object_model_implemented": self.canonical_object_model_implemented,
             "compiler_adapter_implemented": self.compiler_adapter_implemented,
             "hard_constraint_eligibility_implemented": self.hard_constraint_eligibility_implemented,
             "deterministic_replay_verified": self.deterministic_replay_verified,
+            "deterministic_ranking_implemented": self.deterministic_ranking_implemented,
             "agent_ranking_implemented": self.agent_ranking_implemented,
             "team_composition_implemented": self.team_composition_implemented,
+            "permission_bound_proposal_implemented": self.permission_bound_proposal_implemented,
+            "fallback_planning_implemented": self.fallback_planning_implemented,
+            "agent_team_plan_implemented": self.agent_team_plan_implemented,
             "permission_assignment_implemented": self.permission_assignment_implemented,
+            "permission_granting_implemented": self.permission_granting_implemented,
             "runtime_handoff_implemented": self.runtime_handoff_implemented,
+            "runtime_execution_implemented": self.runtime_execution_implemented,
+            "live_availability_implemented": self.live_availability_implemented,
             "h16_migration_implemented": self.h16_migration_implemented,
+            "model_selection_integration_implemented": self.model_selection_integration_implemented,
+            "h22_integration_implemented": self.h22_integration_implemented,
             "live_registry_implemented": self.live_registry_implemented,
             "pilot_validated": self.pilot_validated,
             "production_certified": self.production_certified,
@@ -136,16 +162,28 @@ def version_info() -> VersionInfo:
         product_version=PRODUCT_VERSION,
         canonical_namespace=CANONICAL_NAMESPACE,
         contract_version=CONTRACT_VERSION,
+        composition_contract_version=COMPOSITION_CONTRACT_VERSION,
         supported_ir_versions=SUPPORTED_IR_VERSIONS,
         canonical_object_model_implemented=True,
         compiler_adapter_implemented=True,
         hard_constraint_eligibility_implemented=True,
         deterministic_replay_verified=True,
-        agent_ranking_implemented=False,
-        team_composition_implemented=False,
+        # -- implemented in P2 --
+        deterministic_ranking_implemented=True,
+        agent_ranking_implemented=True,
+        team_composition_implemented=True,
+        permission_bound_proposal_implemented=True,
+        fallback_planning_implemented=True,
+        agent_team_plan_implemented=True,
+        # -- explicitly NOT implemented --
         permission_assignment_implemented=False,
+        permission_granting_implemented=False,
         runtime_handoff_implemented=False,
+        runtime_execution_implemented=False,
+        live_availability_implemented=False,
         h16_migration_implemented=False,
+        model_selection_integration_implemented=False,
+        h22_integration_implemented=False,
         live_registry_implemented=False,
         pilot_validated=False,
         production_certified=False,
@@ -164,6 +202,7 @@ __all__ = [
     "PRODUCT_VERSION",
     "CANONICAL_NAMESPACE",
     "CONTRACT_VERSION",
+    "COMPOSITION_CONTRACT_VERSION",
     "SUPPORTED_IR_VERSIONS",
     "VersionInfo",
     "version_info",
