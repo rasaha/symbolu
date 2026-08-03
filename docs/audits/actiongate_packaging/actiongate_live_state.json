@@ -1,0 +1,58 @@
+{
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+  "latest_merged_prerequisite_pr": 1297,
+  "pr_1297_state": "MERGED",
+  "pr_1297_merge_commit": "179fdc35c13dc99ba0b5847fba157fc2d4676316",
+  "pr_1297_head_sha": "3b8d3055d670b57b0d2b94463a0df2d2840c7269",
+  "existing_actiongate_canonical_packaging_pr": null,
+  "working_branch": "claude/actiongate-canonical-package-bn39s6",
+  "working_tree_clean_at_start": true,
+  "python_version": "3.11.15",
+  "actiongate_implementation_version": "0.1.0",
+  "private_distribution": "dgm-actiongate-provider",
+  "private_distribution_version": "0.1.0",
+  "existing_private_dependencies": [
+    "decision-governance==1.0.0",
+    "dgm-provider-framework==0.1.0"
+  ],
+  "canonical_framework_packages": {
+    "ugence-governance-contracts": "packages/governance-contracts (ugence_governance_contracts)",
+    "ugence-governance-provider-framework": "packages/governance-provider-framework (ugence_governance_provider_framework) 0.1.0",
+    "ugence-decision-authority": "packages/capabilities/decision-authority (ugence_decision_authority)",
+    "ugence-tap-provider": "packages/providers/tap (ugence_tap_provider) 0.1.0 — merged PR #1297",
+    "ugence-ai-hiring": "packages/products/ai-hiring (ugence_ai_hiring) — merged PR #1296"
+  },
+  "baseline_test_count": 30,
+  "baseline_test_result": "PASS (30 passed; the 5 initial failures were solely the missing 'pydantic' env dependency for the decision-authority-backed end-to-end tests, resolved by installing pydantic)",
+  "baseline_wheel_filename": "dgm_actiongate_provider-0.1.0-py3-none-any.whl",
+  "baseline_wheel_sha256": "77b1f73ef071709e6eb88eeac40f7899f4ff1cebd137cea2d5ebd71f18098425",
+  "api_export_count": 26,
+  "api_snapshot_hash": "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300",
+  "behavioral_capture_hash": "d805e6cfa4e2638c4c7542023de4861a3b962b6430c8cfb60f26eb3c885ed200",
+  "platform_freeze_manifest_digest": "815a9250f833a253a621f26b341cd5b0a7cb8d283165fc9142013ff109c524c6",
+  "platform_freeze_substantive_digest": "ee7f083ebb21111cb01e3fdb0fb3f37f39cc0fcf00238ef918a9a5d5984ec47a",
+  "platform_freeze_baseline_result": "PASS",
+  "active_consumers": [
+    "enterprise_validation_pilot",
+    "comparative_governance_benchmark",
+    "provider_heterogeneity_validation",
+    "platform_freeze",
+    "ugence_console_api",
+    "products/code-governance (ugence_code_governance)",
+    "packages/products/ai-hiring (actiongate_legacy_adapter)",
+    "packaging/verify_tap_provider_distribution.py",
+    "packages/governance-provider-framework verifier",
+    "tap_provider tests (peer-independence assertions only)"
+  ],
+  "existing_limitations": [
+    "ActionGate authorizes only; it does not execute, dispatch, observe, or reconcile.",
+    "tenant is not propagated by the neutral ActionGovernanceRequest (intentionally lossy).",
+    "expiry is emitted by the provider; enforcement ownership is downstream (framework/execution layer), not the provider.",
+    "single_use is emitted as a constraint; ActionGate does not itself consume/enforce it (no durable replay protection).",
+    "Not production certified."
+  ],
+  "baseline_failures": [
+    "5 actiongate_provider/tests/test_end_to_end.py tests failed ONLY because 'pydantic' (a decision-authority kernel dependency) was absent in the fresh environment; after 'pip install pydantic' all 30 pass. No code defect."
+  ]
+}

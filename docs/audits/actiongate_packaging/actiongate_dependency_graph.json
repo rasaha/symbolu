@@ -1,0 +1,860 @@
+[
+ {
+  "module": "actiongate_provider/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/__init__.py",
+  "imported": ".version",
+  "symbol": "__version__",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..version",
+  "symbol": "__version__",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..version",
+  "symbol": "CONTRACT_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..version",
+  "symbol": "TARGET_KERNEL_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..version",
+  "symbol": "TARGET_FRAMEWORK_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..provider",
+  "symbol": "ActionGateProvider",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..configuration",
+  "symbol": "ActionGateSettings",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..configuration",
+  "symbol": "build_actiongate_provider",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..client",
+  "symbol": "ActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..client",
+  "symbol": "InProcessActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..client",
+  "symbol": "RemoteActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..observability",
+  "symbol": "ActionGateInvocationLog",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..observability",
+  "symbol": "ActionGateInvocationRecord",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..health",
+  "symbol": "ActionGateHealthReport",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..health",
+  "symbol": "check",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..conformance",
+  "symbol": "ActionGateConformanceReport",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..conformance",
+  "symbol": "run_actiongate_conformance",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateConstraint",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateDecision",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateEngine",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateObligation",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateOutcome",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateRequest",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..core",
+  "symbol": "ConstrainedRule",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..mapping",
+  "symbol": "MAPPING_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..mapping",
+  "symbol": "KNOWN_CONSTRAINT_TYPES",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/api/__init__.py",
+  "imported": "..mapping",
+  "symbol": "KNOWN_OBLIGATION_TYPES",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "typing",
+  "symbol": "Protocol",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "typing",
+  "symbol": "runtime_checkable",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateDecision",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateEngine",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateRequest",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateTimeout",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/client/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateUnavailable",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "dataclasses",
+  "symbol": "dataclass",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "dataclasses",
+  "symbol": "field",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "typing",
+  "symbol": "Mapping",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderConfigurationError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "..client",
+  "symbol": "InProcessActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "..client",
+  "symbol": "RemoteActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateEngine",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "..observability",
+  "symbol": "ActionGateInvocationLog",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/configuration/__init__.py",
+  "imported": "..provider",
+  "symbol": "ActionGateProvider",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "dataclasses",
+  "symbol": "dataclass",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "dataclasses",
+  "symbol": "field",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceOutcome",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceRequest",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderResultValidationError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderTimeoutError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderUnavailableError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..configuration",
+  "symbol": "build_actiongate_provider",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateConstraint",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateEngine",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateObligation",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateOutcome",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..core",
+  "symbol": "ConstrainedRule",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/conformance/__init__.py",
+  "imported": "..mapping",
+  "symbol": "map_request",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "hashlib",
+  "symbol": "hashlib",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "json",
+  "symbol": "json",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "dataclasses",
+  "symbol": "dataclass",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "dataclasses",
+  "symbol": "field",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "enum",
+  "symbol": "Enum",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "typing",
+  "symbol": "Mapping",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/core.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderConfigurationError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderResultValidationError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderTimeoutError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderUnavailableError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateConfigError",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateError",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateMalformedResponse",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateTimeout",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/errors/__init__.py",
+  "imported": "..core",
+  "symbol": "ActionGateUnavailable",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "dataclasses",
+  "symbol": "dataclass",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderHealth",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "..configuration",
+  "symbol": "ActionGateSettings",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "..provider",
+  "symbol": "ActionGateProvider",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/health/__init__.py",
+  "imported": "..version",
+  "symbol": "TARGET_KERNEL_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".request",
+  "symbol": "map_request",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".result",
+  "symbol": "MAPPING_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".result",
+  "symbol": "map_result",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".constraints",
+  "symbol": "KNOWN_CONSTRAINT_TYPES",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".constraints",
+  "symbol": "KNOWN_OBLIGATION_TYPES",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".constraints",
+  "symbol": "encode_constraints",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/__init__.py",
+  "imported": ".constraints",
+  "symbol": "encode_obligations",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/constraints.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/constraints.py",
+  "imported": "..core",
+  "symbol": "ActionGateConstraint",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/constraints.py",
+  "imported": "..core",
+  "symbol": "ActionGateObligation",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/request.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/request.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceRequest",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/mapping/request.py",
+  "imported": "..core",
+  "symbol": "ActionGateRequest",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "hashlib",
+  "symbol": "hashlib",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "json",
+  "symbol": "json",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "datetime",
+  "symbol": "datetime",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "datetime",
+  "symbol": "timedelta",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceOutcome",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceResult",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "..core",
+  "symbol": "ActionGateDecision",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": "..core",
+  "symbol": "ActionGateOutcome",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": ".constraints",
+  "symbol": "encode_constraints",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/mapping/result.py",
+  "imported": ".constraints",
+  "symbol": "encode_obligations",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/observability.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/observability.py",
+  "imported": "dataclasses",
+  "symbol": "dataclass",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/observability.py",
+  "imported": "dataclasses",
+  "symbol": "field",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/observability.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "datetime",
+  "symbol": "datetime",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "datetime",
+  "symbol": "timezone",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "typing",
+  "symbol": "Optional",
+  "class": "STDLIB"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceProvider",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceRequest",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ActionGovernanceResult",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "BaseProvider",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderCapabilities",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderCompatibility",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderDescriptor",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderError",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderHealth",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderKind",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": "governance_providers.api",
+  "symbol": "ProviderLifecycleState",
+  "class": "UGENCE_GOVERNANCE_FRAMEWORK(legacy shim -> canonical)"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".client",
+  "symbol": "ActionGateClient",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".errors",
+  "symbol": "translate_error",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".mapping",
+  "symbol": "MAPPING_VERSION",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".mapping",
+  "symbol": "map_request",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".mapping",
+  "symbol": "map_result",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".observability",
+  "symbol": "ActionGateInvocationLog",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".observability",
+  "symbol": "ActionGateInvocationRecord",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/provider.py",
+  "imported": ".version",
+  "symbol": "__version__",
+  "class": "ACTIONGATE_INTERNAL"
+ },
+ {
+  "module": "actiongate_provider/version.py",
+  "imported": "__future__",
+  "symbol": "annotations",
+  "class": "STDLIB"
+ }
+]
