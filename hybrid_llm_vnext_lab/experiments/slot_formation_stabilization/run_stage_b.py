@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Stage B orchestrator: train A+, B0, and the SELECTED candidate on the five FRESH seeds
+(8,9,10,11,12), 1200 steps, no tuning. Idempotent/resumable. The candidate id is read from
+SELECTED_CANDIDATE.json unless overridden. Re-verifies pre-registration before running.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import subprocess
+import sys
+import time
+
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+SEEDS = [8, 9, 10, 11, 12]
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run-id", default="stageB")
+    ap.add_argument("--candidate", default=None)
+    ap.add_argument("--seeds", default="8,9,10,11,12")
+    ap.add_argument("--steps", type=int, default=1200)
+    args = ap.parse_args()
+
+    try:
+        import torch  # noqa: F401
+    except Exception:
+        print("RESOURCE_BLOCKED: torch not installed.")
+        return 3
+
+    # re-verify pre-registration integrity before fresh training
+    pr = subprocess.run([sys.executable, str(HERE / "verify_preregistration.py")], capture_output=True, text=True)
+    print(pr.stdout.strip())
+    if pr.returncode != 0:
+        print("ABORT: pre-registration integrity failed before Stage B")
+        return 2
+
+    cand = args.candidate
+    if cand is None:
+        sc = HERE / "SELECTED_CANDIDATE.json"
+        if not sc.exists():
+            print("ABORT: no SELECTED_CANDIDATE.json and no --candidate given")
+            return 2
+        sel = json.loads(sc.read_text())
+        cand = sel.get("selected")
+        if cand is None:
+            print(f"No candidate selected ({sel.get('classification')}); Stage B not run.")
+            return 0
+
+    import stabilize as SB
+    out_dir = HERE / "artifacts" / args.run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    seeds = [int(s) for s in args.seeds.split(",")]
+    arms = ["A+", "B0", cand]
+
+    for arm in arms:
+        rf = out_dir / f"{arm}_results.json"
+        if rf.exists() and {r["seed"] for r in json.loads(rf.read_text())["records"]} >= set(seeds):
+            print(f"[stageB] SKIP {arm} (complete)", flush=True)
+            continue
+        records = []
+        for seed in seeds:
+            sf = out_dir / f"{arm}_seed{seed}.json"
+            if sf.exists():
+                records.append(json.loads(sf.read_text())); continue
+            t0 = time.time()
+            print(f"[stageB] RUN {arm} seed{seed}", flush=True)
+            rec = SB.run_arm(arm, seed, steps=args.steps)
+            sf.write_text(json.dumps(rec, indent=2))
+            records.append(rec)
+            print(f"[stageB] DONE {arm} seed{seed} needle@d96={rec['needle_by_dist']['96']:.3f} "
+                  f"({round(time.time()-t0,1)}s)", flush=True)
+        rf.write_text(json.dumps({"arm": arm, "records": records}, indent=2))
+    print("[stageB] ALL ARMS COMPLETE", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
