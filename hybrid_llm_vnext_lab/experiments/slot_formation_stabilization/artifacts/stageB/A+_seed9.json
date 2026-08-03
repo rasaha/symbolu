@@ -1,0 +1,124 @@
+{
+  "arm": "A+",
+  "seed": 9,
+  "params": 2000392,
+  "ff": 1378,
+  "needle_by_dist": {
+    "16": 0.0,
+    "96": 0.0,
+    "220": 0.0
+  },
+  "ppl": {
+    "256": 171.0324221565081,
+    "512": 176.87367997322346
+  },
+  "binding_by_k": {
+    "2": 0.0,
+    "4": 0.0,
+    "8": 0.0
+  },
+  "supersession": {
+    "current_acc": 0.0,
+    "stale_error": 0.0
+  },
+  "source": 0.075,
+  "multihop": 0.0,
+  "warmups_by_group": [
+    60
+  ],
+  "grouped_optimizer": false,
+  "param_group_audit": {
+    "slot_group_params": 0,
+    "nonslot_group_params": 52,
+    "slot_group_numel": 0,
+    "nonslot_group_numel": 2000392,
+    "total_numel": 2000392,
+    "numel_reconciles": true,
+    "no_duplicates": true,
+    "no_omissions": true,
+    "slot_param_names": [],
+    "nonslot_param_count": 52
+  },
+  "init_audit": null,
+  "trajectory": [
+    {
+      "step": 0,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 60,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 120,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 300,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 600,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 900,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 1200,
+      "needle_d96": 0.0
+    }
+  ],
+  "loss_log": [
+    {
+      "step": 0,
+      "main_loss": 7.1818084716796875,
+      "aux": null,
+      "lr": [
+        3.3333333333333335e-05
+      ]
+    },
+    {
+      "step": 60,
+      "main_loss": 4.908018112182617,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 120,
+      "main_loss": 4.201003074645996,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 300,
+      "main_loss": 3.8902409076690674,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 600,
+      "main_loss": 4.064675807952881,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 900,
+      "main_loss": 5.193718433380127,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    }
+  ],
+  "train_s": 218.1
+}
