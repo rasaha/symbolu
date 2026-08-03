@@ -1,0 +1,97 @@
+{
+  "phase": "AI Hiring — Canonical TAP and ActionGate Dependency Normalization",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "0daaf2bb7d43e1e07be135279fa192b237e0636e",
+  "working_branch": "claude/ai-hiring-canonical-providers-5pbhlk",
+  "working_tree_clean_at_start": true,
+  "prerequisite_pr_1299": {
+    "state": "closed",
+    "merged": true,
+    "merge_commit": "0daaf2bb7d43e1e07be135279fa192b237e0636e",
+    "final_head_commit": "ee9d7ecf9bae316ec919184fa09d677bb6dd3de9",
+    "merged_at": "2026-08-03T08:22:42Z"
+  },
+  "existing_normalization_pr": null,
+  "canonical_distributions": {
+    "ugence-tap-provider": "0.1.0",
+    "ugence-actiongate-provider": "0.1.0",
+    "ugence-governance-provider-framework": "0.1.0",
+    "ugence-governance-contracts": "0.1.0",
+    "ugence-decision-authority": "1.0.0",
+    "ugence-ai-hiring": "0.1.0"
+  },
+  "canonical_provider_classes": {
+    "ugence_tap_provider.provider.TAPProvider": "AssertionGovernanceProvider subclass",
+    "ugence_actiongate_provider.provider.ActionGateProvider": "ActionGovernanceProvider subclass"
+  },
+  "baseline_tests": {
+    "ai_hiring_package_suite": "774 passed, 6 skipped",
+    "monorepo_ai_hiring_suite": "778 passed",
+    "pre_existing_failures": "none"
+  },
+  "baseline_wheel": {
+    "distribution_version": "0.1.0",
+    "wheel": "ugence_ai_hiring-0.1.0-py3-none-any.whl",
+    "wheel_sha256": "ce4c7c16941cd92dabc97655bee4ca19caf15e7dbd6c8b89853f27579ada127d",
+    "sdist": "ugence_ai_hiring-0.1.0.tar.gz",
+    "sdist_sha256": "331c431fb404540e3c08b8b79b8f05702e4ef2267a83280db157ec3c9765d7a2"
+  },
+  "baseline_wheel_metadata_extras": {
+    "tap": "dgm-tap-provider",
+    "actiongate": "dgm-actiongate-provider",
+    "core_dependencies": [
+      "pydantic>=2", "ugence-decision-authority>=1.0.0",
+      "ugence-governance-provider-framework>=0.1.0", "ugence-governance-contracts>=0.1.0"
+    ]
+  },
+  "baseline_behavioral_hash": {
+    "product_semantics_hash": "d6984ee7125c8fcbe693c75ff5a3095157b5b2c7fa0363fbe1f6339a7d8a4736",
+    "adapter_semantics_hash": "ad6ba33bc1bc55896ccef853fba6eb88180875208b4a661afb6a70d1dff3632b",
+    "combined_semantics_hash": "b58df90058b05f2e"
+  },
+  "public_api_top_level_hash": "0c6d7ed65f042010e5605662f8dd34afc6a17d6b85d11b8f82fa67de5b75301b",
+  "platform_freeze": {
+    "manifest": "platform/PLATFORM_FREEZE_V1.json",
+    "manifest_digest": "05fdb1caace9216a9b42b979c66eb144e17d8a0032aae3500ab668a446094402",
+    "baseline_substantive_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "ai_hiring_is_a_frozen_component": false
+  },
+  "final": {
+    "distribution_version": "0.1.1",
+    "product_version": "0.6.0",
+    "production_certified": false,
+    "wheel": "ugence_ai_hiring-0.1.1-py3-none-any.whl",
+    "wheel_sha256": "8757d179417af0b19a09b3ddc21ce9a4b5a6024b0b7be64f13a03b46dccf94be",
+    "sdist": "ugence_ai_hiring-0.1.1.tar.gz",
+    "sdist_sha256": "c4eea23fde2ce3772fa5253c93057746276a41a96d9e9f39ce5cf983dde181c7",
+    "wheel_reproducibility": "BIT_FOR_BIT_REPRODUCIBLE",
+    "sdist_reproducibility": "CONTENT_REPRODUCIBLE",
+    "wheel_metadata_extras": {
+      "tap": "ugence-tap-provider>=0.1.0",
+      "actiongate": "ugence-actiongate-provider>=0.1.0",
+      "legacy_dgm_requirement_count": 0
+    },
+    "package_suite": "793 passed, 7 skipped (providers on path); 788 passed, 12 skipped (core-only)",
+    "monorepo_ai_hiring_suite": "778 passed",
+    "distribution_verifier_result": "CANONICAL_PROVIDER_DEPENDENCIES_VERIFIED",
+    "platform_freeze_substantive_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "platform_freeze_fields_changed": "none"
+  },
+  "behavioral_equivalence": {
+    "before": {
+      "product_semantics_hash": "d6984ee7125c8fcbe693c75ff5a3095157b5b2c7fa0363fbe1f6339a7d8a4736",
+      "adapter_semantics_hash": "ad6ba33bc1bc55896ccef853fba6eb88180875208b4a661afb6a70d1dff3632b"
+    },
+    "after_canonical": {
+      "product_semantics_hash": "d6984ee7125c8fcbe693c75ff5a3095157b5b2c7fa0363fbe1f6339a7d8a4736",
+      "adapter_semantics_hash": "ad6ba33bc1bc55896ccef853fba6eb88180875208b4a661afb6a70d1dff3632b"
+    },
+    "after_legacy_paths": {
+      "product_semantics_hash": "d6984ee7125c8fcbe693c75ff5a3095157b5b2c7fa0363fbe1f6339a7d8a4736",
+      "adapter_semantics_hash": "ad6ba33bc1bc55896ccef853fba6eb88180875208b4a661afb6a70d1dff3632b"
+    },
+    "verdict": "EQUIVALENT",
+    "classification": ["DEPENDENCY_METADATA_ONLY", "IMPORT_NAMESPACE_ONLY", "ADDITIVE_COMPATIBILITY_SURFACE"],
+    "semantic_regression": false
+  }
+}

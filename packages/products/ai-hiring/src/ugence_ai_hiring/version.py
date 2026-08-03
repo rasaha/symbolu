@@ -28,8 +28,10 @@ from .product.version import (
 )
 
 #: Independent distribution (wheel packaging) version. Distinct from the product
-#: capability-maturity version below.
-DISTRIBUTION_VERSION = "0.1.0"
+#: capability-maturity version below. Bumped 0.1.0 -> 0.1.1 for the canonical TAP /
+#: ActionGate optional-dependency normalization: a packaging/dependency-metadata
+#: change only — no product capability, API, or behavior change.
+DISTRIBUTION_VERSION = "0.1.1"
 
 #: Distribution name on the index.
 DISTRIBUTION_NAME = "ugence-ai-hiring"
@@ -45,11 +47,17 @@ RELEASE_CLASSIFICATION = "PACKAGE_READY_FOR_CONTROLLED_PILOT"
 # availability at runtime. The core identity provider, in-memory persistence,
 # and neutral authorization ports are always present (they live in the core wheel
 # / its governance-kernel dependency), so they are NOT listed here.
+#
+# Compatibility note: the ``tap_legacy`` / ``actiongate_legacy`` KEY NAMES are
+# retained unchanged so the version-info schema does not break for existing
+# consumers, but the probed MODULES are now the CANONICAL provider namespaces
+# (``ugence_tap_provider`` / ``ugence_actiongate_provider``). A later minor release
+# may normalize the public key names; this patch release keeps them additive-safe.
 _OPTIONAL_INTEGRATIONS = {
     "api": "fastapi",
-    # Optional legacy control-plane adapters (temporary compatibility deps).
-    "tap_legacy": "tap_provider",
-    "actiongate_legacy": "actiongate_provider",
+    # Optional canonical control-plane adapters (dependency-injected peers).
+    "tap_legacy": "ugence_tap_provider",
+    "actiongate_legacy": "ugence_actiongate_provider",
 }
 
 # Runtime dependencies whose versions we surface for provenance/debugging.

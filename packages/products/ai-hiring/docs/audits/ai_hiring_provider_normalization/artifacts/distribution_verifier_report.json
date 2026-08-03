@@ -1,0 +1,93 @@
+{
+  "audits": {
+    "contents": {
+      "forbidden_members": [],
+      "has_canonical_and_facade": true,
+      "no_forbidden_members": true,
+      "no_provider_impl_bundled": true,
+      "wheel_top_level": [
+        "ai_hiring",
+        "ugence_ai_hiring",
+        "ugence_ai_hiring-0.1.1.dist-info"
+      ]
+    },
+    "installed_tests_pass": true,
+    "metadata": {
+      "actiongate_extra_canonical": true,
+      "legacy_dgm_requirement_count": 0,
+      "no_dgm_actiongate_requirement": true,
+      "no_dgm_tap_requirement": true,
+      "requires_dist": [
+        "Requires-Dist: pydantic>=2",
+        "Requires-Dist: ugence-decision-authority>=1.0.0",
+        "Requires-Dist: ugence-governance-provider-framework>=0.1.0",
+        "Requires-Dist: ugence-governance-contracts>=0.1.0",
+        "Requires-Dist: fastapi>=0.100.0; extra == \"api\"",
+        "Requires-Dist: uvicorn>=0.20.0; extra == \"api\"",
+        "Requires-Dist: ugence-tap-provider>=0.1.0; extra == \"tap\"",
+        "Requires-Dist: ugence-actiongate-provider>=0.1.0; extra == \"actiongate\"",
+        "Requires-Dist: pytest>=7.0; extra == \"dev\"",
+        "Requires-Dist: build>=1.0; extra == \"dev\"",
+        "Requires-Dist: fastapi>=0.100.0; extra == \"all\"",
+        "Requires-Dist: uvicorn>=0.20.0; extra == \"all\""
+      ],
+      "tap_actiongate_not_core": true,
+      "tap_extra_canonical": true
+    },
+    "sdist_reproducible": true,
+    "wheel_reproducible": true
+  },
+  "distribution": "ugence-ai-hiring",
+  "installed_tests_passed": 790,
+  "result": "CANONICAL_PROVIDER_DEPENDENCIES_VERIFIED",
+  "scenarios": {
+    "actiongate_only": {
+      "actiongate_class_identity_and_legacy_path": true,
+      "core_import": true,
+      "dgm_actiongate_provider_not_installed": true,
+      "pip_check": true,
+      "tap_provider_absent": true,
+      "ugence_actiongate_provider_installed": true
+    },
+    "combined": {
+      "actiongate_identity": true,
+      "both_canonical_installed": true,
+      "core_import_no_eager_provider_load": true,
+      "neither_dgm_installed": true,
+      "pip_check": true,
+      "tap_identity": true
+    },
+    "core_only": {
+      "actiongate_provider_absent": true,
+      "adapter_import_no_provider_load": true,
+      "cli_demo": true,
+      "cli_verify": true,
+      "cli_version": true,
+      "core_import_and_platform": true,
+      "loaders_fail_closed": true,
+      "pip_check": true,
+      "tap_provider_absent": true
+    },
+    "legacy_deployment": {
+      "canonical_adapters_load_canonical_classes": true,
+      "canonical_providers_pulled_by_dgm": true,
+      "legacy_namespace_facades_available": true,
+      "pip_check": true,
+      "provider_facade_identity": true
+    },
+    "tap_only": {
+      "actiongate_provider_absent": true,
+      "core_import": true,
+      "dgm_tap_provider_not_installed": true,
+      "pip_check": true,
+      "tap_class_identity_and_legacy_path": true,
+      "ugence_tap_provider_installed": true
+    }
+  },
+  "sdist": "ugence_ai_hiring-0.1.1.tar.gz",
+  "sdist_reproducibility": "CONTENT_REPRODUCIBLE",
+  "sdist_sha256": "6331930b9f0c564f00a8c23aa0f0b84b503dd1c28e36b527249f2b21b2e880b1",
+  "wheel": "ugence_ai_hiring-0.1.1-py3-none-any.whl",
+  "wheel_reproducibility": "BIT_FOR_BIT_REPRODUCIBLE",
+  "wheel_sha256": "83be7b22dedeffd1524995e8e2878b15320cde09d7578bd7603253e1acad8f78"
+}

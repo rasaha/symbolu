@@ -1,18 +1,25 @@
 name: ai-hiring-package-ci
 
 # Scoped CI for the independent ugence-ai-hiring product distribution. Runs the
-# migrated + new package suite (governance-boundary, dependency-boundary,
-# import-isolation, compatibility-facade, determinism, packaging), the wheel +
-# sdist build with an isolated clean-venv install, out-of-root import, CLI
-# verify/demo, wheel-content audit, reproducible-wheel comparison, the existing
-# monorepo AI Hiring tests, and platform-freeze verification. No network-dependent
-# integrations run. Triggered only by changes to the package, the historical
-# ai_hiring source, its docs, or this workflow.
+# migrated + new package suite (governance-boundary, dependency-boundary AST,
+# import-isolation, compatibility-facade, determinism, packaging, provider
+# dependency-metadata, canonical + compatibility adapter, object-identity), the
+# behavioral-equivalence comparison (canonical adapter path == legacy adapter path
+# == committed baseline), the canonical-provider clean-install matrix (core-only,
+# TAP-only, ActionGate-only, combined, legacy-deployment) with wheel + sdist build,
+# out-of-root import, CLI verify/demo, wheel-content + METADATA audit, and
+# reproducible-build comparison, the existing monorepo AI Hiring tests, and
+# platform-freeze verification. No network-dependent integrations run. Triggered
+# only by changes to the package, the historical ai_hiring source, its docs, or
+# this workflow.
 
 on:
   pull_request:
     paths:
       - "packages/products/ai-hiring/**"
+      - "packages/providers/**"
+      - "packaging/dgm-tap-provider/**"
+      - "packaging/dgm-actiongate-provider/**"
       - "ai_hiring/**"
       - "docs/ai-hiring/**"
       - "conftest.py"
@@ -21,8 +28,12 @@ on:
     branches:
       - "claude/setup-symbolu-monorepo-**"
       - "claude/ai-hiring-independent-package**"
+      - "claude/ai-hiring-canonical-provider**"
     paths:
       - "packages/products/ai-hiring/**"
+      - "packages/providers/**"
+      - "packaging/dgm-tap-provider/**"
+      - "packaging/dgm-actiongate-provider/**"
       - "ai_hiring/**"
       - "docs/ai-hiring/**"
       - "conftest.py"
@@ -31,6 +42,16 @@ on:
 defaults:
   run:
     shell: bash
+
+# Per-step source paths for the source-tree jobs only. The isolated-distribution
+# job deliberately sets NO PYTHONPATH so the clean-venv verification resolves
+# against the installed wheels, never the source tree.
+env:
+  # Canonical package src + audited Ugence dependency srcs + the canonical TAP /
+  # ActionGate provider srcs (so the canonical-adapter object-identity tests run
+  # against source instead of being skipped).
+  SRC_PYTHONPATH: >-
+    packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/providers/tap/src:packages/providers/actiongate/src
 
 jobs:
   package-suite:
@@ -47,24 +68,54 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest build pydantic
-      - name: Package suite (migrated behavioral + governance/dependency/isolation/compat/determinism/packaging)
+      - name: Package suite (behavioral + governance/dependency/isolation/compat/determinism/packaging/adapters/metadata/identity)
         env:
-          # The canonical package src plus the audited Ugence dependency srcs
-          # (the repo conftest also adds the latter for source checkouts).
-          PYTHONPATH: >-
-            packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
         run: python -m pytest packages/products/ai-hiring/tests -q
       - name: Provenance/metadata validation (version metadata, production_certified is False)
         env:
-          PYTHONPATH: >-
-            packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
         run: |
           python -m ugence_ai_hiring version
-          python -c "import ugence_ai_hiring as u; assert u.version_info().production_certified is False, 'must not be production certified'"
+          python -c "import ugence_ai_hiring as u; assert u.__version__ == '0.1.1'; assert u.PRODUCT_VERSION == '0.6.0'; assert u.version_info().production_certified is False, 'must not be production certified'"
+
+  behavioral-equivalence:
+    name: Behavioral equivalence (canonical == legacy == baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic
+      - name: Capture (canonical + legacy paths) and compare semantic hashes to the committed baseline
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: |
+          CAP=packages/products/ai-hiring/scripts/ai_hiring_provider_normalization_capture.py
+          BASE=packages/products/ai-hiring/docs/audits/ai_hiring_provider_normalization/artifacts
+          python "$CAP" --out /tmp/after_canonical.json --adapter canonical
+          python "$CAP" --out /tmp/after_legacy.json --adapter legacy
+          python - <<'PY'
+          import json
+          def h(p):
+              d = json.load(open(p))
+              return d["product_semantics_hash"], d["adapter_semantics_hash"]
+          base = "packages/products/ai-hiring/docs/audits/ai_hiring_provider_normalization/artifacts"
+          before = h(f"{base}/ai_hiring_behavior_before.json")
+          canon = h("/tmp/after_canonical.json")
+          legacy = h("/tmp/after_legacy.json")
+          assert before == canon == legacy, f"behavioral regression: before={before} canonical={canon} legacy={legacy}"
+          print("behavioral equivalence OK:", before)
+          PY
 
   isolated-distribution:
-    name: Wheel + sdist build, clean install, out-of-root import, CLI, reproducibility
+    name: Canonical-provider clean-install matrix, wheel/sdist, CLI, reproducibility
     runs-on: ubuntu-latest
+    # NOTE: intentionally no PYTHONPATH — the verifier resolves the installed wheels.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,7 +127,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install build pytest
-      - name: Build, clean-install, out-of-root import, CLI verify/demo, wheel audit, reproducible-wheel comparison
+      - name: Build wheelhouse, run core-only/TAP/ActionGate/combined/legacy-deployment install matrix, wheel+METADATA audit, reproducibility
         run: python packages/products/ai-hiring/scripts/verify_ai_hiring_distribution.py
 
   monorepo-regression:

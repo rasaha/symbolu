@@ -19,7 +19,7 @@ claim.
 
 - **Distribution:** `ugence-ai-hiring`
 - **Canonical import:** `ugence_ai_hiring`
-- **Distribution version:** `0.1.0` (independent wheel packaging lifecycle)
+- **Distribution version:** `0.1.1` (independent wheel packaging lifecycle)
 - **Product version:** `0.6.0` (AI Hiring capability maturity, H0–H6)
 - **Release classification:** `PACKAGE_READY_FOR_CONTROLLED_PILOT`
 - **Production certified:** **No** (`version_info().production_certified == False`)
@@ -38,7 +38,20 @@ pip install -e packages/products/ai-hiring
 
 Core dependencies: `pydantic>=2`, `ugence-decision-authority`,
 `ugence-governance-provider-framework`, `ugence-governance-contracts`.
-Optional extra: `ugence-ai-hiring[api]` (FastAPI adapter).
+
+Optional extras (all optional; the core installs and runs without any of them):
+
+```bash
+pip install "ugence-ai-hiring[api]"          # FastAPI adapter
+pip install "ugence-ai-hiring[tap]"          # canonical TAP -> ugence-tap-provider
+pip install "ugence-ai-hiring[actiongate]"   # canonical ActionGate -> ugence-actiongate-provider
+```
+
+TAP and ActionGate are optional, dependency-injected governance providers — never
+core dependencies. The extras resolve the canonical `ugence-tap-provider` /
+`ugence-actiongate-provider` distributions. See
+[`docs/PROVIDER_DEPENDENCY_MIGRATION.md`](docs/PROVIDER_DEPENDENCY_MIGRATION.md)
+and [`docs/TAP_ACTIONGATE_DEPENDENCY_BOUNDARY.md`](docs/TAP_ACTIONGATE_DEPENDENCY_BOUNDARY.md).
 
 ## Quickstart
 

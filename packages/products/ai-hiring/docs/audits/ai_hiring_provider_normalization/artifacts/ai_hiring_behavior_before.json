@@ -1,0 +1,174 @@
+{
+  "adapter_semantics": {
+    "actiongate": {
+      "constraints": [],
+      "descriptor_kind": "ACTION_GOVERNANCE",
+      "descriptor_provider_id": "actiongate",
+      "no_execution_surface": true,
+      "obligations": [
+        "logging=audit"
+      ],
+      "outcome": "AUTHORIZED"
+    },
+    "tap": {
+      "coverage": "SUPPORTED",
+      "descriptor_kind": "ASSERTION_GOVERNANCE",
+      "descriptor_provider_id": "tap",
+      "evidence_coverage": 1.0,
+      "has_authorize": false
+    }
+  },
+  "adapter_semantics_hash": "ad6ba33bc1bc55896ccef853fba6eb88180875208b4a661afb6a70d1dff3632b",
+  "combined_semantics_hash": "b58df90058b05f2e5854a8c37fb6113386375acf14c9a1e573cde7bcce5d7347",
+  "metadata": {
+    "actiongate_module": "ugence_ai_hiring.integrations.actiongate_legacy_adapter",
+    "adapter": "legacy",
+    "distribution": "ugence-ai-hiring",
+    "distribution_version": "0.1.0",
+    "tap_module": "ugence_ai_hiring.integrations.tap_legacy_adapter"
+  },
+  "product_semantics": {
+    "demo": {
+      "accountability_sample": {
+        "audit": {
+          "governance_event_count": 6,
+          "hiring_event_count": 7
+        },
+        "authorization": {
+          "authorized": true,
+          "bound_actor": "actor:7271099d05d3",
+          "constraint_count": 0,
+          "obligation_count": 1,
+          "outcome": "AUTHORIZED"
+        },
+        "claim_count": 2,
+        "claim_outcomes": [
+          "SUPPORTED",
+          "SUPPORTED"
+        ],
+        "compensation": {
+          "count": 0
+        },
+        "execution": {
+          "attempt_number": 1,
+          "execution_status": "SUCCEEDED",
+          "transport_accepted": true
+        },
+        "human_decision": {
+          "authority_type": "HUMAN_APPROVER",
+          "outcome": "ADVANCE",
+          "override": false
+        },
+        "integrity": {
+          "hiring_hash_chain_valid": true,
+          "issues": [],
+          "links_intact": true,
+          "reconstructed": true,
+          "tenant_scope_consistent": true
+        },
+        "recommendation": {
+          "advisory": true,
+          "candidate_subject_ref": "subject:0d80048d576f",
+          "confidence": 1.0,
+          "outcome": "RECOMMEND_ADVANCE",
+          "status": "READY_FOR_HUMAN_REVIEW"
+        },
+        "reconciliation": {
+          "compensation_required": false,
+          "matched_count": 1,
+          "mismatched_count": 0,
+          "outcome": "MATCHED"
+        }
+      },
+      "cohort_summary": [
+        {
+          "authorization_outcome": "AUTHORIZED",
+          "case_id": "demo-advance",
+          "decision_outcome": "ADVANCE",
+          "proposal_status": "RECONCILED",
+          "reached_stage": "reconciliation",
+          "recommendation_status": "READY_FOR_HUMAN_REVIEW",
+          "reconciliation_outcome": "MATCHED"
+        },
+        {
+          "authorization_outcome": "AUTHORIZED",
+          "case_id": "demo-hold",
+          "decision_outcome": "HOLD",
+          "proposal_status": "RECONCILED",
+          "reached_stage": "reconciliation",
+          "recommendation_status": "READY_FOR_HUMAN_REVIEW",
+          "reconciliation_outcome": "MATCHED"
+        },
+        {
+          "authorization_outcome": "AUTHORIZED",
+          "case_id": "demo-reject",
+          "decision_outcome": "REJECT",
+          "proposal_status": "RECONCILED",
+          "reached_stage": "reconciliation",
+          "recommendation_status": "READY_FOR_HUMAN_REVIEW",
+          "reconciliation_outcome": "MATCHED"
+        },
+        {
+          "authorization_outcome": "",
+          "case_id": "demo-review",
+          "decision_outcome": "",
+          "proposal_status": "",
+          "reached_stage": "recommendation",
+          "recommendation_status": "ASSERTION_REVIEW_REQUIRED",
+          "reconciliation_outcome": ""
+        },
+        {
+          "authorization_outcome": "DENIED",
+          "case_id": "demo-denied",
+          "decision_outcome": "ADVANCE",
+          "proposal_status": "AUTHORIZATION_DENIED",
+          "reached_stage": "authorization",
+          "recommendation_status": "READY_FOR_HUMAN_REVIEW",
+          "reconciliation_outcome": ""
+        }
+      ]
+    },
+    "reference_integration": {
+      "reference_assertion": {
+        "coverage": "SUPPORTED",
+        "covered_evidence_refs": [
+          "ev-1",
+          "ev-2"
+        ],
+        "evidence_coverage": 1.0,
+        "unsupported_elements": []
+      }
+    },
+    "version": {
+      "contract_version_keys": [
+        "decision_authority",
+        "governance_contracts",
+        "governance_provider_framework"
+      ],
+      "optional_integration_keys": [
+        "actiongate_legacy",
+        "api",
+        "tap_legacy"
+      ],
+      "platform_baseline": "v1.0",
+      "product_version": "0.6.0",
+      "production_certified": false,
+      "release_classification": "PACKAGE_READY_FOR_CONTROLLED_PILOT",
+      "stability": "pre-1.0 / controlled-pilot",
+      "version_info_keys": [
+        "build_commit",
+        "contract_versions",
+        "dependency_versions",
+        "distribution",
+        "distribution_version",
+        "optional_integrations",
+        "platform_baseline",
+        "product_version",
+        "production_certified",
+        "release_classification",
+        "stability"
+      ]
+    }
+  },
+  "product_semantics_hash": "d6984ee7125c8fcbe693c75ff5a3095157b5b2c7fa0363fbe1f6339a7d8a4736"
+}
