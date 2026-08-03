@@ -1,0 +1,23 @@
+{
+  "authority_concentration_limit_pct": 67,
+  "composition_contract_version": "awc.composition.v1",
+  "failure_domain_concentration_limit_pct": 67,
+  "maximum_ai_roles": 12,
+  "maximum_assignment_combinations": 100000,
+  "maximum_candidates_per_role": 16,
+  "maximum_roles_per_agent": 2,
+  "minimum_deployment_diversity": 1,
+  "minimum_provider_diversity": 1,
+  "policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+  "policy_id": "gs_composition_policy",
+  "policy_version": "1.0",
+  "provider_concentration_limit_pct": 67,
+  "require_interface_compatibility": true,
+  "team_cost_hard_ceiling": 50.0,
+  "team_latency_hard_ceiling": 10000.0,
+  "team_reliability_floor": 0.9,
+  "tie_break": "lexical_assignment",
+  "weight_failure_domain_diversity_bp": 1000,
+  "weight_provider_diversity_bp": 1000,
+  "weight_ranking_bp": 8000
+}

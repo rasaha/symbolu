@@ -1,0 +1,14 @@
+{
+  "schema": "awc.p2_1.result_equivalence.v1",
+  "states": ["BYTE_IDENTICAL", "SEMANTICALLY_EQUIVALENT", "INTENTIONALLY_DIFFERENT", "INCOMPATIBLE"],
+  "dimensions": ["node_dispositions", "role_requirements", "non_agent_dispositions", "role_dependencies", "eligibility", "rankings", "team_assignments", "permission_proposals", "fallback_plans", "AgentTeamPlan"],
+  "scenarios": {
+    "procurement": {"dispositions": "BYTE_IDENTICAL", "adaptation": "SEMANTICALLY_EQUIVALENT", "plan": "SEMANTICALLY_EQUIVALENT"},
+    "customer_support": {"dispositions": "BYTE_IDENTICAL", "adaptation": "SEMANTICALLY_EQUIVALENT", "plan": "SEMANTICALLY_EQUIVALENT"},
+    "cybersecurity_success": {"dispositions": "BYTE_IDENTICAL", "adaptation": "SEMANTICALLY_EQUIVALENT", "plan": "SEMANTICALLY_EQUIVALENT"},
+    "cybersecurity_no_feasible_team": {"dispositions": "BYTE_IDENTICAL", "adaptation": "SEMANTICALLY_EQUIVALENT", "plan": "SEMANTICALLY_EQUIVALENT"}
+  },
+  "intentional_differences": [],
+  "incompatible_differences": [],
+  "fingerprint_strategy": {"v1_compatibility_fingerprint": "unchanged", "v2_adaptation_fingerprint": "versioned, includes v2 provenance", "semantic_equivalence_fingerprint": "planning projection digest; equal for equivalent v1/v2"}
+}

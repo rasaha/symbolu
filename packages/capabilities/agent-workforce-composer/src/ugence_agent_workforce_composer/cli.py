@@ -84,9 +84,39 @@ def cmd_validate_workflow(args) -> int:
 
 
 def cmd_adapt_workflow(args) -> int:
-    result = adapt_compiled_workflow(_read_json(args.file), role_overlay=None)
+    from .adapter_v2 import WORKFLOW_IR_V2, adapt_compiled_workflow_v2, declared_contract_version
+    doc = _read_json(args.file)
+    overlay = _read_json(args.overlay) if getattr(args, "overlay", None) else None
+    contract = getattr(args, "contract", None) or declared_contract_version(doc)
+    if contract == WORKFLOW_IR_V2:
+        env = adapt_compiled_workflow_v2(doc, role_overlay=overlay)
+        _emit(to_canonical_obj(env))
+        return 0 if env.ok else 1
+    # v1 path — output shape frozen for backward compatibility.
+    result = adapt_compiled_workflow(doc, role_overlay=overlay)
     _emit(to_canonical_obj(result))
     return 0 if result.ok else 1
+
+
+def cmd_compare_adaptations(args) -> int:
+    from .compatibility import adapt_workflow, compare_adaptations
+    v1_overlay = _read_json(args.v1_overlay) if getattr(args, "v1_overlay", None) else None
+    v2_overlay = _read_json(args.v2_overlay) if getattr(args, "v2_overlay", None) else None
+    v1 = adapt_workflow(_read_json(args.v1_file), contract_version="workflow_ir.v1",
+                        role_overlay=v1_overlay)
+    v2 = adapt_workflow(_read_json(args.v2_file), contract_version="workflow_ir.v2",
+                        role_overlay=v2_overlay)
+    rep = compare_adaptations(v1, v2)
+    _emit(to_canonical_obj(rep))
+    return 0 if rep.state in ("BYTE_IDENTICAL", "SEMANTICALLY_EQUIVALENT") else 2
+
+
+def cmd_inspect_overlay_reduction(args) -> int:
+    from .adapter_v2 import reduce_overlay
+    reduced, removed = reduce_overlay(_read_json(args.overlay))
+    _emit({"reduced_enterprise_overlay": reduced,
+           "removed_compiler_emitted_fields": {k: sorted(v) for k, v in removed.items()}})
+    return 0
 
 
 def cmd_validate_registry(args) -> int:
@@ -256,7 +286,25 @@ def build_parser() -> argparse.ArgumentParser:
     vw.add_argument("file")
     vw.set_defaults(func=cmd_validate_workflow)
 
-    aw = sub.add_parser("adapt-workflow", help="emit the full adaptation result")
+    ca = sub.add_parser("compare-adaptations",
+                        help="compare a v1 and v2 adaptation of the same workflow")
+    ca.add_argument("v1_file")
+    ca.add_argument("v2_file")
+    ca.add_argument("--v1-overlay", dest="v1_overlay", default=None)
+    ca.add_argument("--v2-overlay", dest="v2_overlay", default=None)
+    ca.set_defaults(func=cmd_compare_adaptations)
+
+    ior = sub.add_parser("inspect-overlay-reduction",
+                         help="split a v1 overlay into reduced-enterprise + compiler-emitted")
+    ior.add_argument("overlay")
+    ior.set_defaults(func=cmd_inspect_overlay_reduction)
+
+    aw = sub.add_parser("adapt-workflow",
+                        help="adapt a serialized workflow (v1 or v2) and emit the result")
+    aw.add_argument("--contract", default=None,
+                    choices=["workflow_ir.v1", "workflow_ir.v2"],
+                    help="explicit compiler contract (default: read from the document)")
+    aw.add_argument("--overlay", default=None, help="enterprise role overlay JSON")
     aw.add_argument("file")
     aw.set_defaults(func=cmd_adapt_workflow)
 

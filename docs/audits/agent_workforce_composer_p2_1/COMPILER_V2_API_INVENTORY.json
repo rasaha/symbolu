@@ -1,0 +1,8 @@
+{
+  "schema": "awc.p2_1.compiler_v2_api_inventory.v1",
+  "consumed_as_data_not_imported": true,
+  "v2_top_level_keys": ["ir_version","contract_version","policy_pack_id","policy_pack_version","base_ir","base_ir_digest","node_semantics","dependency_semantics","semantic_features","capability_reference_manifest","contract_reference_manifest","provenance_manifest","diagnostics","compiler_version","workflow_fingerprint"],
+  "node_semantics_fields": ["node_id","node_kind","semantic_purpose","semantic_description","role_relevance","required_capability_refs","optional_capability_refs","required_input_contract_refs","produced_output_contract_refs","required_tool_refs","data_classification_refs","permission_intent_refs","authority_disposition","canonical_capability_owner","human_review_requirement","human_authority_requirement","governance_boundary_refs","source_policy_refs","provenance","fingerprint"],
+  "dependency_kinds": ["DATA_DEPENDENCY","CONTROL_DEPENDENCY","ORDERING_DEPENDENCY","REVIEW_DEPENDENCY","AUTHORITY_DEPENDENCY","GOVERNANCE_DEPENDENCY","CONDITIONAL_DEPENDENCY"],
+  "compiler_versions": {"distribution": "0.2.0", "product": "0.2.0", "contracts": ["workflow_ir.v1","workflow_ir.v2"], "v1_digest_identity": "0.1.0", "v2_digest_identity": "0.2.0"}
+}

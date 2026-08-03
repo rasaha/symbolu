@@ -146,6 +146,28 @@ from .plan import (
     replay_agent_team_plan,
 )
 
+# -- P2.1: compiler workflow_ir.v2 compatibility adapter -----------------------
+from .adapter_v2 import (
+    COMPILER_ADAPTER_CONTRACT_VERSION,
+    SUPPORTED_COMPILER_CONTRACTS,
+    AdaptationResultV2,
+    AdapterDiagnostic,
+    AdapterDiagnosticCode,
+    CompilerAdapterMode,
+    CompilerContractVersion,
+    adapt_compiled_workflow_v2,
+    declared_contract_version,
+    reduce_overlay,
+)
+from .compatibility import (
+    AdaptationEquivalenceReport,
+    AdaptationEquivalenceState,
+    EquivalenceDifference,
+    adapt_workflow,
+    compare_adaptations,
+    compare_workforce_plans,
+)
+
 # -- fingerprint + version -----------------------------------------------------
 from .fingerprint import fingerprint
 from .version import (
@@ -180,6 +202,13 @@ __all__ = [
     "evaluate_workflow_eligibility", "explain_role_report", "build_replay_record",
     # fingerprint + version
     "fingerprint", "version_info", "VersionInfo",
+    # -- P2.1: compiler workflow_ir.v2 compatibility adapter --
+    "adapt_compiled_workflow_v2", "adapt_workflow", "declared_contract_version",
+    "reduce_overlay", "compare_adaptations", "compare_workforce_plans",
+    "AdaptationResultV2", "AdapterDiagnostic", "AdapterDiagnosticCode",
+    "CompilerContractVersion", "CompilerAdapterMode",
+    "AdaptationEquivalenceState", "AdaptationEquivalenceReport", "EquivalenceDifference",
+    "SUPPORTED_COMPILER_CONTRACTS", "COMPILER_ADAPTER_CONTRACT_VERSION",
     "CONTRACT_VERSION", "VERSION", "__version__",
     # -- P2 (contract awc.composition.v1) --
     "COMPOSITION_CONTRACT_VERSION",

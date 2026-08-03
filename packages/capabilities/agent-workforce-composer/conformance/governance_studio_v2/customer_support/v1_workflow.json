@@ -1,0 +1,141 @@
+{
+  "manifest": {
+    "policy_pack_id": "gs_support",
+    "policy_pack_version": 1,
+    "structural_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98"
+  },
+  "release_metadata": {
+    "synthetic": true
+  },
+  "structural_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+  "workflow_ir": {
+    "edges": [
+      {
+        "edge_id": "edge_0",
+        "kind": "NEXT",
+        "order": 0,
+        "source_id": "sup_triage",
+        "target_id": "sup_retrieval"
+      },
+      {
+        "edge_id": "edge_1",
+        "kind": "NEXT",
+        "order": 1,
+        "source_id": "sup_retrieval",
+        "target_id": "sup_draft"
+      },
+      {
+        "edge_id": "edge_2",
+        "kind": "NEXT",
+        "order": 2,
+        "source_id": "sup_draft",
+        "target_id": "sup_escalation_decision"
+      },
+      {
+        "edge_id": "edge_3",
+        "kind": "NEXT",
+        "order": 3,
+        "source_id": "sup_escalation_decision",
+        "target_id": "sup_human_approval"
+      },
+      {
+        "edge_id": "edge_4",
+        "kind": "NEXT",
+        "order": 4,
+        "source_id": "sup_human_approval",
+        "target_id": "sup_terminal"
+      }
+    ],
+    "ir_version": "workflow_ir.v1",
+    "nodes": [
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "ticket triage / classification",
+        "node_id": "sup_triage",
+        "output_contract": "ticket_class",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "ticket_class"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "customer knowledge retrieval",
+        "node_id": "sup_retrieval",
+        "output_contract": "retrieved_context",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "retrieved_context"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "customer response drafting",
+        "node_id": "sup_draft",
+        "output_contract": "draft_response",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "HUMAN_REVIEWER",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "AUTHORITY_CHECK",
+        "label": "escalation decision",
+        "node_id": "sup_escalation_decision",
+        "output_contract": "",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "HUMAN_APPROVER",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "APPROVAL_GATE",
+        "label": "human approval",
+        "node_id": "sup_human_approval",
+        "output_contract": "",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "TERMINAL_OUTCOME",
+        "label": "terminal outcome",
+        "node_id": "sup_terminal",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      }
+    ],
+    "policy_pack_id": "gs_support",
+    "policy_pack_version": 1,
+    "referenced_capabilities": [
+      "COMPILER",
+      "DECISION_AUTHORITY"
+    ]
+  }
+}

@@ -1,0 +1,999 @@
+{
+  "base_ir": {
+    "edges": [
+      {
+        "edge_id": "edge_0",
+        "kind": "NEXT",
+        "order": 0,
+        "source_id": "sec_evidence_intake",
+        "target_id": "sec_threat_analysis"
+      },
+      {
+        "edge_id": "edge_1",
+        "kind": "NEXT",
+        "order": 1,
+        "source_id": "sec_threat_analysis",
+        "target_id": "sec_incident_correlation"
+      },
+      {
+        "edge_id": "edge_2",
+        "kind": "NEXT",
+        "order": 2,
+        "source_id": "sec_incident_correlation",
+        "target_id": "sec_human_escalation"
+      },
+      {
+        "edge_id": "edge_3",
+        "kind": "NEXT",
+        "order": 3,
+        "source_id": "sec_human_escalation",
+        "target_id": "sec_action_boundary"
+      },
+      {
+        "edge_id": "edge_4",
+        "kind": "NEXT",
+        "order": 4,
+        "source_id": "sec_action_boundary",
+        "target_id": "sec_audit"
+      },
+      {
+        "edge_id": "edge_5",
+        "kind": "NEXT",
+        "order": 5,
+        "source_id": "sec_audit",
+        "target_id": "sec_terminal"
+      }
+    ],
+    "ir_version": "workflow_ir.v1",
+    "nodes": [
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "DECISION_RULE",
+        "label": "incident intake validation",
+        "node_id": "sec_evidence_intake",
+        "output_contract": "incident_evidence",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "incident_evidence"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "threat analysis",
+        "node_id": "sec_threat_analysis",
+        "output_contract": "threat_assessment",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [
+          "threat_assessment"
+        ],
+        "kind": "EVIDENCE_REQUIREMENT",
+        "label": "incident correlation",
+        "node_id": "sec_incident_correlation",
+        "output_contract": "correlated_incident",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "HUMAN_APPROVER",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "OVERRIDE_GATE",
+        "label": "human escalation",
+        "node_id": "sec_human_escalation",
+        "output_contract": "",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "AUTHORITATIVE",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "ACTION_CONSTRAINT",
+        "label": "action authorization boundary",
+        "node_id": "sec_action_boundary",
+        "output_contract": "",
+        "owning_capability": "ACTION_GATE",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "AUDIT_EMISSION",
+        "label": "audit emission",
+        "node_id": "sec_audit",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      {
+        "audit_requirements": [],
+        "authority_type": "",
+        "disposition": "ADVISORY",
+        "failure_behavior": "BLOCK",
+        "input_object_ids": [],
+        "kind": "TERMINAL_OUTCOME",
+        "label": "terminal outcome",
+        "node_id": "sec_terminal",
+        "output_contract": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      }
+    ],
+    "policy_pack_id": "gs_security_infeasible",
+    "policy_pack_version": 1,
+    "referenced_capabilities": [
+      "ACTION_GATE",
+      "COMPILER",
+      "DECISION_AUTHORITY"
+    ]
+  },
+  "base_ir_digest": "sha256:747523540236c361dd36587f7d86ea1605bfc52b7352b3cceaf3b982f5694626",
+  "capability_reference_manifest": [
+    "ACTION_GATE",
+    "DECISION_AUTHORITY",
+    "evidence_extraction"
+  ],
+  "compiler_version": "0.2.0",
+  "contract_reference_manifest": [
+    "correlated_incident",
+    "incident_evidence",
+    "threat_assessment"
+  ],
+  "contract_version": "workflow_ir.v2",
+  "dependency_semantics": [
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "ORDERING_DEPENDENCY",
+      "edge_id": "edge_4",
+      "fingerprint": "sha256:786bed396f9152b6e2c3efb0629d8b0368bb410e0e7b7c6d22ce7ee539af2fbf",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_action_boundary",
+          "sec_audit"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_action_boundary",
+      "target_node_id": "sec_audit"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "ORDERING_DEPENDENCY",
+      "edge_id": "edge_5",
+      "fingerprint": "sha256:6ea35c0da8977585340bedb67b9c4cd016ad4114fce1248f63cef8cb87ec652f",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_audit",
+          "sec_terminal"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_audit",
+      "target_node_id": "sec_terminal"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "DATA_DEPENDENCY",
+      "edge_id": "edge_0",
+      "fingerprint": "sha256:34fe4c637e96567d13877c9ca36c8c1b17f432c437f3da83d7c778fee5914422",
+      "input_contract_refs": [
+        "incident_evidence"
+      ],
+      "output_contract_refs": [
+        "incident_evidence"
+      ],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_evidence_intake",
+          "sec_threat_analysis"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_evidence_intake",
+      "target_node_id": "sec_threat_analysis"
+    },
+    {
+      "authority_context": "AUTHORITATIVE",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "GOVERNANCE_DEPENDENCY",
+      "edge_id": "edge_3",
+      "fingerprint": "sha256:bbc2b7276c04fb0a40fd0a5cffa752dbadb714f27ccfebf2afb4ae33ba648f4d",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_human_escalation",
+          "sec_action_boundary"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_human_escalation",
+      "target_node_id": "sec_action_boundary"
+    },
+    {
+      "authority_context": "AUTHORITATIVE",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "AUTHORITY_DEPENDENCY",
+      "edge_id": "edge_2",
+      "fingerprint": "sha256:df663567b522fffab8cfff48d3bbfc82980557b75970661784dbc575a6cdada0",
+      "input_contract_refs": [],
+      "output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_incident_correlation",
+          "sec_human_escalation"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_incident_correlation",
+      "target_node_id": "sec_human_escalation"
+    },
+    {
+      "authority_context": "ADVISORY",
+      "condition_ref": "",
+      "contract_version": "workflow_ir.v2",
+      "dependency_kind": "DATA_DEPENDENCY",
+      "edge_id": "edge_1",
+      "fingerprint": "sha256:488756e703bd1bc4889bbc0f27df20c09d46bd212c7bbb67da5226cc3e578db6",
+      "input_contract_refs": [
+        "threat_assessment"
+      ],
+      "output_contract_refs": [
+        "threat_assessment"
+      ],
+      "provenance": {
+        "compiler_rule": "edge_dependency_mapping",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DERIVED_FROM_EDGE",
+        "source_declaration": "NEXT",
+        "source_object_ids": [
+          "sec_threat_analysis",
+          "sec_incident_correlation"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "source_node_id": "sec_threat_analysis",
+      "target_node_id": "sec_incident_correlation"
+    }
+  ],
+  "diagnostics": [],
+  "ir_version": "workflow_ir.v2",
+  "node_semantics": [
+    {
+      "authority_disposition": "AUTHORITATIVE",
+      "canonical_capability_owner": "ACTION_GATE",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:8775a80652471996b576e7e5ece98c949b87cb3fddf7d8839b370f8310fc002f",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "action authorization boundary",
+          "source_object_ids": [],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_action_boundary",
+      "node_kind": "ACTION_CONSTRAINT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "action authorization boundary",
+        "source_object_ids": [],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "AUTHORITATIVE",
+          "capability_id": "ACTION_GATE",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:e225abb74ea0f9ae42299df770cd107aa439b68e34235356b62175d137839347",
+          "provenance": {
+            "compiler_rule": "capability_owner_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "action authorization boundary",
+            "source_object_ids": [],
+            "source_policy_id": "gs_security_infeasible",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "CAPABILITY_OWNER_MAPPING",
+          "source_ref": "ACTION_GATE"
+        }
+      ],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "GOVERNANCE_OWNED",
+      "semantic_description": "action authorization boundary",
+      "semantic_purpose": "constrain a governed action",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:f58d41133adbaafbbb9f6bb3590ca909bd9ea1c7ec072bdb2f1e71a1361ce36c",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "audit emission",
+          "source_object_ids": [],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_audit",
+      "node_kind": "AUDIT_EMISSION",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "audit emission",
+        "source_object_ids": [],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "DETERMINISTIC_SERVICE",
+      "semantic_description": "audit emission",
+      "semantic_purpose": "emit a governed audit record",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:0a99af866a66873cf55e7514309538d78fb60d5083ce532680a3a2a7f9066470",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "incident_evidence",
+          "source_object_ids": [],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_evidence_intake",
+      "node_kind": "DECISION_RULE",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "sec_threat_analysis"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "incident_evidence",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "incident_evidence",
+              "source_object_ids": [],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "incident_evidence",
+        "source_object_ids": [],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "UNSUPPORTED",
+      "semantic_description": "incident intake validation",
+      "semantic_purpose": "apply a governed decision rule",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "AUTHORITATIVE",
+      "canonical_capability_owner": "DECISION_AUTHORITY",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:776a3dd2b720f83cf924cbe4232a85a1b245deefe3a55d3beeb865d5960f4886",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": true,
+      "human_review_requirement": {
+        "authority_type": "HUMAN_APPROVER",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "DECISION_AUTHORITY",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "human escalation",
+          "source_object_ids": [],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": true,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "human_authority"
+      },
+      "node_id": "sec_human_escalation",
+      "node_kind": "OVERRIDE_GATE",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "human escalation",
+        "source_object_ids": [],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "AUTHORITATIVE",
+          "capability_id": "DECISION_AUTHORITY",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:55b7e4b5cf3383912df0cef88bf8ab2435c316b9fe6015c1bd923ae4c32321d6",
+          "provenance": {
+            "compiler_rule": "capability_owner_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "human escalation",
+            "source_object_ids": [],
+            "source_policy_id": "gs_security_infeasible",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "CAPABILITY_OWNER_MAPPING",
+          "source_ref": "DECISION_AUTHORITY"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "correlated_incident",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "correlated_incident",
+              "source_object_ids": [
+                "threat_assessment"
+              ],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "sec_incident_correlation",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "HUMAN_AUTHORITY",
+      "semantic_description": "human escalation",
+      "semantic_purpose": "require an authorized override",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:c78f00efe1cb820cf20da596812c165606a75b5a8624a15aac34c66b328544fe",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "correlated_incident",
+          "source_object_ids": [
+            "threat_assessment"
+          ],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_incident_correlation",
+      "node_kind": "EVIDENCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "sec_human_escalation"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "correlated_incident",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "correlated_incident",
+              "source_object_ids": [
+                "threat_assessment"
+              ],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "correlated_incident",
+        "source_object_ids": [
+          "threat_assessment"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "ADVISORY",
+          "capability_id": "evidence_extraction",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:40ab72df863842b8f760cd7ec758ea441d63fa9b7549bc7e16891ebfe871ff4f",
+          "provenance": {
+            "compiler_rule": "node_kind_capability_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "correlated_incident",
+            "source_object_ids": [
+              "threat_assessment"
+            ],
+            "source_policy_id": "gs_security_infeasible",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "NODE_KIND_MAPPING",
+          "source_ref": "EVIDENCE_REQUIREMENT"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "threat_assessment",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "threat_assessment",
+              "source_object_ids": [
+                "incident_evidence"
+              ],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "sec_threat_analysis",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+      "semantic_description": "incident correlation",
+      "semantic_purpose": "collect and extract evidence for a governed decision",
+      "source_policy_refs": [
+        "threat_assessment"
+      ]
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:16f85eaf7082b5aeed492e3cf31ca405e780e81502326deb02519eb40cb4cd19",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "terminal outcome",
+          "source_object_ids": [],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_terminal",
+      "node_kind": "TERMINAL_OUTCOME",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "terminal outcome",
+        "source_object_ids": [],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [],
+      "required_input_contract_refs": [],
+      "required_tool_refs": [],
+      "role_relevance": "DETERMINISTIC_SERVICE",
+      "semantic_description": "terminal outcome",
+      "semantic_purpose": "terminal workflow outcome",
+      "source_policy_refs": []
+    },
+    {
+      "authority_disposition": "ADVISORY",
+      "canonical_capability_owner": "COMPILER",
+      "contract_version": "workflow_ir.v2",
+      "data_classification_refs": [],
+      "fingerprint": "sha256:28a8c657f46ae5a274003f84e5e0a229c93ff5b33393a6a7a80e725ac6bf0f12",
+      "governance_boundary_refs": [],
+      "human_authority_requirement": false,
+      "human_review_requirement": {
+        "authority_type": "",
+        "contract_version": "workflow_ir.v2",
+        "governance_owner": "",
+        "provenance": {
+          "compiler_rule": "human_review_classification",
+          "compiler_version": "0.2.0",
+          "contract_version": "workflow_ir.v2",
+          "derivation_class": "DETERMINISTIC_MAPPING",
+          "source_declaration": "threat_assessment",
+          "source_object_ids": [
+            "incident_evidence"
+          ],
+          "source_policy_id": "gs_security_infeasible",
+          "source_policy_version": 1,
+          "source_refs": []
+        },
+        "required": false,
+        "resolution": "DETERMINISTICALLY_INFERRED",
+        "review_kind": "none"
+      },
+      "node_id": "sec_threat_analysis",
+      "node_kind": "EVIDENCE_REQUIREMENT",
+      "optional_capability_refs": [],
+      "permission_intent_refs": [],
+      "produced_output_contract_refs": [
+        {
+          "consumer_node_ids": [
+            "sec_incident_correlation"
+          ],
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "threat_assessment",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "threat_assessment",
+              "source_object_ids": [
+                "incident_evidence"
+              ],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "provenance": {
+        "compiler_rule": "node_semantics_extraction",
+        "compiler_version": "0.2.0",
+        "contract_version": "workflow_ir.v2",
+        "derivation_class": "DETERMINISTIC_MAPPING",
+        "source_declaration": "threat_assessment",
+        "source_object_ids": [
+          "incident_evidence"
+        ],
+        "source_policy_id": "gs_security_infeasible",
+        "source_policy_version": 1,
+        "source_refs": []
+      },
+      "required_capability_refs": [
+        {
+          "authority_context": "ADVISORY",
+          "capability_id": "evidence_extraction",
+          "contract_version": "workflow_ir.v2",
+          "fingerprint": "sha256:a543e1bb492ed34c503e30846ebe48e90b847c8a04a9b6e40786aa8251050225",
+          "provenance": {
+            "compiler_rule": "node_kind_capability_mapping",
+            "compiler_version": "0.2.0",
+            "contract_version": "workflow_ir.v2",
+            "derivation_class": "DETERMINISTIC_MAPPING",
+            "source_declaration": "threat_assessment",
+            "source_object_ids": [
+              "incident_evidence"
+            ],
+            "source_policy_id": "gs_security_infeasible",
+            "source_policy_version": 1,
+            "source_refs": []
+          },
+          "requirement_level": "REQUIRED",
+          "resolution": "DETERMINISTICALLY_INFERRED",
+          "source": "NODE_KIND_MAPPING",
+          "source_ref": "EVIDENCE_REQUIREMENT"
+        }
+      ],
+      "required_input_contract_refs": [
+        {
+          "compatibility_requirement": "exact_or_unversioned",
+          "contract_ref": {
+            "contract_data_version": "",
+            "contract_id": "incident_evidence",
+            "contract_version": "workflow_ir.v2",
+            "data_classification_ref": "",
+            "provenance": {
+              "compiler_rule": "node_output_contract",
+              "compiler_version": "0.2.0",
+              "contract_version": "workflow_ir.v2",
+              "derivation_class": "DERIVED_FROM_CONTRACT",
+              "source_declaration": "incident_evidence",
+              "source_object_ids": [],
+              "source_policy_id": "gs_security_infeasible",
+              "source_policy_version": 1,
+              "source_refs": []
+            },
+            "resolution": "EXPLICITLY_DECLARED",
+            "schema_ref": ""
+          },
+          "contract_version": "workflow_ir.v2",
+          "producer_node_id": "sec_evidence_intake",
+          "resolution": "EXPLICITLY_DECLARED"
+        }
+      ],
+      "required_tool_refs": [],
+      "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+      "semantic_description": "threat analysis",
+      "semantic_purpose": "collect and extract evidence for a governed decision",
+      "source_policy_refs": [
+        "incident_evidence"
+      ]
+    }
+  ],
+  "policy_pack_id": "gs_security_infeasible",
+  "policy_pack_version": 1,
+  "provenance_manifest": [
+    "gs_security_infeasible"
+  ],
+  "release_metadata": {
+    "synthetic": true
+  },
+  "semantic_features": [
+    {
+      "name": "role_semantics",
+      "present": true
+    },
+    {
+      "name": "typed_contract_refs",
+      "present": true
+    },
+    {
+      "name": "dependency_semantics",
+      "present": true
+    },
+    {
+      "name": "authority_semantics",
+      "present": true
+    },
+    {
+      "name": "human_review_semantics",
+      "present": true
+    },
+    {
+      "name": "policy_provenance",
+      "present": true
+    }
+  ],
+  "workflow_fingerprint": "sha256:d82e56551c5ff46752ab4612cacdd6c532b3c5959c564625aca2126f580cd1cf"
+}

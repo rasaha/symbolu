@@ -57,11 +57,14 @@ def test_no_execution_or_grant_surface_leaked():
 
 
 def test_version_and_contract():
-    # P2: distribution/product moved to 0.2.0; P1 contract awc.v1 preserved; the
-    # additive composition contract is awc.composition.v1.
-    assert pkg.__version__ == "0.2.0"
+    # P2.1: distribution/product moved to 0.2.1 (additive compiler workflow_ir.v2
+    # adapter); the frozen P1 planning contract awc.v1 and the additive P2
+    # composition contract awc.composition.v1 are BOTH unchanged.
+    assert pkg.__version__ == "0.2.1"
     assert pkg.CONTRACT_VERSION == "awc.v1"
     assert pkg.version_info().to_dict()["composition_contract_version"] == "awc.composition.v1"
+    # the compiler-adapter contract version is additive metadata, not a planning contract
+    assert pkg.version_info().to_dict()["compiler_adapter_contract_version"] == "awc.compiler_adapter.v2"
 
 
 def test_maturity_is_honest():

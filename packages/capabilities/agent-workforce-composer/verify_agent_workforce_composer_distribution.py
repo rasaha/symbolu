@@ -36,7 +36,7 @@ CLEAN_INSTALL_CHECK = r'''
 import sys, json
 import ugence_agent_workforce_composer as awc
 from ugence_agent_workforce_composer import api, fixtures
-assert awc.__version__ == "0.2.0", awc.__version__
+assert awc.__version__ == "0.2.1", awc.__version__
 assert awc.CONTRACT_VERSION == "awc.v1", awc.CONTRACT_VERSION
 assert api.COMPOSITION_CONTRACT_VERSION == "awc.composition.v1"
 assert "site-packages" in awc.__file__, awc.__file__
@@ -68,6 +68,48 @@ for fp in plan.role_fallback_plans:
 # security workflow: typed NO_FEASIBLE_TEAM (no silent empty success)
 _a, sec = fixtures.run_compose_demo("security")
 assert sec.plan_state.value == "NO_FEASIBLE_TEAM" and sec.role_assignments == ()
+
+# --- P2.1: compiler workflow_ir.v2 compatibility adapter (self-contained) ---
+import ugence_agent_workforce_composer.adapter_v2 as a2
+from ugence_agent_workforce_composer.compatibility import adapt_workflow
+_node = {"node_id": "n_ev", "kind": "EVIDENCE_REQUIREMENT", "owning_capability": "COMPILER",
+         "authority_type": "", "disposition": "ADVISORY", "public_contract_target": "",
+         "input_object_ids": [], "output_contract": "evidence", "failure_behavior": "BLOCK",
+         "audit_requirements": [], "label": "collect evidence"}
+_term = {"node_id": "n_term", "kind": "TERMINAL_OUTCOME", "owning_capability": "COMPILER",
+         "authority_type": "", "disposition": "ADVISORY", "public_contract_target": "",
+         "input_object_ids": [], "output_contract": "", "failure_behavior": "BLOCK",
+         "audit_requirements": [], "label": "terminal"}
+_v2doc = {"ir_version": "workflow_ir.v2", "contract_version": "workflow_ir.v2",
+          "policy_pack_id": "iso.v2", "policy_pack_version": 1, "base_ir_digest": "sha256:0",
+          "base_ir": {"ir_version": "workflow_ir.v1", "policy_pack_id": "iso.v2",
+                      "policy_pack_version": 1, "nodes": [_node, _term], "edges": [],
+                      "referenced_capabilities": ["COMPILER"]},
+          "node_semantics": [{"node_id": "n_ev", "node_kind": "EVIDENCE_REQUIREMENT",
+              "semantic_purpose": "collect and extract evidence for a governed decision",
+              "semantic_description": "collect evidence", "role_relevance": "ADVISORY_AGENT_ELIGIBLE",
+              "required_capability_refs": [{"capability_id": "evidence_extraction",
+                  "source": "NODE_KIND_MAPPING", "provenance": {"compiler_rule": "node_kind_capability_mapping",
+                  "compiler_version": "0.2.0", "derivation_class": "DETERMINISTIC_MAPPING"}}],
+              "human_review_requirement": {"required": False, "review_kind": "none"},
+              "authority_disposition": "ADVISORY", "canonical_capability_owner": "COMPILER",
+              "provenance": {"compiler_rule": "node_semantics_extraction", "compiler_version": "0.2.0",
+                  "derivation_class": "DETERMINISTIC_MAPPING", "source_policy_id": "iso.v2"}}],
+          "dependency_semantics": [], "compiler_version": "0.2.0", "workflow_fingerprint": "sha256:0",
+          "release_metadata": {"synthetic": True}}
+_env = a2.adapt_compiled_workflow_v2(_v2doc, source_package_digest="sha256:iso")
+assert _env.ok and _env.adapter_mode == "V2_SEMANTIC"
+assert len(_env.adaptation_result.role_requirements) == 1
+_role = _env.adaptation_result.role_requirements[0]
+assert _role.role_name == "collect and extract evidence for a governed decision"
+assert "evidence_extraction" in _role.required_capabilities
+# explicit dispatch: v2 doc routes to the semantic adapter; unknown fails closed.
+assert adapt_workflow(_v2doc, source_package_digest="sha256:iso").adapter_mode == "V2_SEMANTIC"
+assert adapt_workflow({"ir_version": "workflow_ir.v9"}).ok is False
+# overlay reduction removes only compiler-emitted fields.
+_red, _rem = a2.reduce_overlay({"n_ev": {"role_name": "x", "required_capabilities": ["risk"]}})
+assert "role_name" in _rem["n_ev"] and "required_capabilities" in _red["n_ev"]
+print("V2_ADAPTER_OK")
 print("FP:" + plan.plan_fingerprint)
 '''
 
