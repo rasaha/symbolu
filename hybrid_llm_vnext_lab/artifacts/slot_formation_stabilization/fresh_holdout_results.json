@@ -1,0 +1,329 @@
+{
+  "stage": "B",
+  "fresh_seeds": [
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "seeds_uncontaminated": true,
+  "arms": {
+    "A+": {
+      "8": {
+        "seed": 8,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 144.21,
+          "512": 146.22
+        },
+        "ablation": {},
+        "train_s": 206.9
+      },
+      "9": {
+        "seed": 9,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 171.03,
+          "512": 176.87
+        },
+        "ablation": {},
+        "train_s": 218.1
+      },
+      "10": {
+        "seed": 10,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0417,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 128.14,
+          "512": 135.69
+        },
+        "ablation": {},
+        "train_s": 207.7
+      },
+      "11": {
+        "seed": 11,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 137.87,
+          "512": 143.52
+        },
+        "ablation": {},
+        "train_s": 221.8
+      },
+      "12": {
+        "seed": 12,
+        "params": 2000392,
+        "ff": 1378,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 141.84,
+          "512": 149.2
+        },
+        "ablation": {},
+        "train_s": 210.9
+      }
+    },
+    "B0": {
+      "8": {
+        "seed": 8,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.675,
+          "96": 0.6417,
+          "220": 0.5833
+        },
+        "ppl": {
+          "256": 125.93,
+          "512": 130.05
+        },
+        "ablation": {
+          "baseline": 0.6417,
+          "slots_off": 0.025,
+          "randomized_address": 0.0667,
+          "shuffle_values": 0.4667,
+          "write_gate_zero": 0.025,
+          "slot_keys_randomized": 0.1833
+        },
+        "train_s": 797.5
+      },
+      "9": {
+        "seed": 9,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.7833,
+          "96": 0.5833,
+          "220": 0.425
+        },
+        "ppl": {
+          "256": 114.36,
+          "512": 118.88
+        },
+        "ablation": {
+          "baseline": 0.5833,
+          "slots_off": 0.0,
+          "randomized_address": 0.0333,
+          "shuffle_values": 0.1167,
+          "write_gate_zero": 0.0,
+          "slot_keys_randomized": 0.0083
+        },
+        "train_s": 922.6
+      },
+      "10": {
+        "seed": 10,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.2667,
+          "96": 0.1833,
+          "220": 0.1417
+        },
+        "ppl": {
+          "256": 136.66,
+          "512": 142.04
+        },
+        "ablation": {
+          "baseline": 0.1833,
+          "slots_off": 0.0083,
+          "randomized_address": 0.0333,
+          "shuffle_values": 0.05,
+          "write_gate_zero": 0.0083,
+          "slot_keys_randomized": 0.1333
+        },
+        "train_s": 915.9
+      },
+      "11": {
+        "seed": 11,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.0083,
+          "96": 0.0,
+          "220": 0.0333
+        },
+        "ppl": {
+          "256": 127.42,
+          "512": 132.26
+        },
+        "ablation": {
+          "baseline": 0.0,
+          "slots_off": 0.0,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.0,
+          "slot_keys_randomized": 0.0
+        },
+        "train_s": 889.4
+      },
+      "12": {
+        "seed": 12,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.0333,
+          "96": 0.0333,
+          "220": 0.0333
+        },
+        "ppl": {
+          "256": 121.0,
+          "512": 125.93
+        },
+        "ablation": {
+          "baseline": 0.0333,
+          "slots_off": 0.0,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.0,
+          "slot_keys_randomized": 0.05
+        },
+        "train_s": 903.8
+      }
+    },
+    "CR1": {
+      "8": {
+        "seed": 8,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.9833,
+          "96": 0.9917,
+          "220": 1.0
+        },
+        "ppl": {
+          "256": 130.25,
+          "512": 133.87
+        },
+        "ablation": {
+          "baseline": 0.9917,
+          "slots_off": 0.0,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0083,
+          "write_gate_zero": 0.0,
+          "slot_keys_randomized": 0.8833
+        },
+        "train_s": 903.7
+      },
+      "9": {
+        "seed": 9,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.0,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 115.91,
+          "512": 121.36
+        },
+        "ablation": {
+          "baseline": 0.0,
+          "slots_off": 0.0083,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.0083,
+          "slot_keys_randomized": 0.1917
+        },
+        "train_s": 926.5
+      },
+      "10": {
+        "seed": 10,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 1.0,
+          "96": 0.9917,
+          "220": 1.0
+        },
+        "ppl": {
+          "256": 151.95,
+          "512": 157.27
+        },
+        "ablation": {
+          "baseline": 0.9917,
+          "slots_off": 0.0,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.1333,
+          "write_gate_zero": 0.0,
+          "slot_keys_randomized": 0.4917
+        },
+        "train_s": 864.5
+      },
+      "11": {
+        "seed": 11,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 1.0,
+          "96": 1.0,
+          "220": 1.0
+        },
+        "ppl": {
+          "256": 134.75,
+          "512": 140.41
+        },
+        "ablation": {
+          "baseline": 1.0,
+          "slots_off": 0.0167,
+          "randomized_address": 0.0,
+          "shuffle_values": 0.0,
+          "write_gate_zero": 0.0167,
+          "slot_keys_randomized": 0.6833
+        },
+        "train_s": 840.0
+      },
+      "12": {
+        "seed": 12,
+        "params": 2000104,
+        "ff": 1177,
+        "needle_by_dist": {
+          "16": 0.9667,
+          "96": 0.9667,
+          "220": 0.975
+        },
+        "ppl": {
+          "256": 149.86,
+          "512": 152.03
+        },
+        "ablation": {
+          "baseline": 0.9667,
+          "slots_off": 0.0083,
+          "randomized_address": 0.025,
+          "shuffle_values": 0.0333,
+          "write_gate_zero": 0.0083,
+          "slot_keys_randomized": 0.7833
+        },
+        "train_s": 839.8
+      }
+    }
+  }
+}

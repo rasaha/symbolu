@@ -39,12 +39,28 @@ almost no early learning signal — consistent with a `WEAK_EARLY_ROUTING_SIGNAL
 Family 1 (optimizer) and Family 3 (alignment/curriculum) are designed to test. (This is an
 init-structural reading, not a per-seed formation claim.)
 
-## Trajectories (populated from artifacts)
-_Per-arm, per-seed overlap / correct-slot-rank / entropy / gradient-norm / gate trajectories across
-the seven checkpoints, from `routing_diagnostics.json`. The central-question verdict (does overlap
-rise before needle@d96?) is reported per forming and per non-forming seed._
+## Trajectories (from `routing_diagnostics.json`)
 
-<!-- RESULTS:ROUTING_TRAJECTORIES -->
+**Central-question answer: yes — write-read overlap rises *before* needle@d96, and the alignment
+objective is what makes it rise.**
+
+- **Baseline B0 (slow, low-overlap formation):** e.g. fresh seed 9 overlap stays ≈ 0.15 throughout
+  while needle climbs slowly to 0.58 by step 900. Formation is gradual and the address overlap never
+  saturates — the slots form weakly.
+- **Alignment arms (R1/CR1) drive overlap to ≈ 1.0 within 60–120 steps**, and needle follows within
+  ~200 steps. This is the write→address→read loop being directly credited early, exactly the signal
+  that is ≈ 0 at init (overlap ≈ 1/32 = 0.031, slot-key & read-projection gradients ≈ 0).
+
+**The decisive C1-vs-CR1 contrast (development seeds):** both reach high needle, but only CR1's gain
+survives slots-off / randomized-address. Curriculum alone (C1) trains the multi-layer local-window
+pathway (its slots-off residual is 0.575 on s6); the alignment term forces the retrieval through the
+slots (CR1 slots-off ≈ 0). Overlap-before-needle is therefore necessary but **not sufficient** —
+causal collapse is the arbiter.
+
+**Fresh seed 9 (retention trajectory):** overlap and needle both peak (~1.0) at step 300 under the
+alignment scaffold, then **decay together** after λ→0 (step 600) and the curriculum handoff (step
+700): needle 1.0 → 0.62 → 0.10 → 0.00, overlap 1.0 → 0.63. The routing loop *formed and then
+unwound* — a post-scaffold retention failure, visible only because these trajectories were captured.
 
 ## Rule
 The mechanism is argued from these trajectories, **never** from aggregate slot utilization/entropy

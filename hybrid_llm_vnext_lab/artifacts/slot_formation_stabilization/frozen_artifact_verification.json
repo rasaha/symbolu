@@ -1,0 +1,14 @@
+{
+  "frozen_abc_json": {
+    "path": "experiments/phase_lc/results/abc.json",
+    "sha256_expected": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "sha256_actual": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "byte_identical": true
+  },
+  "five_seed_results_unchanged": true,
+  "five_seed_classification_unchanged": true,
+  "platform_freeze_manifest": {
+    "path": "platform/PLATFORM_FREEZE_V1.json",
+    "sha256": "700a8a793cbd693b162ebc4b6c00d321816e7b624dfc6e73571bb85d83b1ebc0"
+  }
+}

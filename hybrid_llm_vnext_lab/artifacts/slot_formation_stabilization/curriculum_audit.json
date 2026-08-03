@@ -1,0 +1,18 @@
+{
+  "boundaries": [
+    300,
+    700,
+    1200
+  ],
+  "phase_1": "steps 1-300: needle-only at distance d16, single supervised position",
+  "phase_2": "steps 301-700: 70% needle (d16/d96), 30% binding k=2 (interference)",
+  "phase_3": "steps 701-1200: ORIGINAL ABC_MIX (frozen train_batch)",
+  "final_500_steps_original": true,
+  "example_count": "16 per step x 1200 steps = 19200, identical to baseline",
+  "tokenizer_corpus_unchanged": {
+    "vocab": 1291,
+    "corpus_tokens": 55547
+  },
+  "leakage_control": "supervised target is always only the answer position (mask at pos-1); value never adjacent to query beyond the designed distance.",
+  "C1_causal_finding": "C1 (curriculum alone) reaches 3/3 needle but FAILS the causal gate on seeds 6,7 (slots_off leaves 0.575/rand 0.90 on s6; rand 0.33 on s7) -> gain routed through the multi-layer local-window pathway, NOT slots. Adding alignment (CR1) restores clean causal collapse (slots_off ~0 on all seeds)."
+}

@@ -57,6 +57,7 @@
       "sys",
       "time",
       "stabilize",
+      "subprocess",
       "torch"
     ],
     "run_stage_b.py": [
@@ -68,6 +69,7 @@
       "sys",
       "time",
       "stabilize",
+      "subprocess",
       "torch"
     ],
     "classify_stage_a.py": [
