@@ -1,0 +1,21 @@
+{
+  "canonical_package": "ugence_ai_hiring",
+  "src_files_scanned": 211,
+  "import_edges": 1428,
+  "classification_summary": {
+    "STDLIB": 459,
+    "INTERNAL_RELATIVE": 770,
+    "UGENCE_PACKAGE_DEPENDENCY": 111,
+    "DECLARED_RUNTIME_DEPENDENCY": 40,
+    "DECLARED_OPTIONAL_DEPENDENCY": 7,
+    "INTERNAL_ABSOLUTE": 41
+  },
+  "external_roots": {
+    "fastapi": "DECLARED_OPTIONAL_DEPENDENCY",
+    "pydantic": "DECLARED_RUNTIME_DEPENDENCY",
+    "ugence_decision_authority": "UGENCE_PACKAGE_DEPENDENCY",
+    "ugence_governance_provider_framework": "UGENCE_PACKAGE_DEPENDENCY"
+  },
+  "forbidden_import_count": 0,
+  "unknown_third_party": []
+}

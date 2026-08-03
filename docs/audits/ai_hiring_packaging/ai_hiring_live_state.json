@@ -1,0 +1,47 @@
+{
+  "generated_for": "AI Hiring v0.6.0 independent distribution audit",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "b6fd6ca50721106958a732dbba88301c00e2fda3",
+  "working_branch": "claude/ai-hiring-independent-package-wsh3x3",
+  "working_tree_clean_at_start": true,
+  "python_version": "3.11.15",
+  "latest_merged_pr": {
+    "number": 1295,
+    "title": "research: incubate and reproduce bounded binding slots",
+    "merge_commit": "b6fd6ca50721106958a732dbba88301c00e2fda3"
+  },
+  "prerequisites_present_on_default_branch": {
+    "context_minimization": true,
+    "hybrid_llm_audit": true,
+    "bounded_slot_incubation": true
+  },
+  "existing_unmerged_ai_hiring_packaging_pr": null,
+  "product_version": "0.6.0",
+  "current_distribution": "bundled inside monolithic 'symbolu' (name=symbolu, version=0.1.0)",
+  "ai_hiring_package_dunder_version": "0.1.0",
+  "release_classification": "PACKAGE_READY_FOR_CONTROLLED_PILOT",
+  "production_certified": false,
+  "build_backend": "setuptools.build_meta",
+  "baseline_ai_hiring_tests": {
+    "collected": 778,
+    "passed": 778,
+    "command": "python -m pytest ai_hiring/tests"
+  },
+  "dependency_versions_observed": {
+    "pydantic": "2.13.4",
+    "ugence-decision-authority": "1.0.0",
+    "ugence-governance-provider-framework": "0.1.0",
+    "ugence-governance-contracts": "0.1.0"
+  },
+  "current_import_paths": [
+    "ai_hiring",
+    "domains.hiring",
+    "applications.ai_hiring"
+  ],
+  "platform_freeze_baseline": {
+    "result": "PASS",
+    "substantive_digest": "d4ad77e16516e0db6bf2faf3275c8ac8351644e7561d33f157bb55b5a174a1a6"
+  },
+  "ci_state_observed_at_start": "no active ai-hiring packaging workflow present",
+  "known_baseline_failures": []
+}

@@ -1,0 +1,84 @@
+# Independent distribution for the Ugence AI Hiring product.
+#
+# AI Hiring is an AI-assisted hiring *governance* product. This wheel ships the
+# product's own deterministic behavior and neutral ports ONLY: canonical
+# contracts, evidence normalization, deterministic search, capability ontology,
+# rubric contracts, a deterministic assessment runtime, decision cases, advisory
+# recommendations, human decisions, governed action-request preparation, neutral
+# authorization ports, in-memory repositories, audit records, and product
+# verification. It ships NO AI scoring model, ranking/fairness model, LLM
+# inference, or production HRIS/ATS/offer/payroll adapter, and makes no
+# production, scale, fairness, or legal-compliance claim.
+#
+# Build:  python -m build packages/products/ai-hiring
+# Verify: python -m ugence_ai_hiring verify
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-ai-hiring"
+dynamic = ["version"]
+description = "Ugence AI Hiring — an AI-assisted hiring governance product enforcing an advisory-AI / human-binding-decision boundary. Deterministic, offline; not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["hiring", "governance", "decision", "ai", "advisory", "ugence"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Minimal core: the product's own behavior (pydantic contracts) plus the neutral
+# governance kernel and provider framework it composes. NO model SDK, NO web
+# framework, NO database driver, NO cloud client. NumPy is deliberately NOT a
+# dependency: no AI Hiring code path imports it.
+dependencies = [
+    "pydantic>=2",
+    "ugence-decision-authority>=1.0.0",
+    "ugence-governance-provider-framework>=0.1.0",
+    "ugence-governance-contracts>=0.1.0",
+]
+
+[project.optional-dependencies]
+# Each extra maps to code that actually exists. Extras that would require a
+# concrete production adapter not shipped here are intentionally NOT defined.
+api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+all = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+
+[project.scripts]
+ugence-ai-hiring = "ugence_ai_hiring.product.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/products/ai-hiring/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_ai_hiring.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+# ``ugence_ai_hiring`` is the canonical implementation; ``ai_hiring`` is the
+# logic-free compatibility facade (re-exports the canonical objects). Both ship
+# in the wheel so a clean-environment ``import ai_hiring`` keeps working.
+include = ["ugence_ai_hiring*", "ai_hiring"]
+
+[tool.setuptools.package-data]
+ugence_ai_hiring = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
