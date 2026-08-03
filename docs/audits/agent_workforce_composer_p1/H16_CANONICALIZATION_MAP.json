@@ -1,0 +1,30 @@
+{
+  "adr": "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md",
+  "decision": "OPTION_A_CANONICALIZE_INTO_AWC",
+  "h16_source": ["agentic/agentic_framework/coordination.py", "agentic/agentic_framework/multi_agent.py"],
+  "p1_modifies_h16": false,
+  "p1_adds_h16_facade": false,
+  "dispositions": {
+    "CANONICALIZE_INTO_AWC": ["AgentProfile"],
+    "ADAPT_TO_AWC": ["CapabilityRegistry", "CoordinationGoal", "DelegationContract", "AuthorityModel"],
+    "COMPATIBILITY_FACADE_CANDIDATE_DEFERRED": ["AgentProfile"],
+    "REFERENCE_ONLY": ["RejectionReason", "Mission", "AuthorityDecision", "CoordinationTraceEntry"],
+    "REMAIN_IN_H16": ["Coordinator", "AgentAssignment(runtime)", "GoalOwnershipLedger",
+      "CoordinationTrace", "AgentRegistry", "KeywordRouter", "LLMRouter", "MultiAgentOrchestrator"],
+    "OUT_OF_SCOPE": ["ScriptedWorker"]
+  },
+  "p1_realization": {
+    "AgentProfile": "distinct canonical evidence-backed type in ugence_agent_workforce_composer.agents (NOT a re-export)",
+    "CoordinationGoal": "realized as WorkflowRoleRequirement derived from WorkflowIR",
+    "CapabilityRegistry": "split: AgentRegistrySnapshot (data) + eligibility engine",
+    "AuthorityModel": "hard-constraint eligibility only; runtime authorize() stays in H16"
+  },
+  "agentprofile_field_diff": {
+    "h16_fields": ["agent_id","role","capabilities:FrozenSet[str]","permissions:FrozenSet[str]",
+      "owned_tools:FrozenSet[str]","supported_goals:FrozenSet[str]","execution_limits","trust_level:int"],
+    "awc_adds": ["agent_version","provider_id","status","declared/measured/observed capabilities",
+      "evidence pointers","validity window","profile_fingerprint","provenance","content-addressing"],
+    "re_export_viable": false,
+    "reason": "field sets diverge; identity re-export impossible; facade deferred to P4"
+  }
+}

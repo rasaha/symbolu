@@ -1,0 +1,87 @@
+# Independent distribution for the Ugence Agent Workforce Composer capability (P1).
+#
+# The Agent Workforce Composer is a deterministic, OFFLINE planning capability. It
+# is not a human-hiring product and not a runtime. P1 implements exactly: the
+# canonical planning object model; a read-only, DATA-ONLY adapter over the Policy
+# Workflow Compiler's serialized ``workflow_ir.v1``; workflow-node disposition and
+# role-requirement extraction; immutable agent profiles and frozen registry
+# snapshots; evidence-backed hard-constraint eligibility; total elimination
+# accounting; deterministic explanation and replay; a small offline CLI.
+#
+# It implements NO ranking, scoring, winner selection, team composition, permission
+# assignment, fallback selection, runtime handoff, H16 migration, Agent Runtime /
+# H22 adapter, Model Selection invocation, live registration, or agent execution.
+#
+# Dependency policy: Python standard library + pydantic ONLY (consistent with the
+# upstream Policy Workflow Compiler capability). AWC is a LEAF capability. It must
+# NOT depend on agentic.agentic_framework (H16), Agent Runtime, H22, Model
+# Selection, AI Hiring, Procurement, ActionGate, Action Clearance, StoryGraph, the
+# control plane, or any provider/benchmark harness. The compiler seam is data-only,
+# so ``ugence-policy-workflow-compiler`` is an OPTIONAL reference dependency, never
+# a core one — AWC builds, installs and imports outside the monorepo.
+#
+# Build:  python -m build packages/capabilities/agent-workforce-composer
+# Verify: python packages/capabilities/agent-workforce-composer/verify_agent_workforce_composer_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-workforce-composer"
+dynamic = ["version"]
+description = "Ugence Agent Workforce Composer — deterministic, offline workflow-role adaptation and hard-constraint agent eligibility (P1). No ranking, team composition, runtime, or execution. Not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["agent", "workforce", "eligibility", "planning", "governance", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Minimal core: only pydantic. The compiler seam is DATA-ONLY (serialized
+# workflow_ir.v1), so no governance runtime, no model SDK, no web framework, no
+# database driver, and no cloud/ERP SDK is a core dependency.
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+# The compiler-reference harness feeds a REAL compiled package's serialized IR
+# through the adapter. It is the ONLY optional integration and is never required
+# for the core adapter, eligibility engine, or the offline demos.
+compiler-reference = ["ugence-policy-workflow-compiler>=0.1.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.scripts]
+ugence-agent-workforce-composer = "ugence_agent_workforce_composer.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/capabilities/agent-workforce-composer/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_workforce_composer.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_workforce_composer*"]
+
+[tool.setuptools.package-data]
+ugence_agent_workforce_composer = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
