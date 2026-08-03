@@ -1,0 +1,27 @@
+{
+  "schema": "slot_formation_stabilization_selection_rule/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED before any training. Frozen. Applied mechanically by select_candidate.py; NO manual override.",
+
+  "step_1_eligibility": "Keep only Stage A arms that satisfy EVERY criterion in ACCEPTANCE_GATES.json:stage_a_arm_eligibility (e1..e8). B0 is a control and is NOT eligible for selection.",
+
+  "step_2_rank_eligible_arms_by": [
+    {"k1": "highest number of diagnostic seeds formed (of 3)"},
+    {"k2": "highest count of rescued historical non-formers (seed 3 and/or seed 7)"},
+    {"k3": "highest MINIMUM per-seed (S - A+) d96 margin across the 3 diagnostic seeds"},
+    {"k4": "highest MEDIAN (S - A+) d96 margin across the 3 diagnostic seeds"},
+    {"k5": "lowest mean PPL@256"},
+    {"k6": "simplest intervention by the fixed simplicity order below"}
+  ],
+
+  "simplicity_order": ["O1", "O2", "K1", "C1", "R1", "CR1"],
+  "simplicity_note": "O1/O2 are ranked as the simplest family (single optimizer schedule change). Within O1 vs O2, apply k1..k5 first; only if still tied use this order (O1 before O2).",
+
+  "step_3_tie_break": "If two eligible arms tie through k1..k6 (including simplicity), select the LEXICOGRAPHICALLY FIRST arm ID and document the tie in the selection trace.",
+
+  "step_4_no_candidate": "If NO Stage A arm is eligible, do NOT run Stage B and classify NO_STABILIZATION_CANDIDATE.",
+
+  "step_5_single_candidate": "Select AT MOST ONE primary intervention candidate. Freeze its full config + hashes into SELECTED_CANDIDATE.json, commit and push BEFORE any fresh Stage B training, then re-run verify_preregistration.py.",
+
+  "combination_prohibition": "This phase selects exactly one arm. It does NOT combine the optimizer winner with K1, and does NOT combine Family 1 or Family 2 with the scaffold winner. Combinations are a later phase, only after individual effects are known."
+}
