@@ -1,0 +1,221 @@
+name: agent-workforce-composer-p1-ci
+
+# Scoped CI for the independent ugence-agent-workforce-composer capability (P1).
+# Runs the package suite, the compiler-adapter fidelity suite, the eligibility +
+# evidence suite, the import-boundary suite, the public-API frozen-artifact check,
+# the clean-install isolated-distribution verifier (wheel/sdist, out-of-root import,
+# CLI, cross-process determinism, reproducibility), determinism/replay, architecture
+# assertions, a stale-terminology scan, and platform-freeze verification (blocking).
+# No network runs, no live agents, no secrets, no model APIs. Path-scoped triggers.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p1-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/agent-workforce-composer-p1-**"
+      - "chatgpt/awc-p1-**"
+    paths:
+      - "packages/capabilities/agent-workforce-composer/**"
+      - ".github/workflows/agent-workforce-composer-p1-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PKG: packages/capabilities/agent-workforce-composer
+  SRC: packages/capabilities/agent-workforce-composer/src
+
+jobs:
+  package-suite:
+    name: Package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - name: Full test suite
+        env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: python -m pytest ${{ env.PKG }}/tests -q
+      - name: Version / maturity metadata is honest
+        env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: |
+          python -m ugence_agent_workforce_composer.cli version
+          python - <<'PY'
+          import ugence_agent_workforce_composer as u
+          assert u.__version__ == "0.1.0" and u.CONTRACT_VERSION == "awc.v1"
+          i = u.version_info().to_dict()
+          for k in ("canonical_object_model_implemented","compiler_adapter_implemented",
+                    "hard_constraint_eligibility_implemented","deterministic_replay_verified"):
+              assert i[k] is True, k
+          for k in ("agent_ranking_implemented","team_composition_implemented",
+                    "permission_assignment_implemented","runtime_handoff_implemented",
+                    "h16_migration_implemented","live_registry_implemented",
+                    "pilot_validated","production_certified"):
+              assert i[k] is False, k
+          print("maturity honest")
+          PY
+
+  compiler-adapter-suite:
+    name: Compiler-adapter fidelity (vs live WorkflowIR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+          pip install -e packages/products/procurement || true
+          pip install -e packages/tooling/policy-workflow-compiler
+      - name: Adapter + compiler-reference tests
+        env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: python -m pytest ${{ env.PKG }}/tests/test_adapter.py ${{ env.PKG }}/tests/test_compiler_reference.py ${{ env.PKG }}/tests/test_examples.py -q
+
+  eligibility-and-evidence-suite:
+    name: Eligibility + evidence suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: python -m pytest ${{ env.PKG }}/tests/test_eligibility.py ${{ env.PKG }}/tests/test_evidence.py ${{ env.PKG }}/tests/test_objects.py -q
+
+  import-boundary-suite:
+    name: Import-boundary integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: python -m pytest ${{ env.PKG }}/tests/test_boundaries.py -q
+
+  public-api-freeze:
+    name: Public-API frozen artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - name: Snapshot is in sync with the frozen artifact
+        env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: |
+          python ${{ env.PKG }}/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/capabilities/agent-workforce-composer/artifacts/public_api.json"))
+          assert live == frozen, "public API drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+
+  isolated-distribution:
+    name: Clean-install verifier, wheel/sdist, CLI, reproducibility
+    runs-on: ubuntu-latest
+    # NOTE: intentionally no PYTHONPATH — the verifier resolves the installed wheel.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install build
+      - run: python ${{ env.PKG }}/verify_agent_workforce_composer_distribution.py
+
+  determinism-replay:
+    name: Determinism + replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pytest pydantic
+      - env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: python -m pytest ${{ env.PKG }}/tests/test_determinism.py ${{ env.PKG }}/tests/test_cli.py -q
+
+  architecture-assertions:
+    name: Architecture assertions (boundaries + no ranking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip && pip install pydantic
+      - name: No ranking/team/permission surface; leaf boundary holds
+        env:
+          PYTHONPATH: ${{ env.SRC }}
+        run: |
+          python - <<'PY'
+          import ugence_agent_workforce_composer.api as api
+          banned = {"rank_agents","score_agents","compose_team","select_agent",
+                    "AgentTeamPlan","PolicyWeights","assign_permissions"}
+          assert not (banned & set(api.__all__)), banned & set(api.__all__)
+          # every eligibility result is score-free
+          from ugence_agent_workforce_composer import fixtures
+          _, res = fixtures.run_demo("procurement")
+          for rep in res.reports:
+              for r in rep.results:
+                  assert not ({"score","rank","winner","recommended","selected"} & set(r.model_dump()))
+          print("architecture assertions OK")
+          PY
+
+  terminology:
+    name: Stale-terminology scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No premature maturity claims in package docs
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          pkg = pathlib.Path("packages/capabilities/agent-workforce-composer")
+          bad = re.compile(r"\b(production[- ]ready|pilot[- ]validated|production[- ]certified)\b", re.I)
+          hist = re.compile(r"(false|not |never|no |=false|is False)", re.I)
+          offenders = []
+          for md in list(pkg.glob("*.md")) + list((pkg/'docs').glob("*.md")):
+              for i, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
+                  if bad.search(line) and not hist.search(line):
+                      offenders.append(f"{md}:{i}: {line.strip()}")
+          if offenders:
+              print("Stale maturity claims:"); [print("  -", o) for o in offenders]; sys.exit(1)
+          print("terminology OK")
+          PY
+
+  platform-freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip && pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
