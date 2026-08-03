@@ -1,6 +1,155 @@
 {
-  "count": 93,
+  "count": 109,
   "fingerprints": {
+    "AdaptationEquivalenceReport": {
+      "kind": "class",
+      "members": [
+        "canonical_dict",
+        "construct",
+        "content_digest",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "AdaptationEquivalenceState": {
+      "kind": "enum",
+      "members": [
+        "BYTE_IDENTICAL",
+        "INCOMPATIBLE",
+        "INTENTIONALLY_DIFFERENT",
+        "SEMANTICALLY_EQUIVALENT"
+      ],
+      "values": [
+        "BYTE_IDENTICAL",
+        "INCOMPATIBLE",
+        "INTENTIONALLY_DIFFERENT",
+        "SEMANTICALLY_EQUIVALENT"
+      ]
+    },
+    "AdaptationResultV2": {
+      "kind": "class",
+      "members": [
+        "canonical_dict",
+        "construct",
+        "content_digest",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "AdapterDiagnostic": {
+      "kind": "class",
+      "members": [
+        "canonical_dict",
+        "construct",
+        "content_digest",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "AdapterDiagnosticCode": {
+      "kind": "enum",
+      "members": [
+        "INVALID_OVERLAY_FIELD",
+        "MALFORMED_V2_DOCUMENT",
+        "OVERLAY_BROADENS_AUTHORITY",
+        "OVERLAY_CAPABILITY_CONFLICT",
+        "OVERLAY_CONFLICTS_WITH_COMPILER_SEMANTICS",
+        "OVERLAY_CONTRACT_MISMATCH",
+        "OVERLAY_PROVENANCE_CONFLICT",
+        "OVERLAY_REMOVES_GOVERNANCE_BOUNDARY",
+        "OVERLAY_REMOVES_HUMAN_REVIEW",
+        "UNRESOLVED_COMPILER_SEMANTICS",
+        "UNSUPPORTED_COMPILER_CONTRACT"
+      ],
+      "values": [
+        "INVALID_OVERLAY_FIELD",
+        "MALFORMED_V2_DOCUMENT",
+        "OVERLAY_BROADENS_AUTHORITY",
+        "OVERLAY_CAPABILITY_CONFLICT",
+        "OVERLAY_CONFLICTS_WITH_COMPILER_SEMANTICS",
+        "OVERLAY_CONTRACT_MISMATCH",
+        "OVERLAY_PROVENANCE_CONFLICT",
+        "OVERLAY_REMOVES_GOVERNANCE_BOUNDARY",
+        "OVERLAY_REMOVES_HUMAN_REVIEW",
+        "UNRESOLVED_COMPILER_SEMANTICS",
+        "UNSUPPORTED_COMPILER_CONTRACT"
+      ]
+    },
     "AgentCapability": {
       "kind": "class",
       "members": [
@@ -437,6 +586,10 @@
         "AUTHORITATIVE"
       ]
     },
+    "COMPILER_ADAPTER_CONTRACT_VERSION": {
+      "kind": "constant",
+      "type": "str"
+    },
     "COMPOSITION_CONTRACT_VERSION": {
       "kind": "constant",
       "type": "str"
@@ -542,6 +695,28 @@
         "schema_json",
         "update_forward_refs",
         "validate"
+      ]
+    },
+    "CompilerAdapterMode": {
+      "kind": "enum",
+      "members": [
+        "V1_FROZEN",
+        "V2_SEMANTIC"
+      ],
+      "values": [
+        "V1_FROZEN",
+        "V2_SEMANTIC"
+      ]
+    },
+    "CompilerContractVersion": {
+      "kind": "enum",
+      "members": [
+        "V1",
+        "V2"
+      ],
+      "values": [
+        "workflow_ir.v1",
+        "workflow_ir.v2"
       ]
     },
     "CompilerWorkflowAdapter": {
@@ -862,6 +1037,41 @@
       ]
     },
     "EnterpriseAgentPolicy": {
+      "kind": "class",
+      "members": [
+        "canonical_dict",
+        "construct",
+        "content_digest",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "EquivalenceDifference": {
       "kind": "class",
       "members": [
         "canonical_dict",
@@ -1621,6 +1831,10 @@
         "validate"
       ]
     },
+    "SUPPORTED_COMPILER_CONTRACTS": {
+      "kind": "object",
+      "type": "tuple"
+    },
     "SearchStatistics": {
       "kind": "class",
       "members": [
@@ -2022,6 +2236,23 @@
         "role_overlay"
       ]
     },
+    "adapt_compiled_workflow_v2": {
+      "kind": "function",
+      "parameters": [
+        "document",
+        "source_package_digest",
+        "role_overlay"
+      ]
+    },
+    "adapt_workflow": {
+      "kind": "function",
+      "parameters": [
+        "document",
+        "contract_version",
+        "source_package_digest",
+        "role_overlay"
+      ]
+    },
     "build_agent_team_plan": {
       "kind": "function",
       "parameters": [
@@ -2093,11 +2324,25 @@
         "authority_type"
       ]
     },
+    "compare_adaptations": {
+      "kind": "function",
+      "parameters": [
+        "v1_env",
+        "v2_env"
+      ]
+    },
     "compare_agent_team_plans": {
       "kind": "function",
       "parameters": [
         "a",
         "b"
+      ]
+    },
+    "compare_workforce_plans": {
+      "kind": "function",
+      "parameters": [
+        "v1_plan",
+        "v2_plan"
       ]
     },
     "compose_agent_team": {
@@ -2113,6 +2358,12 @@
         "eligibility_policy_digest",
         "ranking_policy_digest",
         "workflow_fingerprint"
+      ]
+    },
+    "declared_contract_version": {
+      "kind": "function",
+      "parameters": [
+        "document"
       ]
     },
     "evaluate_agent_eligibility": {
@@ -2206,6 +2457,12 @@
         "logical_time"
       ]
     },
+    "reduce_overlay": {
+      "kind": "function",
+      "parameters": [
+        "full_overlay"
+      ]
+    },
     "replay_agent_team_plan": {
       "kind": "function",
       "parameters": [
@@ -2228,6 +2485,11 @@
   },
   "module": "ugence_agent_workforce_composer.api",
   "public_names": [
+    "AdaptationEquivalenceReport",
+    "AdaptationEquivalenceState",
+    "AdaptationResultV2",
+    "AdapterDiagnostic",
+    "AdapterDiagnosticCode",
     "AgentCapability",
     "AgentCapabilityEvidence",
     "AgentEligibilityResult",
@@ -2242,11 +2504,14 @@
     "AgentTeamPlanState",
     "AuthorityContext",
     "AuthorityDisposition",
+    "COMPILER_ADAPTER_CONTRACT_VERSION",
     "COMPOSITION_CONTRACT_VERSION",
     "CONTRACT_VERSION",
     "CapabilityEvidenceSet",
     "CapabilityOwner",
     "CompilerAdaptationResult",
+    "CompilerAdapterMode",
+    "CompilerContractVersion",
     "CompilerWorkflowAdapter",
     "CompositionReplayRecord",
     "CompositionState",
@@ -2259,6 +2524,7 @@
     "EligibilityState",
     "EliminationReason",
     "EnterpriseAgentPolicy",
+    "EquivalenceDifference",
     "EvidenceClass",
     "FailureDomain",
     "FailureDomainSet",
@@ -2282,6 +2548,7 @@
     "RoleEligibilityReport",
     "RoleFallbackPlan",
     "RoleInterfaceRequirement",
+    "SUPPORTED_COMPILER_CONTRACTS",
     "SearchStatistics",
     "SelectionState",
     "TeamCompositionPolicy",
@@ -2298,6 +2565,8 @@
     "WorkflowRoleRequirement",
     "__version__",
     "adapt_compiled_workflow",
+    "adapt_compiled_workflow_v2",
+    "adapt_workflow",
     "build_agent_team_plan",
     "build_failure_domain_set",
     "build_fallback_plan",
@@ -2306,8 +2575,11 @@
     "build_replay_record",
     "build_role_dependency_graph",
     "classify_node",
+    "compare_adaptations",
     "compare_agent_team_plans",
+    "compare_workforce_plans",
     "compose_agent_team",
+    "declared_contract_version",
     "evaluate_agent_eligibility",
     "evaluate_registry_for_role",
     "evaluate_workflow_eligibility",
@@ -2319,6 +2591,7 @@
     "propose_permission_bound",
     "rank_eligible_candidates",
     "rank_workflow_candidates",
+    "reduce_overlay",
     "replay_agent_team_plan",
     "version_info"
   ]

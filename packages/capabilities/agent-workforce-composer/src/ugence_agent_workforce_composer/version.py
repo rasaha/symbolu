@@ -20,12 +20,15 @@ import importlib.metadata as _md
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-__version__ = "0.2.0"
+# P2.1 adds the additive Policy Workflow Compiler workflow_ir.v2 compatibility
+# adapter (a minor feature over P2); the awc.v1 / awc.composition.v1 planning
+# contracts are UNCHANGED and v1 adaptation stays byte-frozen.
+__version__ = "0.2.1"
 
-DISTRIBUTION_VERSION = "0.2.0"
+DISTRIBUTION_VERSION = "0.2.1"
 DISTRIBUTION_NAME = "ugence-agent-workforce-composer"
 PRODUCT_NAME = "Ugence Agent Workforce Composer"
-PRODUCT_VERSION = "0.2.0"
+PRODUCT_VERSION = "0.2.1"
 CANONICAL_NAMESPACE = "ugence_agent_workforce_composer"
 
 #: The frozen P1 planning-contract version, stamped on P1 canonical objects and
@@ -38,8 +41,16 @@ COMPOSITION_CONTRACT_VERSION = "awc.composition.v1"
 
 VERSION = __version__
 
-#: Compiler workflow-IR contract version this build's adapter consumes.
+#: Compiler workflow-IR contract version the FROZEN v1 adapter consumes.
 SUPPORTED_IR_VERSIONS = ("workflow_ir.v1",)
+
+#: Every compiler workflow-IR contract this build can adapt (v1 via the frozen
+#: path, v2 via the semantic compatibility adapter).
+SUPPORTED_COMPILER_CONTRACTS = ("workflow_ir.v1", "workflow_ir.v2")
+
+#: The adapter's own contract version — adaptation metadata only, NOT part of the
+#: frozen awc.v1 / awc.composition.v1 planning contracts.
+COMPILER_ADAPTER_CONTRACT_VERSION = "awc.compiler_adapter.v2"
 
 _TRACKED_DEPENDENCIES = ("pydantic",)
 
@@ -91,7 +102,17 @@ class VersionInfo:
     permission_bound_proposal_implemented: bool
     fallback_planning_implemented: bool
     agent_team_plan_implemented: bool
+    # -- implemented in P2.1 (compiler v2 compatibility adapter) --
+    compiler_workflow_ir_v1_supported: bool
+    compiler_workflow_ir_v2_supported: bool
+    compiler_v2_adapter_implemented: bool
+    overlay_reduction_implemented: bool
+    v1_fingerprint_compatibility_verified: bool
+    v1_v2_equivalence_harness_implemented: bool
+    compiler_adapter_contract_version: str
+    supported_compiler_contracts: tuple
     # -- explicitly NOT implemented --
+    governance_studio_api_implemented: bool
     permission_assignment_implemented: bool
     permission_granting_implemented: bool
     runtime_handoff_implemented: bool
@@ -127,6 +148,15 @@ class VersionInfo:
             "permission_bound_proposal_implemented": self.permission_bound_proposal_implemented,
             "fallback_planning_implemented": self.fallback_planning_implemented,
             "agent_team_plan_implemented": self.agent_team_plan_implemented,
+            "compiler_workflow_ir_v1_supported": self.compiler_workflow_ir_v1_supported,
+            "compiler_workflow_ir_v2_supported": self.compiler_workflow_ir_v2_supported,
+            "compiler_v2_adapter_implemented": self.compiler_v2_adapter_implemented,
+            "overlay_reduction_implemented": self.overlay_reduction_implemented,
+            "v1_fingerprint_compatibility_verified": self.v1_fingerprint_compatibility_verified,
+            "v1_v2_equivalence_harness_implemented": self.v1_v2_equivalence_harness_implemented,
+            "compiler_adapter_contract_version": self.compiler_adapter_contract_version,
+            "supported_compiler_contracts": list(self.supported_compiler_contracts),
+            "governance_studio_api_implemented": self.governance_studio_api_implemented,
             "permission_assignment_implemented": self.permission_assignment_implemented,
             "permission_granting_implemented": self.permission_granting_implemented,
             "runtime_handoff_implemented": self.runtime_handoff_implemented,
@@ -175,7 +205,17 @@ def version_info() -> VersionInfo:
         permission_bound_proposal_implemented=True,
         fallback_planning_implemented=True,
         agent_team_plan_implemented=True,
+        # -- implemented in P2.1 --
+        compiler_workflow_ir_v1_supported=True,
+        compiler_workflow_ir_v2_supported=True,
+        compiler_v2_adapter_implemented=True,
+        overlay_reduction_implemented=True,
+        v1_fingerprint_compatibility_verified=True,
+        v1_v2_equivalence_harness_implemented=True,
+        compiler_adapter_contract_version=COMPILER_ADAPTER_CONTRACT_VERSION,
+        supported_compiler_contracts=SUPPORTED_COMPILER_CONTRACTS,
         # -- explicitly NOT implemented --
+        governance_studio_api_implemented=False,
         permission_assignment_implemented=False,
         permission_granting_implemented=False,
         runtime_handoff_implemented=False,
@@ -204,6 +244,8 @@ __all__ = [
     "CONTRACT_VERSION",
     "COMPOSITION_CONTRACT_VERSION",
     "SUPPORTED_IR_VERSIONS",
+    "SUPPORTED_COMPILER_CONTRACTS",
+    "COMPILER_ADAPTER_CONTRACT_VERSION",
     "VersionInfo",
     "version_info",
 ]

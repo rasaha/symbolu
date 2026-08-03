@@ -1,0 +1,32 @@
+{
+  "capability_matching": "exact_id",
+  "contract_version": "awc.v1",
+  "evaluation_order": [
+    "input_integrity",
+    "pinned_versions",
+    "agent_status_and_version",
+    "capability_presence",
+    "capability_evidence",
+    "input_output_contract",
+    "tools",
+    "provider",
+    "residency_deployment",
+    "security_audit",
+    "permissions",
+    "authority_ceiling",
+    "hard_limits"
+  ],
+  "evidence_precedence": [
+    "OBSERVED",
+    "MEASURED",
+    "DECLARED"
+  ],
+  "expired_evidence_fail_closed": true,
+  "policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "policy_id": "gs_eligibility_policy",
+  "policy_version": "1.0",
+  "require_measured_or_observed_for_hard": true,
+  "schema_compatibility": "exact_or_declared_subset",
+  "short_circuit": false,
+  "unknown_evidence_fail_closed": true
+}
