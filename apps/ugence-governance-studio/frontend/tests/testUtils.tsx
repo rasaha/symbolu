@@ -17,15 +17,26 @@ import cyberWorkflow from "./fixtures/cybersecurity_no_feasible_team.workflow.js
 import cyberRegistry from "./fixtures/cybersecurity_no_feasible_team.registry.json";
 import cyberEligibility from "./fixtures/cybersecurity_no_feasible_team.eligibility.json";
 import cyberExplain from "./fixtures/cybersecurity_no_feasible_team.explain.json";
+import procRanking from "./fixtures/procurement.ranking.json";
+import procPlan from "./fixtures/procurement.plan.json";
+import procExplainPlan from "./fixtures/procurement.explainplan.json";
+import procReplay from "./fixtures/procurement.replay.json";
+import procWhatIf from "./fixtures/procurement.whatif.json";
+import procCompare from "./fixtures/procurement.compare.json";
+import cyberPlan from "./fixtures/cybersecurity_no_feasible_team.plan.json";
+import cyberReplay from "./fixtures/cybersecurity_no_feasible_team.replay.json";
 
 const RESULT: Record<string, unknown> = {
   "/api/v1/scenarios": scenarios,
   "/api/v1/scenarios/procurement": procDetail,
   "/api/v1/scenarios/procurement/workflow": procWorkflow,
   "/api/v1/scenarios/procurement/registry": procRegistry,
+  "/api/v1/scenarios/procurement/ranking": procRanking,
+  "/api/v1/scenarios/procurement/plan": procPlan,
   "/api/v1/scenarios/cybersecurity_no_feasible_team": cyberDetail,
   "/api/v1/scenarios/cybersecurity_no_feasible_team/workflow": cyberWorkflow,
   "/api/v1/scenarios/cybersecurity_no_feasible_team/registry": cyberRegistry,
+  "/api/v1/scenarios/cybersecurity_no_feasible_team/plan": cyberPlan,
 };
 
 function envelope(result: unknown) {
@@ -70,6 +81,18 @@ export function installFetchMock(opts: FetchMockOptions = {}) {
     }
     if (path === "/api/v1/scenarios/procurement/eligibility") return jsonResponse(envelope(procEligibility));
     if (path === "/api/v1/scenarios/cybersecurity_no_feasible_team/eligibility") return jsonResponse(envelope(cyberEligibility));
+    if (path === "/api/v1/explanations/plan") return jsonResponse(envelope(procExplainPlan));
+    if (path === "/api/v1/plans/replay") {
+      let sid = "procurement";
+      try {
+        sid = JSON.parse(String(init?.body ?? "{}")).scenario_id ?? "procurement";
+      } catch {
+        /* default */
+      }
+      return jsonResponse(envelope(sid === "cybersecurity_no_feasible_team" ? cyberReplay : procReplay));
+    }
+    if (path === "/api/v1/plans/compare") return jsonResponse(envelope(procCompare));
+    if (path.endsWith("/what-if")) return jsonResponse(envelope(procWhatIf));
     if (path === "/api/v1/explanations/eligibility") {
       let scenarioId = "procurement";
       try {
@@ -104,4 +127,11 @@ export const fixtures = {
   procEligibility,
   procExplain,
   cyberEligibility,
+  procRanking,
+  procPlan,
+  procExplainPlan,
+  procReplay,
+  procWhatIf,
+  procCompare,
+  cyberPlan,
 };

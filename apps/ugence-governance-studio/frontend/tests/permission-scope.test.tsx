@@ -35,24 +35,28 @@ describe("permission scope (C2)", () => {
     renderWithProviders(<App />, "/scenarios/procurement");
     await screen.findByTestId("verification-state");
     const nav = screen.getByRole("navigation", { name: /scenario sections/i });
-    // only the five P3C sections; no proposal/composition/permission-proposal link
+    // P3D adds Ranking/Composition/Permissions/Fallbacks/Replay/Comparison/What-If.
     const links = within(nav).getAllByRole("link").map((l) => l.textContent);
-    for (const banned of [/proposal/i, /composition/i, /fallback/i, /ranking/i, /what-if/i, /replay/i]) {
-      expect(links.some((t) => t && banned.test(t))).toBe(false);
+    for (const expected of ["Eligibility", "Ranking", "Composition", "Permissions", "Fallbacks", "What-If"]) {
+      expect(links.some((t) => t === expected)).toBe(true);
     }
   });
 });
 
-// Source-level guard: no permission-proposal / granting / provisioning language.
-describe("permission-proposal language absence (C2)", () => {
+// Source-level guard: permission REQUIREMENTS and PROPOSALS are legitimate (P3C +
+// P3D), but grant / provisioning / authorization language must never appear.
+describe("no permission grant/provisioning language in src (C2 + §19)", () => {
   const SRC = path.resolve(__dirname, "..", "src");
   const BANNED = [
-    "permission proposal",
-    "proposed permission",
+    "permission granted",
     "grant permission",
     "provision permission",
     "permission provisioning",
-    "permission-feasibility",
+    "runtime provisioning",
+    "access granted",
+    "credentials issued",
+    "permission activated",
+    "authorized to execute",
   ];
   function walk(dir: string): string[] {
     const out: string[] = [];
