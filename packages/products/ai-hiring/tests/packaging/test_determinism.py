@@ -27,7 +27,7 @@ def test_version_info_is_stable_and_not_production_certified():
     assert a == b
     assert a["production_certified"] is False
     assert a["product_version"] == "0.6.0"
-    assert a["distribution_version"] == "0.1.0"
+    assert a["distribution_version"] == "0.1.1"
 
 
 def test_version_info_json_serializes_stably():

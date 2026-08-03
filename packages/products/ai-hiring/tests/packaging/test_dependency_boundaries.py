@@ -50,11 +50,18 @@ FORBIDDEN_ROOTS = {
     "numpy",
 }
 
-# Concrete legacy TAP / ActionGate providers. Classification:
-# LEGACY_COMPATIBILITY_DEPENDENCY — permitted ONLY inside the isolated, optional
+# Canonical TAP / ActionGate providers. Classification:
+# OPTIONAL_CANONICAL_ADAPTER — permitted ONLY inside the isolated, optional
 # ``integrations/`` subpackage (lazy-imported there); FORBIDDEN_CORE_DEPENDENCY
 # everywhere else in the package.
-LEGACY_COMPAT_ROOTS = {"tap_provider", "actiongate_provider"}
+CANONICAL_PROVIDER_ROOTS = {"ugence_tap_provider", "ugence_actiongate_provider"}
+
+# Legacy provider namespaces. After canonical normalization AI Hiring targets the
+# canonical namespaces directly, so the legacy ``tap_provider`` /
+# ``actiongate_provider`` compatibility namespaces must NOT be imported anywhere in
+# the production package (not even in integrations/). They remain valid only in
+# retained compatibility documentation and tests.
+LEGACY_PROVIDER_ROOTS = {"tap_provider", "actiongate_provider"}
 
 INTEGRATIONS_DIR = PKG_ROOT / "integrations"
 
@@ -90,30 +97,48 @@ def test_no_forbidden_imports_anywhere_in_core():
     for path in _iter_module_files():
         roots = _imported_roots(path)
         bad = set(roots & FORBIDDEN_ROOTS)
-        # Concrete legacy providers are FORBIDDEN in the core; permitted only in
-        # the isolated optional integrations/ subpackage.
+        # The legacy provider namespaces are FORBIDDEN everywhere in the production
+        # package — AI Hiring targets the canonical namespaces directly.
+        bad |= roots & LEGACY_PROVIDER_ROOTS
+        # The canonical concrete providers are FORBIDDEN in the core; permitted only
+        # in the isolated optional integrations/ subpackage.
         if not _is_integrations(path):
-            bad |= roots & LEGACY_COMPAT_ROOTS
+            bad |= roots & CANONICAL_PROVIDER_ROOTS
         if bad:
             offenders[str(path.relative_to(SRC_ROOT))] = sorted(bad)
     assert not offenders, f"forbidden imports found in core: {offenders}"
 
 
 def test_concrete_tap_actiongate_only_in_integrations():
-    """The concrete TAP/ActionGate providers are referenced ONLY in integrations/.
+    """The concrete canonical TAP/ActionGate providers are referenced ONLY in integrations/.
 
-    Enforces the addendum boundary: tap_provider / actiongate_provider are a
-    LEGACY_COMPATIBILITY_DEPENDENCY confined to the optional adapter subpackage,
-    never a core dependency.
+    Enforces the boundary: ugence_tap_provider / ugence_actiongate_provider are an
+    OPTIONAL_CANONICAL_ADAPTER dependency confined to the optional adapter
+    subpackage, never a core dependency.
     """
     leaks = {}
     for path in _iter_module_files():
         if _is_integrations(path):
             continue
-        hit = _imported_roots(path) & LEGACY_COMPAT_ROOTS
+        hit = _imported_roots(path) & CANONICAL_PROVIDER_ROOTS
         if hit:
             leaks[str(path.relative_to(SRC_ROOT))] = sorted(hit)
     assert not leaks, f"concrete TAP/ActionGate referenced outside integrations/: {leaks}"
+
+
+def test_no_legacy_provider_namespace_imported_anywhere():
+    """The legacy tap_provider / actiongate_provider namespaces are imported nowhere.
+
+    §21: production AI Hiring code must directly target the canonical namespaces;
+    ``import tap_provider`` / ``from actiongate_provider ...`` are forbidden across
+    the whole package, including the integrations/ adapters.
+    """
+    leaks = {}
+    for path in _iter_module_files():
+        hit = _imported_roots(path) & LEGACY_PROVIDER_ROOTS
+        if hit:
+            leaks[str(path.relative_to(SRC_ROOT))] = sorted(hit)
+    assert not leaks, f"legacy provider namespace imported in production code: {leaks}"
 
 
 def test_all_third_party_imports_are_audited():
@@ -124,10 +149,10 @@ def test_all_third_party_imports_are_audited():
     unexpected = {}
     for path in _iter_module_files():
         allowed = set(ALLOWED_RUNTIME_ROOTS)
-        # Legacy providers are an audited LEGACY_COMPATIBILITY_DEPENDENCY only in
-        # the integrations/ subpackage.
+        # Canonical providers are an audited OPTIONAL_CANONICAL_ADAPTER dependency
+        # only in the integrations/ subpackage.
         if _is_integrations(path):
-            allowed |= LEGACY_COMPAT_ROOTS
+            allowed |= CANONICAL_PROVIDER_ROOTS
         for root in _imported_roots(path):
             if root in stdlib or root in allowed:
                 continue
