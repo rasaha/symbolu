@@ -1,0 +1,36 @@
+{
+  "canonical_implementation": {
+    "path": "packages/providers/tap/src/ugence_tap_provider",
+    "role": "CANONICAL_IMPLEMENTATION",
+    "import_namespace": "ugence_tap_provider",
+    "distribution": "ugence-tap-provider",
+    "tests": "packages/providers/tap/tests",
+    "logic_duplicated": false,
+    "disposition": "canonical owner"
+  },
+  "legacy_facade": {
+    "path": "tap_provider",
+    "role": "COMPATIBILITY_SURFACE",
+    "import_namespace": "tap_provider",
+    "distribution": "(shipped by dgm-tap-provider)",
+    "logic_duplicated": false,
+    "disposition": "logic-free shim + retained monorepo tests"
+  },
+  "legacy_distribution": {
+    "path": "packaging/dgm-tap-provider",
+    "role": "PRIVATE_PACKAGING_ENTRY",
+    "distribution": "dgm-tap-provider",
+    "disposition": "converted to compatibility distribution -> ugence-tap-provider[decision-authority]"
+  },
+  "frozen_api_artifact": {
+    "path": "platform/api-snapshots/tap_provider.api.json",
+    "role": "FROZEN_API_ARTIFACT",
+    "disposition": "byte-equivalent (snapshot records no __module__); preserved through facade"
+  },
+  "documentation": {
+    "path": "docs/TAP_PROVIDER.md",
+    "role": "DOCUMENTATION",
+    "disposition": "retained; canonical docs added under packages/providers/tap/docs"
+  },
+  "stale_or_duplicate": []
+}

@@ -1,0 +1,100 @@
+{
+  "canonical_package_tests": {
+    "path": "packages/providers/tap/tests",
+    "total": 82,
+    "result": "82 passed",
+    "by_file": {
+      "test_conformance.py": {
+        "count": 3,
+        "class": "MIGRATED"
+      },
+      "test_mapping_and_errors.py": {
+        "count": 12,
+        "class": "MIGRATED"
+      },
+      "test_registry_health_observability.py": {
+        "count": 8,
+        "class": "MIGRATED"
+      },
+      "test_assessment_lifecycle.py": {
+        "count": 4,
+        "class": "MIGRATED"
+      },
+      "authority/test_authority_boundary.py": {
+        "count": 6,
+        "class": "PACKAGING"
+      },
+      "authority/test_outcome_safety.py": {
+        "count": 11,
+        "class": "PACKAGING"
+      },
+      "mapping/test_mapping_preservation.py": {
+        "count": 5,
+        "class": "PACKAGING"
+      },
+      "mapping/test_evidence_boundary.py": {
+        "count": 6,
+        "class": "PACKAGING"
+      },
+      "boundaries/test_dependency_boundaries.py": {
+        "count": 3,
+        "class": "PACKAGING"
+      },
+      "packaging/test_packaging.py": {
+        "count": 6,
+        "class": "PACKAGING"
+      },
+      "compatibility/test_legacy_namespace.py": {
+        "count": 18,
+        "class": "LEGACY_COMPATIBILITY"
+      }
+    }
+  },
+  "monorepo_tests": {
+    "path": "tap_provider/tests",
+    "total": 40,
+    "result": "40 passed",
+    "by_file": {
+      "test_conformance.py": {
+        "count": 3,
+        "class": "MONOREPO_INTEGRATION",
+        "note": "byte-identical, runs through facade"
+      },
+      "test_mapping_and_errors.py": {
+        "count": 12,
+        "class": "MONOREPO_INTEGRATION",
+        "note": "byte-identical, runs through facade"
+      },
+      "test_registry_health_observability.py": {
+        "count": 8,
+        "class": "MONOREPO_INTEGRATION",
+        "note": "byte-identical, runs through facade"
+      },
+      "test_end_to_end.py": {
+        "count": 5,
+        "class": "MONOREPO_INTEGRATION",
+        "note": "byte-identical; TAP<->ActionGate peer composition"
+      },
+      "test_dependency_boundaries.py": {
+        "count": 6,
+        "class": "MIGRATED",
+        "note": "rewritten for migrated layout; authoritative test for F6"
+      },
+      "test_packaging.py": {
+        "count": 6,
+        "class": "PACKAGING",
+        "note": "rewritten for compat-distribution reality"
+      }
+    }
+  },
+  "counts_by_category": {
+    "migrated_behavioral": 27,
+    "new_canonical_package": 37,
+    "compatibility": 18,
+    "packaging": 12,
+    "monorepo_integration": 28,
+    "clean_installed_wheel": "8 inline checks + CLI verify(12)+demo (via verifier)",
+    "obsolete_with_reason": 0,
+    "blocked": 0
+  }
+}

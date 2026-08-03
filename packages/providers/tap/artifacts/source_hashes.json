@@ -1,0 +1,20 @@
+{
+  "ugence_tap_provider/__init__.py": "0fa99ba10802e84ffa23f08f9640d90dfec19612",
+  "ugence_tap_provider/__main__.py": "563acae0452b3785bc1aff49eedea609d85aade7",
+  "ugence_tap_provider/api/__init__.py": "43cfb109d35fd70b9b5d86725b6b46829e01c081",
+  "ugence_tap_provider/cli.py": "5ae9d433ad8f2e19b1d8fab3d76c799d149f7c17",
+  "ugence_tap_provider/client/__init__.py": "c7fa357c5c3ee09457301bb26f4a64ef8ec85a7f",
+  "ugence_tap_provider/configuration/__init__.py": "da43330a89f6ae1eca0097d0dbe1055a016a80f4",
+  "ugence_tap_provider/conformance/__init__.py": "3752d55a4949680eda7bf463c8c928c1c5603288",
+  "ugence_tap_provider/core/__init__.py": "90453d5f97b1102bd398d13c3388d39f1a290f8d",
+  "ugence_tap_provider/errors/__init__.py": "f2a0958617ef1bd3742a4863d50b3fc368ca3260",
+  "ugence_tap_provider/health/__init__.py": "243178dbf06df34bdc476797aeaee85edd8d44fc",
+  "ugence_tap_provider/mapping/__init__.py": "055ddb85fcbb0750d08fc5c4dae5ada574ebf6fb",
+  "ugence_tap_provider/mapping/controls.py": "a0a374845ad082fb44a2dd221770be7fafb92d09",
+  "ugence_tap_provider/mapping/request.py": "21eddecca2fca6df9ad77449fee9164e743087d1",
+  "ugence_tap_provider/mapping/result.py": "d0ad1385ab4e7594bd7b651108f82a4d74c6649b",
+  "ugence_tap_provider/observability/__init__.py": "6212db7dddae282c6ebfb18bebfa6ca741f073b7",
+  "ugence_tap_provider/provider.py": "249597b89c0972ce005e9963a6423f42d768416d",
+  "ugence_tap_provider/py.typed": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+  "ugence_tap_provider/version.py": "85f84947b4e9c9abf735089a25df1e28f2f63947"
+}

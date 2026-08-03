@@ -1,0 +1,240 @@
+{
+  "configuration": {
+    "embedded_secret_rejected": "ProviderConfigurationError",
+    "incompatible_contract": "ProviderConfigurationError",
+    "invalid_evidence_resolution": "ProviderConfigurationError",
+    "invalid_mode": "ProviderConfigurationError",
+    "secret_reference_accepted": "NO_ERROR",
+    "valid_in_process": "NO_ERROR",
+    "valid_remote": "NO_ERROR"
+  },
+  "descriptor": {
+    "compatible_kernel_majors": [
+      "1"
+    ],
+    "config_schema_version": "1",
+    "contract_version": "1.0.0",
+    "default": true,
+    "deterministic": true,
+    "features": [
+      "component_analysis",
+      "constraints",
+      "evaluate",
+      "evidence_coverage",
+      "in_process",
+      "obligations",
+      "qualifier_analysis",
+      "reason_codes",
+      "remote"
+    ],
+    "implementation_version": "0.1.0",
+    "kind": "ASSERTION_GOVERNANCE",
+    "metadata": {
+      "evidence_resolution": "caller_supplied",
+      "mode": "in_process"
+    },
+    "provider_id": "tap",
+    "vendor": "TAP"
+  },
+  "error_translation": {
+    "config": "ProviderConfigurationError",
+    "malformed": "ProviderResultValidationError",
+    "protocol": "ProviderProtocolError",
+    "timeout": "ProviderTimeoutError",
+    "unavailable": "ProviderUnavailableError",
+    "unexpected": "ProviderError"
+  },
+  "failsafe_off_exceptions": {
+    "config": "ProviderConfigurationError",
+    "malformed": "ProviderResultValidationError",
+    "protocol": "ProviderProtocolError",
+    "timeout": "ProviderTimeoutError",
+    "unavailable": "ProviderUnavailableError"
+  },
+  "failsafe_results": {
+    "config": {
+      "coverage": "INDETERMINATE",
+      "explanation_refs": [
+        "reason:provider_error:ProviderConfigurationError"
+      ],
+      "fingerprint": "bee15f450c8e1e69609f02e67b63ebed77155c7ec0f8bcc0c66db2572b816c25"
+    },
+    "malformed": {
+      "coverage": "INDETERMINATE",
+      "explanation_refs": [
+        "reason:provider_error:ProviderResultValidationError"
+      ],
+      "fingerprint": "bee15f450c8e1e69609f02e67b63ebed77155c7ec0f8bcc0c66db2572b816c25"
+    },
+    "protocol": {
+      "coverage": "INDETERMINATE",
+      "explanation_refs": [
+        "reason:provider_error:ProviderProtocolError"
+      ],
+      "fingerprint": "bee15f450c8e1e69609f02e67b63ebed77155c7ec0f8bcc0c66db2572b816c25"
+    },
+    "timeout": {
+      "coverage": "INDETERMINATE",
+      "explanation_refs": [
+        "reason:provider_error:ProviderTimeoutError"
+      ],
+      "fingerprint": "bee15f450c8e1e69609f02e67b63ebed77155c7ec0f8bcc0c66db2572b816c25"
+    },
+    "unavailable": {
+      "coverage": "INDETERMINATE",
+      "explanation_refs": [
+        "reason:provider_error:ProviderUnavailableError"
+      ],
+      "fingerprint": "bee15f450c8e1e69609f02e67b63ebed77155c7ec0f8bcc0c66db2572b816c25"
+    }
+  },
+  "health": {
+    "available_healthy": true,
+    "available_state": "AVAILABLE",
+    "degraded_healthy": false,
+    "degraded_state": "DEGRADED"
+  },
+  "lifecycle_states": [
+    "REGISTERED",
+    "AVAILABLE",
+    "STOPPED"
+  ],
+  "namespace": "tap_provider",
+  "observability_failure": {
+    "completed": false,
+    "error_class": "ProviderTimeoutError",
+    "evidence_count": 1,
+    "failure_class": "RETRYABLE",
+    "outcome": "INDETERMINATE"
+  },
+  "observability_success": {
+    "compatible": true,
+    "completed": true,
+    "error_class": null,
+    "evidence_count": 1,
+    "evidence_coverage": 1.0,
+    "failure_class": null,
+    "fingerprint_present": true,
+    "mapping_version": "tap-map-1",
+    "mode": "in_process",
+    "outcome": "SUPPORTED",
+    "provider_id": "tap",
+    "provider_version": "0.1.0"
+  },
+  "request_mapping": {
+    "assertion": "Supplier X reduced costs",
+    "assertion_type": "claim",
+    "correlation_id": "corr",
+    "evidence_fingerprints_present": [
+      true,
+      true
+    ],
+    "evidence_ids": [
+      "e1",
+      "e2"
+    ],
+    "evidence_provenance": [
+      "caller_supplied",
+      "caller_supplied"
+    ],
+    "policy_references": [
+      "p:1"
+    ],
+    "source_identity": "src",
+    "trace_id": "corr"
+  },
+  "result_mapping": {
+    "constrained": {
+      "constraints": [
+        "required_qualifier=segment_scope",
+        "maximum_confidence=0.7"
+      ],
+      "coverage": "CONSTRAINED",
+      "covered_evidence_refs": [
+        "e1",
+        "e2"
+      ],
+      "evidence_coverage": 0.6,
+      "explanation_refs": [
+        "reason:certainty_inflation",
+        "reason:scope_expansion",
+        "supported:cost_reduction"
+      ],
+      "fingerprint": "2bbf52d3e2f590121e1b79bb3fc8e6c792ac9cf3e168152f460b3c586267712d",
+      "obligations": [
+        "include_uncertainty_disclosure",
+        "retain_source_attribution"
+      ],
+      "omitted_qualifiers": [
+        "north_america_segment"
+      ],
+      "provider_trace_id": "tap-c2d635d50224cdd2",
+      "unsupported_elements": [
+        "magnitude_20pct"
+      ]
+    },
+    "indeterminate_no_evidence": {
+      "constraints": [],
+      "coverage": "INDETERMINATE",
+      "covered_evidence_refs": [],
+      "evidence_coverage": 0.0,
+      "explanation_refs": [
+        "reason:missing_evidence"
+      ],
+      "fingerprint": "d013633a05856085ba9af5b66d08d3365a4e635c49a852268be234cc35349a0c",
+      "obligations": [],
+      "omitted_qualifiers": [],
+      "provider_trace_id": "tap-8e8ff84db944b967",
+      "unsupported_elements": [
+        "A"
+      ]
+    },
+    "supported": {
+      "constraints": [],
+      "coverage": "SUPPORTED",
+      "covered_evidence_refs": [
+        "e1"
+      ],
+      "evidence_coverage": 1.0,
+      "explanation_refs": [
+        "reason:evidence_supports",
+        "supported:e1"
+      ],
+      "fingerprint": "aa112e136881befdc58a1faffe01f8aa9c5a08e6ebcb358556512dcc530e76a5",
+      "obligations": [],
+      "omitted_qualifiers": [],
+      "provider_trace_id": "tap-7201486585313f1b",
+      "unsupported_elements": []
+    },
+    "unknown_indeterminate": {
+      "constraints": [],
+      "coverage": "INDETERMINATE",
+      "covered_evidence_refs": [],
+      "evidence_coverage": 0.0,
+      "explanation_refs": [
+        "reason:unresolved"
+      ],
+      "fingerprint": "600a8c2f20a0ec2fb3e4a750d7bf8fe2bed5c95dc771b0a4bea334f4c10b0076",
+      "obligations": [],
+      "omitted_qualifiers": [],
+      "provider_trace_id": "tap-7201486585313f1b",
+      "unsupported_elements": []
+    },
+    "unsupported": {
+      "constraints": [],
+      "coverage": "UNSUPPORTED",
+      "covered_evidence_refs": [],
+      "evidence_coverage": 0.0,
+      "explanation_refs": [
+        "reason:contradicting_evidence"
+      ],
+      "fingerprint": "ae4720be3159f97af5bd7cf62998117bf704189569e2b578413234ba955c2323",
+      "obligations": [],
+      "omitted_qualifiers": [],
+      "provider_trace_id": "tap-ea0b6c323996260f",
+      "unsupported_elements": [
+        "no_compliance_incidents"
+      ]
+    }
+  }
+}

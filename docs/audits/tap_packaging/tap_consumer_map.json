@@ -1,0 +1,82 @@
+{
+  "policy": "First migration preserves ALL consumers through the tap_provider compatibility facade; none mass-edited.",
+  "count": 14,
+  "classifications_summary": {
+    "KEEP_LEGACY_IMPORT": 4,
+    "MONOREPO_COMPOSITION": 7,
+    "COMPATIBILITY_TEST": 2,
+    "MONOREPO_INTEGRATION": 1
+  },
+  "consumers": [
+    {
+      "path": "packaging/verify_tap_provider_distribution.py",
+      "classification": "KEEP_LEGACY_IMPORT",
+      "note": "legacy 5-wheel verifier (pre-migration)"
+    },
+    {
+      "path": "packages/governance-provider-framework/verify_governance_provider_framework_distribution.py",
+      "classification": "KEEP_LEGACY_IMPORT",
+      "note": "framework verifier consumes tap via facade"
+    },
+    {
+      "path": "packages/products/ai-hiring/src/ugence_ai_hiring/integrations/tap_legacy_adapter.py",
+      "classification": "KEEP_LEGACY_IMPORT",
+      "note": "AI Hiring optional legacy adapter (do not modify AI Hiring)"
+    },
+    {
+      "path": "enterprise_validation_pilot/composition/engines.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "validation pilot composition"
+    },
+    {
+      "path": "enterprise_validation_pilot/composition/root.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "validation pilot composition root"
+    },
+    {
+      "path": "enterprise_validation_pilot/composition/manifest.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "validation pilot manifest"
+    },
+    {
+      "path": "enterprise_validation_pilot/tests/test_conformance_consumed.py",
+      "classification": "COMPATIBILITY_TEST",
+      "note": "consumes tap conformance"
+    },
+    {
+      "path": "ugence_console_api/capabilities/truth_evidence.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "console api capability"
+    },
+    {
+      "path": "comparative_governance_benchmark/strategies/_tap_support.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "benchmark strategy"
+    },
+    {
+      "path": "provider_heterogeneity_validation/runners/composition.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "heterogeneity validation runner"
+    },
+    {
+      "path": "products/code-governance/src/ugence_code_governance/governance/tap_adapter.py",
+      "classification": "KEEP_LEGACY_IMPORT",
+      "note": "code-governance product adapter"
+    },
+    {
+      "path": "platform_freeze/invariants.py",
+      "classification": "MONOREPO_COMPOSITION",
+      "note": "frozen invariant checks import tap"
+    },
+    {
+      "path": "platform_freeze/tests/test_freeze.py",
+      "classification": "COMPATIBILITY_TEST",
+      "note": "freeze tests import tap"
+    },
+    {
+      "path": "tap_provider/tests/*",
+      "classification": "MONOREPO_INTEGRATION",
+      "note": "legacy monorepo tap tests (run through facade)"
+    }
+  ]
+}
