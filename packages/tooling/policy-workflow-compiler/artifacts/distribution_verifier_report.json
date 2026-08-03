@@ -1,0 +1,82 @@
+{
+  "steps": {
+    "dep_download": {
+      "passed": true,
+      "offline_runtime": true
+    },
+    "wheel_audit": {
+      "passed": true,
+      "problems": [],
+      "has_py_typed": true,
+      "member_count": 58
+    },
+    "clean_install": {
+      "passed": true
+    },
+    "isolated_imports": {
+      "passed": true
+    },
+    "no_repo_path_leak": {
+      "passed": true
+    },
+    "cli_version": {
+      "passed": true,
+      "distribution_version": "0.1.0"
+    },
+    "cli_demo": {
+      "passed": true,
+      "logical_digest": "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd265822c3550ad9938158a"
+    },
+    "cli_verify": {
+      "passed": true
+    },
+    "cli_inspect": {
+      "passed": true
+    },
+    "cli_validate": {
+      "passed": true
+    },
+    "cli_compile": {
+      "passed": true
+    },
+    "cli_diff": {
+      "passed": true
+    },
+    "deterministic_digest": {
+      "passed": true,
+      "digest": "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd265822c3550ad9938158a"
+    },
+    "procurement_equivalence": {
+      "passed": true
+    },
+    "public_api_frozen": {
+      "passed": true,
+      "count": 71
+    },
+    "offline_no_credentials": {
+      "passed": true
+    },
+    "installed_test_suite": {
+      "passed": true,
+      "tail": [
+        "38 passed in 0.37s"
+      ]
+    }
+  },
+  "hashes": {
+    "wheel": {
+      "name": "ugence_policy_workflow_compiler-0.1.0-py3-none-any.whl",
+      "sha256": "e14e74a919a3471ac91eba20b4527a73c0fb8287bdac5304a8dd8553685fcb78"
+    },
+    "sdist": {
+      "name": "ugence_policy_workflow_compiler-0.1.0.tar.gz",
+      "sha256": "5bbaff546d521a092a464278b95903e573c159834f0151ba5e5f2d03f31c4da7"
+    }
+  },
+  "reproducibility": {
+    "wheel_bit_for_bit": true,
+    "sdist_archive_bit_for_bit": false,
+    "sdist_content_reproducible": true
+  },
+  "verdict": "PASS"
+}

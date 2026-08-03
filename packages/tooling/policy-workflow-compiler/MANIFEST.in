@@ -1,0 +1,10 @@
+include README.md CHANGELOG.md LICENSE
+include src/ugence_policy_workflow_compiler/py.typed
+recursive-include src/ugence_policy_workflow_compiler *.py
+# Do NOT ship tests, docs, examples, artifacts, or scripts inside the wheel/sdist.
+prune tests
+prune docs
+prune examples
+prune artifacts
+prune scripts
+global-exclude __pycache__ *.pyc
