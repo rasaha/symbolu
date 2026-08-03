@@ -1,0 +1,40 @@
+{
+  "policy": "No behavioral coverage was reduced. The original ActionGate suite was migrated into the canonical package (canonical imports) and strengthened with new security-boundary suites; the original tree's tests remain at actiongate_provider/tests as the monorepo-integration view running through the compatibility facade.",
+  "canonical_package_tests": {
+    "total": 62,
+    "migrated_behavioral": {
+      "test_conformance.py": {"count": 3, "classification": "MIGRATED", "origin": "actiongate_provider/tests/test_conformance.py"},
+      "test_mapping_and_errors.py": {"count": 7, "classification": "MIGRATED", "origin": "actiongate_provider/tests/test_mapping_and_errors.py"},
+      "test_registry_health_observability.py": {"count": 7, "classification": "MIGRATED", "origin": "actiongate_provider/tests/test_registry_health_observability.py"},
+      "test_control_plane_lifecycle.py": {"count": 5, "classification": "MIGRATED", "origin": "actiongate_provider/tests/test_end_to_end.py (+conftest lifecycle harness)"}
+    },
+    "new_security_boundary": {
+      "authority/test_outcome_safety.py": {"count": 10, "classification": "NEW_SECURITY"},
+      "authority/test_authority_boundary.py": {"count": 5, "classification": "NEW_SECURITY"},
+      "mapping/test_mapping_preservation.py": {"count": 6, "classification": "NEW_SECURITY"},
+      "mapping/test_expiry_idempotency.py": {"count": 6, "classification": "NEW_SECURITY"},
+      "boundaries/test_dependency_boundaries.py": {"count": 4, "classification": "NEW_SECURITY"}
+    },
+    "compatibility": {
+      "compatibility/test_legacy_namespace.py": {"count": 4, "classification": "LEGACY_COMPATIBILITY"}
+    },
+    "packaging": {
+      "packaging/test_packaging.py": {"count": 5, "classification": "PACKAGING"}
+    }
+  },
+  "monorepo_integration_tests": {
+    "location": "actiongate_provider/tests",
+    "total": 37,
+    "classification": "MONOREPO_INTEGRATION",
+    "note": "Run through the compatibility facade; test_packaging.py and test_dependency_boundaries.py were updated for the post-migration layout (canonical tree + facade). test_conformance / test_mapping_and_errors / test_registry_health_observability / test_end_to_end are unchanged and still pass through the facade."
+  },
+  "counts_by_category": {
+    "migrated_behavioral": 22,
+    "new_security": 31,
+    "compatibility": 4,
+    "packaging": 5,
+    "monorepo_integration": 37,
+    "obsolete_with_reason": 0,
+    "blocked": 0
+  }
+}

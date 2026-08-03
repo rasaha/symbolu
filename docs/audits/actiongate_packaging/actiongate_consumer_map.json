@@ -1,0 +1,29 @@
+{
+  "policy": "The initial migration preserves ALL existing consumers through the logic-free actiongate_provider compatibility facade. No consumer is mass-edited in this phase.",
+  "consumers": [
+    {"path": "enterprise_validation_pilot/composition/engines.py", "imports": "actiongate_provider.core", "classification": "MONOREPO_COMPOSITION"},
+    {"path": "enterprise_validation_pilot/composition/root.py", "imports": "actiongate_provider.configuration", "classification": "MONOREPO_COMPOSITION"},
+    {"path": "enterprise_validation_pilot/composition/manifest.py", "imports": "actiongate_provider", "classification": "MONOREPO_COMPOSITION"},
+    {"path": "enterprise_validation_pilot/tests/test_conformance_consumed.py", "imports": "actiongate_provider.configuration/conformance", "classification": "COMPATIBILITY_TEST"},
+    {"path": "comparative_governance_benchmark/strategies/_actiongate_support.py", "imports": "actiongate_provider.configuration/core", "classification": "MONOREPO_COMPOSITION"},
+    {"path": "provider_heterogeneity_validation/runners/composition.py", "imports": "actiongate_provider.configuration", "classification": "MONOREPO_COMPOSITION"},
+    {"path": "ugence_console_api/capabilities/action_control.py", "imports": "actiongate_provider.configuration", "classification": "KEEP_LEGACY_IMPORT"},
+    {"path": "products/code-governance/src/ugence_code_governance/governance/actiongate_adapter.py", "imports": "actiongate_provider.api", "classification": "KEEP_LEGACY_IMPORT"},
+    {"path": "products/code-governance/tests/test_*.py", "imports": "actiongate_provider.api", "classification": "COMPATIBILITY_TEST"},
+    {"path": "packages/products/ai-hiring/src/ugence_ai_hiring/integrations/actiongate_legacy_adapter.py", "imports": "actiongate_provider.provider", "classification": "KEEP_LEGACY_IMPORT", "note": "AI Hiring — MUST NOT be modified in this phase."},
+    {"path": "platform_freeze/invariants.py", "imports": "actiongate_provider.configuration/core", "classification": "KEEP_LEGACY_IMPORT"},
+    {"path": "platform_freeze/tests/test_freeze.py", "imports": "actiongate_provider", "classification": "COMPATIBILITY_TEST"},
+    {"path": "packaging/verify_tap_provider_distribution.py", "imports": "actiongate_provider", "classification": "COMPATIBILITY_TEST", "note": "TAP verifier proves ActionGate/TAP peer independence."},
+    {"path": "packages/governance-provider-framework/verify_governance_provider_framework_distribution.py", "imports": "actiongate_provider.api", "classification": "COMPATIBILITY_TEST"},
+    {"path": "tap_provider/tests/test_dependency_boundaries.py", "imports": "actiongate_provider (assertion of non-import)", "classification": "COMPATIBILITY_TEST"},
+    {"path": "tap_provider/tests/test_end_to_end.py", "imports": "actiongate_provider.configuration/core", "classification": "COMPATIBILITY_TEST"}
+  ],
+  "counts": {
+    "MONOREPO_COMPOSITION": 5,
+    "KEEP_LEGACY_IMPORT": 4,
+    "COMPATIBILITY_TEST": 7,
+    "MIGRATE_TO_CANONICAL_NOW": 0,
+    "EXTERNAL_CONSUMER_UNKNOWN": 0,
+    "DEAD_CODE": 0
+  }
+}

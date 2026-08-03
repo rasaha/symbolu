@@ -1,16 +1,87 @@
-"""ActionGate provider — the first real Action Governance provider for DGM.
+"""COMPATIBILITY-ONLY legacy namespace for the ActionGate action-governance provider.
 
-Implements the neutral ``ActionGovernanceProvider`` contract (authorization only)
-by adapting the ActionGate engine. It plugs into DGM through the Provider
-Framework's ``ActionGovernanceControlPlaneAdapter`` → ``ActionControlPlanePort``,
-leaving the frozen kernel completely unaware of ActionGate.
+Canonical package: ``ugence_actiongate_provider`` (distribution
+``ugence-actiongate-provider``, ``packages/providers/actiongate``). ActionGate
+evaluates whether a proposed action is authorized under supplied authority, policy,
+risk, evidence, and decision context and returns an authorization outcome. It owns
+**no** dispatch or execution authority.
 
-Dependency direction: application → actiongate_provider → {governance_providers,
-decision_governance}.api. The ActionGate *core* (``core.py``) imports neither.
-Import the public surface from ``actiongate_provider.api``.
+This ``actiongate_provider`` namespace is a **logic-free compatibility surface**:
+every public symbol and every submodule re-exports the *same object* from the
+canonical package (object identity preserved), so existing ``import
+actiongate_provider...`` and ``from actiongate_provider... import ...`` statements
+keep working unchanged — with identical serialization, fingerprints, errors, and
+behavior. No ActionGate authorization logic and no second implementation lives here.
+
+Mechanism: an explicit, eager alias of the canonical package's submodules into
+``sys.modules`` under the legacy dotted names — not a meta-path import hook. This is
+required (rather than one hand-written stub per module) because consumers deep-import
+ActionGate submodules (``.api``, ``.core``, ``.client``, ``.configuration``,
+``.mapping[.constraints|.request|.result]``, ``.conformance``, ``.health``,
+``.observability``, ``.errors``, ``.version``, ``.provider``) and rely on object
+identity across the whole tree; per-file stubs could not preserve identity for
+non-``__all__`` attributes. Aliasing an already-imported module object never
+re-executes it, so no extra import side effects are introduced beyond importing the
+canonical package.
+
+ActionGate is a peer of TAP and never imports or invokes it; neither does this
+facade. Removal / review target: aligned with the ``actiongate_provider`` 0.2.0
+compatibility-shim removal.
 """
 from __future__ import annotations
 
-from .version import __version__
 
-__all__ = ["__version__"]
+def _ensure_canonical_actiongate_importable() -> None:
+    """Source-checkout bootstrap (mirrors the ``governance_providers`` shim): put
+    ``packages/providers/actiongate/src`` on ``sys.path`` only when the canonical
+    package is not already importable. Installed as a wheel dependency it is already
+    importable and this is a no-op; only a bare source checkout needs it.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("ugence_actiongate_provider") is not None:
+        return
+    import pathlib
+    import sys
+
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / "packages" / "providers" / "actiongate" / "src"
+        if (cand / "ugence_actiongate_provider" / "__init__.py").exists():
+            if str(cand) not in sys.path:
+                sys.path.insert(0, str(cand))
+            return
+
+
+_ensure_canonical_actiongate_importable()
+
+import importlib as _il  # noqa: E402
+import pkgutil as _pkgutil  # noqa: E402
+import sys as _sys  # noqa: E402
+
+import ugence_actiongate_provider as _canon  # noqa: E402
+
+_CANON = _canon.__name__
+_LEGACY = __name__
+
+# Alias every canonical submodule to the SAME module object under the legacy dotted
+# name so ``import actiongate_provider.<path>`` resolves to the identical object as
+# ``import ugence_actiongate_provider.<path>``. The CLI entry points (``cli``,
+# ``__main__``) are packaging surfaces, not part of the legacy import contract, so
+# they are not aliased into the legacy namespace.
+for _finder, _modname, _ispkg in _pkgutil.walk_packages(_canon.__path__, _CANON + "."):
+    _leaf = _modname[len(_CANON) + 1:]
+    if _leaf in ("cli", "__main__") or _leaf.startswith("cli.") or ".tests" in _modname:
+        continue
+    _sys.modules[_LEGACY + _modname[len(_CANON):]] = _il.import_module(_modname)
+
+# Bind direct-child submodules as attributes of this package for attribute access
+# (e.g. ``actiongate_provider.api`` after ``import actiongate_provider``).
+for _name in list(_sys.modules):
+    if _name.startswith(_LEGACY + ".") and "." not in _name[len(_LEGACY) + 1:]:
+        setattr(_sys.modules[_LEGACY], _name[len(_LEGACY) + 1:], _sys.modules[_name])
+
+# Curated top-level re-exports (identity preserved) — mirror the canonical package.
+from ugence_actiongate_provider import __version__, version_info  # noqa: E402,F401
+
+__all__ = list(getattr(_canon, "__all__", ["__version__", "version_info"]))

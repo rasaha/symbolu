@@ -1,0 +1,527 @@
+{
+  "module": "actiongate_provider.api",
+  "symbols": {
+    "ActionGateClient": {
+      "kind": "protocol",
+      "methods": {
+        "evaluate": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGateRequest') -> 'ActionGateDecision'"
+        },
+        "ping": {
+          "params": [],
+          "signature": "(self) -> 'bool'"
+        },
+        "policy_version": {
+          "params": [],
+          "signature": "(self) -> 'str'"
+        }
+      }
+    },
+    "ActionGateConformanceReport": {
+      "fields": {
+        "results": {
+          "annotation": "list[CheckResult]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {
+        "summary": {
+          "params": [],
+          "signature": "(self) -> 'str'"
+        }
+      }
+    },
+    "ActionGateConstraint": {
+      "fields": {
+        "type": {
+          "annotation": "str",
+          "required": true
+        },
+        "value": {
+          "annotation": "str",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateDecision": {
+      "fields": {
+        "authority_basis": {
+          "annotation": "str",
+          "required": false
+        },
+        "constraints": {
+          "annotation": "tuple[ActionGateConstraint, ...]",
+          "required": false
+        },
+        "expiry_seconds": {
+          "annotation": "Optional[int]",
+          "required": false
+        },
+        "obligations": {
+          "annotation": "tuple[ActionGateObligation, ...]",
+          "required": false
+        },
+        "outcome": {
+          "annotation": "ActionGateOutcome",
+          "required": true
+        },
+        "reason_codes": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "trace_id": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateEngine": {
+      "kind": "class",
+      "methods": {
+        "evaluate": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGateRequest') -> 'ActionGateDecision'"
+        }
+      }
+    },
+    "ActionGateHealthReport": {
+      "fields": {
+        "available": {
+          "annotation": "bool",
+          "required": true
+        },
+        "configuration_valid": {
+          "annotation": "bool",
+          "required": true
+        },
+        "policy_available": {
+          "annotation": "bool",
+          "required": true
+        },
+        "protocol_compatible": {
+          "annotation": "bool",
+          "required": true
+        },
+        "provider_health": {
+          "annotation": "ProviderHealth",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateInvocationLog": {
+      "kind": "class",
+      "methods": {
+        "all": {
+          "params": [],
+          "signature": "(self) -> 'tuple[ActionGateInvocationRecord, ...]'"
+        },
+        "append": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "record"
+            }
+          ],
+          "signature": "(self, record: 'ActionGateInvocationRecord') -> 'None'"
+        }
+      }
+    },
+    "ActionGateInvocationRecord": {
+      "fields": {
+        "compatible": {
+          "annotation": "bool",
+          "required": true
+        },
+        "completed": {
+          "annotation": "bool",
+          "required": true
+        },
+        "error_class": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "failure_class": {
+          "annotation": "Optional[str]",
+          "required": false
+        },
+        "fallback_provider_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "mapping_version": {
+          "annotation": "str",
+          "required": true
+        },
+        "mode": {
+          "annotation": "str",
+          "required": true
+        },
+        "outcome": {
+          "annotation": "str",
+          "required": false
+        },
+        "policy_version": {
+          "annotation": "str",
+          "required": false
+        },
+        "provider_id": {
+          "annotation": "str",
+          "required": true
+        },
+        "provider_version": {
+          "annotation": "str",
+          "required": true
+        },
+        "trace_id": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateObligation": {
+      "fields": {
+        "type": {
+          "annotation": "str",
+          "required": true
+        },
+        "value": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateOutcome": {
+      "kind": "enum",
+      "values": {
+        "ALLOW": "ALLOW",
+        "ALLOW_WITH_CONSTRAINTS": "ALLOW_WITH_CONSTRAINTS",
+        "DENY": "DENY",
+        "UNKNOWN": "UNKNOWN"
+      }
+    },
+    "ActionGateProvider": {
+      "kind": "class",
+      "methods": {
+        "authorize": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGovernanceRequest') -> 'ActionGovernanceResult'"
+        },
+        "degrade": {
+          "params": [
+            {
+              "has_default": true,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "detail"
+            }
+          ],
+          "signature": "(self, detail: 'str' = '') -> 'None'"
+        },
+        "descriptor": {
+          "params": [],
+          "signature": "(self) -> 'ProviderDescriptor'"
+        },
+        "health": {
+          "params": [],
+          "signature": "(self) -> 'ProviderHealth'"
+        },
+        "initialize": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        },
+        "mark_unavailable": {
+          "params": [
+            {
+              "has_default": true,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "detail"
+            }
+          ],
+          "signature": "(self, detail: 'str' = '') -> 'None'"
+        },
+        "shutdown": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "ActionGateRequest": {
+      "fields": {
+        "action_type": {
+          "annotation": "str",
+          "required": true
+        },
+        "authority": {
+          "annotation": "str",
+          "required": false
+        },
+        "correlation_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "decision_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "evidence_refs": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "idempotency_key": {
+          "annotation": "str",
+          "required": false
+        },
+        "parameters": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "policy_context": {
+          "annotation": "tuple[str, ...]",
+          "required": false
+        },
+        "principal": {
+          "annotation": "str",
+          "required": false
+        },
+        "resource": {
+          "annotation": "str",
+          "required": false
+        },
+        "risk_context": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        },
+        "tenant": {
+          "annotation": "str",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "ActionGateSettings": {
+      "fields": {
+        "contract_version": {
+          "annotation": "str",
+          "required": false
+        },
+        "default": {
+          "annotation": "bool",
+          "required": false
+        },
+        "endpoint": {
+          "annotation": "str",
+          "required": false
+        },
+        "mode": {
+          "annotation": "str",
+          "required": false
+        },
+        "provider_id": {
+          "annotation": "str",
+          "required": false
+        },
+        "secret_refs": {
+          "annotation": "Mapping[str, str]",
+          "required": false
+        }
+      },
+      "kind": "class",
+      "methods": {
+        "from_settings": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "settings"
+            },
+            {
+              "has_default": true,
+              "kind": "KEYWORD_ONLY",
+              "name": "provider_id"
+            },
+            {
+              "has_default": true,
+              "kind": "KEYWORD_ONLY",
+              "name": "default"
+            }
+          ],
+          "signature": "(settings: 'Mapping[str, str]', *, provider_id: 'str' = 'actiongate', default: 'bool' = True) -> \"'ActionGateSettings'\""
+        },
+        "validate": {
+          "params": [],
+          "signature": "(self) -> 'None'"
+        }
+      }
+    },
+    "CONTRACT_VERSION": {
+      "kind": "constant",
+      "value": "1.0.0"
+    },
+    "ConstrainedRule": {
+      "fields": {
+        "constraints": {
+          "annotation": "tuple[ActionGateConstraint, ...]",
+          "required": true
+        },
+        "expiry_seconds": {
+          "annotation": "Optional[int]",
+          "required": false
+        },
+        "obligations": {
+          "annotation": "tuple[ActionGateObligation, ...]",
+          "required": true
+        }
+      },
+      "kind": "class",
+      "methods": {}
+    },
+    "InProcessActionGateClient": {
+      "kind": "class",
+      "methods": {
+        "evaluate": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGateRequest') -> 'ActionGateDecision'"
+        },
+        "ping": {
+          "params": [],
+          "signature": "(self) -> 'bool'"
+        },
+        "policy_version": {
+          "params": [],
+          "signature": "(self) -> 'str'"
+        }
+      }
+    },
+    "KNOWN_CONSTRAINT_TYPES": {
+      "kind": "constant",
+      "value": "['allowed_region', 'execution_deadline', 'maximum_amount', 'parameter_restriction', 'rate_limit', 'required_approval', 'single_use']"
+    },
+    "KNOWN_OBLIGATION_TYPES": {
+      "kind": "constant",
+      "value": "['human_review', 'logging', 'notification']"
+    },
+    "MAPPING_VERSION": {
+      "kind": "constant",
+      "value": "actiongate-map-1"
+    },
+    "RemoteActionGateClient": {
+      "kind": "class",
+      "methods": {
+        "evaluate": {
+          "params": [
+            {
+              "has_default": false,
+              "kind": "POSITIONAL_OR_KEYWORD",
+              "name": "request"
+            }
+          ],
+          "signature": "(self, request: 'ActionGateRequest') -> 'ActionGateDecision'"
+        },
+        "ping": {
+          "params": [],
+          "signature": "(self) -> 'bool'"
+        },
+        "policy_version": {
+          "params": [],
+          "signature": "(self) -> 'str'"
+        }
+      }
+    },
+    "TARGET_FRAMEWORK_VERSION": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "TARGET_KERNEL_VERSION": {
+      "kind": "constant",
+      "value": "1.0.0"
+    },
+    "__version__": {
+      "kind": "constant",
+      "value": "0.1.0"
+    },
+    "build_actiongate_provider": {
+      "kind": "function",
+      "params": [
+        {
+          "has_default": true,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "engine"
+        },
+        {
+          "has_default": true,
+          "kind": "KEYWORD_ONLY",
+          "name": "settings"
+        },
+        {
+          "has_default": true,
+          "kind": "KEYWORD_ONLY",
+          "name": "invocation_log"
+        },
+        {
+          "has_default": true,
+          "kind": "KEYWORD_ONLY",
+          "name": "transport_fail"
+        }
+      ],
+      "signature": "(engine: 'Optional[ActionGateEngine]' = None, *, settings: 'Optional[ActionGateSettings]' = None, invocation_log: 'Optional[ActionGateInvocationLog]' = None, transport_fail: 'Optional[str]' = None) -> 'ActionGateProvider'"
+    },
+    "check_health": {
+      "kind": "function",
+      "params": [
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "provider"
+        },
+        {
+          "has_default": false,
+          "kind": "POSITIONAL_OR_KEYWORD",
+          "name": "settings"
+        }
+      ],
+      "signature": "(provider: 'ActionGateProvider', settings: 'ActionGateSettings') -> 'ActionGateHealthReport'"
+    },
+    "run_actiongate_conformance": {
+      "kind": "function",
+      "params": [],
+      "signature": "() -> 'ActionGateConformanceReport'"
+    }
+  }
+}

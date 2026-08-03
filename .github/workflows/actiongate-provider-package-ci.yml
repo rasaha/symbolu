@@ -1,0 +1,119 @@
+name: actiongate-provider-package-ci
+
+# Scoped CI for the canonical ActionGate action-governance package migration.
+# No live remote service and no enterprise execution runs here: the in-process
+# reference engine is deterministic and offline, and the clean-install proof uses
+# ``pip install --no-index`` against locally built wheels only.
+
+on:
+  push:
+    paths:
+      - "packages/providers/actiongate/**"
+      - "actiongate_provider/**"
+      - "packaging/dgm-actiongate-provider/**"
+      - "scripts/actiongate_equivalence_capture.py"
+      - "docs/ACTIONGATE_PROVIDER.md"
+      - "docs/audits/actiongate_packaging/**"
+      - "platform/PLATFORM_FREEZE_V1.json"
+      - "platform_freeze/**"
+      - ".github/workflows/actiongate-provider-package-ci.yml"
+  pull_request:
+    paths:
+      - "packages/providers/actiongate/**"
+      - "actiongate_provider/**"
+      - "packaging/dgm-actiongate-provider/**"
+      - "scripts/actiongate_equivalence_capture.py"
+      - "docs/ACTIONGATE_PROVIDER.md"
+      - "docs/audits/actiongate_packaging/**"
+      - "platform/PLATFORM_FREEZE_V1.json"
+      - "platform_freeze/**"
+      - ".github/workflows/actiongate-provider-package-ci.yml"
+
+jobs:
+  actiongate-package:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: "1704067200"
+      # NB: PYTHONPATH is deliberately NOT set job-wide — the isolated-distribution
+      # verifier and the clean-install steps must not see the monorepo source path.
+      # Only the equivalence / API-snapshot steps that import via a bare interpreter
+      # set it, per-step.
+      SRC_PYTHONPATH: ".:packages/providers/actiongate/src:packages/providers/tap/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/capabilities/decision-authority/src"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip build pytest pydantic
+
+      - name: Canonical package tests (isolation)
+        run: python -m pytest packages/providers/actiongate -q
+
+      - name: Monorepo ActionGate tests (through the facade)
+        run: python -m pytest actiongate_provider/tests -q
+
+      - name: Authority / outcome-safety / dependency-boundary tests
+        run: |
+          python -m pytest \
+            packages/providers/actiongate/tests/authority \
+            packages/providers/actiongate/tests/boundaries \
+            packages/providers/actiongate/tests/mapping \
+            packages/providers/actiongate/tests/compatibility \
+            packages/providers/actiongate/tests/packaging -q
+
+      - name: Behavioral-equivalence comparison (before == canonical == legacy)
+        run: |
+          python scripts/actiongate_equivalence_capture.py ugence_actiongate_provider --out /tmp/after_canonical.json >/dev/null
+          python scripts/actiongate_equivalence_capture.py actiongate_provider --out /tmp/after_legacy.json >/dev/null
+          python - <<'PY'
+          import json
+          def h(f):
+              return json.load(open(f))["capture_hash"]
+          before = h("docs/audits/actiongate_packaging/artifacts/actiongate_equivalence_before.json")
+          canon = h("/tmp/after_canonical.json")
+          legacy = h("/tmp/after_legacy.json")
+          assert before == canon == legacy, "ActionGate behavioral regression"
+          print("behavioral equivalence: OK", before)
+          PY
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+
+      - name: API-snapshot comparison (.api surface byte-identical)
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: |
+          python - <<'PY'
+          import json, hashlib
+          from platform_freeze.api_snapshot import snapshot_module
+          def hh(mod):
+              return hashlib.sha256(json.dumps(snapshot_module(mod), sort_keys=True).encode()).hexdigest()
+          legacy = hh("actiongate_provider.api")
+          base = "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300"
+          assert legacy == base, f"ActionGate public .api surface changed: {legacy}"
+          # canonical .api symbols must match the legacy snapshot (module label aside)
+          a = snapshot_module("ugence_actiongate_provider.api")["symbols"]
+          b = snapshot_module("actiongate_provider.api")["symbols"]
+          assert a == b, "canonical vs legacy .api symbols differ"
+          print("api-surface equivalence: OK", legacy)
+          PY
+
+      - name: Build wheel + sdist (canonical) and legacy wheel
+        run: |
+          python -m build packages/providers/actiongate --outdir dist_actiongate
+          python -m build packaging/dgm-actiongate-provider --outdir dist_actiongate
+          ls -l dist_actiongate
+
+      - name: Wheel reproducibility (bit-for-bit)
+        run: |
+          python -m build --wheel packages/providers/actiongate --outdir dist_repro
+          A=$(sha256sum dist_actiongate/ugence_actiongate_provider-*.whl | cut -d" " -f1)
+          B=$(sha256sum dist_repro/ugence_actiongate_provider-*.whl | cut -d" " -f1)
+          test "$A" = "$B" && echo "wheel reproducible: $A"
+
+      - name: Clean-environment install + framework registry + TAP-absent + CLI
+        run: python packages/providers/actiongate/scripts/verify_actiongate_provider_distribution.py
+
+      - name: Platform-freeze verification
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

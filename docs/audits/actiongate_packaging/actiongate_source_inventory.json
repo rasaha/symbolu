@@ -1,0 +1,178 @@
+[
+ {
+  "path": "actiongate_provider/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "a040393873c00dd29f27860b3d6238b23807ca9a"
+ },
+ {
+  "path": "actiongate_provider/api/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "006ff911c897d0374a2667508f283a568471e01d"
+ },
+ {
+  "path": "actiongate_provider/client/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "7f6b137b6e27c4b6776239119a4360ecf6bc11cd"
+ },
+ {
+  "path": "actiongate_provider/configuration/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "8e7cb5ee4943ad1ba2e7550114d4a71ae0f697c7"
+ },
+ {
+  "path": "actiongate_provider/conformance/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "930bba99adf78bd87ccac1ba5170fb020492b048"
+ },
+ {
+  "path": "actiongate_provider/core.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "d63a2751ece1f4b4ff4765d6d72cdfcabc645f26"
+ },
+ {
+  "path": "actiongate_provider/errors/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "db9b2bf4608b7cfac3c11d729862710e8bdc3908"
+ },
+ {
+  "path": "actiongate_provider/health/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "47d8005043d19ede2349c2f830e5df45531c0077"
+ },
+ {
+  "path": "actiongate_provider/mapping/__init__.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "ad2b8f7e9b1d181698940ef460f5e21ba432a3f1"
+ },
+ {
+  "path": "actiongate_provider/mapping/constraints.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "1c8b8a54c9ace88b02a93d3b3b9be15fc4873c79"
+ },
+ {
+  "path": "actiongate_provider/mapping/request.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "df692f3cd1557c20d68f229bc33316b8b624f04c"
+ },
+ {
+  "path": "actiongate_provider/mapping/result.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "9fe53d0228f0665c076f1b4f0cb99f9cfe90404a"
+ },
+ {
+  "path": "actiongate_provider/observability.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "e938eef84c771c05ae30aef1d0ca5abd4f02f9da"
+ },
+ {
+  "path": "actiongate_provider/provider.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "05180c5fffb899be3cdaaddf0e99ca1fb1b22012"
+ },
+ {
+  "path": "actiongate_provider/tests/conftest.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "dc185aba7eb24d451bfa54f9dd56e13362f1cce8"
+ },
+ {
+  "path": "actiongate_provider/tests/test_conformance.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "41bb4813cbcfa7956bf67c389c9c04f2b0954fd3"
+ },
+ {
+  "path": "actiongate_provider/tests/test_dependency_boundaries.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "70fc450221dd88fc8398bcddc3e907fefb010d60"
+ },
+ {
+  "path": "actiongate_provider/tests/test_end_to_end.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "5e53e19df445250cc23ff040253aea3118a2b33f"
+ },
+ {
+  "path": "actiongate_provider/tests/test_mapping_and_errors.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "c258e781c01cfe4b437511d9bea09d6f6b76ab7a"
+ },
+ {
+  "path": "actiongate_provider/tests/test_packaging.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "9cd37219b7c69fc420abe54b917c547104dcb929"
+ },
+ {
+  "path": "actiongate_provider/tests/test_registry_health_observability.py",
+  "role": "TEST",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": false,
+  "blob_sha": "27286ac7291db71f8eb4f30e61fb740664f1643e"
+ },
+ {
+  "path": "actiongate_provider/version.py",
+  "role": "CANONICAL_IMPLEMENTATION",
+  "import_namespace": "actiongate_provider",
+  "distribution": "dgm-actiongate-provider",
+  "logic_bearing": true,
+  "blob_sha": "147f8f9c91819cd15b224acd4639021d2a949ab9"
+ }
+]

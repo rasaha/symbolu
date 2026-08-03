@@ -1,8 +1,22 @@
-# Independent PRIVATE distribution for the ActionGate action-governance provider.
+# COMPATIBILITY distribution for the legacy ``dgm-actiongate-provider`` wheel name.
 #
-# ./actiongate_provider is a SYMLINK to the canonical ../../actiongate_provider
-# package. It DEPENDS ON the DGM kernel and provider-framework distributions and
-# owns no kernel or framework files.
+# The ActionGate action-governance provider was migrated to the canonical package
+# ``ugence-actiongate-provider`` (``packages/providers/actiongate``). The
+# ./actiongate_provider entry is a SYMLINK to the root ``actiongate_provider``
+# compatibility shim — a logic-free namespace that re-exports the canonical package.
+# This distribution therefore ships NO ActionGate implementation of its own; it
+# exists only so existing ``dgm-actiongate-provider`` dependency declarations keep
+# resolving and ``import actiongate_provider`` keeps working in a clean environment.
+# It depends on the canonical wheel WITH the ``decision-authority`` extra so the
+# pre-migration kernel-bound transitive closure (the kernel facade + provider
+# framework + governance contracts) is preserved for existing consumers.
+#
+# It does NOT ship a second ActionGate implementation, does NOT depend on TAP
+# (ActionGate and TAP are independent peer providers), and does NOT pull applications
+# or domains.
+#
+# Transitional: pinned to the frozen provider version 0.1.0. Removal/review target
+# tracked with the ``actiongate_provider`` shim.
 #
 # Build with:  python -m build packaging/dgm-actiongate-provider
 [build-system]
@@ -11,22 +25,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dgm-actiongate-provider"
-dynamic = ["version"]
-description = "ActionGate action-governance provider for the Decision Governance Middleware."
+version = "0.1.0"
+description = "ActionGate action-governance provider (compatibility distribution) — re-exports ugence-actiongate-provider."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
-dependencies = [
-    "decision-governance==1.0.0",
-    "dgm-provider-framework==0.1.0",
-]
+# No implementation here: the canonical package carries ActionGate. The
+# ``decision-authority`` extra preserves the legacy wheel's kernel-bound transitive
+# closure (framework adapters → decision-governance kernel facade + contracts).
+dependencies = ["ugence-actiongate-provider[decision-authority]==0.1.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
-
-[tool.setuptools.dynamic]
-version = { attr = "actiongate_provider.version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
