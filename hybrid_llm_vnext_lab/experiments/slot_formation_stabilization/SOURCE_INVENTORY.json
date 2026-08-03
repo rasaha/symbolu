@@ -1,0 +1,64 @@
+{
+  "schema": "slot_source_inventory/v1",
+  "date": "2026-08-03",
+  "five_seed_experiment_files": [
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.sha256",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/FROZEN_CONFIG.json",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/PRE_REGISTRATION.md",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/README.md",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/ablate.py",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/classify.py",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/compare.py",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/evaluate.py",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/run.py",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/verify_preregistration.py"
+  ],
+  "frozen_neural_harness_files": [
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/PRE_REGISTRATION.md",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/README.md",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/compare.py",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/config.json",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/run.py",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py"
+  ],
+  "frozen_five_seed_artifacts": [
+    "hybrid_llm_vnext_lab/artifacts/five_seed_results_run1.json",
+    "hybrid_llm_vnext_lab/artifacts/five_seed_classification_run1.json",
+    "hybrid_llm_vnext_lab/artifacts/five_seed_run_manifest_run1.json",
+    "hybrid_llm_vnext_lab/artifacts/five_seed_live_state.json"
+  ],
+  "slot_architecture_sources": {
+    "S_model": "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py",
+    "binding_slots_class": "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py",
+    "note": "The S arm = window softmax attention (WindowSoftmaxAttn, banded O(N*w)) + BindingSlots (bounded O(N*M*D), no global N x N). A+ = window-only, parameter-matched by auto-tuning ff. No Phase in any arm (AST-enforced by tests/boundaries)."
+  },
+  "task_and_data_sources": {
+    "tasks": "experiments/phase_lc/tasks.py (Phase-free: json/re/random/torch only)",
+    "adapter": "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py (read-only re-export)",
+    "corpus": [
+      "bounded_shadow_pilot/data/natural_pilot_v1/corpus.json",
+      "evidence_assurance/data/v1/corpus.json"
+    ],
+    "tokenizer": "Vocab (top ~1200 corpus words + ENT/VAL/SRC symbol tokens + structural words); vocab=1291"
+  },
+  "reuse_plan": {
+    "unmodified_reuse": [
+      "experiments/phase_lc/tasks.py",
+      "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py",
+      "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py",
+      "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py",
+      "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py"
+    ],
+    "new_code_this_phase": [
+      "experiments/slot_formation_stabilization/interventions.py (optimizer groups, orthogonal init, curriculum, alignment)",
+      "experiments/slot_formation_stabilization/diagnostics.py (routing / write-read overlap instrumentation)",
+      "experiments/slot_formation_stabilization/stabilize.py (arm runner reusing frozen model/eval/tasks)",
+      "experiments/slot_formation_stabilization/run_stage_a.py, run_stage_b.py (orchestrators)",
+      "experiments/slot_formation_stabilization/classify_stage_a.py, select_candidate.py, classify_stage_b.py"
+    ],
+    "principle": "No frozen file is edited. Interventions are applied at the instance level after model construction (optimizer param-groups, in-place slot_key re-init, forward-pre-hooks for diagnostics/alignment) so the frozen S forward/read/write equations, parameter count, tensor shapes, and inference path are all unchanged."
+  }
+}

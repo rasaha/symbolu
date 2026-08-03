@@ -1,0 +1,52 @@
+{
+  "schema": "slot_formation_stabilization_live_state/v1",
+  "date": "2026-08-03",
+  "phase": "Phase-Free Slot Formation Stabilization — Top Three Intervention Families",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_head": "04f24d3e4ac9bc755f21fc650ec19a73df0b469b",
+  "working_tree_clean_at_start": true,
+  "work_branch": "claude/slot-formation-stabilization-dtx0lz",
+  "branch_note": "The prompt suggested 'chatgpt/slot-formation-stabilization'; this environment's git discipline mandates the harness-designated branch 'claude/slot-formation-stabilization-dtx0lz' (documented difference). The branch was cut from the live default tip 04f24d3e.",
+  "pr_1300": {
+    "state": "MERGED",
+    "merged": true,
+    "title": "research: validate Phase-free bounded slots across five holdout seeds",
+    "merged_by": "rasaha",
+    "merged_at": "2026-08-03T09:43:05Z",
+    "merge_commit": "5f0cbe4539a4fad108c0bab90f216e5db7b953a7",
+    "final_head": "1ae11f1329600feaf89a293b11f0ac57dc3532ea",
+    "base_ref": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "base_sha_at_pr": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "verdict": "PARTIALLY_STABLE -> NOT_READY_FOR_KDA_VALIDATION",
+    "merge_commit_in_default_history": true
+  },
+  "existing_slot_stabilization_branch_or_pr": "none (only this work branch exists; no prior slot_formation_stabilization experiment dir)",
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "numpy": "2.4.6",
+    "torch_note": "torch/numpy were NOT pre-installed in this container; they were installed from the default (internal) PyPI mirror at session start. download.pytorch.org is blocked (403 via proxy); the default index served torch 2.13.0+cu130 — the SAME build recorded in the frozen five-seed live_state, so the neural harness runs under the identical torch build that produced the frozen result.",
+    "numpy_note": "The frozen run recorded numpy 1.26.4; this container resolved numpy 2.4.6. The harness numerics do not depend on numpy (all tensor math is torch); numpy is only a transitive import. Determinism of the torch training path is unaffected.",
+    "device": "cpu",
+    "cpu_cores": 4,
+    "threads": 4,
+    "dtype": "fp32",
+    "calibrated_s_arm_step_ms": 881,
+    "calibrated_s_arm_1200_steps_s_estimate": 1057,
+    "prior_frozen_s_arm_train_s": [986.8, 983.6, 996.4, 991.3, 1004.6]
+  },
+  "verifiers_at_start": {
+    "lab_verifier": "59 checks, 0 failures",
+    "historical_artifact_protection": "8 checks, 0 failures",
+    "platform_freeze_verify": "BLOCKED: platform_freeze.verify imports packages that require 'pydantic', which is not installed in this research container. This is unrelated to the slot lab. The PLATFORM_FREEZE_V1.json snapshot is present and this phase modifies no frozen platform surface (slots stay inside hybrid_llm_vnext_lab). Freeze manifest sha256 recorded in FROZEN_BASELINE_MANIFEST.json is unchanged pre/post."
+  },
+  "seed_contamination_check": {
+    "seeds_used_for_this_architecture_task_before": [0, 1, 2, 3, 4, 5, 6, 7],
+    "stage_a_diagnostic_seeds": [3, 6, 7],
+    "stage_a_seed_roles": {"3": "historical non-former", "6": "historical marginal former", "7": "historical non-former"},
+    "stage_b_fresh_seeds": [8, 9, 10, 11, 12],
+    "stage_b_seeds_uncontaminated": true,
+    "contamination_evidence": "grep across hybrid_llm_vnext_lab/ and experiments/phase_lc/ shows slot experiments used only seeds 0-2 (reproduce_legacy_slots) and 3-7 (five_seed_slots). No prior use of 8,9,10,11,12 for this S architecture, task, or any intervention."
+  },
+  "platform_freeze_status": "PRESERVED_BY_CONSTRUCTION (no frozen platform surface touched; verifier dependency 'pydantic' absent — recorded honestly)"
+}
