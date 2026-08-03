@@ -1,7 +1,7 @@
 // Small, accessible presentation primitives. State is never conveyed by color
 // alone — every status carries a glyph and an accessible label (§23, §24).
 import { clsx } from "clsx";
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import type { Descriptor } from "@/lib/domain";
 
 const TONE_CLASSES: Record<string, string> = {
@@ -45,9 +45,15 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className,
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={clsx("rounded-lg border border-surface-border bg-surface-1", className)}>{children}</div>
+    <div className={clsx("rounded-lg border border-surface-border bg-surface-1", className)} {...rest}>
+      {children}
+    </div>
   );
 }
 

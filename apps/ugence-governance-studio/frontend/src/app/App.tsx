@@ -8,6 +8,13 @@ import { WorkflowScreen } from "@/features/workflow/WorkflowScreen";
 import { RoleScreen } from "@/features/roles/RoleScreen";
 import { RegistryScreen } from "@/features/registry/RegistryScreen";
 import { EligibilityScreen } from "@/features/eligibility/EligibilityScreen";
+import { RankingScreen } from "@/features/ranking/RankingScreen";
+import { CompositionScreen } from "@/features/composition/CompositionScreen";
+import { PermissionScreen } from "@/features/permissions/PermissionScreen";
+import { FallbackScreen } from "@/features/fallbacks/FallbackScreen";
+import { ReplayScreen } from "@/features/replay/ReplayScreen";
+import { CompareScreen } from "@/features/compare/CompareScreen";
+import { WhatIfScreen } from "@/features/whatif/WhatIfScreen";
 
 export function App() {
   return (
@@ -22,6 +29,13 @@ export function App() {
             <Route path="roles/:roleId" element={<RoleScreen />} />
             <Route path="registry" element={<RegistryScreen />} />
             <Route path="eligibility" element={<EligibilityScreen />} />
+            <Route path="ranking" element={<RankingScreen />} />
+            <Route path="composition" element={<CompositionScreen />} />
+            <Route path="permissions" element={<PermissionScreen />} />
+            <Route path="fallbacks" element={<FallbackScreen />} />
+            <Route path="replay" element={<ReplayScreen />} />
+            <Route path="compare" element={<CompareScreen />} />
+            <Route path="what-if" element={<WhatIfScreen />} />
           </Route>
           <Route path="*" element={<Navigate to="/scenarios" replace />} />
         </Routes>

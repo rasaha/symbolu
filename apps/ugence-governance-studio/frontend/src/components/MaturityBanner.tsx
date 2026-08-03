@@ -34,6 +34,16 @@ export function MaturityBanner() {
   );
 }
 
+export function PlanningNote() {
+  return (
+    <p className="rounded border border-surface-border bg-surface-2/50 p-3 text-xs text-ink-2" data-testid="planning-note">
+      Ranking, composition, permission proposals and fallback plans are deterministic
+      planning outputs over synthetic data. They do not assign agents, grant
+      permissions, provision runtime access, authorize actions or execute workflows.
+    </p>
+  );
+}
+
 export function EligibilityMeaningNote() {
   return (
     <p className="rounded border border-surface-border bg-surface-2/50 p-3 text-xs text-ink-2">
