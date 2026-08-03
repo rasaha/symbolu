@@ -1,0 +1,92 @@
+{
+  "composition_contract_version": "awc.composition.v1",
+  "criteria": [
+    {
+      "direction": "higher_better",
+      "hi": 3.0,
+      "key": "evidence_strength",
+      "lo": 1.0,
+      "metric": "evidence_strength",
+      "weight_bp": 2000
+    },
+    {
+      "direction": "higher_better",
+      "hi": 1.0,
+      "key": "evidence_freshness",
+      "lo": 0.0,
+      "metric": "evidence_freshness",
+      "weight_bp": 1000
+    },
+    {
+      "direction": "higher_better",
+      "hi": 1.0,
+      "key": "measured_quality",
+      "lo": 0.0,
+      "metric": "quality",
+      "weight_bp": 2000
+    },
+    {
+      "direction": "higher_better",
+      "hi": 1.0,
+      "key": "observed_reliability",
+      "lo": 0.9,
+      "metric": "reliability",
+      "weight_bp": 1500
+    },
+    {
+      "direction": "lower_better",
+      "hi": 5000.0,
+      "key": "latency_headroom",
+      "lo": 0.0,
+      "metric": "latency",
+      "weight_bp": 1500
+    },
+    {
+      "direction": "lower_better",
+      "hi": 10.0,
+      "key": "cost_efficiency",
+      "lo": 0.0,
+      "metric": "cost",
+      "weight_bp": 1000
+    },
+    {
+      "direction": "higher_better",
+      "hi": 5.0,
+      "key": "security_headroom",
+      "lo": 0.0,
+      "metric": "security",
+      "weight_bp": 500
+    },
+    {
+      "direction": "higher_better",
+      "hi": 4.0,
+      "key": "audit_strength",
+      "lo": 0.0,
+      "metric": "audit",
+      "weight_bp": 500
+    }
+  ],
+  "evidence_precedence": [
+    "OBSERVED",
+    "MEASURED",
+    "DECLARED"
+  ],
+  "missing_value_rule": "zero",
+  "policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "policy_id": "gs_ranking_policy",
+  "policy_version": "1.0",
+  "score_precision": "1_basis_point",
+  "score_representation": "integer_basis_points",
+  "score_rounding": "ROUND_FLOOR",
+  "tie_break_sequence": [
+    "total_score",
+    "evidence_strength",
+    "evidence_freshness",
+    "reliability",
+    "cost",
+    "latency",
+    "provider_id",
+    "agent_id",
+    "agent_version"
+  ]
+}

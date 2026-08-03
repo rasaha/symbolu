@@ -1,0 +1,14 @@
+{
+  "composition_contract_version": "awc.composition.v1",
+  "governance_owned_permissions": [
+    "authorize_purchase",
+    "approve_binding",
+    "authorize_action"
+  ],
+  "human_review_permissions": [
+    "write_draft"
+  ],
+  "policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+  "policy_id": "gs_permission_policy",
+  "policy_version": "1.0"
+}

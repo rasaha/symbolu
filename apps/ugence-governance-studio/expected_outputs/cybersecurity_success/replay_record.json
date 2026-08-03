@@ -1,0 +1,31 @@
+{
+  "composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+  "contract_versions": [
+    "awc.v1",
+    "awc.composition.v1"
+  ],
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:f0ce7dead307cd2d333b504bb0d6b0b8f7e70b4edc25beb50b486cff630bd8a6",
+  "expected_plan_fingerprint": "sha256:9be9cf67e0a07b2cda0eae33a2a507740d549a7cb7422e43292f7d997944be98",
+  "fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+  "logical_time": 1000000.0,
+  "non_agent_disposition_fingerprints": [
+    "sha256:3fc84ef1cfd9e5fd8e359d436700e28fe6ad47f4f2e899c0b291209e90077177",
+    "sha256:3ac21d34a8ff090f0b0b9ae52d6303d3265d33bd02d893b2e7c7992819955b16",
+    "sha256:b134f44a5b4f5d078f94b4d425586a2084fb9b7b72c6d319a905533eb2939846",
+    "sha256:afe4bd37e1d6cb0fde30087af9ca5f14bb523544e26ac1d2bab668d87f7b19a9",
+    "sha256:76f617c08cd5e99dbeb5dc8216056d3ebf8ffb492d2ad91c5017193a085c20b9"
+  ],
+  "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+  "plan_contract_version": "awc.composition.v1",
+  "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "registry_snapshot_digest": "sha256:2462616dc1297b6c2e6e003fe59b3c11e9042a2cdc771bc7559450b2ed198b67",
+  "replay_fingerprint": "sha256:1ceea86434c395f06f5c05a2d70b6639241bff7bead60e813f26db052ea8fe52",
+  "role_fingerprints": [
+    "sha256:96bfaca4f57860f6cd4bc4598e5056a492325918ac9f24e2691efa53b7015d04",
+    "sha256:c5a7677c9091775edbf72aaad89f3f98358c32cab8b93bfb2b72162a8324e899",
+    "sha256:5c328c86d96ff9a71f562b7b128acc821108672956135eebc227d3386c656cc6",
+    "sha256:10cb13cdff9ec62e73381e38a05909a56e51df687913427f176a9c67729cf8c5"
+  ],
+  "workflow_adaptation_fingerprint": "sha256:9ed3cd67cb3268c6f3346f5d881d747ba6ba729ae7350267ee265bca0c450fc0"
+}

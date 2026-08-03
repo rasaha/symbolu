@@ -1,0 +1,10 @@
+{
+  "adaptation_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a",
+  "composition_fingerprint": "sha256:e4a441ea03ecf05b959e65c869c8ac7fcd6b69439826e4b30247396da63f8769",
+  "expected_plan_fingerprint": "sha256:e4d7ebd1f69b20e94d12162d7db5b881a2fc8c050db9fd14c158478aaefb147b",
+  "plan_fingerprint": "sha256:e4d7ebd1f69b20e94d12162d7db5b881a2fc8c050db9fd14c158478aaefb147b",
+  "plan_id": "plan::1642abd9bb2d5e0c",
+  "plan_state": "NO_FEASIBLE_TEAM",
+  "replay_fingerprint": "sha256:cde148a4259aba329bc6914ec51d06734fd33f5c956f3e76aef7dcde4b2981b5",
+  "workflow_eligibility_fingerprint": "sha256:17055bc22cbee319263269b118e547ab1fc0ab190b6acb22f75635dd71eba6cb"
+}

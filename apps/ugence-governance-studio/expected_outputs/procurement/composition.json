@@ -1,0 +1,178 @@
+{
+  "composition_contract_version": "awc.composition.v1",
+  "composition_fingerprint": "sha256:781802c3023ed48eab1517acce72522362bd2b50ce5a703236ddba5bd5b19fd0",
+  "composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+  "composition_state": "COMPLETE",
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:6c5c763c40bcbe870a6e989f155e2b5d49161e84772ff44fa0c691375fb3fdc3",
+  "hard_constraint_results": [
+    {
+      "constraint": "max_roles_per_agent",
+      "detail": "",
+      "limit_value": "2",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "provider_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "failure_domain_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "authority_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "1/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_provider_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "2",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_deployment_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_cost_ceiling",
+      "detail": "",
+      "limit_value": "50.0",
+      "measured_value": "8.5",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_latency_ceiling",
+      "detail": "",
+      "limit_value": "10000.0",
+      "measured_value": "1000.0",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_reliability_floor",
+      "detail": "",
+      "limit_value": "0.9",
+      "measured_value": "0.99",
+      "satisfied": true
+    },
+    {
+      "constraint": "interface_compatibility",
+      "detail": "",
+      "limit_value": "",
+      "measured_value": "",
+      "satisfied": true
+    }
+  ],
+  "objective_results": [
+    {
+      "evidence_refs": [],
+      "explanation": "sum of primary ranking scores",
+      "normalized_value": 22832,
+      "objective": "aggregate_ranking_quality",
+      "raw_value": "22832",
+      "weight": 8000,
+      "weighted_contribution": 22832
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct providers",
+      "normalized_value": 2,
+      "objective": "provider_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct provider failure domains",
+      "normalized_value": 2,
+      "objective": "failure_domain_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    }
+  ],
+  "optimality_status": "EXACT_OPTIMUM",
+  "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "registry_snapshot_digest": "sha256:7068ec47aeeb7ec4aa3b865490162a157ed0ec90758e268f4656b76e4bd4f545",
+  "role_assignments": [
+    {
+      "assignment_explanation": "selected rank #1 score 7589bp; provider anthropic",
+      "assignment_fingerprint": "sha256:618d3bfc48fd1016c26abda33cb9e9c477e25dd749145713d371d277c6ac9514",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:e9ab8582754a154d048fdbe3d67260d85e61a89b52c0236dd79b2239284c0cb9",
+      "fallback_plan_ref": "",
+      "primary_agent_id": "agent_procurement_recommendation",
+      "primary_agent_version": "1.2.0",
+      "proposed_permission_bound_ref": "sha256:4900f2f023cb5281ffb9d5afbd456870b9fd1da97311644ecaa97b8dfe53ab73",
+      "rank_result_fingerprint": "sha256:ee747cb74827360747cbbc821e080e150abaee7aff513704659549ba8f879175",
+      "required_interface_refs": [
+        "supplier_risk_report"
+      ],
+      "role_id": "role::proc_recommendation",
+      "total_score": 7589
+    },
+    {
+      "assignment_explanation": "selected rank #2 score 7604bp; provider openai",
+      "assignment_fingerprint": "sha256:c6adf6562e27cbafe703a0269fe9a909e32275436748641699e98ced1501912c",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:21eb639d6d589a57d0c8e82607d6ea358f37f88e844d648fa62ba870428f669c",
+      "fallback_plan_ref": "",
+      "primary_agent_id": "agent_general_analyst",
+      "primary_agent_version": "1.0.0",
+      "proposed_permission_bound_ref": "sha256:f4a463b6acbd9fc5395ad9e9d95b9fefe372205241922e47627d5f183f709b9a",
+      "rank_result_fingerprint": "sha256:987402ff2adf1b38514d9c4af5ce80f16f9d4c92fad2f302e1e77e658090a897",
+      "required_interface_refs": [
+        "supplier_evidence"
+      ],
+      "role_id": "role::proc_supplier_evidence",
+      "total_score": 7604
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7639bp; provider anthropic",
+      "assignment_fingerprint": "sha256:0d8123e3415694d03433579f45f2e0875eb5c0b4907a21e733b62a2d7d3378fa",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:f5ba945f3f8a971ebfc9b192a0bcc8ff8f51eb4deb89901ab3b4b954830aa2a2",
+      "fallback_plan_ref": "",
+      "primary_agent_id": "agent_procurement_risk",
+      "primary_agent_version": "2.1.0",
+      "proposed_permission_bound_ref": "sha256:9e24ed5414b6ca86c4d03506d5760d06ab0c89598d8e7080c38bf2eebcae372b",
+      "rank_result_fingerprint": "sha256:939418047fa9c8e3163a4bc0d3e42771ab90ce263b395b843b98f80c8b073142",
+      "required_interface_refs": [
+        "supplier_evidence",
+        "supplier_risk_report"
+      ],
+      "role_id": "role::proc_supplier_risk",
+      "total_score": 7639
+    }
+  ],
+  "search_statistics": {
+    "algorithm": "deterministic_branch_and_bound",
+    "assignments_explored": 2,
+    "assignments_pruned": 0,
+    "feasible_team_count": 1,
+    "max_candidates_per_role": 16,
+    "max_combinations_limit": 100000,
+    "max_roles": 3,
+    "optimality_status": "EXACT_OPTIMUM",
+    "search_space_size": 2,
+    "termination_reason": "exhaustive bounded search complete"
+  },
+  "total_team_score": 26832,
+  "unfilled_roles": [],
+  "workflow_fingerprint": "sha256:91c1f7d2533b02f75e1b81c5a5a048b01c4252cd4d6ec9b58a84bfc4babce25a"
+}

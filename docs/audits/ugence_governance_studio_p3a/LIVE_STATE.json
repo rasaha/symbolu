@@ -1,0 +1,34 @@
+{
+  "stage": "P3A",
+  "product_surface": "Ugence Governance Studio",
+  "capability": "Agent Workforce Composer Eligibility and Composition Explorer",
+  "repository": "rasaha/symbolu",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "edea48d37855d3247da735291a332f2fca40e1de",
+  "working_branch": "claude/governance-studio-p3a-ficdup",
+  "prerequisites": {
+    "pr_1308_p1": {"merged": true, "merge_commit": "d1cfad24777ae0bbd49f7be4a699786fed1ffb3b"},
+    "pr_1310_p2": {"merged": true, "merge_commit": "0f5a461fb6714a4c55637d29e488814a2fe1a646", "verified_via_github": true, "merged_at": "2026-08-03T14:59:57Z"}
+  },
+  "existing_governance_studio_app": false,
+  "working_tree_clean_at_branch_creation": true,
+  "awc": {
+    "import_name": "ugence_agent_workforce_composer",
+    "distribution": "ugence-agent-workforce-composer",
+    "location": "packages/capabilities/agent-workforce-composer/",
+    "version": "0.2.0",
+    "contract_version": "awc.v1",
+    "composition_contract_version": "awc.composition.v1",
+    "public_api_names": 93,
+    "core_dependency": "pydantic>=2"
+  },
+  "verification": {
+    "awc_test_suite": "156 passed, 1 skipped",
+    "distribution_verifier": "AWC_P2_DISTRIBUTION_VERIFIED",
+    "distribution_wheel_sha256": "e283b716998f06e349a1260273acb9a799fe2680c7345d7f13994109f860e101",
+    "distribution_sdist_sha256": "0b20d2deea8cd7fb488abed683b95540baedc16d1d69fe64a630d9e7f7314077",
+    "platform_freeze": "PASS",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "audit_timestamp_utc": "2026-08-03T15:40:03Z"
+}

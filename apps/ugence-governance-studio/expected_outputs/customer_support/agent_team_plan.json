@@ -1,0 +1,568 @@
+{
+  "compiler_source_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+  "composition_policy_digest": "sha256:d0f929758b54f0e6a53c1ffa3fac9abcef00bfecb78f9612bf37ca5ef14cee40",
+  "created_at": 1000000.0,
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+  "fallback_policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+  "governance_boundary_refs": [
+    "sup_escalation_decision",
+    "sup_human_approval"
+  ],
+  "human_review_requirements": [],
+  "non_agent_dispositions": [
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "HUMAN_REVIEWER",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "DECISION_AUTHORITY",
+      "contract_version": "awc.v1",
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "fingerprint": "sha256:2618d259f76941c99e0474215f4ad1b5c1956d4737b30241917cf145e0a85da9",
+      "human_review_required": true,
+      "node_id": "sup_escalation_decision",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_escalation_decision",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "human_authority_type:HUMAN_REVIEWER"
+      ],
+      "source_capability": "DECISION_AUTHORITY",
+      "source_node_kind": "AUTHORITY_CHECK",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "AUTHORITATIVE",
+        "authority_type": "HUMAN_APPROVER",
+        "owning_capability": "DECISION_AUTHORITY",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "DECISION_AUTHORITY",
+      "contract_version": "awc.v1",
+      "disposition": "HUMAN_AUTHORITY_REQUIRED",
+      "fingerprint": "sha256:6b7ab72b6b87f28a24d30c2bec3b2e853d2da24be27c6c131d6a97b7f0258faa",
+      "human_review_required": true,
+      "node_id": "sup_human_approval",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_human_approval",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "human_authority_node:APPROVAL_GATE"
+      ],
+      "source_capability": "DECISION_AUTHORITY",
+      "source_node_kind": "APPROVAL_GATE",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    },
+    {
+      "authority_context": {
+        "authority_disposition": "ADVISORY",
+        "authority_type": "",
+        "owning_capability": "COMPILER",
+        "public_contract_target": ""
+      },
+      "canonical_owner": "COMPILER",
+      "contract_version": "awc.v1",
+      "disposition": "NO_AI_AGENT_REQUIRED",
+      "fingerprint": "sha256:3847d511fd7646681520dad517feb8083c313c459a0a79001f96c87305d36f1f",
+      "human_review_required": false,
+      "node_id": "sup_terminal",
+      "provenance": {
+        "notes": "",
+        "source_kind": "compiler_workflow_ir",
+        "source_ref": "gs_support@v1:sup_terminal",
+        "synthetic": true
+      },
+      "reason_codes": [
+        "structural_kind:TERMINAL_OUTCOME"
+      ],
+      "source_capability": "COMPILER",
+      "source_node_kind": "TERMINAL_OUTCOME",
+      "source_package_digest": "sha256:2694f1c697a813758e03ae3c2d5f8a0def60e27e47c6ede1c2fd426356037f98",
+      "workflow_id": "gs_support"
+    }
+  ],
+  "permission_bound_proposals": [
+    {
+      "agent_id": "agent_response_drafting",
+      "agent_version": "2.0.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:5d223ba02058e5ca1c842d761e82ae56568bac656a03dc531c587657b448d992",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+      "role_id": "role::sup_draft"
+    },
+    {
+      "agent_id": "agent_knowledge_retrieval",
+      "agent_version": "1.0.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:955a55725fe0fd0c7e5f894c99c46a18d01c026fa670c494509aba0a7c213a2a",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+      "role_id": "role::sup_retrieval"
+    },
+    {
+      "agent_id": "agent_support_triage",
+      "agent_version": "1.1.0",
+      "categorized": [
+        {
+          "category": "PROPOSED",
+          "detail": "",
+          "permission": "read_context"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "feasible": true,
+      "infeasible_reasons": [],
+      "notice": "This is a planning-time permission-bound proposal. It does not grant, authorize, provision or execute any permission.",
+      "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+      "proposal_fingerprint": "sha256:1c24506f948cfbe5796fbe35cab7fb3bea6c0db9d1417c34f715703d30959961",
+      "proposed_authority_scope": 1,
+      "proposed_permissions": [
+        "read_context"
+      ],
+      "requires_human_review": false,
+      "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+      "role_id": "role::sup_triage"
+    }
+  ],
+  "permission_policy_digest": "sha256:99f1c543248990e894ac4538533d93fda91b4eb794eb89aa17afe42708c23d96",
+  "plan_contract_version": "awc.composition.v1",
+  "plan_fingerprint": "sha256:16ca0146d69f1dc9862496cf6b935dfbb469e51132c03f90fc748d1794e68ae8",
+  "plan_id": "plan::00ea7809a04c6622",
+  "plan_state": "COMPLETE",
+  "provenance": {
+    "notes": "",
+    "source_kind": "p2_composition",
+    "source_ref": "",
+    "synthetic": true
+  },
+  "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "registry_snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+  "registry_snapshot_id": "gs_support_registry",
+  "role_assignments": [
+    {
+      "assignment_explanation": "selected rank #1 score 7759bp; provider anthropic",
+      "assignment_fingerprint": "sha256:3a496abfab5742c3294c7117b94e18570ae81c2538a7bc21c411f541a95cbd54",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:a7ded94715bdaf62dd5c9a53984336ed904b43fca0c4528871e1e3a91b684759",
+      "fallback_plan_ref": "sha256:850bb212544d888bdc45999ad72ed90e5c0ad423cd2080c1c5ad88fa5d7a7839",
+      "primary_agent_id": "agent_response_drafting",
+      "primary_agent_version": "2.0.0",
+      "proposed_permission_bound_ref": "sha256:5d223ba02058e5ca1c842d761e82ae56568bac656a03dc531c587657b448d992",
+      "rank_result_fingerprint": "sha256:9503714c1df403d711020d36584be783292750f309ef1274384c8340b8c9d574",
+      "required_interface_refs": [
+        "retrieved_context"
+      ],
+      "role_id": "role::sup_draft",
+      "total_score": 7759
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7774bp; provider openai",
+      "assignment_fingerprint": "sha256:14edd59411e931ff716c97429bd02fa5687a6d73e8e6184fd3412ff810095109",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:aff76b58d3225c3f6b64b06e96876f84d717c4544760c558fe8c4aad0da4f503",
+      "fallback_plan_ref": "sha256:9eecbee65686aa55ca8e7c42e7a1af6b5b2cb1fa2ef4e9cc9d139d26e78eef80",
+      "primary_agent_id": "agent_knowledge_retrieval",
+      "primary_agent_version": "1.0.0",
+      "proposed_permission_bound_ref": "sha256:955a55725fe0fd0c7e5f894c99c46a18d01c026fa670c494509aba0a7c213a2a",
+      "rank_result_fingerprint": "sha256:f85feed649d4afdf445661e3b272efd22d19762a0dee3e76b9f9f96deda65cff",
+      "required_interface_refs": [
+        "retrieved_context",
+        "ticket_class"
+      ],
+      "role_id": "role::sup_retrieval",
+      "total_score": 7774
+    },
+    {
+      "assignment_explanation": "selected rank #1 score 7859bp; provider anthropic",
+      "assignment_fingerprint": "sha256:5bd2a969df9cf0d92ac959ed6c362efe8f70c68202d6e18e50709e1130e50162",
+      "composition_contract_version": "awc.composition.v1",
+      "eligibility_result_fingerprint": "sha256:e1d7518c4013d5b0808dcea37fcd282866468231946c90a55f88000e1edeaa89",
+      "fallback_plan_ref": "sha256:1d6bd1b69d0ff7a9b6eb864a52bb7be8eb437390aa68adc43a0371fd4f0f6e9f",
+      "primary_agent_id": "agent_support_triage",
+      "primary_agent_version": "1.1.0",
+      "proposed_permission_bound_ref": "sha256:1c24506f948cfbe5796fbe35cab7fb3bea6c0db9d1417c34f715703d30959961",
+      "rank_result_fingerprint": "sha256:4c8cc6ac5e691ed968970f297e3ac8a0a220a307edcee2eecd31731de63b64e9",
+      "required_interface_refs": [
+        "ticket_class"
+      ],
+      "role_id": "role::sup_triage",
+      "total_score": 7859
+    }
+  ],
+  "role_fallback_plans": [
+    {
+      "candidates": [
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "composition_contract_version": "awc.composition.v1",
+          "eligibility_fingerprint": "sha256:d8ef379f4d9de751a9a5e8af645cbb3a4aabd01ce05cebfd353e58d288d56bc5",
+          "failure_domain_comparison": "different_provider",
+          "fallback_fingerprint": "sha256:7b05988ae77079147d295548de5c24b839ac62a1b33007ef44bdd46f37156a7c",
+          "fallback_order": 1,
+          "permission_bound_ref": "sha256:a5071e4454f5c06ff746a6ba718939e234989205b8c62e014ca6d95bcdaba88d",
+          "rank": 2,
+          "rank_fingerprint": "sha256:df5bf590515b99b6423671fc7e17e8556f2d2c18201a6ba73790b44b40f95d87",
+          "ranking_score": 7579,
+          "selection_reason": "rank #2, score 7579bp, diverse failure domain"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "PARTIAL",
+      "plan_fingerprint": "sha256:850bb212544d888bdc45999ad72ed90e5c0ad423cd2080c1c5ad88fa5d7a7839",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_response_drafting",
+      "primary_agent_version": "2.0.0",
+      "role_id": "role::sup_draft"
+    },
+    {
+      "candidates": [
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "composition_contract_version": "awc.composition.v1",
+          "eligibility_fingerprint": "sha256:834edefea963c871a3ae525576299c9c62861500b7cc52cc7b40e1d361664e70",
+          "failure_domain_comparison": "same_provider",
+          "fallback_fingerprint": "sha256:bb419d4d749789712c0969638a529bc38823f1318774d2cfef5a8e56eab83e29",
+          "fallback_order": 1,
+          "permission_bound_ref": "sha256:f3b3e233aab92732d4778964555ff5716766b08dfadd64ec224af08166a8b57f",
+          "rank": 2,
+          "rank_fingerprint": "sha256:ec01af646ded92ef02ee17f755e8f85fbff6922612bf611a3ea029ec75102b58",
+          "ranking_score": 7579,
+          "selection_reason": "rank #2, score 7579bp, same failure domain"
+        },
+        {
+          "agent_id": "agent_general_analyst",
+          "agent_version": "1.0.0",
+          "composition_contract_version": "awc.composition.v1",
+          "eligibility_fingerprint": "sha256:90e129386e9cd87b49715e31a105adbe1aefd5d41fed65019e00116a4e42edb9",
+          "failure_domain_comparison": "same_provider",
+          "fallback_fingerprint": "sha256:efda0ed31033d29ceb9b678ac11b59e62a5aa93e698d8f2a976a4cf7ef4ce66b",
+          "fallback_order": 2,
+          "permission_bound_ref": "sha256:db00a9d3ba2aa9f70e103c03ae6f69c3af7e8a3af00f2e4e1682449b8d8452e3",
+          "rank": 3,
+          "rank_fingerprint": "sha256:11096f0baeab4a51b3460ac9e1f8b0bb3c01b353e89460d077ac673d773c3fda",
+          "ranking_score": 7504,
+          "selection_reason": "rank #3, score 7504bp, same failure domain"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "COMPLETE",
+      "plan_fingerprint": "sha256:9eecbee65686aa55ca8e7c42e7a1af6b5b2cb1fa2ef4e9cc9d139d26e78eef80",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_knowledge_retrieval",
+      "primary_agent_version": "1.0.0",
+      "role_id": "role::sup_retrieval"
+    },
+    {
+      "candidates": [
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "composition_contract_version": "awc.composition.v1",
+          "eligibility_fingerprint": "sha256:8e5cfebd00c9c34a1dd72480155d021f859b0a1d7cde64209d24bfb3fd78b271",
+          "failure_domain_comparison": "different_provider",
+          "fallback_fingerprint": "sha256:6370f402ca1450b9a486df6cbc74fc3d64fd571b3ebcc563767bfbddeaed5425",
+          "fallback_order": 1,
+          "permission_bound_ref": "sha256:e111b0fa6c10ac0238633262a73c8198368f7954458a926ed3a4fdfcb533ec41",
+          "rank": 2,
+          "rank_fingerprint": "sha256:7e73dda04f46863a4c0860b398ed0e86632b8dcc6b93028b41450c257051578e",
+          "ranking_score": 7579,
+          "selection_reason": "rank #2, score 7579bp, diverse failure domain"
+        }
+      ],
+      "composition_contract_version": "awc.composition.v1",
+      "fallback_state": "PARTIAL",
+      "plan_fingerprint": "sha256:1d6bd1b69d0ff7a9b6eb864a52bb7be8eb437390aa68adc43a0371fd4f0f6e9f",
+      "policy_digest": "sha256:e51fa74c0ea5c3341bd14a513f2e923a39515478e27a7119f65bec78815faac4",
+      "primary_agent_id": "agent_support_triage",
+      "primary_agent_version": "1.1.0",
+      "role_id": "role::sup_triage"
+    }
+  ],
+  "search_statistics": {
+    "algorithm": "deterministic_branch_and_bound",
+    "assignments_explored": 12,
+    "assignments_pruned": 0,
+    "feasible_team_count": 9,
+    "max_candidates_per_role": 16,
+    "max_combinations_limit": 100000,
+    "max_roles": 3,
+    "optimality_status": "EXACT_OPTIMUM",
+    "search_space_size": 12,
+    "termination_reason": "exhaustive bounded search complete"
+  },
+  "selection_explanation": {
+    "narrative": [
+      "workflow gs_support: composition COMPLETE, EXACT_OPTIMUM; 3 role(s) assigned, team score 27392bp"
+    ],
+    "role_explanations": [
+      {
+        "candidate_states": [
+          [
+            "agent_response_drafting@2.0.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7759bp"
+          ],
+          [
+            "agent_multilingual_support@1.0.0",
+            "SELECTED_FALLBACK",
+            "pre-approved fallback; rank #2"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_knowledge_retrieval@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_support_triage@1.1.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sup_draft",
+        "selected_primary": "agent_response_drafting@2.0.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      },
+      {
+        "candidate_states": [
+          [
+            "agent_knowledge_retrieval@1.0.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7774bp"
+          ],
+          [
+            "agent_multilingual_support@1.0.0",
+            "SELECTED_FALLBACK",
+            "pre-approved fallback; rank #2"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "SELECTED_FALLBACK",
+            "pre-approved fallback; rank #3"
+          ],
+          [
+            "agent_response_drafting@2.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_support_triage@1.1.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sup_retrieval",
+        "selected_primary": "agent_knowledge_retrieval@1.0.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      },
+      {
+        "candidate_states": [
+          [
+            "agent_support_triage@1.1.0",
+            "SELECTED_PRIMARY",
+            "highest feasible team fit; rank #1, 7859bp"
+          ],
+          [
+            "agent_multilingual_support@1.0.0",
+            "SELECTED_FALLBACK",
+            "pre-approved fallback; rank #2"
+          ],
+          [
+            "agent_general_analyst@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_knowledge_retrieval@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_response_drafting@2.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ],
+          [
+            "agent_threat_analysis@1.0.0",
+            "INELIGIBLE",
+            "P1-ineligible: MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        "role_id": "role::sup_triage",
+        "selected_primary": "agent_support_triage@1.1.0",
+        "team_tradeoffs": [
+          "highest-ranked individuals may differ from best feasible team due to provider/failure-domain/authority concentration and interface constraints"
+        ]
+      }
+    ],
+    "workflow_identity": "gs_support"
+  },
+  "team_constraint_results": [
+    {
+      "constraint": "max_roles_per_agent",
+      "detail": "",
+      "limit_value": "2",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "provider_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "failure_domain_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "2/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "authority_concentration",
+      "detail": "",
+      "limit_value": "67%",
+      "measured_value": "1/3",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_provider_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "2",
+      "satisfied": true
+    },
+    {
+      "constraint": "min_deployment_diversity",
+      "detail": "",
+      "limit_value": "1",
+      "measured_value": "1",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_cost_ceiling",
+      "detail": "",
+      "limit_value": "50.0",
+      "measured_value": "5.3",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_latency_ceiling",
+      "detail": "",
+      "limit_value": "10000.0",
+      "measured_value": "700.0",
+      "satisfied": true
+    },
+    {
+      "constraint": "team_reliability_floor",
+      "detail": "",
+      "limit_value": "0.9",
+      "measured_value": "0.99",
+      "satisfied": true
+    },
+    {
+      "constraint": "interface_compatibility",
+      "detail": "",
+      "limit_value": "",
+      "measured_value": "",
+      "satisfied": true
+    }
+  ],
+  "team_objective_results": [
+    {
+      "evidence_refs": [],
+      "explanation": "sum of primary ranking scores",
+      "normalized_value": 23392,
+      "objective": "aggregate_ranking_quality",
+      "raw_value": "23392",
+      "weight": 8000,
+      "weighted_contribution": 23392
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct providers",
+      "normalized_value": 2,
+      "objective": "provider_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    },
+    {
+      "evidence_refs": [],
+      "explanation": "distinct provider failure domains",
+      "normalized_value": 2,
+      "objective": "failure_domain_diversity",
+      "raw_value": "2",
+      "weight": 1000,
+      "weighted_contribution": 2000
+    }
+  ],
+  "total_team_score": 27392,
+  "unfilled_roles": [],
+  "workflow_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e",
+  "workflow_identity": "gs_support"
+}

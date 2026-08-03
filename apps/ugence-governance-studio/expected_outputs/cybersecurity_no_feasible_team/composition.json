@@ -1,0 +1,29 @@
+{
+  "composition_contract_version": "awc.composition.v1",
+  "composition_fingerprint": "sha256:e4a441ea03ecf05b959e65c869c8ac7fcd6b69439826e4b30247396da63f8769",
+  "composition_policy_digest": "sha256:a82fbdc145e9150db649ec995d26fdf25d7239d52c2febd6eef953b1aa02a598",
+  "composition_state": "NO_FEASIBLE_TEAM",
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:dcf404aab453713ba4e8407d21e2610827e93068c34e34b8417d9370a3293f9e",
+  "hard_constraint_results": [],
+  "objective_results": [],
+  "optimality_status": "NO_FEASIBLE_TEAM",
+  "ranking_policy_digest": "sha256:5763fa260334619bee5b7062dbe2459f3559d38c5d6910ccd69178d9d09a2c69",
+  "registry_snapshot_digest": "sha256:b15fe31cf63a7af2835cbdbc5a5b0d57b3d38b76fec6d9d5ae04e2e75d014fa9",
+  "role_assignments": [],
+  "search_statistics": {
+    "algorithm": "deterministic_branch_and_bound",
+    "assignments_explored": 1,
+    "assignments_pruned": 0,
+    "feasible_team_count": 0,
+    "max_candidates_per_role": 16,
+    "max_combinations_limit": 100000,
+    "max_roles": 2,
+    "optimality_status": "NO_FEASIBLE_TEAM",
+    "search_space_size": 1,
+    "termination_reason": "exhaustive bounded search complete"
+  },
+  "total_team_score": 0,
+  "unfilled_roles": [],
+  "workflow_fingerprint": "sha256:414342946cc299da8689dce05383fe8f3db5f301928bd2259938c855baa3486a"
+}

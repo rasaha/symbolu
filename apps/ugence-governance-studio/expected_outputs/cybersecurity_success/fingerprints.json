@@ -1,0 +1,10 @@
+{
+  "adaptation_fingerprint": "sha256:9ed3cd67cb3268c6f3346f5d881d747ba6ba729ae7350267ee265bca0c450fc0",
+  "composition_fingerprint": "sha256:c14fe8bd63cdea3f5b4ba59803e0d18c624834b757d0757f6ca87bdbc0dc6907",
+  "expected_plan_fingerprint": "sha256:9be9cf67e0a07b2cda0eae33a2a507740d549a7cb7422e43292f7d997944be98",
+  "plan_fingerprint": "sha256:9be9cf67e0a07b2cda0eae33a2a507740d549a7cb7422e43292f7d997944be98",
+  "plan_id": "plan::6db166d196926a39",
+  "plan_state": "COMPLETE",
+  "replay_fingerprint": "sha256:1ceea86434c395f06f5c05a2d70b6639241bff7bead60e813f26db052ea8fe52",
+  "workflow_eligibility_fingerprint": "sha256:33ff9600051fb111e8b5cdd69247de1655dda512093dea5cabd5d7922039e803"
+}

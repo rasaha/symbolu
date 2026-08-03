@@ -1,0 +1,1220 @@
+{
+  "adaptation_fingerprint": "sha256:cfeb97a252048309116ef15cfd747d6047ba0c2fbc5a29c5ee90a70757add90e",
+  "contract_version": "awc.v1",
+  "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+  "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+  "explanations": [
+    {
+      "eligible": [
+        "agent_multilingual_support@1.0.0",
+        "agent_response_drafting@2.0.0"
+      ],
+      "eliminated": [
+        [
+          "agent_general_analyst@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_knowledge_retrieval@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_support_triage@1.1.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_threat_analysis@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ]
+      ],
+      "indeterminate": [],
+      "narrative": [
+        "role role::sup_draft: HAS_ELIGIBLE_AGENT",
+        "evaluated 6 agent(s); 2 eligible, 4 eliminated, 0 indeterminate",
+        "  - agent_general_analyst@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_knowledge_retrieval@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_support_triage@1.1.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_threat_analysis@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+      ],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "role_id": "role::sup_draft"
+    },
+    {
+      "eligible": [
+        "agent_general_analyst@1.0.0",
+        "agent_knowledge_retrieval@1.0.0",
+        "agent_multilingual_support@1.0.0"
+      ],
+      "eliminated": [
+        [
+          "agent_response_drafting@2.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_support_triage@1.1.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_threat_analysis@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ]
+      ],
+      "indeterminate": [],
+      "narrative": [
+        "role role::sup_retrieval: HAS_ELIGIBLE_AGENT",
+        "evaluated 6 agent(s); 3 eligible, 3 eliminated, 0 indeterminate",
+        "  - agent_response_drafting@2.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_support_triage@1.1.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_threat_analysis@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+      ],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "role_id": "role::sup_retrieval"
+    },
+    {
+      "eligible": [
+        "agent_multilingual_support@1.0.0",
+        "agent_support_triage@1.1.0"
+      ],
+      "eliminated": [
+        [
+          "agent_general_analyst@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_knowledge_retrieval@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_response_drafting@2.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ],
+        [
+          "agent_threat_analysis@1.0.0",
+          [
+            "MISSING_REQUIRED_CAPABILITY"
+          ]
+        ]
+      ],
+      "indeterminate": [],
+      "narrative": [
+        "role role::sup_triage: HAS_ELIGIBLE_AGENT",
+        "evaluated 6 agent(s); 2 eligible, 4 eliminated, 0 indeterminate",
+        "  - agent_general_analyst@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_knowledge_retrieval@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_response_drafting@2.0.0 eliminated: MISSING_REQUIRED_CAPABILITY",
+        "  - agent_threat_analysis@1.0.0 eliminated: MISSING_REQUIRED_CAPABILITY"
+      ],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "role_id": "role::sup_triage"
+    }
+  ],
+  "logical_time": 1000000.0,
+  "replay_records": [
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "logical_time": 1000000.0,
+      "replay_fingerprint": "sha256:66d1d308795949fe1618faf1204154b06b00d2ded12569193c649d4672d16697",
+      "report_fingerprint": "sha256:a1fe4397337774ff2767aa1c666d5ee5792b29bf134b74dabbb60102c8634dba",
+      "result_fingerprints": [
+        "sha256:cef1408888928da1c55fcdb403702f4a6a2a2ca8df212d8f3a804df2a780dd22",
+        "sha256:231f509f082b8fab5ac5ae888063192aa3342a59c120b3cad2b6c4d1b5908786",
+        "sha256:d8ef379f4d9de751a9a5e8af645cbb3a4aabd01ce05cebfd353e58d288d56bc5",
+        "sha256:a7ded94715bdaf62dd5c9a53984336ed904b43fca0c4528871e1e3a91b684759",
+        "sha256:901270f25e527f9bdf36de075ac8ed34fd2aa7b342d9e73e8c5aba57878135f7",
+        "sha256:df35b9ea03b63a36dd381708c727940d216985bfff54fd29a0f9a0b698f35f5d"
+      ],
+      "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+      "role_id": "role::sup_draft",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+    },
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "logical_time": 1000000.0,
+      "replay_fingerprint": "sha256:17cd97fa29fe9446519dc29340a1f242168aa372c28018c7fd6bb289d7feaab1",
+      "report_fingerprint": "sha256:85fc0678c76c193a1bd878182beae86aed3b136a66ca688277a360789e53973b",
+      "result_fingerprints": [
+        "sha256:90e129386e9cd87b49715e31a105adbe1aefd5d41fed65019e00116a4e42edb9",
+        "sha256:aff76b58d3225c3f6b64b06e96876f84d717c4544760c558fe8c4aad0da4f503",
+        "sha256:834edefea963c871a3ae525576299c9c62861500b7cc52cc7b40e1d361664e70",
+        "sha256:dcd927185c0f4da45acee31ea05e561bab3f02970d371b671bce0e0edccdfae5",
+        "sha256:4decaa72cf36e1fcba400bc9f55c04b6a34a640bbc35897b1c3427990610cd35",
+        "sha256:9cb582a352a320336906c2d6f2e0c394a0252b9fe7b253750b73d8ec893ee466"
+      ],
+      "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+      "role_id": "role::sup_retrieval",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+    },
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "logical_time": 1000000.0,
+      "replay_fingerprint": "sha256:2ed25fdfdc44e168ff9d8d6afc6d21891ab204397a5115b9f993f404efd80b94",
+      "report_fingerprint": "sha256:fa45f90d461b47cc351b8c782fb0b5428e9143804bccabd83ff28c6714321e18",
+      "result_fingerprints": [
+        "sha256:c9a8083f6824dde712ef1270de3e61722f537799490c4d3bc1bd67002875e010",
+        "sha256:19d8009c7867c7dc5cacf48b8dea7ef1890731e7c49e5c70efba882ec0f84e8c",
+        "sha256:8e5cfebd00c9c34a1dd72480155d021f859b0a1d7cde64209d24bfb3fd78b271",
+        "sha256:5ea62f30390cb8e383368cbe7e6084886fb8a4f4ec94d9e2d9ab22e3599af859",
+        "sha256:e1d7518c4013d5b0808dcea37fcd282866468231946c90a55f88000e1edeaa89",
+        "sha256:0ead5dbe583cd530365a6f5c97014ed1b578c915244944f49d9eb5b16eee9db5"
+      ],
+      "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+      "role_id": "role::sup_triage",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d"
+    }
+  ],
+  "reports": [
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "eligible_agent_ids": [
+        "agent_multilingual_support@1.0.0",
+        "agent_response_drafting@2.0.0"
+      ],
+      "eliminated_agent_ids": [
+        "agent_general_analyst@1.0.0",
+        "agent_knowledge_retrieval@1.0.0",
+        "agent_support_triage@1.1.0",
+        "agent_threat_analysis@1.0.0"
+      ],
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "evaluated_at": 1000000.0,
+      "indeterminate_agent_ids": [],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "report_fingerprint": "sha256:a1fe4397337774ff2767aa1c666d5ee5792b29bf134b74dabbb60102c8634dba",
+      "results": [
+        {
+          "agent_id": "agent_general_analyst",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:response_drafting",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'response_drafting'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:cef1408888928da1c55fcdb403702f4a6a2a2ca8df212d8f3a804df2a780dd22",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_knowledge_retrieval",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:response_drafting",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'response_drafting'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:231f509f082b8fab5ac5ae888063192aa3342a59c120b3cad2b6c4d1b5908786",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:response_drafting",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:response_drafting",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:d8ef379f4d9de751a9a5e8af645cbb3a4aabd01ce05cebfd353e58d288d56bc5",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_response_drafting",
+          "agent_version": "2.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+            "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:response_drafting",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:response_drafting",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:a7ded94715bdaf62dd5c9a53984336ed904b43fca0c4528871e1e3a91b684759",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_support_triage",
+          "agent_version": "1.1.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+            "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:response_drafting",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'response_drafting'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:901270f25e527f9bdf36de075ac8ed34fd2aa7b342d9e73e8c5aba57878135f7",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_threat_analysis",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_threat_analysis::1.0.0::threat_analysis::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:evidence_extraction",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'evidence_extraction'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            },
+            {
+              "condition": "capability_presence:response_drafting",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'response_drafting'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:df35b9ea03b63a36dd381708c727940d216985bfff54fd29a0f9a0b698f35f5d",
+          "role_fingerprint": "sha256:6b1a8a14fd3364071ace881524d5386356f4ae878f685b6cf3b28621a8da6c67",
+          "role_id": "role::sup_draft",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        }
+      ],
+      "role_id": "role::sup_draft",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+      "workflow_id": "gs_support"
+    },
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "eligible_agent_ids": [
+        "agent_general_analyst@1.0.0",
+        "agent_knowledge_retrieval@1.0.0",
+        "agent_multilingual_support@1.0.0"
+      ],
+      "eliminated_agent_ids": [
+        "agent_response_drafting@2.0.0",
+        "agent_support_triage@1.1.0",
+        "agent_threat_analysis@1.0.0"
+      ],
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "evaluated_at": 1000000.0,
+      "indeterminate_agent_ids": [],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "report_fingerprint": "sha256:85fc0678c76c193a1bd878182beae86aed3b136a66ca688277a360789e53973b",
+      "results": [
+        {
+          "agent_id": "agent_general_analyst",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:knowledge_retrieval",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:knowledge_retrieval",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:90e129386e9cd87b49715e31a105adbe1aefd5d41fed65019e00116a4e42edb9",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_knowledge_retrieval",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:knowledge_retrieval",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:knowledge_retrieval",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:aff76b58d3225c3f6b64b06e96876f84d717c4544760c558fe8c4aad0da4f503",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:knowledge_retrieval",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:knowledge_retrieval",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:834edefea963c871a3ae525576299c9c62861500b7cc52cc7b40e1d361664e70",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_response_drafting",
+          "agent_version": "2.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+            "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:knowledge_retrieval",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'knowledge_retrieval'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:dcd927185c0f4da45acee31ea05e561bab3f02970d371b671bce0e0edccdfae5",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_support_triage",
+          "agent_version": "1.1.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+            "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:knowledge_retrieval",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'knowledge_retrieval'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:4decaa72cf36e1fcba400bc9f55c04b6a34a640bbc35897b1c3427990610cd35",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_threat_analysis",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_threat_analysis::1.0.0::threat_analysis::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:evidence_extraction",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'evidence_extraction'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            },
+            {
+              "condition": "capability_presence:knowledge_retrieval",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'knowledge_retrieval'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:9cb582a352a320336906c2d6f2e0c394a0252b9fe7b253750b73d8ec893ee466",
+          "role_fingerprint": "sha256:9cc246caa42addfbe843270ea7db72ef56fe71b046e532eb6a7437d0d3e3077d",
+          "role_id": "role::sup_retrieval",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        }
+      ],
+      "role_id": "role::sup_retrieval",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+      "workflow_id": "gs_support"
+    },
+    {
+      "contract_version": "awc.v1",
+      "eligibility_policy_digest": "sha256:5ad93a43940bb0473e385d6408892fcb2d9603eefc92f522179f577c7976c434",
+      "eligible_agent_ids": [
+        "agent_multilingual_support@1.0.0",
+        "agent_support_triage@1.1.0"
+      ],
+      "eliminated_agent_ids": [
+        "agent_general_analyst@1.0.0",
+        "agent_knowledge_retrieval@1.0.0",
+        "agent_response_drafting@2.0.0",
+        "agent_threat_analysis@1.0.0"
+      ],
+      "enterprise_policy_digest": "sha256:f25bbf16e51e03ad3fc6f4beb94138f20fe620c1a9cb9d5a98295a5a8095462a",
+      "evaluated_at": 1000000.0,
+      "indeterminate_agent_ids": [],
+      "outcome": "HAS_ELIGIBLE_AGENT",
+      "report_fingerprint": "sha256:fa45f90d461b47cc351b8c782fb0b5428e9143804bccabd83ff28c6714321e18",
+      "results": [
+        {
+          "agent_id": "agent_general_analyst",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_general_analyst::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_general_analyst::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:support_triage",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'support_triage'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:c9a8083f6824dde712ef1270de3e61722f537799490c4d3bc1bd67002875e010",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_knowledge_retrieval",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_knowledge_retrieval::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_knowledge_retrieval::1.0.0::knowledge_retrieval::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:support_triage",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'support_triage'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:19d8009c7867c7dc5cacf48b8dea7ef1890731e7c49e5c70efba882ec0f84e8c",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_multilingual_support",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_multilingual_support::1.0.0::evidence_extraction::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::knowledge_retrieval::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::response_drafting::MEASURED",
+            "ev::agent_multilingual_support::1.0.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:support_triage",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:support_triage",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:8e5cfebd00c9c34a1dd72480155d021f859b0a1d7cde64209d24bfb3fd78b271",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_response_drafting",
+          "agent_version": "2.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_response_drafting::2.0.0::evidence_extraction::MEASURED",
+            "ev::agent_response_drafting::2.0.0::response_drafting::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:support_triage",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'support_triage'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_evidence:evidence_extraction",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:5ea62f30390cb8e383368cbe7e6084886fb8a4f4ec94d9e2d9ab22e3599af859",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_support_triage",
+          "agent_version": "1.1.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_support_triage::1.1.0::evidence_extraction::MEASURED",
+            "ev::agent_support_triage::1.1.0::support_triage::MEASURED"
+          ],
+          "failed_conditions": [],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "capability_presence:evidence_extraction",
+            "capability_presence:support_triage",
+            "capability_evidence:evidence_extraction",
+            "capability_evidence:support_triage",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:e1d7518c4013d5b0808dcea37fcd282866468231946c90a55f88000e1edeaa89",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "ELIGIBLE",
+          "unknown_conditions": []
+        },
+        {
+          "agent_id": "agent_threat_analysis",
+          "agent_version": "1.0.0",
+          "contract_version": "awc.v1",
+          "elimination_reasons": [
+            "MISSING_REQUIRED_CAPABILITY"
+          ],
+          "evaluated_at": 1000000.0,
+          "evidence_refs": [
+            "ev::agent_threat_analysis::1.0.0::threat_analysis::MEASURED"
+          ],
+          "failed_conditions": [
+            {
+              "condition": "capability_presence:evidence_extraction",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'evidence_extraction'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            },
+            {
+              "condition": "capability_presence:support_triage",
+              "criticality": "CRITICAL_OP",
+              "detail": "agent does not claim capability 'support_triage'",
+              "reason": "MISSING_REQUIRED_CAPABILITY",
+              "verdict": "FAIL"
+            }
+          ],
+          "passed_conditions": [
+            "input_integrity",
+            "pinned_versions",
+            "agent_status",
+            "profile_validity",
+            "agent_version",
+            "input_contract",
+            "output_contract",
+            "provider",
+            "residency",
+            "deployment",
+            "security_classification",
+            "audit_capability",
+            "permissions",
+            "authority_ceiling",
+            "cost_hard_limit",
+            "latency_hard_limit",
+            "quality_floor"
+          ],
+          "policy_digest": "sha256:055695edc9135953fbb80b45fd2c0a5046d858e8cadb117e28320b505a797cfd",
+          "policy_refs": [
+            "gs_support_enterprise_policy",
+            "gs_eligibility_policy"
+          ],
+          "profile_fingerprint": "",
+          "result_fingerprint": "sha256:0ead5dbe583cd530365a6f5c97014ed1b578c915244944f49d9eb5b16eee9db5",
+          "role_fingerprint": "sha256:bfe18564ba74bdd52f7d2743dfd1d0dd0eedc758898cd6c57356d929c2f96745",
+          "role_id": "role::sup_triage",
+          "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+          "state": "INELIGIBLE",
+          "unknown_conditions": []
+        }
+      ],
+      "role_id": "role::sup_triage",
+      "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+      "workflow_id": "gs_support"
+    }
+  ],
+  "snapshot_digest": "sha256:f5a7aae29700e955a1544c83f58c261cb48e5ef4936a8eb57b49b73f90028c8d",
+  "workflow_fingerprint": "sha256:023e6dd3eebb3851cdfc769fc1aa66c652c36cfe1b2d27c27b3a7743009aca67",
+  "workflow_identity": "gs_support"
+}
