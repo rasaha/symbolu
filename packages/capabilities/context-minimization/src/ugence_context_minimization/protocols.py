@@ -16,7 +16,17 @@ if TYPE_CHECKING:  # avoid an import cycle at runtime
 
 @runtime_checkable
 class TokenCounter(Protocol):
-    """Neutral token counter. Any callable object with ``count(text) -> int``."""
+    """Neutral token counter: any object with ``count(text) -> int``.
+
+    ``count`` MUST return a non-negative ``int`` (never ``bool``, ``float``, NaN,
+    ``inf``, or ``str``); a malformed return fails closed with ``InvalidUnitError``
+    before any fingerprint uses the value.
+
+    Optional stable identity (recommended for reproducible ``run_fingerprint``): a
+    counter MAY expose string ``counter_id`` (and optional ``counter_version``). When
+    absent, the run fingerprint identifies the counter by its fully-qualified type
+    name (module + qualname).
+    """
 
     def count(self, text: str) -> int: ...
 
