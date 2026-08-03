@@ -46,14 +46,21 @@ jobs:
             ${{ env.PKG }}/tests/test_authority_boundaries.py ${{ env.PKG }}/tests/test_compilation.py \
             ${{ env.PKG }}/tests/test_assurance.py ${{ env.PKG }}/tests/test_approval.py \
             ${{ env.PKG }}/tests/test_diff.py ${{ env.PKG }}/tests/test_v2_contract_and_regression.py -q
-      - name: distribution 0.1.0 held, product 0.2.0, honest maturity
+      - name: distribution 0.2.0, v1 digest identity frozen at 0.1.0, honest maturity
         env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
           python - <<'PY'
-          from ugence_policy_workflow_compiler.version import DISTRIBUTION_VERSION, version_info
+          from ugence_policy_workflow_compiler.version import (
+              DISTRIBUTION_VERSION, WORKFLOW_IR_V1, WORKFLOW_IR_V2,
+              digest_compiler_version_for, version_info,
+          )
           i = version_info().to_dict()
-          assert DISTRIBUTION_VERSION == "0.1.0", DISTRIBUTION_VERSION  # preserves v1 digests
+          assert DISTRIBUTION_VERSION == "0.2.0", DISTRIBUTION_VERSION
           assert i["product_version"] == "0.2.0"
+          # the digest identity is decoupled from the package version and frozen for v1
+          assert digest_compiler_version_for(WORKFLOW_IR_V1) == "0.1.0"
+          assert digest_compiler_version_for(WORKFLOW_IR_V2) == "0.2.0"
+          assert i["workflow_ir_v1_digest_compiler_version"] == "0.1.0"
           for k in ("workflow_ir_v2_supported","semantic_node_enrichment_implemented",
                     "capability_requirement_extraction_implemented","typed_contract_references_implemented",
                     "dependency_semantics_implemented","authority_semantics_implemented",

@@ -21,7 +21,7 @@ from ..models.common import CompilerModel
 from ..models.policy_pack import PolicyPack
 from ..serialization import hashing
 from ..validation.errors import ValidationReport
-from ..version import DISTRIBUTION_VERSION
+from ..version import WORKFLOW_IR_V1, digest_compiler_version_for
 from .capability_registry import CapabilityDefinition, CapabilityRegistry, DEFAULT_REGISTRY
 from .workflow_ir import WorkflowIR
 
@@ -141,7 +141,12 @@ def _logical_payload(
         "assurance_manifest": assurance,
         "coverage_matrix": coverage,
         "audit_schema": audit_schema,
-        "compiler_distribution_version": DISTRIBUTION_VERSION,
+        # FROZEN v1 semantic identity — NOT the package/distribution version. This
+        # is what keeps every existing workflow_ir.v1 release digest byte-identical
+        # after the distribution bumps to 0.2.0. Never read ambient package
+        # metadata here. (The key name stays "compiler_distribution_version" so the
+        # canonical digest bytes are unchanged.)
+        "compiler_distribution_version": digest_compiler_version_for(WORKFLOW_IR_V1),
     }
 
 

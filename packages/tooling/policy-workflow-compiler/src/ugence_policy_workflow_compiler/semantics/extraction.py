@@ -361,9 +361,11 @@ def compile_workflow_v2(pack: PolicyPack, approval=None, *, registry=None,
     """Compile a policy pack to v1 (via the unchanged pipeline) and enrich it to
     ``workflow_ir.v2``. Raises ``ValueError`` if the v1 compilation fails."""
     from ..compiler.compiler import compile_policy_pack
-    from ..version import DISTRIBUTION_VERSION
+    from ..version import WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION
 
-    cv = compiler_version or DISTRIBUTION_VERSION
+    # v2 fingerprints commit to the explicit v2 semantic identity, not the package
+    # version, so a distribution bump never perturbs a v2 fingerprint on its own.
+    cv = compiler_version or WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION
     result = compile_policy_pack(pack, approval, registry=registry,
                                  require_approval=require_approval)
     if not result.success or result.workflow_ir is None:
@@ -374,11 +376,16 @@ def compile_workflow_v2(pack: PolicyPack, approval=None, *, registry=None,
 
 def upgrade_workflow_ir(ir: WorkflowIR, pack: Optional[PolicyPack] = None, *,
                         compiler_version: Optional[str] = None) -> WorkflowIRv2:
-    """Lossless upgrade of a v1 IR to v2. Semantics absent from v1 are marked
-    unresolved/not-applicable, never invented. Identical to :func:`enrich_workflow`
-    (enrichment is a pure function of the v1 graph)."""
-    from ..version import DISTRIBUTION_VERSION
-    return enrich_workflow(ir, pack, compiler_version=compiler_version or DISTRIBUTION_VERSION)
+    """Deterministic, non-destructive v1->v2 enrichment. It preserves ALL v1
+    information (the exact v1 graph is embedded and its digest pinned) and is
+    lossless only in that narrow sense — no v1 data is discarded. It does NOT
+    recover source-policy facts absent from v1: semantics that cannot be derived
+    from the v1 graph are explicitly labeled derived, defaulted, deferred or
+    unresolved via their provenance derivation class, never invented. Identical to
+    :func:`enrich_workflow` (enrichment is a pure function of the v1 graph)."""
+    from ..version import WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION
+    return enrich_workflow(
+        ir, pack, compiler_version=compiler_version or WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION)
 
 
 class _MinimalPack:

@@ -31,8 +31,15 @@ def _pack():
     return pack, build_procurement_approval_fixture(pack)
 
 
-def test_distribution_version_unchanged_preserves_v1_digest():
-    assert DISTRIBUTION_VERSION == "0.1.0"
+def test_distribution_bumped_but_v1_digest_frozen():
+    # The distribution is 0.2.0, but the v1 logical digest commits to the FROZEN
+    # v1 semantic identity (0.1.0), so every existing v1 fingerprint is unchanged.
+    from ugence_policy_workflow_compiler.version import (
+        WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION, digest_compiler_version_for,
+    )
+    assert DISTRIBUTION_VERSION == "0.2.0"
+    assert WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION == "0.1.0"
+    assert digest_compiler_version_for(WORKFLOW_IR_V1) == "0.1.0"
     pack, appr = _pack()
     result = api.compile_policy_pack(pack, appr)
     assert result.success

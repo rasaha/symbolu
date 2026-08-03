@@ -6,9 +6,11 @@ product version tracks capability maturity separately.
 
 ## Product 0.2.0 — Phase 2: Semantic Workflow Enrichment (contract `workflow_ir.v2`)
 
-Additive. Distribution version held at **0.1.0** (it feeds the v1 release digest, so
-holding it preserves byte-stable v1 fingerprints); the product version marks the P2
-capability. `workflow_ir.v1` is unchanged.
+Additive. Distribution and product versions are both **0.2.0**. The version a
+workflow-IR logical digest commits to is a FROZEN semantic identity per contract
+(`workflow_ir.v1` -> `0.1.0`, `workflow_ir.v2` -> `0.2.0`), decoupled from the
+package version, so publishing 0.2.0 leaves every existing `workflow_ir.v1`
+fingerprint byte-identical. `workflow_ir.v1` is otherwise unchanged.
 
 ### Added
 - **`workflow_ir.v2`** semantic-enrichment contract that embeds the unchanged v1

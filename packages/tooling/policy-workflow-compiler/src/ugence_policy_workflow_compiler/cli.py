@@ -373,7 +373,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_cmp.set_defaults(func=cmd_compare_contracts)
 
     p_up = sub.add_parser("upgrade-v1",
-                          help="losslessly upgrade a v1 IR JSON to workflow_ir.v2")
+                          help="deterministic, non-destructive v1->v2 enrichment "
+                               "(preserves all v1 information; derived/deferred/"
+                               "unresolved semantics are labeled, never invented)")
     p_up.add_argument("file")
     p_up.add_argument("--out", default=None, help="write v2 JSON to FILE")
     p_up.set_defaults(func=cmd_upgrade_v1)

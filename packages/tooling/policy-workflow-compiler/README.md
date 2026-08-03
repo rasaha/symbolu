@@ -92,7 +92,9 @@ semantics, authority / human-review classification, and per-value policy provena
 It also adds a strict `CompiledReleaseValidator`.
 
 `workflow_ir.v1` is unchanged and its fingerprints are byte-stable. The distribution
-version is held at `0.1.0` (it feeds the v1 digest); the product version is `0.2.0`.
+and product versions are both `0.2.0`; the version that a v1 logical digest commits
+to is a FROZEN v1 semantic identity (`0.1.0`) decoupled from the package version, so
+the bump to 0.2.0 leaves every existing v1 fingerprint byte-identical.
 
 The compiler still **describes** the governed workflow; it never selects, ranks, or
 assigns agents, never embeds enterprise deployment policy, and never grants or

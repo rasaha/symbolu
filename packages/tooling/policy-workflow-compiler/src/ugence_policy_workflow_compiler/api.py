@@ -132,8 +132,12 @@ from .validation.release_validator import (
 from .version import (
     SUPPORTED_WORKFLOW_IR_VERSIONS,
     WORKFLOW_IR_V1,
+    WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION,
     WORKFLOW_IR_V2,
+    WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION,
+    UnsupportedContractVersion,
     VersionInfo,
+    digest_compiler_version_for,
     version_info,
 )
 
@@ -247,4 +251,8 @@ __all__ = [
     # version
     "version_info",
     "VersionInfo",
+    "WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION",
+    "WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION",
+    "digest_compiler_version_for",
+    "UnsupportedContractVersion",
 ]

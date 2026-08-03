@@ -21,12 +21,18 @@ import importlib.metadata as _md
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-# The distribution (wheel) version is DELIBERATELY held at 0.1.0: it is an input
-# to the v1 structural/logical digest (release._logical_payload), so bumping it
-# would change every existing workflow_ir.v1 release digest and break P1
-# fingerprint stability. P2 is an ADDITIVE contract (workflow_ir.v2) delivered at
-# the same distribution version; the product marker below carries the P2 bump.
-DISTRIBUTION_VERSION = "0.1.0"
+# The distribution (wheel) version and product version both report 0.2.0 — this
+# build ships workflow_ir.v2, ~30 new public names, new CLI commands, release
+# validation, and materially different wheel/sdist contents, so it must not be
+# published under the same version as the P1-only 0.1.0 build.
+#
+# CRITICAL DECOUPLING: the version that participates in a workflow-IR logical
+# digest is a FROZEN SEMANTIC IDENTITY per contract, NOT the package version.
+# `workflow_ir.v1` digests continue to commit to the frozen legacy identity
+# "0.1.0" so every existing v1 fingerprint is byte-identical; `workflow_ir.v2`
+# digests commit to the explicit v2 semantic identity "0.2.0". The digest never
+# reads ambient package metadata — see `digest_compiler_version_for` below.
+DISTRIBUTION_VERSION = "0.2.0"
 DISTRIBUTION_NAME = "ugence-policy-workflow-compiler"
 PRODUCT_NAME = "Ugence Policy Workflow Compiler"
 PRODUCT_VERSION = "0.2.0"
@@ -40,6 +46,32 @@ WORKFLOW_IR_V2 = "workflow_ir.v2"
 SUPPORTED_WORKFLOW_IR_VERSIONS = (WORKFLOW_IR_V1, WORKFLOW_IR_V2)
 #: The source policy-pack schema version (unchanged).
 POLICY_PACK_SCHEMA_VERSION = "policy_pack.v1"
+
+#: FROZEN semantic identity committed to by every workflow_ir.v1 logical digest.
+#: This is legacy and must never change or track the package version — it is what
+#: keeps every existing v1 fingerprint byte-identical.
+WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION = "0.1.0"
+#: Explicit semantic identity committed to by every workflow_ir.v2 logical digest.
+WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION = "0.2.0"
+
+
+class UnsupportedContractVersion(ValueError):
+    """Raised when a digest is requested for an unknown workflow-IR contract."""
+
+
+def digest_compiler_version_for(contract_version: str) -> str:
+    """Return the FROZEN semantic-identity version a contract's logical digest
+    commits to. Fail-closed on unknown versions. This never reads ambient package
+    metadata, the installed wheel version, the clock, or the environment — the
+    identity is a pinned constant per contract so digests are reproducible and a
+    package-version bump cannot perturb a legacy digest."""
+    if contract_version == WORKFLOW_IR_V1:
+        return WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION
+    if contract_version == WORKFLOW_IR_V2:
+        return WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION
+    raise UnsupportedContractVersion(
+        f"no digest semantic identity for contract {contract_version!r}; "
+        f"supported: {SUPPORTED_WORKFLOW_IR_VERSIONS}")
 
 #: Optional integrations this distribution can probe for at runtime. The core
 #: compiler never imports these; the capability registry resolves capability
@@ -105,6 +137,8 @@ class VersionInfo:
     action_authorization_implemented: bool = False
     enterprise_policy_evaluation_implemented: bool = False
     supported_workflow_ir_versions: tuple = ()
+    workflow_ir_v1_digest_compiler_version: str = ""
+    workflow_ir_v2_digest_compiler_version: str = ""
     dependency_versions: Dict[str, Optional[str]] = field(default_factory=dict)
     optional_integrations: Dict[str, bool] = field(default_factory=dict)
     build_commit: Optional[str] = None
@@ -148,6 +182,8 @@ class VersionInfo:
                 self.enterprise_policy_evaluation_implemented
             ),
             "supported_workflow_ir_versions": list(self.supported_workflow_ir_versions),
+            "workflow_ir_v1_digest_compiler_version": self.workflow_ir_v1_digest_compiler_version,
+            "workflow_ir_v2_digest_compiler_version": self.workflow_ir_v2_digest_compiler_version,
             "dependency_versions": dict(self.dependency_versions),
             "optional_integrations": dict(self.optional_integrations),
             "build_commit": self.build_commit,
@@ -201,6 +237,8 @@ def version_info() -> VersionInfo:
         action_authorization_implemented=False,
         enterprise_policy_evaluation_implemented=False,
         supported_workflow_ir_versions=SUPPORTED_WORKFLOW_IR_VERSIONS,
+        workflow_ir_v1_digest_compiler_version=WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION,
+        workflow_ir_v2_digest_compiler_version=WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION,
         dependency_versions=deps,
         optional_integrations=integrations,
         build_commit=None,
@@ -217,6 +255,10 @@ __all__ = [
     "WORKFLOW_IR_V2",
     "SUPPORTED_WORKFLOW_IR_VERSIONS",
     "POLICY_PACK_SCHEMA_VERSION",
+    "WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION",
+    "WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION",
+    "digest_compiler_version_for",
+    "UnsupportedContractVersion",
     "VersionInfo",
     "version_info",
 ]

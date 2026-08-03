@@ -1,5 +1,5 @@
 {
-  "count": 101,
+  "count": 105,
   "fingerprints": {
     "ActionConstraint": {
       "kind": "class",
@@ -2065,6 +2065,14 @@
         "validate"
       ]
     },
+    "UnsupportedContractVersion": {
+      "kind": "class",
+      "members": [
+        "add_note",
+        "args",
+        "with_traceback"
+      ]
+    },
     "ValidationDiagnostic": {
       "kind": "class",
       "members": [
@@ -2193,7 +2201,9 @@
         "team_composition_implemented",
         "to_dict",
         "typed_contract_references_implemented",
+        "workflow_ir_v1_digest_compiler_version",
         "workflow_ir_v1_supported",
+        "workflow_ir_v2_digest_compiler_version",
         "workflow_ir_v2_supported"
       ]
     },
@@ -2201,7 +2211,15 @@
       "kind": "constant",
       "type": "str"
     },
+    "WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION": {
+      "kind": "constant",
+      "type": "str"
+    },
     "WORKFLOW_IR_V2": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION": {
       "kind": "constant",
       "type": "str"
     },
@@ -2462,6 +2480,12 @@
         "new"
       ]
     },
+    "digest_compiler_version_for": {
+      "kind": "function",
+      "parameters": [
+        "contract_version"
+      ]
+    },
     "enrich_workflow": {
       "kind": "function",
       "parameters": [
@@ -2587,12 +2611,15 @@
     "SourceDocument",
     "TestCategory",
     "TestScenario",
+    "UnsupportedContractVersion",
     "ValidationDiagnostic",
     "ValidationReport",
     "VerificationReport",
     "VersionInfo",
     "WORKFLOW_IR_V1",
+    "WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION",
     "WORKFLOW_IR_V2",
+    "WORKFLOW_IR_V2_DIGEST_COMPILER_VERSION",
     "WorkflowDependencySemantics",
     "WorkflowEdge",
     "WorkflowIR",
@@ -2605,6 +2632,7 @@
     "compile_workflow_v2",
     "compute_pack_digest",
     "diff_policy_packs",
+    "digest_compiler_version_for",
     "enrich_workflow",
     "is_legal_transition",
     "upgrade_workflow_ir",
