@@ -4,6 +4,57 @@ All notable changes to this package are documented here. This package follows
 SemVer for the distribution version and carries a separate `CONTRACT_VERSION` for
 the minimization contract (result shape, reason-code vocabulary, oracle protocol).
 
+## 0.1.2 — timestamp validation & fingerprint documentation correction
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+Contract version `1.0.1` → `1.0.2`. A small, bounded post-merge correction; the
+architecture from PRs #1291/#1292 is intact. No ActionGate integration, no H22, no
+Hybrid LLM packaging.
+
+### Fixed (fail-closed hardening)
+- **Strict timestamp value contract.** A timestamp (`evaluation_time`, `valid_until`)
+  must be a **finite real number that is not a Boolean**. Caller `evaluation_time`
+  is validated at the public boundary and raises `InvalidRequestError` **before the
+  oracle is called** (an invalid caller time never reaches an oracle, comparison, or
+  fingerprint). Oracle `valid_until` is validated as oracle **output** and fails
+  closed with `ORACLE_RESULT_MALFORMED` (never an uncaught `TypeError`; NaN never
+  silently mis-orders a comparison). Inclusive expiry (`>=`) is unchanged. Validation
+  order: type → key → oracle_id → contract_version → correlation → valid_until
+  finiteness → required evaluation_time → inclusive expiry.
+- **Strict canonical serialization.** All fingerprint/policy JSON now uses
+  `allow_nan=False`, so a digest can never contain `NaN` / `Infinity`; a non-finite
+  value raises deterministically instead of producing an unstable digest.
+- **Token-count value contract.** Caller `ContextUnit.token_count` and injected
+  `TokenCounter.count()` results must be **non-negative ints** (never bool, non-integral
+  float, NaN, inf, or str); malformed values raise `InvalidUnitError`.
+- **Scalar metadata contract.** Metadata keys must be `str`; values must be JSON
+  scalars (`str` / finite number / `bool` / `None`). Non-scalar values are rejected
+  with `InvalidUnitError` instead of being `str()`-coerced (which could embed
+  nondeterministic object reprs).
+
+### Changed
+- **Token-counter run-fingerprint identity** is now module-qualified
+  (`module.qualname`, or an explicit optional `counter_id`/`counter_version`) instead
+  of the bare class name. The **run-fingerprint domain** is bumped honestly
+  (`run/1` → `run/2`); `run_fingerprint` is a v0.1.1 addition with no external
+  consumer. `InvalidRequestError` and `InvalidUnitError` now also subclass
+  `ValueError` (backward compatible).
+
+### Documentation corrected
+- `outcome_fingerprint` does **not** bind token counts (or unit text, requested
+  reduction/budget, evaluation time, reason codes, policy fingerprint, or oracle
+  validity/correlation). Corrected in the `MinimizationResult` docstring,
+  `fingerprint.py`, `docs/DETERMINISM.md`, and the generated invariance-contract
+  artifact (now with explicit `binds`/`excludes` inventories). Token counts remain
+  bound by `run_fingerprint`.
+
+### Compatibility
+- The **outcome digest is byte-unchanged** (a frozen fixture test guards it).
+  `run_fingerprint` values change (domain `run/2` + counter identity) — no external
+  consumer depends on them. New validation rejects inputs that were previously
+  coerced/mis-handled; audited callers (Console) pass only valid values.
+
 ## 0.1.1 — oracle & result contract hardening
 
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to

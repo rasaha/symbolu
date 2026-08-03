@@ -56,13 +56,35 @@ carry the identical id:
 
 Missing and mismatched are **not** collapsed into one ambiguous code.
 
+## Timestamp value contract (v0.1.2)
+
+A timestamp — caller `evaluation_time` or oracle `valid_until` — must be a **finite
+real number that is not a Boolean** (`int`/`float`; not `bool`, NaN, ±inf, `str`,
+`Decimal`, or arbitrary objects). The two roles fail differently:
+
+- **`evaluation_time` is caller input.** It is validated at the public boundary; a
+  malformed value raises `InvalidRequestError` **before the oracle is called**, so it
+  never reaches an oracle, comparison, or fingerprint. It is never turned into a reason
+  code.
+- **`valid_until` is oracle output.** A malformed value **fails closed** with
+  `ORACLE_RESULT_MALFORMED` (never an uncaught `TypeError`, and NaN never silently
+  mis-orders the comparison).
+
 ## Expiry (inclusive, deterministic, v0.1.1)
 
 A validity horizon is **inclusive**: an evaluation is expired when
 `evaluation_time >= valid_until`. The core never reads a wall clock — the caller
-controls `evaluation_time` for deterministic replay. If `valid_until` is supplied but
-`evaluation_time` is `None`, the run fails closed (`ORACLE_EVALUATION_TIME_REQUIRED`)
-rather than assuming the evaluation is unexpired.
+controls `evaluation_time` for deterministic replay. If a well-formed `valid_until` is
+supplied but `evaluation_time` is `None`, the run fails closed
+(`ORACLE_EVALUATION_TIME_REQUIRED`) rather than assuming the evaluation is unexpired.
+
+## Validation order
+
+An oracle evaluation is validated deterministically: (1) is an `OracleEvaluation`;
+(2) `equivalence_key` is a string; (3) `oracle_id` non-empty string; (4)
+`contract_version` non-empty string; (5) correlation binding; (6) `valid_until` type +
+finiteness; (7) required `evaluation_time`; (8) inclusive expiry. When several fields
+are malformed, the earliest failing check determines the reason code.
 
 ## Fail-closed conditions
 

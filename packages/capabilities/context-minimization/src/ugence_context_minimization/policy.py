@@ -77,7 +77,7 @@ class MinimizationPolicy:
             "filler_hints": list(self.filler_hints),
             "unknown_rank": self.unknown_rank,
         }
-        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
         digest = hashlib.sha256(b"ugence-cm-policy/1\x00" + blob.encode("utf-8")).hexdigest()
         return f"{self.version}:{digest[:16]}"
 

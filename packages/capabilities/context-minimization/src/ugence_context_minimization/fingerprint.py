@@ -5,11 +5,13 @@ collide with each other or any other Ugence fingerprint, and both over canonical
 JSON (sorted keys, no whitespace):
 
 * :func:`result_fingerprint` — the **outcome** digest. A stable digest of the
-  selected outcome only. Byte-identical to the v0.1.0 field. It deliberately does
-  NOT include the opaque oracle equivalence-key value, the request contents, or the
-  context contents — only what survived/was removed/restored/protected, the token
-  counts, the equivalence status, the fallback flag, the policy version, and the
-  oracle identity.
+  selected outcome only. Byte-identical to the v0.1.0 field. It binds ONLY: context
+  id, mode, surviving ids (ordered), structurally-removed / extractively-removed /
+  restored / protected id sets, equivalence status, fallback flag, policy **version**,
+  oracle id, and oracle contract version. It deliberately does NOT include token
+  counts, unit text/content, requested reduction/budget, evaluation time, reason
+  codes, the policy fingerprint, the oracle validity/correlation, or the opaque
+  equivalence-key value. (Token counts are bound by ``run_fingerprint``, not here.)
 * :func:`run_fingerprint` — the **complete run identity** digest. Binds request
   identity (context contract version, id, correlation, ordered unit content digests
   + resolved token counts, requested reduction, requested token budget, mode,
@@ -25,12 +27,46 @@ import hashlib
 import json
 
 _DOMAIN = b"ugence-context-minimization/result/1\x00"
-_RUN_DOMAIN = b"ugence-context-minimization/run/1\x00"
+# run/2 (v0.1.2): the token-counter identity became module-qualified (was the bare
+# class name), so the run-fingerprint domain is bumped honestly. run_fingerprint is a
+# v0.1.1 addition with no external consumer; the outcome digest (result/1) is
+# unchanged and remains byte-compatible.
+_RUN_DOMAIN = b"ugence-context-minimization/run/2\x00"
 
 
 def _unit_content_digest(text: str) -> str:
     """Compact, canonical digest of a unit's extractive payload."""
     return hashlib.sha256(("t\x00" + (text or "")).encode("utf-8")).hexdigest()[:32]
+
+
+def _canonical_json(payload) -> bytes:
+    """Canonical JSON for fingerprinting: sorted keys, no whitespace, and NON-FINITE
+    numbers REJECTED (``allow_nan=False``). Default ``json.dumps`` would emit the
+    non-standard ``NaN`` / ``Infinity`` tokens; a digest must never contain them.
+    A non-finite value raises ``ValueError`` deterministically rather than producing
+    an unstable or invalid digest.
+    """
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+
+
+def _counter_identity(counter) -> str:
+    """Stable identity for a token counter used in the run fingerprint.
+
+    Prefers a neutral, explicit ``counter_id`` (optionally ``counter_version``) the
+    counter may expose; otherwise falls back to the fully-qualified type name
+    (module + qualname), which is stable across counters that merely share a bare
+    class name. ``None`` means the default word/punct counter.
+    """
+    if counter is None:
+        return "default"
+    cid = getattr(counter, "counter_id", None)
+    if isinstance(cid, str) and cid:
+        cver = getattr(counter, "counter_version", None)
+        return f"{cid}@{cver}" if isinstance(cver, str) and cver else cid
+    t = type(counter)
+    return f"{t.__module__}.{t.__qualname__}"
 
 
 def result_fingerprint(
@@ -68,7 +104,7 @@ def result_fingerprint(
         "oracle_id": oracle_id,
         "oracle_contract_version": oracle_contract_version,
     }
-    blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    blob = _canonical_json(payload)
     return "sha256:" + hashlib.sha256(_DOMAIN + blob).hexdigest()
 
 
@@ -133,7 +169,7 @@ def run_fingerprint(
         "policy": {
             "version": policy.version,
             "fingerprint": policy.fingerprint(),
-            "token_counter": "default" if token_counter is None else type(token_counter).__name__,
+            "token_counter": _counter_identity(token_counter),
         },
         "oracle": oracle,
         "outcome": {
@@ -149,5 +185,5 @@ def run_fingerprint(
             "reason_codes": list(reason_codes),
         },
     }
-    blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    blob = _canonical_json(payload)
     return "sha256:" + hashlib.sha256(_RUN_DOMAIN + blob).hexdigest()

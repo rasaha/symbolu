@@ -26,6 +26,7 @@ from .models import (
     OracleEvaluation,
     ProtectionResult,
 )
+from .numeric import is_timestamp, is_token_count
 from .policy import DEFAULT_POLICY, MinimizationPolicy
 from .protocols import InvarianceOracle, ProtectionProvider, TokenCounter
 from .structural import deduplicate_context
@@ -60,10 +61,15 @@ def _validate_eval(
         if ev.correlation_id != context.correlation_id:
             return None, reasons.ORACLE_CORRELATION_MISMATCH
 
-    # Expiry (v0.1.1): inclusive at the exact instant, and a supplied validity horizon
-    # with no evaluation_time fails closed rather than being treated as unexpired. The
-    # caller controls evaluation_time; the core never reads a wall clock.
+    # Expiry (v0.1.1, hardened v0.1.2): a malformed validity horizon (bool / NaN /
+    # ±inf / str / arbitrary object) is malformed ORACLE OUTPUT and fails closed as
+    # ORACLE_RESULT_MALFORMED — it never reaches a raw Python comparison (which could
+    # raise TypeError or, for NaN, silently mis-order). A well-formed horizon with no
+    # evaluation_time fails closed (the caller controls time; the core reads no wall
+    # clock). Expiry is inclusive at the exact instant.
     if ev.valid_until is not None:
+        if not is_timestamp(ev.valid_until):
+            return None, reasons.ORACLE_RESULT_MALFORMED
         if evaluation_time is None:
             return None, reasons.ORACLE_EVALUATION_TIME_REQUIRED
         if evaluation_time >= ev.valid_until:
@@ -322,8 +328,16 @@ def minimize_context(
         )
     if not 0.0 <= target_reduction <= 1.0:
         raise InvalidRequestError("target_reduction must be within [0, 1]")
-    if token_budget is not None and token_budget < 0:
-        raise InvalidRequestError("token_budget must be >= 0")
+    if token_budget is not None and not is_token_count(token_budget):
+        raise InvalidRequestError("token_budget must be a non-negative int")
+    # Caller-controlled evaluation_time is validated at the PUBLIC BOUNDARY, before the
+    # oracle is ever called: a malformed caller time must never reach an oracle,
+    # comparison, or fingerprint function. Malformed caller input raises; it is NOT
+    # turned into an oracle reason code.
+    if evaluation_time is not None and not is_timestamp(evaluation_time):
+        raise InvalidRequestError(
+            "evaluation_time must be a finite real number (not bool/NaN/inf/str)"
+        )
 
     # The caller's request, preserved verbatim on every result path (v0.1.1).
     req = dict(requested_reduction=target_reduction, requested_token_budget=token_budget,

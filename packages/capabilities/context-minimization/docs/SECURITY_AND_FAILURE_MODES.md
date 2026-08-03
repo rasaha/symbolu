@@ -11,9 +11,12 @@ no "best-effort compressed" result on an oracle failure — an oracle failure re
 | No oracle (oracle mode) | raise `OracleRequiredError` | — |
 | Oracle raises | full fallback | `ORACLE_RAISED` |
 | Non-string key / malformed result / empty oracle identity | full fallback | `ORACLE_RESULT_MALFORMED` |
+| Malformed oracle `valid_until` (bool / NaN / inf / str / object) | full fallback | `ORACLE_RESULT_MALFORMED` |
 | `oracle_id`/`contract_version` drift between calls | full fallback | `ORACLE_CONTRACT_MISMATCH` |
 | `evaluation_time >= valid_until` (**inclusive**) | full fallback | `ORACLE_EVALUATION_EXPIRED` |
 | `valid_until` supplied but no `evaluation_time` | full fallback | `ORACLE_EVALUATION_TIME_REQUIRED` |
+| Malformed caller `evaluation_time` (bool / NaN / inf / str) | **raise** `InvalidRequestError` (before the oracle) | — |
+| Malformed token count / non-scalar metadata | **raise** `InvalidUnitError` (at construction / resolution) | — |
 | Context has correlation but evaluation omits it | full fallback | `ORACLE_CORRELATION_MISSING` |
 | Context correlation ≠ evaluation correlation | full fallback | `ORACLE_CORRELATION_MISMATCH` |
 | Changed equivalence key | restore necessary spans, else full fallback | `SPANS_RESTORED` / `JOINT_EFFECT_FALLBACK` |

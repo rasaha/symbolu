@@ -134,11 +134,10 @@ def test_structural_mode_populates_both_fingerprints():
     assert r.fingerprint == r.outcome_fingerprint
 
 
-def test_unsupported_metadata_value_fails_deterministically():
-    # metadata values are coerced to str at construction; a nested unserializable
-    # object becomes its repr string deterministically, never a raw object in the digest.
-    u = (ContextUnit(id="x", text="deploy", source_type="state_fact",
-                     metadata={"k": [1, 2, 3]}),)
-    r = minimize_context(Context(id="c", correlation_id="k", units=u),
-                         oracle=KeywordOracle(), target_reduction=0.0, evaluation_time=1.0)
-    assert r.run_fingerprint.startswith("sha256:")
+def test_non_scalar_metadata_value_rejected_at_construction():
+    # v0.1.2: a non-scalar metadata value is rejected (never str()-coerced with a
+    # nondeterministic repr), deterministically, at model construction.
+    import pytest
+    from ugence_context_minimization.api import InvalidUnitError
+    with pytest.raises(InvalidUnitError):
+        ContextUnit(id="x", text="deploy", source_type="state_fact", metadata={"k": [1, 2, 3]})

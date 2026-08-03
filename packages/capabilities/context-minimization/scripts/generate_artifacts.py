@@ -103,10 +103,56 @@ def invariance_contract() -> dict:
             "the caller controls evaluation_time for deterministic replay."
         ),
         "fingerprints": {
-            "outcome_fingerprint": "digest of the selected outcome only (byte-identical to the v0.1.0 field)",
-            "run_fingerprint": "complete run identity: request + policy + oracle + outcome (incl. reason codes)",
+            "outcome_fingerprint": {
+                "summary": "digest of the selected outcome only (byte-identical to the v0.1.0 field)",
+                "domain": "ugence-context-minimization/result/1",
+                "binds": [
+                    "context_id", "mode", "surviving_ids", "removed_structural",
+                    "removed_extractive", "restored_ids", "protected_ids",
+                    "equivalence_status", "fell_back", "policy_version",
+                    "oracle_id", "oracle_contract_version",
+                ],
+                "excludes": [
+                    "original_tokens", "resulting_tokens", "unit_text_or_content_digest",
+                    "requested_reduction", "requested_token_budget", "evaluation_time",
+                    "reason_codes", "policy_fingerprint", "oracle_evaluation_ref",
+                    "oracle_valid_until", "correlation_id", "equivalence_key",
+                ],
+            },
+            "run_fingerprint": {
+                "summary": "complete run identity: request + policy + oracle + outcome",
+                "domain": "ugence-context-minimization/run/2",
+                "binds": [
+                    "context_contract_version", "context_id", "correlation_id",
+                    "unit_id", "unit_source_type", "unit_content_digest",
+                    "unit_resolved_token_count", "unit_protected", "unit_redundancy_set",
+                    "requested_reduction", "requested_token_budget", "mode",
+                    "evaluation_time", "policy_version", "policy_fingerprint",
+                    "token_counter_identity", "oracle_id", "oracle_contract_version",
+                    "oracle_evaluation_ref", "oracle_valid_until", "oracle_correlation_id",
+                    "surviving_ids", "removed_structural", "removed_extractive",
+                    "restored_ids", "protected_ids", "original_tokens", "resulting_tokens",
+                    "equivalence_status", "fell_back", "reason_codes",
+                ],
+                "excludes": ["credentials", "secrets", "equivalence_key", "raw_metadata_objects"],
+            },
             "fingerprint": "DEPRECATED alias of outcome_fingerprint",
         },
+        "timestamp_contract": (
+            "evaluation_time (caller) and valid_until (oracle) must be finite real "
+            "numbers, not bool/NaN/inf/str. Malformed caller evaluation_time raises "
+            "InvalidRequestError before the oracle is called; malformed oracle "
+            "valid_until fails closed with ORACLE_RESULT_MALFORMED."
+        ),
+        "token_count_contract": (
+            "Caller ContextUnit.token_count and injected TokenCounter.count() results "
+            "must be non-negative ints (never bool/float/NaN/inf/str); malformed values "
+            "raise InvalidUnitError."
+        ),
+        "metadata_contract": (
+            "Metadata keys must be str; values must be JSON scalars (str / finite number "
+            "/ bool / None). Non-scalar values raise InvalidUnitError."
+        ),
         "guarantees_boundary": {
             "is": ["extractive omission", "equivalence relative to supplied oracle",
                    "structurally lossless dedup (structural mode)"],

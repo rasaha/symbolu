@@ -13,13 +13,23 @@ class ContextMinimizationError(Exception):
     """Base class for all package errors."""
 
 
-class InvalidRequestError(ContextMinimizationError):
-    """The minimization request is structurally invalid (bad target, budget, etc.)."""
+class InvalidRequestError(ContextMinimizationError, ValueError):
+    """The minimization request is structurally invalid (bad target, budget,
+    evaluation_time, etc.).
+
+    Subclasses :class:`ValueError` so existing ``except ValueError`` callers keep
+    working while the error is also identifiable as a package error.
+    """
 
 
 class OracleRequiredError(ContextMinimizationError):
     """Oracle-verified mode was requested without a valid invariance oracle."""
 
 
-class InvalidUnitError(ContextMinimizationError):
-    """A context unit has invalid identity or payload the minimizer cannot process."""
+class InvalidUnitError(ContextMinimizationError, ValueError):
+    """A context unit has invalid identity or payload the minimizer cannot process
+    (bad id, malformed token count, non-scalar metadata value).
+
+    Subclasses :class:`ValueError` for backward compatibility with callers that
+    catch ``ValueError`` on model construction.
+    """

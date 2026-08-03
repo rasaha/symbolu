@@ -3,7 +3,7 @@
     "achieved_reduction",
     "equivalence_verified"
   ],
-  "contract_version": "1.0.1",
+  "contract_version": "1.0.2",
   "fields": [
     {
       "name": "context_id",

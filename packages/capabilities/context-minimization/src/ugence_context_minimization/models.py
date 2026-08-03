@@ -19,6 +19,9 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, Mapping, Optional
 
+from .errors import InvalidRequestError, InvalidUnitError
+from .numeric import is_finite_number, is_timestamp, is_token_count
+
 # --------------------------------------------------------------------------- #
 # Neutral, approximate token counting (stdlib only).
 # --------------------------------------------------------------------------- #
@@ -37,16 +40,31 @@ def default_token_count(text: str) -> int:
     return len(_TOKEN_RE.findall(text or ""))
 
 
-def _freeze_mapping(m: Optional[Mapping[str, Any]]) -> Mapping[str, str]:
-    """Return a read-only, string-valued copy of ``m`` (safe value contract).
+def _freeze_mapping(m: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """Return a read-only copy of ``m`` under the scalar metadata value contract.
 
-    Values are coerced to ``str`` so a stored model can never retain a caller-owned
-    mutable structure by reference, and so the model stays JSON-serializable and
-    hashable-by-content for fingerprinting.
+    Metadata keys must be strings. Values must already be **scalar JSON-compatible**
+    values — ``str``, a finite ``int``/``float``, ``bool``, or ``None``. Lists,
+    dicts, sets, bytes, callables, dates/datetimes, non-finite numbers, and arbitrary
+    objects are rejected with :class:`InvalidUnitError` rather than being coerced via
+    ``str()`` (which, for arbitrary objects, would embed nondeterministic memory
+    addresses). This keeps stored models deterministic and JSON-serializable without
+    silently claiming determinism for un-canonicalizable values.
     """
     if not m:
         return MappingProxyType({})
-    return MappingProxyType({str(k): str(v) for k, v in m.items()})
+    out: dict[str, Any] = {}
+    for k, v in m.items():
+        if not isinstance(k, str):
+            raise InvalidUnitError(f"metadata keys must be str, got {type(k).__name__}")
+        if v is None or isinstance(v, str) or isinstance(v, bool) or is_finite_number(v):
+            out[k] = v
+        else:
+            raise InvalidUnitError(
+                f"metadata value for {k!r} must be a scalar (str / finite number / "
+                f"bool / None), got {type(v).__name__}"
+            )
+    return MappingProxyType(out)
 
 
 # --------------------------------------------------------------------------- #
@@ -96,27 +114,37 @@ class ContextUnit:
     redundancy_set: Optional[str] = None
     protected: bool = False
     provenance: Optional[str] = None
-    metadata: Mapping[str, str] = field(default_factory=dict)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str) or not self.id:
-            raise ValueError("ContextUnit.id must be a non-empty str")
-        if self.token_count is not None and self.token_count < 0:
-            raise ValueError(f"ContextUnit {self.id!r}: token_count must be >= 0")
+            raise InvalidUnitError("ContextUnit.id must be a non-empty str")
+        # Token counts must be a non-negative int (never bool, float, NaN, inf, str).
+        if self.token_count is not None and not is_token_count(self.token_count):
+            raise InvalidUnitError(
+                f"ContextUnit {self.id!r}: token_count must be a non-negative int, "
+                f"got {self.token_count!r}"
+            )
         object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
 
     def counted_tokens(self, counter: "Optional[TokenCounter]" = None) -> int:
         """Resolve this unit's token count deterministically.
 
         Precedence: caller-supplied ``token_count`` → injected ``counter`` →
-        :func:`default_token_count`. A zero-token span counts as zero.
+        :func:`default_token_count`. A zero-token span counts as zero. An injected
+        counter that returns anything other than a non-negative ``int`` raises
+        :class:`InvalidUnitError` deterministically, before any fingerprint uses the
+        value.
         """
         if self.token_count is not None:
             return self.token_count
         if counter is not None:
             n = counter.count(self.text)
-            if n < 0:
-                raise ValueError(f"TokenCounter returned negative count for {self.id!r}")
+            if not is_token_count(n):
+                raise InvalidUnitError(
+                    f"TokenCounter returned a non-(non-negative-int) count {n!r} "
+                    f"for {self.id!r}"
+                )
             return n
         return default_token_count(self.text)
 
@@ -239,9 +267,13 @@ class MinimizationRequest:
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.target_reduction <= 1.0:
-            raise ValueError("target_reduction must be within [0, 1]")
-        if self.token_budget is not None and self.token_budget < 0:
-            raise ValueError("token_budget must be >= 0")
+            raise InvalidRequestError("target_reduction must be within [0, 1]")
+        if self.token_budget is not None and not is_token_count(self.token_budget):
+            raise InvalidRequestError("token_budget must be a non-negative int")
+        if self.evaluation_time is not None and not is_timestamp(self.evaluation_time):
+            raise InvalidRequestError(
+                "evaluation_time must be a finite real number (not bool/NaN/inf/str)"
+            )
 
 
 @dataclass(frozen=True)
@@ -255,10 +287,13 @@ class MinimizationResult:
     Two fingerprints (v0.1.1), so a single field is never overloaded with two
     meanings:
 
-    * ``outcome_fingerprint`` — a deterministic digest of the *selected outcome*
-      (surviving/removed/restored/protected ids, token counts, equivalence status,
-      fallback, policy version, oracle identity). It is NOT a complete identity of
-      the request, context contents, or oracle evaluation.
+    * ``outcome_fingerprint`` — a deterministic digest of the *selected outcome*:
+      context id, mode, surviving/structurally-removed/extractively-removed/restored/
+      protected ids, equivalence status, fallback, policy **version**, and oracle
+      identity (id + contract version). It does NOT bind token counts, unit text,
+      requested reduction/budget, evaluation time, reason codes, the policy
+      fingerprint, or the oracle validity/correlation — it is not a complete identity
+      of the request, context contents, or oracle evaluation.
     * ``run_fingerprint`` — the *complete auditable run identity*: request identity
       (context contract version, id, correlation, ordered unit content digests,
       requested reduction, requested token budget, mode, evaluation time), policy
