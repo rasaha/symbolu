@@ -1,0 +1,145 @@
+{
+  "arm": "A+",
+  "seed": 17,
+  "params": 2000392,
+  "ff": 1378,
+  "needle_by_dist": {
+    "16": 0.0,
+    "96": 0.0,
+    "220": 0.0
+  },
+  "ppl": {
+    "256": 123.95325492588812,
+    "512": 129.46885762508833
+  },
+  "binding_by_k": {
+    "2": 0.0,
+    "4": 0.0,
+    "8": 0.008333333333333333
+  },
+  "supersession": {
+    "current_acc": 0.0,
+    "stale_error": 0.0
+  },
+  "source": 0.025,
+  "multihop": 0.0,
+  "warmups_by_group": [
+    60
+  ],
+  "grouped_optimizer": false,
+  "param_group_audit": {
+    "slot_group_params": 0,
+    "nonslot_group_params": 52,
+    "slot_group_numel": 0,
+    "nonslot_group_numel": 2000392,
+    "total_numel": 2000392,
+    "numel_reconciles": true,
+    "no_duplicates": true,
+    "no_omissions": true,
+    "slot_param_names": [],
+    "nonslot_param_count": 52
+  },
+  "init_audit": null,
+  "trajectory": [
+    {
+      "step": 0,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 60,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 120,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 300,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 600,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 900,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 1200,
+      "needle_d96": 0.0
+    }
+  ],
+  "loss_log": [
+    {
+      "step": 0,
+      "main_loss": 7.176309108734131,
+      "aux": null,
+      "lr": [
+        3.3333333333333335e-05
+      ]
+    },
+    {
+      "step": 60,
+      "main_loss": 4.760499477386475,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 120,
+      "main_loss": 3.7240965366363525,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 300,
+      "main_loss": 4.062754154205322,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 600,
+      "main_loss": 4.161594390869141,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 900,
+      "main_loss": 3.5710628032684326,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    }
+  ],
+  "train_s": 238.3,
+  "schema": "bindingslots_confirmatory/seed_result/v1",
+  "config_hash": "ce4d93ea311da931c30a845b4437b45b5cb1d287c2e8bd1a03ce7d8054957f70",
+  "code_commit": "1886363bdabf76fafb926263f7ed76d75e7dbff2",
+  "environment_fingerprint": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "torch": "2.2.2+cu121",
+    "cuda_available": false,
+    "num_threads": 4,
+    "fp": "fp32"
+  },
+  "checkpoint_steps": [
+    0,
+    60,
+    120,
+    300,
+    600,
+    900,
+    1200
+  ]
+}
