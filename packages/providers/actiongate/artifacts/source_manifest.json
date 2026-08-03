@@ -1,0 +1,146 @@
+[
+  {
+    "canonical_path": "ugence_actiongate_provider/__init__.py",
+    "original_path": "actiongate_provider/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "a040393873c00dd29f27860b3d6238b23807ca9a",
+    "current_blob_sha": "975e83b11e4c3f96b9e235484c9cec782aa2cf29",
+    "migration_type": "SEMANTIC_EXTRACTION"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/__main__.py",
+    "original_path": null,
+    "original_commit": null,
+    "original_blob_sha": null,
+    "current_blob_sha": "28a4809cbd04c26e4f5307eecbcddcee7c23da49",
+    "migration_type": "NEW_PACKAGING_FILE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/api/__init__.py",
+    "original_path": "actiongate_provider/api/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "006ff911c897d0374a2667508f283a568471e01d",
+    "current_blob_sha": "006ff911c897d0374a2667508f283a568471e01d",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/cli.py",
+    "original_path": null,
+    "original_commit": null,
+    "original_blob_sha": null,
+    "current_blob_sha": "690afc23a1bb9fc0a520cea4de8bada64fe52201",
+    "migration_type": "NEW_PACKAGING_FILE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/client/__init__.py",
+    "original_path": "actiongate_provider/client/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "7f6b137b6e27c4b6776239119a4360ecf6bc11cd",
+    "current_blob_sha": "7f6b137b6e27c4b6776239119a4360ecf6bc11cd",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/configuration/__init__.py",
+    "original_path": "actiongate_provider/configuration/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "8e7cb5ee4943ad1ba2e7550114d4a71ae0f697c7",
+    "current_blob_sha": "1b4fada93c511f12a2f9bf32d049e2f67dde3f63",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/conformance/__init__.py",
+    "original_path": "actiongate_provider/conformance/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "930bba99adf78bd87ccac1ba5170fb020492b048",
+    "current_blob_sha": "2a4acd6289b9a178d8e7517e813a27e2b4b5b101",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/core.py",
+    "original_path": "actiongate_provider/core.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "d63a2751ece1f4b4ff4765d6d72cdfcabc645f26",
+    "current_blob_sha": "d63a2751ece1f4b4ff4765d6d72cdfcabc645f26",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/errors/__init__.py",
+    "original_path": "actiongate_provider/errors/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "db9b2bf4608b7cfac3c11d729862710e8bdc3908",
+    "current_blob_sha": "2c3abc82fce1f62c8858abdcb4f0fd935e2e548c",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/health/__init__.py",
+    "original_path": "actiongate_provider/health/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "47d8005043d19ede2349c2f830e5df45531c0077",
+    "current_blob_sha": "83aa4293ac58b2f79049367649ee7cab7d487849",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/mapping/__init__.py",
+    "original_path": "actiongate_provider/mapping/__init__.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "ad2b8f7e9b1d181698940ef460f5e21ba432a3f1",
+    "current_blob_sha": "ad2b8f7e9b1d181698940ef460f5e21ba432a3f1",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/mapping/constraints.py",
+    "original_path": "actiongate_provider/mapping/constraints.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "1c8b8a54c9ace88b02a93d3b3b9be15fc4873c79",
+    "current_blob_sha": "1c8b8a54c9ace88b02a93d3b3b9be15fc4873c79",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/mapping/request.py",
+    "original_path": "actiongate_provider/mapping/request.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "df692f3cd1557c20d68f229bc33316b8b624f04c",
+    "current_blob_sha": "b5b241c157992473d059dfc3855bd58337c23071",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/mapping/result.py",
+    "original_path": "actiongate_provider/mapping/result.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "9fe53d0228f0665c076f1b4f0cb99f9cfe90404a",
+    "current_blob_sha": "cea0c27154993620807ff061667eb2b1e1f7d06a",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/observability.py",
+    "original_path": "actiongate_provider/observability.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "e938eef84c771c05ae30aef1d0ca5abd4f02f9da",
+    "current_blob_sha": "e938eef84c771c05ae30aef1d0ca5abd4f02f9da",
+    "migration_type": "BYTE_IDENTICAL"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/provider.py",
+    "original_path": "actiongate_provider/provider.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "05180c5fffb899be3cdaaddf0e99ca1fb1b22012",
+    "current_blob_sha": "87c1475913efa798fc9f248536e59ae98e4f7783",
+    "migration_type": "IMPORT_ONLY_CHANGE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/py.typed",
+    "original_path": null,
+    "original_commit": null,
+    "original_blob_sha": null,
+    "current_blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "migration_type": "NEW_PACKAGING_FILE"
+  },
+  {
+    "canonical_path": "ugence_actiongate_provider/version.py",
+    "original_path": "actiongate_provider/version.py",
+    "original_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+    "original_blob_sha": "147f8f9c91819cd15b224acd4639021d2a949ab9",
+    "current_blob_sha": "813c6b598686791c6c0109dbd6c04a6cfce27e37",
+    "migration_type": "SEMANTIC_EXTRACTION"
+  }
+]

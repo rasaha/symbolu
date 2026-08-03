@@ -12,7 +12,7 @@ Intentionally lossy / not-populated (documented):
 
 from __future__ import annotations
 
-from governance_providers.api import ActionGovernanceRequest
+from ugence_governance_provider_framework.api import ActionGovernanceRequest
 
 from ..core import ActionGateRequest
 

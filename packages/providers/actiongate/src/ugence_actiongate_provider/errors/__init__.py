@@ -7,7 +7,7 @@ adapter then normalizes to a fail-safe ``INDETERMINATE`` authorization).
 
 from __future__ import annotations
 
-from governance_providers.api import (
+from ugence_governance_provider_framework.api import (
     ProviderConfigurationError,
     ProviderError,
     ProviderResultValidationError,

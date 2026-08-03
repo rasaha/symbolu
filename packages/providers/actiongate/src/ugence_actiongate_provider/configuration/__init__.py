@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
 
-from governance_providers.api import ProviderConfigurationError
+from ugence_governance_provider_framework.api import ProviderConfigurationError
 
 from ..client import InProcessActionGateClient, RemoteActionGateClient
 from ..core import ActionGateEngine

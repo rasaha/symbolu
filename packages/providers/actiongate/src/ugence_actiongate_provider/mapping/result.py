@@ -18,7 +18,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Optional
 
-from governance_providers.api import ActionGovernanceOutcome, ActionGovernanceResult
+from ugence_governance_provider_framework.api import ActionGovernanceOutcome, ActionGovernanceResult
 
 from ..core import ActionGateDecision, ActionGateOutcome
 from .constraints import encode_constraints, encode_obligations

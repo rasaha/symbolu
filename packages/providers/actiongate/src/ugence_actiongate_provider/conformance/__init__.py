@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from governance_providers.api import (
+from ugence_governance_provider_framework.api import (
     ActionGovernanceOutcome,
     ActionGovernanceRequest,
     ProviderResultValidationError,
