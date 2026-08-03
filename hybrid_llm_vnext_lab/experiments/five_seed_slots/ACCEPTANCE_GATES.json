@@ -1,0 +1,62 @@
+{
+  "schema": "five_seed_acceptance_gates/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED before seed 3 training. Frozen; a verifier fails if this file's sha256 changes.",
+  "primary_metric": "needle@d96 (chance ~= 0.02)",
+  "holdout_seeds": [3, 4, 5, 6, 7],
+  "verdict_basis": "seeds 3-7 only; seeds 0-2 frozen/separate; 0-7 supplementary",
+  "forming_seed": {
+    "all_required": ["S_needle_d96 >= 0.075", "S_minus_Aplus_d96 >= 0.050", "S_needle_d96 >= chance+0.050 (>= 0.07)"],
+    "labels": ["FORMED", "DID_NOT_FORM", "INVALID_RUN", "RESOURCE_FAILED"]
+  },
+  "primary_stability_gate": {
+    "all_required": [
+      "forming_seeds >= 4 of 5",
+      "mean(S - A+) at d96 >= 0.080",
+      "median(S - A+) at d96 >= 0.050",
+      "S > A+ at d96 in >= 4 of 5 seeds"
+    ]
+  },
+  "causal_gate": {
+    "ablations_release": ["slots_off", "randomized_address", "shuffle_values", "write_gate_zero"],
+    "per_forming_seed_required": {
+      "slots_off_AND_randomized_address_each": [
+        "reduce needle@d96 by >= 0.050 absolute",
+        "reduce the slot gain (baseline - A+) by >= 50%",
+        "post-ablation <= max(A+_needle_d96 + 0.030, 0.050)"
+      ]
+    },
+    "overall": "passes only if EVERY forming holdout seed satisfies the slots_off AND randomized_address conditions (no averaging away a failed seed)"
+  },
+  "ppl_quality_gate": {
+    "all_required": [
+      "mean PPL(S)@256 <= 1.20 * mean PPL(A+)@256",
+      "<= 2 of 5 seeds exceed A+ PPL@256 by more than 25%"
+    ],
+    "fail_label": "RETRIEVAL_STABLE_BUT_QUALITY_REGRESSED"
+  },
+  "parameter_control_gate": {
+    "require": "S beats A+ (not merely A)",
+    "fail_label": "PARAMETER_BUDGET_EXPLAINS_GAIN"
+  },
+  "context_distance_gate": {
+    "primary": "d96",
+    "d16_material_regression": "S < A+ by more than 0.050 absolute -> regression",
+    "d220_secondary": ">= 3 forming seeds retain positive S - A+ at d220",
+    "note": "d220 must not replace the d96 gate"
+  },
+  "complexity_gate": {
+    "no_nxn": {"phase_builds_NN": false, "slots_builds_NN": false},
+    "bounded_state_independent_of_N": "state bytes constant across N in {16,64,160,256,512}, M=32",
+    "distinction": {"training_scan": "O(N*M*D)", "streaming_state": "O(M*D)", "global_NxN": "absent"}
+  },
+  "relational_emerging_definition": {
+    "EMERGING": "above chance in >= 4 of 5 seeds AND mean improvement over A+ >= 0.050",
+    "else": "AT_CHANCE / NOT_SUPPORTED (do not promote a single successful seed)",
+    "not_a_required_gate_this_phase": true
+  },
+  "final_classifications": ["FIVE_SEED_STABLE", "STABLE_RETRIEVAL_WITH_QUALITY_REGRESSION", "PARTIALLY_STABLE", "UNSTABLE", "NOT_CAUSALLY_ATTRIBUTED", "PARAMETER_BUDGET_EXPLAINS_GAIN", "RESOURCE_BLOCKED", "INVALID_EXPERIMENT"],
+  "readiness": {"READY_FOR_KDA_VALIDATION": "only if FIVE_SEED_STABLE or STABLE_RETRIEVAL_WITH_QUALITY_REGRESSION (regression isolated)", "else": "NOT_READY_FOR_KDA_VALIDATION"},
+  "invalid_run_policy": "any crash reruns the ENTIRE paired seed set (A + A+ + S); never rerun only S; never selectively rerun poor seeds",
+  "no_architecture_change_after_results": true
+}

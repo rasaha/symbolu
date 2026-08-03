@@ -1,0 +1,37 @@
+{
+  "schema": "five_seed_frozen_config/v1",
+  "date": "2026-08-03",
+  "frozen_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+  "reuses_harness": "hybrid_llm_vnext_lab/experiments/neural_slots_only/ (frozen; no model logic forked)",
+  "verified_from_live_code": true,
+  "config": {
+    "hidden_dimension": 128,
+    "attention_heads": 4,
+    "layers": 4,
+    "local_window": 64,
+    "slot_count": 32,
+    "slot_key_dim": 64,
+    "target_parameters": 2000000,
+    "sequence_length": 160,
+    "batch_size": 16,
+    "training_steps": 1200,
+    "optimizer": "AdamW",
+    "learning_rate": 2e-3,
+    "weight_decay": 0.01,
+    "warmup_steps": 60,
+    "gradient_clip": 1.0,
+    "dropout": 0.0,
+    "dtype": "fp32",
+    "threads": 4,
+    "ff_auto_tuned_per_arm_to_target": true,
+    "tokenizer_corpus": "identical to phase_lc (vocab 1291, corpus 55547 tokens) via read-only tasks_adapter"
+  },
+  "arms": {
+    "A": "sliding-window baseline",
+    "A+": "sliding-window baseline, parameter budget matched to S (PRIMARY control)",
+    "S": "sliding window + incubated neural bounded slots, NO Phase"
+  },
+  "holdout_seeds": [3, 4, 5, 6, 7],
+  "seed_semantics": "the harness uses a single integer seed per arm for model init (random.seed + torch.manual_seed) and derives the data-order rng as random.Random(seed*991+7); evaluation fixtures use fixed internal seeds (123 for needle) independent of the training seed; ablations reset the same torch seed before each stochastic forward.",
+  "do_not_change": ["layers","hidden_dimension","heads","window","slot_count","slot_key_dim","routing","write_gate","read_projection","slot_init","optimizer","lr","batch_size","steps","corpus","tokenizer","tasks","primary_metric","target_params"]
+}

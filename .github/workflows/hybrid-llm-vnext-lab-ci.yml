@@ -49,5 +49,13 @@ jobs:
           python hybrid_llm_vnext_lab/tests/boundaries/test_no_phase_imports.py
           python hybrid_llm_vnext_lab/tests/boundaries/test_slots_only_no_phase.py
 
+      - name: No-KDA/MLA boundary
+        run: python hybrid_llm_vnext_lab/tests/boundaries/test_no_kda_mla.py
+
+      - name: Five-seed pre-registration integrity + config
+        run: |
+          python hybrid_llm_vnext_lab/experiments/five_seed_slots/verify_preregistration.py
+          python hybrid_llm_vnext_lab/experiments/five_seed_slots/run.py --check-environment
+
       - name: Merged audit-integrity verifier (must still pass)
         run: python docs/audits/hybrid_llm/verify_hybrid_llm_audit.py

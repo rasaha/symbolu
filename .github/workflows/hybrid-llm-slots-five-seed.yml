@@ -1,0 +1,73 @@
+name: hybrid-llm-slots-five-seed
+
+# Manual-only five-seed holdout validation (workflow_dispatch). Installs a CPU torch wheel,
+# verifies the frozen pre-registration + historical artifact, then runs / evaluates / classifies
+# the holdout seeds. NEVER auto-triggered; NEVER auto-merges or packages.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Unique run id'
+        required: true
+        default: 'ci-fiveseed'
+      seed_start:
+        description: 'first holdout seed'
+        required: true
+        default: '3'
+      seed_end:
+        description: 'last holdout seed'
+        required: true
+        default: '7'
+      job:
+        description: 'validate | evaluate_only | classify_only'
+        required: true
+        default: 'validate'
+
+permissions:
+  contents: read
+
+jobs:
+  five_seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Disk space guard
+        run: df -h .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CPU torch (pinned)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu "numpy<2" "torch==2.*"
+          python -c "import torch;print('torch',torch.__version__)"
+      - name: Pre-registration integrity
+        run: python hybrid_llm_vnext_lab/experiments/five_seed_slots/verify_preregistration.py
+      - name: Frozen artifact digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+      - name: Run holdout seeds
+        if: ${{ inputs.job == 'validate' }}
+        run: |
+          SEEDS=$(seq -s, ${{ inputs.seed_start }} ${{ inputs.seed_end }})
+          OMP_NUM_THREADS=2 python hybrid_llm_vnext_lab/experiments/five_seed_slots/run.py \
+            --run-id "${{ inputs.run_id }}" --seeds "$SEEDS" --steps 1200
+      - name: Classify
+        if: ${{ inputs.job != 'evaluate_only' }}
+        run: |
+          F=$(ls hybrid_llm_vnext_lab/experiments/five_seed_slots/artifacts/${{ inputs.run_id }}/five_seed_results.json 2>/dev/null || true)
+          if [ -n "$F" ]; then python hybrid_llm_vnext_lab/experiments/five_seed_slots/classify.py --results "$F"; else echo "no results to classify"; fi
+      - name: Frozen artifact unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: five-seed-${{ inputs.run_id }}
+          path: hybrid_llm_vnext_lab/experiments/five_seed_slots/artifacts/**
+          if-no-files-found: ignore

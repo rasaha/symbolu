@@ -1,0 +1,95 @@
+{
+  "holdout_seeds": [
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "param_match_ok": true,
+  "needle_d96": {
+    "3": {
+      "A": 0.016666666666666666,
+      "A+": 0.016666666666666666,
+      "S": 0.0
+    },
+    "4": {
+      "A": 0.0,
+      "A+": 0.0,
+      "S": 0.2833333333333333
+    },
+    "5": {
+      "A": 0.0,
+      "A+": 0.0,
+      "S": 0.4083333333333333
+    },
+    "6": {
+      "A": 0.016666666666666666,
+      "A+": 0.016666666666666666,
+      "S": 0.075
+    },
+    "7": {
+      "A": 0.0,
+      "A+": 0.0,
+      "S": 0.041666666666666664
+    }
+  },
+  "S_minus_Aplus_d96": {
+    "3": -0.0167,
+    "4": 0.2833,
+    "5": 0.4083,
+    "6": 0.0583,
+    "7": 0.0417
+  },
+  "forming": {
+    "3": false,
+    "4": true,
+    "5": true,
+    "6": true,
+    "7": false
+  },
+  "n_forming": 3,
+  "mean_S_minus_Aplus": 0.155,
+  "median_S_minus_Aplus": 0.0583,
+  "win_count_S_gt_Aplus": 4,
+  "stability_gate": false,
+  "causal_by_seed": {
+    "4": true,
+    "5": true,
+    "6": true
+  },
+  "causal_gate": true,
+  "ppl_gate": true,
+  "ppl_mean_S256": 117.77,
+  "ppl_mean_Aplus256": 139.83,
+  "param_control_gate": true,
+  "context_distance": {
+    "d16_ok": true,
+    "d220_forming_positive": 3,
+    "d220_ok": true
+  },
+  "relational": {
+    "binding_k2": {
+      "S_mean": 0.07,
+      "above_chance_seeds": 5,
+      "label": "EMERGING"
+    },
+    "supersession": {
+      "S_mean": 0.0367,
+      "above_chance_seeds": 3,
+      "label": "AT_CHANCE"
+    },
+    "source": {
+      "S_mean": 0.0517,
+      "above_chance_seeds": 4,
+      "label": "AT_CHANCE"
+    },
+    "multihop": {
+      "S_mean": 0.045,
+      "above_chance_seeds": 2,
+      "label": "AT_CHANCE"
+    }
+  },
+  "final_classification": "PARTIALLY_STABLE",
+  "readiness": "NOT_READY_FOR_KDA_VALIDATION"
+}

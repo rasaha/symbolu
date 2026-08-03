@@ -1,0 +1,42 @@
+{
+  "schema": "five_seed_live_state/v1",
+  "date": "2026-08-03",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_head": "3b521f0f9517e12c8c379a9ad26ed57de1da4309",
+  "work_branch": "claude/hybrid-llm-slots-five-seed-validation",
+  "branch_note": "The prompt suggested 'chatgpt/hybrid-llm-slots-five-seed-validation'; this environment's git discipline mandates 'claude/' branch prefixes, so 'claude/hybrid-llm-slots-five-seed-validation' is used (documented difference).",
+  "pr_1298": {"state": "MERGED", "merged_at": "2026-08-03T07:01:53Z", "merge_commit": "3b521f0f9517e12c8c379a9ad26ed57de1da4309"},
+  "working_tree_clean_at_start": true,
+  "frozen_abc_json": {
+    "git_blob": "cbcd94f11e1a4b107d63de52fba790551389b5f8",
+    "sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "size_bytes": 23218
+  },
+  "prior_three_seed_artifacts_on_default": {
+    "slots_only_results_sarm_1200_run1.json_blob": "fdeca65ccf49082a6c7336bc5b11d095b79ac37d",
+    "historical_abc_reproduction.json_blob": "30b537bfeccb7e3b819d79e63809ffc87823e5dd"
+  },
+  "evidence_present_on_default": {
+    "historical_abc_exact_reproduction": true,
+    "neural_exact_parity": true,
+    "s_arm_seeds_0_1_2": true,
+    "immutable_reproduction_artifacts": true,
+    "historical_artifact_protection": true,
+    "no_phase_ast_tests": true,
+    "manual_neural_workflow": true,
+    "lab_verifier": true
+  },
+  "baseline_verifiers": {
+    "audit_verifier": "201 checks, 0 failures",
+    "lab_verifier": "58 checks, 0 failures",
+    "historical_artifact_protection": "8 checks, 0 failures",
+    "stdlib_tests": "41 run, 0 failed",
+    "neural_parity": "4 passed (EXACT)",
+    "no_phase_boundary": "2 passed"
+  },
+  "environment": {"python": "3.11.15", "torch": "2.13.0+cu130", "numpy": "1.26.4", "threads": 4, "dtype": "fp32"},
+  "existing_five_seed_pr": "none",
+  "holdout_seeds": [3, 4, 5, 6, 7],
+  "previously_observed_seeds": [0, 1, 2],
+  "verdict_basis": "seeds 3-7 (holdout); seeds 0-7 combined is supplementary/descriptive only"
+}
