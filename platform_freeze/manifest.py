@@ -21,13 +21,15 @@ PLATFORM_DIR = REPO / "platform"
 MANIFEST_PATH = PLATFORM_DIR / "PLATFORM_FREEZE_V1.json"
 API_SNAPSHOT_DIR = PLATFORM_DIR / "api-snapshots"
 
-# Provider conformance suites hashed by the freeze. TAP was migrated to the
-# canonical package ``ugence-tap-provider``; its conformance suite physically
-# relocated to ``packages/providers/tap/src/ugence_tap_provider/conformance``, so
-# the freeze hashes it at that canonical path (coverage preserved, not dropped).
-# The behavior is byte-identical through the ``tap_provider`` compatibility facade.
+# Provider conformance suites hashed by the freeze. TAP and ActionGate were migrated
+# to the canonical packages ``ugence-tap-provider`` / ``ugence-actiongate-provider``;
+# each conformance suite physically relocated to
+# ``packages/providers/<name>/src/ugence_<name>_provider/conformance``, so the freeze
+# hashes it at that canonical path (coverage preserved, not dropped). The behavior is
+# byte-identical through the ``tap_provider`` / ``actiongate_provider`` compatibility
+# facades.
 _PROVIDERS_WITH_CONFORMANCE = (
-    "actiongate_provider",
+    "packages/providers/actiongate/src/ugence_actiongate_provider",
     "packages/providers/tap/src/ugence_tap_provider",
 )
 

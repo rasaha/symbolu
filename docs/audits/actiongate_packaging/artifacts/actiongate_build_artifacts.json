@@ -1,0 +1,33 @@
+{
+  "source_date_epoch": "1704067200",
+  "python": "3.11.15",
+  "canonical_wheel": {
+    "filename": "ugence_actiongate_provider-0.1.0-py3-none-any.whl",
+    "sha256": "f8b2cf4bf7c383bb1227265f7a9b9846c208be9d961ef0c9e1e8c05d397dc053",
+    "reproducibility": "BIT_FOR_BIT_REPRODUCIBLE",
+    "members": 24,
+    "pure_python": true,
+    "ships_tests": false,
+    "ships_tap": false,
+    "ships_ai_hiring": false
+  },
+  "canonical_sdist": {
+    "filename": "ugence_actiongate_provider-0.1.0.tar.gz",
+    "sha256": "68614921282a0093b5644262f104adc886944a5e38d2fa4e94a96b3fa94669cb",
+    "content_digest": "4d3b35be5edb7ffa078bf9da6944ef14420013c12b43e0bc5c2a719dcdd88c30",
+    "reproducibility": "CONTENT_REPRODUCIBLE"
+  },
+  "legacy_wheel": {
+    "filename": "dgm_actiongate_provider-0.1.0-py3-none-any.whl",
+    "sha256": "cf62e5d830518a116017dd549d9bacbe627ce0a637e129fa0d945ec2e11bab8c",
+    "reproducibility": "BIT_FOR_BIT_REPRODUCIBLE",
+    "ships": ["actiongate_provider/__init__.py"],
+    "ships_second_implementation": false
+  },
+  "baseline_legacy_wheel": {
+    "filename": "dgm_actiongate_provider-0.1.0-py3-none-any.whl",
+    "sha256": "77b1f73ef071709e6eb88eeac40f7899f4ff1cebd137cea2d5ebd71f18098425",
+    "note": "pre-migration baseline wheel (symlinked the implementation tree)"
+  },
+  "distribution_verification": "PASS (packages/providers/actiongate/scripts/verify_actiongate_provider_distribution.py) — clean-env install, all four outcomes, fail-closed, health degrade, framework registry resolution, TAP-absent, CLI verify/demo, wheel content audit, legacy facade object identity"
+}

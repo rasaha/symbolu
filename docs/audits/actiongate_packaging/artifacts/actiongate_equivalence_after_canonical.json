@@ -1,0 +1,190 @@
+{
+  "capture_hash": "d805e6cfa4e2638c4c7542023de4861a3b962b6430c8cfb60f26eb3c885ed200",
+  "descriptor": {
+    "compatible_kernel_majors": [
+      "1"
+    ],
+    "contract_version": "1.0.0",
+    "default": true,
+    "deterministic": true,
+    "features": [
+      "authority_basis",
+      "authorize",
+      "constraints",
+      "expiry",
+      "in_process",
+      "obligations",
+      "reason_codes",
+      "remote"
+    ],
+    "implementation_version": "0.1.0",
+    "kind": "ACTION_GOVERNANCE",
+    "mode": "in_process",
+    "provider_id": "actiongate",
+    "vendor": "ActionGate"
+  },
+  "errors": {
+    "config": "ProviderConfigurationError",
+    "invalid_config": "ProviderConfigurationError",
+    "malformed": "ProviderResultValidationError",
+    "timeout": "ProviderTimeoutError",
+    "unavailable": "ProviderUnavailableError"
+  },
+  "health": {
+    "degraded_healthy": false,
+    "degraded_state": "DEGRADED",
+    "healthy_ok": true
+  },
+  "lifecycle_states": [
+    "REGISTERED",
+    "AVAILABLE"
+  ],
+  "namespace": "ugence_actiongate_provider",
+  "observability": [
+    {
+      "compatible": true,
+      "completed": true,
+      "error_class": null,
+      "failure_class": null,
+      "has_trace": true,
+      "mapping_version": "actiongate-map-1",
+      "mode": "in_process",
+      "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+      "policy_version": "policy-1"
+    },
+    {
+      "compatible": true,
+      "completed": false,
+      "error_class": "ProviderTimeoutError",
+      "failure_class": "RETRYABLE",
+      "has_trace": false,
+      "mapping_version": "actiongate-map-1",
+      "mode": "in_process",
+      "outcome": "",
+      "policy_version": "policy-1"
+    }
+  ],
+  "repeated_request": {
+    "fingerprint": "0a0a7d339602d3a7f00823ee2ed5345cc3c562a31b1434a61862dd346d97330d",
+    "fingerprint_stable": true,
+    "outcome_stable": true
+  },
+  "request_mapping": {
+    "action_type": "ACT",
+    "authority": "auth-ctx",
+    "correlation_id": "corr-id",
+    "decision_refs": [
+      "d1"
+    ],
+    "evidence_refs": [
+      "e1",
+      "e2"
+    ],
+    "idempotency_key": "idem-key",
+    "parameters": {
+      "amount": "10",
+      "k": "v"
+    },
+    "policy_context": [
+      "p:1",
+      "p:2"
+    ],
+    "principal": "u",
+    "resource": "res:1",
+    "risk_context": {
+      "score": "low"
+    },
+    "tenant": ""
+  },
+  "result_allow": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "4651bf9d34d4efd7feceab6f73b3199d801b4d5e9a08f6da2ab28b0a003a5a57",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED",
+    "provider_trace_id": "ag-27174565ce64bb69",
+    "reason_codes": [
+      "policy_allow"
+    ]
+  },
+  "result_constrained": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [
+      "ext:ext_custom=x",
+      "maximum_amount=100000",
+      "required_approval=senior"
+    ],
+    "expiry": "2024-01-01T01:00:00+00:00",
+    "fingerprint": "0a0a7d339602d3a7f00823ee2ed5345cc3c562a31b1434a61862dd346d97330d",
+    "obligations": [
+      "ext:ext_obl=y",
+      "human_review",
+      "notification=finance"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-6059293f888693eb",
+    "reason_codes": [
+      "policy_allow_with_constraints"
+    ]
+  },
+  "result_denied": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "6e70e535ea9ef82164c8c19f35af7bbc82d79f4e72322343aa93a235a0d0e9c5",
+    "obligations": [],
+    "outcome": "DENIED",
+    "provider_trace_id": "ag-9fdce00386c07ab4",
+    "reason_codes": [
+      "policy_denied"
+    ]
+  },
+  "result_negative_expiry": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": "2023-12-31T23:59:00+00:00",
+    "fingerprint": "d77665570ce6c4f29a330578a4b2f6e1eed25e57cb9271c6ad3e5dfb9fb94e89",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-9c761aca160f4cb3",
+    "reason_codes": [
+      "policy_allow_with_constraints"
+    ]
+  },
+  "result_unknown": {
+    "authority_basis": "",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "4d8ce5facf25560d0ae07c5e66212f70ba12640a17b71d52fbc56ff2f3a915fd",
+    "obligations": [],
+    "outcome": "INDETERMINATE",
+    "provider_trace_id": "ag-fb0feac3205f80b4",
+    "reason_codes": [
+      "policy_unknown"
+    ]
+  },
+  "result_zero_expiry": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": "2024-01-01T00:00:00+00:00",
+    "fingerprint": "d3bce347a452043cf0db60485f2982f82f000cdab4bf2f28cd64fa3e2f098564",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-a57983ce4432154e",
+    "reason_codes": [
+      "policy_allow_with_constraints"
+    ]
+  },
+  "version": {
+    "__version__": "0.1.0",
+    "contract_version": "1.0.0",
+    "mapping_version": "actiongate-map-1"
+  }
+}
