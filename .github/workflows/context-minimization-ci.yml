@@ -20,6 +20,7 @@ on:
     branches:
       - "claude/setup-symbolu-monorepo-**"
       - "claude/package-context-minimization-**"
+      - "claude/context-minimization-**"
     paths:
       - "packages/capabilities/context-minimization/**"
       - "ugence_console_api/capabilities/context_gateway.py"

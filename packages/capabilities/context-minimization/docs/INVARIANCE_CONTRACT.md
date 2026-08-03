@@ -40,12 +40,39 @@ no credentials, no unstable `repr()`, documented included/excluded fields, and t
 proving materially different authorization results yield different keys. The core does
 not broaden the equivalence definition.
 
+## Correlation binding (mandatory, v0.1.1)
+
+Correlation is part of the oracle-evaluation binding, not optional metadata. When the
+input context carries a **non-empty** `correlation_id`, every usable evaluation —
+baseline, reduced, each per-unit restoration eval, and the final restored eval — MUST
+carry the identical id:
+
+| context correlation | oracle correlation | outcome |
+| --- | --- | --- |
+| present | identical | usable |
+| present | missing | fail closed — `ORACLE_CORRELATION_MISSING` |
+| present | different | fail closed — `ORACLE_CORRELATION_MISMATCH` |
+| absent | (any) | no binding required |
+
+Missing and mismatched are **not** collapsed into one ambiguous code.
+
+## Expiry (inclusive, deterministic, v0.1.1)
+
+A validity horizon is **inclusive**: an evaluation is expired when
+`evaluation_time >= valid_until`. The core never reads a wall clock — the caller
+controls `evaluation_time` for deterministic replay. If `valid_until` is supplied but
+`evaluation_time` is `None`, the run fails closed (`ORACLE_EVALUATION_TIME_REQUIRED`)
+rather than assuming the evaluation is unexpired.
+
 ## Fail-closed conditions
 
 Missing oracle → `OracleRequiredError` (raised, oracle mode only). Oracle raises →
-`ORACLE_RAISED`. Non-string key → `ORACLE_RESULT_MALFORMED`. `oracle_id`/
-`contract_version` drift → `ORACLE_CONTRACT_MISMATCH`. `evaluation_time > valid_until`
-→ `ORACLE_EVALUATION_EXPIRED`. Correlation mismatch → `CORRELATION_MISMATCH`. Changed
-key → restore or `JOINT_EFFECT_FALLBACK`. All resolve toward **more retained context**.
+`ORACLE_RAISED`. Non-string key or empty oracle identity → `ORACLE_RESULT_MALFORMED`.
+`oracle_id`/`contract_version` drift → `ORACLE_CONTRACT_MISMATCH`.
+`evaluation_time >= valid_until` → `ORACLE_EVALUATION_EXPIRED`; `valid_until` without
+`evaluation_time` → `ORACLE_EVALUATION_TIME_REQUIRED`. Correlation missing →
+`ORACLE_CORRELATION_MISSING`; correlation mismatch → `ORACLE_CORRELATION_MISMATCH`.
+Changed key → restore or `JOINT_EFFECT_FALLBACK`. All resolve toward **more retained
+context**.
 
 The machine-readable version of this contract is `artifacts/invariance_contract.json`.

@@ -8,7 +8,9 @@
    a `ProtectionResult`/`ProtectionProvider`'s effective-protected set). A provider
    that raises or returns garbage → **protect everything** (fail closed).
 2. **Base evaluation.** Evaluate the oracle on the *full* context. If it raises, is
-   malformed, expired, or correlation-mismatched → **full fallback**.
+   malformed, expired (inclusive; or missing `evaluation_time` when a horizon is
+   supplied), or correlation-missing/mismatched → **full fallback**. See
+   `INVARIANCE_CONTRACT.md`.
 3. **Structural pass.** Deduplicate (protected excluded).
 4. **Extractive selection.** Remove the lowest-priority unprotected candidates until
    the target reduction / token budget is reached (see `DETERMINISM.md`).

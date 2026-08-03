@@ -32,10 +32,25 @@ budget → the safest achievable result plus `BUDGET_UNREACHABLE_WITHOUT_PROTECT
 Because the default counter is approximate, **do not** present reductions computed from
 it as exact provider billing savings.
 
-## Fingerprint
+## Fingerprints (two, v0.1.1)
 
-`result_fingerprint(...)` is a domain-separated SHA-256 over canonical JSON of the
-outcome (ordered surviving ids; sorted removed/restored/protected id sets;
-equivalence status; fallback flag; policy version; oracle identity). It deliberately
-excludes the opaque equivalence-key *value* (the oracle's private contract). Changing
-the context id, the policy, or the outcome changes the fingerprint.
+To avoid overloading one field with two meanings, a result carries two digests, each
+a domain-separated SHA-256 over canonical JSON (sorted keys, no whitespace, no
+`repr()`), and neither includes the opaque equivalence-key *value*:
+
+- **`outcome_fingerprint`** — the *selected outcome* only (ordered surviving ids;
+  sorted removed/restored/protected id sets; token counts; equivalence status;
+  fallback flag; policy version; oracle identity). Byte-identical to the v0.1.0
+  `fingerprint` field.
+- **`run_fingerprint`** — the *complete run identity*: request identity (context
+  contract version, id, correlation, ordered per-unit content digests + resolved
+  token counts + protected flag + redundancy set, requested reduction, requested
+  token budget, mode, evaluation time), policy identity (version + actual
+  `policy.fingerprint()` + token-counter mode), oracle identity (id, contract version,
+  evaluation ref, validity horizon, correlation), and the outcome including reason
+  codes.
+
+`fingerprint` is a **deprecated alias** of `outcome_fingerprint`. Changing the context
+text, correlation, requested reduction, token budget, policy, or resolved token counts
+changes `run_fingerprint`; changing what survived changes both. Dictionary/metadata
+ordering never changes either digest.
