@@ -81,6 +81,11 @@ export function RoleScreen() {
           </Section>
 
           <Section title="Authority & permission boundaries">
+            <p className="mb-2 rounded border border-surface-border bg-surface-2/40 p-2 text-[11px] text-ink-2" data-testid="permission-scope-note">
+              These are permission <strong className="text-ink-1">requirements</strong> used as
+              eligibility inputs. P3C does not show composition-time proposal bundles, feasibility
+              scoring or the granting of permissions (P3D).
+            </p>
             <dl>
               <Field label="Required permissions">{displayOrUnresolved(role.required_permissions, "list")}</Field>
               <Field label="Prohibited permissions">{displayOrUnresolved(role.prohibited_permissions, "list")}</Field>
