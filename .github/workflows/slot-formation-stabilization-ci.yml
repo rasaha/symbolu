@@ -1,0 +1,167 @@
+name: slot-formation-stabilization-ci
+
+# Scoped CI for the Phase-free slot-formation-stabilization phase.
+#
+# The push/PR job is TORCH-FREE: pre-registration integrity, configuration/optimizer/init/
+# curriculum/alignment/classifier tests, no-Phase / no-KDA/MLA / no-quadratic boundaries,
+# complexity report, historical artifact integrity (verified before AND after), lab verifier,
+# platform-freeze snapshot check, and terminology/safety checks. It NEVER runs the CPU training
+# matrix.
+#
+# A manual workflow_dispatch runs a single stage (diagnostic | fresh_validation | classify_only |
+# verify_only), installs a CPU torch wheel, verifies the frozen historical artifact before and
+# after, uploads run artifacts, and NEVER auto-merges or packages.
+
+on:
+  push:
+    paths:
+      - 'hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/**'
+      - 'hybrid_llm_vnext_lab/tests/stabilization/**'
+      - 'hybrid_llm_vnext_lab/artifacts/slot_formation_stabilization/**'
+      - 'hybrid_llm_vnext_lab/docs/SLOT_FORMATION_*'
+      - 'hybrid_llm_vnext_lab/docs/SLOT_ROUTING_*'
+      - 'hybrid_llm_vnext_lab/docs/SLOT_STABILIZATION_*'
+      - '.github/workflows/slot-formation-stabilization-ci.yml'
+  pull_request:
+    paths:
+      - 'hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/**'
+      - 'hybrid_llm_vnext_lab/tests/stabilization/**'
+      - 'hybrid_llm_vnext_lab/artifacts/slot_formation_stabilization/**'
+      - '.github/workflows/slot-formation-stabilization-ci.yml'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'diagnostic | fresh_validation | classify_only | verify_only'
+        required: true
+        default: 'verify_only'
+      run_id:
+        description: 'Unique run id (for diagnostic/fresh_validation)'
+        required: false
+        default: 'ci-stab'
+      candidate:
+        description: 'Selected candidate arm id (for fresh_validation)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    # Always-on torch-free integrity + tests
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Frozen historical artifact digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Pre-registration integrity
+        run: python hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/verify_preregistration.py
+
+      - name: Complexity / boundary report (no N×N, no Phase/KDA/MLA, no packaging)
+        run: python hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/complexity_report.py
+
+      - name: No-Phase / No-KDA-MLA boundaries (lab-wide)
+        run: |
+          python hybrid_llm_vnext_lab/tests/boundaries/test_no_phase_imports.py
+          python hybrid_llm_vnext_lab/tests/boundaries/test_slots_only_no_phase.py
+          python hybrid_llm_vnext_lab/tests/boundaries/test_no_kda_mla.py
+
+      - name: Configuration / optimizer / init / curriculum / alignment / classifier tests
+        run: python hybrid_llm_vnext_lab/scripts/run_stdlib_tests.py
+
+      - name: Lab integrity verifier
+        run: python hybrid_llm_vnext_lab/scripts/verify_lab.py
+
+      - name: Historical-artifact protection
+        run: python hybrid_llm_vnext_lab/scripts/verify_historical_artifact_protection.py
+
+      - name: Platform-freeze snapshot present + unchanged
+        run: |
+          test -f platform/PLATFORM_FREEZE_V1.json && echo "freeze snapshot present"
+          sha256sum platform/PLATFORM_FREEZE_V1.json
+
+      - name: Terminology / safety (no premature promotion, no packaging)
+        run: |
+          set -e
+          D=hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
+          ! grep -rniE "READY_FOR_KDA_VALIDATION[^_]" $D/PREREGISTRATION.md $D/ACCEPTANCE_GATES.json | grep -v NOT_READY || (echo "found bare KDA-ready claim" && exit 1)
+          ! test -f $D/pyproject.toml && ! test -f $D/setup.py && echo "no packaging files"
+          ! grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|import kda|import mla" $D/*.py || (echo "forbidden import" && exit 1)
+
+      - name: Frozen historical artifact unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
+
+  run_stage:
+    # Manual training / classification for a single stage
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Disk space guard
+        run: df -h .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Frozen historical artifact digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Pre-registration integrity
+        run: python hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/verify_preregistration.py
+
+      - name: Install CPU torch
+        if: ${{ inputs.job == 'diagnostic' || inputs.job == 'fresh_validation' }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu "numpy<2" "torch==2.*"
+          python -c "import torch;print('torch',torch.__version__)"
+
+      - name: Stage A diagnostic
+        if: ${{ inputs.job == 'diagnostic' }}
+        working-directory: hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
+        run: OMP_NUM_THREADS=4 python run_stage_a.py --run-id "${{ inputs.run_id }}"
+
+      - name: Stage B fresh validation
+        if: ${{ inputs.job == 'fresh_validation' }}
+        working-directory: hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
+        run: OMP_NUM_THREADS=4 python run_stage_b.py --run-id "${{ inputs.run_id }}" --candidate "${{ inputs.candidate }}"
+
+      - name: Classify only
+        if: ${{ inputs.job == 'classify_only' }}
+        working-directory: hybrid_llm_vnext_lab/experiments/slot_formation_stabilization
+        run: |
+          if [ -d "artifacts/${{ inputs.run_id }}" ]; then
+            python classify_stage_a.py --results-dir "artifacts/${{ inputs.run_id }}" || true
+          else echo "no results dir to classify"; fi
+
+      - name: Verify only
+        if: ${{ inputs.job == 'verify_only' }}
+        run: |
+          python hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/complexity_report.py
+          python hybrid_llm_vnext_lab/scripts/verify_lab.py
+
+      - name: Frozen historical artifact unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slot-stab-${{ inputs.run_id }}
+          path: hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/artifacts/**
+          if-no-files-found: ignore

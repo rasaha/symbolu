@@ -1,0 +1,110 @@
+{
+  "schema": "slot_formation_stabilization_complexity_report/v1",
+  "phase": "slot_formation_stabilization",
+  "no_nxn_sequence_attention": {
+    "slots_path": "BindingSlots is O(N*M*D): cumsum over N of [B,N,M,D]; the deployed state is [M,D]. No [N,N] score matrix. (frozen, unchanged)",
+    "window_path": "WindowSoftmaxAttn uses a banded [N,N] masked to width w -> O(N*w) effective; this is the LOCAL baseline path, identical to the historical harness and excluded from the no-global-NxN rule exactly as before. Present in A/A+/S equally.",
+    "alignment_path": "L_align uses only fact-time write vector w[B,M] and query-time read vector r[B,M]; overlap = sum_m w_m*r_m -> [B]. No [N,N] and no [N,M,N] tensor is ever formed.",
+    "global_nxn_softmax_present": false
+  },
+  "quadratic_event_softmax_present": false,
+  "bounded_streaming_state": "O(M*D) with M=32 fixed, independent of N (frozen slot state).",
+  "training_scan_complexity": "O(N*M*D)",
+  "no_phase": true,
+  "no_kda": true,
+  "no_mla": true,
+  "no_packaging_added": true,
+  "alignment_materializes_pairwise_token_matrix": false,
+  "imports_by_file": {
+    "interventions.py": [
+      "__future__",
+      "torch",
+      "torch.nn.functional"
+    ],
+    "diagnostics.py": [
+      "__future__",
+      "math",
+      "torch",
+      "torch.nn.functional",
+      "interventions",
+      "random",
+      "random"
+    ],
+    "stabilize.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib",
+      "random",
+      "sys",
+      "time",
+      "torch",
+      "torch.nn.functional",
+      "_nso",
+      "interventions",
+      "diagnostics",
+      "torch",
+      "_nso",
+      "hashlib",
+      "torch",
+      "torch"
+    ],
+    "run_stage_a.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib",
+      "sys",
+      "time",
+      "stabilize",
+      "torch"
+    ],
+    "run_stage_b.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib",
+      "subprocess",
+      "sys",
+      "time",
+      "stabilize",
+      "torch"
+    ],
+    "classify_stage_a.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib",
+      "statistics"
+    ],
+    "select_candidate.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib"
+    ],
+    "classify_stage_b.py": [
+      "__future__",
+      "argparse",
+      "json",
+      "pathlib",
+      "statistics"
+    ],
+    "verify_preregistration.py": [
+      "__future__",
+      "hashlib",
+      "json",
+      "pathlib",
+      "sys"
+    ],
+    "complexity_report.py": [
+      "__future__",
+      "ast",
+      "json",
+      "pathlib",
+      "sys"
+    ]
+  },
+  "findings": [],
+  "ok": true
+}

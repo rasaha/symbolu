@@ -1,0 +1,114 @@
+{
+  "schema": "slot_formation_stabilization_experiment_matrix/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED before any training. Frozen. verify_preregistration.py fails if arms/seeds/schedules change after results exist.",
+
+  "frozen_architecture": {
+    "hidden_dimension": 128,
+    "attention_heads": 4,
+    "layers": 4,
+    "local_window": 64,
+    "slots": 32,
+    "slot_key_dimension": 64,
+    "sequence_length": 160,
+    "batch_size": 16,
+    "training_steps": 1200,
+    "optimizer": "AdamW",
+    "baseline_lr": 2e-3,
+    "weight_decay": 0.01,
+    "baseline_warmup": 60,
+    "gradient_clip": 1.0,
+    "dropout": 0.0,
+    "dtype": "fp32",
+    "target_parameters": 2000000,
+    "threads": 4,
+    "verified_from_live_code": true,
+    "allowed_intervention_surfaces": [
+      "optimizer parameter groups",
+      "warmup schedule (per group)",
+      "initial slot-key values (in-place, shape/dtype/count preserved)",
+      "training-example difficulty schedule (curriculum)",
+      "temporary auxiliary routing loss (alignment; zero after step 600; inference-free)",
+      "diagnostic instrumentation (forward-pre-hooks; no parameters, no inference change)"
+    ],
+    "forbidden_changes": [
+      "slot_count", "hidden_dimension", "key_dimension", "layers", "local_window",
+      "task_definitions", "tokenizer", "corpus", "parameter_count", "inference_path",
+      "slot_read_write_equations", "output_head", "optimizer_family", "total_steps"
+    ]
+  },
+
+  "stage_a": {
+    "diagnostic_seeds": [3, 6, 7],
+    "seed_roles": {"3": "historical non-former", "6": "historical marginal former", "7": "historical non-former"},
+    "seed_status": "DEVELOPMENT SET — may select a candidate; MUST NEVER be reported as a fresh holdout result.",
+    "aplus_for_stage_a": "REUSED from the frozen five-seed artifacts for seeds 3,6,7 (config identical, code unchanged, hashes pinned) AND re-trained fresh inside the B0 arm run for a self-contained check. The classifier uses the freshly-trained A+ from the B0 run when present, else the pinned frozen A+ values (3: 0.0167, 6: 0.0167, 7: 0.0).",
+    "arms": [
+      {"id": "B0",  "family": "control",     "desc": "frozen S baseline (no intervention) — confirms local reproducibility on 3,6,7", "slot_lr": 2e-3, "slot_warmup": 60,  "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": false, "alignment": false},
+      {"id": "O1",  "family": "1_optimizer", "desc": "longer slot warmup + LOWER slot LR",          "slot_lr": 1e-3, "slot_warmup": 180, "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": false, "alignment": false},
+      {"id": "O2",  "family": "1_optimizer", "desc": "longer slot warmup + HIGHER slot LR",         "slot_lr": 3e-3, "slot_warmup": 180, "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": false, "alignment": false},
+      {"id": "K1",  "family": "2_init",      "desc": "orthogonal trainable slot-key initialization","slot_lr": 2e-3, "slot_warmup": 60,  "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": true,  "curriculum": false, "alignment": false},
+      {"id": "C1",  "family": "3_scaffold",  "desc": "curriculum only",                             "slot_lr": 2e-3, "slot_warmup": 60,  "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": true,  "alignment": false},
+      {"id": "R1",  "family": "3_scaffold",  "desc": "temporary write-read alignment only",         "slot_lr": 2e-3, "slot_warmup": 60,  "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": false, "alignment": true},
+      {"id": "CR1", "family": "3_scaffold",  "desc": "curriculum + temporary alignment",            "slot_lr": 2e-3, "slot_warmup": 60,  "nonslot_lr": 2e-3, "nonslot_warmup": 60, "orthogonal_keys": false, "curriculum": true,  "alignment": true}
+    ],
+    "constraints": [
+      "Do NOT combine optimizer (Family 1) and init (Family 2) in Stage A.",
+      "Do NOT combine Family 1 or Family 2 with the scaffold (Family 3) in Stage A.",
+      "CR1 combines ONLY the two Family-3 scaffolds (C1 + R1), to test their complementarity."
+    ]
+  },
+
+  "stage_b": {
+    "fresh_seeds": [8, 9, 10, 11, 12],
+    "seeds_uncontaminated": true,
+    "arms": ["A+", "B0", "SELECTED_CANDIDATE"],
+    "budget": "exactly 1200 steps; no tuning on fresh seeds; all five seeds for every arm."
+  },
+
+  "optimizer_param_groups": {
+    "description": "For O1/O2 the model parameters are split into a slot-routing group and a non-slot group. slot-routing = every parameter whose qualified name lies inside a BindingSlots module: slot_keys, W_wk (write addressing), W_rq (read addressing), W_wv (write value), gate (write gate), W_o (slot output), norm (slot pre-norm LayerNorm). All other parameters (token/pos embeddings, window attention Wq/Wk/Wv/Wo, block LayerNorms, FFN, final norm, tied head) are non-slot.",
+    "invariants": ["each parameter appears in exactly one group", "no parameter omitted", "no parameter duplicated", "group LR/warmup exactly as the arm defines"]
+  },
+
+  "orthogonal_init_K1": {
+    "method": "Deterministic per-seed orthogonal re-init of each slot_keys tensor ([32,64]) AFTER model construction, in-place: draw a seed-derived Gaussian [32,64], QR-orthonormalize its rows (semi-orthogonal since 32<=64), then row-normalize to unit L2 (matching the baseline which also row-normalizes). Shape/dtype/param-count preserved; keys remain a trainable nn.Parameter; NOT frozen; NO added parameters; read/write equations untouched.",
+    "baseline_note": "The frozen BindingSlots ALREADY orthogonalizes+normalizes at init (32<=64). K1 is a distinct, explicitly-seeded orthogonalization; the initialization audit quantifies the (expected small) change in off-diagonal cosine similarity.",
+    "audit_fields": ["baseline_pairwise_cosine", "K1_pairwise_cosine", "key_norms", "variance", "singular_values", "deterministic_hash_per_seed", "shape_dtype_count_unchanged"]
+  },
+
+  "curriculum_C1": {
+    "total_steps": 1200,
+    "phase_1_steps": "1-300: needle only, distance ~ d16, low distractors (pure needle batches at distance=16)",
+    "phase_2_steps": "301-700: one relevant fact, mixed d16/d96, moderate distractors (70% needle at distance in {16,96}, 30% binding k=2 for interference)",
+    "phase_3_steps": "701-1200: ORIGINAL ABC_MIX task distribution (frozen train_batch), includes d16/d96/d220 via the standard generators and original distractor behavior",
+    "final_500_steps_original": true,
+    "example_count_preserved": "batch_size 16 every step, 1200 steps -> identical example count to baseline",
+    "resources": "only existing task primitives + the existing corpus/tokenizer; no external data",
+    "leakage_rule": "the supervised target is always only the answer position (mask at pos-1); the value token is never adjacent to the query beyond the designed retrieval distance."
+  },
+
+  "alignment_R1": {
+    "objective": "label-free write-read overlap. Per layer: overlap = sum_m write_weight[m] * read_weight[m]; L_align = -log(mean_overlap + epsilon), epsilon=1e-6.",
+    "write_weight": "the slot write-address distribution (softmax over M slots) at the fact's VALUE-token position",
+    "read_weight": "the slot read-address distribution (softmax over M slots) at the query position (the position whose output predicts the value)",
+    "signal_source": "an auxiliary needle probe batch (B_align=8, mixed d16/d96) drawn each step DURING the alignment window; its cross-entropy is NEVER added to the loss (no output-token supervision). Only the slot-address distributions are used.",
+    "distribution_note": "the MAIN objective for R1 uses the ORIGINAL ABC_MIX distribution for all 1200 steps; the alignment term is an ADDED auxiliary loss.",
+    "lambda_schedule": {"steps_1_300": 0.10, "steps_301_600": "linear decay 0.10 -> 0.0", "steps_601_1200": 0.0},
+    "guarantees": ["no fixed 'correct slot' label", "does not reveal the answer token", "uses only spans the synthetic generator provides", "no N x N tensor", "adds no inference-time op/param", "lambda == 0 for all steps > 600 and during all evaluation"],
+    "logging": ["main_loss and aux_loss recorded separately per checkpoint"]
+  },
+
+  "diagnostics": {
+    "checkpoints": [0, 60, 120, 300, 600, 900, 1200],
+    "per_checkpoint_needle_d96": true,
+    "per_fact_query_fields": [
+      "write_distribution_at_fact", "read_distribution_at_query", "write_read_overlap",
+      "read_prob_on_highest_write_slot", "rank_of_highest_write_slot_under_read",
+      "top1_slot_agreement", "topk_slot_agreement", "write_entropy", "read_entropy",
+      "address_logit_margin", "write_gate_value_at_fact", "read_contribution_at_query",
+      "grad_norm_slot_keys", "grad_norm_read_proj", "grad_norm_write_proj"
+    ],
+    "central_question": "Does successful formation correspond to RISING fact-write/query-read overlap BEFORE final needle performance rises? (argued from overlap trajectory, not aggregate entropy)"
+  }
+}

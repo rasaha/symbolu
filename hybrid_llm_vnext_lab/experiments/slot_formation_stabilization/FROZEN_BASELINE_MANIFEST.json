@@ -1,0 +1,118 @@
+{
+  "schema": "frozen_baseline_manifest/v1",
+  "date": "2026-08-03",
+  "purpose": "Immutable digests of every artifact and source file this phase treats as frozen scientific input. A verifier fails if any of these change.",
+  "frozen_abc_json": {
+    "path": "experiments/phase_lc/results/abc.json",
+    "sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "git_blob": "cbcd94f11e1a4b107d63de52fba790551389b5f8",
+    "size_bytes": 23218,
+    "role": "historical Phase A/B/C study result; MUST remain byte-identical (must not be modified)"
+  },
+  "pr_1300_five_seed_results": {
+    "path": "hybrid_llm_vnext_lab/artifacts/five_seed_results_run1.json",
+    "sha256": "87dd642b04e955a1057acea61feb0ab7e3f9efe8f1b26b3ca13da21312f52ae3",
+    "git_blob": "ad520363d04d3ba9b15c93ece50d553f92a2ae2b",
+    "size_bytes": 17535,
+    "role": "immutable five-seed holdout results (A/A+/S on seeds 3,4,5,6,7)"
+  },
+  "five_seed_classification": {
+    "path": "hybrid_llm_vnext_lab/artifacts/five_seed_classification_run1.json",
+    "sha256": "25aa469863e45de7b52bf1ebe7fb7bea729cf090f7f67bb60ce91b5d46fe354a",
+    "git_blob": "82c2dda2a146ab36866684340be3850130130b2e",
+    "size_bytes": 1754,
+    "role": "frozen PARTIALLY_STABLE / NOT_READY_FOR_KDA_VALIDATION classification (must not be reclassified)"
+  },
+  "five_seed_run_manifest": {
+    "path": "hybrid_llm_vnext_lab/artifacts/five_seed_run_manifest_run1.json",
+    "sha256": "0ea400a3530058e18bde9b4351cf26c8b07d61aeeb169c75e4ee8c0184d79ee6",
+    "git_blob": "2fa6477cbe4133e9e81da480a93b95f3d7b52e99",
+    "size_bytes": 619
+  },
+  "five_seed_live_state": {
+    "path": "hybrid_llm_vnext_lab/artifacts/five_seed_live_state.json",
+    "sha256": "e763eea83b37033027841424abe1d8e2980ba5b5b5bf7c52c550c1c954268912",
+    "git_blob": "b9018661dda88eef5be0f5227a40d4e5ce9653c7",
+    "size_bytes": 2072
+  },
+  "current_S_architecture_source": {
+    "path": "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py",
+    "sha256": "5e95a1a17925d3935ea991c4019e3a0a94a5b481cabc5a0211e53aa2b0c6918b",
+    "git_blob": "4a05581284b4f69bdfcd5cf4a38a2da0a110b95c",
+    "size_bytes": 6095,
+    "role": "the exact S architecture (LM/SlotsMixer/WindowSoftmaxAttn/build_matched). This phase reuses it unmodified."
+  },
+  "binding_slots_class_source": {
+    "path": "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py",
+    "sha256": "86d7065735cc917d868e850d57771175d9de61acbf62f3f7351f7462ebe9fe8a",
+    "git_blob": "b225bebd5a03028c05245da29136c4873ae95d04",
+    "size_bytes": 5086,
+    "role": "byte-identical BindingSlots (write/route/read equations). NOT modified. Interventions instrument it non-invasively.",
+    "note": "This class ALREADY applies nn.init.orthogonal_(keys) when num_slots(32) <= key_dim(64); the baseline slot keys are therefore already orthogonalized + normalized. This is a material fact for Intervention Family 2 (K1)."
+  },
+  "current_task_generator": {
+    "path": "experiments/phase_lc/tasks.py",
+    "sha256": "806e2445990f9c9676ddc585c98aea97d7fffc73c53ce292ed14f6011e69d05c",
+    "git_blob": "753793a575c6064655906d95e14c0d33673af46f",
+    "size_bytes": 10586,
+    "role": "corpus loader + tokenizer (Vocab) + task generators (needle/binding/multihop/supersession/source) + train_batch/lm_batch. Reused read-only."
+  },
+  "tasks_adapter": {
+    "path": "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py",
+    "sha256": "e836b9e1e47cf7f948333e14083a402b71409fa95da05f05f18f2343032cd7a2",
+    "git_blob": "d8d69a566ab59da4f80824e18991c49c43f8ef0d",
+    "size_bytes": 1498
+  },
+  "evaluation_suite": {
+    "path": "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py",
+    "sha256": "51b94840786e28b1529db9470eff4a7dc01a991edfb149b55d8ec77c18a30dc2",
+    "git_blob": "b3433edd9aec0e316215aafc4a19eff0892adb35",
+    "size_bytes": 4462,
+    "role": "frozen eval_suite + s_ablations. Reused unmodified for all arms."
+  },
+  "frozen_neural_run_harness": {
+    "path": "hybrid_llm_vnext_lab/experiments/neural_slots_only/run.py",
+    "sha256": "18abd3a8205ab5e3c58510d176e47251041e5e8591c31a80fc1a49390aee4407",
+    "git_blob": "f0ed7457c9c4788a9b40bd01f44d6318da706297",
+    "size_bytes": 5743
+  },
+  "current_acceptance_gates": {
+    "path": "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json",
+    "sha256": "1833db22587fffd33abbc379afeeb93d720f45a1b73bbaccc3c76dfc7fb59afa",
+    "git_blob": "557fcd4bc57a07feb6ab485fb86308b8c3d8badd",
+    "size_bytes": 3100,
+    "role": "frozen formation rule + gates from PR #1300. This phase inherits the SAME formation definition."
+  },
+  "frozen_config": {
+    "path": "hybrid_llm_vnext_lab/experiments/five_seed_slots/FROZEN_CONFIG.json",
+    "sha256": "c0ba6851ad9d15de6ddc817d9d9e18f099c4359058ce7a80e2598e463d80e4fa",
+    "git_blob": "46f8d63c70dd8b93fcd5002051a8af221f3988fd",
+    "size_bytes": 1726
+  },
+  "frozen_classifier": {
+    "path": "hybrid_llm_vnext_lab/experiments/five_seed_slots/classify.py",
+    "sha256": "28b3817ce4c8273741e9fb589298d8198786296ec19bcca17a8088fcefe379ce",
+    "git_blob": "aa41635993aba98fa7430faf3911f61149102c29",
+    "size_bytes": 6134,
+    "role": "frozen five-seed formation classifier; the stabilization classifier reuses its exact formation/causal/ppl gate logic."
+  },
+  "corpus_files": {
+    "bounded_shadow_pilot_natural_pilot_v1": {
+      "path": "bounded_shadow_pilot/data/natural_pilot_v1/corpus.json",
+      "sha256": "dfa196d5d32ab562e69110415912f53312cb1e519d958760b2aaae8d2afc03aa",
+      "size_bytes": 582449
+    },
+    "evidence_assurance_v1": {
+      "path": "evidence_assurance/data/v1/corpus.json",
+      "sha256": "4260dd4b766658159c72b7426e0977a19fb3309a1aa4929dc74a437a22997b2b",
+      "size_bytes": 1070830
+    },
+    "vocab_size": 1291,
+    "corpus_tokens": 55547
+  },
+  "platform_freeze_manifest": {
+    "path": "platform/PLATFORM_FREEZE_V1.json",
+    "sha256": "700a8a793cbd693b162ebc4b6c00d321816e7b624dfc6e73571bb85d83b1ebc0",
+    "role": "recorded to prove the platform freeze snapshot is unchanged by this phase"
+  }
+}

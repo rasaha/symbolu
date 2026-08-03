@@ -1,0 +1,109 @@
+{
+  "schema": "slot_formation_stabilization_acceptance_gates/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED before any Stage A training. Frozen; verify_preregistration.py fails if this file's sha256 changes after results exist.",
+  "primary_metric": "needle@d96 (chance ~= 0.02)",
+  "inherits_from_pr_1300": "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json (sha256 1833db22...) — the formation, causal, ppl, parameter-control and distance rules are INHERITED UNCHANGED and MUST NOT be weakened.",
+
+  "formation_rule": {
+    "source": "frozen five-seed rule (PR #1300)",
+    "all_required": [
+      "S_needle_d96 >= 0.075",
+      "S_minus_Aplus_d96 >= 0.050",
+      "S_needle_d96 >= chance + 0.050  (>= 0.07)"
+    ],
+    "marginal_note": "A seed exactly at threshold (e.g. 0.075) is labelled 'marginal' but COUNTS as FORMED by the frozen numerical rule.",
+    "labels": ["FORMED", "DID_NOT_FORM", "INVALID_RUN", "RESOURCE_FAILED"]
+  },
+
+  "stage_a_arm_eligibility": {
+    "description": "An intervention arm (run on diagnostic seeds 3,6,7) is a Stage B CANDIDATE only if ALL hold.",
+    "all_required": [
+      "e1_forms_>=2_of_3_diagnostic_seeds",
+      "e2_rescues_>=1_historical_non_former (seed 3 OR seed 7 flips DID_NOT_FORM -> FORMED)",
+      "e3_seed6_not_regressed_below_formation UNLESS both non-formers (3 AND 7) are rescued",
+      "e4_ppl_quality_passes (mean PPL(S)@256 <= 1.20 * mean PPL(A+)@256 over the 3 seeds)",
+      "e5_every_newly_forming_seed_collapses under slots_off AND randomized_address (per the causal gate)",
+      "e6_no_NxN_operation (declarative complexity audit passes)",
+      "e7_parameter_count_matched (|params(S_arm) - params(A+)| / params(S_arm) <= 0.0005)",
+      "e8_no_Phase_no_KDA_no_MLA in the graph (AST boundary + import audit)"
+    ],
+    "causal_gate_per_forming_seed": {
+      "ablations_release": ["slots_off", "randomized_address", "shuffle_values", "write_gate_zero"],
+      "slots_off_AND_randomized_address_each": [
+        "reduce needle@d96 by >= 0.050 absolute",
+        "reduce the slot gain (baseline - A+) by >= 50%",
+        "post-ablation <= max(A+_needle_d96 + 0.030, 0.050)"
+      ],
+      "overall": "EVERY newly-forming diagnostic seed must satisfy slots_off AND randomized_address; no averaging away a failed seed."
+    }
+  },
+
+  "stage_b_gates": {
+    "description": "Applied to the ONE selected candidate on the five FRESH seeds 8,9,10,11,12 (A+, B0, candidate all trained fresh).",
+    "all_required": [
+      "b1_formation_count >= 4 of 5 fresh seeds",
+      "b2_mean(S_candidate - A+) at d96 >= 0.080",
+      "b3_median(S_candidate - A+) at d96 >= 0.050",
+      "b4_S_candidate > A+ at d96 in >= 4 of 5 seeds",
+      "b5_candidate_formation_count > B0_formation_count (candidate beats frozen baseline formation)",
+      "b6_parameter_match passes",
+      "b7_ppl_quality passes (mean PPL(cand)@256 <= 1.20 * mean PPL(A+)@256; <= 2 of 5 exceed A+ by >25%)",
+      "b8_causal_gate passes for EVERY forming fresh seed (slots_off AND randomized_address collapse)",
+      "b9_context_distance gates pass (d16 no material regression; >=3 forming seeds keep positive S-A+ at d220)",
+      "b10_no_NxN confirmed; bounded streaming state O(M*D) unchanged",
+      "b11_Phase absent; KDA absent; MLA absent"
+    ],
+    "explicit_rule": "A higher mean with fewer than 4/5 formed DOES NOT pass. b1 (>=4/5) is mandatory and cannot be traded for margin."
+  },
+
+  "ppl_quality_gate": {
+    "all_required": [
+      "mean PPL@256 of the slot arm <= 1.20 * mean PPL@256 of A+",
+      "<= 2 of 5 seeds exceed A+ PPL@256 by more than 25%"
+    ],
+    "fail_label": "RETRIEVAL_STABLE_BUT_QUALITY_REGRESSED"
+  },
+
+  "parameter_control_gate": {
+    "require": "the slot arm beats A+ (not merely A)",
+    "fail_label": "PARAMETER_BUDGET_EXPLAINS_GAIN"
+  },
+
+  "context_distance_gate": {
+    "primary": "d96",
+    "d16_material_regression": "S < A+ by more than 0.050 absolute -> regression",
+    "d220_secondary": ">= 3 forming seeds retain positive S - A+ at d220",
+    "note": "d220 must not replace the d96 gate"
+  },
+
+  "complexity_gate": {
+    "no_nxn": {"slots_builds_NN": false, "alignment_builds_NN": false},
+    "bounded_state_independent_of_N": true,
+    "distinction": {"training_scan": "O(N*M*D)", "streaming_state": "O(M*D)", "global_NxN": "absent"}
+  },
+
+  "final_classifications": [
+    "NO_STABILIZATION_CANDIDATE",
+    "INTERVENTION_RESCUES_KNOWN_FAILURES_ONLY",
+    "FRESH_HOLDOUT_UNSTABLE",
+    "PROVISIONALLY_STABILIZED",
+    "INVALID_EXPERIMENT",
+    "RESOURCE_BLOCKED"
+  ],
+  "readiness_under_provisional": "PROVISIONALLY_STABILIZED STILL reports NOT_READY_FOR_KDA_VALIDATION (intervention was selected over multiple candidates). The next gate is ONE independent confirmatory five-seed replication of the frozen winning intervention with no further tuning.",
+
+  "mechanism_labels": [
+    "DELAYED_FORMATION",
+    "OPTIMIZER_SENSITIVITY",
+    "SLOT_SYMMETRY_FAILURE",
+    "WEAK_EARLY_ROUTING_SIGNAL",
+    "ARCHITECTURAL_BISTABILITY",
+    "NO_IDENTIFIED_MECHANISM"
+  ],
+  "mechanism_evidence_rule": "The mechanism MUST be argued from task-specific routing diagnostics (write-read overlap trajectory, correct-slot rank, address-logit margin, per-group gradient norms) — NEVER from aggregate slot utilization/entropy alone.",
+
+  "invalid_run_policy": "Any crash reruns the ENTIRE affected arm/seed; never rerun only the poor seeds and never change config to rescue a run.",
+  "no_architecture_change_after_results": true,
+  "chance_needle_d96": 0.02
+}
