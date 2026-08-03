@@ -1,0 +1,59 @@
+{
+  "schema": "source_manifest/v1",
+  "date": "2026-08-03",
+  "source_commit": "8b4ec6e71666282384a4e23f78c724f8df4ba767",
+  "principle": "COPY, DO NOT MOVE. Every original remains untouched and continues to serve as the historical reference. No historical experiment was repointed at this lab.",
+  "entries": [
+    {
+      "original_path": "experiments/phase_lc/models.py",
+      "original_symbol": "class BindingSlots (lines 200-273)",
+      "source_blob": "76b5af69f12b23f6c94e66727b790028bc0fc26e",
+      "destination": "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py",
+      "incubated_blob": "b225bebd5a03028c05245da29136c4873ae95d04",
+      "extraction_status": "SEMANTIC_EXTRACTION",
+      "byte_identical_body": true,
+      "reason": "Primary reproduction target: the implementation that produced the measured phase_lc A/B/C positive slot result and carries the causal ablation hooks.",
+      "dependencies_removed": ["all Phase code and the RealPhase/PhaseAttentionLayer import present in the source models.py", "all other model classes (SoftmaxAttn, GatedLinearRec, PhaseAttn, ABCMixer, LM, etc.)"],
+      "semantic_changes": "none to the class body (byte-identical); file reduced to the slot class + its torch imports",
+      "parity_test": "tests/parity/test_torch_reference_parity.py (RESOURCE_BLOCKED: torch)"
+    },
+    {
+      "original_path": "symbolu/lightweight_phase/binding_slots.py",
+      "original_symbol": "class BoundedBindingSlots + dataclass BindingSlotState (whole file)",
+      "source_blob": "6ee03c133b61bca2b089e787f06c00a99d007bc1",
+      "destination": "hybrid_llm_vnext_lab/src/binding_slots/bounded_binding_slots.py",
+      "incubated_blob": "a81bcb5dd8c2124c8a277fc90c5ce702d1706f0c",
+      "extraction_status": "SEMANTIC_EXTRACTION",
+      "byte_identical_body": true,
+      "reason": "Metadata-extended variant: the only implementation with source/version/supersession/eviction; target for the not-yet-demonstrated relational capabilities.",
+      "dependencies_removed": [],
+      "semantic_changes": "exactly one line changed: `from .invariants import register_shape` -> `from ..instrumentation.invariants import register_shape` (vendored invariants is byte-identical). Provenance header prepended.",
+      "parity_test": "tests/parity/test_torch_reference_parity.py (RESOURCE_BLOCKED: torch)"
+    },
+    {
+      "original_path": "symbolu/lightweight_phase/invariants.py",
+      "original_symbol": "whole file (register_shape / shape_audit / InvariantViolation)",
+      "source_blob": "d064b252de162cfe4886c6e301e088a26d0a72d9",
+      "destination": "hybrid_llm_vnext_lab/src/instrumentation/invariants.py",
+      "incubated_blob": "f8d7e9acacbb1cbd896c95ae7eeafd47092c043b",
+      "extraction_status": "BYTE_IDENTICAL",
+      "byte_identical_body": true,
+      "reason": "Declarative no-[N,N] / bounded-state audit machinery (stdlib); reused by the stdlib reference and the torch modules.",
+      "dependencies_removed": [],
+      "semantic_changes": "provenance header prepended only; body byte-identical",
+      "parity_test": "tests/complexity/test_no_nxn.py (stdlib, runnable)"
+    },
+    {
+      "original_path": "(new)",
+      "original_symbol": "SlotReference (stdlib reference of the union of discrete slot mechanics)",
+      "source_blob": null,
+      "destination": "hybrid_llm_vnext_lab/src/binding_slots/slot_reference.py",
+      "extraction_status": "SEMANTIC_EXTRACTION",
+      "byte_identical_body": false,
+      "reason": "Dependency-free reference so behavioural/complexity claims run without PyTorch; parity oracle for the torch modules.",
+      "dependencies_removed": ["torch (reimplemented in stdlib)"],
+      "semantic_changes": "operates on already-projected key/value vectors so tests control addressing directly; learned projections are the RESOURCE_BLOCKED part and are intentionally out of scope",
+      "parity_test": "tests/unit/*, tests/behavioral/*, tests/complexity/* (stdlib, runnable)"
+    }
+  ]
+}

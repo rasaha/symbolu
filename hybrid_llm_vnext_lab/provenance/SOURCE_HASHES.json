@@ -1,0 +1,12 @@
+{
+  "schema": "source_hashes/v1",
+  "date": "2026-08-03",
+  "hash_algorithm": "git blob sha1 (git hash-object)",
+  "source_commit": "8b4ec6e71666282384a4e23f78c724f8df4ba767",
+  "note": "source_blob = original object id at source_commit; incubated_blob = git hash-object of the copied file in this lab. Integrity is checked by scripts/verify_lab.py (source_blob still resolvable at source_commit; incubated_blob matches the on-disk file).",
+  "files": [
+    {"destination": "src/binding_slots/legacy_phase_lc_slots.py", "original_path": "experiments/phase_lc/models.py", "source_blob": "76b5af69f12b23f6c94e66727b790028bc0fc26e", "incubated_blob": "b225bebd5a03028c05245da29136c4873ae95d04", "body_byte_identical_to_source_lines": "200-273"},
+    {"destination": "src/binding_slots/bounded_binding_slots.py", "original_path": "symbolu/lightweight_phase/binding_slots.py", "source_blob": "6ee03c133b61bca2b089e787f06c00a99d007bc1", "incubated_blob": "a81bcb5dd8c2124c8a277fc90c5ce702d1706f0c", "single_line_delta": "register_shape import path"},
+    {"destination": "src/instrumentation/invariants.py", "original_path": "symbolu/lightweight_phase/invariants.py", "source_blob": "d064b252de162cfe4886c6e301e088a26d0a72d9", "incubated_blob": "f8d7e9acacbb1cbd896c95ae7eeafd47092c043b", "body_byte_identical": true}
+  ]
+}

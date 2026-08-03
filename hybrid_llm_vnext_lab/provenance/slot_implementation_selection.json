@@ -1,0 +1,57 @@
+{
+  "schema": "slot_implementation_selection/v1",
+  "date": "2026-08-03",
+  "source_commit": "8b4ec6e71666282384a4e23f78c724f8df4ba767",
+  "candidates": [
+    {
+      "name": "BindingSlots",
+      "path": "experiments/phase_lc/models.py",
+      "lines": "200-273",
+      "source_blob": "76b5af69f12b23f6c94e66727b790028bc0fc26e",
+      "uses_phase": false,
+      "phase_in_same_file": true,
+      "uses_quadratic_seq_attention": false,
+      "state": "M fixed slots; deployed state M*d (32*128=4096/layer); [B,N,M,D] is a training-time cumsum scan artifact, not persistent",
+      "write_rule": "addr=softmax(W_wk x . SlotKeys^T); w=sigmoid(gate) * addr; slot=cumsum(w v)/cumsum(w)",
+      "read_rule": "raddr=softmax(W_rq x . SlotKeys^T); out=W_o(sum_m raddr_m slot_m)",
+      "overwrite": "soft cumulative (running mean per slot)",
+      "source_version_support": false,
+      "ablation_hooks": ["zero (slots-off)", "shuffle_val", "rand_keys (randomized address)"],
+      "measured_positive_result": true,
+      "result_artifact": "experiments/phase_lc/results/abc.json",
+      "causal_slots_off_evidence": true,
+      "reproducible_harness": "experiments/phase_lc/harness_abc.py",
+      "controller_coupling": "minimal (nn.Module; used additively in ABCMixer)"
+    },
+    {
+      "name": "BoundedBindingSlots",
+      "path": "symbolu/lightweight_phase/binding_slots.py",
+      "lines": "63-205",
+      "source_blob": "6ee03c133b61bca2b089e787f06c00a99d007bc1",
+      "uses_phase": false,
+      "phase_in_same_file": false,
+      "uses_quadratic_seq_attention": false,
+      "state": "M fixed slots; keys/values/source/version/usage/active; O(M*D), streaming read-then-write",
+      "write_rule": "cosine-address to active slots; match>=thr -> supersede same slot + version++; else free slot else LRU evict; convex-combine by gate",
+      "read_rule": "top-k soft attention over active slots (dot / sqrt(Ds))",
+      "overwrite": "supersede-in-place with version bump; hard LRU eviction on allocation",
+      "source_version_support": true,
+      "ablation_hooks": [],
+      "measured_positive_result": false,
+      "result_artifact": null,
+      "causal_slots_off_evidence": false,
+      "reproducible_harness": null,
+      "controller_coupling": "minimal (nn.Module)",
+      "note": "validation ladder explicitly DEFERRED in source docstring ('No binding capability claimed as demonstrated')"
+    }
+  ],
+  "selection": {
+    "primary_reproduction_target": "BindingSlots (experiments/phase_lc/models.py)",
+    "rationale": "It is the implementation that produced the ONLY measured positive slot result (abc.json), carries the built-in causal ablation hooks the harness used (zero / rand_keys), has a reproducible matched harness, is Phase-independent as a module, is bounded, and builds no N x N tensor. Selection criteria 1 (positive measured result), 2 (causal slots-off evidence) and 7 (reproducible harness) are decisive for a REPRODUCTION phase.",
+    "metadata_extension_reference": "BoundedBindingSlots (symbolu/lightweight_phase/binding_slots.py)",
+    "extension_rationale": "It is the only implementation with clean source / version / supersession / eviction semantics (criterion 6) and is the target for the NOT-YET-DEMONSTRATED relational capabilities. Its validation was deferred, so it is incubated as the metadata-extended variant, not as the reproduction target.",
+    "stdlib_reference": "src/binding_slots/slot_reference.py",
+    "stdlib_rationale": "A dependency-free reference implementing the union of testable DISCRETE mechanics (content addressing, supersession+version, source retention, LRU eviction, bounded state, no N x N) so behavioural/complexity claims run WITHOUT torch. It is also the parity oracle the torch modules must match once torch is available.",
+    "not_selected_by": "class name, file date, or documentation language alone"
+  }
+}
