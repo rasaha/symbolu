@@ -47,6 +47,14 @@ jobs:
         run: npm run verify:boundary
       - name: terminology
         run: npm run verify:terminology
+      - name: permission-scope-terminology
+        run: npx vitest run tests/permission-scope.test.tsx
+      - name: contrast-verification
+        run: npm run verify:contrast
+      - name: production-dependency-audit
+        run: npm run audit:dependencies
+      - name: dependency-exception-validation
+        run: npx vitest run tests/dependency-audit.test.ts tests/contrast.test.ts
       - name: typecheck
         run: npm run type-check
       - name: lint
@@ -110,8 +118,9 @@ jobs:
           npm run build
           npx playwright install --with-deps chromium
 
-      - name: backend-integration + browser-e2e
+      - name: browser-e2e-all-scenarios
         working-directory: apps/ugence-governance-studio/frontend
+        # runs all four direct scenario tests against the real local backend
         run: npx playwright test
 
       - name: platform-freeze

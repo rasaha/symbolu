@@ -17,3 +17,10 @@ Data flow: **compatibility gate → react-query hook → typed client → OpenAP
 envelope → view-model → component**. The frontend fetches, validates
 compatibility, formats, filters and sorts for presentation, and renders. It
 computes no domain outcome; server responses are authoritative.
+
+## Permission display boundary
+
+P3C displays permission **requirements** and permission-related eligibility
+evidence (role-required/prohibited/requested permissions, authority ceilings,
+policy-related permission failures). It does **not** display composition-time
+permission proposals and does not grant or provision permissions (P3D+).

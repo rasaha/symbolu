@@ -47,10 +47,20 @@ npm run lint               # eslint, 0 warnings
 npm run test               # vitest: unit + component + a11y (axe)
 npm run verify:openapi     # generated-client drift vs frozen contract
 npm run verify:boundary    # no AWC/compiler/backend imports, no P3D paths
-npm run verify:terminology # no ranking/selection/authorization language
+npm run verify:terminology # no ranking/selection/authorization/permission-proposal language
+npm run verify:contrast    # measured WCAG 2.2 token contrast (artifacts/contrast-report.json)
+npm run audit:dependencies # blocking: fail on high/critical production vulnerabilities
 npm run build              # production build
-npm run e2e                # Playwright against the real backend
+npm run e2e                # Playwright: all four scenarios against the real backend
 ```
+
+## Boundaries
+
+P3C displays permission **requirements** and permission-related eligibility
+evidence (role-required / prohibited / requested permissions, authority ceilings,
+policy-related permission failures). It does **not** display composition-time
+permission proposals and does not grant or provision permissions (P3D+). No
+ranking, composition, fallback, replay, comparison or what-if UI is present.
 
 See [`../docs/FRONTEND_ARCHITECTURE.md`](../docs/FRONTEND_ARCHITECTURE.md) and the
 `docs/` set for architecture, accessibility, security and testing details.

@@ -1,0 +1,24 @@
+{
+  "phase": "governance_studio_p3c_final_hardening",
+  "predecessor_pr": {"number": 1321, "state": "merged", "merge_commit": "3ce28d91"},
+  "branch": "claude/governance-studio-p3c-hardening",
+  "base": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "corrections": {
+    "C1_all_four_scenario_e2e": true,
+    "C2_permission_scope_terminology": true,
+    "C3_blocking_dependency_audit": true,
+    "C4_measured_contrast": true
+  },
+  "e2e": {"procurement": "pass", "customer_support": "pass", "cybersecurity_success": "pass",
+          "cybersecurity_no_feasible_team": "pass", "direct_scenario_count": 4, "total_playwright": 4,
+          "real_backend": true},
+  "vitest_total": 46,
+  "dependency_audit": {"command": "npm audit --omit=dev --json", "production_total": 2,
+                       "high": 0, "critical": 0, "moderate": 2, "accepted_exceptions": 0, "result": "PASS"},
+  "contrast": {"pairs": 21, "thresholds": {"normal": 4.5, "large": 3.0, "nontext": 3.0},
+               "failed_pairs": 0, "lowest_passing_ratio": 4.09, "result": "PASS",
+               "report": "apps/ugence-governance-studio/frontend/artifacts/contrast-report.json"},
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+  "verdict": "GOVERNANCE_STUDIO_P3C_FINAL_HARDENING_VERIFIED"
+}
