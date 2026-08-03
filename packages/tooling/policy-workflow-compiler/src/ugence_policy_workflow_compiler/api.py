@@ -95,8 +95,47 @@ from .verification import (
     verify_compiled_package,
 )
 
+# -- P2: workflow_ir.v2 semantic enrichment (additive) -------------------------
+from .semantics import (
+    CapabilityRequirement,
+    CapabilityRequirementSource,
+    DataContractRef,
+    DependencyKind,
+    DerivationClass,
+    HumanReviewRequirement,
+    NodeInputRequirement,
+    NodeOutputDeclaration,
+    PolicyProvenanceRef,
+    RequirementLevel,
+    ResolutionStatus,
+    RoleRelevance,
+    SemanticDiagnostic,
+    SemanticFeature,
+    SemanticFeatureName,
+    WorkflowDependencySemantics,
+    WorkflowIRv2,
+    WorkflowNodeSemantics,
+    classify_role_relevance,
+    compile_workflow_v2,
+    enrich_workflow,
+    upgrade_workflow_ir,
+)
+from .validation.release_validator import (
+    CompiledReleaseValidator,
+    ReleaseValidationCode,
+    ReleaseValidationResult,
+    ReleaseValidationState,
+    validate_compiled_release,
+)
+
 # -- version -------------------------------------------------------------------
-from .version import VersionInfo, version_info
+from .version import (
+    SUPPORTED_WORKFLOW_IR_VERSIONS,
+    WORKFLOW_IR_V1,
+    WORKFLOW_IR_V2,
+    VersionInfo,
+    version_info,
+)
 
 __all__ = [
     # object model
@@ -174,6 +213,37 @@ __all__ = [
     "VerificationReport",
     "CompiledPackageVerifier",
     "verify_compiled_package",
+    # -- P2: workflow_ir.v2 semantic enrichment --
+    "WORKFLOW_IR_V1",
+    "WORKFLOW_IR_V2",
+    "SUPPORTED_WORKFLOW_IR_VERSIONS",
+    "RoleRelevance",
+    "RequirementLevel",
+    "CapabilityRequirementSource",
+    "DependencyKind",
+    "ResolutionStatus",
+    "DerivationClass",
+    "SemanticFeatureName",
+    "PolicyProvenanceRef",
+    "CapabilityRequirement",
+    "DataContractRef",
+    "NodeInputRequirement",
+    "NodeOutputDeclaration",
+    "HumanReviewRequirement",
+    "WorkflowNodeSemantics",
+    "WorkflowDependencySemantics",
+    "SemanticFeature",
+    "SemanticDiagnostic",
+    "WorkflowIRv2",
+    "classify_role_relevance",
+    "enrich_workflow",
+    "compile_workflow_v2",
+    "upgrade_workflow_ir",
+    "CompiledReleaseValidator",
+    "ReleaseValidationResult",
+    "ReleaseValidationState",
+    "ReleaseValidationCode",
+    "validate_compiled_release",
     # version
     "version_info",
     "VersionInfo",

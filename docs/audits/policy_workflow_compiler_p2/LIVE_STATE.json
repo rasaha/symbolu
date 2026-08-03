@@ -1,0 +1,41 @@
+{
+  "phase": "Policy Workflow Compiler P2",
+  "repository": "rasaha/symbolu",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "c9b630ba91fa382f9b21f61fce4e8fbca2812ac4",
+  "working_branch": "claude/policy-workflow-compiler-p2",
+  "working_tree_clean_at_branch_creation": true,
+  "active_compiler_p2_pr": false,
+  "prerequisites": {
+    "pr_1303_pwc_p1": {"merged": true, "merge_commit": "e2d82ab4dc18d5cc816adf6c27263f8ad9f77b3f"},
+    "pr_1308_awc_p1": {"merged": true, "merge_commit": "d1cfad24777ae0bbd49f7be4a699786fed1ffb3b"},
+    "pr_1310_awc_p2": {"merged": true, "merge_commit": "0f5a461fb6714a4c55637d29e488814a2fe1a646"},
+    "pr_1312_governance_studio_p3a": {"merged": true, "merge_commit": "8f19d17bba08864af81b2369aacf8102dea3a582", "verified_via_github": true, "merged_at": "2026-08-03T15:59:22Z"}
+  },
+  "compiler_package": {
+    "import_name": "ugence_policy_workflow_compiler",
+    "distribution": "ugence-policy-workflow-compiler",
+    "location": "packages/tooling/policy-workflow-compiler/",
+    "distribution_version_before": "0.1.0",
+    "distribution_version_after": "0.1.0",
+    "product_version_before": "0.1.0",
+    "product_version_after": "0.2.0",
+    "contract_versions_before": ["workflow_ir.v1"],
+    "contract_versions_after": ["workflow_ir.v1", "workflow_ir.v2"],
+    "public_api_before": 71,
+    "public_api_after": 101,
+    "core_dependency": "pydantic>=2"
+  },
+  "baseline_verification": {
+    "compiler_p1_tests": "78 passed, 1 skipped",
+    "compiler_distribution_verifier": "PASS",
+    "compiler_public_api_in_sync": true,
+    "awc_p1_p2_tests": "158 passed",
+    "governance_studio_p3a_tests": "94 passed",
+    "platform_freeze": "PASS",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "contract_version_decision": "Option B (introduce workflow_ir.v2), with distribution version held at 0.1.0 to preserve v1 digest byte-stability",
+  "v1_release_digest_pin": "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd265822c3550ad9938158a",
+  "v1_ir_digest_pin": "sha256:169ad24c09e45ac7176a75a2708ff4687085f2f8f878990862542df0c20ca1e1"
+}

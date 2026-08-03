@@ -1,0 +1,29 @@
+{
+  "schema": "policy_workflow_compiler.p1_contract_inventory.v1",
+  "distribution": "ugence-policy-workflow-compiler",
+  "distribution_version": "0.1.0",
+  "public_api_names_before": 71,
+  "public_api_names_after": 101,
+  "version_strings": {
+    "policy_pack_schema": "policy_pack.v1",
+    "workflow_ir": "workflow_ir.v1",
+    "capability_registry": "capability_registry.v1"
+  },
+  "node_kinds": ["EVIDENCE_REQUIREMENT","EVIDENCE_ADMISSIBILITY","DECISION_RULE","AUTHORITY_CHECK","APPROVAL_GATE","SEGREGATION_OF_DUTIES_GATE","PROHIBITED_CONDITION","EXCEPTION_BRANCH","OVERRIDE_GATE","ACTION_CONSTRAINT","SEQUENCE_RISK_CHECK","ACTION_CLEARANCE_REQUIREMENT","AUDIT_EMISSION","TERMINAL_OUTCOME"],
+  "edge_kinds": ["NEXT","ON_PASS","ON_FAIL","ON_MISSING","ON_EXCEPTION","ON_OVERRIDE","ON_ESCALATE","ON_DENY","ON_INDETERMINATE"],
+  "workflow_node_fields": ["node_id","kind","owning_capability","authority_type","disposition","public_contract_target","input_object_ids","output_contract","failure_behavior","audit_requirements","label"],
+  "workflow_edge_fields": ["edge_id","kind","source_id","target_id","order"],
+  "capability_ids": ["TAP","DECISION_AUTHORITY","ACTION_GATE","ACTION_CLEARANCE","STORYGRAPH","MODEL_SELECTION","OPTIONAL_ORCHESTRATOR","COMPILER"],
+  "authority_dispositions": ["ADVISORY","AUTHORITATIVE"],
+  "digest_model": {
+    "release_logical_digest_inputs": ["policy_pack(minus status)","workflow_ir","capability_manifest","assurance_manifest","coverage_matrix","audit_schema","compiler_distribution_version"],
+    "workflow_ir_logical_digest_inputs": ["ordered nodes","ordered edges"],
+    "release_metadata_excluded_from_digest": true,
+    "injected_logical_clock": false,
+    "wall_clock_in_digest": false
+  },
+  "existing_diagnostic_codes": ["UNSUPPORTED_SCHEMA_VERSION","MISSING_PROVENANCE","DANGLING_PROVENANCE_REFERENCE","EMBEDDED_SECRET","NON_DETERMINISTIC_VALUE","DUPLICATE_OBJECT_ID","DANGLING_REFERENCE","UNRESOLVED_AUTHORITY_REFERENCE","ACTION_CONSTRAINT_WITHOUT_AUTHORITY","EXCEPTION_WITHOUT_DECISION_RULE","OVERRIDE_WITHOUT_DECISION_RULE","APPROVAL_PATH_MISSING_STEPS","IMPOSSIBLE_APPROVAL_ORDERING","SEGREGATION_OF_DUTIES_CONTRADICTION","UNKNOWN_CAPABILITY","MISSING_EXPECTED_OUTCOME","INCOMPLETE_COVERAGE","APPROVAL_REQUIRED","AUTHORITY_BOUNDARY_VIOLATION"],
+  "severity_levels": ["INFO","WARNING","REVIEW_REQUIRED","ERROR","FATAL"],
+  "cli_subcommands_before": ["version","validate","compile","verify","diff","inspect","demo"],
+  "dependency_direction": "leaf; core imports pydantic only; no AWC/agentic/agent_runtime/model_selection imports; providers referenced by metadata string only"
+}

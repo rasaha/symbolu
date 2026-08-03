@@ -65,3 +65,7 @@ model-selection capability present.
 Every node's `disposition` and `owning_capability` are checked against the
 authority-boundary table before the IR is accepted; see
 `AUTHORITY_BOUNDARIES.md`.
+
+## See also: workflow_ir.v2
+
+`workflow_ir.v2` is an additive superset that embeds this v1 graph unchanged and adds role-relevant semantics beside it. This document describes v1, which is frozen. See `WORKFLOW_IR_V2.md`.

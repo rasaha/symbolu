@@ -1,0 +1,314 @@
+{
+  "schema": "policy_workflow_compiler.p3a_field_resolution.v1",
+  "source_requirements": "apps/ugence-governance-studio/docs/COMPILER_VS_OVERLAY_OWNERSHIP.md",
+  "compiler_contract_before": "workflow_ir.v1",
+  "compiler_contract_after": [
+    "workflow_ir.v1",
+    "workflow_ir.v2"
+  ],
+  "field_count": 37,
+  "outcome_summary": {
+    "COMPILER_EMITTED": 14,
+    "AWC_DERIVED": 1,
+    "DEFERRED": 3,
+    "CORRECTLY_REMAINS_OVERLAY": 19
+  },
+  "fields": [
+    {
+      "field_name": "role_id",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "derived from node id; unchanged"
+    },
+    {
+      "field_name": "workflow_id",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "workflow identity"
+    },
+    {
+      "field_name": "workflow_version",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "policy pack version"
+    },
+    {
+      "field_name": "source_node_id",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "source node"
+    },
+    {
+      "field_name": "source_node_kind",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "node kind"
+    },
+    {
+      "field_name": "role_name",
+      "p3a_ownership": "compiler->overlay",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 emits semantic_purpose/semantic_description; overlay no longer needed for a stable role name"
+    },
+    {
+      "field_name": "role_description",
+      "p3a_ownership": "compiler->overlay",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 semantic_description (node label kept verbatim)"
+    },
+    {
+      "field_name": "required_capabilities",
+      "p3a_ownership": "compiler-base + overlay-specialist",
+      "current_source": "C+O",
+      "post_p2_source": "C(functional)+O(domain)",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 emits the functional capability (evidence_extraction) via NODE_KIND_MAPPING CapabilityRequirement with provenance; a domain-specialist capability remains overlay unless source-declared"
+    },
+    {
+      "field_name": "input_contract_refs",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 NodeInputRequirement with typed DataContractRef + producer"
+    },
+    {
+      "field_name": "output_contract_refs",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 NodeOutputDeclaration with typed DataContractRef + consumers"
+    },
+    {
+      "field_name": "authority_context",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 authority_disposition + canonical_capability_owner + governance_boundary_refs"
+    },
+    {
+      "field_name": "provenance",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 PolicyProvenanceRef per node/edge"
+    },
+    {
+      "field_name": "source_package_digest",
+      "p3a_ownership": "compiler-derived",
+      "current_source": "compiler-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "structural digest; unchanged"
+    },
+    {
+      "field_name": "role_fingerprint",
+      "p3a_ownership": "AWC-derived",
+      "current_source": "AWC-derived",
+      "post_p2_source": "AWC-derived",
+      "outcome": "AWC_DERIVED",
+      "notes": "AWC stamps its own role fingerprint; compiler emits node/workflow fingerprints separately"
+    },
+    {
+      "field_name": "data_classification",
+      "p3a_ownership": "overlay (should become compiler)",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "O (slot exists)",
+      "outcome": "DEFERRED",
+      "notes": "v2 has data_classification_refs; populated only when source policy declares classification. Demo packs do not, so it correctly remains overlay for now"
+    },
+    {
+      "field_name": "optional_capabilities",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise preference"
+    },
+    {
+      "field_name": "required_tools",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "O (slot exists)",
+      "outcome": "DEFERRED",
+      "notes": "v2 required_tool_refs populated only on source declaration"
+    },
+    {
+      "field_name": "prohibited_tools",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise denylist"
+    },
+    {
+      "field_name": "domain_requirements",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise domain scoping"
+    },
+    {
+      "field_name": "residency_constraints",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "jurisdiction posture; must not enter portable compiler IR"
+    },
+    {
+      "field_name": "provider_constraints",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "vendor posture; must not enter portable compiler IR"
+    },
+    {
+      "field_name": "deployment_constraints",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "deployment posture"
+    },
+    {
+      "field_name": "required_permissions",
+      "p3a_ownership": "overlay (permission intent could become compiler)",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "O (slot exists)",
+      "outcome": "DEFERRED",
+      "notes": "v2 permission_intent_refs populated only when source declares permission intent; enterprise permission CEILING always remains overlay"
+    },
+    {
+      "field_name": "prohibited_permissions",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise least-privilege"
+    },
+    {
+      "field_name": "authority_ceiling",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise authority ceiling"
+    },
+    {
+      "field_name": "required_audit_capabilities",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise control posture"
+    },
+    {
+      "field_name": "required_security_classification",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise clearance floor; never compiler-owned"
+    },
+    {
+      "field_name": "required_evidence_classes",
+      "p3a_ownership": "overlay (floor could become compiler)",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "compiler could emit a structural minimum-evidence floor in a future contract; not added in P2 (no source construct). Enterprise tightening always overlay"
+    },
+    {
+      "field_name": "state_requirement",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise state model"
+    },
+    {
+      "field_name": "human_review_requirement",
+      "p3a_ownership": "overlay (structurally compiler-known)",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "compiler-derived",
+      "outcome": "COMPILER_EMITTED",
+      "notes": "v2 HumanReviewRequirement classifies human review/authority deterministically from node kind/owner/disposition"
+    },
+    {
+      "field_name": "minimum_quality_constraint",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise SLA"
+    },
+    {
+      "field_name": "maximum_latency_constraint",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise SLA"
+    },
+    {
+      "field_name": "maximum_cost_constraint",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise budget"
+    },
+    {
+      "field_name": "model_requirement_refs",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "Model Selection concern; out of scope"
+    },
+    {
+      "field_name": "fallback_policy_ref",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "AWC fallback policy reference"
+    },
+    {
+      "field_name": "evidence_refs",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise/registry references"
+    },
+    {
+      "field_name": "policy_refs",
+      "p3a_ownership": "enterprise-overlay-derived",
+      "current_source": "enterprise-overlay-derived",
+      "post_p2_source": "enterprise-overlay-derived",
+      "outcome": "CORRECTLY_REMAINS_OVERLAY",
+      "notes": "enterprise/registry references"
+    }
+  ]
+}

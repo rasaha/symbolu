@@ -215,6 +215,55 @@ def main() -> int:
         diff = _run([str(cli), "diff", "pack.json", "pack.json"], env=env, cwd=str(tmp))
         report["steps"]["cli_diff"] = {"passed": json.loads(diff.stdout)["added"] == []}
 
+        # 5b. P2 workflow_ir.v2: compile v2, validate release, inspect, upgrade, compare.
+        cver = _run([str(cli), "version"], env=env, cwd=str(tmp))
+        vjson = json.loads(cver.stdout)
+        report["steps"]["cli_version_v2_flags"] = {
+            "passed": vjson["workflow_ir_v2_supported"] is True
+            and vjson["semantic_node_enrichment_implemented"] is True
+            and vjson["awc_adapter_updated"] is False
+            and vjson["agent_eligibility_implemented"] is False
+            and vjson["product_version"] == "0.2.0"}
+        cv2 = _run([str(cli), "compile", "pack.json", "--approval", "appr.json",
+                    "--contract", "workflow_ir.v2", "--out", "v2.json"], env=env, cwd=str(tmp))
+        cv2j = json.loads(cv2.stdout)
+        report["steps"]["cli_compile_v2"] = {
+            "passed": cv2j["success"] and cv2j["contract"] == "workflow_ir.v2"
+            and cv2j["node_semantics"] > 0,
+            "workflow_fingerprint": cv2j["workflow_fingerprint"]}
+        vr = _run([str(cli), "validate-release", "v2.json"], env=env, cwd=str(tmp))
+        report["steps"]["cli_validate_release"] = {
+            "passed": json.loads(vr.stdout)["state"] == "VALID"}
+        isem = _run([str(cli), "inspect-semantics", "v2.json"], env=env, cwd=str(tmp))
+        report["steps"]["cli_inspect_semantics"] = {
+            "passed": len(json.loads(isem.stdout)["node_semantics"]) > 0}
+        idep = _run([str(cli), "inspect-dependencies", "v2.json"], env=env, cwd=str(tmp))
+        report["steps"]["cli_inspect_dependencies"] = {
+            "passed": len(json.loads(idep.stdout)["dependencies"]) > 0}
+        iprov = _run([str(cli), "inspect-provenance", "v2.json"], env=env, cwd=str(tmp))
+        report["steps"]["cli_inspect_provenance"] = {
+            "passed": len(json.loads(iprov.stdout)["node_provenance"]) > 0}
+        # export a v1 IR json and upgrade it; the upgrade must reproduce the v2 fp.
+        exp_ir = (
+            "from ugence_policy_workflow_compiler.api import compile_policy_pack\n"
+            "from ugence_policy_workflow_compiler.reference.procurement import "
+            "build_procurement_policy_pack, build_procurement_approval_fixture\n"
+            "from ugence_policy_workflow_compiler.serialization import canonical_json\n"
+            "p=build_procurement_policy_pack(); a=build_procurement_approval_fixture(p)\n"
+            "r=compile_policy_pack(p,a)\n"
+            "open('v1_ir.json','w').write(canonical_json.dumps_pretty(r.workflow_ir.model_dump(mode='python')))\n"
+            "print('IR')\n"
+        )
+        _run([str(py), "-c", exp_ir], env=env, cwd=str(tmp))
+        up = _run([str(cli), "upgrade-v1", "v1_ir.json"], env=env, cwd=str(tmp))
+        upj = json.loads(up.stdout)
+        report["steps"]["cli_upgrade_v1"] = {
+            "passed": upj["to"] == "workflow_ir.v2"
+            and upj["workflow_fingerprint"] == cv2j["workflow_fingerprint"]}
+        cmp = _run([str(cli), "compare-contracts", "v1_ir.json", "v2.json"], env=env, cwd=str(tmp))
+        report["steps"]["cli_compare_contracts"] = {
+            "passed": json.loads(cmp.stdout)["base_graphs_match"] is True}
+
         # 6. Deterministic logical digest + equivalence + public API, in the clean env.
         probe2 = (
             "import json\n"
@@ -235,6 +284,26 @@ def main() -> int:
                                                     "digest": eq["digest"]}
         report["steps"]["procurement_equivalence"] = {
             "passed": eq["equivalence"] == "EQUIVALENT"}
+
+        # 6b. Cross-process v2 determinism: two separate processes must agree on the
+        # enriched workflow fingerprint and the release must validate as VALID.
+        probe_v2 = (
+            "import json\n"
+            "from ugence_policy_workflow_compiler.semantics import compile_workflow_v2\n"
+            "from ugence_policy_workflow_compiler.validation.release_validator import validate_compiled_release\n"
+            "from ugence_policy_workflow_compiler.reference.procurement import "
+            "build_procurement_policy_pack, build_procurement_approval_fixture\n"
+            "p=build_procurement_policy_pack(); a=build_procurement_approval_fixture(p)\n"
+            "v2=compile_workflow_v2(p,a,require_approval=True)\n"
+            "st=validate_compiled_release(v2).state.value\n"
+            "print(json.dumps({'fp': v2.workflow_fingerprint, 'base': v2.base_ir_digest, 'state': st}))\n"
+        )
+        a1 = json.loads(_run([str(py), "-c", probe_v2], env=env, cwd=str(tmp)).stdout.strip().splitlines()[-1])
+        a2 = json.loads(_run([str(py), "-c", probe_v2], env=env, cwd=str(tmp)).stdout.strip().splitlines()[-1])
+        report["steps"]["deterministic_v2_fingerprint"] = {
+            "passed": a1["fp"] == a2["fp"] and a1["fp"].startswith("sha256:")
+            and a1["base"] == a2["base"] and a1["state"] == "VALID",
+            "workflow_fingerprint": a1["fp"]}
 
         # public API frozen check (regenerate in clean env, compare to shipped artifact)
         snap = _run([str(py), str(PKG / "scripts" / "public_api_snapshot.py")], env=env, cwd=str(tmp))
