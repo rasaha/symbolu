@@ -49,9 +49,10 @@ jobs:
           pip install pytest build pydantic
       - name: Package suite (migrated behavioral + governance/dependency/isolation/compat/determinism/packaging)
         env:
-          # Resolve the audited Ugence dependencies from source (conftest also adds these).
+          # The canonical package src plus the audited Ugence dependency srcs
+          # (the repo conftest also adds the latter for source checkouts).
           PYTHONPATH: >-
-            packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
+            packages/products/ai-hiring/src:packages/capabilities/decision-authority/src:packages/governance-provider-framework/src:packages/governance-contracts/src
         run: python -m pytest packages/products/ai-hiring/tests -q
       - name: Provenance/metadata validation (version metadata, production_certified is False)
         env:

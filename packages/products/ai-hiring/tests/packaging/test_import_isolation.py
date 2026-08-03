@@ -41,16 +41,31 @@ def test_import_does_not_depend_on_cwd(tmp_path):
     assert "OK" in result.stdout
 
 
-def test_no_repo_root_shim_modules_loaded():
-    """The legacy repo-root compat namespaces must not be what we resolve."""
-    import ugence_ai_hiring  # noqa: F401
+def test_no_repo_root_shim_modules_loaded(tmp_path):
+    """Importing the canonical package pulls in no legacy repo-root compat shim.
 
-    # If any of these are present, they must be the CANONICAL installed packages,
-    # never a repo-root shim. The core never imports the legacy names at all.
-    for legacy in ("decision_governance", "governance_providers"):
-        assert legacy not in sys.modules, (
-            f"core import pulled in legacy shim {legacy!r}"
-        )
+    Checked in a CLEAN subprocess (order-independent): importing
+    ``ugence_ai_hiring`` alone must not load ``decision_governance`` or
+    ``governance_providers`` — the core imports the canonical Ugence packages
+    directly, never the legacy namespaces.
+    """
+    env = dict(os.environ)
+    roots = [p for p in sys.path if p and os.path.isabs(p) and os.path.isdir(p)]
+    env["PYTHONPATH"] = os.pathsep.join(roots)
+    code = (
+        "import sys, ugence_ai_hiring;"
+        "ugence_ai_hiring.build_in_memory_platform();"
+        "leaked=[m for m in ('decision_governance','governance_providers') if m in sys.modules];"
+        "print('LEAKED=' + ','.join(leaked))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], cwd=str(tmp_path), env=env,
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "LEAKED=" in result.stdout and result.stdout.strip().endswith("LEAKED="), (
+        f"core import pulled in a legacy shim: {result.stdout.strip()}"
+    )
 
 
 def test_canonical_kernel_is_importable():

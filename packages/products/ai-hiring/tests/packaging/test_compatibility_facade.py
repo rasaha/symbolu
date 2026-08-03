@@ -8,8 +8,28 @@ against the independent distribution.
 
 from __future__ import annotations
 
+import pathlib
+
+import pytest
+
 import ai_hiring
 import ugence_ai_hiring
+
+# In a source checkout the monorepo's original ``ai_hiring`` package shadows the
+# wheel-shipped compatibility facade, so ``import ai_hiring`` resolves to the
+# historical implementation rather than the re-export facade. The facade's
+# behavior is then exercised by the isolated-distribution CI job (clean wheel
+# install, where only the facade exists). Detect which one we have and skip the
+# facade-specific assertions when the original shadows it.
+_IS_PACKAGED_FACADE = "import ugence_ai_hiring" in pathlib.Path(
+    ai_hiring.__file__
+).read_text()
+
+pytestmark = pytest.mark.skipif(
+    not _IS_PACKAGED_FACADE,
+    reason="`ai_hiring` resolves to the monorepo original in this source checkout; "
+    "the wheel facade is verified by the isolated-distribution CI job",
+)
 
 
 def test_version_preserved():
