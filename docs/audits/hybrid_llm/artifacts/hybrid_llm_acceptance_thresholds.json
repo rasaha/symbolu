@@ -1,0 +1,63 @@
+{
+  "schema": "hybrid_llm_acceptance_thresholds/v1",
+  "audit_date": "2026-08-03",
+  "status": "PRE-REGISTERED (defined before any vNext training). H22 NOT implemented.",
+  "arms": {
+    "A": "sliding-window (SWA) baseline",
+    "B": "selected modern recurrent mechanism (KDA; fallback GDN) -- pure recurrent stack",
+    "C": "B + periodic MLA/full attention at 3:1 (the selected core)",
+    "D": "C + bounded slots (ONLY if slots remain under consideration)",
+    "E": "conventional attention hybrid baseline (GQA/SWA/MLA + full)",
+    "HISTORICAL": "current Phase-based best internal architecture -- NON-CANDIDATE reference only"
+  },
+  "matched_conditions": {
+    "params": "matched total (and active, for any MoE) parameter count across A-E",
+    "tokens": "matched training tokens (target ~15B, aligned with arXiv:2607.07953)",
+    "tokenizer": "identical",
+    "data_order": "identical",
+    "optimizer": "matched across arms; AdamW primary, Muon compared separately so optimizer gains are not attributed to architecture",
+    "seeds": ">=5 for threshold-sensitive (retrieval/binding/supersession) tasks",
+    "decode_check": "assert true recurrent decode (no full-prefix replay) via state-size + logits-equivalence hook",
+    "nxn_check": "assert NO [.,N,N] tensor in any linear-only layer via forward hooks",
+    "resource_measurement": "prefill/decode throughput, peak memory, recurrent-state bytes recorded"
+  },
+  "thresholds": {
+    "T1_language_modeling": {"metric":"validation ppl / bpc","require":"C (or B) achieves statistically meaningful improvement OR parity vs A and E (95% CI over >=5 seeds); no regression > noise"},
+    "T2_long_range_single_key": {"metric":"single-key needle recall @ >= tested context","require":"C robust across >=5 seeds (mean and worst-seed both above chance+margin); NOT a 1/3-seed artifact"},
+    "T3_multi_key_retrieval": {"metric":"RULER-style MK-NIAH recall","require":"C >= E within margin; degrade gracefully with distractors"},
+    "T4_entity_attribute_binding": {"metric":"binding accuracy k=2/4/8","require":"C materially > chance and > A across >=5 seeds (this is the capability Phase FAILED)"},
+    "T5_source_attribution": {"metric":"source-id accuracy","require":"D > C only if slots retained; slots-off causal drop >= predefined delta"},
+    "T6_supersession": {"metric":"active-version accuracy after replacement","require":"D correctly supersedes; erase/write-gate-off causal degradation demonstrated"},
+    "T7_contradiction": {"metric":"conflict detection F1","require":"C or D above baseline"},
+    "T8_multi_hop": {"metric":"multi-hop evidence-integration accuracy","require":"above chance and above A"},
+    "T9_distractor_resistance": {"metric":"recall under distractor load","require":"no collapse vs clean setting beyond predefined margin"},
+    "T10_long_output": {"metric":"long-generation coherence/ppl","require":"no degradation vs A"},
+    "T11_recurrent_state_stress": {"metric":"capacity vs #facts","require":"documented graceful degradation; bounded-state size confirmed constant in N"},
+    "T12_context_extrapolation": {"metric":"ppl/recall beyond trained length","require":"no catastrophic blowup"},
+    "T_efficiency": {"metric":"decode throughput, peak mem, state bytes","require":"C sub-quadratic decode; recurrent-state bytes constant in N; measured, not computed"}
+  },
+  "causal_ablations_required": [
+    "recurrent path off",
+    "full-attention/MLA path off",
+    "slots off (if present)",
+    "write gate disabled",
+    "erase gate disabled",
+    "decay disabled",
+    "randomized slot addresses",
+    "memory reset",
+    "raw-token vs compressed-memory read (where relevant)"
+  ],
+  "hard_gates": [
+    "statistically meaningful LM improvement OR parity vs baseline (>=5 seeds)",
+    "robust multi-seed retrieval (not 1/3-seed)",
+    "binding BEYOND single-fact recall",
+    "supersession capability demonstrated",
+    "every claimed path shows causal ablation degradation (no decorative path)",
+    "NO N×N tensor in linear-only layers",
+    "bounded recurrent decode state (constant in N)",
+    "NO full-prefix replay",
+    "measured throughput and memory",
+    "thresholds NOT reused from tiny synthetic runs without justification"
+  ],
+  "notes": "The HISTORICAL Phase arm's result must NOT affect packaging selection except as evidence the replacement must outperform or avoid its failure modes (no retrieval, decorative path, full-prefix replay decode)."
+}
