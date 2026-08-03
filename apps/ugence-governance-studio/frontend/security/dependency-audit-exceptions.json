@@ -1,0 +1,20 @@
+{
+  "$schema": "governance_studio.dependency_audit_exceptions.v1",
+  "description": "Structured, bounded, expiring exceptions to the blocking production dependency-audit policy. No open-ended or wildcard suppression; critical production vulnerabilities may not be excepted; an expired or undocumented exception fails CI. Each entry MUST carry all required fields.",
+  "required_fields": [
+    "package",
+    "installed_version",
+    "advisory_id",
+    "severity",
+    "affected_range",
+    "dependency_class",
+    "reachable_in_production",
+    "exploitability",
+    "compensating_control",
+    "reason",
+    "owner",
+    "expiry_date",
+    "remediation_target"
+  ],
+  "exceptions": []
+}
