@@ -1,5 +1,33 @@
 # Agent Workforce Composer — Implementation Roadmap
 
+> ## Implementation-Status Correction & Reconciliation Note (2026-08-03)
+>
+> *Added by AWC Phase 0 (H16 reconciliation). Changes documentation only; no production code.*
+> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
+> and the audit set [`docs/audits/agent_workforce_composer_phase0/`](docs/audits/agent_workforce_composer_phase0/).
+>
+> - **Original assumption:** the Policy Workflow Compiler was *spec-only / not yet implemented*, with no typed
+>   `WorkflowIR`, to be integrated "when it ships"; AWC would consume an invented `WorkflowGraphSource`.
+> - **Current verified state:** the compiler is **implemented** as the independently packaged
+>   `ugence-policy-workflow-compiler` tooling distribution (PR #1303, merge `96afb58a…`). It emits a deterministic
+>   **`WorkflowIR`** (`workflow_ir.v1`), capability metadata, assurance artifacts, and content-addressed compiled
+>   packages. Document extraction, NLP interpretation, and runtime deployment remain outside its implemented
+>   Phase 1 scope.
+> - **Architectural consequence:** AWC Phase 1 consumes the **canonical compiler contract** via a thin, versioned,
+>   data-only `CompilerWorkflowAdapter` (formerly `WorkflowGraphSource`) — **not** a second workflow
+>   representation. The former "spec-only upstream" risk is replaced by
+>   **`UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT`**.
+> - **Documents changed:** all seven `AGENT_WORKFORCE_COMPOSER_*.md`, plus the new ADR and
+>   `docs/architecture/agent_workforce_composer_boundaries.json`.
+>
+> **Reconciled positions all seven documents now agree on:** (1) the Policy Workflow Compiler is implemented;
+> (2) AWC consumes the canonical compiler `WorkflowIR`; (3) H16 canonicalization is the accepted ADR decision
+> (Option A); (4) AWC is a deterministic, offline, side-effect-free *planning* capability; (5) H16 retains runtime
+> coordination and recovery; (6) Model Selection remains separate (models, not agents); (7) Agent Runtime remains
+> the executor; (8) H22 remains the scheduler; (9) binding authority (Decision Authority / ActionGate / Action
+> Clearance) remains outside AWC; (10) P1 implementation cannot start until the ADR's exit gates pass.
+
+
 **Status:** `[SPEC]` design / pre-implementation. Companion to `AGENT_WORKFORCE_COMPOSER_DESIGN_SPEC.md`.
 Claim labels per design spec §1. **No production code is written in this phase.** This roadmap sequences the work
 so the gating design risk (H16 overlap) is resolved *before* any object-model code exists.
@@ -50,7 +78,7 @@ written* (design spec §2.3).
 
 `[SPEC]` Build `models.py`, `states.py`, `reason_codes.py`, `extraction.py`, `eligibility.py`, `registry.py`,
 `fingerprint.py`, `version.py`, `api.py` (skeleton). Frozen dataclasses per the object-model doc; role extraction
-from a hand-authored `WorkflowGraphSource`; the hard-constraint eligibility gate (never ranks); the append-only
+from a real compiler `WorkflowIR` fixture via the `CompilerWorkflowAdapter`; the hard-constraint eligibility gate (never ranks); the append-only
 `EliminationReason` taxonomy; `canonical_hash` digests. Ship the import-boundary test and the distribution-verify
 script from day one. **No scoring, no composition yet.** Deliver against the 10–15 synthetic agents.
 
@@ -86,8 +114,9 @@ latency delta, and any `NO_ELIGIBLE_AGENT` role.
 Real `AgentRegistrySnapshot` provenance/discovery (owner TBD — open question 2); production telemetry → `observed`
 evidence; runtime handoff to Agent Runtime (`AgentTeamPlan`→`WorkflowDefinition`) and H22 (`assigned_agent`+
 `authority_scope`); runtime reassignment/adaptation (governed, human-approved, non-broadening); learned ranking
-(rank-only, never an enforcement node — `[EXISTING]` Policy Workflow Compiler §7); real Policy-Workflow-Compiler
-integration when it ships; runtime outcome counterfactuals (needs off-policy estimation). None of these is in the
+(rank-only, never an enforcement node — `[EXISTING]` Policy Workflow Compiler §7); deeper Policy-Workflow-Compiler
+integration beyond the P1 `WorkflowIR` adapter (the compiler is already implemented and consumed);
+runtime outcome counterfactuals (needs off-policy estimation). None of these is in the
 MVP and none may weaken an invariant.
 
 ---
@@ -100,8 +129,9 @@ MVP and none may weaken an invariant.
    narrowing, and the import-boundary test.
 3. **`[UNVALIDATED]` heuristics** — the authority-concentration measure (§18) and the `minimum_quality` provenance
    bar are deterministic but uncalibrated; keep them advisory / policy-tunable until validated.
-4. **Spec-only upstream** — the Policy Workflow Compiler is not implemented; the `WorkflowGraphSource` adapter must
-   be co-designed with it to avoid two divergent IRs (open question 5).
+4. **`UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT`** — the Policy Workflow Compiler is **implemented** and emits
+   a canonical `WorkflowIR`; the `CompilerWorkflowAdapter` consumes it directly (no second IR). The risk is pinning
+   `workflow_ir.v1` and detecting node/edge/capability enum drift, not upstream absence (open question 5).
 5. **Registry trust** — the snapshot's provenance/integrity must be owned upstream; a poisoned snapshot defeats
    selection (open question 2).
 6. **`[UNVALIDATED]` demand** — no repository evidence of customer pull; the MVP claims only internal consistency.

@@ -1,5 +1,33 @@
 # Agent Workforce Composer — Canonical Object Model
 
+> ## Implementation-Status Correction & Reconciliation Note (2026-08-03)
+>
+> *Added by AWC Phase 0 (H16 reconciliation). Changes documentation only; no production code.*
+> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
+> and the audit set [`docs/audits/agent_workforce_composer_phase0/`](docs/audits/agent_workforce_composer_phase0/).
+>
+> - **Original assumption:** the Policy Workflow Compiler was *spec-only / not yet implemented*, with no typed
+>   `WorkflowIR`, to be integrated "when it ships"; AWC would consume an invented `WorkflowGraphSource`.
+> - **Current verified state:** the compiler is **implemented** as the independently packaged
+>   `ugence-policy-workflow-compiler` tooling distribution (PR #1303, merge `96afb58a…`). It emits a deterministic
+>   **`WorkflowIR`** (`workflow_ir.v1`), capability metadata, assurance artifacts, and content-addressed compiled
+>   packages. Document extraction, NLP interpretation, and runtime deployment remain outside its implemented
+>   Phase 1 scope.
+> - **Architectural consequence:** AWC Phase 1 consumes the **canonical compiler contract** via a thin, versioned,
+>   data-only `CompilerWorkflowAdapter` (formerly `WorkflowGraphSource`) — **not** a second workflow
+>   representation. The former "spec-only upstream" risk is replaced by
+>   **`UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT`**.
+> - **Documents changed:** all seven `AGENT_WORKFORCE_COMPOSER_*.md`, plus the new ADR and
+>   `docs/architecture/agent_workforce_composer_boundaries.json`.
+>
+> **Reconciled positions all seven documents now agree on:** (1) the Policy Workflow Compiler is implemented;
+> (2) AWC consumes the canonical compiler `WorkflowIR`; (3) H16 canonicalization is the accepted ADR decision
+> (Option A); (4) AWC is a deterministic, offline, side-effect-free *planning* capability; (5) H16 retains runtime
+> coordination and recovery; (6) Model Selection remains separate (models, not agents); (7) Agent Runtime remains
+> the executor; (8) H22 remains the scheduler; (9) binding authority (Decision Authority / ActionGate / Action
+> Clearance) remains outside AWC; (10) P1 implementation cannot start until the ADR's exit gates pass.
+
+
 **Status:** `[SPEC]` design / pre-implementation. Companion to `AGENT_WORKFORCE_COMPOSER_DESIGN_SPEC.md`.
 Claim labels per design spec §1. All objects are **frozen/immutable**; state changes mint a new `version`
 (`ADAPT` from AI Hiring's universal `DomainModel` idiom `[EXISTING]`). All objects carry `tenant_id` and a
@@ -12,9 +40,11 @@ content digest via `canonical_hash` (`REUSE`).
 `[SPEC]` Names are **domain-neutral**: no employment/recruiting terminology. The proposed names from the concept
 brief are adopted where already neutral and improved where not. Two names collide with existing H16 symbols in
 `agentic/agentic_framework/coordination.py` (`[EXISTING]` `AgentProfile`, `AgentAssignment`) and one with AI
-Hiring/Model Selection (`Candidate`); those are flagged **⚠ reconcile** and are resolved by the canonicalization
-decision in the roadmap Phase 0 (either AWC owns the canonical name and H16 re-exports — the
-`execution_gate`→`ugence_model_selection` facade pattern — or AWC uses a distinct name).
+Hiring/Model Selection (`Candidate`). These are **resolved** by the Phase 0 ADR
+(`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`, Option A): the selection `AgentProfile`
+is canonicalized into the AWC namespace (H16 may re-export where byte-identical, the
+`execution_gate`→`ugence_model_selection` facade pattern); the planning `AgentAssignment` lives in the AWC
+namespace and is kept **distinct** from H16's mutable runtime `AgentAssignment` (they are not merged).
 
 ---
 
@@ -66,7 +96,7 @@ evidence_ref,   # opaque locator (REUSE governance-contracts) — never raw cont
 provenance, raw_signal(audit-only)   # is_stale(now) -> stale degrades to UNKNOWN
 ```
 
-**`AgentProfile`** ⚠ reconcile with H16 `AgentProfile` — evidence-backed agent manifest.
+**`AgentProfile`** (canonicalized into AWC per the Phase 0 ADR; H16 re-exports where byte-identical) — evidence-backed agent manifest.
 ```
 agent_id, agent_version, provider, agent_type, tenant_id,
 capability_manifest: tuple[AgentCapability],
@@ -176,7 +206,7 @@ authority_ceiling: AuthorityLevel,   max_reachable_resources,   consequential_to
 # construction fails (BoundaryViolation) if agent.authority_requirements > ceiling
 ```
 
-**`AgentAssignment`** ⚠ reconcile with H16 `AgentAssignment` — role→agent binding.
+**`AgentAssignment`** (AWC-namespace planning object; **distinct** from H16's mutable runtime `AgentAssignment` per the Phase 0 ADR) — role→agent binding.
 ```
 assignment_id, role_id, workflow_node_id, agent_id, agent_version, tenant_id,
 permission_grant: AgentPermissionGrant, authority_boundary: AuthorityBoundary,
