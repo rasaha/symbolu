@@ -88,14 +88,88 @@ class NonStringKeyOracle:
 
 
 class ExpiringOracle:
-    """valid_until is always strictly before the supplied evaluation_time."""
+    """valid_until is always strictly before the supplied evaluation_time.
+
+    Binds correlation correctly so the EXPIRY path (not correlation) is what fires.
+    """
 
     def evaluate(self, context, *, evaluation_time=None):
         et = 1000.0 if evaluation_time is None else evaluation_time
         return OracleEvaluation(
             equivalence_key="k", oracle_id="expiring", contract_version="1.0",
-            valid_until=et - 1.0,
+            correlation_id=context.correlation_id, valid_until=et - 1.0,
         )
+
+
+class ExpiryHorizonOracle:
+    """Returns a fixed valid_until so callers can probe the inclusive boundary and
+    the missing-evaluation-time path deterministically."""
+
+    def __init__(self, valid_until):
+        self.valid_until = valid_until
+
+    def evaluate(self, context, *, evaluation_time=None):
+        return OracleEvaluation(
+            equivalence_key="k", oracle_id="horizon", contract_version="1.0",
+            correlation_id=context.correlation_id, valid_until=self.valid_until,
+        )
+
+
+class NoCorrelationOracle:
+    """Omits correlation entirely — usable only when the context has no correlation."""
+
+    def evaluate(self, context, *, evaluation_time=None):
+        present = sorted({
+            kw for u in context.units for kw in DEFAULT_KEYWORDS if kw in (u.text or "").lower()
+        })
+        return OracleEvaluation(
+            equivalence_key="kw:" + ",".join(present),
+            oracle_id="no-correlation-oracle", contract_version="1.0",
+        )
+
+
+class MissingCorrelationOracle:
+    """Omits correlation even though the context has one — must fail closed."""
+
+    def evaluate(self, context, *, evaluation_time=None):
+        return OracleEvaluation(
+            equivalence_key="k", oracle_id="missingcorr", contract_version="1.0",
+        )
+
+
+class LenGatedOracle:
+    """Oracle whose per-call behaviour depends on the surviving-context length, so a
+    test can make the BASE call usable but a specific reduced / restoration call fail
+    closed on a chosen dimension.
+
+    ``dimension='expiry'`` toggles ``valid_until`` (usable when len in ``ok_lens``,
+    expired otherwise). ``dimension='correlation'`` toggles whether the evaluation
+    carries the context's correlation id. ``key_members`` controls the equivalence
+    key so a reduced key can differ from the base (forcing restoration).
+    """
+
+    oracle_id = "len-gated-oracle"
+    contract_version = "1.0"
+
+    def __init__(self, key_members=(), ok_lens=(), *, dimension="expiry",
+                 valid_until=100.0, expired_until=0.0):
+        self.key_members = frozenset(key_members)
+        self.ok_lens = set(ok_lens)
+        self.dimension = dimension
+        self.valid_until = valid_until
+        self.expired_until = expired_until
+
+    def evaluate(self, context, *, evaluation_time=None):
+        present = sorted(u.id for u in context.units if u.id in self.key_members)
+        key = "k:" + ",".join(present)
+        ok = len(context.units) in self.ok_lens
+        if self.dimension == "expiry":
+            vu = self.valid_until if ok else self.expired_until
+            return OracleEvaluation(
+                key, self.oracle_id, self.contract_version,
+                correlation_id=context.correlation_id, valid_until=vu)
+        corr = context.correlation_id if ok else None
+        return OracleEvaluation(key, self.oracle_id, self.contract_version, correlation_id=corr)
 
 
 class WrongCorrelationOracle:
@@ -117,7 +191,8 @@ class DriftingContractOracle:
 
     def evaluate(self, context, *, evaluation_time=None):
         cv = "1.0" if len(context.units) >= self.threshold else "2.0"
-        return OracleEvaluation(equivalence_key="k", oracle_id=self.oracle_id, contract_version=cv)
+        return OracleEvaluation(equivalence_key="k", oracle_id=self.oracle_id,
+                                contract_version=cv, correlation_id=context.correlation_id)
 
 
 class RecordingOracle:

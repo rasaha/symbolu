@@ -39,8 +39,8 @@ _CHECK = r'''
 import importlib.util, sys
 
 import ugence_context_minimization as cm
-assert cm.__version__ == "0.1.0", cm.__version__
-assert cm.CONTRACT_VERSION == "1.0.0", cm.CONTRACT_VERSION
+assert cm.__version__ == "0.1.1", cm.__version__
+assert cm.CONTRACT_VERSION == "1.0.1", cm.CONTRACT_VERSION
 assert "site-packages" in cm.__file__, cm.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -113,6 +113,31 @@ except OracleRequiredError:
 
 assert isinstance(REASON_CODES, tuple) and "JOINT_EFFECT_FALLBACK" in REASON_CODES
 
+# 7) v0.1.1 corrections, proven on the installed wheel
+from ugence_context_minimization.api import OracleEvaluation as _OE
+
+class HorizonOracle:
+    def evaluate(self, context, *, evaluation_time=None):
+        return _OE("k", "horizon", "1.0", correlation_id=context.correlation_id, valid_until=10.0)
+
+# inclusive expiry: exact instant fails closed
+ex = minimize_context(ctx, oracle=HorizonOracle(), target_reduction=0.5, evaluation_time=10.0)
+assert ex.fell_back and "ORACLE_EVALUATION_EXPIRED" in ex.reason_codes, ex
+# missing evaluation_time with a horizon fails closed
+mt = minimize_context(ctx, oracle=HorizonOracle(), target_reduction=0.5, evaluation_time=None)
+assert mt.fell_back and "ORACLE_EVALUATION_TIME_REQUIRED" in mt.reason_codes, mt
+
+class MissingCorr:
+    def evaluate(self, context, *, evaluation_time=None):
+        return _OE("k", "mc", "1.0")  # omits correlation
+mc = minimize_context(ctx, oracle=MissingCorr(), target_reduction=0.5, evaluation_time=1.0)
+assert mc.fell_back and "ORACLE_CORRELATION_MISSING" in mc.reason_codes, mc
+
+# requested_reduction preserved on fallback; two distinct fingerprints; alias holds
+assert ex.requested_reduction == 0.5, ex
+assert o.run_fingerprint and o.outcome_fingerprint and o.run_fingerprint != o.outcome_fingerprint
+assert o.fingerprint == o.outcome_fingerprint
+
 # ---- NO unrelated package importable in this clean env --------------------
 for mod in ("action_gate_ref", "action_gateway", "actiongate_context_ablation",
             "ugence_console_api", "robotics_reliability_bench", "experiments",
@@ -176,7 +201,7 @@ def main() -> int:
         _run([str(py), "-c",
               "import importlib.metadata as m; "
               "d=m.distribution('ugence-context-minimization'); "
-              "assert d.version=='0.1.0', d.version; print('metadata', d.metadata['Name'], d.version)"])
+              "assert d.version=='0.1.1', d.version; print('metadata', d.metadata['Name'], d.version)"])
 
     shutil.rmtree(findlinks, ignore_errors=True)
     print("\nISOLATED SINGLE-WHEEL CONTEXT-MINIMIZATION DISTRIBUTION VERIFIED ✔")

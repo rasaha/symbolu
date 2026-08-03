@@ -107,7 +107,7 @@ def test_expired_evaluation_fails_closed():
 def test_correlation_mismatch_fails_closed():
     r = minimize_context(_ctx(), oracle=WrongCorrelationOracle(), target_reduction=0.5, evaluation_time=1.0)
     assert r.fell_back
-    assert reasons.CORRELATION_MISMATCH in r.reason_codes
+    assert reasons.ORACLE_CORRELATION_MISMATCH in r.reason_codes
 
 
 def test_contract_drift_between_calls_fails_closed():

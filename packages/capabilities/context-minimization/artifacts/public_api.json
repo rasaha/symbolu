@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.0.1",
   "distribution": "ugence-context-minimization",
   "exports": [
     "CONTRACT_VERSION",
@@ -30,5 +30,5 @@
   ],
   "module": "ugence_context_minimization.api",
   "namespace": "ugence_context_minimization",
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

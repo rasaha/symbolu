@@ -3,7 +3,7 @@
     "achieved_reduction",
     "equivalence_verified"
   ],
-  "contract_version": "1.0.0",
+  "contract_version": "1.0.1",
   "fields": [
     {
       "name": "context_id",
@@ -80,6 +80,18 @@
     {
       "name": "oracle_contract_version",
       "type": "Optional[str]"
+    },
+    {
+      "name": "requested_token_budget",
+      "type": "Optional[int]"
+    },
+    {
+      "name": "outcome_fingerprint",
+      "type": "str"
+    },
+    {
+      "name": "run_fingerprint",
+      "type": "str"
     },
     {
       "name": "fingerprint",
