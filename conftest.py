@@ -17,6 +17,7 @@ if str(project_root) not in sys.path:
 for _src in (project_root / "packages" / "governance-contracts" / "src",
              project_root / "packages" / "governance-provider-framework" / "src",
              project_root / "packages" / "providers" / "tap" / "src",
+             project_root / "packages" / "providers" / "actiongate" / "src",
              project_root / "packages" / "capabilities" / "storygraph" / "src",
              project_root / "packages" / "capabilities" / "decision-authority" / "src",
              project_root / "packages" / "capabilities" / "model-selection" / "src",
