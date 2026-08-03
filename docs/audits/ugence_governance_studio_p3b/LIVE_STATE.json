@@ -1,0 +1,26 @@
+{
+  "phase": "governance_studio_p3b",
+  "audited_at_logical": "session-start",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "6a2e53cd2c7d726929eae9cc7f496156bc58b291",
+  "working_tree_clean_at_start": true,
+  "prerequisites": {
+    "pr_1312_governance_studio_p3a": {"state": "merged", "merge_commit": "8f19d17b"},
+    "pr_1314_policy_workflow_compiler_p2": {"state": "merged", "merge_commit": "40d19b83"},
+    "pr_1316_compiler_version_correction": {"state": "merged", "merge_commit": "db10adad"},
+    "pr_1317_awc_p2_1_compiler_v2_adapter": {"state": "merged", "merge_commit": "6a2e53cd", "head": "e1dbd5f5", "merged_at": "2026-08-03T18:10:35Z"}
+  },
+  "compiler": {"distribution_version": "0.2.0", "contracts": ["workflow_ir.v1", "workflow_ir.v2"]},
+  "awc": {"distribution_version": "0.2.1", "product_version": "0.2.1", "public_api_count": 109,
+          "contracts": ["awc.v1", "awc.composition.v1", "awc.compiler_adapter.v2"],
+          "supported_compiler_contracts": ["workflow_ir.v1", "workflow_ir.v2"]},
+  "p3a": {"manifest_schema": "governance_studio.fixture_manifest.v1",
+          "manifest_generator_awc_version": "0.2.0",
+          "logical_time": 1000000.0,
+          "scenarios": ["procurement", "customer_support", "cybersecurity_success", "cybersecurity_no_feasible_team"],
+          "awc_0_2_1_reproduces_frozen_outputs": true},
+  "baseline_suites": {"awc": "201 passed, 1 skipped", "p3a": "94 passed"},
+  "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+  "no_p3b_branch_or_pr_preexisting": true,
+  "no_backend_preexisting": true
+}

@@ -1,0 +1,20 @@
+{
+  "awc_version": "0.2.1",
+  "public_api_count": 109,
+  "consumed_by_p3b": [
+    "adapt_compiled_workflow", "adapt_workflow", "declared_contract_version",
+    "evaluate_workflow_eligibility", "evaluate_registry_for_role", "explain_role_report",
+    "rank_eligible_candidates", "build_role_dependency_graph", "compose_agent_team",
+    "build_agent_team_plan", "build_replay_record", "replay_agent_team_plan",
+    "compare_agent_team_plans", "compare_adaptations",
+    "finalize_enterprise_policy", "build_registry_snapshot", "Provenance",
+    "AgentRegistrySnapshot", "EnterpriseAgentPolicy", "EligibilityPolicy",
+    "AgentRankingPolicy", "TeamCompositionPolicy", "PermissionBoundingPolicy",
+    "AgentFallbackPolicy", "__version__", "CONTRACT_VERSION",
+    "COMPOSITION_CONTRACT_VERSION", "COMPILER_ADAPTER_CONTRACT_VERSION",
+    "SUPPORTED_COMPILER_CONTRACTS"
+  ],
+  "additional_public_helper_used": "ugence_agent_workforce_composer.fingerprint.stamp_fingerprint",
+  "prohibited_imports_used": "none",
+  "import_form": "import ugence_agent_workforce_composer.api as awc"
+}
