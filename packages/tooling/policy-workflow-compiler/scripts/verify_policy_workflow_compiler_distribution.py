@@ -140,6 +140,12 @@ def main() -> int:
         report["hashes"]["wheel"] = {"name": wheel.name, "sha256": _sha256(wheel)}
         report["hashes"]["sdist"] = {"name": sdist.name, "sha256": _sha256(sdist)}
 
+        # 1b. Distribution filenames must report 0.2.0 and carry no stale 0.1.0.
+        report["steps"]["distribution_version_0_2_0"] = {
+            "passed": "0.2.0" in wheel.name and "0.2.0" in sdist.name
+            and "0.1.0" not in wheel.name and "0.1.0" not in sdist.name,
+            "wheel": wheel.name, "sdist": sdist.name}
+
         # 2. Wheel-content audit.
         report["steps"]["wheel_audit"] = _audit_wheel(wheel)
 
@@ -157,7 +163,7 @@ def main() -> int:
         probe = (
             "import ugence_policy_workflow_compiler as u, ugence_policy_workflow_compiler.api\n"
             "import sys\n"
-            "assert u.__version__ == '0.1.0'\n"
+            "assert u.__version__ == '0.2.0'\n"
             "assert not any('symbolu' in p and 'site-packages' not in p for p in sys.path), sys.path\n"
             "print('OK')\n"
         )
@@ -171,6 +177,10 @@ def main() -> int:
         vinfo = json.loads(v.stdout)
         report["steps"]["cli_version"] = {
             "passed": vinfo["distribution"] == "ugence-policy-workflow-compiler"
+            and vinfo["distribution_version"] == "0.2.0"
+            and vinfo["product_version"] == "0.2.0"
+            and vinfo["workflow_ir_v1_digest_compiler_version"] == "0.1.0"
+            and vinfo["workflow_ir_v2_digest_compiler_version"] == "0.2.0"
             and vinfo["pilot_validated"] is False
             and vinfo["production_certified"] is False
             and vinfo["document_extraction_implemented"] is False
@@ -280,8 +290,11 @@ def main() -> int:
         )
         r2 = _run([str(py), "-c", probe2], env=env, cwd=str(tmp))
         eq = json.loads(r2.stdout.strip().splitlines()[-1])
-        report["steps"]["deterministic_digest"] = {"passed": eq["digest"].startswith("sha256:"),
-                                                    "digest": eq["digest"]}
+        # The v1 release digest must be byte-identical to the frozen legacy value,
+        # proving the distribution bump to 0.2.0 did not perturb any v1 fingerprint.
+        _V1_FROZEN = "sha256:fb9fd4b934cb94425a67b0f6b469ca0bbc198b356cd265822c3550ad9938158a"
+        report["steps"]["deterministic_digest"] = {
+            "passed": eq["digest"] == _V1_FROZEN, "digest": eq["digest"]}
         report["steps"]["procurement_equivalence"] = {
             "passed": eq["equivalence"] == "EQUIVALENT"}
 

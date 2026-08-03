@@ -1,7 +1,7 @@
 # Install
 
 `ugence-policy-workflow-compiler` (namespace `ugence_policy_workflow_compiler`,
-version 0.1.0) is a pure-Python tooling package.
+version 0.2.0) is a pure-Python tooling package.
 
 ## Requirements
 

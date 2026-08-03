@@ -17,7 +17,7 @@ _SRC = pathlib.Path(u.__file__).resolve().parent
 
 
 def test_canonical_namespace():
-    assert u.__version__ == "0.1.0"
+    assert u.__version__ == "0.2.0"
     assert u.DISTRIBUTION_NAME == "ugence-policy-workflow-compiler"
     assert u.CANONICAL_NAMESPACE == "ugence_policy_workflow_compiler"
 

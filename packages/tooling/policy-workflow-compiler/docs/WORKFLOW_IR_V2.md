@@ -30,8 +30,10 @@ WorkflowIRv2
 - `compile_workflow_v2(pack, approval=None, *, require_approval=True)` — compile v1
   via the unchanged pipeline, then enrich.
 - `enrich_workflow(ir, pack=None, *, compiler_version)` — enrich an existing v1 IR.
-- `upgrade_workflow_ir(ir, ...)` — lossless v1→v2 upgrade; unresolved semantics are
-  marked, never invented.
+- `upgrade_workflow_ir(ir, ...)` — deterministic, non-destructive v1→v2 enrichment.
+  It preserves all v1 information (lossless in that narrow sense) but does NOT
+  recover source facts absent from v1; derived/deferred/unresolved semantics are
+  labeled via their provenance derivation class, never invented.
 - CLI: `compile --contract workflow_ir.v2`, `upgrade-v1`, `compare-contracts`.
 
 ## Determinism
