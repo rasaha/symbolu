@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.1",
+  "contract_version": "1.0.2",
   "scenarios": [
     {
       "expect": "unprotected exact duplicate removed, representative kept",

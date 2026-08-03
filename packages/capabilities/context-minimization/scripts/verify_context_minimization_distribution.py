@@ -39,8 +39,8 @@ _CHECK = r'''
 import importlib.util, sys
 
 import ugence_context_minimization as cm
-assert cm.__version__ == "0.1.1", cm.__version__
-assert cm.CONTRACT_VERSION == "1.0.1", cm.CONTRACT_VERSION
+assert cm.__version__ == "0.1.2", cm.__version__
+assert cm.CONTRACT_VERSION == "1.0.2", cm.CONTRACT_VERSION
 assert "site-packages" in cm.__file__, cm.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -51,8 +51,9 @@ from ugence_context_minimization.api import (
     Context, ContextUnit, OracleEvaluation, ProtectionResult,
     structural_minimize, minimize_context, deduplicate_context,
     MinimizationMode, EquivalenceStatus, InvarianceOracle, OracleRequiredError,
-    REASON_CODES,
+    InvalidRequestError, InvalidUnitError, REASON_CODES,
 )
+import math as _math
 
 # ---- product-neutral deterministic fake oracle ----------------------------
 class FakeOracle:
@@ -138,6 +139,47 @@ assert ex.requested_reduction == 0.5, ex
 assert o.run_fingerprint and o.outcome_fingerprint and o.run_fingerprint != o.outcome_fingerprint
 assert o.fingerprint == o.outcome_fingerprint
 
+# 8) v0.1.2 timestamp + numeric hardening, proven on the installed wheel
+# malformed caller evaluation_time raises before the oracle is reached
+for _bad in (True, _math.nan, _math.inf, "later"):
+    try:
+        minimize_context(ctx, oracle=FakeOracle(), target_reduction=0.5, evaluation_time=_bad)
+        raise AssertionError("expected InvalidRequestError for evaluation_time=%r" % (_bad,))
+    except InvalidRequestError:
+        pass
+
+class BadHorizon:
+    def __init__(self, vu): self.vu = vu
+    def evaluate(self, context, *, evaluation_time=None):
+        return _OE("k", "bh", "1.0", correlation_id=context.correlation_id, valid_until=self.vu)
+for _bad in (True, _math.nan, _math.inf, "later", object()):
+    r_bad = minimize_context(ctx, oracle=BadHorizon(_bad), target_reduction=0.5, evaluation_time=1.0)
+    assert r_bad.fell_back and "ORACLE_RESULT_MALFORMED" in r_bad.reason_codes, (_bad, r_bad)
+    assert r_bad.surviving_ids == r_bad.original_ids
+
+# malformed token counts rejected deterministically
+for _bad in (-1, True, 1.5, _math.nan, "3"):
+    try:
+        ContextUnit(id="z", text="t", token_count=_bad)
+        raise AssertionError("expected InvalidUnitError for token_count=%r" % (_bad,))
+    except InvalidUnitError:
+        pass
+
+# non-scalar metadata rejected
+try:
+    ContextUnit(id="z", text="t", metadata={"k": [1, 2]})
+    raise AssertionError("expected InvalidUnitError for non-scalar metadata")
+except InvalidUnitError:
+    pass
+
+# canonical fingerprint serialization rejects non-finite numbers
+from ugence_context_minimization.fingerprint import _canonical_json
+try:
+    _canonical_json({"x": _math.inf})
+    raise AssertionError("expected ValueError for non-finite in canonical JSON")
+except ValueError:
+    pass
+
 # ---- NO unrelated package importable in this clean env --------------------
 for mod in ("action_gate_ref", "action_gateway", "actiongate_context_ablation",
             "ugence_console_api", "robotics_reliability_bench", "experiments",
@@ -201,7 +243,7 @@ def main() -> int:
         _run([str(py), "-c",
               "import importlib.metadata as m; "
               "d=m.distribution('ugence-context-minimization'); "
-              "assert d.version=='0.1.1', d.version; print('metadata', d.metadata['Name'], d.version)"])
+              "assert d.version=='0.1.2', d.version; print('metadata', d.metadata['Name'], d.version)"])
 
     shutil.rmtree(findlinks, ignore_errors=True)
     print("\nISOLATED SINGLE-WHEEL CONTEXT-MINIMIZATION DISTRIBUTION VERIFIED ✔")
