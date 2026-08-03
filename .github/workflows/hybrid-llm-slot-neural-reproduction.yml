@@ -1,0 +1,79 @@
+name: hybrid-llm-slot-neural-reproduction
+
+# Manual-only neural reproduction (workflow_dispatch). Installs a CPU torch wheel and runs the
+# neural parity test + a bounded neural job. NEVER triggered by push/PR. Uploads immutable
+# artifacts. Guards the frozen historical artifact. Expensive full 1200-step training is opt-in
+# via the 'job' input and a generous-but-bounded timeout; default runs parity + complexity only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Unique run id for artifact naming'
+        required: true
+        default: 'ci-neural'
+      job:
+        description: 'parity_only | with_smoke | full_s_arm'
+        required: true
+        default: 'parity_only'
+
+permissions:
+  contents: read
+
+jobs:
+  neural:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Disk space guard
+        run: df -h . && echo "need >= 6GB free for the torch CPU wheel"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CPU torch (pinned)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu "numpy<2" "torch==2.*"
+          python -c "import torch,numpy;print('torch',torch.__version__,'numpy',numpy.__version__)"
+
+      - name: Record frozen artifact digest (pre-run guard)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Neural parity (incubated vs historical BindingSlots)
+        run: python hybrid_llm_vnext_lab/tests/parity/test_legacy_neural_slot_parity.py
+
+      - name: Neural complexity + decode instrumentation
+        run: python hybrid_llm_vnext_lab/scripts/neural_complexity_probe.py
+
+      - name: Optional smoke (short S-arm)
+        if: ${{ inputs.job == 'with_smoke' }}
+        run: |
+          OMP_NUM_THREADS=2 python hybrid_llm_vnext_lab/experiments/neural_slots_only/run.py \
+            --run-id "${{ inputs.run_id }}_smoke" --seeds 0 --steps 40
+
+      - name: Optional full S-arm (1200 steps, 3 seeds)
+        if: ${{ inputs.job == 'full_s_arm' }}
+        run: |
+          OMP_NUM_THREADS=2 python hybrid_llm_vnext_lab/experiments/neural_slots_only/run.py \
+            --run-id "${{ inputs.run_id }}" --seeds 0,1,2 --steps 1200
+
+      - name: Frozen artifact unchanged (post-run guard)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "frozen abc.json UNCHANGED"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neural-reproduction-${{ inputs.run_id }}
+          path: |
+            hybrid_llm_vnext_lab/artifacts/**
+            hybrid_llm_vnext_lab/experiments/neural_slots_only/artifacts/**
+          if-no-files-found: ignore

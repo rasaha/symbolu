@@ -1,0 +1,24 @@
+{
+  "schema": "environment_lock/v1",
+  "date": "2026-08-03",
+  "fields": {
+    "python_version": {"value": "3.11.x", "level": "CURRENT_REPRODUCTION_CHOICE", "note": "historical Python version NOT_FOUND in artifacts; current env is 3.11.15"},
+    "torch_version": {"value": "2.13 CPU", "level": "INFERRED", "note": "REPORT_ABC.md prose says 'torch 2.13 CPU' — ANOMALOUS: no torch 2.13 exists (likely a report typo for 2.1.x/2.3.x). Repo GPU stack pins torch==2.4.1. Reproduction pins a 2.x CPU wheel and records the exact resolved version at run time."},
+    "numpy_version": {"value": "<2", "level": "CURRENT_REPRODUCTION_CHOICE", "note": "historical NOT_FOUND; pin <2 to avoid numpy-2 ABI surprises with older torch"},
+    "cpu_arch": {"value": "x86_64", "level": "CURRENT_REPRODUCTION_CHOICE"},
+    "os": {"value": "Linux", "level": "VERIFIED"},
+    "thread_count": {"value": 4, "level": "VERIFIED", "note": "REPORT_ABC.md 'CPU-only (4 cores)'; reproduction sets torch.set_num_threads(4)"},
+    "ram": {"value": "15 GB", "level": "VERIFIED", "note": "REPORT_ABC.md 'HARDWARE CEILING: 4 CPU cores, 15 GB RAM, no GPU'"},
+    "blas_backend": {"value": null, "level": "NOT_FOUND"},
+    "dtype": {"value": "fp32", "level": "VERIFIED", "note": "REPORT_ABC.md 'fp32'; harness never casts to half"},
+    "deterministic_settings": {"value": "random.seed(s)+torch.manual_seed(s); data rng random.Random(seed*991+7)", "level": "VERIFIED", "note": "harness_abc.py:21-22,179; torch.use_deterministic_algorithms NOT set historically"},
+    "seed_behavior": {"value": "seeds 0,1,2", "level": "VERIFIED"}
+  },
+  "reproduction_modes": {
+    "HISTORICAL_COMPATIBILITY_MODE": "matches the historical numerical contract: torch.manual_seed + random.seed only, torch.use_deterministic_algorithms NOT forced (the historical path did not set it). 4 threads, fp32.",
+    "STRICT_DETERMINISTIC_MODE": "additionally sets torch.use_deterministic_algorithms(True) + CUBLAS/workspace env; run ONLY if it does not alter or block the historical code path. Any numerical divergence from HISTORICAL_COMPATIBILITY_MODE is recorded, not silently accepted."
+  },
+  "env_vars_to_set": ["PYTHONHASHSEED=0", "OMP_NUM_THREADS=4", "MKL_NUM_THREADS=4", "OPENBLAS_NUM_THREADS=4", "NUMEXPR_NUM_THREADS=4"],
+  "runtime_recorded_at_execution": ["torch.__version__", "torch.version.*", "torch.get_num_threads()", "torch.get_num_interop_threads()", "torch.are_deterministic_algorithms_enabled()"],
+  "current_execution_status": "torch/numpy NOT importable at doc-write time; install attempted; see NEURAL_REPRODUCTION_LIVE_STATE for the resolved outcome"
+}

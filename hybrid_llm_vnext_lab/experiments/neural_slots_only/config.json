@@ -1,0 +1,29 @@
+{
+  "schema": "neural_slots_only_config/v1",
+  "date": "2026-08-03",
+  "purpose": "Answer: can bounded slots LEARN the beyond-window retrieval capability with NO Phase present during init/forward/backprop/eval? Decisive comparison S - A at needle@d96, with a parameter-matched A+ control.",
+  "phase_free": true,
+  "arms": {
+    "A": "sliding window only (matched to target_params; serves as the parameter-matched baseline / A+)",
+    "S": "sliding window + bounded slots (incubated Phase-free BindingSlots) — the decisive arm",
+    "A+": "sliding window only, matched to S's exact parameter count (added-parameter control)"
+  },
+  "matched_config": {
+    "d": 128, "heads": 4, "layers": 4, "window": 64, "num_slots": 32,
+    "target_params": 2000000, "N": 160, "batch": 16, "steps": 1200,
+    "optimizer": "AdamW", "lr": 2e-3, "weight_decay": 0.01, "warmup": 60,
+    "grad_clip": 1.0, "dropout": 0.0, "dtype": "fp32", "threads": 4,
+    "seeds": [0, 1, 2],
+    "ff_auto_tuned_per_arm_to_target_params": true,
+    "tokenizer_corpus": "IDENTICAL to phase_lc (read-only via tasks_adapter): vocab 1291, corpus 55547 tokens",
+    "loss_mixture": "20% real-LM + 80% tasks (needle .20 / binding .20 / supersession .15 / source .15 / multihop .10), reused from historical ABC_MIX"
+  },
+  "verified_param_counts": {"A": 2000392, "S": 2000104, "note": "A matches the historical A count 2000392 exactly; S matched to ~2e6. A+ matched to S's exact count at runtime."},
+  "eval": {"needle_distances": [16, 96, 220], "binding_k": [2, 4, 8], "primary_metric": "needle@d96 (beyond window=64)", "n_per_condition": 120, "eval_N": [256, 512]},
+  "s_ablations": {
+    "native_to_incubated_class": ["slots_off (ablate=zero)", "randomized_address (ablate=rand_keys)", "shuffle_values (ablate=shuffle_val)"],
+    "extended_via_wrapper_no_class_edit": ["write_gate_zero (gate->~0)", "slot_keys_randomized (replace learned slot_keys with random unit vectors)"]
+  },
+  "seeds_this_phase": [0, 1, 2],
+  "not_this_phase": ["five-seed stability", "KDA", "MLA", "composition", "packaging"]
+}

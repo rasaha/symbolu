@@ -1,0 +1,62 @@
+{
+  "status": "EXECUTED",
+  "config": {
+    "B": 2,
+    "N": 48,
+    "D": 128,
+    "M": 32
+  },
+  "historical_parallel_scan": {
+    "materializes_NxN_global_score": false,
+    "materializes_routing_BxNxM": true,
+    "materializes_training_scan_BxNxMxD": true,
+    "recorded_op_shapes_sample": [
+      [
+        2,
+        48,
+        32,
+        128
+      ],
+      [
+        2,
+        48,
+        32
+      ],
+      [
+        2,
+        48,
+        128
+      ]
+    ],
+    "verdict": "NO global N x N; DOES materialize [B,N,M,D] scan during training (NOT constant-memory in training); routing [B,N,M]"
+  },
+  "streaming_bounded_slots": {
+    "deployed_state_shape": "[B,M,D] (+ [B,M] metadata)",
+    "state_numel_by_N": {
+      "16": 8320,
+      "64": 8320,
+      "256": 8320
+    },
+    "state_independent_of_N": true,
+    "decode_state_bytes_grid_MxD_floats": {
+      "M8_D64": 1056,
+      "M8_D128": 2080,
+      "M8_D256": 4128,
+      "M16_D64": 2112,
+      "M16_D128": 4160,
+      "M16_D256": 8256,
+      "M32_D64": 4224,
+      "M32_D128": 8320,
+      "M32_D256": 16512,
+      "M64_D64": 8448,
+      "M64_D128": 16640,
+      "M64_D256": 33024
+    }
+  },
+  "algorithm_relationship": {
+    "historical": "soft cumulative distributed writes to learned FIXED slots (parallel cumsum); [B,N,M,D] scan",
+    "streaming": "dynamic keys, cosine threshold match, DISCRETE allocation/eviction, version/source metadata",
+    "classification": "RELATED_BUT_DIFFERENT_ALGORITHM",
+    "note": "Do NOT claim numerical parity between these two mechanisms. Neural PARITY is asserted only between the incubated legacy_phase_lc_slots.BindingSlots and the historical BindingSlots (same algorithm) \u2014 see tests/parity/test_legacy_neural_slot_parity.py."
+  }
+}

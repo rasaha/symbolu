@@ -1,0 +1,33 @@
+{
+  "schema": "reproduction_acceptance/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED before any reproduction run. Thresholds fixed here, not after observing results.",
+  "target_artifact": "experiments/phase_lc/results/abc.json",
+  "must_match_exactly": {
+    "configuration": ["d=128", "heads=4", "layers=4", "window=64", "num_slots=32", "N=160", "batch=16", "steps=1200", "target_params=2000000", "seeds=[0,1,2]", "lr=2e-3", "weight_decay=0.01", "warmup=60", "grad_clip=1.0"],
+    "parameter_counts": {"A": 2000392, "B": 1999752, "C": 2000492, "tolerance": 0},
+    "no_nxn_flags": {"phase_builds_NN": false, "slots_builds_NN": false},
+    "bounded_state_floats": {"C_total": 16896, "C_slots_all_layers": 16384, "tolerance": 0},
+    "vocab_size": 1291,
+    "corpus_tokens": 55547
+  },
+  "primary_causal_pattern": {
+    "seed0_C_needle_d96_exceeds_chance": {"require": "> 0.20", "saved": 0.4667, "chance": 0.02},
+    "slots_off_reduces_seed0_needle_d96": {"require_absolute_drop": ">= 0.20", "saved": "0.4667 -> 0.0167"},
+    "randomized_address_reduces_seed0_needle_d96": {"require": "< 0.15", "saved": 0.050},
+    "phase_off_does_not_reduce_slot_result": {"require": "seed0 >= 0.20 (within 0.10 of baseline)", "saved": 0.475}
+  },
+  "statistical_tolerances": {
+    "per_seed_needle_d96_abs_tolerance": 0.15,
+    "ppl_at_256_relative_tolerance": 0.25,
+    "note": "exact-value reproduction not expected across a different torch build/thread-count; STATISTICAL_REPRODUCTION requires the seed-0-forms / ablations-collapse / phase-off-preserved PATTERN plus mean/variance consistency within tolerance."
+  },
+  "classification_rules": {
+    "EXACT_REPRODUCTION": "same seeds within per_seed_needle_d96_abs_tolerance AND config/params/nxn/state match exactly",
+    "STATISTICAL_REPRODUCTION": "causal pattern reproduces AND means/variance consistent AND config/params/nxn/state match exactly",
+    "PARTIAL_REPRODUCTION": "seed-0 circuit forms but ablation pattern incomplete OR seed pattern differs materially",
+    "NOT_REPRODUCED": "C does not exceed A/B on needle@d96 OR slots-off does not collapse OR rand-address does not reduce",
+    "RESOURCE_BLOCKED": "execution impossible (no torch / no compute)"
+  },
+  "excluded_from_gate": "The report's prose-only 1800-step / batch-24 needle=1.00 figure (NOT_FOUND as any artifact)."
+}
