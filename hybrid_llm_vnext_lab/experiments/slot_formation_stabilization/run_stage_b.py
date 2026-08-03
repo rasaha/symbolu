@@ -74,8 +74,33 @@ def main() -> int:
             print(f"[stageB] DONE {arm} seed{seed} needle@d96={rec['needle_by_dist']['96']:.3f} "
                   f"({round(time.time()-t0,1)}s)", flush=True)
         rf.write_text(json.dumps({"arm": arm, "records": records}, indent=2))
+        _preserve(args.run_id, arm, out_dir)
     print("[stageB] ALL ARMS COMPLETE", flush=True)
     return 0
+
+
+def _preserve(run_id, arm, out_dir):
+    """Durably commit+push a completed Stage B arm's raw results (restart-safe). Non-fatal."""
+    import subprocess
+    REPO = "/home/user/symbolu"
+    safe = arm.replace("+", "plus")
+    files = [str(out_dir / f"{arm}_results.json")] + [str(p) for p in out_dir.glob(f"{arm}_seed*.json")]
+    try:
+        subprocess.run(["git", "-C", REPO, "add", "-f", *files], check=False, capture_output=True)
+        r = subprocess.run(["git", "-C", REPO, "commit", "-q", "-m",
+                            f"research(slots): checkpoint Stage B arm {arm} results ({run_id})",
+                            "-m", "Automated per-arm durability checkpoint (fresh-holdout results).",
+                            "-m", "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>",
+                            "-m", "Claude-Session: https://claude.ai/code/session_0158cnJzS81RoDfw8ptbnrnn"],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            for _ in range(3):
+                if subprocess.run(["git", "-C", REPO, "push"], capture_output=True, text=True).returncode == 0:
+                    print(f"[stageB] preserved+pushed {arm}", flush=True); return
+                time.sleep(4)
+            print(f"[stageB] committed {arm} (push retry next arm)", flush=True)
+    except Exception as e:
+        print(f"[stageB] preserve {arm} error (non-fatal): {e}", flush=True)
 
 
 if __name__ == "__main__":
