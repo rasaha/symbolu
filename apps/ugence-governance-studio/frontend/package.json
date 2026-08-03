@@ -1,9 +1,9 @@
 {
   "name": "@ugence/governance-studio-frontend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Ugence Governance Studio — Eligibility Explorer frontend over the frozen governance_studio.api.v1 contract (P3C). Synthetic data; planning only; no ranking, composition, permission, fallback, replay, what-if, authentication, deployment or agent execution.",
+  "description": "Ugence Governance Studio — planning explorer over the frozen governance_studio.api.v1 contract (P3C eligibility + P3D ranking, composition, permission proposals, fallbacks, replay, comparison and controlled what-if). Synthetic data; deterministic planning only; no authentication, deployment, permission granting, runtime provisioning or agent execution.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -107,6 +107,27 @@ export function buildPairs() {
   add("error text on error background", T("ink", "1"), tint("state", "ineligible", s0), "normal");
   add("error title on error background", T("state", "ineligible"), tint("state", "ineligible", s0), "normal");
   add("success/readiness text on background", T("state", "eligible"), stateBg, "normal");
+
+  // P3D semantic states (§35). Each reuses a contrast-verified state token on the
+  // /10 tinted surface it renders over; measured explicitly here so the report
+  // documents ranking / selection / permission / fallback / replay / diff / what-if
+  // color pairs individually.
+  const p3d = [
+    ["selected primary state", "eligible"],
+    ["selected fallback state", "governance"],
+    ["eligible-not-selected state", "indeterminate"],
+    ["permission proposed state", "governance"],
+    ["permission excluded/prohibited state", "ineligible"],
+    ["fallback available state", "eligible"],
+    ["no fallback state", "ineligible"],
+    ["replay match state", "eligible"],
+    ["replay mismatch state", "ineligible"],
+    ["plan added state", "eligible"],
+    ["plan removed state", "ineligible"],
+    ["plan changed state", "indeterminate"],
+    ["what-if active state", "authority"],
+  ];
+  for (const [label, tone] of p3d) add(label, T("state", tone), tint("state", tone, s2), "normal");
   return p;
 }
 

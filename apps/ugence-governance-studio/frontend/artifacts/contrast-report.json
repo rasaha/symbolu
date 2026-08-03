@@ -5,7 +5,7 @@
     "large": 3,
     "nontext": 3
   },
-  "pair_count": 21,
+  "pair_count": 34,
   "lowest_passing_ratio": 4.09,
   "failed_pairs": [],
   "missing_required_pairs": [],
@@ -176,6 +176,110 @@
       "bg": "#102120",
       "kind": "normal",
       "ratio": 8.35,
+      "pass": true
+    },
+    {
+      "name": "selected primary state",
+      "fg": "#3ecf8e",
+      "bg": "#1a2e34",
+      "kind": "normal",
+      "ratio": 7.09,
+      "pass": true
+    },
+    {
+      "name": "selected fallback state",
+      "fg": "#4fc4cd",
+      "bg": "#1c2d3a",
+      "kind": "normal",
+      "ratio": 6.8,
+      "pass": true
+    },
+    {
+      "name": "eligible-not-selected state",
+      "fg": "#d9a441",
+      "bg": "#2a2a2c",
+      "kind": "normal",
+      "ratio": 6.37,
+      "pass": true
+    },
+    {
+      "name": "permission proposed state",
+      "fg": "#4fc4cd",
+      "bg": "#1c2d3a",
+      "kind": "normal",
+      "ratio": 6.8,
+      "pass": true
+    },
+    {
+      "name": "permission excluded/prohibited state",
+      "fg": "#f0685c",
+      "bg": "#2c242f",
+      "kind": "normal",
+      "ratio": 4.88,
+      "pass": true
+    },
+    {
+      "name": "fallback available state",
+      "fg": "#3ecf8e",
+      "bg": "#1a2e34",
+      "kind": "normal",
+      "ratio": 7.09,
+      "pass": true
+    },
+    {
+      "name": "no fallback state",
+      "fg": "#f0685c",
+      "bg": "#2c242f",
+      "kind": "normal",
+      "ratio": 4.88,
+      "pass": true
+    },
+    {
+      "name": "replay match state",
+      "fg": "#3ecf8e",
+      "bg": "#1a2e34",
+      "kind": "normal",
+      "ratio": 7.09,
+      "pass": true
+    },
+    {
+      "name": "replay mismatch state",
+      "fg": "#f0685c",
+      "bg": "#2c242f",
+      "kind": "normal",
+      "ratio": 4.88,
+      "pass": true
+    },
+    {
+      "name": "plan added state",
+      "fg": "#3ecf8e",
+      "bg": "#1a2e34",
+      "kind": "normal",
+      "ratio": 7.09,
+      "pass": true
+    },
+    {
+      "name": "plan removed state",
+      "fg": "#f0685c",
+      "bg": "#2c242f",
+      "kind": "normal",
+      "ratio": 4.88,
+      "pass": true
+    },
+    {
+      "name": "plan changed state",
+      "fg": "#d9a441",
+      "bg": "#2a2a2c",
+      "kind": "normal",
+      "ratio": 6.37,
+      "pass": true
+    },
+    {
+      "name": "what-if active state",
+      "fg": "#5aa2e0",
+      "bg": "#1d293c",
+      "kind": "normal",
+      "ratio": 5.35,
       "pass": true
     }
   ],
