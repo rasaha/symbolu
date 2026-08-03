@@ -1,0 +1,131 @@
+{
+  "schema": "slot_formation_stabilization_run_manifest/v1",
+  "phase": "Phase-free slot formation stabilization",
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "numpy": "2.4.6",
+    "device": "cpu",
+    "cores": 4,
+    "threads": 4,
+    "dtype": "fp32",
+    "torch_note": "installed from default PyPI mirror (same build as frozen five-seed run); download.pytorch.org blocked (403)."
+  },
+  "commits": {
+    "preregistration": "a87b81fc",
+    "default_head_at_start": "04f24d3e",
+    "current_head": "b39bcdf7ee3bdfefa7286fd0255021d8edb92000"
+  },
+  "pr_1300": {
+    "merged": true,
+    "merge_commit": "5f0cbe45"
+  },
+  "stage_a": {
+    "seeds": [
+      3,
+      6,
+      7
+    ],
+    "arms": [
+      "B0",
+      "O1",
+      "O2",
+      "K1",
+      "C1",
+      "R1",
+      "CR1"
+    ],
+    "aplus": "reused frozen",
+    "train_s_by_arm": {
+      "O1": [
+        945.6,
+        994.9,
+        939.5
+      ],
+      "O2": [
+        912.9,
+        940.4,
+        957.1
+      ],
+      "CR1": [
+        832.2,
+        814.1,
+        792.8
+      ],
+      "K1": [
+        923.1,
+        837.3,
+        891.6
+      ],
+      "B0": [
+        1006.9,
+        959.9,
+        944.3
+      ],
+      "R1": [
+        766.7,
+        851.3,
+        840.7
+      ],
+      "C1": [
+        901.2,
+        904.1,
+        836.7
+      ]
+    }
+  },
+  "stage_b": {
+    "seeds": [
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "arms": [
+      "A+",
+      "B0",
+      "CR1"
+    ],
+    "candidate": "CR1",
+    "train_s_by_arm": {
+      "CR1": [
+        903.7,
+        926.5,
+        864.5,
+        840.0,
+        839.8
+      ],
+      "A+": [
+        206.9,
+        218.1,
+        207.7,
+        221.8,
+        210.9
+      ],
+      "B0": [
+        797.5,
+        922.6,
+        915.9,
+        889.4,
+        903.8
+      ]
+    }
+  },
+  "interruptions": [
+    {
+      "event": "container restart #1",
+      "effect": "Stage A stopped after O1; disk preserved; idempotent resume (per-arm auto-commit added)."
+    },
+    {
+      "event": "container restart #2",
+      "effect": "Stage A stopped mid-run; resumed; completed all 7 arms."
+    },
+    {
+      "event": "container restart #3",
+      "effect": "Stage B stopped after A+ and B0 seed8; resumed; completed A+/B0/CR1 on seeds 8-12."
+    }
+  ],
+  "verdict": "PROVISIONALLY_STABILIZED",
+  "readiness": "NOT_READY_FOR_KDA_VALIDATION"
+}

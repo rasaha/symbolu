@@ -1,0 +1,86 @@
+{
+  "stage": "B",
+  "candidate": "CR1",
+  "fresh_seeds": [
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "needle_d96": {
+    "8": {
+      "cand": 0.9916666666666667,
+      "A+": 0.0,
+      "B0": 0.6416666666666667
+    },
+    "9": {
+      "cand": 0.0,
+      "A+": 0.0,
+      "B0": 0.5833333333333334
+    },
+    "10": {
+      "cand": 0.9916666666666667,
+      "A+": 0.0,
+      "B0": 0.18333333333333332
+    },
+    "11": {
+      "cand": 1.0,
+      "A+": 0.0,
+      "B0": 0.0
+    },
+    "12": {
+      "cand": 0.9666666666666667,
+      "A+": 0.0,
+      "B0": 0.03333333333333333
+    }
+  },
+  "forming": {
+    "8": true,
+    "9": false,
+    "10": true,
+    "11": true,
+    "12": true
+  },
+  "candidate_formation_count": 4,
+  "b0_formation_count": 3,
+  "S_minus_Aplus_d96": {
+    "8": 0.9917,
+    "9": 0.0,
+    "10": 0.9917,
+    "11": 1.0,
+    "12": 0.9667
+  },
+  "mean_margin": 0.79,
+  "median_margin": 0.9917,
+  "win_count": 4,
+  "ppl_mean_cand256": 136.55,
+  "ppl_mean_Aplus256": 144.62,
+  "causal_by_forming_seed": {
+    "8": true,
+    "10": true,
+    "11": true,
+    "12": true
+  },
+  "distance": {
+    "d16_ok": true,
+    "d220_forming_positive": 4,
+    "d220_ok": true
+  },
+  "gates": {
+    "b1_form_ge4": true,
+    "b2_mean_margin": true,
+    "b3_median_margin": true,
+    "b4_win_ge4": true,
+    "b5_beats_b0_formation": true,
+    "b6_param_match": true,
+    "b7_ppl": true,
+    "b8_causal": true,
+    "b9_distance": true
+  },
+  "all_gates_pass": true,
+  "final_classification": "PROVISIONALLY_STABILIZED",
+  "readiness": "NOT_READY_FOR_KDA_VALIDATION",
+  "readiness_note": "Even under PROVISIONALLY_STABILIZED the readiness is NOT_READY_FOR_KDA_VALIDATION (intervention selected over multiple candidates). Next gate: one independent confirmatory five-seed replication of the frozen winning intervention, no further tuning.",
+  "mandatory_gate_note": "A higher mean with <4/5 formed does NOT pass (b1 is mandatory)."
+}

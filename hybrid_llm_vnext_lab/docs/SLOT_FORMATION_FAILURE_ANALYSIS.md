@@ -34,12 +34,37 @@ routing loop is thus starved of early learning signal — the concrete reading b
 `WEAK_EARLY_ROUTING_SIGNAL`, which O1/O2 (slot-specific schedule) and R1/C1 (early routing scaffold)
 are designed to test.
 
-## Evidence and verdict (populated from artifacts)
-_Per-arm: whether it rescued seed 3 and/or seed 7, whether seed 6 stayed formed, causal-ablation
-outcomes, and which mechanism the routing trajectories support. Filled from
-`diagnostic_classification.json` + `routing_diagnostics.json`._
+## Evidence and verdict
 
-<!-- RESULTS:MECHANISM_VERDICT -->
+**Supported mechanism: `WEAK_EARLY_ROUTING_SIGNAL` compounded by `ARCHITECTURAL_BISTABILITY`.**
+`OPTIMIZER_SENSITIVITY` and `SLOT_SYMMETRY_FAILURE` are **refuted** by the evidence.
+
+| mechanism | evidence | status |
+|---|---|---|
+| OPTIMIZER_SENSITIVITY | O1 & O2 (slot-specific LR/warmup) both *regressed* s6 and rescued nothing | **refuted** |
+| SLOT_SYMMETRY_FAILURE | baseline keys already orthogonal (off-diag cosine ≈ 0); K1 no reliability gain | **refuted** |
+| WEAK_EARLY_ROUTING_SIGNAL | init overlap ≈ chance, routing gradients ≈ 0; alignment (R1/CR1) that injects early routing gradient is the only thing that works | **supported** |
+| ARCHITECTURAL_BISTABILITY | K1 *relocates* which seed forms; fresh seed 9 forms then unwinds post-scaffold | **supported** |
+
+**Per-arm outcome (development seeds 3/6/7):**
+- **O1, O2:** 0/3, regressed s6, rescued neither non-former.
+- **K1:** rescued s3 (0→0.125) but broke s6 (0.075→0.017); net 1/3 — pure basin reshuffling.
+- **C1:** 3/3 on the metric but **causally invalid** — slots-off leaves 0.575 (s6) and rand-address
+  0.90/0.33 (s6/s7): the multi-layer local-window pathway does the retrieval, not the slots.
+- **R1:** 2/3, rescued s7, causally clean.
+- **CR1:** 3/3, rescued s3 **and** s7, causally clean — selected candidate.
+
+**Fresh-seed confirmation (8–12):** CR1 formed 4/5 (vs baseline B0 3/5), all forming seeds causally
+clean. The single miss (seed 9) is the **retention** signature of bistability: needle peaked 1.000
+at step 300 then decayed to 0.000 after the scaffold was removed (λ→0 at step 600; curriculum→
+original at step 700), while seeds 8/10/11 dipped at step 900 and recovered. The circuit *can* form
+on seed 9 — it is not retained without the scaffold's continued pressure.
+
+**Implication (unproven hypothesis, next-phase):** since the alignment scaffold demonstrably forms
+the circuit even on hard seeds, the residual failure is a **consolidation/handoff** problem. A
+slower λ decay, a small residual alignment term through the curriculum→original transition, or a
+retention/EMA-consolidation step are the indicated next levers — not a new intervention family, and
+not any architecture change. Any such change must be re-run under this same causal gate.
 
 ## Discipline
 A rescued diagnostic seed is a development observation, **not** generalization. Any mechanism claim

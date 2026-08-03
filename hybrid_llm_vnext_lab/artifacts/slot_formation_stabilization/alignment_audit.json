@@ -1,0 +1,215 @@
+{
+  "objective": "L_align = -log(mean_layers,batch sum_m w_m*r_m + 1e-6); w=write-addr at fact value-token, r=read-addr at query.",
+  "lambda_schedule": {
+    "steps_1_300": 0.1,
+    "steps_301_600": "linear 0.10->0",
+    "steps_601_1200": 0.0
+  },
+  "guarantees": [
+    "label-free",
+    "no fixed correct slot",
+    "no answer-token leakage (verified by test)",
+    "no N x N tensor",
+    "zero after step 600 and during all eval"
+  ],
+  "R1_seed6_loss_log": [
+    {
+      "step": 0,
+      "main_loss": 7.1487,
+      "lambda": 0.1,
+      "L_align": 3.4658,
+      "overlap": 0.0312
+    },
+    {
+      "step": 60,
+      "main_loss": 4.3052,
+      "lambda": 0.1,
+      "L_align": 0.4539,
+      "overlap": 0.6352
+    },
+    {
+      "step": 100,
+      "main_loss": 4.0338,
+      "lambda": 0.1,
+      "L_align": 0.0024,
+      "overlap": 0.9976
+    },
+    {
+      "step": 120,
+      "main_loss": 3.9724,
+      "lambda": 0.1,
+      "L_align": 0.0017,
+      "overlap": 0.9983
+    },
+    {
+      "step": 200,
+      "main_loss": 5.4541,
+      "lambda": 0.1,
+      "L_align": 0.0044,
+      "overlap": 0.9956
+    },
+    {
+      "step": 300,
+      "main_loss": 4.1488,
+      "lambda": 0.1,
+      "L_align": 0.0006,
+      "overlap": 0.9994
+    },
+    {
+      "step": 400,
+      "main_loss": 4.0015,
+      "lambda": 0.06666666666666668,
+      "L_align": 0.0022,
+      "overlap": 0.9978
+    },
+    {
+      "step": 500,
+      "main_loss": 5.1046,
+      "lambda": 0.03333333333333334,
+      "L_align": 0.0062,
+      "overlap": 0.9938
+    },
+    {
+      "step": 600,
+      "main_loss": 3.5756,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 700,
+      "main_loss": 3.5144,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 800,
+      "main_loss": 5.0707,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 900,
+      "main_loss": 3.668,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 1000,
+      "main_loss": 3.9885,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 1100,
+      "main_loss": 3.8549,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    }
+  ],
+  "CR1_seed8_loss_log": [
+    {
+      "step": 0,
+      "main_loss": 7.1695,
+      "lambda": 0.1,
+      "L_align": 3.4656,
+      "overlap": 0.0313
+    },
+    {
+      "step": 60,
+      "main_loss": 3.8918,
+      "lambda": 0.1,
+      "L_align": 0.3598,
+      "overlap": 0.6978
+    },
+    {
+      "step": 100,
+      "main_loss": 4.0878,
+      "lambda": 0.1,
+      "L_align": 0.0019,
+      "overlap": 0.9981
+    },
+    {
+      "step": 120,
+      "main_loss": 4.058,
+      "lambda": 0.1,
+      "L_align": 0.0063,
+      "overlap": 0.9938
+    },
+    {
+      "step": 200,
+      "main_loss": 0.1427,
+      "lambda": 0.1,
+      "L_align": 0.0169,
+      "overlap": 0.9833
+    },
+    {
+      "step": 300,
+      "main_loss": 0.0067,
+      "lambda": 0.1,
+      "L_align": 0.0006,
+      "overlap": 0.9994
+    },
+    {
+      "step": 400,
+      "main_loss": 0.0353,
+      "lambda": 0.06666666666666668,
+      "L_align": 0.0006,
+      "overlap": 0.9994
+    },
+    {
+      "step": 500,
+      "main_loss": 0.0098,
+      "lambda": 0.03333333333333334,
+      "L_align": 0.0015,
+      "overlap": 0.9985
+    },
+    {
+      "step": 600,
+      "main_loss": 0.0167,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 700,
+      "main_loss": 10.9294,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 800,
+      "main_loss": 2.1062,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 900,
+      "main_loss": 3.736,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 1000,
+      "main_loss": 2.4296,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    },
+    {
+      "step": 1100,
+      "main_loss": 5.1237,
+      "lambda": 0.0,
+      "L_align": null,
+      "overlap": null
+    }
+  ]
+}
