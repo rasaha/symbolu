@@ -1,0 +1,162 @@
+name: procurement-package-ci
+
+# Scoped CI for the independent ugence-procurement product distribution. Runs the
+# migrated + new package suite (behavioral, governance-invariant, dependency-boundary
+# AST, compatibility-facade / object-identity, public-API, determinism, version
+# metadata), the behavioral-equivalence comparison (canonical == legacy == committed
+# baseline), the clean-install isolated-distribution verifier (wheel + sdist build,
+# out-of-root canonical + legacy import, CLI version/verify/demo, wheel-content audit,
+# reproducibility), the legacy monorepo procurement compatibility suite (exercising
+# the facades), and platform-freeze verification. No network-dependent integration
+# runs. Triggered only by changes to the package, the legacy procurement facades,
+# the shared conftest, or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/products/procurement/**"
+      - "domains/procurement/**"
+      - "applications/procurement/**"
+      - "conftest.py"
+      - ".github/workflows/procurement-package-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/procurement-independent-package**"
+      - "chatgpt/procurement-independent-package**"
+    paths:
+      - "packages/products/procurement/**"
+      - "domains/procurement/**"
+      - "applications/procurement/**"
+      - "conftest.py"
+      - ".github/workflows/procurement-package-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+# Per-step source paths for the source-tree jobs only. The isolated-distribution job
+# deliberately sets NO PYTHONPATH so the clean-venv verification resolves against the
+# installed wheels, never the source tree.
+env:
+  SRC_PYTHONPATH: >-
+    packages/products/procurement/src:packages/capabilities/decision-authority/src
+
+jobs:
+  package-suite:
+    name: Procurement package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+      - name: Package suite (behavioral + governance/dependency/compat/public-api/determinism/version)
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: python -m pytest packages/products/procurement/tests -q
+      - name: Public-API snapshot is in sync with the frozen artifact
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: |
+          python packages/products/procurement/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/products/procurement/artifacts/public_api.json"))
+          assert live == frozen, "ugence_procurement.api drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+      - name: Version/maturity metadata (pilot_validated + production_certified are False)
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: |
+          python -m ugence_procurement version
+          python -c "import ugence_procurement as u; assert u.__version__ == '0.1.0'; i = u.version_info().to_dict(); assert i['pilot_validated'] is False and i['production_certified'] is False, i"
+
+  behavioral-equivalence:
+    name: Behavioral equivalence (canonical == legacy == baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic
+      - name: Capture canonical + legacy behavior and compare to the committed baseline
+        run: |
+          CAP=packages/products/procurement/scripts/capture_behavior.py
+          BASE=packages/products/procurement/docs/audits/procurement_packaging/artifacts
+          export PYTHONPATH="$PWD:$PWD/packages/capabilities/decision-authority/src:$PWD/packages/products/procurement/src"
+          PROC_CAPTURE_MODE=canonical python "$CAP" > /tmp/after_canonical.json
+          PROC_CAPTURE_MODE=legacy    python "$CAP" > /tmp/after_legacy.json
+          python - <<'PY'
+          import json, hashlib
+          def h(p):
+              return hashlib.sha256(json.dumps(json.load(open(p))["capture"], sort_keys=True).encode()).hexdigest()
+          base = "packages/products/procurement/docs/audits/procurement_packaging/artifacts"
+          before = h(f"{base}/BEHAVIOR_CAPTURE_BEFORE.json")
+          canon = h("/tmp/after_canonical.json")
+          legacy = h("/tmp/after_legacy.json")
+          assert before == canon == legacy, f"behavioral regression: before={before} canonical={canon} legacy={legacy}"
+          print("behavioral equivalence OK:", before)
+          PY
+
+  isolated-distribution:
+    name: Clean-install verifier, wheel/sdist, CLI, reproducibility
+    runs-on: ubuntu-latest
+    # NOTE: intentionally no PYTHONPATH — the verifier resolves the installed wheels.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheelhouse, clean-install outside repo, CLI, wheel audit, reproducibility
+        run: python packages/products/procurement/scripts/verify_procurement_distribution.py
+
+  monorepo-compat:
+    name: Legacy monorepo procurement compatibility suite (facades)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Legacy domains.procurement / applications.procurement tests pass through the facades
+        run: python -m pytest domains/procurement/tests -q
+
+  freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
