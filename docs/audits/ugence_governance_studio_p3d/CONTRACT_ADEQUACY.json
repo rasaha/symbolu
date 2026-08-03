@@ -1,0 +1,23 @@
+{
+  "assessment": "governance_studio_p3d_contract_adequacy",
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "contract_changed": false,
+  "blocked": false,
+  "block_token_raised": null,
+  "views": {
+    "ranking": {"adequate": true, "operations": ["get_scenario_ranking", "explain_ranking"]},
+    "composition": {"adequate": true, "operations": ["get_scenario_plan", "explain_plan"]},
+    "permission_proposals": {"adequate": true, "operations": ["get_scenario_plan"]},
+    "fallbacks": {"adequate": true, "operations": ["get_scenario_plan"]},
+    "replay": {"adequate": true, "operations": ["replay_plan"]},
+    "comparison": {"adequate": true, "operations": ["compare_plans"]},
+    "what_if": {"adequate": true, "operations": ["scenario_what_if"]},
+    "export": {"adequate": true, "operations": ["export_scenario"]}
+  },
+  "no_feasible_team": {
+    "kind": "domain_state",
+    "http_status": 200,
+    "treated_as_error": false,
+    "verified_scenario": "cybersecurity_no_feasible_team"
+  }
+}
