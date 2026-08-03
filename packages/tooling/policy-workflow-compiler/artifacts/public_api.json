@@ -1,5 +1,5 @@
 {
-  "count": 71,
+  "count": 101,
   "fingerprints": {
     "ActionConstraint": {
       "kind": "class",
@@ -432,6 +432,56 @@
         "version"
       ]
     },
+    "CapabilityRequirement": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "CapabilityRequirementSource": {
+      "kind": "enum",
+      "members": [
+        "CAPABILITY_OWNER_MAPPING",
+        "CONTRACT_DERIVATION",
+        "EXPLICIT_POLICY",
+        "NODE_KIND_MAPPING",
+        "UNRESOLVED"
+      ],
+      "values": [
+        "CAPABILITY_OWNER_MAPPING",
+        "CONTRACT_DERIVATION",
+        "EXPLICIT_POLICY",
+        "NODE_KIND_MAPPING",
+        "UNRESOLVED"
+      ]
+    },
     "ChangeType": {
       "kind": "enum",
       "members": [
@@ -542,6 +592,12 @@
         "validate"
       ]
     },
+    "CompiledReleaseValidator": {
+      "kind": "class",
+      "members": [
+        "validate"
+      ]
+    },
     "ConnectorMapping": {
       "kind": "class",
       "members": [
@@ -631,6 +687,39 @@
         "validate"
       ]
     },
+    "DataContractRef": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "DecisionRule": {
       "kind": "class",
       "members": [
@@ -663,6 +752,46 @@
         "schema_json",
         "update_forward_refs",
         "validate"
+      ]
+    },
+    "DependencyKind": {
+      "kind": "enum",
+      "members": [
+        "AUTHORITY_DEPENDENCY",
+        "CONDITIONAL_DEPENDENCY",
+        "CONTROL_DEPENDENCY",
+        "DATA_DEPENDENCY",
+        "GOVERNANCE_DEPENDENCY",
+        "ORDERING_DEPENDENCY",
+        "REVIEW_DEPENDENCY"
+      ],
+      "values": [
+        "AUTHORITY_DEPENDENCY",
+        "CONDITIONAL_DEPENDENCY",
+        "CONTROL_DEPENDENCY",
+        "DATA_DEPENDENCY",
+        "GOVERNANCE_DEPENDENCY",
+        "ORDERING_DEPENDENCY",
+        "REVIEW_DEPENDENCY"
+      ]
+    },
+    "DerivationClass": {
+      "kind": "enum",
+      "members": [
+        "DEFAULTED_SAFE",
+        "DERIVED_FROM_CONTRACT",
+        "DERIVED_FROM_EDGE",
+        "DETERMINISTIC_MAPPING",
+        "EXPLICIT",
+        "UNRESOLVED"
+      ],
+      "values": [
+        "DEFAULTED_SAFE",
+        "DERIVED_FROM_CONTRACT",
+        "DERIVED_FROM_EDGE",
+        "DETERMINISTIC_MAPPING",
+        "EXPLICIT",
+        "UNRESOLVED"
       ]
     },
     "EdgeKind": {
@@ -818,6 +947,39 @@
         "validate"
       ]
     },
+    "HumanReviewRequirement": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "ImpactSummary": {
       "kind": "class",
       "members": [
@@ -885,6 +1047,39 @@
         "validate"
       ]
     },
+    "NodeInputRequirement": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "NodeKind": {
       "kind": "enum",
       "members": [
@@ -918,6 +1113,39 @@
         "SEGREGATION_OF_DUTIES_GATE",
         "SEQUENCE_RISK_CHECK",
         "TERMINAL_OUTCOME"
+      ]
+    },
+    "NodeOutputDeclaration": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
       ]
     },
     "ObjectChange": {
@@ -1170,6 +1398,39 @@
         "validate"
       ]
     },
+    "PolicyProvenanceRef": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "Predicate": {
       "kind": "class",
       "members": [
@@ -1340,6 +1601,112 @@
         "validate"
       ]
     },
+    "ReleaseValidationCode": {
+      "kind": "enum",
+      "members": [
+        "AI_ELIGIBLE_ON_AUTHORITATIVE_NODE",
+        "BASE_DIGEST_MISMATCH",
+        "BROKEN_PROVENANCE",
+        "CONFLICTING_AUTHORITY_DISPOSITION",
+        "CONFLICTING_POLICY_SOURCE",
+        "CONTRACT_VERSION_MISMATCH",
+        "DANGLING_EDGE",
+        "DUPLICATE_CAPABILITY_REQUIREMENT",
+        "DUPLICATE_EDGE_ID",
+        "DUPLICATE_NODE_ID",
+        "INCOMPLETE_ROLE_SEMANTICS",
+        "INVALID_DEPENDENCY",
+        "MISSING_AUTHORITY_DISPOSITION",
+        "MISSING_CAPABILITY_REQUIREMENT",
+        "MISSING_INPUT_CONTRACT",
+        "MISSING_NODE_SEMANTICS",
+        "MISSING_OUTPUT_CONTRACT",
+        "UNKNOWN_CAPABILITY_REF",
+        "UNKNOWN_CONTRACT_VERSION",
+        "UNRESOLVED_CONTRACT_REF",
+        "UNSUPPORTED_CYCLE",
+        "UNSUPPORTED_EDGE_KIND",
+        "UNSUPPORTED_NODE_KIND",
+        "WORKFLOW_FINGERPRINT_MISMATCH"
+      ],
+      "values": [
+        "AI_ELIGIBLE_ON_AUTHORITATIVE_NODE",
+        "BASE_DIGEST_MISMATCH",
+        "BROKEN_PROVENANCE",
+        "CONFLICTING_AUTHORITY_DISPOSITION",
+        "CONFLICTING_POLICY_SOURCE",
+        "CONTRACT_VERSION_MISMATCH",
+        "DANGLING_EDGE",
+        "DUPLICATE_CAPABILITY_REQUIREMENT",
+        "DUPLICATE_EDGE_ID",
+        "DUPLICATE_NODE_ID",
+        "INCOMPLETE_ROLE_SEMANTICS",
+        "INVALID_DEPENDENCY",
+        "MISSING_AUTHORITY_DISPOSITION",
+        "MISSING_CAPABILITY_REQUIREMENT",
+        "MISSING_INPUT_CONTRACT",
+        "MISSING_NODE_SEMANTICS",
+        "MISSING_OUTPUT_CONTRACT",
+        "UNKNOWN_CAPABILITY_REF",
+        "UNKNOWN_CONTRACT_VERSION",
+        "UNRESOLVED_CONTRACT_REF",
+        "UNSUPPORTED_CYCLE",
+        "UNSUPPORTED_EDGE_KIND",
+        "UNSUPPORTED_NODE_KIND",
+        "WORKFLOW_FINGERPRINT_MISMATCH"
+      ]
+    },
+    "ReleaseValidationResult": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "ok",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "ReleaseValidationState": {
+      "kind": "enum",
+      "members": [
+        "INTEGRITY_FAILURE",
+        "INVALID",
+        "UNSUPPORTED_VERSION",
+        "VALID",
+        "VALID_WITH_WARNINGS"
+      ],
+      "values": [
+        "INTEGRITY_FAILURE",
+        "INVALID",
+        "UNSUPPORTED_VERSION",
+        "VALID",
+        "VALID_WITH_WARNINGS"
+      ]
+    },
     "ReplayCase": {
       "kind": "class",
       "members": [
@@ -1406,6 +1773,142 @@
         "schema_json",
         "update_forward_refs",
         "validate"
+      ]
+    },
+    "RequirementLevel": {
+      "kind": "enum",
+      "members": [
+        "OPTIONAL",
+        "REQUIRED"
+      ],
+      "values": [
+        "OPTIONAL",
+        "REQUIRED"
+      ]
+    },
+    "ResolutionStatus": {
+      "kind": "enum",
+      "members": [
+        "DETERMINISTICALLY_INFERRED",
+        "EXPLICITLY_DECLARED",
+        "NOT_APPLICABLE",
+        "UNKNOWN",
+        "UNSUPPORTED"
+      ],
+      "values": [
+        "DETERMINISTICALLY_INFERRED",
+        "EXPLICITLY_DECLARED",
+        "NOT_APPLICABLE",
+        "UNKNOWN",
+        "UNSUPPORTED"
+      ]
+    },
+    "RoleRelevance": {
+      "kind": "enum",
+      "members": [
+        "ADVISORY_AGENT_ELIGIBLE",
+        "DETERMINISTIC_SERVICE",
+        "GOVERNANCE_OWNED",
+        "HUMAN_AUTHORITY",
+        "HUMAN_REVIEW",
+        "UNSUPPORTED"
+      ],
+      "values": [
+        "ADVISORY_AGENT_ELIGIBLE",
+        "DETERMINISTIC_SERVICE",
+        "GOVERNANCE_OWNED",
+        "HUMAN_AUTHORITY",
+        "HUMAN_REVIEW",
+        "UNSUPPORTED"
+      ]
+    },
+    "SUPPORTED_WORKFLOW_IR_VERSIONS": {
+      "kind": "object",
+      "type": "tuple"
+    },
+    "SemanticDiagnostic": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "SemanticFeature": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "SemanticFeatureName": {
+      "kind": "enum",
+      "members": [
+        "AUTHORITY_SEMANTICS",
+        "DEPENDENCY_SEMANTICS",
+        "HUMAN_REVIEW_SEMANTICS",
+        "POLICY_PROVENANCE",
+        "ROLE_SEMANTICS",
+        "TYPED_CONTRACT_REFS"
+      ],
+      "values": [
+        "authority_semantics",
+        "dependency_semantics",
+        "human_review_semantics",
+        "policy_provenance",
+        "role_semantics",
+        "typed_contract_refs"
       ]
     },
     "SequenceRiskPattern": {
@@ -1671,8 +2174,68 @@
     "VersionInfo": {
       "kind": "class",
       "members": [
+        "action_authorization_implemented",
+        "agent_eligibility_implemented",
+        "agent_ranking_implemented",
+        "authority_semantics_implemented",
+        "awc_adapter_updated",
         "build_commit",
-        "to_dict"
+        "capability_requirement_extraction_implemented",
+        "dependency_semantics_implemented",
+        "deterministic_replay_verified",
+        "enterprise_policy_evaluation_implemented",
+        "human_review_semantics_implemented",
+        "policy_provenance_implemented",
+        "release_validation_implemented",
+        "runtime_execution_implemented",
+        "semantic_node_enrichment_implemented",
+        "supported_workflow_ir_versions",
+        "team_composition_implemented",
+        "to_dict",
+        "typed_contract_references_implemented",
+        "workflow_ir_v1_supported",
+        "workflow_ir_v2_supported"
+      ]
+    },
+    "WORKFLOW_IR_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "WORKFLOW_IR_V2": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "WorkflowDependencySemantics": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
       ]
     },
     "WorkflowEdge": {
@@ -1743,7 +2306,74 @@
         "validate"
       ]
     },
+    "WorkflowIRv2": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "logical_digest",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
     "WorkflowNode": {
+      "kind": "class",
+      "members": [
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
+        "json",
+        "model_computed_fields",
+        "model_config",
+        "model_construct",
+        "model_copy",
+        "model_dump",
+        "model_dump_json",
+        "model_extra",
+        "model_fields",
+        "model_fields_set",
+        "model_json_schema",
+        "model_parametrized_name",
+        "model_post_init",
+        "model_rebuild",
+        "model_validate",
+        "model_validate_json",
+        "model_validate_strings",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate"
+      ]
+    },
+    "WorkflowNodeSemantics": {
       "kind": "class",
       "members": [
         "construct",
@@ -1794,6 +2424,12 @@
         "name"
       ]
     },
+    "classify_role_relevance": {
+      "kind": "function",
+      "parameters": [
+        "node"
+      ]
+    },
     "compile_policy_pack": {
       "kind": "function",
       "parameters": [
@@ -1801,6 +2437,16 @@
         "approval",
         "registry",
         "require_approval"
+      ]
+    },
+    "compile_workflow_v2": {
+      "kind": "function",
+      "parameters": [
+        "pack",
+        "approval",
+        "registry",
+        "require_approval",
+        "compiler_version"
       ]
     },
     "compute_pack_digest": {
@@ -1816,11 +2462,33 @@
         "new"
       ]
     },
+    "enrich_workflow": {
+      "kind": "function",
+      "parameters": [
+        "ir",
+        "pack",
+        "compiler_version"
+      ]
+    },
     "is_legal_transition": {
       "kind": "function",
       "parameters": [
         "src",
         "dst"
+      ]
+    },
+    "upgrade_workflow_ir": {
+      "kind": "function",
+      "parameters": [
+        "ir",
+        "pack",
+        "compiler_version"
+      ]
+    },
+    "validate_compiled_release": {
+      "kind": "function",
+      "parameters": [
+        "ir_v2"
       ]
     },
     "validate_policy_pack": {
@@ -1860,24 +2528,33 @@
     "CapabilityId",
     "CapabilityManifest",
     "CapabilityRegistry",
+    "CapabilityRequirement",
+    "CapabilityRequirementSource",
     "ChangeType",
     "Comparator",
     "CompilationResult",
     "CompiledPackageVerifier",
     "CompiledReleasePackage",
+    "CompiledReleaseValidator",
     "ConnectorMapping",
     "ConstraintKind",
     "CoverageMatrix",
+    "DataContractRef",
     "DecisionRule",
+    "DependencyKind",
+    "DerivationClass",
     "EdgeKind",
     "EvidenceKind",
     "ExceptionRule",
     "ExpectedOutcome",
     "GovernedWorkflowCompiler",
     "HumanApprovalRecord",
+    "HumanReviewRequirement",
     "ImpactSummary",
     "LegitimateCounterexample",
+    "NodeInputRequirement",
     "NodeKind",
+    "NodeOutputDeclaration",
     "ObjectChange",
     "ObjectType",
     "OverrideRule",
@@ -1886,14 +2563,25 @@
     "PolicyPackDiff",
     "PolicyPackStatus",
     "PolicyPackValidator",
+    "PolicyProvenanceRef",
     "Predicate",
     "ProhibitedCondition",
     "ProvenanceReference",
     "ProvenanceSourceType",
     "ProvenanceStatus",
     "ReleaseManifest",
+    "ReleaseValidationCode",
+    "ReleaseValidationResult",
+    "ReleaseValidationState",
     "ReplayCase",
     "RequiredEvidence",
+    "RequirementLevel",
+    "ResolutionStatus",
+    "RoleRelevance",
+    "SUPPORTED_WORKFLOW_IR_VERSIONS",
+    "SemanticDiagnostic",
+    "SemanticFeature",
+    "SemanticFeatureName",
     "SequenceRiskPattern",
     "Severity",
     "SourceDocument",
@@ -1903,14 +2591,24 @@
     "ValidationReport",
     "VerificationReport",
     "VersionInfo",
+    "WORKFLOW_IR_V1",
+    "WORKFLOW_IR_V2",
+    "WorkflowDependencySemantics",
     "WorkflowEdge",
     "WorkflowIR",
+    "WorkflowIRv2",
     "WorkflowNode",
+    "WorkflowNodeSemantics",
     "build_approval_record",
+    "classify_role_relevance",
     "compile_policy_pack",
+    "compile_workflow_v2",
     "compute_pack_digest",
     "diff_policy_packs",
+    "enrich_workflow",
     "is_legal_transition",
+    "upgrade_workflow_ir",
+    "validate_compiled_release",
     "validate_policy_pack",
     "verify_compiled_package",
     "version_info"

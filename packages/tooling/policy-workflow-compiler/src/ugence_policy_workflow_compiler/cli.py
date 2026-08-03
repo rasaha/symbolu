@@ -20,10 +20,19 @@ import sys
 from typing import Optional
 
 from .api import (
+    SUPPORTED_WORKFLOW_IR_VERSIONS,
+    WORKFLOW_IR_V1,
+    WORKFLOW_IR_V2,
     GovernedWorkflowCompiler,
     HumanApprovalRecord,
     PolicyPack,
+    WorkflowIR,
+    WorkflowIRv2,
+    compile_workflow_v2,
     diff_policy_packs,
+    enrich_workflow,
+    upgrade_workflow_ir,
+    validate_compiled_release,
     validate_policy_pack,
     verify_compiled_package,
     version_info,
@@ -34,6 +43,16 @@ from .serialization import canonical_json, package_io
 def _load_pack(path: str) -> PolicyPack:
     text = pathlib.Path(path).read_text(encoding="utf-8")
     return PolicyPack.model_validate(canonical_json.loads(text))
+
+
+def _load_v1_ir(path: str) -> WorkflowIR:
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    return WorkflowIR.model_validate(canonical_json.loads(text))
+
+
+def _load_v2(path: str) -> WorkflowIRv2:
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    return WorkflowIRv2.model_validate(canonical_json.loads(text))
 
 
 def _load_approval(path: str) -> HumanApprovalRecord:
@@ -59,24 +78,135 @@ def cmd_validate(args) -> int:
 
 
 def cmd_compile(args) -> int:
+    contract = getattr(args, "contract", WORKFLOW_IR_V1)
+    if contract not in SUPPORTED_WORKFLOW_IR_VERSIONS:
+        _print({"error": f"unsupported contract {contract!r}",
+                "supported": list(SUPPORTED_WORKFLOW_IR_VERSIONS)})
+        return 2
     pack = _load_pack(args.pack)
     approval = _load_approval(args.approval) if args.approval else None
     result = GovernedWorkflowCompiler().compile(
         pack, approval, require_approval=not args.no_approval
     )
     if not result.success:
-        _print({"success": False,
+        _print({"success": False, "contract": contract,
                 "diagnostics": [d.model_dump(mode="python") for d in result.diagnostics]})
         return 2
+    if contract == WORKFLOW_IR_V2:
+        v2 = enrich_workflow(result.workflow_ir, pack, compiler_version=version_info().distribution_version)
+        if args.out:
+            pathlib.Path(args.out).write_text(
+                canonical_json.dumps_pretty(v2.model_dump(mode="python")), encoding="utf-8")
+        _print({
+            "success": True, "contract": WORKFLOW_IR_V2,
+            "workflow_fingerprint": v2.workflow_fingerprint,
+            "base_ir_digest": v2.base_ir_digest,
+            "nodes": len(v2.base_ir.nodes),
+            "node_semantics": len(v2.node_semantics),
+            "dependency_semantics": len(v2.dependency_semantics),
+            "written_to": args.out or None,
+        })
+        return 0
     if args.out:
         package_io.write_package(result.compiled_package, args.out)
     _print({
-        "success": True,
+        "success": True, "contract": WORKFLOW_IR_V1,
         "logical_digest": result.logical_digest,
         "nodes": len(result.workflow_ir.nodes),
         "edges": len(result.workflow_ir.edges),
         "assurance_tests": result.assurance_manifest.test_count,
         "coverage_complete": result.assurance_manifest.coverage_matrix.complete,
+        "written_to": args.out or None,
+    })
+    return 0
+
+
+def cmd_validate_release(args) -> int:
+    v2 = _load_v2(args.file)
+    result = validate_compiled_release(v2)
+    _print({"state": result.state.value, "ok": result.ok,
+            "structural_ok": result.structural_ok, "semantic_ok": result.semantic_ok,
+            "authority_ok": result.authority_ok, "contract_ok": result.contract_ok,
+            "dependency_ok": result.dependency_ok, "provenance_ok": result.provenance_ok,
+            "digest_ok": result.digest_ok,
+            "diagnostics": [d.model_dump(mode="python") for d in result.diagnostics]})
+    return 0 if result.ok else 2
+
+
+def cmd_inspect_semantics(args) -> int:
+    v2 = _load_v2(args.file)
+    _print({
+        "policy_pack_id": v2.policy_pack_id,
+        "contract_version": v2.ir_version,
+        "node_semantics": [
+            {"node_id": s.node_id, "node_kind": s.node_kind,
+             "role_relevance": s.role_relevance.value,
+             "semantic_purpose": s.semantic_purpose,
+             "authority_disposition": s.authority_disposition,
+             "canonical_capability_owner": s.canonical_capability_owner,
+             "required_capabilities": [c.capability_id for c in s.required_capability_refs],
+             "human_review": s.human_review_requirement.review_kind}
+            for s in v2.node_semantics],
+        "capability_reference_manifest": list(v2.capability_reference_manifest),
+    })
+    return 0
+
+
+def cmd_inspect_dependencies(args) -> int:
+    v2 = _load_v2(args.file)
+    _print({
+        "policy_pack_id": v2.policy_pack_id,
+        "dependencies": [
+            {"edge_id": d.edge_id, "source": d.source_node_id, "target": d.target_node_id,
+             "dependency_kind": d.dependency_kind.value, "condition_ref": d.condition_ref}
+            for d in v2.dependency_semantics],
+    })
+    return 0
+
+
+def cmd_inspect_provenance(args) -> int:
+    v2 = _load_v2(args.file)
+    _print({
+        "policy_pack_id": v2.policy_pack_id,
+        "provenance_manifest": list(v2.provenance_manifest),
+        "node_provenance": [
+            {"node_id": s.node_id, "derivation_class": s.provenance.derivation_class.value,
+             "compiler_rule": s.provenance.compiler_rule,
+             "source_object_ids": list(s.provenance.source_object_ids)}
+            for s in v2.node_semantics],
+    })
+    return 0
+
+
+def cmd_compare_contracts(args) -> int:
+    v1 = _load_v1_ir(args.v1_file)
+    v2 = _load_v2(args.v2_file)
+    _print({
+        "v1_ir_version": v1.ir_version,
+        "v2_ir_version": v2.ir_version,
+        "v1_logical_digest": v1.logical_digest(),
+        "v2_base_ir_digest": v2.base_ir_digest,
+        "base_graphs_match": v1.logical_digest() == v2.base_ir_digest,
+        "v2_adds": {
+            "node_semantics": len(v2.node_semantics),
+            "dependency_semantics": len(v2.dependency_semantics),
+            "semantic_features": [f.name.value for f in v2.semantic_features if f.present],
+        },
+    })
+    return 0
+
+
+def cmd_upgrade_v1(args) -> int:
+    v1 = _load_v1_ir(args.file)
+    v2 = upgrade_workflow_ir(v1, compiler_version=version_info().distribution_version)
+    if args.out:
+        pathlib.Path(args.out).write_text(
+            canonical_json.dumps_pretty(v2.model_dump(mode="python")), encoding="utf-8")
+    _print({
+        "upgraded": True, "from": v1.ir_version, "to": v2.ir_version,
+        "base_ir_digest": v2.base_ir_digest, "workflow_fingerprint": v2.workflow_fingerprint,
+        "node_semantics": len(v2.node_semantics),
+        "note": "semantics absent from v1 are marked unresolved/not-applicable; none are invented",
         "written_to": args.out or None,
     })
     return 0
@@ -210,10 +340,43 @@ def build_parser() -> argparse.ArgumentParser:
     p_compile = sub.add_parser("compile", help="compile an approved policy pack")
     p_compile.add_argument("pack")
     p_compile.add_argument("--approval", default=None, help="approval record JSON")
-    p_compile.add_argument("--out", default=None, help="write compiled package to DIR")
+    p_compile.add_argument("--out", default=None,
+                           help="write compiled package to DIR (v1) or v2 JSON to FILE")
+    p_compile.add_argument("--contract", default=WORKFLOW_IR_V1,
+                           choices=list(SUPPORTED_WORKFLOW_IR_VERSIONS),
+                           help="target workflow-IR contract (default workflow_ir.v1)")
     p_compile.add_argument("--no-approval", action="store_true",
                            help="skip the approval gate (preview only)")
     p_compile.set_defaults(func=cmd_compile)
+
+    p_valrel = sub.add_parser("validate-release",
+                              help="validate an enriched workflow_ir.v2 release JSON")
+    p_valrel.add_argument("file")
+    p_valrel.set_defaults(func=cmd_validate_release)
+
+    p_isem = sub.add_parser("inspect-semantics", help="inspect v2 node semantics")
+    p_isem.add_argument("file")
+    p_isem.set_defaults(func=cmd_inspect_semantics)
+
+    p_idep = sub.add_parser("inspect-dependencies", help="inspect v2 dependency semantics")
+    p_idep.add_argument("file")
+    p_idep.set_defaults(func=cmd_inspect_dependencies)
+
+    p_iprov = sub.add_parser("inspect-provenance", help="inspect v2 policy provenance")
+    p_iprov.add_argument("file")
+    p_iprov.set_defaults(func=cmd_inspect_provenance)
+
+    p_cmp = sub.add_parser("compare-contracts",
+                           help="compare a v1 IR JSON and a v2 release JSON")
+    p_cmp.add_argument("v1_file")
+    p_cmp.add_argument("v2_file")
+    p_cmp.set_defaults(func=cmd_compare_contracts)
+
+    p_up = sub.add_parser("upgrade-v1",
+                          help="losslessly upgrade a v1 IR JSON to workflow_ir.v2")
+    p_up.add_argument("file")
+    p_up.add_argument("--out", default=None, help="write v2 JSON to FILE")
+    p_up.set_defaults(func=cmd_upgrade_v1)
 
     p_verify = sub.add_parser("verify", help="verify a compiled package directory")
     p_verify.add_argument("package")
