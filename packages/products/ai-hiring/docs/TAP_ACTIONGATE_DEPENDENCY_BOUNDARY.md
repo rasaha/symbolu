@@ -1,8 +1,11 @@
 # TAP / ActionGate Dependency Boundary
 
 TAP and ActionGate are governed **control-plane** capabilities that AI Hiring
-*uses* but does not *own*. They will be independently packaged in later phases.
-This package is designed so that migration requires **no product redesign**.
+*uses* but does not *own*. They are now independently packaged as the canonical
+Ugence provider distributions **`ugence-tap-provider`** (namespace
+`ugence_tap_provider`) and **`ugence-actiongate-provider`** (namespace
+`ugence_actiongate_provider`). AI Hiring's optional extras and adapters target
+those canonical packages. This normalization required **no product redesign**.
 
 ## What the core does (and does not) do
 
@@ -27,30 +30,40 @@ offline** reference providers, so the core is fully verifiable with **no**
 concrete TAP or ActionGate provider installed. Authorization preparation is a
 separate record and service from execution.
 
-## Optional legacy adapters (isolated)
+## Optional canonical adapters (isolated)
 
-Concrete bridges to the current providers live **only** under
+Concrete bridges to the canonical providers live **only** under
 `ugence_ai_hiring/integrations/`:
 
 | Module | Bridges | Neutral target |
 |---|---|---|
-| `integrations/tap_legacy_adapter.py` | `tap_provider.TAPProvider` | `AssertionGovernanceProvider` → `ClaimAssertionEvaluator` |
-| `integrations/actiongate_legacy_adapter.py` | `actiongate_provider.ActionGateProvider` | `ActionGovernanceProvider` → `ActionAuthorizationIntegration` |
+| `integrations/tap_adapter.py` | `ugence_tap_provider.provider.TAPProvider` | `AssertionGovernanceProvider` → `ClaimAssertionEvaluator` |
+| `integrations/actiongate_adapter.py` | `ugence_actiongate_provider.provider.ActionGateProvider` | `ActionGovernanceProvider` → `ActionAuthorizationIntegration` |
+
+The old adapter module names remain as **compatibility import paths** — logic-free
+facades that re-export the canonical adapter callables (object identity preserved):
+
+| Compatibility path | Canonical module |
+|---|---|
+| `integrations/tap_legacy_adapter.py` | `integrations/tap_adapter.py` |
+| `integrations/actiongate_legacy_adapter.py` | `integrations/actiongate_adapter.py` |
 
 These adapters:
 
-- import the legacy provider **lazily** (only when a loader/builder is called);
+- import the canonical provider **lazily** (only when a loader/builder is called);
 - are **not** imported by the core, so `import ugence_ai_hiring` never loads them;
 - implement **no** adjudication/authorization logic — they only construct the
-  injected legacy provider and hand it to the core's neutral integration;
-- fail closed with `LegacyProviderUnavailable` when the optional distribution is
-  absent.
+  injected provider and hand it to the core's neutral integration;
+- fail closed with `ProviderUnavailable` (retained alias:
+  `LegacyProviderUnavailable is ProviderUnavailable`) when the optional
+  distribution is absent.
 
-Install with the optional extras (temporary legacy-compatibility dependencies):
+Install with the optional extras (user-facing extra names unchanged; they now
+resolve the canonical distributions):
 
 ```bash
-pip install "ugence-ai-hiring[tap]"          # -> dgm-tap-provider
-pip install "ugence-ai-hiring[actiongate]"   # -> dgm-actiongate-provider
+pip install "ugence-ai-hiring[tap]"          # -> ugence-tap-provider
+pip install "ugence-ai-hiring[actiongate]"   # -> ugence-actiongate-provider
 ```
 
 ## Dependency classification
@@ -59,29 +72,30 @@ pip install "ugence-ai-hiring[actiongate]"   # -> dgm-actiongate-provider
 |---|---|
 | Neutral governance ports/protocols used by the core | NEUTRAL_CONTRACT |
 | `tap` / `actiongate` extras | OPTIONAL_INTEGRATION |
-| `tap_provider` / `actiongate_provider` inside `integrations/` (lazy) | LEGACY_COMPATIBILITY_DEPENDENCY |
-| `tap_provider` / `actiongate_provider` anywhere in the core | FORBIDDEN_CORE_DEPENDENCY (count 0) |
-| Legacy providers exercised by compatibility tests when importable | TEST_ONLY |
+| `ugence_tap_provider` / `ugence_actiongate_provider` inside `integrations/` (lazy) | OPTIONAL_CANONICAL_ADAPTER |
+| `ugence_tap_provider` / `ugence_actiongate_provider` anywhere in the core | FORBIDDEN_CORE_DEPENDENCY (count 0) |
+| Legacy `tap_provider` / `actiongate_provider` namespaces anywhere in the package | FORBIDDEN (count 0) — the core targets the canonical namespaces directly |
+| Canonical providers exercised by compatibility tests when importable | TEST_ONLY |
 
-`dgm-tap-provider` and `dgm-actiongate-provider` are recorded as **temporary
-legacy-compatibility dependencies**, not canonical ownership.
+`dgm-tap-provider` and `dgm-actiongate-provider` are **no longer AI Hiring
+dependencies**. They remain valid **provider compatibility distributions** for old
+deployments: installing them pulls in the canonical providers
+(`ugence-tap-provider` / `ugence-actiongate-provider`) and keeps
+`import tap_provider` / `import actiongate_provider` working — but AI Hiring itself
+never declares them.
 
-## Follow-up migration (later, bounded, dependency-only PR)
+## Boundary is preserved
 
-After the canonical Ugence packages are created (in their own phases), a bounded,
-**dependency-only, compatibility-preserving** follow-up PR will migrate:
+- AI Hiring core still depends only on neutral protocols (AST-verified).
+- Importing `ugence_ai_hiring` (or the integration adapters) never eagerly loads a
+  provider; core-only installation is fully functional.
+- Missing optional providers fail explicitly and safely (`ProviderUnavailable`).
+- `production_certified` remains `False`; TAP and ActionGate semantics, the
+  advisory-AI / human-binding-decision boundary, and the
+  authorization-vs-execution boundary are unchanged.
 
-```
-dgm-tap-provider        -> ugence-tap-provider
-tap_provider            -> ugence_tap_provider
-dgm-actiongate-provider -> ugence-actiongate-provider
-actiongate_provider     -> ugence_actiongate_provider
-```
-
-Because the core depends only on neutral protocols and the concrete providers are
-confined to the isolated `integrations/` adapters (and the `tap` / `actiongate`
-extras), that migration is a dependency/import swap inside those adapters and the
-extras — **no product redesign, no new hiring logic, and no change to the
-advisory-AI / human-binding-decision or authorization-vs-execution boundaries.**
-This PR does **not** rename or redesign TAP or ActionGate and does **not** create
-their canonical packages.
+This normalization is a **dependency/import swap** inside the isolated adapters and
+the optional extras — **no product redesign, no new hiring logic, no TAP rewrite,
+no ActionGate rewrite, and no change to any governance semantic or control-plane
+boundary.** It does not modify TAP or ActionGate implementation logic and does not
+remove their compatibility distributions.
