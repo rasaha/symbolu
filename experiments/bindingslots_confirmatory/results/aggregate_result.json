@@ -1,0 +1,117 @@
+{
+  "schema": "bindingslots_confirmatory/aggregate_result/v1",
+  "candidate": "CR1",
+  "fresh_seeds": [
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "needle_d96": {
+    "13": {
+      "CR1": 0.0,
+      "A+": 0.0,
+      "B0": 0.0
+    },
+    "14": {
+      "CR1": 0.0,
+      "A+": 0.0,
+      "B0": 0.0
+    },
+    "15": {
+      "CR1": 1.0,
+      "A+": 0.0,
+      "B0": 0.0
+    },
+    "16": {
+      "CR1": 1.0,
+      "A+": 0.008333333333333333,
+      "B0": 0.0
+    },
+    "17": {
+      "CR1": 1.0,
+      "A+": 0.0,
+      "B0": 0.0
+    }
+  },
+  "forming": {
+    "13": false,
+    "14": false,
+    "15": true,
+    "16": true,
+    "17": true
+  },
+  "cr1_formation_count": 3,
+  "b0_formation_count": 0,
+  "aplus_formation_count": 0,
+  "S_minus_Aplus_d96": {
+    "13": 0.0,
+    "14": 0.0,
+    "15": 1.0,
+    "16": 0.9917,
+    "17": 1.0
+  },
+  "mean_margin": 0.5983,
+  "median_margin": 0.9917,
+  "win_count": 3,
+  "causal_by_forming_seed": {
+    "15": {
+      "combined": true,
+      "slots_off": true,
+      "randomized_address": true
+    },
+    "16": {
+      "combined": false,
+      "slots_off": true,
+      "randomized_address": false
+    },
+    "17": {
+      "combined": true,
+      "slots_off": true,
+      "randomized_address": true
+    }
+  },
+  "quality": {
+    "ppl_mean_cand256": 135.55,
+    "ppl_mean_Aplus256": 142.1,
+    "n_exceed_25pct": 0,
+    "pass": true
+  },
+  "distance": {
+    "d16_ok": true,
+    "d220_forming_positive": 3,
+    "d220_ok": true
+  },
+  "retention_by_seed": {
+    "13": "FORMED_THEN_COLLAPSED",
+    "14": "FORMED_THEN_COLLAPSED",
+    "15": "FORMED_AND_RETAINED",
+    "16": "FORMED_AND_RETAINED",
+    "17": "FORMED_AND_RETAINED"
+  },
+  "gates": {
+    "C1_form_ge4": false,
+    "C2_form_gt_B0": true,
+    "C3_win_ge4": false,
+    "C4_mean_margin": true,
+    "C5_median_margin": true,
+    "C6_quality": true,
+    "C7_distance": true,
+    "C8_slots_off": true,
+    "C9_randomized_address": false,
+    "C10_integrity_param": true,
+    "C11_no_deviation": true
+  },
+  "all_gates_pass": false,
+  "scientific_gates_pass": false,
+  "primary_verdict": "CONFIRMATORY_REPLICATION_FAILED",
+  "slot_formation_status": "SLOT_FORMATION_NOT_REPLICATED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "protocol_deviations": [],
+  "notes": [
+    "3/5 is NOT 'nearly replicated'.",
+    "One causally-unclean forming seed fails the whole replication; causal results never averaged.",
+    "No best-checkpoint selection; classifier uses only the step-1200 evaluation."
+  ]
+}

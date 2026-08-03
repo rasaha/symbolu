@@ -1,0 +1,1198 @@
+{
+  "arm": "CR1",
+  "seed": 15,
+  "params": 2000104,
+  "ff": 1177,
+  "needle_by_dist": {
+    "16": 1.0,
+    "96": 1.0,
+    "220": 1.0
+  },
+  "ppl": {
+    "256": 136.16110657983455,
+    "512": 140.15228318411874
+  },
+  "binding_by_k": {
+    "2": 0.45,
+    "4": 0.19166666666666668,
+    "8": 0.10833333333333334
+  },
+  "supersession": {
+    "current_acc": 0.18333333333333332,
+    "stale_error": 0.15833333333333333
+  },
+  "source": 0.03333333333333333,
+  "multihop": 0.26666666666666666,
+  "warmups_by_group": [
+    60
+  ],
+  "grouped_optimizer": false,
+  "param_group_audit": {
+    "slot_group_params": 36,
+    "nonslot_group_params": 52,
+    "slot_group_numel": 206340,
+    "nonslot_group_numel": 1793764,
+    "total_numel": 2000104,
+    "numel_reconciles": true,
+    "no_duplicates": true,
+    "no_omissions": true,
+    "slot_param_names": [
+      "blocks.0.mix.slots.slot_keys",
+      "blocks.0.mix.slots.W_wk.weight",
+      "blocks.0.mix.slots.W_rq.weight",
+      "blocks.0.mix.slots.W_wv.weight",
+      "blocks.0.mix.slots.gate.weight",
+      "blocks.0.mix.slots.gate.bias",
+      "blocks.0.mix.slots.W_o.weight",
+      "blocks.0.mix.slots.norm.weight",
+      "blocks.0.mix.slots.norm.bias",
+      "blocks.1.mix.slots.slot_keys",
+      "blocks.1.mix.slots.W_wk.weight",
+      "blocks.1.mix.slots.W_rq.weight",
+      "blocks.1.mix.slots.W_wv.weight",
+      "blocks.1.mix.slots.gate.weight",
+      "blocks.1.mix.slots.gate.bias",
+      "blocks.1.mix.slots.W_o.weight",
+      "blocks.1.mix.slots.norm.weight",
+      "blocks.1.mix.slots.norm.bias",
+      "blocks.2.mix.slots.slot_keys",
+      "blocks.2.mix.slots.W_wk.weight",
+      "blocks.2.mix.slots.W_rq.weight",
+      "blocks.2.mix.slots.W_wv.weight",
+      "blocks.2.mix.slots.gate.weight",
+      "blocks.2.mix.slots.gate.bias",
+      "blocks.2.mix.slots.W_o.weight",
+      "blocks.2.mix.slots.norm.weight",
+      "blocks.2.mix.slots.norm.bias",
+      "blocks.3.mix.slots.slot_keys",
+      "blocks.3.mix.slots.W_wk.weight",
+      "blocks.3.mix.slots.W_rq.weight",
+      "blocks.3.mix.slots.W_wv.weight",
+      "blocks.3.mix.slots.gate.weight",
+      "blocks.3.mix.slots.gate.bias",
+      "blocks.3.mix.slots.W_o.weight",
+      "blocks.3.mix.slots.norm.weight",
+      "blocks.3.mix.slots.norm.bias"
+    ],
+    "nonslot_param_count": 52
+  },
+  "init_audit": null,
+  "trajectory": [
+    {
+      "step": 0,
+      "routing": {
+        "write_read_overlap": 0.03125268034636974,
+        "read_prob_on_highest_write_slot": 0.0315194483846426,
+        "rank_of_highest_write_slot_under_read": 12.7578125,
+        "top1_slot_agreement": 0.01953125,
+        "topk_slot_agreement": 0.1653645895421505,
+        "write_entropy": 3.465342164039612,
+        "read_entropy": 3.465379536151886,
+        "address_logit_margin": 0.011885155574418604,
+        "write_gate_at_fact": 0.5071845352649689,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.03125152364373207,
+            "read_prob_on_highest_write_slot": 0.031565722078084946,
+            "rank_of_highest_write_slot_under_read": 11.46875,
+            "top1_slot_agreement": 0.0,
+            "topk_slot_agreement": 0.2447916716337204,
+            "write_entropy": 3.465341091156006,
+            "read_entropy": 3.4654123783111572,
+            "address_logit_margin": 0.011384863406419754,
+            "write_gate_at_fact": 0.5101264119148254
+          },
+          {
+            "write_read_overlap": 0.0312504917383194,
+            "read_prob_on_highest_write_slot": 0.030650857836008072,
+            "rank_of_highest_write_slot_under_read": 21.78125,
+            "top1_slot_agreement": 0.0,
+            "topk_slot_agreement": 0.0729166716337204,
+            "write_entropy": 3.4653849601745605,
+            "read_entropy": 3.46549654006958,
+            "address_logit_margin": 0.0030522672459483147,
+            "write_gate_at_fact": 0.5161036252975464
+          },
+          {
+            "write_read_overlap": 0.03125527501106262,
+            "read_prob_on_highest_write_slot": 0.03193298727273941,
+            "rank_of_highest_write_slot_under_read": 9.71875,
+            "top1_slot_agreement": 0.078125,
+            "topk_slot_agreement": 0.1302083432674408,
+            "write_entropy": 3.4653477668762207,
+            "read_entropy": 3.465278387069702,
+            "address_logit_margin": 0.005480907391756773,
+            "write_gate_at_fact": 0.5021641850471497
+          },
+          {
+            "write_read_overlap": 0.03125343099236488,
+            "read_prob_on_highest_write_slot": 0.031928226351737976,
+            "rank_of_highest_write_slot_under_read": 8.0625,
+            "top1_slot_agreement": 0.0,
+            "topk_slot_agreement": 0.2135416716337204,
+            "write_entropy": 3.46529483795166,
+            "read_entropy": 3.4653308391571045,
+            "address_logit_margin": 0.027622584253549576,
+            "write_gate_at_fact": 0.500343918800354
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.03124849544838071,
+        "read_prob_on_highest_write_slot": 0.031142739113420248,
+        "rank_of_highest_write_slot_under_read": 16.7734375,
+        "top1_slot_agreement": 0.01953125,
+        "topk_slot_agreement": 0.07161458674818277,
+        "write_entropy": 3.4653812050819397,
+        "read_entropy": 3.4653789401054382,
+        "address_logit_margin": 0.011998881353065372,
+        "write_gate_at_fact": 0.5144444853067398,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.03124679997563362,
+            "read_prob_on_highest_write_slot": 0.03095233626663685,
+            "rank_of_highest_write_slot_under_read": 18.96875,
+            "top1_slot_agreement": 0.0,
+            "topk_slot_agreement": 0.0572916679084301,
+            "write_entropy": 3.465353488922119,
+            "read_entropy": 3.4654123783111572,
+            "address_logit_margin": 0.011384863406419754,
+            "write_gate_at_fact": 0.49882209300994873
+          },
+          {
+            "write_read_overlap": 0.0312512144446373,
+            "read_prob_on_highest_write_slot": 0.03139336407184601,
+            "rank_of_highest_write_slot_under_read": 14.46875,
+            "top1_slot_agreement": 0.0,
+            "topk_slot_agreement": 0.0781250074505806,
+            "write_entropy": 3.46543550491333,
+            "read_entropy": 3.46549916267395,
+            "address_logit_margin": 0.003140359651297331,
+            "write_gate_at_fact": 0.5439553260803223
+          },
+          {
+            "write_read_overlap": 0.03124566189944744,
+            "read_prob_on_highest_write_slot": 0.031061626970767975,
+            "rank_of_highest_write_slot_under_read": 16.859375,
+            "top1_slot_agreement": 0.03125,
+            "topk_slot_agreement": 0.0520833358168602,
+            "write_entropy": 3.4653427600860596,
+            "read_entropy": 3.4652721881866455,
+            "address_logit_margin": 0.00462598679587245,
+            "write_gate_at_fact": 0.5031763315200806
+          },
+          {
+            "write_read_overlap": 0.031250305473804474,
+            "read_prob_on_highest_write_slot": 0.03116362914443016,
+            "rank_of_highest_write_slot_under_read": 16.796875,
+            "top1_slot_agreement": 0.046875,
+            "topk_slot_agreement": 0.0989583358168602,
+            "write_entropy": 3.46539306640625,
+            "read_entropy": 3.46533203125,
+            "address_logit_margin": 0.02884431555867195,
+            "write_gate_at_fact": 0.5118241906166077
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 1.2143424777589353e-05,
+        "grad_norm_read_proj": 5.068396564094204e-05,
+        "grad_norm_write_proj": 6.086553032318095e-05,
+        "grad_norm_write_value": 0.8112624733841138,
+        "grad_norm_gate": 0.0830657687949194,
+        "probe_loss": 7.164762020111084
+      },
+      "needle_d96": 0.0
+    },
+    {
+      "step": 60,
+      "routing": {
+        "write_read_overlap": 0.9667051881551743,
+        "read_prob_on_highest_write_slot": 0.9901779294013977,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 1.0,
+        "write_entropy": 0.15085540059953928,
+        "read_entropy": 0.06911109713837504,
+        "address_logit_margin": 5.843361258506775,
+        "write_gate_at_fact": 0.5657286792993546,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.924881637096405,
+            "read_prob_on_highest_write_slot": 0.9776110053062439,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.32477614283561707,
+            "read_entropy": 0.15052640438079834,
+            "address_logit_margin": 4.92005729675293,
+            "write_gate_at_fact": 0.5550339818000793
+          },
+          {
+            "write_read_overlap": 0.9586398601531982,
+            "read_prob_on_highest_write_slot": 0.9891780018806458,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.19182559847831726,
+            "read_entropy": 0.07471604645252228,
+            "address_logit_margin": 4.987379550933838,
+            "write_gate_at_fact": 0.4869616627693176
+          },
+          {
+            "write_read_overlap": 0.9944893717765808,
+            "read_prob_on_highest_write_slot": 0.9982695579528809,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.034680601209402084,
+            "read_entropy": 0.01702054776251316,
+            "address_logit_margin": 7.6239848136901855,
+            "write_gate_at_fact": 0.7104413509368896
+          },
+          {
+            "write_read_overlap": 0.9888098835945129,
+            "read_prob_on_highest_write_slot": 0.9956531524658203,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.05213925987482071,
+            "read_entropy": 0.0341813899576664,
+            "address_logit_margin": 5.8420233726501465,
+            "write_gate_at_fact": 0.5104777216911316
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.9440953731536865,
+        "read_prob_on_highest_write_slot": 0.9721549600362778,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 1.0,
+        "write_entropy": 0.17836160119622946,
+        "read_entropy": 0.1586724272929132,
+        "address_logit_margin": 5.50011932849884,
+        "write_gate_at_fact": 0.5664332583546638,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9037899971008301,
+            "read_prob_on_highest_write_slot": 0.9776110053062439,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.4353736937046051,
+            "read_entropy": 0.15052640438079834,
+            "address_logit_margin": 4.92005729675293,
+            "write_gate_at_fact": 0.5610060691833496
+          },
+          {
+            "write_read_overlap": 0.8901633024215698,
+            "read_prob_on_highest_write_slot": 0.9180333614349365,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.1918054223060608,
+            "read_entropy": 0.42532506585121155,
+            "address_logit_margin": 3.9050307273864746,
+            "write_gate_at_fact": 0.4837798774242401
+          },
+          {
+            "write_read_overlap": 0.9940391182899475,
+            "read_prob_on_highest_write_slot": 0.9977608919143677,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.03421604633331299,
+            "read_entropy": 0.02150421403348446,
+            "address_logit_margin": 7.4139580726623535,
+            "write_gate_at_fact": 0.7105332016944885
+          },
+          {
+            "write_read_overlap": 0.9883890748023987,
+            "read_prob_on_highest_write_slot": 0.995214581489563,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.05205124244093895,
+            "read_entropy": 0.03733402490615845,
+            "address_logit_margin": 5.7614312171936035,
+            "write_gate_at_fact": 0.5104138851165771
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.0009841745167973757,
+        "grad_norm_read_proj": 0.00011247008351915696,
+        "grad_norm_write_proj": 0.0009411436195683286,
+        "grad_norm_write_value": 0.05518255964788411,
+        "grad_norm_gate": 0.004734430386257705,
+        "probe_loss": 3.9550633430480957
+      },
+      "needle_d96": 0.025
+    },
+    {
+      "step": 120,
+      "routing": {
+        "write_read_overlap": 0.9887526780366898,
+        "read_prob_on_highest_write_slot": 0.9950407594442368,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 1.0,
+        "write_entropy": 0.056170965544879436,
+        "read_entropy": 0.043628321363939904,
+        "address_logit_margin": 7.946879506111145,
+        "write_gate_at_fact": 0.7268353849649429,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9970967769622803,
+            "read_prob_on_highest_write_slot": 0.9999337196350098,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.025917744264006615,
+            "read_entropy": 0.0008626593626104295,
+            "address_logit_margin": 10.996323585510254,
+            "write_gate_at_fact": 0.5026086568832397
+          },
+          {
+            "write_read_overlap": 0.9929001331329346,
+            "read_prob_on_highest_write_slot": 0.9949588775634766,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.020641079172492027,
+            "read_entropy": 0.044996656477451324,
+            "address_logit_margin": 7.222408771514893,
+            "write_gate_at_fact": 0.6923801302909851
+          },
+          {
+            "write_read_overlap": 0.9847976565361023,
+            "read_prob_on_highest_write_slot": 0.9936843514442444,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.08034686744213104,
+            "read_entropy": 0.057065244764089584,
+            "address_logit_margin": 7.3362226486206055,
+            "write_gate_at_fact": 0.8746270537376404
+          },
+          {
+            "write_read_overlap": 0.9802161455154419,
+            "read_prob_on_highest_write_slot": 0.9915860891342163,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.09777817130088806,
+            "read_entropy": 0.07158872485160828,
+            "address_logit_margin": 6.232563018798828,
+            "write_gate_at_fact": 0.8377256989479065
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.9190393090248108,
+        "read_prob_on_highest_write_slot": 0.9726245403289795,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 0.9947916716337204,
+        "write_entropy": 0.3118125097826123,
+        "read_entropy": 0.1957306492695352,
+        "address_logit_margin": 6.959373950958252,
+        "write_gate_at_fact": 0.7199810743331909,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.8138831853866577,
+            "read_prob_on_highest_write_slot": 0.9999337196350098,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.9941263198852539,
+            "read_entropy": 0.0008626593626104295,
+            "address_logit_margin": 10.996323585510254,
+            "write_gate_at_fact": 0.5733408331871033
+          },
+          {
+            "write_read_overlap": 0.9625757932662964,
+            "read_prob_on_highest_write_slot": 0.9665083885192871,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.037682030349969864,
+            "read_entropy": 0.23995807766914368,
+            "address_logit_margin": 5.682866096496582,
+            "write_gate_at_fact": 0.6707074046134949
+          },
+          {
+            "write_read_overlap": 0.9497324228286743,
+            "read_prob_on_highest_write_slot": 0.9594311714172363,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.08978527784347534,
+            "read_entropy": 0.2892075777053833,
+            "address_logit_margin": 5.8849897384643555,
+            "write_gate_at_fact": 0.8354015946388245
+          },
+          {
+            "write_read_overlap": 0.9499658346176147,
+            "read_prob_on_highest_write_slot": 0.9646248817443848,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.9791666865348816,
+            "write_entropy": 0.12565641105175018,
+            "read_entropy": 0.2528942823410034,
+            "address_logit_margin": 5.273316383361816,
+            "write_gate_at_fact": 0.8004744648933411
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.0010373546730263882,
+        "grad_norm_read_proj": 0.00036620695627595333,
+        "grad_norm_write_proj": 0.00022526769816734823,
+        "grad_norm_write_value": 2.105164405784367,
+        "grad_norm_gate": 0.0053164830852813144,
+        "probe_loss": 2.123656749725342
+      },
+      "needle_d96": 0.5916666666666667
+    },
+    {
+      "step": 300,
+      "routing": {
+        "write_read_overlap": 0.9999273419380188,
+        "read_prob_on_highest_write_slot": 0.9999816119670868,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 1.0,
+        "write_entropy": 0.0007271405956998933,
+        "read_entropy": 0.000256370542501827,
+        "address_logit_margin": 12.966813802719116,
+        "write_gate_at_fact": 0.7433299869298935,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9999824166297913,
+            "read_prob_on_highest_write_slot": 0.999999463558197,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.00023700958990957588,
+            "read_entropy": 1.2382037311908789e-05,
+            "address_logit_margin": 15.309479713439941,
+            "write_gate_at_fact": 0.5078647136688232
+          },
+          {
+            "write_read_overlap": 0.9998831748962402,
+            "read_prob_on_highest_write_slot": 0.9999901652336121,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.0013818410225212574,
+            "read_entropy": 0.00014701731561217457,
+            "address_logit_margin": 12.770235061645508,
+            "write_gate_at_fact": 0.7445054054260254
+          },
+          {
+            "write_read_overlap": 0.9999127984046936,
+            "read_prob_on_highest_write_slot": 0.999975860118866,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.0008737720781937242,
+            "read_entropy": 0.0003457661659922451,
+            "address_logit_margin": 12.50477409362793,
+            "write_gate_at_fact": 0.8918154239654541
+          },
+          {
+            "write_read_overlap": 0.9999309778213501,
+            "read_prob_on_highest_write_slot": 0.9999609589576721,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.0004159396921750158,
+            "read_entropy": 0.0005203166510909796,
+            "address_logit_margin": 11.282766342163086,
+            "write_gate_at_fact": 0.8291344046592712
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.9993624985218048,
+        "read_prob_on_highest_write_slot": 0.9997231066226959,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 0.9947916716337204,
+        "write_entropy": 0.0038770889514125884,
+        "read_entropy": 0.0032039067268669896,
+        "address_logit_margin": 11.171027421951294,
+        "write_gate_at_fact": 0.7388866394758224,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9987860918045044,
+            "read_prob_on_highest_write_slot": 0.999999463558197,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.012471347115933895,
+            "read_entropy": 1.2382037311908789e-05,
+            "address_logit_margin": 15.309479713439941,
+            "write_gate_at_fact": 0.5617935657501221
+          },
+          {
+            "write_read_overlap": 0.9996085166931152,
+            "read_prob_on_highest_write_slot": 0.9997167587280273,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.0013963975943624973,
+            "read_entropy": 0.003348178695887327,
+            "address_logit_margin": 9.984528541564941,
+            "write_gate_at_fact": 0.7236011028289795
+          },
+          {
+            "write_read_overlap": 0.9995193481445312,
+            "read_prob_on_highest_write_slot": 0.9995914697647095,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.000987650128081441,
+            "read_entropy": 0.004760263953357935,
+            "address_logit_margin": 10.126663208007812,
+            "write_gate_at_fact": 0.8677247762680054
+          },
+          {
+            "write_read_overlap": 0.9995360374450684,
+            "read_prob_on_highest_write_slot": 0.9995847344398499,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.9791666865348816,
+            "write_entropy": 0.0006529609672725201,
+            "read_entropy": 0.004694802220910788,
+            "address_logit_margin": 9.26343822479248,
+            "write_gate_at_fact": 0.8024271130561829
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.0001775329455859755,
+        "grad_norm_read_proj": 0.00013476950690651126,
+        "grad_norm_write_proj": 0.00017681839184116515,
+        "grad_norm_write_value": 1.7209259019927314,
+        "grad_norm_gate": 0.005786560235644258,
+        "probe_loss": 0.29144978523254395
+      },
+      "needle_d96": 0.975
+    },
+    {
+      "step": 600,
+      "routing": {
+        "write_read_overlap": 0.9973931610584259,
+        "read_prob_on_highest_write_slot": 0.9979346692562103,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 0.94921875,
+        "write_entropy": 0.005276609328575432,
+        "read_entropy": 0.020009971689672196,
+        "address_logit_margin": 14.104264259338379,
+        "write_gate_at_fact": 0.8446277678012848,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9992573261260986,
+            "read_prob_on_highest_write_slot": 1.0,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.006529794540256262,
+            "read_entropy": 9.573434709905793e-13,
+            "address_logit_margin": 31.27794075012207,
+            "write_gate_at_fact": 0.919713020324707
+          },
+          {
+            "write_read_overlap": 0.9972474575042725,
+            "read_prob_on_highest_write_slot": 0.9975141882896423,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.0027112418320029974,
+            "read_entropy": 0.024287885054945946,
+            "address_logit_margin": 8.555513381958008,
+            "write_gate_at_fact": 0.7403703331947327
+          },
+          {
+            "write_read_overlap": 0.9960773587226868,
+            "read_prob_on_highest_write_slot": 0.9969685077667236,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.008945828303694725,
+            "read_entropy": 0.02946624904870987,
+            "address_logit_margin": 8.563776016235352,
+            "write_gate_at_fact": 0.8106206655502319
+          },
+          {
+            "write_read_overlap": 0.9969905018806458,
+            "read_prob_on_highest_write_slot": 0.9972559809684753,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.796875,
+            "write_entropy": 0.002919572638347745,
+            "read_entropy": 0.026285752654075623,
+            "address_logit_margin": 8.019826889038086,
+            "write_gate_at_fact": 0.9078070521354675
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.9949983060359955,
+        "read_prob_on_highest_write_slot": 0.9974085837602615,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 0.9869791716337204,
+        "write_entropy": 0.022426559320592787,
+        "read_entropy": 0.02453045547032448,
+        "address_logit_margin": 13.956611037254333,
+        "write_gate_at_fact": 0.8021404594182968,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9999908804893494,
+            "read_prob_on_highest_write_slot": 1.0,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.00011425823322497308,
+            "read_entropy": 9.573434709905793e-13,
+            "address_logit_margin": 31.27794075012207,
+            "write_gate_at_fact": 0.9378809332847595
+          },
+          {
+            "write_read_overlap": 0.9910876154899597,
+            "read_prob_on_highest_write_slot": 0.9968010187149048,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.04990144819021225,
+            "read_entropy": 0.030326124280691147,
+            "address_logit_margin": 8.390706062316895,
+            "write_gate_at_fact": 0.7073209881782532
+          },
+          {
+            "write_read_overlap": 0.9934574961662292,
+            "read_prob_on_highest_write_slot": 0.9961852431297302,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 0.027271810919046402,
+            "read_entropy": 0.036065373569726944,
+            "address_logit_margin": 8.382794380187988,
+            "write_gate_at_fact": 0.686698317527771
+          },
+          {
+            "write_read_overlap": 0.9954572319984436,
+            "read_prob_on_highest_write_slot": 0.9966480731964111,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.9479166865348816,
+            "write_entropy": 0.012418719939887524,
+            "read_entropy": 0.031730324029922485,
+            "address_logit_margin": 7.775002956390381,
+            "write_gate_at_fact": 0.8766615986824036
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.0004028507040752165,
+        "grad_norm_read_proj": 0.00027694169896474915,
+        "grad_norm_write_proj": 0.0007090255453640071,
+        "grad_norm_write_value": 0.027847114552118423,
+        "grad_norm_gate": 0.006059587536435449,
+        "probe_loss": 0.014559934847056866
+      },
+      "needle_d96": 0.9916666666666667
+    },
+    {
+      "step": 900,
+      "routing": {
+        "write_read_overlap": 0.7818386405706406,
+        "read_prob_on_highest_write_slot": 0.9285392761230469,
+        "rank_of_highest_write_slot_under_read": 0.98046875,
+        "top1_slot_agreement": 0.9453125,
+        "topk_slot_agreement": 0.794270858168602,
+        "write_entropy": 0.8269033078104258,
+        "read_entropy": 0.11260763835367846,
+        "address_logit_margin": 13.184741139411926,
+        "write_gate_at_fact": 0.8906050622463226,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9843741655349731,
+            "read_prob_on_highest_write_slot": 0.984375,
+            "rank_of_highest_write_slot_under_read": 0.484375,
+            "top1_slot_agreement": 0.984375,
+            "topk_slot_agreement": 0.984375,
+            "write_entropy": 0.025068245828151703,
+            "read_entropy": 8.23688946910428e-12,
+            "address_logit_margin": 29.161510467529297,
+            "write_gate_at_fact": 0.9791644811630249
+          },
+          {
+            "write_read_overlap": 0.2452356219291687,
+            "read_prob_on_highest_write_slot": 0.78724205493927,
+            "rank_of_highest_write_slot_under_read": 3.4375,
+            "top1_slot_agreement": 0.796875,
+            "topk_slot_agreement": 0.7760416865348816,
+            "write_entropy": 2.936530113220215,
+            "read_entropy": 0.10040193796157837,
+            "address_logit_margin": 8.274194717407227,
+            "write_gate_at_fact": 0.8941105604171753
+          },
+          {
+            "write_read_overlap": 0.9699208736419678,
+            "read_prob_on_highest_write_slot": 0.9939744472503662,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.7135417461395264,
+            "write_entropy": 0.18042553961277008,
+            "read_entropy": 0.04918820783495903,
+            "address_logit_margin": 8.856640815734863,
+            "write_gate_at_fact": 0.8943134546279907
+          },
+          {
+            "write_read_overlap": 0.9278239011764526,
+            "read_prob_on_highest_write_slot": 0.9485656023025513,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.703125,
+            "write_entropy": 0.1655893325805664,
+            "read_entropy": 0.3008404076099396,
+            "address_logit_margin": 6.446618556976318,
+            "write_gate_at_fact": 0.7948317527770996
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.8375669196248055,
+        "read_prob_on_highest_write_slot": 0.9742809683084488,
+        "rank_of_highest_write_slot_under_read": 0.38671875,
+        "top1_slot_agreement": 0.984375,
+        "topk_slot_agreement": 0.837239608168602,
+        "write_entropy": 0.664662903174758,
+        "read_entropy": 0.06919388799202729,
+        "address_logit_margin": 13.95727789402008,
+        "write_gate_at_fact": 0.8758692592382431,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9843752980232239,
+            "read_prob_on_highest_write_slot": 0.984375,
+            "rank_of_highest_write_slot_under_read": 0.484375,
+            "top1_slot_agreement": 0.984375,
+            "topk_slot_agreement": 0.984375,
+            "write_entropy": 0.044051527976989746,
+            "read_entropy": 8.23688946910428e-12,
+            "address_logit_margin": 29.161510467529297,
+            "write_gate_at_fact": 0.9901540279388428
+          },
+          {
+            "write_read_overlap": 0.43156948685646057,
+            "read_prob_on_highest_write_slot": 0.9508402347564697,
+            "rank_of_highest_write_slot_under_read": 1.0625,
+            "top1_slot_agreement": 0.953125,
+            "topk_slot_agreement": 0.9114583730697632,
+            "write_entropy": 2.391453742980957,
+            "read_entropy": 0.033683814108371735,
+            "address_logit_margin": 9.77303695678711,
+            "write_gate_at_fact": 0.8887487053871155
+          },
+          {
+            "write_read_overlap": 0.9823329448699951,
+            "read_prob_on_highest_write_slot": 0.9975922107696533,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.7552083730697632,
+            "write_entropy": 0.12130077928304672,
+            "read_entropy": 0.021886071190238,
+            "address_logit_margin": 9.788728713989258,
+            "write_gate_at_fact": 0.8502113819122314
+          },
+          {
+            "write_read_overlap": 0.9519899487495422,
+            "read_prob_on_highest_write_slot": 0.9643164277076721,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.6979166865348816,
+            "write_entropy": 0.10184556245803833,
+            "read_entropy": 0.2212056666612625,
+            "address_logit_margin": 7.105835437774658,
+            "write_gate_at_fact": 0.7743629217147827
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.000872516178587263,
+        "grad_norm_read_proj": 0.00022014157301741532,
+        "grad_norm_write_proj": 0.0012395918594661764,
+        "grad_norm_write_value": 0.023849191580075528,
+        "grad_norm_gate": 0.01137605979370625,
+        "probe_loss": 0.02944694273173809
+      },
+      "needle_d96": 0.9833333333333333
+    },
+    {
+      "step": 1200,
+      "routing": {
+        "write_read_overlap": 0.843612551689148,
+        "read_prob_on_highest_write_slot": 0.9523581713438034,
+        "rank_of_highest_write_slot_under_read": 0.6328125,
+        "top1_slot_agreement": 0.97265625,
+        "topk_slot_agreement": 0.8385417014360428,
+        "write_entropy": 0.6003310614084683,
+        "read_entropy": 0.1259752066145099,
+        "address_logit_margin": 10.946587085723877,
+        "write_gate_at_fact": 0.8715856075286865,
+        "distance": 96,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 0.9999999403953552,
+            "read_prob_on_highest_write_slot": 1.0,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 1.0761640396594885e-06,
+            "read_entropy": 3.773361711978396e-08,
+            "address_logit_margin": 20.714570999145508,
+            "write_gate_at_fact": 0.993256688117981
+          },
+          {
+            "write_read_overlap": 0.5416663885116577,
+            "read_prob_on_highest_write_slot": 0.87906813621521,
+            "rank_of_highest_write_slot_under_read": 2.0625,
+            "top1_slot_agreement": 0.90625,
+            "topk_slot_agreement": 0.8177083730697632,
+            "write_entropy": 1.8106764554977417,
+            "read_entropy": 0.18362870812416077,
+            "address_logit_margin": 7.344047546386719,
+            "write_gate_at_fact": 0.8229568004608154
+          },
+          {
+            "write_read_overlap": 0.9494146108627319,
+            "read_prob_on_highest_write_slot": 0.9954021573066711,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.7760417461395264,
+            "write_entropy": 0.2461806833744049,
+            "read_entropy": 0.039414457976818085,
+            "address_logit_margin": 9.02766227722168,
+            "write_gate_at_fact": 0.8005427122116089
+          },
+          {
+            "write_read_overlap": 0.8833692669868469,
+            "read_prob_on_highest_write_slot": 0.9349623918533325,
+            "rank_of_highest_write_slot_under_read": 0.46875,
+            "top1_slot_agreement": 0.984375,
+            "topk_slot_agreement": 0.7604166865348816,
+            "write_entropy": 0.34446603059768677,
+            "read_entropy": 0.2808576226234436,
+            "address_logit_margin": 6.700067520141602,
+            "write_gate_at_fact": 0.8695862293243408
+          }
+        ]
+      },
+      "routing_d16": {
+        "write_read_overlap": 0.9408200979232788,
+        "read_prob_on_highest_write_slot": 0.997224822640419,
+        "rank_of_highest_write_slot_under_read": 0.0,
+        "top1_slot_agreement": 1.0,
+        "topk_slot_agreement": 0.8984375447034836,
+        "write_entropy": 0.27993442542430186,
+        "read_entropy": 0.023954215812534763,
+        "address_logit_margin": 11.850208044052124,
+        "write_gate_at_fact": 0.89731764793396,
+        "distance": 16,
+        "n_pairs": 64,
+        "per_layer": [
+          {
+            "write_read_overlap": 1.0,
+            "read_prob_on_highest_write_slot": 1.0,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 1.0,
+            "write_entropy": 2.0668609879148647e-10,
+            "read_entropy": 3.773361711978396e-08,
+            "address_logit_margin": 20.714570999145508,
+            "write_gate_at_fact": 0.9988550543785095
+          },
+          {
+            "write_read_overlap": 0.7758818864822388,
+            "read_prob_on_highest_write_slot": 0.9954838156700134,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.9895833730697632,
+            "write_entropy": 1.062949299812317,
+            "read_entropy": 0.03929918259382248,
+            "address_logit_margin": 8.647388458251953,
+            "write_gate_at_fact": 0.8392131924629211
+          },
+          {
+            "write_read_overlap": 0.9971249103546143,
+            "read_prob_on_highest_write_slot": 0.9994008541107178,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.802083432674408,
+            "write_entropy": 0.022362062707543373,
+            "read_entropy": 0.006557387299835682,
+            "address_logit_margin": 10.268081665039062,
+            "write_gate_at_fact": 0.8529426455497742
+          },
+          {
+            "write_read_overlap": 0.9902735948562622,
+            "read_prob_on_highest_write_slot": 0.9940146207809448,
+            "rank_of_highest_write_slot_under_read": 0.0,
+            "top1_slot_agreement": 1.0,
+            "topk_slot_agreement": 0.8020833730697632,
+            "write_entropy": 0.03442633897066116,
+            "read_entropy": 0.04996025562286377,
+            "address_logit_margin": 7.770791053771973,
+            "write_gate_at_fact": 0.898259699344635
+          }
+        ]
+      },
+      "grad_norms": {
+        "grad_norm_slot_keys": 0.00027385129513164816,
+        "grad_norm_read_proj": 0.00013365764850028754,
+        "grad_norm_write_proj": 0.00025231031289323845,
+        "grad_norm_write_value": 0.008589752346966397,
+        "grad_norm_gate": 0.0016873551870505029,
+        "probe_loss": 0.010386067442595959
+      },
+      "needle_d96": 1.0
+    }
+  ],
+  "loss_log": [
+    {
+      "step": 0,
+      "main_loss": 7.158753871917725,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 3.465665578842163,
+        "overlap": 0.031251199543476105
+      },
+      "lr": [
+        3.3333333333333335e-05
+      ]
+    },
+    {
+      "step": 60,
+      "main_loss": 3.887565851211548,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 0.03990644961595535,
+        "overlap": 0.960878312587738
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 100,
+      "main_loss": 2.490781545639038,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 0.12347852438688278,
+        "overlap": 0.8838396072387695
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 120,
+      "main_loss": 1.280746340751648,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 0.058805473148822784,
+        "overlap": 0.9428891539573669
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 200,
+      "main_loss": 0.011677408590912819,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 0.0015055539552122355,
+        "overlap": 0.998494565486908
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 300,
+      "main_loss": 0.004177864175289869,
+      "aux": {
+        "lambda": 0.1,
+        "L_align": 0.00023057735234033316,
+        "overlap": 0.9997684359550476
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 400,
+      "main_loss": 3.640770196914673,
+      "aux": {
+        "lambda": 0.06666666666666668,
+        "L_align": 0.00041046220576390624,
+        "overlap": 0.9995886087417603
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 500,
+      "main_loss": 2.220367431640625,
+      "aux": {
+        "lambda": 0.03333333333333334,
+        "L_align": 0.0006132217822596431,
+        "overlap": 0.9993859529495239
+      },
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 600,
+      "main_loss": 2.6767663955688477,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 700,
+      "main_loss": 11.357295989990234,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 800,
+      "main_loss": 4.176421165466309,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 900,
+      "main_loss": 5.019402980804443,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 1000,
+      "main_loss": 2.933354139328003,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 1100,
+      "main_loss": 0.030403632670640945,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    }
+  ],
+  "train_s": 856.3,
+  "ablation": {
+    "baseline": 1.0,
+    "slots_off": 0.0,
+    "randomized_address": 0.0,
+    "shuffle_values": 0.0,
+    "write_gate_zero": 0.0,
+    "slot_keys_randomized": 0.975,
+    "slot_diagnostics": [
+      {
+        "slot_write_gate_mean": 0.009830072522163391,
+        "slot_util_entropy": 2.1338601112365723,
+        "slot_util_max": 0.406785249710083,
+        "read_addr_max_mean": 0.11392202228307724,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.6645179986953735,
+        "slot_util_entropy": 3.4477181434631348,
+        "slot_util_max": 0.04666218161582947,
+        "read_addr_max_mean": 0.052789051085710526,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.6802427768707275,
+        "slot_util_entropy": 3.4350662231445312,
+        "slot_util_max": 0.05470424145460129,
+        "read_addr_max_mean": 0.044493041932582855,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.6890823841094971,
+        "slot_util_entropy": 3.460414409637451,
+        "slot_util_max": 0.038796328008174896,
+        "read_addr_max_mean": 0.04074476659297943,
+        "num_slots": 32
+      }
+    ]
+  },
+  "schema": "bindingslots_confirmatory/seed_result/v1",
+  "config_hash": "ce4d93ea311da931c30a845b4437b45b5cb1d287c2e8bd1a03ce7d8054957f70",
+  "code_commit": "1886363bdabf76fafb926263f7ed76d75e7dbff2",
+  "environment_fingerprint": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "torch": "2.2.2+cu121",
+    "cuda_available": false,
+    "num_threads": 4,
+    "fp": "fp32"
+  },
+  "checkpoint_steps": [
+    0,
+    60,
+    120,
+    300,
+    600,
+    900,
+    1200
+  ]
+}

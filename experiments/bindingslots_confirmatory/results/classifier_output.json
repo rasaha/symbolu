@@ -1,0 +1,28 @@
+{
+  "primary_verdict": "CONFIRMATORY_REPLICATION_FAILED",
+  "slot_formation_status": "SLOT_FORMATION_NOT_REPLICATED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "gates": {
+    "C1_form_ge4": false,
+    "C2_form_gt_B0": true,
+    "C3_win_ge4": false,
+    "C4_mean_margin": true,
+    "C5_median_margin": true,
+    "C6_quality": true,
+    "C7_distance": true,
+    "C8_slots_off": true,
+    "C9_randomized_address": false,
+    "C10_integrity_param": true,
+    "C11_no_deviation": true
+  },
+  "all_gates_pass": false,
+  "cr1_formation_count": 3,
+  "b0_formation_count": 0,
+  "forming": {
+    "13": false,
+    "14": false,
+    "15": true,
+    "16": true,
+    "17": true
+  }
+}

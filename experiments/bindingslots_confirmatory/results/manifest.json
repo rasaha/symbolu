@@ -25,7 +25,7 @@
     "fp": "fp32"
   },
   "abc_json_sha256_before": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
-  "abc_json_sha256_after": null,
+  "abc_json_sha256_after": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
   "restart_events": [
     {
       "event": "orchestrator_start",
@@ -39,6 +39,14 @@
     "A+_seed16": "complete",
     "A+_seed17": "complete",
     "B0_seed13": "complete",
-    "B0_seed14": "complete"
+    "B0_seed14": "complete",
+    "B0_seed15": "complete",
+    "B0_seed16": "complete",
+    "B0_seed17": "complete",
+    "CR1_seed13": "complete",
+    "CR1_seed14": "complete",
+    "CR1_seed15": "complete",
+    "CR1_seed16": "complete",
+    "CR1_seed17": "complete"
   }
 }
