@@ -34,7 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1704067200"
-      PYTHONPATH: ".:packages/providers/actiongate/src:packages/providers/tap/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/capabilities/decision-authority/src"
+      # NB: PYTHONPATH is deliberately NOT set job-wide — the isolated-distribution
+      # verifier and the clean-install steps must not see the monorepo source path.
+      # Only the equivalence / API-snapshot steps that import via a bare interpreter
+      # set it, per-step.
+      SRC_PYTHONPATH: ".:packages/providers/actiongate/src:packages/providers/tap/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/capabilities/decision-authority/src"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -73,8 +77,12 @@ jobs:
           assert before == canon == legacy, "ActionGate behavioral regression"
           print("behavioral equivalence: OK", before)
           PY
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
 
       - name: API-snapshot comparison (.api surface byte-identical)
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
         run: |
           python - <<'PY'
           import json, hashlib

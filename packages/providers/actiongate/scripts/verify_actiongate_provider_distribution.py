@@ -24,6 +24,7 @@ Exit code 0 on success; non-zero on the first failed step.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,12 @@ import tempfile
 import venv
 import zipfile
 from pathlib import Path
+
+# The isolation proof must not leak the monorepo source path into the clean venv:
+# a repo-relative ``PYTHONPATH`` (e.g. set job-wide in CI) would make pip report the
+# package "already satisfied" and make imports resolve against the source tree instead
+# of the installed wheel. Scrub it for every subprocess so isolation is real.
+_CLEAN_ENV = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
 
 PKG = Path(__file__).resolve().parents[1]
 REPO = PKG.parents[2]  # packages/providers/actiongate -> packages/providers -> packages -> repo
@@ -120,6 +127,7 @@ print("legacy facade checks: OK")
 
 def _run(cmd, **kw):
     print("  $", " ".join(str(c) for c in cmd))
+    kw.setdefault("env", _CLEAN_ENV)
     return subprocess.run(cmd, check=True, **kw)
 
 
