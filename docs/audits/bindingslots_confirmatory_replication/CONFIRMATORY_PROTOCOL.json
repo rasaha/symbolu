@@ -1,0 +1,73 @@
+{
+  "schema": "bindingslots_confirmatory/preregistration/v1",
+  "title": "Phase-Free BindingSlots Confirmatory Replication of frozen CR1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED. Committed and pushed BEFORE any confirmatory model training. No hyperparameter, schedule, architecture, task, optimizer, threshold, classifier, gate, seed, or verdict-mapping change is permitted after training begins.",
+
+  "scientific_question": "Does the merged, frozen CR1 intervention (curriculum + temporary write-read alignment) reproducibly increase causally slot-dependent retrieval-circuit formation on five independent fresh seeds, without architecture changes, schedule changes, task changes, or post-hoc tuning?",
+
+  "prerequisites": {
+    "pr_1300": {"merged": true, "merge_commit": "5f0cbe45", "verdict": "PARTIALLY_STABLE -> NOT_READY_FOR_KDA_VALIDATION"},
+    "pr_1319": {"merged": true, "merge_commit": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb", "verdict": "PROVISIONALLY_STABILIZED -> NOT_READY_FOR_KDA_VALIDATION"},
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "starting_commit": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb"
+  },
+
+  "intervention": "CR1 = frozen curriculum (boundaries 300/700/1200; final 500 steps original ABC_MIX) + frozen temporary write-read alignment (lambda 0.10 -> 0 by step 600, label-free, no inference-time op). See frozen_cr1_config.json.",
+
+  "fresh_seeds": [13, 14, 15, 16, 17],
+  "seed_selection_rule": "next five consecutive integers after the highest previously-used BindingSlots training seed (12); outcome-independent. See fresh_seeds.json.",
+
+  "arms": {
+    "A+": "frozen window-only parameter/architecture control (reference for formation, margin, causal, and quality gates; part of the frozen Stage B matrix)",
+    "B0": "frozen unscaffolded S baseline (no intervention)",
+    "CR1": "frozen selected intervention"
+  },
+  "arms_note": "A+ is included because the frozen Stage B classifier defines formation, margins, causal collapse thresholds, and the quality gate relative to A+, and A+ is listed in the frozen stage_b matrix arms. Including it is required to apply the frozen classifier unchanged; it does not alter the primary decision rule.",
+
+  "training_protocol": {
+    "steps": 1200,
+    "checkpoints": [0, 60, 120, 300, 600, 900, 1200],
+    "no_best_checkpoint_selection": true,
+    "final_evaluation_point": 1200,
+    "resumable_idempotent": true,
+    "restart_preserves": ["seed", "initialization", "data order", "optimizer state", "model state", "scheduler state", "curriculum stage", "alignment coefficient", "step number", "RNG states", "configuration hash"]
+  },
+
+  "primary_confirmatory_criterion": "REPLICATED_SLOT_FORMATION_STABILIZATION iff: CR1 forms on >= 4/5 fresh seeds AND CR1 formation > B0 formation AND CR1 wins on >= 4/5 paired seeds vs A+ AND mean(CR1-A+ d96) >= 0.080 AND median >= 0.050 AND every forming seed collapses under slots_off AND every forming seed collapses under randomized_address AND quality gate passes AND distance gate passes AND integrity passes AND no protocol deviation.",
+
+  "gates": "see classifier.json (C1..C11) — thresholds inherited byte-identically from the merged Stage B classifier.",
+
+  "final_verdicts": [
+    "REPLICATED_SLOT_FORMATION_STABILIZATION",
+    "CONFIRMATORY_REPLICATION_FAILED",
+    "CONFIRMATORY_PROTOCOL_VIOLATED",
+    "CONFIRMATORY_INTEGRITY_FAILED",
+    "CONFIRMATORY_ENVIRONMENT_MISMATCH",
+    "CONFIRMATORY_RESOURCE_BLOCKED"
+  ],
+  "readiness_states": ["ELIGIBLE_FOR_NEXT_VALIDATION_LADDER", "KDA_VALIDATION_BLOCKED"],
+  "verdict_discipline": [
+    "3/5 is NOT 'nearly replicated'.",
+    "PROVISIONALLY_STABILIZED is NOT a valid confirmatory verdict.",
+    "One causally-unclean forming seed fails the whole replication.",
+    "Causal-ablation results are never averaged across seeds.",
+    "READY_FOR_KDA_VALIDATION is never emitted directly from this experiment."
+  ],
+
+  "retention_diagnostics": {
+    "categories": ["NEVER_FORMED", "FORMED_AND_RETAINED", "FORMED_THEN_COLLAPSED", "LATE_FORMATION", "TRANSIENT_RECOVERY", "OTHER_PREDEFINED"],
+    "status": "explanatory diagnostics only; never override the formation classifier",
+    "note": "Prior seed 9 showed a post-scaffold retention failure; this phase observes retention but does not change CR1 to solve it."
+  },
+
+  "failure_rules": {
+    "invalid_run_policy": "any crash reruns the ENTIRE affected arm/seed; never rerun only poor seeds and never change config to rescue a run",
+    "seed_replacement": "only for a documented infrastructure-only failure that produced no valid result; replacement is the next unused integer chosen without inspecting model quality",
+    "no_outcome_based_exclusion": true
+  },
+
+  "no_tuning_declaration": "No schedule, architecture, optimizer, task, threshold, classifier, or gate change is permitted after training begins. No change is made to improve seed retention (no slower decay, residual alignment, alignment floor, retention loss, EMA, teacher, checkpoint selection, extended training, early stopping, restart-from-best, seed-specific schedules, curriculum extension, different optimizer/lr/init, orthogonal reinit, gradient surgery, slot/window dropout, or additional auxiliary loss). No Phase, KDA, MLA, quadratic attention, N x N state, or new inference-time op/param is introduced.",
+
+  "environment_note": "The merged Stage B run used a different torch build than this environment (this run: torch 2.2.2+cu121, CPU, fp32, threads=4). The frozen protocol pins the optimizer/lr/betas/schedule, NOT the torch build. Fresh seeds (13-17) are new, so exact numerical reproduction of seeds 8-12 is neither required nor expected; the test is whether the frozen intervention reproduces >=4/5 formation on new seeds. The torch-build delta is recorded as a documented environment factor, not a protocol change."
+}

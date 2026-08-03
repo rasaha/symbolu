@@ -1,0 +1,81 @@
+{
+  "schema": "bindingslots_confirmatory/live_state/v1",
+  "audit_date": "2026-08-03",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_branch_tip": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb",
+  "starting_commit": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb",
+  "working_branch": "claude/bindingslots-confirmatory-replication-d117c1",
+  "working_branch_base": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb",
+
+  "pr_1300": {
+    "merged": true,
+    "merge_commit": "5f0cbe45",
+    "merged_at": "2026-08-03T09:43:05Z",
+    "base": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "verdict": "PARTIALLY_STABLE -> NOT_READY_FOR_KDA_VALIDATION",
+    "result": "S circuit formed 3/5 on holdout seeds 3-7 (below >=4/5 bar)"
+  },
+  "pr_1319": {
+    "merged": true,
+    "merge_commit": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb",
+    "merged_at": "2026-08-03T19:39:36Z",
+    "base": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "verdict": "PROVISIONALLY_STABILIZED -> NOT_READY_FOR_KDA_VALIDATION",
+    "result": "CR1 forms 4/5 fresh holdout seeds 8-12 (B0 3/5, A+ 0/5); every forming seed causally slot-dependent; seed 9 post-scaffold retention failure"
+  },
+
+  "frozen_abc_json": {
+    "path": "experiments/phase_lc/results/abc.json",
+    "sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "matches_pinned_value": true
+  },
+
+  "architecture": {
+    "hidden_dimension": 128, "attention_heads": 4, "layers": 4, "local_window": 64,
+    "slots": 32, "slot_key_dimension": 64, "sequence_length": 160, "batch_size": 16,
+    "training_steps": 1200, "optimizer": "AdamW", "baseline_lr": 0.002, "weight_decay": 0.01,
+    "baseline_warmup": 60, "gradient_clip": 1.0, "dropout": 0.0, "dtype": "fp32",
+    "slot_arm_params": 2000104, "aplus_control_params": 2000392,
+    "architecture_signature_sha256": "6e8672bd3df43f81241f4fe965508055b2500cceba5c66b59b012e2ff4a7cff1",
+    "vocab_size": 1291
+  },
+
+  "cr1_config": {
+    "id": "CR1", "curriculum": true, "alignment": true, "orthogonal_keys": false,
+    "curriculum_boundaries": [300, 700, 1200], "final_500_steps_original": true,
+    "alignment_lambda_peak": 0.10, "alignment_zero_point": 600,
+    "slot_lr": 0.002, "slot_warmup": 60, "nonslot_lr": 0.002, "nonslot_warmup": 60
+  },
+
+  "seeds_used_history": {
+    "frozen_0_2": [0, 1, 2],
+    "five_seed_holdout_pr_1300": [3, 4, 5, 6, 7],
+    "stage_a_diagnostic_pr_1319": [3, 6, 7],
+    "stage_b_fresh_pr_1319": [8, 9, 10, 11, 12],
+    "highest_used": 12
+  },
+  "confirmatory_seeds": [13, 14, 15, 16, 17],
+
+  "verifiers_at_audit": {
+    "preregistration_integrity_pr_1319": "26 checks, 0 failures",
+    "lab_verifier": "81 checks, 0 failures",
+    "historical_artifact_protection": "8 checks, 0 failures",
+    "stdlib_tests": "74 run, 0 failed",
+    "stabilization_config_tests": "19 passed",
+    "confirmatory_prereg_integrity": "27 checks, 0 failures"
+  },
+
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "torch": "2.2.2+cu121",
+    "cuda_available": false,
+    "num_threads": 4,
+    "fp": "fp32",
+    "note": "torch build differs from the merged Stage B run; protocol pins optimizer/schedule not torch build; fresh seeds make exact seed-8-12 reproduction irrelevant"
+  },
+
+  "working_tree_clean_at_audit": true,
+  "existing_confirmatory_branch_or_pr": "none (only the designated working branch)"
+}

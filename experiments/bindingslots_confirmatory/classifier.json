@@ -1,0 +1,60 @@
+{
+  "schema": "bindingslots_confirmatory/classifier/v1",
+  "status": "FROZEN before any confirmatory training. The formation, causal, quality, and distance rules are INHERITED UNCHANGED from the merged Stage B classifier (classify_stage_b.py, sha256 3ca1e75f...). Only the fresh-seed list (13-17) and the final confirmatory verdict mapping are new; no threshold is changed.",
+
+  "inherited_from": {
+    "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py",
+    "sha256": "3ca1e75fde529fcfb4492ba08044a0bfe53d660753de63630ab4bf08bad3c80d"
+  },
+
+  "fresh_seeds": [13, 14, 15, 16, 17],
+  "arms": ["A+", "B0", "CR1"],
+
+  "constants": {
+    "CHANCE": 0.02,
+    "FORM_MIN": 0.075,
+    "FORM_MARGIN": 0.050,
+    "STAB_MEAN": 0.080,
+    "STAB_MEDIAN": 0.050
+  },
+
+  "formation_rule": "forming(S, A+) := needle_d96(S) >= 0.075 AND (needle_d96(S) - needle_d96(A+)) >= 0.050 AND needle_d96(S) >= 0.07",
+
+  "causal_rule_per_forming_seed": "for k in {slots_off, randomized_address}: drop_abs = baseline - ablated; require drop_abs >= 0.050 AND (drop_abs >= 0.5*gain if gain>0 else True) AND ablated <= max(A+_d96 + 0.030, 0.050); where baseline = ablation.baseline (post-train needle@d96) and gain = baseline - A+_d96.",
+
+  "primary_gates": {
+    "C1_form_ge_4_of_5": "CR1 forms on >= 4 of 5 fresh seeds (b1)",
+    "C2_form_gt_B0": "CR1 formation count > B0 formation count (b5)",
+    "C3_win_ge_4_of_5": "CR1 needle_d96 > A+ needle_d96 on >= 4 of 5 seeds (b4)",
+    "C4_mean_margin": "mean(CR1_d96 - A+_d96) >= 0.080 (b2)",
+    "C5_median_margin": "median(CR1_d96 - A+_d96) >= 0.050 (b3)",
+    "C6_quality": "mean(CR1 ppl256) <= 1.20*mean(A+ ppl256) AND <= 2 of 5 exceed A+ ppl256 by >25% (b7)",
+    "C7_distance": "d16 no material regression (CR1 >= A+ - 0.050 all seeds) AND >= 3 forming seeds keep positive CR1-A+ at d220 (b9)",
+    "C8_slots_off": "every forming CR1 seed collapses under slots_off (part of b8)",
+    "C9_randomized_address": "every forming CR1 seed collapses under randomized_address (part of b8)",
+    "C10_integrity": "frozen abc.json + code hashes unchanged; no forbidden architecture; parameter match (b6, b10, b11)",
+    "C11_no_protocol_deviation": "no schedule/architecture/optimizer/task/threshold change after training began"
+  },
+
+  "final_verdict_mapping": {
+    "REPLICATED_SLOT_FORMATION_STABILIZATION": "emitted iff C1..C11 all true",
+    "CONFIRMATORY_REPLICATION_FAILED": "emitted iff a valid scientific run completed but any of the scientific gates C1..C9 fails",
+    "CONFIRMATORY_PROTOCOL_VIOLATED": "C11 false (a tuning/schedule/architecture deviation occurred)",
+    "CONFIRMATORY_INTEGRITY_FAILED": "C10 false (frozen artifact or historical evidence changed, or forbidden architecture detected)",
+    "CONFIRMATORY_ENVIRONMENT_MISMATCH": "the runtime environment is incompatible with producing a valid comparison",
+    "CONFIRMATORY_RESOURCE_BLOCKED": "compute unavailable so no valid scientific run could be produced (e.g., torch cannot be installed / trained)"
+  },
+
+  "readiness_mapping": {
+    "on_replicated": {"slot_formation": "SLOT_FORMATION_REPLICATED", "kda_readiness": "ELIGIBLE_FOR_NEXT_VALIDATION_LADDER"},
+    "on_not_replicated": {"slot_formation": "SLOT_FORMATION_NOT_REPLICATED", "kda_readiness": "KDA_VALIDATION_BLOCKED"}
+  },
+
+  "hard_rules": [
+    "3/5 is NOT 'nearly replicated' -> CONFIRMATORY_REPLICATION_FAILED.",
+    "A higher mean with < 4/5 formed does NOT pass (C1 mandatory).",
+    "One causally-unclean forming seed fails the whole replication; causal results are NEVER averaged across seeds.",
+    "PROVISIONALLY_STABILIZED is NOT a valid confirmatory verdict.",
+    "No best-checkpoint selection; the classifier uses only the step-1200 evaluation."
+  ]
+}

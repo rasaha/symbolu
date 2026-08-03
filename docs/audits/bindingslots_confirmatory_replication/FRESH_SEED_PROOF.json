@@ -1,0 +1,33 @@
+{
+  "schema": "bindingslots_confirmatory/fresh_seeds/v1",
+  "status": "FROZEN before any confirmatory training. Selection is outcome-independent and deterministic.",
+  "selection_rule": "The five confirmatory seeds are the next five consecutive integers after the highest BindingSlots model-training seed ever used in the program. The highest previously-used BindingSlots training seed is 12 (Stage B fresh seeds 8-12). Therefore the confirmatory seeds are 13,14,15,16,17. Selection does not inspect any outcome.",
+  "confirmatory_seeds": [13, 14, 15, 16, 17],
+
+  "previously_used_bindingslots_training_seeds": {
+    "frozen_seeds_0_2": [0, 1, 2],
+    "five_seed_baseline_pr_1300_holdout": [3, 4, 5, 6, 7],
+    "stage_a_diagnostic_pr_1319": [3, 6, 7],
+    "stage_b_fresh_pr_1319": [8, 9, 10, 11, 12],
+    "union_all_training_seeds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "highest_used_training_seed": 12
+  },
+
+  "independence_proof": {
+    "method": "repo-wide grep for each confirmatory seed as a BindingSlots model-init/training seed across experiments/, artifacts/, and hybrid_llm_vnext_lab/",
+    "confirmatory_seeds_as_bindingslots_training_seed": "NONE. Seeds 13-17 never appear as a BindingSlots model-init or training seed, nor in any five_seed / stabilization result artifact, log, or manifest.",
+    "unrelated_literal_appearances": [
+      {"seed": 13, "location": "experiments/branch_d/run_branch_d.py, run_branch_d1.py; experiments/phase_guidance_diagnostics/score_decomposition.py", "role": "permutation / decomposition RNG seed for an UNRELATED phoneme / varna research line; never initializes a BindingSlots neural model"},
+      {"seed": 17, "location": "experiments/phase_guidance_diagnostics/slot_chain_trace.py", "role": "default arg of an unrelated diagnostic tracer; never initializes a BindingSlots neural model"},
+      {"seeds": [14, 15, 16], "location": "not present as any seed anywhere in the repository", "role": "none"}
+    ],
+    "eval_rng_constants_not_training_seeds": [123, 777, 4321],
+    "conclusion": "Seeds 13-17 are uncontaminated for the BindingSlots formation experiment: none was ever used to train, initialize, tune, debug, or evaluate a BindingSlots model, and none appears in any BindingSlots result artifact or log. The two literal appearances of 13 and 17 are in disjoint research lines whose RNG never touches BindingSlots model state."
+  },
+
+  "replacement_policy": {
+    "outcome_based_replacement": "FORBIDDEN. A seed is never replaced because its result is inconvenient or below threshold.",
+    "infrastructure_only_replacement": "A seed may be replaced ONLY if it produced no valid training result due to a documented infrastructure failure. The replacement is the next unused integer (18, then 19, ...), chosen without inspecting model quality.",
+    "restart_rule": "A restarted run retains the same seed and configuration; resume is idempotent."
+  }
+}

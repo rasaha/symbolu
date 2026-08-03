@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bindingslots_confirmatory_aggregate_result",
+  "type": "object",
+  "required": ["schema", "fresh_seeds", "cr1_formation_count", "b0_formation_count", "gates", "primary_verdict", "kda_readiness"],
+  "properties": {
+    "schema": {"const": "bindingslots_confirmatory/aggregate_result/v1"},
+    "fresh_seeds": {"type": "array", "items": {"type": "integer"}},
+    "needle_d96": {"type": "object"},
+    "forming": {"type": "object"},
+    "cr1_formation_count": {"type": "integer"},
+    "b0_formation_count": {"type": "integer"},
+    "aplus_formation_count": {"type": "integer"},
+    "S_minus_Aplus_d96": {"type": "object"},
+    "mean_margin": {"type": "number"},
+    "median_margin": {"type": "number"},
+    "win_count": {"type": "integer"},
+    "causal_by_forming_seed": {"type": "object"},
+    "quality": {"type": "object"},
+    "distance": {"type": "object"},
+    "retention_by_seed": {"type": "object"},
+    "gates": {
+      "type": "object",
+      "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11"]
+    },
+    "all_gates_pass": {"type": "boolean"},
+    "primary_verdict": {
+      "type": "string",
+      "enum": [
+        "REPLICATED_SLOT_FORMATION_STABILIZATION",
+        "CONFIRMATORY_REPLICATION_FAILED",
+        "CONFIRMATORY_PROTOCOL_VIOLATED",
+        "CONFIRMATORY_INTEGRITY_FAILED",
+        "CONFIRMATORY_ENVIRONMENT_MISMATCH",
+        "CONFIRMATORY_RESOURCE_BLOCKED"
+      ]
+    },
+    "slot_formation_status": {"type": "string", "enum": ["SLOT_FORMATION_REPLICATED", "SLOT_FORMATION_NOT_REPLICATED", "UNDETERMINED"]},
+    "kda_readiness": {"type": "string", "enum": ["ELIGIBLE_FOR_NEXT_VALIDATION_LADDER", "KDA_VALIDATION_BLOCKED"]},
+    "protocol_deviations": {"type": "array"},
+    "integrity": {"type": "object"}
+  }
+}
