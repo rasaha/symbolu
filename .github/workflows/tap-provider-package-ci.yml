@@ -1,0 +1,106 @@
+name: tap-provider-package-ci
+
+# Scoped CI for the canonical TAP assertion-governance package migration.
+# No live remote service and no network-dependent test runs here: the in-process
+# reference engine is deterministic and offline, and the clean-install proof uses
+# ``pip install --no-index`` against locally built wheels only.
+
+on:
+  push:
+    paths:
+      - "packages/providers/tap/**"
+      - "tap_provider/**"
+      - "packaging/dgm-tap-provider/**"
+      - "docs/TAP_PROVIDER.md"
+      - "docs/audits/tap_packaging/**"
+      - "platform/PLATFORM_FREEZE_V1.json"
+      - "platform_freeze/**"
+      - ".github/workflows/tap-provider-package-ci.yml"
+  pull_request:
+    paths:
+      - "packages/providers/tap/**"
+      - "tap_provider/**"
+      - "packaging/dgm-tap-provider/**"
+      - "docs/TAP_PROVIDER.md"
+      - "docs/audits/tap_packaging/**"
+      - "platform/PLATFORM_FREEZE_V1.json"
+      - "platform_freeze/**"
+      - ".github/workflows/tap-provider-package-ci.yml"
+
+jobs:
+  tap-package:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: "1704067200"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip build pytest pydantic
+
+      - name: Canonical package tests (isolation)
+        run: python -m pytest packages/providers/tap/tests -q
+
+      - name: Monorepo TAP tests (through the facade)
+        run: python -m pytest tap_provider/tests -q
+
+      - name: Authority / outcome-safety / dependency-boundary tests
+        run: |
+          python -m pytest \
+            packages/providers/tap/tests/authority \
+            packages/providers/tap/tests/boundaries \
+            packages/providers/tap/tests/mapping -q
+
+      - name: Behavioral-equivalence comparison (before == canonical == legacy)
+        run: |
+          python scripts/tap_equivalence_capture.py ugence_tap_provider /tmp/after_canonical.json
+          python scripts/tap_equivalence_capture.py tap_provider /tmp/after_legacy.json
+          python - <<'PY'
+          import json
+          def norm(f):
+              d = json.load(open(f)); d.pop("namespace", None); return d
+          before = norm("docs/audits/tap_packaging/artifacts/tap_equivalence_before.json")
+          canon = norm("/tmp/after_canonical.json")
+          legacy = norm("/tmp/after_legacy.json")
+          assert before == canon == legacy, "TAP behavioral regression"
+          print("behavioral equivalence: OK")
+          PY
+        env:
+          PYTHONPATH: ".:packages/providers/tap/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/capabilities/decision-authority/src"
+
+      - name: API-snapshot comparison (.api surface byte-identical)
+        run: |
+          python scripts/tap_api_snapshot.py ugence_tap_provider /tmp/api_canonical.json
+          python scripts/tap_api_snapshot.py tap_provider /tmp/api_legacy.json
+          python - <<'PY'
+          import json
+          a = json.load(open("/tmp/api_canonical.json"))["api"]
+          b = json.load(open("/tmp/api_legacy.json"))["api"]
+          base = json.load(open("docs/audits/tap_packaging/artifacts/tap_public_api_baseline.json"))["api"]
+          assert a == b == base, "TAP public .api surface changed"
+          print("api-surface equivalence: OK")
+          PY
+        env:
+          PYTHONPATH: ".:packages/providers/tap/src:packages/governance-provider-framework/src:packages/governance-contracts/src:packages/capabilities/decision-authority/src"
+
+      - name: Build wheel + sdist (canonical) and legacy wheel
+        run: |
+          python -m build packages/providers/tap --outdir dist_tap
+          python -m build packaging/dgm-tap-provider --outdir dist_tap
+          ls -l dist_tap
+
+      - name: Wheel reproducibility (bit-for-bit)
+        run: |
+          python -m build --wheel packages/providers/tap --outdir dist_repro
+          A=$(sha256sum dist_tap/ugence_tap_provider-*.whl | cut -d" " -f1)
+          B=$(sha256sum dist_repro/ugence_tap_provider-*.whl | cut -d" " -f1)
+          test "$A" = "$B" && echo "wheel reproducible: $A"
+
+      - name: Clean-environment install + framework registry + ActionGate-absent + CLI
+        run: python packages/providers/tap/scripts/verify_tap_provider_distribution.py
+
+      - name: Platform-freeze verification
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

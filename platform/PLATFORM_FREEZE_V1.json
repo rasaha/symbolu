@@ -30,13 +30,13 @@
   },
   "conformance_hashes": {
     "actiongate_provider": "8d4a5d3545da2b20c27bf1d0f67bf98d090ac5cd9e4b8606c59b054a6c559a42",
-    "tap_provider": "c3ecf91b2520e23ae6afe23b3930e9ecbb9d87deb314dbc7c8d3f3a5e09e8736"
+    "packages/providers/tap/src/ugence_tap_provider": "f52903dc7c630407140a134f8355328bb9d5f3d39b38759c0870f29021fe5d5a"
   },
   "core_tree_hashes": {
     "actiongate_provider": "f40f0cf3c390486026d50a53e6bbe14f0d499e57147bd8a736c32d107e12f8dc",
     "decision_governance": "3e98d8dbbc2a5737a8f66c701653ac00b674a6c7c9336a582331d45a667485d0",
     "governance_providers": "9ec688e64fcd8f3c37f7f91d63751123ffa56d761d5f34ed64af4cd65517e9c3",
-    "tap_provider": "4209eb875af9e2f9b7a703f37c8c884313cfcf3d1e3387406cd010bc1c66d074"
+    "tap_provider": "53b7abf7534eaf084201c84a8bb26dda50fb2b835cf0e933fab53f018c938249"
   },
   "core_trees": [
     "decision_governance",
@@ -191,7 +191,7 @@
       "statement": "Frozen package dependency direction remains acyclic."
     }
   ],
-  "manifest_digest": "bd346cb2a50889668e38851958b566dcf867a4d5693bef4e575886c72454808f",
+  "manifest_digest": "815a9250f833a253a621f26b341cd5b0a7cb8d283165fc9142013ff109c524c6",
   "platform_name": "Decision Governance Platform",
   "platform_version": "1.0.0",
   "public_api_manifests": {
