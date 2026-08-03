@@ -69,8 +69,14 @@ print("RESULT_JSON " + json.dumps(out))
 '''
 
 
+# A clean environment for every subprocess: strip PYTHONPATH so the venv is
+# TRULY isolated and can never import the package from the repo source tree.
+_CLEAN_ENV = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+
+
 def _run(cmd, **kw):
     print("+", " ".join(cmd))
+    kw.setdefault("env", _CLEAN_ENV)
     return subprocess.run(cmd, check=True, **kw)
 
 
@@ -137,15 +143,19 @@ def main() -> int:
         _run([vpy, "-m", "pip", "install", "--quiet", "httpx"])
 
         print("== running installed-package verification (process 1) ==")
-        r1 = subprocess.run([vpy, "-c", _INNER], cwd=work, check=True,
-                            capture_output=True, text=True)
+        r1 = subprocess.run([vpy, "-c", _INNER], cwd=work, check=False,
+                            capture_output=True, text=True, env=_CLEAN_ENV)
+        if r1.returncode != 0:
+            print("INNER STDOUT:\n" + r1.stdout, file=sys.stderr)
+            print("INNER STDERR:\n" + r1.stderr, file=sys.stderr)
+            raise SystemExit(1)
         line1 = next(l for l in r1.stdout.splitlines() if l.startswith("RESULT_JSON "))
         res1 = json.loads(line1[len("RESULT_JSON "):])
         print(json.dumps(res1, indent=2))
 
         print("== separate-process determinism (process 2) ==")
         r2 = subprocess.run([vpy, "-c", _INNER], cwd=work, check=True,
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, env=_CLEAN_ENV)
         line2 = next(l for l in r2.stdout.splitlines() if l.startswith("RESULT_JSON "))
         res2 = json.loads(line2[len("RESULT_JSON "):])
         determinism = (res1["plan_fingerprint"] == res2["plan_fingerprint"]

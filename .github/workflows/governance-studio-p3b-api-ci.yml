@@ -49,6 +49,20 @@ jobs:
           assert set(a.SUPPORTED_COMPILER_CONTRACTS)=={'workflow_ir.v1','workflow_ir.v2'}, a.SUPPORTED_COMPILER_CONTRACTS; \
           assert a.__version__=='0.2.1', a.__version__; print('compiler contracts OK')"
 
+      - name: awc-version-range
+        run: |
+          python -m pytest $BACKEND/tests/test_awc_version_range.py -q
+          python -c "import tomllib; d=tomllib.load(open('$BACKEND/pyproject.toml','rb')); \
+          dep=[x for x in d['project']['dependencies'] if x.startswith('ugence-agent-workforce-composer')][0]; \
+          assert '>=0.2.1' in dep and '<0.3.0' in dep, dep; \
+          assert 'ugence-agent-workforce-composer==0.2.1' in open('$BACKEND/constraints.txt').read(); \
+          print('AWC version range + lock OK')"
+
+      - name: fixture-bundle-drift
+        run: |
+          python $BACKEND/scripts/verify_fixture_bundle.py
+          python -m pytest $BACKEND/tests/test_fixture_bundle.py -q
+
       - name: api-unit-suite
         run: python -m pytest $BACKEND/tests -q
 

@@ -18,6 +18,43 @@ __version__: str = VERSION
 # Frozen API contract identity (advertised in OpenAPI + every response envelope).
 API_CONTRACT_VERSION: str = "governance_studio.api.v1"
 
+# Supported AWC minor line (P3B packaging protection P1). The backend is pinned to
+# the 0.2.x compatibility surface: it requires >= the minimum tested version and
+# refuses anything at or above the next minor, which may change the awc.v1 /
+# awc.composition.v1 / awc.compiler_adapter.v2 contracts. The reproducible demo
+# environment locks the exact tested version (see backend/constraints.txt).
+SUPPORTED_AWC_MIN: str = "0.2.1"
+SUPPORTED_AWC_MAX_EXCLUSIVE: str = "0.3.0"
+PINNED_AWC_VERSION: str = "0.2.1"
+
+
+def _parse_version(text: str) -> tuple:
+    """Parse a dotted release version into a comparable integer tuple.
+
+    Only the numeric release segment is considered (a trailing pre/post/dev
+    suffix is ignored) — sufficient for the bounded 0.2.x range check.
+    """
+    release = ""
+    for ch in str(text).strip():
+        if ch.isdigit() or ch == ".":
+            release += ch
+        else:
+            break
+    parts = [p for p in release.split(".") if p != ""]
+    nums = []
+    for p in parts:
+        try:
+            nums.append(int(p))
+        except ValueError:
+            break
+    return tuple(nums) or (0,)
+
+
+def awc_version_supported(version: str) -> bool:
+    """True iff ``version`` is within ``[SUPPORTED_AWC_MIN, SUPPORTED_AWC_MAX_EXCLUSIVE)``."""
+    v = _parse_version(version)
+    return _parse_version(SUPPORTED_AWC_MIN) <= v < _parse_version(SUPPORTED_AWC_MAX_EXCLUSIVE)
+
 # Honest maturity flags (§27). These describe exactly what P3B does and does not
 # implement. They are asserted by the test-suite and surfaced by ``/version``.
 MATURITY_FLAGS: Dict[str, bool] = {
@@ -69,6 +106,9 @@ def awc_version_facts() -> Dict[str, Any]:
             awc.COMPILER_ADAPTER_CONTRACT_VERSION,
         ],
         "supported_workflow_contracts": list(awc.SUPPORTED_COMPILER_CONTRACTS),
+        "supported_awc_range": f">={SUPPORTED_AWC_MIN},<{SUPPORTED_AWC_MAX_EXCLUSIVE}",
+        "pinned_awc_version": PINNED_AWC_VERSION,
+        "awc_version_supported": awc_version_supported(awc.__version__),
     }
     # The compiler is NOT a direct API dependency: P3B consumes serialized
     # workflow_ir.v1 / workflow_ir.v2 artifacts THROUGH the AWC public adapter
