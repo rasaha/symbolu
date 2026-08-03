@@ -1,0 +1,32 @@
+{
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "starting_commit": "04f24d3e4ac9bc755f21fc650ec19a73df0b469b",
+  "working_branch": "claude/policy-workflow-compiler-mvp-5m6o02",
+  "pr_1302": {
+    "state": "closed",
+    "merged": true,
+    "merged_by": "rasaha",
+    "base_ref": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "head_ref": "claude/procurement-independent-package-yypnqs",
+    "head_sha": "fb6635dc1ec32c088bba8af2228bd12c1c56a65f",
+    "merged_at": "2026-08-03T10:16:44Z",
+    "merge_commit_on_default": "04f24d3e4ac9bc755f21fc650ec19a73df0b469b"
+  },
+  "procurement": {
+    "path": "packages/products/procurement/",
+    "distribution": "ugence-procurement",
+    "namespace": "ugence_procurement",
+    "version": "0.1.0",
+    "public_api_count": 48
+  },
+  "platform_freeze_before": {
+    "result": "PASS",
+    "substantive_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "platform_freeze_after": {
+    "result": "PASS",
+    "substantive_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "existing_compiler_implementation": "none_found",
+  "disposition": "new_build"
+}

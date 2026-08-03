@@ -1,0 +1,94 @@
+{
+  "registry_version": "capability_registry.v1",
+  "capabilities": [
+    {
+      "capability_id": "TAP",
+      "canonical_distribution": "ugence-tap-provider",
+      "canonical_namespace": "ugence_tap_provider",
+      "public_contract": "ugence_tap_provider.api",
+      "authority_owned": "assertion-support evaluation (evidence admissibility)",
+      "disposition": "ADVISORY",
+      "optional": true,
+      "minimum_version": "0.1.0",
+      "repo_path": "packages/providers/tap/"
+    },
+    {
+      "capability_id": "DECISION_AUTHORITY",
+      "canonical_distribution": "ugence-decision-authority",
+      "canonical_namespace": "ugence_decision_authority",
+      "public_contract": "ugence_decision_authority.api",
+      "authority_owned": "governs when a recommendation may become a binding decision",
+      "disposition": "AUTHORITATIVE",
+      "optional": false,
+      "minimum_version": "1.0.0",
+      "repo_path": "packages/capabilities/decision-authority/"
+    },
+    {
+      "capability_id": "ACTION_GATE",
+      "canonical_distribution": "ugence-actiongate-provider",
+      "canonical_namespace": "ugence_actiongate_provider",
+      "public_contract": "ugence_actiongate_provider.api",
+      "authority_owned": "exact-action authorization (range/digest/once-only)",
+      "disposition": "AUTHORITATIVE",
+      "optional": true,
+      "minimum_version": "0.1.0",
+      "repo_path": "packages/providers/actiongate/"
+    },
+    {
+      "capability_id": "ACTION_CLEARANCE",
+      "canonical_distribution": "ugence-action-clearance",
+      "canonical_namespace": "ugence_action_clearance",
+      "public_contract": "ugence_action_clearance.api",
+      "authority_owned": "commit-time operational clearance of an already-authorized action",
+      "disposition": "AUTHORITATIVE",
+      "optional": true,
+      "minimum_version": "0.1.0",
+      "repo_path": "packages/capabilities/action-clearance/"
+    },
+    {
+      "capability_id": "STORYGRAPH",
+      "canonical_distribution": "ugence-storygraph",
+      "canonical_namespace": "ugence_storygraph",
+      "public_contract": "ugence_storygraph.api",
+      "authority_owned": "sequence-risk analysis (advisory)",
+      "disposition": "ADVISORY",
+      "optional": true,
+      "minimum_version": "2.0.0",
+      "repo_path": "packages/capabilities/storygraph/"
+    },
+    {
+      "capability_id": "MODEL_SELECTION",
+      "canonical_distribution": "ugence-model-selection",
+      "canonical_namespace": "ugence_model_selection",
+      "public_contract": "ugence_model_selection.api",
+      "authority_owned": "policy-bounded model eligibility (mandatory) + selection (advisory)",
+      "disposition": "ADVISORY",
+      "optional": true,
+      "minimum_version": "0.1.0",
+      "repo_path": "packages/capabilities/model-selection/"
+    },
+    {
+      "capability_id": "OPTIONAL_ORCHESTRATOR",
+      "canonical_distribution": "",
+      "canonical_namespace": "",
+      "public_contract": "",
+      "authority_owned": "optional workflow composition (bypassable)",
+      "disposition": "ADVISORY",
+      "optional": true,
+      "minimum_version": "",
+      "repo_path": "ugence_console_api/orchestrator.py (bypassable)"
+    }
+  ],
+  "neutral_contracts": {
+    "governance_contracts": {
+      "distribution": "ugence-governance-contracts",
+      "namespace": "ugence_governance_contracts",
+      "role": "neutral contracts, not authority"
+    },
+    "governance_provider_framework": {
+      "distribution": "ugence-governance-provider-framework",
+      "namespace": "ugence_governance_provider_framework",
+      "role": "neutral provider mechanics, owns no authority"
+    }
+  }
+}

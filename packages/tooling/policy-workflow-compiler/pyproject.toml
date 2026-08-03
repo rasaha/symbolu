@@ -1,0 +1,83 @@
+# Independent distribution for the Ugence Policy Workflow Compiler (tooling).
+#
+# The Policy Workflow Compiler is a deterministic TOOLING product: it compiles a
+# reviewed, structured governance policy pack into a governed-workflow IR, an
+# assurance manifest + test scenarios, an audit schema, a capability-requirement
+# manifest, structural diffs, human-approval records, and a content-addressed
+# compiled package. It is NOT a governance authority: it makes no binding decision,
+# approves nothing, authorizes no action, clears nothing, and runs nothing.
+#
+# It ships NO document ingestion, NLP/LLM extraction, runtime deployment, live
+# connector (SAP Ariba / Coupa / ServiceNow / Oracle), purchase-order write, model
+# SDK, web framework, database driver, or cloud SDK, and makes no pilot or
+# production claim.
+#
+# Build:  python -m build packages/tooling/policy-workflow-compiler
+# Verify: python -m ugence_policy_workflow_compiler demo procurement
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-policy-workflow-compiler"
+dynamic = ["version"]
+description = "Ugence Policy Workflow Compiler — compiles a reviewed structured governance policy pack into a deterministic governed-workflow IR and assurance package. Tooling, not a governance authority. Deterministic, offline; not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["policy", "governance", "workflow", "compiler", "assurance", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Minimal core: only pydantic. The compiler targets capability PUBLIC CONTRACTS by
+# stable identifier and resolves them from the capability-registry METADATA — it
+# never imports a runtime provider to emit an IR. NO governance runtime, NO model
+# SDK, NO web framework, NO database driver, NO cloud/ERP SDK is a core dependency.
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+# The Procurement equivalence harness compares the compiler's interpretation to the
+# live ugence-procurement reference workflow. It is the ONLY optional integration,
+# and it is never required for core compilation or the offline demo.
+procurement-reference = ["ugence-procurement>=0.1.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.scripts]
+ugence-policy-workflow-compiler = "ugence_policy_workflow_compiler.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/tooling/policy-workflow-compiler/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_policy_workflow_compiler.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_policy_workflow_compiler*"]
+
+[tool.setuptools.package-data]
+ugence_policy_workflow_compiler = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# No test-case classes are used; this stops pytest from trying to collect the
+# imported ``TestScenario`` / ``TestCategory`` model classes.
+python_classes = ["_DisableClassCollection"]
+addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

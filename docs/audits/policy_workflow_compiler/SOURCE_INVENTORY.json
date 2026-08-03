@@ -1,0 +1,39 @@
+{
+  "design_spec": "POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md",
+  "reference_product": {
+    "path": "packages/products/procurement/",
+    "distribution": "ugence-procurement",
+    "namespace": "ugence_procurement",
+    "key_modules": {
+      "requests/contracts.py": "PurchaseRequest, SupplierReference, BudgetReference, PurchaseItem, Urgency, RequestStatus",
+      "policies/assessment.py": "ProcurementAssessmentService (6 checks; 3 blocking), PolicyAssessment, PolicyCheck",
+      "policies/budget_authority.py": "BudgetAuthorityAdapter (EXPIRED->restricted DENIED->hard-limit DENIED->threshold WITH_CONSTRAINTS->AUTHORIZED)",
+      "validation/request_validation.py": "ProcurementRequestValidator (total<=0, unknown supplier/budget)",
+      "approvals/mappings.py": "PurchaseRecommendation, PurchaseApproval, RECOMMENDATION_TO_PROPOSED, APPROVAL_TO_DECISION",
+      "actions/mappings.py": "decision outcome -> action (CREATE_PURCHASE_ORDER / CANCEL_REQUEST / ROUTE_TO_SENIOR_APPROVER / REQUEST_MORE_INFORMATION)",
+      "suppliers/outcomes.py": "SupplierOutcome, SUPPLIER_TO_BUSINESS",
+      "routes.py": "ProcurementAPI end-to-end governance lifecycle"
+    }
+  },
+  "kernel_vocabulary_source": {
+    "path": "packages/capabilities/decision-authority/src/ugence_decision_authority/",
+    "enums": {
+      "DecisionOutcome": ["ADVANCE", "HOLD", "REJECT", "DEFER"],
+      "AuthorizationOutcome": ["AUTHORIZED", "AUTHORIZED_WITH_CONSTRAINTS", "DENIED", "INDETERMINATE", "EXPIRED"],
+      "BusinessOutcome": ["SUCCEEDED", "FAILED", "PARTIALLY_SUCCEEDED", "REJECTED", "CANCELLED_EXTERNALLY", "DUPLICATE", "UNKNOWN"],
+      "ReconciliationStatus": ["RECONCILED", "MISMATCHED", "PARTIALLY_RECONCILED", "INDETERMINATE", "MANUAL_REVIEW_REQUIRED", "COMPENSATION_REQUIRED"],
+      "AuthorityType": ["HUMAN_REVIEWER", "HUMAN_APPROVER", "DELEGATED_POLICY", "COMMITTEE", "EXTERNAL_AUTHORITY"],
+      "ReasonCode": ["MISSING_REQUIRED_EVIDENCE", "STALE_EVIDENCE", "INSUFFICIENT_SAMPLE", "CONFLICTING_EVIDENCE", "PROHIBITED_EVIDENCE", "QUARANTINED_CONTENT", "LOW_CONFIDENCE", "NOT_APPLICABLE"]
+    }
+  },
+  "platform_freeze": {
+    "verifier": "platform_freeze/verify.py",
+    "manifest": "platform/PLATFORM_FREEZE_V1.json",
+    "invoke": "python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json"
+  },
+  "new_package": {
+    "path": "packages/tooling/policy-workflow-compiler/",
+    "distribution": "ugence-policy-workflow-compiler",
+    "namespace": "ugence_policy_workflow_compiler"
+  }
+}

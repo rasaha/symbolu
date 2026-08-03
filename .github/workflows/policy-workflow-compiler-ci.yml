@@ -1,0 +1,149 @@
+name: policy-workflow-compiler-ci
+
+# Scoped CI for the independent ugence-policy-workflow-compiler tooling distribution.
+# Runs the package suite (models, validation, authority boundaries, deterministic
+# compilation, assurance coverage, approval, structural diff, packaging), the
+# public-API frozen-artifact check, the Procurement reference-equivalence suite, the
+# clean-install isolated-distribution verifier (wheel + sdist build, out-of-root
+# import, CLI, wheel-content audit, reproducibility, deterministic logical digest),
+# and platform-freeze verification (blocking). No network-dependent runs. Triggered
+# only by changes to the package or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/tooling/policy-workflow-compiler/**"
+      - ".github/workflows/policy-workflow-compiler-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/policy-workflow-compiler-**"
+      - "chatgpt/policy-workflow-compiler-**"
+    paths:
+      - "packages/tooling/policy-workflow-compiler/**"
+      - ".github/workflows/policy-workflow-compiler-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+# Per-step source paths for the source-tree jobs only. The isolated-distribution job
+# deliberately sets NO PYTHONPATH so the clean-venv verification resolves the wheels.
+env:
+  SRC_PYTHONPATH: >-
+    packages/tooling/policy-workflow-compiler/src:packages/capabilities/decision-authority/src:packages/products/procurement/src
+
+jobs:
+  package-suite:
+    name: Compiler package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+          pip install -e packages/capabilities/decision-authority
+          pip install -e packages/products/procurement
+      - name: Package suite (models/validation/authority/compilation/assurance/approval/diff/packaging)
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: python -m pytest packages/tooling/policy-workflow-compiler/tests -q
+      - name: Public-API snapshot is in sync with the frozen artifact
+        env:
+          PYTHONPATH: packages/tooling/policy-workflow-compiler/src
+        run: |
+          python packages/tooling/policy-workflow-compiler/scripts/public_api_snapshot.py > /tmp/live_api.json
+          python - <<'PY'
+          import json
+          live = json.load(open("/tmp/live_api.json"))
+          frozen = json.load(open("packages/tooling/policy-workflow-compiler/artifacts/public_api.json"))
+          assert live == frozen, "ugence_policy_workflow_compiler.api drifted from artifacts/public_api.json"
+          print("public API in sync:", live["count"], "names")
+          PY
+      - name: Version/maturity metadata (extraction/runtime/pilot/production are False)
+        env:
+          PYTHONPATH: packages/tooling/policy-workflow-compiler/src
+        run: |
+          python -m ugence_policy_workflow_compiler version
+          python - <<'PY'
+          import ugence_policy_workflow_compiler as u
+          assert u.__version__ == "0.1.0"
+          i = u.version_info().to_dict()
+          for k in ("document_extraction_implemented", "runtime_deployment_implemented",
+                    "pilot_validated", "production_certified"):
+              assert i[k] is False, (k, i[k])
+          for k in ("structured_policy_pack_implemented", "deterministic_compilation_verified",
+                    "procurement_reference_equivalence_verified"):
+              assert i[k] is True, (k, i[k])
+          print("maturity honest")
+          PY
+
+  procurement-equivalence:
+    name: Procurement reference equivalence (EQUIVALENT gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+          pip install -e packages/products/procurement
+      - name: Compiler-generated Procurement interpretation == reference workflow
+        env:
+          PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
+        run: |
+          python -m pytest packages/tooling/policy-workflow-compiler/tests/test_procurement_equivalence.py -q
+          python - <<'PY'
+          from ugence_policy_workflow_compiler.reference.procurement_equivalence import run_equivalence, EQUIVALENT
+          res = run_equivalence()
+          assert res.classification == EQUIVALENT, res.to_dict()
+          print("procurement equivalence:", res.classification)
+          for d in res.dimensions:
+              print(" ", d.dimension, d.classification, d.checked)
+          PY
+
+  isolated-distribution:
+    name: Clean-install verifier, wheel/sdist, CLI, reproducibility
+    runs-on: ubuntu-latest
+    # NOTE: intentionally no PYTHONPATH — the verifier resolves the installed wheels.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheel/sdist, clean-install outside repo, CLI, wheel audit, reproducibility
+        run: python packages/tooling/policy-workflow-compiler/scripts/verify_policy_workflow_compiler_distribution.py
+
+  freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
