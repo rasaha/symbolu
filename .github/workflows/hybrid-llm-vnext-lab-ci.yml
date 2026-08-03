@@ -1,0 +1,46 @@
+name: hybrid-llm-vnext-lab-ci
+
+# Narrowly scoped CI for the bounded binding-slot incubation lab. Torch-free by design:
+# it runs the stdlib reference tests, the provenance/boundary/complexity checks, the lab
+# integrity verifier, and the merged audit-integrity verifier. It does NOT run neural
+# training (that is RESOURCE_BLOCKED and belongs in a torch-enabled environment).
+
+on:
+  push:
+    paths:
+      - 'hybrid_llm_vnext_lab/**'
+      - 'docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
+      - 'docs/audits/hybrid_llm/artifacts/binding_slot_evidence_reconciliation.json'
+      - '.github/workflows/hybrid-llm-vnext-lab-ci.yml'
+  pull_request:
+    paths:
+      - 'hybrid_llm_vnext_lab/**'
+      - 'docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
+      - 'docs/audits/hybrid_llm/artifacts/binding_slot_evidence_reconciliation.json'
+      - '.github/workflows/hybrid-llm-vnext-lab-ci.yml'
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # provenance verifier resolves source blobs at the source commit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Lab integrity (provenance, boundaries, JSON, status markers)
+        run: python hybrid_llm_vnext_lab/scripts/verify_lab.py
+
+      - name: Stdlib reference tests (no torch)
+        run: python hybrid_llm_vnext_lab/scripts/run_stdlib_tests.py
+
+      - name: No-Phase import boundary
+        run: python hybrid_llm_vnext_lab/tests/boundaries/test_no_phase_imports.py
+
+      - name: Merged audit-integrity verifier (must still pass)
+        run: python docs/audits/hybrid_llm/verify_hybrid_llm_audit.py
+
+      - name: Reconciliation artifact validates
+        run: python -c "import json; json.load(open('docs/audits/hybrid_llm/artifacts/binding_slot_evidence_reconciliation.json'))"

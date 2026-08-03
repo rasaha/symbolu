@@ -1,0 +1,19 @@
+{
+  "schema": "multis_seed_slots_config/v1",
+  "date": "2026-08-03",
+  "status": "PRE-REGISTERED; runs ONLY after neural reproduction parity (STATISTICAL_REPRODUCTION or better). RESOURCE_BLOCKED here (no torch).",
+  "inherits_thresholds_from": "docs/audits/hybrid_llm/artifacts/hybrid_llm_acceptance_thresholds.json (merged in PR #1294)",
+  "threshold_policy": "The merged audit thresholds are authoritative and are NOT silently replaced. This file only ADDS run-specific clarifications where the merged thresholds are ambiguous for the slots-only experiment; any clarification is recorded here BEFORE running, never after observing results.",
+  "clarifications": [
+    {"threshold": "T2_long_range_single_key", "clarification": "For slots, 'robust across >=5 seeds' is operationalized as: mean needle@d96 > 0.5 AND worst-of-5 seeds > 0.2 (the phase_lc result failed the worst-seed bar at 0/3 on two seeds)."},
+    {"threshold": "T4_entity_attribute_binding", "clarification": "binding accuracy (k=2) mean > 0.5 and > A by >= 0.3 across >=5 seeds; this is the primary go/no-go for slots as relational memory."},
+    {"threshold": "T5/T6 source & supersession", "clarification": "D-only; require slots-off causal drop >= 0.2 and erase/write-gate-off causal degradation."}
+  ],
+  "seeds": [0, 1, 2, 3, 4],
+  "primary_metric": "needle@d96 (single-fact) mean AND worst-seed",
+  "secondary_metrics": ["binding k=2/4/8", "supersession current_acc/stale_error", "source", "multihop", "ppl@256"],
+  "stopping_rule": "fixed 5 seeds x 1200 steps; no peeking / no early stop based on the metric",
+  "acceptance": "meets merged thresholds T1,T2,T4 (+ T5,T6 if slots claim relational memory) -> WORKING_BUT_UNSTABLE advances toward MULTI_SEED_VALIDATED",
+  "failure": "worst-seed needle@d96 <= 0.2 OR binding k=2 mean <= chance+0.1 -> remains WORKING_BUT_UNSTABLE; do NOT advance",
+  "required_ablations": ["slots off", "randomized addresses", "write gate disabled", "phase off (confirm independence)", "memory reset"]
+}

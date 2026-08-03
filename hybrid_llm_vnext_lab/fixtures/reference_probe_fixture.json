@@ -1,0 +1,20 @@
+{
+  "description": "deterministic stdlib slot-reference probe fixture (single-fact + supersession + source)",
+  "retrieve_e0_argmax": 5,
+  "retrieve_e2_argmax": 3,
+  "versions": [
+    2,
+    1,
+    0,
+    0
+  ],
+  "sources": [
+    11,
+    9,
+    -1,
+    -1
+  ],
+  "n_active": 2,
+  "collisions": 1,
+  "state_numel": 80
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "reproduce_legacy_slots_config/v1",
+  "date": "2026-08-03",
+  "target_artifact": "experiments/phase_lc/results/abc.json",
+  "target_commit": "8b4ec6e71666282384a4e23f78c724f8df4ba767",
+  "provenance_note": "All values extracted from the live phase_lc artifacts (harness_abc.py / tasks.py / models.py / results/abc.json), not from memory. The report's 1800-step/batch-24 needle=1.00 is prose-only (NOT_FOUND) and is NOT a target.",
+  "model": {
+    "d": 128, "heads": 4, "layers": 4, "window": 64, "num_slots": 32,
+    "ff_width": "AUTO-TUNED by binary search to hit target_params (NOT a fixed 384)",
+    "target_params": 2000000,
+    "actual_params": {"A": 2000392, "B": 1999752, "C": 2000492},
+    "max_len_pos_emb": 1200,
+    "tie_lm_head_to_embedding": true,
+    "init": "Linear/Embedding N(0,0.02), biases 0; slot gate bias +1.0"
+  },
+  "data": {
+    "vocab_size": 1291,
+    "tokenizer_top_k": 1200,
+    "corpus_tokens": 55547,
+    "corpus_sources": ["bounded_shadow_pilot/data/natural_pilot_v1/corpus.json", "evidence_assurance/data/v1/corpus.json"],
+    "corpus_regex": "[a-z]+|[.,] (lowercased)",
+    "max_words": 400000,
+    "N_ENT": 24, "N_VAL": 48, "N_SRC": 12
+  },
+  "training": {
+    "seq_len_train": 160,
+    "batch_size": 16,
+    "optimizer": "AdamW",
+    "lr": 2e-3,
+    "weight_decay": 0.01,
+    "lr_schedule": "LambdaLR: linear warmup then constant (min(1.0, step/warmup))",
+    "warmup_steps": 60,
+    "steps": 1200,
+    "grad_clip_norm": 1.0,
+    "dropout": 0.0,
+    "device": "cpu",
+    "dtype": "float32",
+    "seeds": [0, 1, 2],
+    "data_rng": "random.Random(seed*991 + 7)",
+    "log_every": 240,
+    "early_stopping": false,
+    "loss_mixture": {"real_lm_full_seq_CE": 0.20, "tasks_answer_token_CE": 0.80},
+    "task_mix": {"needle": 0.20, "binding": 0.20, "supersession": 0.15, "source": 0.15, "multihop": 0.10}
+  },
+  "eval": {
+    "seq_len_eval": 256,
+    "n_per_condition": 120,
+    "needle_distances": [16, 96, 220],
+    "binding_k": [2, 4, 8],
+    "primary_metric": "needle@d96 (beyond-window single-fact retrieval)",
+    "scoring": "argmax over full vocab at position N-2 (answer token), exact-match to target"
+  },
+  "ablations": {
+    "how_triggered": "harness sets every slot mixer's .ablate and every ABC mixer's .ablate_phase, probes, then resets",
+    "slots_off": "mixer.slots.ablate = 'zero'",
+    "randomized_address": "mixer.slots.ablate = 'rand_keys'",
+    "phase_off": "mixer.ablate_phase = True"
+  },
+  "saved_baseline_targets_needle_at_d96": {
+    "C_baseline": {"seed0": 0.4667, "seed1": 0.0, "seed2": 0.0, "mean": 0.1556},
+    "C_slots_off": {"seed0": 0.0167, "seed1": 0.0, "seed2": 0.0417},
+    "C_rand_keys": {"seed0": 0.050, "seed1": 0.0, "seed2": 0.0083},
+    "C_phase_off": {"seed0": 0.475, "seed1": 0.0, "seed2": 0.0},
+    "A_baseline_mean": 0.014,
+    "B_baseline_mean": 0.0028,
+    "ppl_at_256_mean": {"A": 118.29, "B": 72.76, "C": 83.34}
+  },
+  "bounded_state_targets": {
+    "C_total_bounded_state_floats": 16896,
+    "C_slot_state_floats_per_layer": 4096,
+    "C_slot_state_floats_all_layers": 16384,
+    "no_nxn_check_expected": {"phase_builds_NN": false, "slots_builds_NN": false}
+  }
+}
