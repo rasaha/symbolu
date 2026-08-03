@@ -1,0 +1,102 @@
+{
+  "audit": "H16_OVERLAP_INVENTORY",
+  "date": "2026-08-03",
+  "modules": [
+    "agentic/agentic_framework/coordination.py",
+    "agentic/agentic_framework/multi_agent.py"
+  ],
+  "disposition_legend": [
+    "CANONICALIZE_INTO_AWC",
+    "REMAIN_IN_H16",
+    "ADAPT_TO_AWC",
+    "COMPATIBILITY_FACADE_CANDIDATE",
+    "SHARED_NEUTRAL_CONTRACT",
+    "REFERENCE_ONLY",
+    "DEPRECATE_LATER",
+    "OUT_OF_SCOPE"
+  ],
+  "notes": [
+    "H16 objects are hand-rolled dataclasses/classes (no pydantic), serialized via to_dict/to_list; lifecycle vocabularies are string-constant classes, not enums.",
+    "AuthorityModel (coordination.py:378) is the sole authority decision-maker; DelegationContract/AgentProfile/CoordinationGoal only carry authority data.",
+    "Name collisions across subsystems: AgentProfile, CapabilityRegistry, AgentAssignment each exist in H16 AND in AWC docs/compiler with different semantics.",
+    "Identically named objects are NOT assumed semantically identical."
+  ],
+  "symbols": [
+    {"symbol": "CoordinationState", "module": "coordination.py", "line": 78, "responsibility": "String-constant lifecycle states for assignments", "phase": "runtime", "purity": "pure", "determinism": "deterministic", "state_binding": "constants", "serialization": "plain class (not enum)", "authority": "labels only", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "RejectionReason", "module": "coordination.py", "line": 90, "responsibility": "String-constant deterministic rejection/failure reasons", "phase": "selection-time labels", "purity": "pure", "determinism": "deterministic", "state_binding": "constants", "serialization": "plain class (not enum)", "authority": "carries decision labels, makes none", "future_owner": "AWC defines its own elimination-reason vocabulary; H16 keeps runtime rejection reasons", "disposition": "REFERENCE_ONLY"},
+    {"symbol": "MissionStatus", "module": "coordination.py", "line": 104, "responsibility": "Terminal mission status constants", "phase": "runtime", "purity": "pure", "determinism": "deterministic", "state_binding": "constants", "serialization": "plain class (not enum)", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "AgentProfile", "module": "coordination.py", "line": 116, "responsibility": "Immutable authority envelope of a worker (capabilities, permissions, owned_tools, supported_goals, trust_level)", "phase": "selection-time", "purity": "pure", "determinism": "deterministic", "state_binding": "frozen snapshot", "serialization": "frozen dataclass; to_dict sorts sets", "authority": "carries authority data; makes no decision", "future_owner": "AWC (canonical selection profile)", "disposition": "CANONICALIZE_INTO_AWC", "compat": "H16 import path becomes logic-free re-export of canonical AWC profile (identity-preserving) IF fields stay identical; else adapter"},
+    {"symbol": "CapabilityRegistry", "module": "coordination.py", "line": 144, "responsibility": "Mutable registry agent_id->profile+executor + availability; candidates_for filters/orders eligible agents", "phase": "mixed (selection filter + live availability)", "purity": "side-effecting (register, mark_(un)available)", "determinism": "deterministic (candidates_for sorts by -trust,id)", "state_binding": "ambient/live availability", "serialization": "plain mutable class; no to_dict", "authority": "eligibility pre-filter (soft gate)", "future_owner": "SPLIT: frozen snapshot + candidates_for eligibility -> AWC (AgentRegistrySnapshot); live availability -> H16", "disposition": "ADAPT_TO_AWC", "compat": "H16 keeps a runtime registry with live availability; AWC owns the immutable snapshot + deterministic eligibility. Adapter, not identity re-export."},
+    {"symbol": "CoordinationGoal", "module": "coordination.py", "line": 204, "responsibility": "One mission goal with authority requirements (required_capabilities, authority_scope, deps, timeout)", "phase": "selection-time (spec)", "purity": "pure", "determinism": "deterministic", "state_binding": "frozen snapshot", "serialization": "frozen dataclass; to_dict sorts sets", "authority": "carries required authority_scope + capabilities (demand side)", "future_owner": "AWC role requirement is derived from the compiler WorkflowIR; H16 keeps CoordinationGoal as its runtime input", "disposition": "ADAPT_TO_AWC", "compat": "AWC WorkflowRoleRequirement is the canonical planning analogue derived from WorkflowIR; H16 goal shape is adapted at the AgentTeamPlan->coordination seam."},
+    {"symbol": "Mission", "module": "coordination.py", "line": 238, "responsibility": "Immutable ordered tuple of CoordinationGoals", "phase": "selection-time (input)", "purity": "pure", "determinism": "deterministic", "state_binding": "frozen snapshot", "serialization": "frozen dataclass; no to_dict", "authority": "none", "future_owner": "H16 runtime input", "disposition": "REFERENCE_ONLY"},
+    {"symbol": "DelegationContract", "module": "coordination.py", "line": 253, "responsibility": "Immutable per-delegation contract binding a goal to assigned_agent with authority_scope, IO, timeout", "phase": "runtime artifact (issued at delegation)", "purity": "pure", "determinism": "deterministic", "state_binding": "frozen snapshot", "serialization": "frozen dataclass; to_dict sorts authority_scope", "authority": "frozen record of an authority grant; makes none", "future_owner": "H16 issues DelegationContract at runtime; AWC produces the planning-time AgentAssignment upstream of it", "disposition": "ADAPT_TO_AWC", "compat": "AWC AgentAssignment (planning) is adapted into H16 DelegationContract (runtime) via the AgentTeamPlan->coordination adapter; must not broaden authority_scope."},
+    {"symbol": "AssignmentTransition", "module": "coordination.py", "line": 288, "responsibility": "One state-transition record", "phase": "runtime", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass; to_dict", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "AgentAssignment", "module": "coordination.py", "line": 300, "responsibility": "A worker's runtime assignment with append-only history and result; transition() mutates", "phase": "runtime", "purity": "side-effecting (transition)", "determinism": "deterministic", "state_binding": "ambient/live mutable lifecycle", "serialization": "mutable dataclass; to_dict", "authority": "holds contract; makes no decision", "future_owner": "H16 (runtime lifecycle object)", "disposition": "REMAIN_IN_H16", "compat": "NAME COLLISION: AWC's AgentAssignment is a distinct immutable planning object in the AWC namespace. Do NOT merge. H16 keeps this mutable runtime type unchanged."},
+    {"symbol": "OwnershipTransfer", "module": "coordination.py", "line": 330, "responsibility": "One ownership-transfer record (not in __all__)", "phase": "runtime", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass; to_dict", "authority": "records ownership handoff", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "GoalOwnershipLedger", "module": "coordination.py", "line": 342, "responsibility": "Single-owner-per-goal ledger via append-only transfers", "phase": "runtime", "purity": "side-effecting (transfer)", "determinism": "deterministic", "state_binding": "ambient/live mutable ledger", "serialization": "plain class; to_list", "authority": "enforces single-owner invariant", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "AuthorityDecision", "module": "coordination.py", "line": 372, "responsibility": "Result of one authority check (ok, reason, detail)", "phase": "selection-time", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass; no to_dict", "authority": "carries authority outcome", "future_owner": "AWC eligibility result is the planning analogue; H16 keeps runtime AuthorityDecision", "disposition": "REFERENCE_ONLY"},
+    {"symbol": "AuthorityModel", "module": "coordination.py", "line": 378, "responsibility": "Deterministic capability/authority/budget/ownership checks; authorize() runs them in fixed order", "phase": "mixed (hard-constraint checks = selection; budget/ownership = runtime)", "purity": "pure (reads inputs, returns decision)", "determinism": "deterministic", "state_binding": "reads frozen profile/goal + ambient budget/ledger", "serialization": "stateless class; none", "authority": "THE authority decision-maker", "future_owner": "SPLIT: deterministic hard-constraint eligibility (capability/authority/goal-support) -> AWC; runtime authorize() (budget/ownership at dispatch) -> H16 Coordinator", "disposition": "ADAPT_TO_AWC", "compat": "AWC canonicalizes the pure hard-constraint eligibility semantics; H16 retains runtime authorize() that binds budget/ownership at dispatch. AWC never binds authority."},
+    {"symbol": "WorkerResult", "module": "coordination.py", "line": 441, "responsibility": "Outcome a worker returns", "phase": "runtime", "purity": "pure data", "determinism": "worker-dependent", "state_binding": "snapshot record", "serialization": "mutable dataclass; to_dict", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "WorkerUnavailable", "module": "coordination.py", "line": 460, "responsibility": "Exception triggering runtime recovery", "phase": "runtime", "purity": "side-effecting (control flow)", "determinism": "n/a", "state_binding": "n/a", "serialization": "exception", "authority": "drives AGENT_UNAVAILABLE recovery", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "WorkerExecutor", "module": "coordination.py", "line": 464, "responsibility": "Protocol for executing a contract", "phase": "runtime", "purity": "interface", "determinism": "n/a", "state_binding": "n/a", "serialization": "Protocol", "authority": "none", "future_owner": "H16 / Agent Runtime", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "ScriptedWorker", "module": "coordination.py", "line": 476, "responsibility": "Deterministic test/demo worker", "phase": "runtime", "purity": "side-effecting (internal counter)", "determinism": "deterministic (scripted)", "state_binding": "ambient counter", "serialization": "plain class", "authority": "none", "future_owner": "H16 tests", "disposition": "OUT_OF_SCOPE"},
+    {"symbol": "AgentWorker", "module": "coordination.py", "line": 497, "responsibility": "Wraps a governed agent; runs contract via agent.run_with_trace", "phase": "runtime", "purity": "side-effecting (real agent I/O)", "determinism": "nondeterministic", "state_binding": "ambient/live", "serialization": "plain class", "authority": "executes under delegated authority", "future_owner": "H16 / Agent Runtime", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "CoordinationTraceEntry", "module": "coordination.py", "line": 529, "responsibility": "One coordination decision record", "phase": "runtime", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass; to_dict", "authority": "records rejections/decisions", "future_owner": "H16 (runtime trace); AWC has its own replay record", "disposition": "REFERENCE_ONLY"},
+    {"symbol": "CoordinationTrace", "module": "coordination.py", "line": 560, "responsibility": "Append-only log of coordination decisions", "phase": "runtime", "purity": "side-effecting", "determinism": "deterministic", "state_binding": "ambient/live log", "serialization": "plain class; to_list", "authority": "audit of decisions", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "CoordinationResult", "module": "coordination.py", "line": 581, "responsibility": "Aggregate mission outcome", "phase": "runtime", "purity": "pure data + lookup", "determinism": "deterministic", "state_binding": "holds live ledger/trace/budget refs", "serialization": "mutable dataclass; to_dict", "authority": "aggregates outcomes", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "Coordinator", "module": "coordination.py", "line": 613, "responsibility": "Deterministic coordinator: selects agent, issues contract, invokes executor, commits outputs, advances ownership", "phase": "runtime (orchestration)", "purity": "side-effecting (shared memory, budget, availability, ownership)", "determinism": "deterministic given deterministic workers", "state_binding": "ambient/live shared state", "serialization": "plain class", "authority": "central runtime authority enforcer (calls authorize, reserves budget, recovers)", "future_owner": "H16 (consumes AgentTeamPlan via adapter)", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "format_coordination_trace", "module": "coordination.py", "line": 855, "responsibility": "Render trace to human-readable string", "phase": "runtime", "purity": "pure", "determinism": "deterministic", "state_binding": "reads snapshot", "serialization": "function", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+
+    {"symbol": "RegisteredAgent", "module": "multi_agent.py", "line": 83, "responsibility": "An agent enrolled in a team with routing description", "phase": "selection-time", "purity": "pure data", "determinism": "deterministic", "state_binding": "mutable record", "serialization": "mutable dataclass; no to_dict", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "AgentRegistry", "module": "multi_agent.py", "line": 91, "responsibility": "Named collection of governed agents (name->wrapped agent)", "phase": "selection-time", "purity": "side-effecting (register)", "determinism": "deterministic", "state_binding": "ambient/live mutable", "serialization": "plain class; roster() text", "authority": "none", "future_owner": "H16 (distinct from H16 CapabilityRegistry and AWC snapshot)", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "AgentTurn", "module": "multi_agent.py", "line": 129, "responsibility": "One agent's governed turn", "phase": "runtime", "purity": "pure data", "determinism": "deterministic given trace", "state_binding": "snapshot of one turn", "serialization": "mutable dataclass", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "Handoff", "module": "multi_agent.py", "line": 147, "responsibility": "A control transfer record", "phase": "runtime", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "MultiAgentResult", "module": "multi_agent.py", "line": 156, "responsibility": "Orchestration outcome (turns, handoffs, stop_reason, budget timeline)", "phase": "runtime", "purity": "pure data + props", "determinism": "deterministic given turns", "state_binding": "holds live budget ref", "serialization": "mutable dataclass; to_dict", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "RouteDecision", "module": "multi_agent.py", "line": 220, "responsibility": "Where control goes next (target, done, reason)", "phase": "selection-time (runtime routing)", "purity": "pure data", "determinism": "deterministic", "state_binding": "snapshot record", "serialization": "mutable dataclass; no to_dict", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "Router", "module": "multi_agent.py", "line": 229, "responsibility": "Protocol: selects next agent or signals completion", "phase": "runtime routing", "purity": "interface", "determinism": "n/a", "state_binding": "n/a", "serialization": "Protocol", "authority": "none", "future_owner": "H16", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "KeywordRouter", "module": "multi_agent.py", "line": 246, "responsibility": "Deterministic keyword-scoring supervisor for runtime handoff", "phase": "runtime routing", "purity": "pure", "determinism": "deterministic", "state_binding": "reads ambient turns/registry", "serialization": "plain class", "authority": "none (routing, not authorization)", "future_owner": "H16 (runtime routing != AWC selection)", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "LLMRouter", "module": "multi_agent.py", "line": 325, "responsibility": "LLM-backed supervisor (nondeterministic runtime routing)", "phase": "runtime routing", "purity": "side-effecting (LLM I/O)", "determinism": "nondeterministic", "state_binding": "reads ambient turns/registry", "serialization": "plain class", "authority": "none", "future_owner": "H16 (explicitly must NOT enter AWC: nondeterministic)", "disposition": "REMAIN_IN_H16"},
+    {"symbol": "MultiAgentOrchestrator", "module": "multi_agent.py", "line": 384, "responsibility": "Coordinates a team with handoff; budget + handoff-count bounds only", "phase": "runtime", "purity": "side-effecting", "determinism": "deterministic with KeywordRouter; nondeterministic with LLMRouter", "state_binding": "ambient/live", "serialization": "plain class", "authority": "budget + handoff-count bounds only; no capability/authority model", "future_owner": "H16", "disposition": "REMAIN_IN_H16"}
+  ],
+  "consumers": {
+    "coordination.py": [
+      "agentic/agentic_framework/__init__.py:312 (full re-export)",
+      "agentic/agentic_framework/hierarchical_planning.py:35",
+      "agentic/agentic_framework/event_workflows.py:44",
+      "agentic/agentic_framework/parallel_execution.py:81",
+      "agentic/agentic_framework/workflow_durability.py:53",
+      "agentic/agentic_framework/human_governance.py:38",
+      "agentic/agentic_framework/multi_workflow_orchestration.py:55",
+      "agentic/agentic_framework/external_actions.py:57",
+      "agentic/agentic_framework/tests/test_coordination.py:50"
+    ],
+    "multi_agent.py": [
+      "agentic/agentic_framework/__init__.py:219 (full re-export; only direct importer)"
+    ],
+    "examples": [
+      "examples/authority_aware_coordination.py",
+      "examples/hierarchical_planning.py",
+      "examples/human_governance_review.py",
+      "examples/durable_workflow_recovery.py",
+      "examples/event_driven_workflow.py",
+      "examples/governed_external_actions.py",
+      "agentic/agentic_framework/examples_h21.py",
+      "agentic/agentic_framework/examples_h22.py"
+    ],
+    "tests": [
+      "agentic/agentic_framework/tests/test_coordination.py",
+      "agentic/agentic_framework/tests/test_multi_agent.py",
+      "test_human_governance.py, test_multi_workflow_orchestration.py, test_external_actions.py, test_parallel_execution.py, test_workflow_durability.py, test_event_workflows.py (transitive)"
+    ]
+  },
+  "disposition_summary": {
+    "CANONICALIZE_INTO_AWC": ["AgentProfile"],
+    "ADAPT_TO_AWC": ["CapabilityRegistry", "CoordinationGoal", "DelegationContract", "AuthorityModel"],
+    "COMPATIBILITY_FACADE_CANDIDATE": ["AgentProfile"],
+    "SHARED_NEUTRAL_CONTRACT": [],
+    "REFERENCE_ONLY": ["RejectionReason", "Mission", "AuthorityDecision", "CoordinationTraceEntry"],
+    "REMAIN_IN_H16": ["CoordinationState", "MissionStatus", "AssignmentTransition", "AgentAssignment", "OwnershipTransfer", "GoalOwnershipLedger", "WorkerResult", "WorkerUnavailable", "WorkerExecutor", "AgentWorker", "CoordinationTrace", "CoordinationResult", "Coordinator", "format_coordination_trace", "RegisteredAgent", "AgentRegistry", "AgentTurn", "Handoff", "MultiAgentResult", "RouteDecision", "Router", "KeywordRouter", "LLMRouter", "MultiAgentOrchestrator"],
+    "OUT_OF_SCOPE": ["ScriptedWorker"],
+    "DEPRECATE_LATER": []
+  }
+}

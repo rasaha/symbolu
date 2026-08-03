@@ -1,0 +1,73 @@
+{
+  "audit": "POLICY_COMPILER_CONTRACT_AUDIT",
+  "date": "2026-08-03",
+  "compiler": {
+    "package_root": "packages/tooling/policy-workflow-compiler/",
+    "distribution": "ugence-policy-workflow-compiler",
+    "namespace": "ugence_policy_workflow_compiler",
+    "supported_import_surface": "ugence_policy_workflow_compiler.api",
+    "public_api_name_count": 71,
+    "distribution_version": "0.1.0",
+    "product_version": "0.1.0",
+    "ir_version": "workflow_ir.v1",
+    "schema_version": "policy_pack.v1",
+    "registry_version": "capability_registry.v1",
+    "implemented": true
+  },
+  "canonical_types": {
+    "WorkflowIR": {"module": "compiler/workflow_ir.py", "line": 93, "fields": ["policy_pack_id:str", "policy_pack_version:int", "ir_version:str=workflow_ir.v1", "nodes:Tuple[WorkflowNode,...]", "edges:Tuple[WorkflowEdge,...]", "referenced_capabilities:Tuple[str,...]"], "methods": ["node_kinds (property)", "logical_digest()"]},
+    "WorkflowNode": {"module": "compiler/workflow_ir.py", "line": 56, "fields": ["node_id:str", "kind:NodeKind", "owning_capability:CapabilityId", "authority_type:str", "disposition:AuthorityDisposition", "public_contract_target:str", "input_object_ids:Tuple[str,...]", "output_contract:str", "failure_behavior:BlockBehavior=BLOCK", "audit_requirements:Tuple[str,...]", "label:str"]},
+    "WorkflowEdge": {"module": "compiler/workflow_ir.py", "line": 82, "fields": ["edge_id:str", "kind:EdgeKind", "source_id:str", "target_id:str", "order:int>=0"]},
+    "NodeKind": {"module": "compiler/workflow_ir.py", "line": 27, "count": 14, "values": ["EVIDENCE_REQUIREMENT", "EVIDENCE_ADMISSIBILITY", "DECISION_RULE", "AUTHORITY_CHECK", "APPROVAL_GATE", "SEGREGATION_OF_DUTIES_GATE", "PROHIBITED_CONDITION", "EXCEPTION_BRANCH", "OVERRIDE_GATE", "ACTION_CONSTRAINT", "SEQUENCE_RISK_CHECK", "ACTION_CLEARANCE_REQUIREMENT", "AUDIT_EMISSION", "TERMINAL_OUTCOME"]},
+    "EdgeKind": {"module": "compiler/workflow_ir.py", "line": 44, "count": 9, "values": ["NEXT", "ON_PASS", "ON_FAIL", "ON_MISSING", "ON_EXCEPTION", "ON_OVERRIDE", "ON_ESCALATE", "ON_DENY", "ON_INDETERMINATE"]},
+    "CapabilityId": {"module": "models/common.py", "line": 84, "count": 8, "values": ["TAP", "DECISION_AUTHORITY", "ACTION_GATE", "ACTION_CLEARANCE", "STORYGRAPH", "MODEL_SELECTION", "OPTIONAL_ORCHESTRATOR", "COMPILER"]},
+    "AuthorityDisposition": {"module": "models/common.py", "line": 104, "values": ["ADVISORY", "AUTHORITATIVE"]},
+    "AuthorityType_enum": {"module": "models/common.py", "line": 112, "note": "DISTINCT from WorkflowNode.authority_type (a free-text str)", "values": ["HUMAN_REVIEWER", "HUMAN_APPROVER", "DELEGATED_POLICY", "COMMITTEE", "EXTERNAL_AUTHORITY"]},
+    "CapabilityDefinition": {"module": "compiler/capability_registry.py", "line": 28},
+    "CapabilityRegistry": {"module": "compiler/capability_registry.py", "line": 145, "note": "distinct from H16 CapabilityRegistry"},
+    "CapabilityManifest": {"module": "compiler/release.py", "line": 43},
+    "CompiledReleasePackage": {"module": "compiler/release.py", "line": 64},
+    "ReleaseManifest": {"module": "compiler/release.py", "line": 53}
+  },
+  "node_identity": {
+    "function": "make_node_id",
+    "module": "compiler/workflow_ir.py",
+    "line": 119,
+    "formula": "node_{kind.lower()}_{sha256({kind, owning_capability, sorted(input_object_ids)})[:12]}",
+    "note": "content-addressed; stable node-to-role mapping key"
+  },
+  "governance_ownership": {
+    "authoritative_capabilities": ["DECISION_AUTHORITY", "ACTION_GATE", "ACTION_CLEARANCE"],
+    "advisory_capabilities": ["TAP", "STORYGRAPH", "MODEL_SELECTION", "OPTIONAL_ORCHESTRATOR", "COMPILER"],
+    "rule": "governance ownership = owning_capability in authoritative set AND disposition==AUTHORITATIVE; there is no single is-governance boolean"
+  },
+  "compiled_package_digest": {
+    "algorithm": "sha256 over canonical JSON, prefix 'sha256:'",
+    "logical_payload": ["policy_pack (status-stripped)", "workflow_ir", "capability_manifest", "assurance_manifest", "coverage_matrix", "audit_schema", "compiler_distribution_version"],
+    "excluded": ["timestamps", "release_metadata"],
+    "property": "identical approved input + compiler version -> identical logical digest"
+  },
+  "awc_adapter_contract": {
+    "proposed_name": "CompilerWorkflowAdapter",
+    "status": "PROPOSED_NOT_IMPLEMENTED_IN_PHASE0",
+    "consumes": "ugence_policy_workflow_compiler.WorkflowIR",
+    "produces": ["WorkflowRoleRequirement[]", "NonAgentDisposition[]"],
+    "classification_outcomes": ["AI_AGENT_ELIGIBLE", "NO_AI_AGENT_REQUIRED", "DETERMINISTIC_SERVICE_PREFERRED", "HUMAN_AUTHORITY_REQUIRED", "HUMAN_REVIEW_REQUIRED", "EXISTING_GOVERNANCE_CAPABILITY_OWNS_STEP", "UNSUPPORTED_NODE"],
+    "guarantees": {
+      "supported_contract_version": "workflow_ir.v1 + capability_registry.v1",
+      "unknown_version_behavior": "fail closed; all nodes UNSUPPORTED_NODE; no plan emitted",
+      "unsupported_node_behavior": "classify UNSUPPORTED_NODE; workflow not staffable until resolved; never silently dropped",
+      "provenance_propagation": "carry input_object_ids, audit_requirements, owning_capability, disposition, node_id",
+      "capability_ownership_propagation": "owning_capability preserved unchanged; adapter never re-owns a node",
+      "authority_boundary_preservation": "AUTHORITATIVE never becomes agent work",
+      "stable_node_to_role_mapping": "keyed by content-addressed WorkflowNode.node_id",
+      "fail_closed": "honor failure_behavior=BLOCK; ambiguity escalates, never proceeds",
+      "semantic_drift_detection": "pin compiler distribution version + known (NodeKind,EdgeKind,CapabilityId) set; any new/removed member trips drift alarm"
+    }
+  },
+  "semantic_drift_findings": [
+    "AWC docs invent 'WorkflowGraphSource'; canonical live type is WorkflowIR (no WorkflowGraphSource exists in compiler).",
+    "AWC docs say '15-object policy-pack IR'; the compiler models 20 object categories and emits a 14-node-kind / 9-edge-kind WorkflowIR.",
+    "WorkflowNode.authority_type (free-text str) collides in name with the AuthorityType enum; keep distinct."
+  ]
+}

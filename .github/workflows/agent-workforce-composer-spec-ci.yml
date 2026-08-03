@@ -1,0 +1,139 @@
+name: agent-workforce-composer-spec-ci
+
+# Scoped, documentation-only CI for the Agent Workforce Composer Phase 0
+# reconciliation. This phase adds NO production package and changes NO runtime
+# behavior. The workflow enforces exactly that, plus documentation consistency:
+#   - architecture-assertion validation (boundaries contract);
+#   - stale-terminology scan (no active "spec-only" / "when it ships" compiler claim);
+#   - Markdown-link validation for the new docs/ADR;
+#   - platform-freeze verification (blocking; digest must be unchanged);
+#   - confirmation that no AWC production package was added;
+#   - confirmation that H16 source behavior was not modified;
+#   - confirmation that Policy Workflow Compiler source behavior was not modified.
+# Triggered only by changes to the AWC docs, the ADR/boundary artifacts, the
+# validation script, or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "AGENT_WORKFORCE_COMPOSER_*.md"
+      - "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md"
+      - "docs/architecture/agent_workforce_composer_boundaries.json"
+      - "docs/audits/agent_workforce_composer_phase0/**"
+      - "scripts/validate_awc_boundaries.py"
+      - ".github/workflows/agent-workforce-composer-spec-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/awc-phase0-**"
+      - "chatgpt/awc-phase0-**"
+    paths:
+      - "AGENT_WORKFORCE_COMPOSER_*.md"
+      - "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md"
+      - "docs/architecture/agent_workforce_composer_boundaries.json"
+      - "docs/audits/agent_workforce_composer_phase0/**"
+      - "scripts/validate_awc_boundaries.py"
+      - ".github/workflows/agent-workforce-composer-spec-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  doc-consistency:
+    name: Architecture assertions, stale-terminology, Markdown links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Architecture-assertion + stale-terminology validation
+        run: python scripts/validate_awc_boundaries.py
+      - name: Markdown-link validation (AWC docs, ADR, audit set)
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          repo = pathlib.Path(".")
+          docs = list(repo.glob("AGENT_WORKFORCE_COMPOSER_*.md"))
+          docs.append(repo / "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md")
+          docs += list((repo / "docs/audits/agent_workforce_composer_phase0").glob("*.md"))
+          link = re.compile(r"\[[^\]]*\]\((?!https?://|mailto:)([^)#]+)(?:#[^)]*)?\)")
+          broken = []
+          for d in docs:
+              base = d.parent
+              for i, line in enumerate(d.read_text(encoding="utf-8").splitlines(), 1):
+                  for m in link.finditer(line):
+                      target = m.group(1).strip()
+                      if not target:
+                          continue
+                      # resolve relative to the doc, then relative to repo root
+                      if not ((base / target).exists() or (repo / target).exists()):
+                          broken.append(f"{d}:{i} -> {target}")
+          if broken:
+              print("Broken relative Markdown links:")
+              for b in broken:
+                  print("  -", b)
+              sys.exit(1)
+          print(f"Markdown links OK across {len(docs)} documents")
+          PY
+
+  no-production-code:
+    name: No production package / no H16 or compiler source change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No AWC production package was added
+        run: |
+          if [ -e packages/capabilities/agent-workforce-composer ]; then
+            echo "FAIL: packages/capabilities/agent-workforce-composer must not exist in Phase 0"
+            exit 1
+          fi
+          echo "OK: no AWC production package present"
+      - name: Determine diff base
+        id: base
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: H16 coordination source behavior unchanged
+        run: |
+          CHANGED=$(git diff --name-only "${{ steps.base.outputs.sha }}"...HEAD -- \
+            agentic/agentic_framework/coordination.py \
+            agentic/agentic_framework/multi_agent.py || true)
+          if [ -n "$CHANGED" ]; then
+            echo "FAIL: H16 source changed in a documentation-only phase:"; echo "$CHANGED"; exit 1
+          fi
+          echo "OK: H16 source unchanged"
+      - name: Policy Workflow Compiler source behavior unchanged
+        run: |
+          CHANGED=$(git diff --name-only "${{ steps.base.outputs.sha }}"...HEAD -- \
+            'packages/tooling/policy-workflow-compiler/src/**' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "FAIL: compiler source changed in a documentation-only phase:"; echo "$CHANGED"; exit 1
+          fi
+          echo "OK: compiler source unchanged"
+
+  freeze:
+    name: Platform-freeze verification (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/capabilities/decision-authority
+      - name: Freeze verification (frozen governance artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

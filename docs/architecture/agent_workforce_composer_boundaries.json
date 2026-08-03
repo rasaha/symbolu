@@ -1,0 +1,84 @@
+{
+  "capability": "AGENT_WORKFORCE_COMPOSER",
+  "status": "PHASE0_FROZEN_CONTRACT",
+  "adr": "docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md",
+  "decision": "OPTION_A_CANONICALIZE_INTO_AWC",
+  "owns": [
+    "WORKFLOW_ROLE_EXTRACTION",
+    "AGENT_ELIGIBILITY",
+    "AGENT_RANKING",
+    "TEAM_COMPOSITION",
+    "PLAN_EXPLANATION",
+    "PLAN_REPLAY"
+  ],
+  "must_not_own": [
+    "AGENT_EXECUTION",
+    "MODEL_SELECTION",
+    "WORKFLOW_SCHEDULING",
+    "BINDING_BUSINESS_DECISION",
+    "EXACT_ACTION_AUTHORIZATION",
+    "OPERATIONAL_CLEARANCE"
+  ],
+  "boundaries": {
+    "AWC_TO_COMPILER": {
+      "consumes": "ugence_policy_workflow_compiler.WorkflowIR (workflow_ir.v1)",
+      "seam": "CompilerWorkflowAdapter (data-only, versioned, not implemented in Phase 0)",
+      "rule": "never reclassify an AUTHORITATIVE governance node as agent work; fail closed on unknown version/node"
+    },
+    "AWC_TO_H16": {
+      "awc": ["offline", "pure", "snapshot-pinned", "deterministic", "explainable", "plan-producing", "side-effect-free"],
+      "h16": ["runtime", "stateful", "availability-aware", "dispatching", "recovering", "supervising", "potentially-nondeterministic-where-configured"],
+      "output": "AgentTeamPlan",
+      "rule": "H16 must not silently reselect an agent in a way that broadens permissions, authority_scope, provider allowance, data residency, tool access, cost ceiling, or quality floor; fallback from AWC-approved set or governed reassessment"
+    },
+    "AWC_TO_MODEL_SELECTION": {
+      "awc_selects": "functional AI agents for workflow roles",
+      "model_selection_selects": "models/providers that may power a selected agent invocation",
+      "awc_may_emit": ["model_policy_ref", "model_requirement_ref", "model_constraint_ref"],
+      "rule": "AWC must not rank LLMs, call provider registries, choose endpoints, implement fallback models, or duplicate Model Selection policy"
+    },
+    "AWC_TO_AGENT_RUNTIME": {
+      "handoff": "AgentTeamPlan -> Agent Runtime adapter -> WorkflowDefinition/TaskDefinition/runtime assignment",
+      "rule": "runtime may narrow but never broaden authority/permission bounds; unsupported agent versions fail closed; assignment digests + policy versions preserved; outcomes refer back to plan",
+      "implemented_in_phase0": false
+    },
+    "AWC_TO_H22": {
+      "awc_produces": ["assigned_agent", "authority_scope"],
+      "h22_consumes": "PortfolioWorkflowEntry (agentic/agentic_framework/multi_workflow_orchestration.py:855-856)",
+      "rule": "H22 schedules already-staffed workflows; must not select agents, change assignments, broaden authority, invent fallbacks, or override residency/provider constraints; may pause/surface on unavailability, never ungoverned reselection"
+    }
+  },
+  "canonical_ownership_matrix": {
+    "WORKFLOW_AND_GOVERNANCE_INTERPRETATION": "POLICY_WORKFLOW_COMPILER",
+    "WORKFLOW_ROLE_EXTRACTION": "AGENT_WORKFORCE_COMPOSER",
+    "FROZEN_AGENT_REGISTRY_SNAPSHOT": "AGENT_WORKFORCE_COMPOSER",
+    "AGENT_ELIGIBILITY": "AGENT_WORKFORCE_COMPOSER",
+    "AGENT_RANKING": "AGENT_WORKFORCE_COMPOSER",
+    "TEAM_COMPOSITION": "AGENT_WORKFORCE_COMPOSER",
+    "PROPOSED_PERMISSION_BOUNDS": "AGENT_WORKFORCE_COMPOSER",
+    "BINDING_PERMISSION_ENFORCEMENT": "AGENT_RUNTIME_ACTIONGATE_ACTION_CLEARANCE",
+    "RUNTIME_TASK_DELEGATION": "H16_COORDINATION_OR_AGENT_RUNTIME",
+    "RUNTIME_DISPATCH": "AGENT_RUNTIME",
+    "RUNTIME_RECOVERY": "H16_OR_AGENT_RUNTIME",
+    "MODEL_CHOICE": "MODEL_SELECTION",
+    "MULTI_WORKFLOW_SCHEDULING": "H22",
+    "BINDING_BUSINESS_DECISION": "DECISION_AUTHORITY",
+    "EXACT_ACTION_AUTHORIZATION": "ACTIONGATE",
+    "OPERATIONAL_CLEARANCE": "ACTION_CLEARANCE",
+    "SEQUENCE_RISK_ADVISORY_ANALYSIS": "STORYGRAPH"
+  },
+  "frozen_target_package": {
+    "path": "packages/capabilities/agent-workforce-composer/",
+    "distribution": "ugence-agent-workforce-composer",
+    "namespace": "ugence_agent_workforce_composer",
+    "created_in_phase0": false
+  },
+  "upstream_contract": {
+    "distribution": "ugence-policy-workflow-compiler",
+    "namespace": "ugence_policy_workflow_compiler",
+    "ir_version": "workflow_ir.v1",
+    "implemented": true,
+    "spec_only": false,
+    "risk_label": "UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT"
+  }
+}

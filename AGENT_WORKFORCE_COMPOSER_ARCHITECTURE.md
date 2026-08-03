@@ -1,5 +1,33 @@
 # Agent Workforce Composer — Architecture
 
+> ## Implementation-Status Correction & Reconciliation Note (2026-08-03)
+>
+> *Added by AWC Phase 0 (H16 reconciliation). Changes documentation only; no production code.*
+> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
+> and the audit set [`docs/audits/agent_workforce_composer_phase0/`](docs/audits/agent_workforce_composer_phase0/).
+>
+> - **Original assumption:** the Policy Workflow Compiler was *spec-only / not yet implemented*, with no typed
+>   `WorkflowIR`, to be integrated "when it ships"; AWC would consume an invented `WorkflowGraphSource`.
+> - **Current verified state:** the compiler is **implemented** as the independently packaged
+>   `ugence-policy-workflow-compiler` tooling distribution (PR #1303, merge `96afb58a…`). It emits a deterministic
+>   **`WorkflowIR`** (`workflow_ir.v1`), capability metadata, assurance artifacts, and content-addressed compiled
+>   packages. Document extraction, NLP interpretation, and runtime deployment remain outside its implemented
+>   Phase 1 scope.
+> - **Architectural consequence:** AWC Phase 1 consumes the **canonical compiler contract** via a thin, versioned,
+>   data-only `CompilerWorkflowAdapter` (formerly `WorkflowGraphSource`) — **not** a second workflow
+>   representation. The former "spec-only upstream" risk is replaced by
+>   **`UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT`**.
+> - **Documents changed:** all seven `AGENT_WORKFORCE_COMPOSER_*.md`, plus the new ADR and
+>   `docs/architecture/agent_workforce_composer_boundaries.json`.
+>
+> **Reconciled positions all seven documents now agree on:** (1) the Policy Workflow Compiler is implemented;
+> (2) AWC consumes the canonical compiler `WorkflowIR`; (3) H16 canonicalization is the accepted ADR decision
+> (Option A); (4) AWC is a deterministic, offline, side-effect-free *planning* capability; (5) H16 retains runtime
+> coordination and recovery; (6) Model Selection remains separate (models, not agents); (7) Agent Runtime remains
+> the executor; (8) H22 remains the scheduler; (9) binding authority (Decision Authority / ActionGate / Action
+> Clearance) remains outside AWC; (10) P1 implementation cannot start until the ADR's exit gates pass.
+
+
 **Status:** `[SPEC]` design / pre-implementation. Companion to `AGENT_WORKFORCE_COMPOSER_DESIGN_SPEC.md`.
 Claim labels: `[EXISTING] [SPEC] [INFERENCE] [PROPOSED] [DEFERRED] [UNVALIDATED]` (see design spec §1).
 
@@ -29,10 +57,10 @@ It never opens a socket, calls a provider, executes an agent, or reads a clock.
 
 ```
         ┌─────────────────────────────┐
-        │  Policy Workflow Compiler   │  [EXISTING: spec-only]
-        │  → governed workflow graph  │
+        │  Policy Workflow Compiler   │  [EXISTING] (implemented, PR #1303)
+        │  → WorkflowIR (workflow_ir.v1) │
         └──────────────┬──────────────┘
-                       │  (injected data: WorkflowGraphSource)
+                       │  (injected data: WorkflowIR via CompilerWorkflowAdapter)
                        ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                    AGENT WORKFORCE COMPOSER  [SPEC]                 │
@@ -136,7 +164,7 @@ eliminated-with-reason. There is no path that drops an input silently or invents
 
 | Seam | Direction | Shape | Classification |
 |---|---|---|---|
-| `WorkflowGraphSource` | in | adapter over the Policy Workflow Compiler's governed workflow graph | `COMPOSE` |
+| `CompilerWorkflowAdapter` (over `WorkflowIR`) | in | versioned data-only adapter over the Policy Workflow Compiler's canonical `WorkflowIR` (`workflow_ir.v1`) | `COMPOSE` |
 | `AgentRegistrySnapshot` | in | frozen provider/agent profiles; provenance owned upstream | `COMPOSE` (+ `ADAPT` H16 shape) |
 | `EnterpriseAgentPolicy` / `CompositionPolicy` | in | customer-owned constraints + engine policy-as-data | `SPEC` |
 | `AgentTeamPlan` → Agent Runtime | out | maps to a `WorkflowDefinition` of `TaskDefinition`s | `COMPOSE` |

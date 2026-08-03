@@ -1,5 +1,33 @@
 # Agent Workforce Composer — Design Specification
 
+> ## Implementation-Status Correction & Reconciliation Note (2026-08-03)
+>
+> *Added by AWC Phase 0 (H16 reconciliation). Changes documentation only; no production code.*
+> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
+> and the audit set [`docs/audits/agent_workforce_composer_phase0/`](docs/audits/agent_workforce_composer_phase0/).
+>
+> - **Original assumption:** the Policy Workflow Compiler was *spec-only / not yet implemented*, with no typed
+>   `WorkflowIR`, to be integrated "when it ships"; AWC would consume an invented `WorkflowGraphSource`.
+> - **Current verified state:** the compiler is **implemented** as the independently packaged
+>   `ugence-policy-workflow-compiler` tooling distribution (PR #1303, merge `96afb58a…`). It emits a deterministic
+>   **`WorkflowIR`** (`workflow_ir.v1`), capability metadata, assurance artifacts, and content-addressed compiled
+>   packages. Document extraction, NLP interpretation, and runtime deployment remain outside its implemented
+>   Phase 1 scope.
+> - **Architectural consequence:** AWC Phase 1 consumes the **canonical compiler contract** via a thin, versioned,
+>   data-only `CompilerWorkflowAdapter` (formerly `WorkflowGraphSource`) — **not** a second workflow
+>   representation. The former "spec-only upstream" risk is replaced by
+>   **`UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT`**.
+> - **Documents changed:** all seven `AGENT_WORKFORCE_COMPOSER_*.md`, plus the new ADR and
+>   `docs/architecture/agent_workforce_composer_boundaries.json`.
+>
+> **Reconciled positions all seven documents now agree on:** (1) the Policy Workflow Compiler is implemented;
+> (2) AWC consumes the canonical compiler `WorkflowIR`; (3) H16 canonicalization is the accepted ADR decision
+> (Option A); (4) AWC is a deterministic, offline, side-effect-free *planning* capability; (5) H16 retains runtime
+> coordination and recovery; (6) Model Selection remains separate (models, not agents); (7) Agent Runtime remains
+> the executor; (8) H22 remains the scheduler; (9) binding authority (Decision Authority / ActionGate / Action
+> Clearance) remains outside AWC; (10) P1 implementation cannot start until the ADR's exit gates pass.
+
+
 **Working name:** Ugence Agent Workforce Composer (AWC)
 **Proposed distribution:** `ugence-agent-workforce-composer` · **namespace:** `ugence_agent_workforce_composer`
 **Status:** `[SPEC]` — design / pre-implementation. Version 0.1 (design spec). Date: 2026-08-03.
@@ -198,7 +226,7 @@ audits). Classes: `REUSE` (import its public contract), `COMPOSE` (consume/emit 
 | **AI Hiring** | `packages/products/ai-hiring` (`ugence_ai_hiring`) + `ai_hiring/` | `REFERENCE_ONLY` | Donates rubric/evidence/eligibility/authority-separation/immutable-record/replay **patterns**. **No dependency; no candidate/employment entity reuse.** |
 | **`ugence-decision-authority` kernel** | `packages/capabilities/decision-authority` (`ugence_decision_authority`) | `REUSE` (domain-neutral primitives) | `DomainModel`, `ActorType`, `AuditEvent`, `ReasonCode`/catalog, `canonical_hash`, `Clock`/`IdFactory`, decision-case/CER contracts are already domain-neutral and extracted from hiring. AWC binds to the opaque-`subject_ref` seam. |
 | **Governance Contracts** | `packages/governance-contracts` (`ugence_governance_contracts`) | `REUSE` | Neutral provenance vocabulary: `evidence_refs`, `decision_refs`, `policy_refs`, `authority_context`/`authority_basis`, `fingerprint`, `correlation_id`; `ProviderKind`/`ProviderCapabilities`/`ProviderDescriptor` for the provider side. Leaf, stdlib-only. |
-| **Policy Workflow Compiler** | `POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md` (spec-only) | `COMPOSE` (upstream input) | Produces the governed workflow graph AWC consumes. **Spec-only today**; AWC must define an adapter against its 15-object policy-pack IR and degrade gracefully when it is absent (§7). |
+| **Policy Workflow Compiler** | `packages/tooling/policy-workflow-compiler` (`ugence_policy_workflow_compiler`) — **implemented** (PR #1303) | `COMPOSE` (upstream input) | `[EXISTING]` Emits a typed, deterministic **`WorkflowIR`** (`workflow_ir.v1`: 14 node kinds, 9 edge kinds, content-addressed node ids) that AWC consumes. AWC defines a versioned data-only adapter (`CompilerWorkflowAdapter`) over `WorkflowIR` — **not** a second IR (§7). Document extraction / NLP / runtime deployment remain outside the compiler's implemented Phase 1 scope. |
 | **StoryGraph policy-pack compiler** | `packages/capabilities/storygraph/.../policypack/compiler.py` | `REFERENCE_ONLY` | Real deterministic-compile-with-digest-lineage + human-approval publish gate — the template for AWC's compile+freeze+publish discipline (`CompiledPolicyBundle`: `source_pack_digest`, `bundle_digest`, `lineage`, `publishable`). |
 | **Tool contracts** | `cyber_security/action_gateway_mcp/.../registry.py` (`ToolSpec`); `agent_runtime_migration/tools/registry.py` (`RegisteredTool`, `RiskClass`) | `ADAPT` | Model the per-tool contract shape (`required_evidence`, `approver_policy`, `scope_permissions`, `consequence`, `reversibility`, `simulation_required`) and the risk-class-from-trusted-registry-never-model discipline. |
 | **H16 multi-agent coordination** | `agentic/agentic_framework/coordination.py`, `multi_agent.py` | **`OVERLAPPING` / `DUPLICATE_RISK`** → `ADAPT` | Already implements agent profiles, deterministic candidate selection, delegation/assignment, authority model, fallback-across-candidates. AWC must **adapt/canonicalize** these into a leaf capability, not fork them. The *runtime coordination/recovery* and `LLMRouter` parts stay in H16 and are `OUT_OF_SCOPE` for AWC. |
@@ -220,7 +248,7 @@ where a name collides with an existing H16 symbol it is flagged for reconciliati
 
 - **`WorkflowRoleRequirement`** — the measurable requirement for one eligible workflow step.
 - **`AgentCapability`** / **`CapabilityEvidence`** — a declared/measured/observed capability and its provenance.
-- **`AgentProfile`** — an agent's evidence-backed manifest (⚠ name collides with H16 `AgentProfile`; reconcile).
+- **`AgentProfile`** — an agent's evidence-backed manifest. **Resolved** by the Phase 0 ADR (`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`): the selection `AgentProfile` is canonicalized into the AWC namespace; H16 retains its runtime coordination and may re-export the canonical profile only where fields are byte-identical.
 - **`AgentRegistrySnapshot`** — the frozen, content-addressed set of profiles AWC selects over.
 - **`EnterpriseAgentPolicy`** — customer-owned hard constraints and prohibitions (governance plane).
 - **`CompositionPolicy`** — the versioned policy-as-data artifact (weights, team rules) the AWC engine interprets.
@@ -245,12 +273,13 @@ where a name collides with an existing H16 symbol it is flagged for reconciliati
 
 ## 7. Workflow-role extraction contract
 
-`[SPEC]` **Input.** AWC consumes the **governed workflow graph** produced by the Policy Workflow Compiler
-(`[EXISTING]` spec-only: `POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md` §9 output contract — "workflow graph,
-evidence collectors, authority checks, decision gates, exception/override branches, action constraints,
-sequence-risk checks, audit schema, connector configuration"). Because that compiler is **not yet implemented**,
-AWC defines a stable adapter interface `WorkflowGraphSource` and, for the MVP, accepts a hand-authored graph that
-conforms to the same shape. AWC never re-derives controls; it reads them.
+`[SPEC]` **Input.** AWC consumes the canonical **`WorkflowIR`** emitted by the **implemented** Policy Workflow
+Compiler (`[EXISTING]` `ugence_policy_workflow_compiler.api.WorkflowIR`, `workflow_ir.v1` — nodes carry
+`kind`, `owning_capability`, `disposition` (ADVISORY/AUTHORITATIVE), `input_object_ids`, `failure_behavior`,
+`audit_requirements`; edges carry a deterministic `order`). AWC defines a stable, versioned, data-only adapter
+interface `CompilerWorkflowAdapter` (formerly named `WorkflowGraphSource`) over `WorkflowIR` — a thin classifier,
+**not** a second workflow representation. For offline assurance the MVP may additionally accept a hand-authored
+`WorkflowIR` fixture of the same type. AWC never re-derives controls; it reads them.
 
 `[SPEC]` **Extraction is deterministic and per-node.** For each workflow node, the extractor classifies the node
 into exactly one of:
@@ -633,7 +662,7 @@ def compose_agents(
     *, now: float,
 ) -> AgentTeamPlan: ...
 
-def extract_roles(workflow_graph: WorkflowGraphSource, *, now: float) -> list[WorkflowRoleRequirement | NonAgentDisposition]: ...
+def extract_roles(workflow_ir: WorkflowIR, *, now: float) -> list[WorkflowRoleRequirement | NonAgentDisposition]: ...  # via CompilerWorkflowAdapter
 def evaluate_eligibility(profile: AgentProfile, role: WorkflowRoleRequirement, *, policy, now) -> AgentEligibilityResult: ...
 def explain(plan: AgentTeamPlan) -> SelectionExplanation: ...
 def replay(record: SelectionReplayRecord) -> AgentTeamPlan: ...
@@ -691,7 +720,7 @@ demand claim.
 - three reference workflows (§35): procurement approval, customer-support escalation, cybersecurity incident triage;
 - 10–15 **synthetic** agent profiles with declared/measured/observed evidence;
 - frozen registry snapshots + `CompositionPolicy` + `EnterpriseAgentPolicy` fixtures;
-- role extraction from a hand-authored governed-workflow graph (Policy Workflow Compiler is spec-only);
+- role extraction from a real compiler `WorkflowIR` fixture (the Policy Workflow Compiler is implemented; a hand-authored `WorkflowIR` of the same type is an additional offline fixture);
 - hard-constraint elimination; individual scoring; team composition; permission-bounded assignments;
 - fallback selection; the explanation/elimination ledger; replay; offline counterfactual (the constraint-change
   demo — "customer data must remain in India");
@@ -763,8 +792,10 @@ analysis agent any containment permission (SoD).
    definition before any non-advisory use.
 4. **Model-policy handoff** — exact neutral shape of the per-assignment `model_policy_ref` that Model Selection later
    resolves (avoid coupling).
-5. **Policy Workflow Compiler IR** — the upstream compiler is spec-only; the `WorkflowGraphSource` adapter must be
-   co-designed with it to avoid two divergent IRs.
+5. **Policy Workflow Compiler IR** — the upstream compiler is **implemented** and emits a canonical `WorkflowIR`;
+   the `CompilerWorkflowAdapter` consumes it directly (no second IR). The residual risk is
+   `UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT` — pinning `workflow_ir.v1` and detecting node/edge/capability
+   enum drift rather than inventing a rival representation.
 6. **Quality provenance** — minimum evidence bar (sample size, TTL) for a `measured` capability to satisfy a hard
    `minimum_quality`. `[UNVALIDATED]`.
 
@@ -800,7 +831,7 @@ reassignment.
    **nothing** that executes an agent, routes a model, authorizes an action, or schedules a workflow.
 5. **Major technical risks?** (a) H16 duplication if not reconciled first; (b) authority-boundary creep into
    decision/authorization/clearance/scheduling; (c) `[UNVALIDATED]` authority-concentration and quality heuristics;
-   (d) dependence on a **spec-only** upstream compiler (IR risk); (e) trust/provenance of the registry snapshot;
+   (d) `UPSTREAM_CONTRACT_ALIGNMENT_AND_SEMANTIC_DRIFT` — consuming the implemented compiler's canonical `WorkflowIR` and detecting contract/semantic drift (this supersedes the earlier assumption that the compiler was unbuilt); (e) trust/provenance of the registry snapshot;
    (f) `[UNVALIDATED]` demand.
 6. **Exact next implementation phase?** **Phase 0 (no production code):** a reconciliation ADR that decides the H16
    canonicalization shape and freezes the AWC↔H16, AWC↔Model-Selection, AWC↔Agent-Runtime, and AWC↔H22 boundaries —

@@ -1,0 +1,78 @@
+{
+  "audit_phase": "AWC_PHASE0_H16_RECONCILIATION",
+  "audit_date": "2026-08-03",
+  "repository": "rasaha/symbolu",
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_branch_tip_sha": "0d8c4e05718494e95c501402dd5b09daefc99636",
+  "starting_commit_sha": "0d8c4e05718494e95c501402dd5b09daefc99636",
+  "working_branch": "claude/awc-phase0-h16-reconciliation-b7jw0x",
+  "working_branch_prefix_note": "Environment requires the 'claude/' branch prefix; the roadmap-suggested name 'chatgpt/awc-phase0-reconciliation' is superseded by the mandated branch.",
+  "pull_requests": {
+    "policy_workflow_compiler": {
+      "number": 1303,
+      "title": "tooling: implement structured Policy-Pack workflow compiler MVP",
+      "state": "closed",
+      "merged": true,
+      "merged_at_utc": "2026-08-03T11:27:48Z",
+      "merge_commit_sha": "96afb58a5792b4d80225f81406abf8fcfe0eec4f",
+      "head_ref": "claude/policy-workflow-compiler-mvp-5m6o02",
+      "head_sha": "4a95d538270b9e88a75f67e382600a63d4d82c62",
+      "base_ref": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+      "base_sha_at_open": "04f24d3e4ac9bc755f21fc650ec19a73df0b469b",
+      "additions": 11275,
+      "changed_files": 109,
+      "commits": 13,
+      "html_url": "https://github.com/rasaha/symbolu/pull/1303"
+    },
+    "agent_workforce_composer_spec": {
+      "number": 1305,
+      "title": "Add Agent Workforce Composer design specification (spec-only)",
+      "state": "closed",
+      "merged": true,
+      "merged_at_utc": "2026-08-03T11:39:51Z",
+      "merge_commit_sha": "0fa80fe4146478aa452ae40eed12e234683e645e",
+      "head_ref": "claude/agent-workforce-composer-spec-3rjaux",
+      "head_sha": "b80e8104786cbd8c9729df3a8fb14ef993b19bd3",
+      "base_ref": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+      "base_sha_at_open": "96afb58a5792b4d80225f81406abf8fcfe0eec4f",
+      "additions": 1828,
+      "changed_files": 7,
+      "commits": 1,
+      "html_url": "https://github.com/rasaha/symbolu/pull/1305"
+    }
+  },
+  "policy_workflow_compiler": {
+    "package_root": "packages/tooling/policy-workflow-compiler/",
+    "distribution_name": "ugence-policy-workflow-compiler",
+    "canonical_namespace": "ugence_policy_workflow_compiler",
+    "distribution_version": "0.1.0",
+    "product_version": "0.1.0",
+    "supported_import_surface": "ugence_policy_workflow_compiler.api",
+    "public_api_name_count": 71,
+    "ir_version": "workflow_ir.v1",
+    "schema_version": "policy_pack.v1",
+    "registry_version": "capability_registry.v1",
+    "implemented": true,
+    "maturity": {
+      "structured_policy_pack_implemented": true,
+      "deterministic_compilation_verified": true,
+      "procurement_reference_equivalence_verified": true,
+      "document_extraction_implemented": false,
+      "runtime_deployment_implemented": false,
+      "pilot_validated": false,
+      "production_certified": false
+    }
+  },
+  "platform_freeze": {
+    "verify_command": "python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json",
+    "result_before": "PASS",
+    "substantive_digest_before": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "rebaselined": false
+  },
+  "h16_coordination_layer": {
+    "primary_modules": [
+      "agentic/agentic_framework/coordination.py",
+      "agentic/agentic_framework/multi_agent.py"
+    ]
+  }
+}
