@@ -38,10 +38,12 @@ To avoid overloading one field with two meanings, a result carries two digests, 
 a domain-separated SHA-256 over canonical JSON (sorted keys, no whitespace, no
 `repr()`), and neither includes the opaque equivalence-key *value*:
 
-- **`outcome_fingerprint`** — the *selected outcome* only (ordered surviving ids;
-  sorted removed/restored/protected id sets; token counts; equivalence status;
-  fallback flag; policy version; oracle identity). Byte-identical to the v0.1.0
-  `fingerprint` field.
+- **`outcome_fingerprint`** — the *selected outcome* only: context id; mode; ordered
+  surviving ids; sorted structurally-removed / extractively-removed / restored /
+  protected id sets; equivalence status; fallback flag; policy **version**; oracle id;
+  oracle contract version. It does **not** bind token counts, unit text, requested
+  reduction/budget, evaluation time, reason codes, the policy fingerprint, or the
+  oracle validity/correlation. Byte-identical to the v0.1.0 `fingerprint` field.
 - **`run_fingerprint`** — the *complete run identity*: request identity (context
   contract version, id, correlation, ordered per-unit content digests + resolved
   token counts + protected flag + redundancy set, requested reduction, requested
@@ -54,3 +56,14 @@ a domain-separated SHA-256 over canonical JSON (sorted keys, no whitespace, no
 text, correlation, requested reduction, token budget, policy, or resolved token counts
 changes `run_fingerprint`; changing what survived changes both. Dictionary/metadata
 ordering never changes either digest.
+
+**Strict canonical JSON (v0.1.2).** All fingerprint/policy serialization uses
+`allow_nan=False`, so a digest can never contain the non-standard `NaN` / `Infinity`
+tokens — a non-finite number raises `ValueError` deterministically instead of yielding
+an unstable digest. Timestamps and token counts are validated to be finite before they
+can reach a digest.
+
+**Token-counter identity (v0.1.2, `run/2`).** The run fingerprint identifies an injected
+token counter by an explicit optional `counter_id` (with optional `counter_version`),
+falling back to the fully-qualified type name (`module.qualname`) — not the bare class
+name, which two different counters could share. The default counter is `"default"`.
