@@ -105,6 +105,13 @@
       "clean_stable": false,
       "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
       "dir": "results/seeds/H1/seed_24"
+    },
+    {
+      "arm": "H1",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/H1/seed_25"
     }
   ]
 }
