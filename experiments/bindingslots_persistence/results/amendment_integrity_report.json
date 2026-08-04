@@ -1,6 +1,6 @@
 {
   "schema": "bindingslots_persistence/amendment_integrity_report/v1",
-  "checks": 34,
+  "checks": 35,
   "failures": [],
   "verdict": "BINDINGSLOTS_PERSISTENCE_ADAPTIVE_AMENDMENT_VERIFIED",
   "training_started": false,
