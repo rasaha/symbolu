@@ -1,0 +1,98 @@
+{
+  "checks": [
+    {
+      "check": "all_fixture_artifacts_present",
+      "detail": "14/14",
+      "passed": true
+    },
+    {
+      "check": "fixture_evidence_labeled",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "no_artifact_claims_real_access",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "all_decisions_shadow_proposed_only",
+      "detail": "3 decisions",
+      "passed": true
+    },
+    {
+      "check": "ledger_no_transmitted_write_methods",
+      "detail": "[]",
+      "passed": true
+    },
+    {
+      "check": "request_method_ledger_complete",
+      "detail": "6 entries",
+      "passed": true
+    },
+    {
+      "check": "authorization_scenarios_all_ok",
+      "detail": "20 scenarios",
+      "passed": true
+    },
+    {
+      "check": "stale_state_all_ok",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "hpa_classifications_complete",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "mutation_canaries_all_blocked",
+      "detail": "14/14",
+      "passed": true
+    },
+    {
+      "check": "canaries_no_transmitted_writes",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "network_failures_contained",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "secret_redaction_ok",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "no_committed_secret_material",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "aggregate_verdict_ok",
+      "detail": "CLOUD_SCALING_OPERATIONS_SHADOW_HARNESS_FIXTURE_OK",
+      "passed": true
+    },
+    {
+      "check": "schemas_validate",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "package_versions_recorded",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "source_revision_recorded",
+      "detail": "",
+      "passed": true
+    }
+  ],
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "ok": true,
+  "real_cluster_accessed": false,
+  "real_environment_observed": false
+}

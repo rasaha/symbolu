@@ -1,0 +1,71 @@
+{
+  "all_ok": true,
+  "cases": [
+    {
+      "actionable": true,
+      "case": "fresh",
+      "classification": "FRESH",
+      "expected": "FRESH",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "age_exceeded",
+      "classification": "AGE_EXCEEDED",
+      "expected": "AGE_EXCEEDED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "resource_version_changed",
+      "classification": "RESOURCE_VERSION_CHANGED",
+      "expected": "RESOURCE_VERSION_CHANGED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "generation_changed",
+      "classification": "GENERATION_CHANGED",
+      "expected": "GENERATION_CHANGED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "replica_state_changed",
+      "classification": "REPLICA_STATE_CHANGED",
+      "expected": "REPLICA_STATE_CHANGED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "hpa_desired_changed",
+      "classification": "HPA_DESIRED_CHANGED",
+      "expected": "HPA_DESIRED_CHANGED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "resource_disappeared",
+      "classification": "RESOURCE_DISAPPEARED",
+      "expected": "RESOURCE_DISAPPEARED",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "namespace_unavailable",
+      "classification": "NAMESPACE_UNAVAILABLE",
+      "expected": "NAMESPACE_UNAVAILABLE",
+      "ok": true
+    },
+    {
+      "actionable": false,
+      "case": "incomplete",
+      "classification": "INCOMPLETE",
+      "expected": "INCOMPLETE",
+      "ok": true
+    }
+  ],
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "real_cluster_accessed": false,
+  "real_environment_observed": false
+}

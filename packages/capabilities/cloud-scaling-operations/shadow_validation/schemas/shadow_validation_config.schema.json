@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "cluster_identifier": {
+      "type": "string"
+    },
+    "context_name": {
+      "type": "string"
+    },
+    "environment_classification": {
+      "type": "string"
+    },
+    "execution_mode": {
+      "const": "SHADOW",
+      "type": "string"
+    },
+    "maximum_observation_age_seconds": {
+      "type": "number"
+    },
+    "maximum_target_count": {
+      "type": "integer"
+    },
+    "mutation_enabled": {
+      "type": "boolean"
+    },
+    "namespace_allowlist": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "request_timeout_seconds": {
+      "type": "number"
+    },
+    "resource_kind_allowlist": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "resource_name_allowlist": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "tls_verify": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "environment_classification",
+    "cluster_identifier",
+    "context_name",
+    "namespace_allowlist",
+    "resource_kind_allowlist",
+    "resource_name_allowlist",
+    "maximum_target_count",
+    "tls_verify",
+    "execution_mode",
+    "mutation_enabled"
+  ],
+  "title": "ShadowValidationConfig",
+  "type": "object"
+}

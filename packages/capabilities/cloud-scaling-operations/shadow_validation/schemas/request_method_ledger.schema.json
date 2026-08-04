@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "allowed": {
+      "type": "boolean"
+    },
+    "blocked": {
+      "type": "boolean"
+    },
+    "blocked_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "call_site": {
+      "type": "string"
+    },
+    "destination_class": {
+      "type": "string"
+    },
+    "duration_ms": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "fixture_or_real": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "redacted_endpoint": {
+      "type": "string"
+    },
+    "response_status": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "timestamp": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "timestamp",
+    "destination_class",
+    "redacted_endpoint",
+    "method",
+    "allowed",
+    "blocked",
+    "call_site",
+    "fixture_or_real"
+  ],
+  "title": "RequestMethodLedgerEntry",
+  "type": "object"
+}

@@ -147,6 +147,26 @@ def _cmd_verify_install(_a) -> int:
     return 0
 
 
+def _cmd_shadow(a) -> int:
+    # The read-only shadow-validation harness is a repository dev tool (not shipped in
+    # the wheel). Delegate to it lazily; from an installed wheel it is unavailable.
+    import os
+    try:
+        from shadow_validation.cli import main as shadow_main
+    except ImportError:
+        pkg_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        if pkg_dir not in sys.path:
+            sys.path.insert(0, pkg_dir)
+        try:
+            from shadow_validation.cli import main as shadow_main
+        except ImportError:
+            _eprint("error: the read-only shadow-validation harness is a repository dev "
+                    "tool and is not part of the installed wheel; run it from a source "
+                    "checkout (packages/capabilities/cloud-scaling-operations).")
+            return 3
+    return shadow_main(a.shadow_args)
+
+
 def _cmd_execute(a) -> int:
     # Live execution is deliberately hard: it requires an unmistakable command plus
     # explicit flags. This CLI never ships a real backend/credentials, so a live
@@ -186,6 +206,10 @@ def build_parser() -> argparse.ArgumentParser:
     sim.add_argument("--input", "-i", required=True)
     sim.add_argument("--authorization", "-a", default=None)
     sim.set_defaults(func=_cmd_simulate)
+
+    sh = sub.add_parser("shadow", help="read-only shadow-validation harness (dev tool)")
+    sh.add_argument("shadow_args", nargs=argparse.REMAINDER)
+    sh.set_defaults(func=_cmd_shadow)
 
     ex = sub.add_parser("execute", help="live execution (requires explicit flags)")
     ex.add_argument("--mode", default="dry_run")

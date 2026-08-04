@@ -1,0 +1,167 @@
+{
+  "all_blocked": true,
+  "canaries": [
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "outcome=shadowed, backend unchanged=True",
+      "entrypoint": "ControlledScalingExecutor(SHADOW)",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "shadowed",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "outcome=denied",
+      "entrypoint": "ControlledScalingExecutor(LIVE, no authorization)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "denied",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "barrier blocked PATCH=True, transmitted_writes=[]",
+      "entrypoint": "KubernetesScalingExecutor.set_replicas",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "blocked",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "applied=False, transmitted_writes=[], token_leaked=False",
+      "entrypoint": "GateExecutor.sync(LIVE)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "hold",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "missing prior execution receipt",
+      "entrypoint": "RollbackCoordinator.rollback(no authorization)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "denied",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "",
+      "entrypoint": "ReadOnlyHTTPClient(generic POST)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "blocked",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "refused: RuntimeError",
+      "entrypoint": "ProductionOrchestrator(auto-approve + live actuator)",
+      "fallback_bypass": false,
+      "mutation_path_reached": true,
+      "passed": true,
+      "result": "refused",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=dry_run",
+      "entrypoint": "GateActuator (default)",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:dry_run",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=dry_run",
+      "entrypoint": "K8sActuator (default)",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:dry_run",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=no_listener",
+      "entrypoint": "MetricsExporter (default)",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:no_listener",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=noop_without_sdk",
+      "entrypoint": "OtelExporter (default)",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:noop_without_sdk",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=constructed_no_dispatch",
+      "entrypoint": "recommendation webhook sender",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:constructed_no_dispatch",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=evaluation_only",
+      "entrypoint": "admission-policy path",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:evaluation_only",
+      "transport_write_calls": 0
+    },
+    {
+      "audit_or_denial": true,
+      "blocked_before_transmission": true,
+      "detail": "default mode=recommendation_only_no_execution",
+      "entrypoint": "RecommendEngine",
+      "fallback_bypass": false,
+      "mutation_path_reached": false,
+      "passed": true,
+      "result": "default_non_mutating:recommendation_only_no_execution",
+      "transport_write_calls": 0
+    }
+  ],
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "passed": 14,
+  "real_cluster_accessed": false,
+  "real_environment_observed": false,
+  "real_network_transmissions": 0,
+  "socket_opens": 1,
+  "total": 14,
+  "transmitted_write_methods": []
+}
