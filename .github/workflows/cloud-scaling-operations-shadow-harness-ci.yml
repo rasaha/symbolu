@@ -1,0 +1,164 @@
+name: cloud-scaling-operations-shadow-harness-ci
+
+# Scoped CI for the environment-independent read-only shadow-validation HARNESS. This
+# workflow uses ONLY local fakes: it receives no kubeconfig and no cluster credentials,
+# contacts no Kubernetes or ArgoCD server, and performs no infrastructure mutation. The
+# real-environment observation is a separate, manually-run, resource-gated task whose
+# sanitized evidence would later be checked here.
+
+on:
+  push:
+    paths:
+      - "packages/capabilities/cloud-scaling-operations/**"
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - ".github/workflows/cloud-scaling-operations-shadow-harness-ci.yml"
+  pull_request:
+    paths:
+      - "packages/capabilities/cloud-scaling-operations/**"
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - ".github/workflows/cloud-scaling-operations-shadow-harness-ci.yml"
+
+jobs:
+  cloud-scaling-operations-shadow-harness:
+    runs-on: ubuntu-latest
+    env:
+      OPS: packages/capabilities/cloud-scaling-operations
+      ADV: packages/capabilities/cloud-scaling-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling (no cloud SDK, no kubeconfig)
+        run: python -m pip install --upgrade pip build pytest pip-audit numpy
+
+      - name: Set PYTHONPATH (harness + operations + advisory, source only)
+        run: echo "PYTHONPATH=$PWD/$OPS:$PWD/$OPS/src:$PWD/$ADV/src" >> "$GITHUB_ENV"
+
+      - name: Byte-compile (syntax) check
+        run: |
+          python -m py_compile $(git ls-files "$OPS/shadow_validation" | grep '\.py$')
+          python -m py_compile "$OPS/shadow_mutation_canaries.py" \
+            "$OPS/verify_cloud_scaling_operations_shadow_harness.py"
+
+      - name: Harness source scan (no live executor / no auto-discovery)
+        run: |
+          python - <<'PY'
+          from shadow_validation.integrity import scan_harness_source
+          v = scan_harness_source()
+          assert not v, v
+          print("harness source scan clean")
+          PY
+
+      - name: JSON schema validation (schemas parse + self-consistent)
+        run: |
+          python - <<'PY'
+          from shadow_validation.evidence import list_schemas, load_schema
+          s = list_schemas(); assert len(s) == 11, s
+          for n in s:
+              sch = load_schema(n)
+              assert sch.get("type") == "object" and "properties" in sch, n
+          print("schemas ok:", len(s))
+          PY
+
+      - name: Shadow harness unit tests (transport/canaries/authz/stale/hpa/redaction/import)
+        run: python -m pytest "$OPS/tests/shadow_validation" -q
+
+      - name: Mutation canaries (zero transmissions)
+        run: |
+          python - <<'PY'
+          from shadow_mutation_canaries import run_mutation_canaries
+          r = run_mutation_canaries()
+          assert r["all_blocked"], [c for c in r["canaries"] if not c["passed"]]
+          assert r["transmitted_write_methods"] == [] and r["real_network_transmissions"] == 0
+          print("canaries all blocked:", r["passed"], "/", r["total"])
+          PY
+
+      - name: Fixture evidence generation (temp dir; committed evidence untouched)
+        run: SHADOW_FIXTURE_OUT=/tmp/shadow-fixture-ci python "$OPS/scripts/generate_shadow_fixture_evidence.py"
+
+      - name: Shadow harness integrity verifier (regenerates + compares deterministic evidence)
+        run: python "$OPS/verify_cloud_scaling_operations_shadow_harness.py"
+
+      - name: CLI smoke (non-mutating; fake only)
+        run: |
+          python -m ugence_cloud_scaling_operations.cli shadow inspect-harness >/dev/null
+          python -m ugence_cloud_scaling_operations.cli shadow mutation-canaries >/dev/null
+          python -m ugence_cloud_scaling_operations.cli shadow validate-config >/dev/null
+          echo "shadow CLI smoke ok"
+
+      - name: Operations package regression (authority intact)
+        run: python -m pytest "$OPS/tests" -q
+
+      - name: Advisory-boundary regression (advisory stays advisory-only)
+        run: python -m pytest "$ADV/tests" -q
+
+      - name: Existing Cloud Scaling regression (legacy identity intact)
+        run: python -m pytest tests/cloud_controller -q
+
+      - name: Operations distribution verifier (execution-capable + authority-gated)
+        run: python "$OPS/verify_cloud_scaling_operations_distribution.py"
+
+      - name: Advisory distribution verifier (advisory-only)
+        run: python "$ADV/verify_cloud_scaling_controller_distribution.py"
+
+      - name: Credential / secret scan (no cluster creds committed)
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path("packages/capabilities/cloud-scaling-operations")
+          pats = [re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
+                  re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+                  re.compile(r"(?i)apiVersion:\s*v1[\s\S]*kind:\s*Config")]  # kubeconfig
+          bad = []
+          for p in list(root.glob("artifacts/shadow_harness_fixture/*")) + \
+                   list(root.glob("shadow_validation/**/*.py")):
+              t = p.read_text(errors="ignore")
+              for rx in pats:
+                  for m in rx.finditer(t):
+                      if "<redacted>" not in m.group(0):
+                          bad.append(f"{p}: {m.group(0)[:24]}...")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("credential/secret scan clean")
+          PY
+
+      - name: Claims / terminology check (no real-validation claim)
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          root = pathlib.Path("packages/capabilities/cloud-scaling-operations")
+          forbidden = ["READ_ONLY_SHADOW_VALIDATED", "production certified",
+                       "real cluster validated"]
+          bad = []
+          for p in root.glob("artifacts/shadow_harness_fixture/*.json"):
+              t = p.read_text()
+              if '"real_environment_observed": true' in t or '"real_cluster_accessed": true' in t:
+                  bad.append(f"{p}: claims real access")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("claims/terminology check clean")
+          PY
+
+      - name: pip check + pip-audit (installed runtime closure)
+        run: |
+          python -m build "$OPS" -o "$OPS/dist"
+          python -m build "$ADV" -o "$OPS/dist"
+          python -m venv /tmp/cso-shadow-audit
+          /tmp/cso-shadow-audit/bin/python -m pip install --quiet --find-links "$OPS/dist" ugence-cloud-scaling-operations
+          /tmp/cso-shadow-audit/bin/python -m pip check
+          /tmp/cso-shadow-audit/bin/python -m pip freeze \
+            | grep -ivE "^(pip|setuptools|wheel|ugence-cloud-scaling-operations|ugence-cloud-scaling-controller)==" \
+            > /tmp/cso-shadow-reqs.txt
+          python -m pip_audit -r /tmp/cso-shadow-reqs.txt
+
+      - name: Upload harness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-operations-shadow-harness-evidence
+          path: |
+            packages/capabilities/cloud-scaling-operations/artifacts/shadow_harness/*.json
+            packages/capabilities/cloud-scaling-operations/artifacts/shadow_harness_fixture/*
+          if-no-files-found: warn
