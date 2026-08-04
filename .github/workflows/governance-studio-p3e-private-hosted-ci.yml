@@ -19,6 +19,7 @@ on:
       - "deployment/governance-studio/**"
       - "apps/ugence-governance-studio/**"
       - ".github/workflows/governance-studio-p3e-private-hosted-ci.yml"
+  workflow_dispatch:  # manual base-image digest resolution (resolve-base-images job)
 
 env:
   PYTHONPATH: >-
@@ -111,11 +112,29 @@ jobs:
               print(f"NOTE: {v.get('moderate',0)} moderate / {v.get('low',0)} low advisories present (documented, not blocking)")
           PY
 
+  resolve-base-images:
+    # Resolution stage (§3): resolve live base-image digests from the registry manifest
+    # API and upload a machine-readable report. Run manually (workflow_dispatch) to obtain
+    # digests to commit; it does NOT silently update the approved pins.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: resolve
+        run: |
+          python deployment/governance-studio/ci/resolve_base_images.py \
+            deployment/governance-studio/base-images.json /tmp/base-image-resolution.json
+          cat /tmp/base-image-resolution.json
+      - uses: actions/upload-artifact@v4
+        with: { name: base-image-resolution, path: /tmp/base-image-resolution.json }
+
   container:
-    # Requires a container runtime AND container-registry egress (base-image pulls). Where
-    # registry egress is denied the base-image-digest-verification step fails closed
-    # (unresolved digests are a BLOCKING failure), so the container gates never report as
-    # passed without a real build.
+    # Requires a container runtime AND container-registry access to pull the pinned base
+    # images. base-image-digest-verification is BLOCKING: a null/unresolved or drifted
+    # digest, an unpinned Dockerfile, or an inaccessible registry all fail the job — the
+    # container gates never report as passed without a real build.
     runs-on: ubuntu-latest
     needs: application
     env:
@@ -128,36 +147,36 @@ jobs:
         run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
 
       - name: base-image-digest-verification
-        # BLOCKING: every base image must be digest-pinned in base-images.json, the live
-        # registry digest must match, the Dockerfile must use that digest, and the platform
-        # must be verifiable. A null/unresolved digest is a failure, never a warning.
         run: |
+          python deployment/governance-studio/ci/resolve_base_images.py \
+            deployment/governance-studio/base-images.json /tmp/live-resolution.json
           python - <<'PY'
-          import json, subprocess, sys
+          import json, sys
           pins = json.load(open("deployment/governance-studio/base-images.json"))
-          dockerfile = open("deployment/governance-studio/Dockerfile").read()
-          plat = pins.get("platform", "linux/amd64")
+          live = {(r["repository"], r["tag"]): r for r in json.load(open("/tmp/live-resolution.json"))["results"]}
+          df = open("deployment/governance-studio/Dockerfile").read()
           fail = []
           for e in pins["base_images"]:
-              ref = f'{e["registry"]}/{e["repository"]}:{e["tag"]}'
-              pinned = e.get("manifest_digest")
-              if not pinned:
-                  fail.append(f"{ref}: manifest_digest is null (UNRESOLVED — blocking)"); continue
-              live = subprocess.check_output(["docker","buildx","imagetools","inspect",ref,"--format","{{json .Manifest.Digest}}"]).decode().strip().strip('"')
-              if live != pinned:
-                  fail.append(f"{ref}: live {live} != pinned {pinned}")
-              if f'{e["repository"].split("/")[-1]}:{e["tag"]}@{pinned}' not in dockerfile and pinned not in dockerfile:
-                  fail.append(f"{ref}: Dockerfile does not pin {pinned}")
-              subprocess.check_call(["docker","buildx","imagetools","inspect",ref,"--format","{{.Manifest.Platform.OS}}/{{.Manifest.Platform.Architecture}}"])
-          if fail:
-              print("\n".join("FAIL "+f for f in fail), file=sys.stderr); sys.exit(1)
-          print("base images digest-pinned and verified for", plat)
+              key = (e["repository"], e["tag"]); ref = f'{e["registry"]}/{e["repository"]}:{e["tag"]}'
+              d = e.get("manifest_digest")
+              if not d: fail.append(f"{ref}: pinned digest is null (blocking)"); continue
+              lr = live.get(key, {})
+              if lr.get("status") != "resolved": fail.append(f"{ref}: registry status {lr.get('status')}")
+              elif lr.get("manifest_digest") != d: fail.append(f"{ref}: live {lr.get('manifest_digest')} != pinned {d}")
+              if f"@{d}" not in df: fail.append(f"{ref}: Dockerfile does not pin {d}")
+              if e.get("platform") != pins.get("platform", "linux/amd64"): fail.append(f"{ref}: platform mismatch")
+          if fail: print("\n".join("FAIL "+f for f in fail), file=sys.stderr); sys.exit(1)
+          print("base images: digest-pinned, live-verified, Dockerfile-pinned, platform-verified")
           PY
 
       - name: container-build
         run: |
-          docker buildx build --platform linux/amd64 --load --pull=false -t "$IMAGE" -f deployment/governance-studio/Dockerfile .
+          DFSHA=$(sha256sum deployment/governance-studio/Dockerfile | cut -d' ' -f1)
+          docker buildx build --platform linux/amd64 --load -t "$IMAGE" -f deployment/governance-studio/Dockerfile .
           docker image inspect "$IMAGE" --format 'id={{.Id}} arch={{.Architecture}} os={{.Os}} size={{.Size}}'
+          echo "IMAGE_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')" >> "$GITHUB_ENV"
+          echo "DOCKERFILE_SHA256=$DFSHA" >> "$GITHUB_ENV"
+
       - name: image-inspection
         run: |
           test "$(docker inspect --format '{{.Config.User}}' "$IMAGE")" = "10001:10001"
@@ -167,41 +186,69 @@ jobs:
       - name: runtime-package-inventory
         run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee deployment/governance-studio/artifacts/runtime-image-packages.txt
 
-      - name: image-secret-history-scan
+      - name: image-layer-secret-scan
         run: |
+          # config/history first, then genuine per-layer CONTENT scan
           ! docker history --no-trunc "$IMAGE" | grep -Ei 'PASSWORD=|server\.key|BEGIN [A-Z ]*PRIVATE KEY|_TOKEN=|AWS_SECRET'
-          docker save "$IMAGE" -o /tmp/img.tar
-          ! tar -tf /tmp/img.tar | grep -E '\.git/|/\.env$|tests/certs/.*\.key$'
-          echo "no secrets / SCM metadata / test keys in image layers"
+          python deployment/governance-studio/ci/scan_image_layers.py "$IMAGE" deployment/governance-studio/artifacts/secret-scan.json
 
       - name: container-runtime-verification
         run: |
           mkdir -p /tmp/tls
           openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/tls/server.key -out /tmp/tls/server.crt -days 2 -subj "/CN=localhost" -addext "subjectAltName=IP:127.0.0.1" 2>/dev/null
+          openssl genrsa -out /tmp/tls/mismatch.key 2048 2>/dev/null   # for the cert/key-mismatch startup negative
           chmod +x deployment/governance-studio/ci/verify_container.sh
           deployment/governance-studio/ci/verify_container.sh "$IMAGE" /tmp/tls operator "demo-pass-123"
 
       - name: image-sbom
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft "$IMAGE" -o cyclonedx-json=deployment/governance-studio/artifacts/sbom.image.cdx.json
-          python -c "import hashlib,json; b=open('deployment/governance-studio/artifacts/sbom.image.cdx.json','rb').read(); print('image SBOM sha256', hashlib.sha256(b).hexdigest())"
+        # pinned SBOM action (Syft); binds the SBOM to the built image
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          image: governance-studio-private-hosted:ci
+          format: cyclonedx-json
+          output-file: deployment/governance-studio/artifacts/sbom.image.cdx.json
 
       - name: container-vulnerability-scan
+        # pinned Trivy action; blocking on HIGH/CRITICAL, JSON evidence
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: governance-studio-private-hosted:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: json
+          output: deployment/governance-studio/artifacts/container-scan.json
+
+      - name: evidence-manifest
+        if: always()
         run: |
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --severity HIGH,CRITICAL --exit-code 1 --format json -o deployment/governance-studio/artifacts/container-scan.json "$IMAGE"
-          echo "trivy: 0 HIGH/CRITICAL"
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          def sha(p): return hashlib.sha256(open(p,'rb').read()).hexdigest() if os.path.isfile(p) else None
+          A="deployment/governance-studio/artifacts"
+          man = {
+            "image_id": os.environ.get("IMAGE_ID"),
+            "image_tag": "governance-studio-private-hosted:ci",
+            "source_commit": subprocess.check_output(["git","rev-parse","HEAD"]).decode().strip(),
+            "dockerfile_sha256": os.environ.get("DOCKERFILE_SHA256"),
+            "base_images": json.load(open("deployment/governance-studio/base-images.json"))["base_images"],
+            "sbom_sha256": sha(f"{A}/sbom.image.cdx.json"),
+            "vuln_report_sha256": sha(f"{A}/container-scan.json"),
+            "secret_scan_sha256": sha(f"{A}/secret-scan.json"),
+            "egress_report_sha256": sha(f"{A}/runtime-egress-report.json"),
+          }
+          json.dump(man, open(f"{A}/evidence-manifest.json","w"), indent=2)
+          print(json.dumps(man, indent=2))
+          PY
 
       - name: clean-checkout-reproducibility
         run: |
           TMP="$(mktemp -d)"; git archive HEAD | tar -x -C "$TMP"
-          docker buildx build --platform linux/amd64 --load --pull=false -t governance-studio-private-hosted:clean -f "$TMP/deployment/governance-studio/Dockerfile" "$TMP"
+          docker buildx build --platform linux/amd64 --load -t governance-studio-private-hosted:clean -f "$TMP/deployment/governance-studio/Dockerfile" "$TMP"
           A=$(docker image inspect "$IMAGE" --format '{{.Id}}'); B=$(docker image inspect governance-studio-private-hosted:clean --format '{{.Id}}')
           echo "primary=$A clean=$B"
           # application-artifact reproducibility is asserted in the application job; image
-          # bit-reproducibility is reported (timestamps/layer metadata may differ) but not
-          # required by the P3E spec.
+          # bit-reproducibility is reported (build timestamps/metadata may differ) — not a
+          # P3E acceptance requirement.
           [ "$A" = "$B" ] && echo "image bit-reproducible" || echo "image not bit-reproducible (documented; application artifacts are reproducible)"
 
       - name: upload-evidence
