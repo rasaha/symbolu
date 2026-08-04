@@ -140,6 +140,20 @@
       "clean_stable": true,
       "category": "CLEAN_STABLE",
       "dir": "results/seeds/O1/seed_23"
+    },
+    {
+      "arm": "O1",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_24"
+    },
+    {
+      "arm": "O1",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1/seed_25"
     }
   ]
 }
