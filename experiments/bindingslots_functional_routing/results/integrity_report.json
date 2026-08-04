@@ -1,0 +1,20 @@
+{
+  "schema": "bindingslots_functional_routing/integrity_report/v1",
+  "frozen_code_hashes_ok": true,
+  "per_file": {
+    "experiments/phase_lc/results/abc.json": true,
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py": true,
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py": true,
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py": true,
+    "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py": true,
+    "experiments/phase_lc/tasks.py": true,
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/interventions.py": true,
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/stabilize.py": true,
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/diagnostics.py": true,
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py": true
+  },
+  "abc_json_sha256_before": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_json_sha256_after": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_unchanged": true,
+  "integrity_ok": true
+}
