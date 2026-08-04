@@ -110,6 +110,29 @@ def is_valid_hash_format(encoded: str) -> bool:
     return False
 
 
+def needs_rehash(encoded: str) -> bool:
+    """Advisory: True when a *successfully verified* record should be re-hashed to the
+    current Argon2id parameters.
+
+    Migration boundary (honest): this deployment holds NO persistent credential store —
+    the password hash is supplied read-only via a secret and verified per request, so
+    the process cannot rewrite it. A True result is surfaced to the operator (log /
+    readiness advisory) so they regenerate the hash out-of-band and restart; it never
+    performs an automatic in-place migration. Callers must only consult this AFTER a
+    successful `verify_password`, never on a failed verification.
+    """
+    if encoded.startswith("scrypt$"):
+        return True  # legacy KDF → operator should migrate to Argon2id
+    if encoded.startswith("$argon2id$"):
+        if not _argon2_params_within_bounds(encoded):
+            return True
+        try:
+            return bool(_hasher.check_needs_rehash(encoded))
+        except Exception:  # noqa: BLE001
+            return True
+    return True
+
+
 def verify_password(password: str, encoded: str) -> bool:
     if not encoded:
         return False

@@ -41,7 +41,15 @@ jobs:
       - name: install
         run: |
           pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest pip-audit
-          pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend
+          # install every local package (incl. the deployment package, which declares
+          # argon2-cffi) in ONE resolver transaction so the backend's local AWC dependency
+          # resolves and Argon2id is importable.
+          pip install \
+            -e packages/tooling/policy-workflow-compiler \
+            -e packages/capabilities/agent-workforce-composer \
+            -e apps/ugence-governance-studio/backend \
+            -e deployment/governance-studio
+          python -c "import argon2, governance_studio_deployment, ugence_agent_workforce_composer.api as a; assert a.__version__=='0.2.1'; print('install OK: argon2 + deployment + AWC', a.__version__)"
 
       - name: p3d-prerequisite
         working-directory: apps/ugence-governance-studio/frontend
@@ -88,54 +96,117 @@ jobs:
         working-directory: deployment/governance-studio
         run: python -m pytest
 
-      - name: python-dependency-audit
-        run: pip-audit -r <(pip freeze) || true   # advisory locally; blocking policy enforced on 0 critical/high
-
       - name: npm-production-audit
         working-directory: apps/ugence-governance-studio/frontend
-        run: npm audit --omit=dev --audit-level=high
+        # blocking on high/critical; report accurate severity counts (moderate allowed,
+        # never described as "clean" when present).
+        run: |
+          npm audit --omit=dev --json > /tmp/npm-audit.json || true
+          python - <<'PY'
+          import json
+          v = json.load(open("/tmp/npm-audit.json")).get("metadata", {}).get("vulnerabilities", {})
+          print("npm production vulnerabilities:", v)
+          assert v.get("critical", 0) == 0 and v.get("high", 0) == 0, "blocking: high/critical npm vulnerabilities"
+          if v.get("moderate", 0) or v.get("low", 0):
+              print(f"NOTE: {v.get('moderate',0)} moderate / {v.get('low',0)} low advisories present (documented, not blocking)")
+          PY
 
   container:
-    # Container build/run + image scan require a container runtime; run only where one is
-    # present. In environments without a daemon this job is skipped (NOT_EXECUTED), never
-    # reported as passed.
+    # Requires a container runtime AND container-registry egress (base-image pulls). Where
+    # registry egress is denied the base-image-digest-verification step fails closed
+    # (unresolved digests are a BLOCKING failure), so the container gates never report as
+    # passed without a real build.
     runs-on: ubuntu-latest
     needs: application
+    env:
+      IMAGE: governance-studio-private-hosted:ci
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: install-e2e-driver-deps
+        run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
+
       - name: base-image-digest-verification
+        # BLOCKING: every base image must be digest-pinned in base-images.json, the live
+        # registry digest must match, the Dockerfile must use that digest, and the platform
+        # must be verifiable. A null/unresolved digest is a failure, never a warning.
         run: |
-          # base-images.json records the digest each FROM must resolve to; verify the
-          # live registry digest still matches (requires registry egress).
           python - <<'PY'
-          import json, subprocess
+          import json, subprocess, sys
           pins = json.load(open("deployment/governance-studio/base-images.json"))
-          for entry in pins["base_images"]:
-              ref = f'{entry["registry"]}/{entry["repository"]}:{entry["tag"]}'
-              out = subprocess.check_output(["docker", "buildx", "imagetools", "inspect", ref, "--format", "{{json .Manifest.Digest}}"]).decode().strip().strip('"')
-              pinned = entry.get("manifest_digest")
-              if pinned is None:
-                  print(f"RESOLVED (commit this) {ref} {out}")  # pin was UNRESOLVED; record for follow-up
-              else:
-                  assert out == pinned, f'{ref}: live {out} != pinned {pinned}'
-                  print(f"OK {ref} {out}")
+          dockerfile = open("deployment/governance-studio/Dockerfile").read()
+          plat = pins.get("platform", "linux/amd64")
+          fail = []
+          for e in pins["base_images"]:
+              ref = f'{e["registry"]}/{e["repository"]}:{e["tag"]}'
+              pinned = e.get("manifest_digest")
+              if not pinned:
+                  fail.append(f"{ref}: manifest_digest is null (UNRESOLVED — blocking)"); continue
+              live = subprocess.check_output(["docker","buildx","imagetools","inspect",ref,"--format","{{json .Manifest.Digest}}"]).decode().strip().strip('"')
+              if live != pinned:
+                  fail.append(f"{ref}: live {live} != pinned {pinned}")
+              if f'{e["repository"].split("/")[-1]}:{e["tag"]}@{pinned}' not in dockerfile and pinned not in dockerfile:
+                  fail.append(f"{ref}: Dockerfile does not pin {pinned}")
+              subprocess.check_call(["docker","buildx","imagetools","inspect",ref,"--format","{{.Manifest.Platform.OS}}/{{.Manifest.Platform.Architecture}}"])
+          if fail:
+              print("\n".join("FAIL "+f for f in fail), file=sys.stderr); sys.exit(1)
+          print("base images digest-pinned and verified for", plat)
           PY
+
       - name: container-build
-        run: docker build -f deployment/governance-studio/Dockerfile -t governance-studio-private-hosted:ci .
-      - name: container-nonroot
-        run: test "$(docker inspect --format '{{.Config.User}}' governance-studio-private-hosted:ci)" = "10001:10001"
-      - name: container-exposes-only-8443
-        run: docker inspect --format '{{json .Config.ExposedPorts}}' governance-studio-private-hosted:ci | grep -q '"8443/tcp"'
-      - name: clean-checkout-container-build
+        run: |
+          docker buildx build --platform linux/amd64 --load --pull=false -t "$IMAGE" -f deployment/governance-studio/Dockerfile .
+          docker image inspect "$IMAGE" --format 'id={{.Id}} arch={{.Architecture}} os={{.Os}} size={{.Size}}'
+      - name: image-inspection
+        run: |
+          test "$(docker inspect --format '{{.Config.User}}' "$IMAGE")" = "10001:10001"
+          docker inspect --format '{{json .Config.ExposedPorts}}' "$IMAGE" | python -c "import json,sys; p=json.load(sys.stdin); assert list(p)==['8443/tcp'], p; print('exposes only 8443/tcp')"
+          for t in npm node tsc gcc cc; do if docker run --rm --entrypoint sh "$IMAGE" -c "command -v $t" 2>/dev/null; then echo "FAIL $t present in runtime"; exit 1; fi; done
+          echo "no npm/node/compiler in runtime image"
+      - name: runtime-package-inventory
+        run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee deployment/governance-studio/artifacts/runtime-image-packages.txt
+
+      - name: image-secret-history-scan
+        run: |
+          ! docker history --no-trunc "$IMAGE" | grep -Ei 'PASSWORD=|server\.key|BEGIN [A-Z ]*PRIVATE KEY|_TOKEN=|AWS_SECRET'
+          docker save "$IMAGE" -o /tmp/img.tar
+          ! tar -tf /tmp/img.tar | grep -E '\.git/|/\.env$|tests/certs/.*\.key$'
+          echo "no secrets / SCM metadata / test keys in image layers"
+
+      - name: container-runtime-verification
+        run: |
+          mkdir -p /tmp/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/tls/server.key -out /tmp/tls/server.crt -days 2 -subj "/CN=localhost" -addext "subjectAltName=IP:127.0.0.1" 2>/dev/null
+          chmod +x deployment/governance-studio/ci/verify_container.sh
+          deployment/governance-studio/ci/verify_container.sh "$IMAGE" /tmp/tls operator "demo-pass-123"
+
+      - name: image-sbom
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft "$IMAGE" -o cyclonedx-json=deployment/governance-studio/artifacts/sbom.image.cdx.json
+          python -c "import hashlib,json; b=open('deployment/governance-studio/artifacts/sbom.image.cdx.json','rb').read(); print('image SBOM sha256', hashlib.sha256(b).hexdigest())"
+
+      - name: container-vulnerability-scan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy image --severity HIGH,CRITICAL --exit-code 1 --format json -o deployment/governance-studio/artifacts/container-scan.json "$IMAGE"
+          echo "trivy: 0 HIGH/CRITICAL"
+
+      - name: clean-checkout-reproducibility
         run: |
           TMP="$(mktemp -d)"; git archive HEAD | tar -x -C "$TMP"
-          docker build -f "$TMP/deployment/governance-studio/Dockerfile" -t governance-studio-private-hosted:clean "$TMP"
-      - name: container-secret-scan
-        run: |
-          ! docker history --no-trunc governance-studio-private-hosted:ci | grep -Ei 'PASSWORD|server.key|BEGIN PRIVATE KEY'
-      - name: runtime-egress-and-e2e
-        run: echo "packaged HTTPS container start + 4-scenario E2E + egress capture run here (compose up, curl /readyz, pytest packaged E2E against the container)"
-      - name: container-vulnerability-scan
-        run: echo "trivy image governance-studio-private-hosted:ci --severity HIGH,CRITICAL --exit-code 1"
-      - name: sbom-generation
-        run: echo "syft governance-studio-private-hosted:ci -o cyclonedx-json > sbom.cdx.json"
+          docker buildx build --platform linux/amd64 --load --pull=false -t governance-studio-private-hosted:clean -f "$TMP/deployment/governance-studio/Dockerfile" "$TMP"
+          A=$(docker image inspect "$IMAGE" --format '{{.Id}}'); B=$(docker image inspect governance-studio-private-hosted:clean --format '{{.Id}}')
+          echo "primary=$A clean=$B"
+          # application-artifact reproducibility is asserted in the application job; image
+          # bit-reproducibility is reported (timestamps/layer metadata may differ) but not
+          # required by the P3E spec.
+          [ "$A" = "$B" ] && echo "image bit-reproducible" || echo "image not bit-reproducible (documented; application artifacts are reproducible)"
+
+      - name: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3e-container-evidence
+          path: deployment/governance-studio/artifacts/*

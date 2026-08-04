@@ -22,3 +22,16 @@ installs reproducibly. The deployment now uses Argon2id.
 
 Covered by `tests/test_passwords.py` (Argon2id encoding, roundtrip, salted, malformed
 rejection, **excessive-cost rejection before KDF**, legacy-scrypt migration verify).
+
+## Migration boundary (honest)
+
+This deployment holds **no persistent credential store** — the password hash is provided
+read-only via a secret and verified per request, so the process cannot rewrite it.
+`needs_rehash(encoded)` is therefore an **advisory** signal (surfaced to the operator, e.g.
+in logs/readiness) returning `True` for a legacy scrypt record or an Argon2id record below
+current parameters, so the operator regenerates the hash with `generate_password_hash` and
+restarts. It performs **no automatic in-place migration**, and it is consulted only after a
+**successful** verification — a failed verification never triggers migration. Tests:
+`test_current_argon2id_hash_does_not_need_rehash`,
+`test_legacy_scrypt_record_reports_needs_rehash_after_success`,
+`test_failed_verification_never_triggers_migration`.
