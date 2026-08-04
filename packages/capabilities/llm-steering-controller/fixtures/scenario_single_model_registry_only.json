@@ -1,0 +1,35 @@
+{
+  "expect": {
+    "recommended_model": "only",
+    "status": "RECOMMENDED"
+  },
+  "name": "single_model_registry_only",
+  "registry": {
+    "models": [
+      {
+        "context_limit": 16000,
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "only",
+        "provider_id": "p1",
+        "regions": [
+          "us"
+        ]
+      }
+    ],
+    "providers": [
+      {
+        "provider_id": "p1",
+        "regions": [
+          "us"
+        ]
+      }
+    ]
+  },
+  "request": {
+    "requirements": {
+      "estimated_input_tokens": 2000
+    }
+  }
+}

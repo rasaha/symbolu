@@ -1,0 +1,56 @@
+{
+  "expect": {
+    "recommended_model": "m-a",
+    "status": "RECOMMENDED"
+  },
+  "name": "equal_score_tie",
+  "registry": {
+    "models": [
+      {
+        "availability_class": "broad",
+        "context_limit": 16000,
+        "cost_class": "medium",
+        "latency_class": "medium",
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "m-b",
+        "provider_id": "p",
+        "quality_tier": "standard",
+        "regions": [
+          "us"
+        ],
+        "reliability_class": "medium"
+      },
+      {
+        "availability_class": "broad",
+        "context_limit": 16000,
+        "cost_class": "medium",
+        "latency_class": "medium",
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "m-a",
+        "provider_id": "p",
+        "quality_tier": "standard",
+        "regions": [
+          "us"
+        ],
+        "reliability_class": "medium"
+      }
+    ],
+    "providers": [
+      {
+        "provider_id": "p",
+        "regions": [
+          "us"
+        ]
+      }
+    ]
+  },
+  "request": {
+    "requirements": {
+      "estimated_input_tokens": 2000
+    }
+  }
+}

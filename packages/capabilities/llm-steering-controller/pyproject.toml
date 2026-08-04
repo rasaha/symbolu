@@ -1,0 +1,65 @@
+# Independent distribution for the canonical Ugence LLM Steering Controller.
+#
+# This is the ONE canonical source tree (``src/ugence_llm_steering_controller``) for the
+# advisory LLM ROUTING layer: given a request's requirements and a metadata-only candidate
+# registry, it discovers model/provider candidates, applies hard policy/capability
+# constraints (fail-closed, before scoring), scores the eligible set, and returns a ranked,
+# explainable routing RECOMMENDATION. It is advisory-only: it never invokes a model or
+# provider, loads a credential, opens a socket, retries, performs a fallback, or executes
+# anything.
+#
+# Dependency policy: Python standard library ONLY. The steering controller is a leaf
+# capability. It must NOT depend on applications, domains, the control plane, the AI
+# Control Plane, Agent Runtime, Hybrid LLM, the Governance Provider Framework, concrete
+# providers, provider SDKs (openai/anthropic/boto3/google-cloud/...), the model-selection
+# research pilots, or any benchmark harness. Provider SDKs are never a dependency — not
+# for import, recommendation, simulation, CLI fixture execution, or verification.
+#
+# Relationship to siblings (see docs/CANONICAL_SOURCE_DECISION.md): the deterministic
+# selection *leaf* is the separate ``ugence-model-selection`` distribution; this package is
+# the *routing* layer above it and does not depend on it. Provider EXECUTION lives OUTSIDE
+# this distribution in the monorepo-only ``model_selection_pilot`` research namespace.
+#
+# Build:  python -m build packages/capabilities/llm-steering-controller
+# Verify: python packages/capabilities/llm-steering-controller/verify_llm_steering_controller_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-llm-steering-controller"
+dynamic = ["version"]
+description = "Ugence LLM Steering Controller — deterministic, provider-neutral, advisory-only LLM routing recommendations (candidate discovery, hard-constraint filtering, scoring, fallback/escalation recommendations). Owns no provider execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["llm", "routing", "model-selection", "provider-selection", "steering",
+            "advisory", "deterministic", "governance", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# No runtime dependency: standard library only.
+dependencies = []
+
+[project.optional-dependencies]
+# Development / verification tooling only (never required to import, recommend, simulate,
+# run the CLI on fixtures, or verify the package).
+dev = ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+
+[project.scripts]
+ugence-llm-steering = "ugence_llm_steering_controller.cli:main"
+
+# Read statically from the version module's literal so the build backend never imports the
+# package to resolve the version.
+[tool.setuptools.dynamic]
+version = { attr = "ugence_llm_steering_controller.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_llm_steering_controller*"]
+
+[tool.setuptools.package-data]
+ugence_llm_steering_controller = ["py.typed"]
