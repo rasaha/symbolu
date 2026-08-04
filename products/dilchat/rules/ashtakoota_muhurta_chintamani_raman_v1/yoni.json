@@ -1,0 +1,88 @@
+{
+  "component": "yoni",
+  "max": 4,
+  "keyed_by": "nakshatra",
+  "executable": false,
+  "review_required": true,
+  "review_status": "BLOCKED_DOMAIN_SOURCE",
+  "directional": false,
+  "high_risk": true,
+  "high_risk_reason": "The diagonal (same yoni = 4) and the 7 mortal-enemy pairs (= 0) are load-bearing and well attested. The intermediate friendly(3) / neutral(2) / unfriendly(1) gradations of the 14x14 matrix are source-variable and are BLOCKED_DOMAIN_SOURCE until transcribed from a frozen edition.",
+  "description": "Yoni koota — instinctive/physical temperament compatibility via the animal (yoni) of each janma nakshatra. Scored 4 (same) down to 0 (mortal-enemy). Interpretation is bounded to consensual adult romantic context ONLY (DEC-021 spirit).",
+  "safety_note": "Yoni output must never be sexualized outside a consensual adult romantic context.",
+  "yonis": [
+    { "index": 0,  "name": "Ashwa (Horse)" },
+    { "index": 1,  "name": "Gaja (Elephant)" },
+    { "index": 2,  "name": "Mesha (Sheep/Ram)" },
+    { "index": 3,  "name": "Sarpa (Serpent)" },
+    { "index": 4,  "name": "Shwan (Dog)" },
+    { "index": 5,  "name": "Marjara (Cat)" },
+    { "index": 6,  "name": "Mushaka (Rat/Mouse)" },
+    { "index": 7,  "name": "Gau (Cow)" },
+    { "index": 8,  "name": "Mahisha (Buffalo)" },
+    { "index": 9,  "name": "Vyaghra (Tiger)" },
+    { "index": 10, "name": "Mriga (Deer)" },
+    { "index": 11, "name": "Vanara (Monkey)" },
+    { "index": 12, "name": "Nakula (Mongoose)" },
+    { "index": 13, "name": "Simha (Lion)" }
+  ],
+  "nakshatra_to_yoni": {
+    "0": 0, "1": 1, "2": 2, "3": 3, "4": 3, "5": 4, "6": 5, "7": 2, "8": 5,
+    "9": 6, "10": 6, "11": 7, "12": 8, "13": 9, "14": 8, "15": 9, "16": 10,
+    "17": 10, "18": 4, "19": 11, "20": 12, "21": 11, "22": 13, "23": 0,
+    "24": 13, "25": 7, "26": 1
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [4, 3, 2, 1, 0],
+    "scale": {
+      "4": "same yoni",
+      "3": "friendly (BLOCKED — gradation not transcribed)",
+      "2": "neutral",
+      "1": "unfriendly (BLOCKED — gradation not transcribed)",
+      "0": "mortal enemy (natural predator/prey)"
+    },
+    "rule": "Look up (yoni_A, yoni_B) in yoni_score_matrix. Symmetric.",
+    "mortal_enemy_pairs": [
+      [0, 8], [1, 13], [2, 11], [3, 12], [5, 6], [7, 9], [4, 10]
+    ],
+    "mortal_enemy_glosses": [
+      "Horse-Buffalo", "Elephant-Lion", "Sheep-Monkey", "Serpent-Mongoose", "Cat-Rat", "Cow-Tiger", "Dog-Deer"
+    ],
+    "gradation_status": "BLOCKED_DOMAIN_SOURCE — all off-diagonal, non-mortal-enemy cells are set to a documented neutral default of 2 as a PLACEHOLDER. The friendly(3) and unfriendly(1) distinctions of the classical 14x14 Yoni table MUST be transcribed from the frozen source before any of these cells is executable.",
+    "yoni_score_matrix": {
+      "0":  { "0": 4, "1": 2, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 0, "9": 2, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "1":  { "0": 2, "1": 4, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 2, "13": 0 },
+      "2":  { "0": 2, "1": 2, "2": 4, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 0, "12": 2, "13": 2 },
+      "3":  { "0": 2, "1": 2, "2": 2, "3": 4, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 0, "13": 2 },
+      "4":  { "0": 2, "1": 2, "2": 2, "3": 2, "4": 4, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 0, "11": 2, "12": 2, "13": 2 },
+      "5":  { "0": 2, "1": 2, "2": 2, "3": 2, "4": 2, "5": 4, "6": 0, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "6":  { "0": 2, "1": 2, "2": 2, "3": 2, "4": 2, "5": 0, "6": 4, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "7":  { "0": 2, "1": 2, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 4, "8": 2, "9": 0, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "8":  { "0": 0, "1": 2, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 4, "9": 2, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "9":  { "0": 2, "1": 2, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 0, "8": 2, "9": 4, "10": 2, "11": 2, "12": 2, "13": 2 },
+      "10": { "0": 2, "1": 2, "2": 2, "3": 2, "4": 0, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 4, "11": 2, "12": 2, "13": 2 },
+      "11": { "0": 2, "1": 2, "2": 0, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 4, "12": 2, "13": 2 },
+      "12": { "0": 2, "1": 2, "2": 2, "3": 0, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 4, "13": 2 },
+      "13": { "0": 2, "1": 0, "2": 2, "3": 2, "4": 2, "5": 2, "6": 2, "7": 2, "8": 2, "9": 2, "10": 2, "11": 2, "12": 2, "13": 4 }
+    }
+  },
+  "conflicts": [
+    {
+      "cell": "all friendly(3) and unfriendly(1) off-diagonal cells",
+      "mc_value": "graded friendly/neutral/unfriendly per the classical 14x14 Yoni table",
+      "raman_value": "engineering tabulations vary in which pairs are friendly(3) vs unfriendly(1)",
+      "resolution": "PENDING"
+    }
+  ],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",    "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING","chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Sanskrit term: Yoni.",
+    "Only diagonal (4) and mortal-enemy (0) cells are treated as reliable; every 2 in the matrix is a PLACEHOLDER neutral pending the friendly(3)/unfriendly(1) transcription.",
+    "DEC-021 spirit: never surface Yoni as explicit/medical sexual content."
+  ]
+}

@@ -42,6 +42,11 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.5",
 ]
+# Independent astronomical validation ONLY (Workstream A). Astropy is a separate
+# ERFA/IAU-SOFA implementation, independent of Swiss Ephemeris; used offline to
+# regenerate INDEPENDENT_REFERENCE fixtures. Not required to run the test suite
+# (the committed fixtures carry the frozen independently-sourced values).
+validation = ["astropy>=6.0"]
 
 [project.scripts]
 dilchat-openapi = "ugence_dilchat.scripts_openapi:main"

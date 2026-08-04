@@ -99,9 +99,21 @@ def _sample_longitudes(
     ]
 
     # Adaptive densification so no category (min width = one pada) can be skipped.
+    # Completeness precondition (strategy B): the Moon's ecliptic longitude is
+    # monotonically PROGRADE (never retrograde), so the forward gap between adjacent
+    # samples equals the true path length between them. We (a) refuse a
+    # non-monotonic/discontinuous path (forward gap > 180 deg implies a backward jump
+    # or a >half-circle step neither of which the Moon exhibits over these intervals),
+    # and (b) densify until every gap is STRICTLY below one pada width, then assert it
+    # — so the "no category skipped" guarantee holds or we fail explicitly.
     i = 0
     while i < len(instants) - 1:
         gap = _forward_delta(lons[i], lons[i + 1])
+        if gap > 180.0:
+            raise EphemerisUnavailableError(
+                "Non-monotonic / discontinuous Moon longitude between samples; "
+                "interval completeness precondition (prograde motion) violated."
+            )
         depth = 0
         while gap >= _GAP_THRESHOLD_DEG and depth < _MAX_DENSIFY_DEPTH:
             mid_t = instants[i] + (instants[i + 1] - instants[i]) / 2
@@ -113,6 +125,17 @@ def _sample_longitudes(
             gap = _forward_delta(lons[i], lons[i + 1])
             depth += 1
         i += 1
+
+    # Post-condition guaranteeing completeness: with every forward gap strictly below
+    # the smallest category width, no category can lie entirely between two adjacent
+    # samples, so every category the path enters contains a sample. If densification
+    # could not achieve this (pathological provider), fail rather than under-report.
+    max_gap = max(_forward_delta(lons[i], lons[i + 1]) for i in range(len(lons) - 1))
+    if max_gap >= _GAP_THRESHOLD_DEG:
+        raise EphemerisUnavailableError(
+            f"Could not densify below one pada width (max gap {max_gap:.4f} deg); "
+            "interval completeness not guaranteed."
+        )
     return instants, lons
 
 

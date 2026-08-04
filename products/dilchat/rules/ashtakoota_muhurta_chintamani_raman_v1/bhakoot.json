@@ -1,0 +1,48 @@
+{
+  "component": "bhakoot",
+  "max": 7,
+  "keyed_by": "rashi",
+  "executable": false,
+  "review_required": true,
+  "review_status": "PENDING_DOMAIN_REVIEW",
+  "directional": false,
+  "high_risk": true,
+  "high_risk_reason": "Bhakoot dosha and its cancellation (same rashi lord; lords mutual friends) are load-bearing and school-variable. Cancellation is handled ONLY in parihara.json (disabled by default) and is never silently applied here.",
+  "description": "Bhakoot (Rashi / Bhakut) koota — emotional bonding, family welfare and prosperity from the mutual rashi-to-rashi position of the two Moon signs. Penalized positions score 0; all others score the full 7.",
+  "counting_rule": {
+    "description": "Count from rashi A to rashi B (inclusive, forward) and from B to A. The unordered pair of counts identifies the relationship. Same rashi = 1/1.",
+    "count_inclusive": true,
+    "cycle_length": 12,
+    "formula_note": "count_ab = ((B - A) mod 12) + 1 ; count_ba = ((A - B) mod 12) + 1"
+  },
+  "penalized_relationships": {
+    "dwidwadasha_2_12": { "counts": [2, 12], "name": "Dwir-Dwadasha (2/12)" },
+    "nava_pancham_5_9": { "counts": [5, 9],  "name": "Nava-Pancham (5/9)" },
+    "shadashtaka_6_8":  { "counts": [6, 8],  "name": "Shad-Ashtaka (6/8)" }
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [7, 0],
+    "rule": "If the unordered pair of mutual counts equals {2,12}, {5,9}, or {6,8} -> 0 (Bhakoot dosha). Otherwise -> 7.",
+    "points_dosha": 0,
+    "points_ok": 7,
+    "auspicious_relationships_full_score": ["1/1 (same rashi)", "3/11", "4/10", "7/7"]
+  },
+  "dosha": {
+    "name": "Bhakoot dosha",
+    "triggers": ["2/12 (Dwir-Dwadasha)", "5/9 (Nava-Pancham)", "6/8 (Shad-Ashtaka)"],
+    "severity_note": "6/8 and 2/12 are traditionally regarded as more serious than 5/9 in some schools; this pack applies a uniform 0 for all three pending review.",
+    "cancellation": "Handled in parihara.json ONLY (bhakoot_cancel_same_rashi_lord, bhakoot_cancel_lords_friends) — disabled by default."
+  },
+  "conflicts": [],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",     "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING", "chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Sanskrit term: Bhakoot / Bhakut / Rashi koota.",
+    "Symmetric: swapping the two rashis yields the same count-pair (directional=false).",
+    "Whether all three dosha types are weighted equally (uniform 0) vs differentiated is PENDING_DOMAIN_REVIEW."
+  ]
+}

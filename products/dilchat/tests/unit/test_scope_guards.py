@@ -15,6 +15,32 @@ from ugence_dilchat.config import Environment, Settings
 
 _PRODUCT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _RULE_PACK = _PRODUCT_ROOT / "rules" / "ashtakoota_lahiri_classical_v1"
+_NEW_PACK = _PRODUCT_ROOT / "rules" / "ashtakoota_muhurta_chintamani_raman_v1"
+
+
+def test_new_authority_pack_is_non_executable_and_unverified():
+    man = json.loads((_NEW_PACK / "manifest.json").read_text())
+    # The new named pack must stay non-executable / draft until the authority gate clears.
+    assert man["draft"] is True
+    assert man["executable"] is False
+    maxima = {c["name"]: c["max"] for c in man["components"]}
+    assert maxima == {"varna": 1, "vashya": 2, "tara": 3, "yoni": 4,
+                      "graha_maitri": 5, "gana": 6, "bhakoot": 7, "nadi": 8}
+    assert man["total_max"] == 36
+    # Nothing is domain-approved or source-frozen, and no citation is verified.
+    src_path = _PRODUCT_ROOT / "rules" / "sources" / "GUNA_SOURCE_MANIFEST.json"
+    src = json.loads(src_path.read_text())
+    assert src["overall_status"] == "PENDING_ACQUISITION"
+    assert all(s["review_status"] != "FROZEN_PRIMARY" for s in src["sources"])
+    # Every parihara rule is disabled.
+    par = json.loads((_NEW_PACK / "parihara.json").read_text())
+    rules = par.get("rules", [])
+    assert rules and all(r.get("enabled") is False for r in rules)
+
+
+def test_old_draft_pack_preserved():
+    # The prior draft pack must not be overwritten/deleted (deprecated evidence).
+    assert (_RULE_PACK / "manifest.json").exists()
 
 
 def test_no_guna_route_registered():

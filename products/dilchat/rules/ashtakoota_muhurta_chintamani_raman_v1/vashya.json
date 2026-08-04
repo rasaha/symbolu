@@ -1,0 +1,73 @@
+{
+  "component": "vashya",
+  "max": 2,
+  "keyed_by": "rashi",
+  "executable": false,
+  "review_required": true,
+  "review_status": "SOURCE_CONFLICT",
+  "directional": false,
+  "high_risk": true,
+  "high_risk_reason": "The canonical classical form is a 12x12 rashi-pair Vashya table (each rashi 'controls'/attracts specific rashis, with graded values). The widely-circulated 5x5 vashya-group reduction below is a documented SIMPLIFICATION and does not reproduce every cell of the 12x12 table. Which form (and which gradations) is authoritative is a SOURCE_CONFLICT pending domain review.",
+  "description": "Vashya (Vasya) koota — mutual control / magnetic attraction between the two Moon rashis. Scored 2 / 1 / 0.5 / 0.",
+  "vashya_groups": {
+    "Chatushpada": "quadruped",
+    "Manava": "human / biped (Dwipada)",
+    "Jalachara": "watery / aquatic",
+    "Vanachara": "wild forest-dweller",
+    "Keeta": "insect"
+  },
+  "rashi_to_vashya_group": {
+    "0":  "Chatushpada",
+    "1":  "Chatushpada",
+    "2":  "Manava",
+    "3":  "Jalachara",
+    "4":  "Vanachara",
+    "5":  "Manava",
+    "6":  "Manava",
+    "7":  "Keeta",
+    "8":  "Manava",
+    "9":  "Jalachara",
+    "10": "Manava",
+    "11": "Jalachara"
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [2, 1, 0.5, 0],
+    "rule_5x5": "Reduced form: look up (group_A, group_B) in group_score_matrix. Diagonal (same group) = 2.",
+    "rule_12x12": "Canonical form: look up (rashi_A, rashi_B) in the 12x12 rashi-pair Vashya table (NOT transcribed — BLOCKED pending frozen source). The reduction below is a stand-in.",
+    "canonical_form": "12x12 rashi-pair (BLOCKED_DOMAIN_SOURCE — not transcribed)",
+    "reduced_form_provided": "5x5 group matrix (SOURCE_CONFLICT — off-diagonal cells source-variable)",
+    "group_score_matrix": {
+      "_comment": "5x5 reduction. Same-group=2 is certain. Off-diagonal 1/0.5/0 cells are the most source-variable in the pack and are BLOCKED against the 12x12 canonical table.",
+      "Chatushpada": { "Chatushpada": 2,   "Manava": 1,   "Jalachara": 1,   "Vanachara": 1,   "Keeta": 1 },
+      "Manava":      { "Chatushpada": 1,   "Manava": 2,   "Jalachara": 1,   "Vanachara": 0,   "Keeta": 1 },
+      "Jalachara":   { "Chatushpada": 1,   "Manava": 1,   "Jalachara": 2,   "Vanachara": 1,   "Keeta": 0.5 },
+      "Vanachara":   { "Chatushpada": 1,   "Manava": 0,   "Jalachara": 1,   "Vanachara": 2,   "Keeta": 1 },
+      "Keeta":       { "Chatushpada": 1,   "Manava": 1,   "Jalachara": 0.5, "Vanachara": 1,   "Keeta": 2 }
+    }
+  },
+  "conflicts": [
+    {
+      "cell": "canonical_table_form",
+      "mc_value": "12x12 rashi-pair Vashya table (rashi 'vashya' of rashi, graded control values)",
+      "raman_value": "commonly tabulated as a reduced group form in engineering summaries",
+      "resolution": "PENDING"
+    },
+    {
+      "cell": "off_diagonal_group_gradations (e.g. Manava x Vanachara, Jalachara x Keeta)",
+      "mc_value": "graded per the 12x12 rashi-pair table (specific controlled/half-controlled pairs)",
+      "raman_value": "0 / 0.5 / 1 group approximations (source-variable across printings)",
+      "resolution": "PENDING"
+    }
+  ],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",    "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING","chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Half-sign assignments (Sagittarius, Capricorn) are ambiguous across sources: here Sagittarius=Manava, Capricorn=Jalachara, Cancer=Jalachara. Verify against the frozen edition.",
+    "The authoritative implementation should prefer the 12x12 rashi-pair Vashya table; the 5x5 matrix is a stand-in and is BLOCKED until the canonical table is transcribed and cited.",
+    "Sanskrit term: Vashya / Vasya."
+  ]
+}

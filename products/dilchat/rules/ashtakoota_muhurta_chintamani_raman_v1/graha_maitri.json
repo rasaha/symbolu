@@ -1,0 +1,62 @@
+{
+  "component": "graha_maitri",
+  "max": 5,
+  "keyed_by": "rashi",
+  "executable": false,
+  "review_required": true,
+  "review_status": "PENDING_DOMAIN_REVIEW",
+  "directional": false,
+  "high_risk": true,
+  "high_risk_reason": "Graha Maitri MUST use ONLY the Naisargika (natural, permanent) friendship. Tatkalika (temporary) and the five-fold Panchadha compound relationship MUST be EXCLUDED for Guna Milan. Some engineering summaries collapse or relabel the middle compound bands.",
+  "description": "Graha Maitri (Rasyadhipati / lord-friendship) koota — mental/psychological compatibility from the NATURAL friendship between the lords of the two Moon rashis.",
+  "friendship_basis": "Naisargika (natural, permanent) ONLY. Tatkalika (temporary) friendship EXCLUDED. Panchadha (five-fold) compound EXCLUDED.",
+  "rashi_to_lord": {
+    "0":  "Mars",
+    "1":  "Venus",
+    "2":  "Mercury",
+    "3":  "Moon",
+    "4":  "Sun",
+    "5":  "Mercury",
+    "6":  "Venus",
+    "7":  "Mars",
+    "8":  "Jupiter",
+    "9":  "Saturn",
+    "10": "Saturn",
+    "11": "Jupiter"
+  },
+  "naisargika_relationships": {
+    "_comment": "Natural, permanent relationship of each planet TOWARD every other. Directional per row; the compound score combines both directions. Nodes (Rahu/Ketu) are not rashi lords here. Cross-referenced to BPHS-XREF (Naisargika data only).",
+    "Sun":     { "Moon": "friend",  "Mars": "friend",  "Mercury": "neutral", "Jupiter": "friend",  "Venus": "enemy",    "Saturn": "enemy" },
+    "Moon":    { "Sun": "friend",   "Mars": "neutral", "Mercury": "friend",  "Jupiter": "neutral", "Venus": "neutral",  "Saturn": "neutral" },
+    "Mars":    { "Sun": "friend",   "Moon": "friend",  "Mercury": "enemy",   "Jupiter": "friend",  "Venus": "neutral",  "Saturn": "neutral" },
+    "Mercury": { "Sun": "friend",   "Moon": "enemy",   "Mars": "neutral",    "Jupiter": "neutral", "Venus": "friend",   "Saturn": "neutral" },
+    "Jupiter": { "Sun": "friend",   "Moon": "friend",  "Mars": "friend",     "Mercury": "enemy",   "Venus": "enemy",    "Saturn": "neutral" },
+    "Venus":   { "Sun": "enemy",    "Moon": "enemy",   "Mars": "neutral",    "Mercury": "friend",  "Jupiter": "neutral","Saturn": "friend" },
+    "Saturn":  { "Sun": "enemy",    "Moon": "enemy",   "Mars": "enemy",      "Mercury": "friend",  "Jupiter": "neutral","Venus": "friend" }
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [5, 4, 3, 1, 0.5, 0],
+    "rule": "Let a = relation(lordA -> lordB), b = relation(lordB -> lordA). Combine the unordered pair {a,b} via compound_table. If lordA == lordB, treat as friend+friend -> 5.",
+    "compound_table": {
+      "friend+friend":   5,
+      "friend+neutral":  4,
+      "neutral+neutral": 3,
+      "friend+enemy":    1,
+      "neutral+enemy":   0.5,
+      "enemy+enemy":     0
+    }
+  },
+  "conflicts": [],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",     "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING", "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "BPHS-XREF",         "chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Sanskrit term: Graha Maitri / Rasyadhipati.",
+    "HARD RULE: exclude Tatkalika (temporary) friendship — use Naisargika only. Confirm the exact 6-band compound point values (esp. neutral+neutral = 3) against the frozen source; some schools collapse the middle bands. PENDING_DOMAIN_REVIEW.",
+    "Naisargika matrix cross-referenced to BPHS-XREF; verified:false until a frozen BPHS edition is cited."
+  ]
+}

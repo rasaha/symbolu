@@ -39,6 +39,24 @@ parts of Phase B**).
 > boundaries, RLS, fixture integrity) is recorded in
 > [`docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md`](docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md)
 > and Decision-Log entries DEC-029…DEC-035.
+
+### Astrology & Guna authority validation (this phase)
+
+| Workstream | Document | Verdict |
+|------------|----------|---------|
+| Consolidated gate | [DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md](docs/DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md) | **AUTHORITY_VALIDATION_COMPLETE_WITH_EXPLICIT_EXCLUSIONS** · rule pack **RULE_PACK_BLOCKED** |
+| A · Independent astronomy | [DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md](docs/DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md) | PASS (≤ 19.8″ vs Astropy/ERFA) |
+| B · Interval completeness | [DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md](docs/DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md) | PROVEN_WITH_LIMITATIONS |
+| C · SECURITY DEFINER / RLS | [DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md](docs/DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md) | SECURITY_DEFINER_RLS_HARDENED |
+| D · Source freeze | [DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md](docs/DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md) · [`rules/sources/GUNA_SOURCE_MANIFEST.json`](rules/sources/GUNA_SOURCE_MANIFEST.json) | PENDING_ACQUISITION |
+| E · Rule traceability | [DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md](docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md) · [`rules/ashtakoota_muhurta_chintamani_raman_v1/`](rules/ashtakoota_muhurta_chintamani_raman_v1/) | per-Koota BLOCKED/CONFLICT |
+| F · Parihara model | [DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md](docs/DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md) | ordered deterministic; rules PENDING |
+| G · Domain review | [DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md](docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md) | DOMAIN_REVIEW_PENDING |
+
+Decision-Log entries DEC-036…DEC-041. The classical Guna rule pack
+`ashtakoota_muhurta_chintamani_raman_v1` is **draft, non-executable** and cannot
+back user-facing output until the authority gate clears; the earlier
+`ashtakoota_lahiri_classical_v1` pack is retained as deprecated draft evidence.
 - A pure **three-scope authorization** model (`PRIVATE_A`/`PRIVATE_B`/`SHARED`),
   default-deny, existence non-disclosure (404 not 403), and background-job
   scope re-validation (DEC-027).

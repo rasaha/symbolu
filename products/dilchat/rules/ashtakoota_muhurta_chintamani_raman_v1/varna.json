@@ -1,0 +1,50 @@
+{
+  "component": "varna",
+  "max": 1,
+  "keyed_by": "rashi",
+  "executable": false,
+  "review_required": true,
+  "review_status": "PENDING_DOMAIN_REVIEW",
+  "directional": true,
+  "role_ordering": "PENDING (OQ-2)",
+  "description": "Varna (Varan) koota — temperament/spiritual-grade compatibility derived from the Moon rashi of each partner. Classical grouping by element: water = Brahmin, fire = Kshatriya, earth = Vaishya, air = Shudra. Directional: the groom's varna rank must be >= the bride's. This is a temperament ordering only, not a social value judgement.",
+  "varna_ranks": {
+    "_comment": "Higher number = higher varna in the scoring order. Purely the classical scoring order.",
+    "Brahmin": 4,
+    "Kshatriya": 3,
+    "Vaishya": 2,
+    "Shudra": 1
+  },
+  "rashi_to_varna": {
+    "0":  "Kshatriya",
+    "1":  "Vaishya",
+    "2":  "Shudra",
+    "3":  "Brahmin",
+    "4":  "Kshatriya",
+    "5":  "Vaishya",
+    "6":  "Shudra",
+    "7":  "Brahmin",
+    "8":  "Kshatriya",
+    "9":  "Vaishya",
+    "10": "Shudra",
+    "11": "Brahmin"
+  },
+  "scoring": {
+    "directional": true,
+    "roles": "groom vs bride (seeker/partner mapped per manifest.role_mapping — PENDING OQ-2)",
+    "rule": "Let g = varna_rank(groom.rashi), b = varna_rank(bride.rashi). If g >= b -> 1 point, else 0.",
+    "possible_values": [1, 0],
+    "points_if_groom_ge_bride": 1,
+    "points_otherwise": 0
+  },
+  "conflicts": [],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",    "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING","chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Rashi->varna by element: Brahmin = Cancer, Scorpio, Pisces (water); Kshatriya = Aries, Leo, Sagittarius (fire); Vaishya = Taurus, Virgo, Capricorn (earth); Shudra = Gemini, Libra, Aquarius (air).",
+    "Directionality (which role must hold the higher/equal rank) depends on the confirmed bride/groom mapping — PENDING OQ-2. If the mapping is reversed the win/lose asymmetry flips.",
+    "Sanskrit term: Varna / Varan. Standard classification is well documented; the executable inclusion remains PENDING_DOMAIN_REVIEW against a frozen MC + Raman edition."
+  ]
+}

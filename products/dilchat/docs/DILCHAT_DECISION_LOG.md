@@ -661,3 +661,75 @@ stays gated until independent cases are populated and verified.
 | OQ | Question | Recommendation (bounded) |
 |----|----------|--------------------------|
 | OQ-14 | Do ended couples retain read access to previously-approved shared artifacts? | **Recommend: revoke on unpair** (current RLS policy). Retained-history access is a founder decision; if adopted, add an explicit retained-history policy rather than relaxing the default. |
+
+---
+
+# Astrology & Guna Authority Validation (DEC-036 … DEC-041)
+
+> Added by the Astrology & Guna Authority Validation phase. New entries only.
+> See the workstream documents linked from the README documentation index.
+
+## DEC-036 — Independent astronomical validation source: Astropy/ERFA
+**Status:** Accepted · **[Technical]**
+
+Natal-Moon astronomical **correctness** is corroborated by **Astropy**
+(`get_body('moon')`, built-in **pyerfa / IAU-SOFA** model) — an implementation
+independent of Swiss Ephemeris, requiring no external download. 16 coverage cases
+are frozen as `VERIFIED_INDEPENDENT` fixtures; DilChat's Swiss (Moshier) output
+agrees to **≤ 20 arcsec** (max 19.8″). The sidereal conversion uses the identical
+Lahiri ayanamsa (Swiss `SE_SIDM_LAHIRI`) so the two are not conflated. A JPL-DE
+(Skyfield) cross-check remains an optional future tightening (JPL download blocked
+in this environment). Documented boundary finding: within ~0.005° of a boundary the
+two implementations may classify into adjacent buckets — expected, and mitigated by
+the uncertainty model. See `DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md`.
+
+## DEC-037 — Interval completeness: proven with limitations
+**Status:** Accepted · **[Technical]**
+
+The interval evaluator's "no category skipped" guarantee is proven under an
+**enforced monotonic-prograde precondition** (rejects non-monotonic/discontinuous
+providers) and a **fail-closed density post-condition** (raises if it cannot densify
+below one pada width). Half-open `[start,end)` semantics; conservative closed
+end-sampling. Limitation: exact crossing **timestamps** are not refined into the
+trace. Verdict `INTERVAL_BOUNDARY_COMPLETENESS_PROVEN_WITH_LIMITATIONS`. See
+`DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md`.
+
+## DEC-038 — SECURITY DEFINER hardening
+**Status:** Accepted · **[Security]** · migration `b2c3d4e5f6a7`
+
+The RLS SECURITY DEFINER helpers are hardened: dedicated **non-login owner**
+`dilchat_secfn_owner` (BYPASSRLS, least-privilege SELECT on exactly the tables it
+reads), **fixed `search_path = pg_catalog, public`** on every helper, and **PUBLIC
+EXECUTE revoked** (execute granted only to runtime roles). Runtime roles cannot
+alter/replace/re-own/grant/shadow/bypass, proven via real non-owner roles. Verdict
+`SECURITY_DEFINER_RLS_HARDENED`. See `DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md`.
+
+## DEC-039 — Guna source hierarchy (editions pending acquisition)
+**Status:** Requires acquisition + domain review · **[Traditional Vedic rule]**
+
+DilChat v1 Guna authority hierarchy: **normative** = *Muhurta Chintamani* (Rama
+Daivajna, Melapaka Prakarana); **engineering** = B. V. Raman (*Muhurtha*, Marriage
+Adaptability); **cross-reference** = *Brihat Parashara Hora Shastra* (Naisargika
+friendship only); **supplementary** = *Kalaprakasika*. **No edition has been
+acquired or frozen** in this environment → `PENDING_ACQUISITION`. No copyrighted
+scans are committed. See `rules/sources/GUNA_SOURCE_MANIFEST.json` and
+`DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md`.
+
+## DEC-040 — New named rule pack supersedes the draft; non-executable
+**Status:** Accepted (structure) · **BLOCKED (authority)** · **[Traditional Vedic rule]**
+
+A new pack `ashtakoota_muhurta_chintamani_raman_v1` is created with per-rule
+source traceability; it is `draft:true, executable:false` and cannot back
+user-facing output until the authority gate clears. The old
+`ashtakoota_lahiri_classical_v1` pack is **preserved** as deprecated draft
+evidence (not overwritten). See `DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md`.
+
+## DEC-041 — Parihara = ordered deterministic precedence (no weighted accumulation)
+**Status:** Accepted (model) · **PENDING domain review** (rules) · **[Traditional Vedic rule]**
+
+Dosha cancellation uses an **ordered deterministic** rule model with explicit
+priority, stacking policy, and mutual exclusions — **never** a weighted matrix that
+could accumulate weak rules into an invented probability. Outcomes: NO_DOSHA /
+DOSHA_PRESENT / DOSHA_CANCELLED / DOSHA_PARTIALLY_RELIEVED / SOURCE_CONFLICT /
+REQUIRES_DOMAIN_REVIEW. All rules ship disabled/PENDING. See
+`DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md` and `parihara.json`.

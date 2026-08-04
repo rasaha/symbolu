@@ -37,9 +37,12 @@ PY
   **not** qualify as independent.
 - Full per-case metadata schema is in the file's `_case_schema`.
 
-**Current status: `INDEPENDENT_REFERENCE_VALIDATION_PENDING`.** No independently
-sourced cases have been obtained yet (offline environment). The schema and the
-validation harness (`test_golden_astrology.py::test_independent_reference_fixtures`)
-exist; while `cases` is empty the harness reports **XFAIL** so the pending state is
-visible and is never hidden behind a green pass. User-facing natal release stays
-gated on populating and verifying this file.
+**Current status: `VERIFIED_INDEPENDENT`.** 16 cases populated from **Astropy**
+(pyerfa / IAU-SOFA), an implementation independent of Swiss Ephemeris — see
+`docs/DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md`. Regenerate with
+`pip install -e ".[validation,swiss]"` then
+`python scripts/generate_independent_reference.py`. The committed suite validates
+DilChat's Swiss provider against these frozen values in
+`tests/integration/test_independent_astro.py` (no Astropy needed at runtime).
+Max observed sidereal difference: **19.8 arcsec**. A JPL-DE (Skyfield) cross-check
+remains an optional future tightening (JPL download blocked in this environment).

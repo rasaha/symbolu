@@ -1,0 +1,76 @@
+{
+  "component": "nadi",
+  "max": 8,
+  "keyed_by": "nakshatra",
+  "executable": false,
+  "review_required": true,
+  "review_status": "PENDING_DOMAIN_REVIEW",
+  "directional": false,
+  "high_risk": true,
+  "high_risk_reason": "Nadi carries the highest single weight (8). Nakshatra->nadi classification and the same-rashi / same-lord / same-nakshatra-different-pada exceptions are school-variable. All cancellation is handled in parihara.json (disabled by default).",
+  "description": "Nadi koota — traditional CONSTITUTIONAL-temperament compatibility from the nadi (Aadi/Vata, Madhya/Pitta, Antya/Kapha) of each janma nakshatra. Same nadi on both sides = Nadi dosha (0); different nadi = full 8.",
+  "safety_constraint": {
+    "dec": "DEC-021",
+    "hard": true,
+    "rule": "Nadi is presented ONLY as traditional constitutional-temperament compatibility. It MUST NEVER be surfaced, worded, or interpreted as medical, genetic, fertility, pregnancy, progeny, or health information. AI and interpretation layers must enforce this. Nadi dosha is NOT a health warning."
+  },
+  "nadis": ["Aadi", "Madhya", "Antya"],
+  "nadi_glosses": { "Aadi": "Vata (traditional constitutional label)", "Madhya": "Pitta (traditional constitutional label)", "Antya": "Kapha (traditional constitutional label)" },
+  "nadi_gloss_caveat": "The Vata/Pitta/Kapha glosses are traditional labels ONLY and must not be read as Ayurvedic medical diagnosis or any health claim (DEC-021).",
+  "nakshatra_to_nadi": {
+    "0":  "Aadi",
+    "1":  "Madhya",
+    "2":  "Antya",
+    "3":  "Antya",
+    "4":  "Madhya",
+    "5":  "Aadi",
+    "6":  "Aadi",
+    "7":  "Madhya",
+    "8":  "Antya",
+    "9":  "Antya",
+    "10": "Madhya",
+    "11": "Aadi",
+    "12": "Aadi",
+    "13": "Madhya",
+    "14": "Antya",
+    "15": "Antya",
+    "16": "Madhya",
+    "17": "Aadi",
+    "18": "Aadi",
+    "19": "Madhya",
+    "20": "Antya",
+    "21": "Antya",
+    "22": "Madhya",
+    "23": "Aadi",
+    "24": "Aadi",
+    "25": "Madhya",
+    "26": "Antya"
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [8, 0],
+    "rule": "If nadi(A) == nadi(B) -> 0 (Nadi dosha). Otherwise -> 8.",
+    "points_same_nadi": 0,
+    "points_different_nadi": 8
+  },
+  "dosha": {
+    "name": "Nadi dosha",
+    "trigger": "same nadi on both sides",
+    "framing": "constitutional-temperament only (DEC-021) — never medical/genetic/fertility/health",
+    "exceptions": "Handled in parihara.json ONLY (nadi_cancel_same_rashi_diff_nakshatra, nadi_cancel_same_nakshatra_diff_pada, nadi_cancel_lords_friends) — disabled by default.",
+    "same_rashi_same_lord_note": "Same-rashi (different nakshatra) and same-lord conditions are classical cancellation candidates, defined and gated in parihara.json."
+  },
+  "conflicts": [],
+  "source_refs": [
+    { "source_id": "MC-NORMATIVE",     "chapter": null, "verse": null, "page": null, "verified": false },
+    { "source_id": "RAMAN-ENGINEERING", "chapter": null, "verse": null, "page": null, "verified": false }
+  ],
+  "notes": [
+    "Sanskrit term: Nadi.",
+    "Aadi(Vata) = Ashwini, Ardra, Punarvasu, Uttara Phalguni, Hasta, Jyeshtha, Mula, Shatabhisha, Purva Bhadrapada.",
+    "Madhya(Pitta) = Bharani, Mrigashira, Pushya, Purva Phalguni, Chitra, Anuradha, Purva Ashadha, Dhanishta, Uttara Bhadrapada.",
+    "Antya(Kapha) = Krittika, Rohini, Ashlesha, Magha, Swati, Vishakha, Uttara Ashadha, Shravana, Revati.",
+    "DEC-021 HARD constraint: constitutional framing only — never medical/genetic/fertility/pregnancy/progeny/health."
+  ]
+}

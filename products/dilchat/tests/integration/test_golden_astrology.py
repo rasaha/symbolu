@@ -38,28 +38,6 @@ def test_golden_fixtures_are_regression_class_only():
     assert _INDEPENDENT["fixture_class"] == "INDEPENDENT_REFERENCE_FIXTURE"
 
 
-def test_independent_reference_fixtures():
-    """Validate correctness against independently-sourced charts, when present.
-
-    While no independent cases exist this reports XFAIL so the pending external
-    validation is explicit and never a silent green pass.
-    """
-    cases = _INDEPENDENT.get("cases", [])
-    if not cases:
-        pytest.xfail(
-            "INDEPENDENT_REFERENCE_VALIDATION_PENDING: no independently-sourced "
-            "reference charts yet; user-facing natal release stays gated."
-        )
-    prov = SwissEphemerisProvider(mode="moshier")  # replace with the configured real provider
-    for c in cases:
-        inst = dt.datetime.fromisoformat(c["utc_instant"])
-        d = prov.compute_moon(inst, input_confidence=1.0).derivation
-        assert abs(d.longitude - c["expected_longitude_deg"]) <= c["tolerance_deg"], c["label"]
-        assert d.rashi_index == c["expected_rashi"], c["label"]
-        assert d.nakshatra_index == c["expected_nakshatra"], c["label"]
-        assert d.pada == c["expected_pada"], c["label"]
-
-
 def _instant(case) -> dt.datetime:
     r = compute_birth_instant(
         birth_date=dt.date.fromisoformat(case["birth_date"]),
