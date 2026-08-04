@@ -1,0 +1,58 @@
+{
+  "component": "nadi",
+  "max": 8,
+  "keyed_by": "nakshatra",
+  "draft": true,
+  "review_required": true,
+  "directional": false,
+  "description": "Nadi koota — traditional CONSTITUTIONAL-temperament compatibility, from the nadi (Aadi/Vata, Madhya/Pitta, Antya/Kapha) of each janma nakshatra. Same nadi on both sides = Nadi dosha (0); different nadi = full 8. Carries the highest single weight (8) in Ashtakoota.",
+  "safety_constraint": {
+    "dec": "DEC-021",
+    "rule": "Nadi is presented ONLY as traditional constitutional compatibility. It must NEVER be surfaced, worded, or interpreted as medical, genetic, fertility, pregnancy, progeny, or health information. AI and interpretation layers must enforce this. Nadi dosha is not a health warning.",
+    "hard": true
+  },
+  "nadis": ["Aadi", "Madhya", "Antya"],
+  "nadi_glosses": { "Aadi": "Vata (traditional)", "Madhya": "Pitta (traditional)", "Antya": "Kapha (traditional)" },
+  "nakshatra_to_nadi": {
+    "0":  "Aadi",
+    "1":  "Madhya",
+    "2":  "Antya",
+    "3":  "Antya",
+    "4":  "Madhya",
+    "5":  "Aadi",
+    "6":  "Aadi",
+    "7":  "Madhya",
+    "8":  "Antya",
+    "9":  "Antya",
+    "10": "Madhya",
+    "11": "Aadi",
+    "12": "Aadi",
+    "13": "Madhya",
+    "14": "Antya",
+    "15": "Antya",
+    "16": "Madhya",
+    "17": "Aadi",
+    "18": "Aadi",
+    "19": "Madhya",
+    "20": "Antya",
+    "21": "Antya",
+    "22": "Madhya",
+    "23": "Aadi",
+    "24": "Aadi",
+    "25": "Madhya",
+    "26": "Antya"
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [8, 0],
+    "rule": "If groom.nadi == bride.nadi -> 0 (Nadi dosha). Otherwise -> 8.",
+    "points_same_nadi": 0,
+    "points_different_nadi": 8
+  },
+  "notes": [
+    "Nadi assignment: Aadi(Vata) = Ashwini, Ardra, Punarvasu, Uttara Phalguni, Hasta, Jyeshtha, Mula, Shatabhisha, Purva Bhadrapada. Madhya(Pitta) = Bharani, Mrigashira, Pushya, Purva Phalguni, Chitra, Anuradha, Purva Ashadha, Dhanishta, Uttara Bhadrapada. Antya(Kapha) = Krittika, Rohini, Ashlesha, Magha, Swati, Vishakha, Uttara Ashadha, Shravana, Revati.",
+    "Nadi dosha is a common candidate for classical cancellation (same rashi different nakshatra, same nakshatra different pada, lords being friends, etc.). No cancellation is applied unless explicitly enabled in exceptions.json, and every applied cancellation is recorded in the report trace.",
+    "DEC-021 reminder: constitutional-compatibility framing ONLY — never medical/genetic/fertility/health."
+  ]
+}

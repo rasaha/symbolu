@@ -1,0 +1,184 @@
+{
+  "manifest_id": "guna_source_manifest_v2",
+  "supersedes": "guna_source_manifest_v1",
+  "supersession_note": "v1 recorded the INTENDED sources with no edition identified. v2 records REAL, externally-verifiable candidate editions (publisher / translator / ISBN / archive catalogue identifiers) discovered by bibliographic search. This is edition IDENTIFICATION, not acquisition and not freeze. See DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md.",
+  "purpose": "Bibliographic edition record for the DilChat v1 Ashtakoota rule pack. Records candidate classical, engineering, and cross-reference editions with an honest acquisition/verification status. NO source below has been physically acquired, its pages read, or its content verified in this environment; therefore NONE is FROZEN and NO rule is domain-approved. No copyrighted book text or scan is committed.",
+  "committed_evidence_policy": "Only bibliographic metadata, catalogue/archive identifiers, page/verse references, brief legally-compliant quotations (added at review time), reviewer notes, file hashes, and acquisition records may be committed. Full scans / OCR of copyrighted works must NOT be committed unless Ugence Labs holds clear redistribution rights.",
+  "environment_limitation": "This phase ran in an isolated build environment. Bibliographic search engines were reachable and returned verifiable catalogue records (Open Library, Amazon/AbeBooks, publisher pages, Internet Archive listing pages). Internet Archive item CONTENT endpoints returned HTTP 403 through the environment proxy, so no scan page was opened, no pagination was verified, and no Melapaka Prakarana / Marriage Adaptability text was read here. Edition identity below is therefore CANDIDATE metadata pending human acquisition and reviewer access.",
+  "source_status_legend": [
+    "FROZEN_PRIMARY", "FROZEN_ENGINEERING", "FROZEN_CROSS_REFERENCE",
+    "ACQUIRED_PENDING_VERIFICATION", "EDITION_IDENTIFIED_NOT_ACQUIRED",
+    "PENDING_ACQUISITION", "PENDING_DOMAIN_REVIEW", "REJECTED_SOURCE"
+  ],
+  "edition_identification_legend": {
+    "EDITION_IDENTIFIED_NOT_ACQUIRED": "A specific, real, citable edition has been identified from catalogue metadata, but the physical/authorized-digital copy has NOT been acquired and its pages have NOT been opened or verified in this environment.",
+    "ACQUIRED_PENDING_VERIFICATION": "A copy has been legally acquired and is in hand, but pagination / bibliographic identity / usability for rule adjudication is not yet confirmed by a qualified reviewer.",
+    "FROZEN_ANY": "Edition known, relevant pages/verses accessible, pagination stable, bibliographic identity unambiguous, immutable checksum recorded, text usable for rule adjudication, and reviewer has confirmed usability."
+  },
+  "overall_status": "PENDING_ACQUISITION",
+  "overall_status_reason": "Editions are IDENTIFIED (real ISBNs / catalogue IDs recorded) but NOT acquired, NOT accessed, and NOT reviewer-usable in this environment. No source meets the freeze criteria. The four source conflicts and the eight per-Koota authorities cannot be resolved until a qualified reviewer works from a frozen edition.",
+  "freeze_criteria": [
+    "exact edition (publisher, year, printing, translator) known",
+    "relevant pages or verses physically/legally accessible",
+    "pagination stable and citable",
+    "bibliographic identity unambiguous",
+    "immutable identity (checksum or catalogue permalink) recorded",
+    "text usable by a qualified reviewer for rule adjudication",
+    "qualified reviewer has confirmed usability"
+  ],
+  "sources": [
+    {
+      "source_id": "MC-NORMATIVE",
+      "role": "normative_classical_authority",
+      "canonical_title": "Muhurta Chintamani",
+      "original_title": "Muhurtacintamani",
+      "author": "Rama Daivajna (Daivajna Acharya Shri Rama)",
+      "relevant_section": "Melapaka Prakarana (marriage-matching chapter)",
+      "review_status": "PENDING_ACQUISITION",
+      "edition_identification": "EDITION_IDENTIFIED_NOT_ACQUIRED",
+      "candidate_editions": [
+        {
+          "candidate_id": "MC-EN-SHARMA",
+          "preference": "primary_english_engineering_bridge",
+          "editor_or_commentator": "Girish Chand Sharma",
+          "translator": "Girish Chand Sharma",
+          "language": "Sanskrit text + English translation, commentary and annotation",
+          "publisher": "Sagar Publications, New Delhi",
+          "publication_year": 1996,
+          "edition_number": null,
+          "isbn_or_identifier": null,
+          "catalogue_url": "https://openlibrary.org/works/OL63483W/",
+          "copyright_restrictions": "In copyright (Sagar Publications). Do NOT commit scans.",
+          "acquisition_method": "purchase (bookseller) — not yet acquired",
+          "notes": "English translation with Melapaka Prakarana; usable as an accessibility bridge but the SANSKRIT normative text governs on conflict."
+        },
+        {
+          "candidate_id": "MC-SKT-HARIDAS-185",
+          "preference": "sanskrit_normative_reference",
+          "editor_or_commentator": "Pt. Kapileshwar Shastri",
+          "translator": null,
+          "language": "Sanskrit (with Sanskrit commentary)",
+          "publisher": "Haridas Sanskrit Series #185, Chowkhamba",
+          "publication_year": null,
+          "edition_number": null,
+          "isbn_or_identifier": "archive.org: muhurt-chintamani-of-shri-ram-daivajna-with-pt.-kapilessvar-shastri-185-haridas-sanskrit-series",
+          "catalogue_url": "https://archive.org/details/muhurt-chintamani-of-shri-ram-daivajna-with-pt.-kapilessvar-shastri-185-haridas-sanskrit-series",
+          "copyright_restrictions": "Verify per edition/date; older Sanskrit editions may be public domain. Content endpoint returned HTTP 403 in this environment; not opened.",
+          "acquisition_method": "Internet Archive (listing seen; content not accessible here)",
+          "notes": "Candidate Sanskrit normative reference. Verse-level identity for Melapaka Prakarana must be confirmed by a Sanskrit-competent reviewer."
+        }
+      ],
+      "copyright_restrictions": "Depends on selected edition. Do not commit scans of in-copyright editions.",
+      "acquisition_date": null,
+      "file_checksum": null,
+      "notes": "Exact edition/translator MUST be acquired and reviewer-confirmed before any rule can be FROZEN_PRIMARY. Both a Sanskrit normative reference and an English bridge are recommended."
+    },
+    {
+      "source_id": "RAMAN-ENGINEERING",
+      "role": "engineering_interpretation_authority",
+      "canonical_title": "Muhurtha (Electional Astrology)",
+      "author": "B. V. Raman (Bangalore Venkata Raman)",
+      "relevant_section": "Marriage / Marriage Adaptability chapter and the Ashtakoota / Kuta tables used by the rule pack",
+      "review_status": "PENDING_ACQUISITION",
+      "edition_identification": "EDITION_IDENTIFIED_NOT_ACQUIRED",
+      "candidate_editions": [
+        {
+          "candidate_id": "RAMAN-UBSPD",
+          "preference": "primary_engineering",
+          "editor_or_commentator": null,
+          "translator": null,
+          "language": "English",
+          "publisher": "UBS Publishers' Distributors (UBSPD)",
+          "publication_year": 1993,
+          "edition_number": "commonly cited 13th edition / reprint",
+          "isbn_or_identifier": "ISBN-13 978-8185674681 / ISBN-10 818567468X",
+          "catalogue_url": "https://www.abebooks.com/book-search/isbn/9788185674681/",
+          "copyright_restrictions": "In copyright. Do NOT commit scans.",
+          "acquisition_method": "purchase (bookseller) — not yet acquired",
+          "notes": "The specific PRINTING must be pinned because table pagination varies across reprints."
+        },
+        {
+          "candidate_id": "RAMAN-MLBD-REPRINT",
+          "preference": "alternate_engineering",
+          "editor_or_commentator": null,
+          "translator": null,
+          "language": "English",
+          "publisher": "Motilal Banarsidass",
+          "publication_year": null,
+          "edition_number": "MLBD reprint",
+          "isbn_or_identifier": "ISBN 9789359662923 / 9789359661070 (MLBD reprint)",
+          "catalogue_url": "https://www.mlbd.in/products/muhurtha-electional-astrology-by-b-v-raman-9789359662923-9359662925-9789359661070-9359661074",
+          "copyright_restrictions": "In copyright. Do NOT commit scans.",
+          "acquisition_method": "purchase (bookseller) — not yet acquired",
+          "notes": "If chosen, pagination differs from the UBSPD printing; pin one printing for all page citations."
+        }
+      ],
+      "copyright_restrictions": "In copyright; do not commit scans.",
+      "acquisition_date": null,
+      "file_checksum": null,
+      "notes": "Engineering interpretation authority for table gradations and directional ordering. Raman must NOT silently override a clearly adjudicated MC normative verse."
+    },
+    {
+      "source_id": "BPHS-XREF",
+      "role": "foundational_cross_reference",
+      "canonical_title": "Brihat Parashara Hora Shastra",
+      "author": "attributed to Maharshi Parashara",
+      "relevant_section": "Naisargika (natural) planetary-friendship data ONLY, where consistent with the selected matching tradition",
+      "review_status": "PENDING_ACQUISITION",
+      "edition_identification": "EDITION_IDENTIFIED_NOT_ACQUIRED",
+      "candidate_editions": [
+        {
+          "candidate_id": "BPHS-SANTHANAM-RANJAN",
+          "preference": "primary_cross_reference",
+          "editor_or_commentator": null,
+          "translator": "R. Santhanam",
+          "language": "Sanskrit + English translation",
+          "publisher": "Ranjan Publications, New Delhi",
+          "publication_year": 1984,
+          "edition_number": "2-volume set (reprinted)",
+          "isbn_or_identifier": "ISBN-13 978-8188230600 / ISBN-10 818823060X",
+          "catalogue_url": "https://www.abebooks.com/9788188230600/Brihat-Parasara-Hora-Sastra-Maharshi-818823060X/plp",
+          "copyright_restrictions": "Translation in copyright (Ranjan Publications). Do NOT commit scans.",
+          "acquisition_method": "purchase (bookseller) — not yet acquired",
+          "notes": "97-chapter Santhanam translation; use ONLY the natural-friendship (Naisargika Maitri) chapter for Graha Maitri cross-reference."
+        }
+      ],
+      "copyright_restrictions": "Translation editions in copyright; do not commit scans.",
+      "acquisition_date": null,
+      "file_checksum": null,
+      "notes": "Cross-reference for the Graha Maitri natural-friendship matrix ONLY. Do NOT combine natural + temporary + compound friendship unless the selected Ashtakoota source explicitly requires it."
+    },
+    {
+      "source_id": "KALAPRAKASIKA-XREF",
+      "role": "supplementary_cross_check",
+      "canonical_title": "Kalaprakasika",
+      "author": "N. P. Subramania Iyer (translation; reprint of 1917 edition)",
+      "relevant_section": "Only where exact edition/chapter/page evidence is available AND the rule is relevant to the selected v1 tradition",
+      "review_status": "PENDING_ACQUISITION",
+      "edition_identification": "EDITION_IDENTIFIED_NOT_ACQUIRED",
+      "candidate_editions": [
+        {
+          "candidate_id": "KALAP-GYAN",
+          "preference": "supplementary",
+          "editor_or_commentator": null,
+          "translator": "N. P. Subramania Iyer",
+          "language": "Devanagari text + English translation",
+          "publisher": "Gyan Publishing House (and Asian Educational Services reprint of the 1917 edition)",
+          "publication_year": null,
+          "edition_number": "reprint of 1917 edition",
+          "isbn_or_identifier": "ISBN 9788121236591 (pb) / 9788121236607 (hb)",
+          "catalogue_url": "https://www.abebooks.com/9788121236591/Kalaprakasika-Standard-Book-Election-System-8121236592/plp",
+          "copyright_restrictions": "1917 text is old; modern reprint typesetting may carry its own rights. Verify before retaining any scan.",
+          "acquisition_method": "purchase (bookseller) — not yet acquired",
+          "notes": "Supplementary ONLY. Must not be used to fill a missing cell. Regional (South-Indian electional) system — do NOT blend silently with a North-Indian MC tradition."
+        }
+      ],
+      "copyright_restrictions": "Verify per edition.",
+      "acquisition_date": null,
+      "file_checksum": null,
+      "notes": "Supplementary only; used solely where precise page/verse evidence is available and consistent with the selected v1 tradition."
+    }
+  ],
+  "prohibited_sources": "Blogs, mobile applications, AI summaries, anonymous transcriptions, uncorrected OCR, and secondary websites without edition/page evidence are NOT acceptable rule authority.",
+  "domain_review": "DOMAIN_REVIEW_PENDING"
+}

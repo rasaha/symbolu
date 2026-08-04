@@ -1,0 +1,1277 @@
+openapi: 3.1.0
+info:
+  title: DilChat API
+  version: "1.0.0"
+  summary: Consumer relationship + Vedic-astrology API for DilChat (Ugence Labs).
+  description: |
+    Design contract for the DilChat backend. REST/JSON over HTTPS, FastAPI-generated.
+    Authoritative canon: `DILCHAT_DECISION_LOG.md`. Prose companion: `DILCHAT_API_SPEC.md`.
+
+    Invariants encoded here:
+    - Short-lived ES256 JWT access token (`Authorization: Bearer`) + rotating opaque refresh token.
+    - Privacy scopes PRIVATE_A/PRIVATE_B/SHARED resolved server-side; couple membership re-checked
+      on every shared request; default deny.
+    - Content moves private -> shared ONLY via explicit consent grants.
+    - Every derived response carries a `Provenance` block; AI never recomputes astrology.
+    - Cross-private reads return 404 (never 403) so the other partner's private data existence
+      is never leaked.
+  contact:
+    name: DilChat Engineering
+    url: https://dilchat.com
+  license:
+    name: Proprietary — Ugence Labs
+servers:
+  - url: https://api.dilchat.com/v1
+    description: Production (India-first region, DEC-018)
+security:
+  - bearerAuth: []
+tags:
+  - name: identity
+  - name: users
+  - name: birth_profiles
+  - name: astrology
+  - name: guna_milan
+  - name: moon_transits
+  - name: couples
+  - name: consent
+  - name: agreements
+  - name: ai_guidance
+
+paths:
+  /auth/register:
+    post:
+      tags: [identity]
+      operationId: authRegister
+      summary: Create an account
+      security: []
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Account created
+          headers: { Location: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  /auth/login:
+    post:
+      tags: [identity]
+      operationId: authLogin
+      summary: Password login
+      security: []
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  /auth/refresh:
+    post:
+      tags: [identity]
+      operationId: authRefresh
+      summary: Rotate refresh token, mint new access token
+      security: []
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Rotated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401':
+          description: Invalid/reused refresh (AUTH_REFRESH_INVALID / AUTH_REFRESH_REUSE)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /auth/logout:
+    post:
+      tags: [identity]
+      operationId: authLogout
+      summary: Revoke the current session
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses:
+        '204': { description: Session revoked }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /me:
+    get:
+      tags: [users]
+      operationId: getMe
+      summary: Current user profile
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [users]
+      operationId: patchMe
+      summary: Update profile
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                locale: { type: string }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+    delete:
+      tags: [users]
+      operationId: deleteMe
+      summary: Request account deletion (async -> deletion_pending)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties: { confirm: { type: string } }
+      responses:
+        '202':
+          description: Deletion pending
+          headers: { Location: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+
+  /me/export:
+    post:
+      tags: [users]
+      operationId: startExport
+      summary: Start a data-export job (async)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format: { type: string, enum: [zip, json], default: zip }
+                include: { type: array, items: { type: string } }
+      responses:
+        '202':
+          description: Job queued
+          headers:
+            Location: { schema: { type: string } }
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+
+  /me/export/{job_id}:
+    get:
+      tags: [users]
+      operationId: getExportJob
+      summary: Poll an export/deletion job
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /birth-profiles:
+    post:
+      tags: [birth_profiles]
+      operationId: createBirthProfile
+      summary: Create a birth profile (private to owner)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BirthProfileInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfile' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /birth-profiles/{id}:
+    get:
+      tags: [birth_profiles]
+      operationId: getBirthProfile
+      summary: Get a birth-profile version (owner only; 404 for others)
+      parameters: [ { $ref: '#/components/parameters/PathId' } ]
+      responses:
+        '200':
+          description: Birth profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfile' }
+        '404':
+          description: Not found or masked cross-private (never 403)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    patch:
+      tags: [birth_profiles]
+      operationId: patchBirthProfile
+      summary: Supersede with a new immutable version
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BirthProfileInput' }
+      responses:
+        '201':
+          description: New version created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfile' }
+
+  /me/birth-profile:
+    get:
+      tags: [birth_profiles]
+      operationId: getMyBirthProfile
+      summary: Current (latest-version) birth profile
+      responses:
+        '200':
+          description: Birth profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthProfile' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /charts:calculate:
+    post:
+      tags: [astrology]
+      operationId: calculateChart
+      summary: Derive a natal chart from a birth profile (sync fast-path)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [birth_profile_id]
+              properties:
+                birth_profile_id: { type: string }
+      responses:
+        '200':
+          description: Chart computed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NatalChart' }
+        '202':
+          description: Queued under worker saturation
+          headers:
+            Location: { schema: { type: string } }
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '503':
+          description: EPHEMERIS_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /charts/{id}:
+    get:
+      tags: [astrology]
+      operationId: getChart
+      summary: Fetch a computed chart (owner only)
+      parameters: [ { $ref: '#/components/parameters/PathId' } ]
+      responses:
+        '200':
+          description: Chart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NatalChart' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /guna-milan:preview:
+    post:
+      tags: [guna_milan]
+      operationId: gunaMilanPreview
+      summary: Single-user preview vs manually entered partner data (PRIVATE, no couple)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [self_birth_profile_id, partner]
+              properties:
+                self_birth_profile_id: { type: string }
+                partner: { $ref: '#/components/schemas/BirthProfileInput' }
+      responses:
+        '200':
+          description: Preview scorecard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GunaMilanReport' }
+
+  /couples/{couple_id}/guna-milan:
+    get:
+      tags: [guna_milan]
+      operationId: getCoupleGunaMilan
+      summary: Shared Ashtakoota scorecard (SHARED; membership re-checked)
+      parameters:
+        - { $ref: '#/components/parameters/CoupleId' }
+      responses:
+        '200':
+          description: Scorecard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GunaMilanReport' }
+        '403':
+          description: SCOPE_DENIED / COUPLE_NOT_ACTIVE
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /me/daily:
+    get:
+      tags: [moon_transits]
+      operationId: getDaily
+      summary: Personal daily emotional & interest profile
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Daily profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyProfile' }
+
+  /couples/{couple_id}/climate:
+    get:
+      tags: [moon_transits]
+      operationId: getCoupleClimate
+      summary: Couple daily relational climate (SHARED)
+      parameters:
+        - { $ref: '#/components/parameters/CoupleId' }
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Climate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyProfile' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /couples/invitations:
+    post:
+      tags: [couples]
+      operationId: createInvitation
+      summary: Create a pairing invitation
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel: { type: string, enum: [link, code, email], default: link }
+                invitee_hint: { type: string }
+                role: { type: string, enum: [seeker, partner], default: seeker }
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+
+  /couples/invitations/{id}:
+    get:
+      tags: [couples]
+      operationId: getInvitation
+      summary: Inspect an invitation
+      parameters: [ { $ref: '#/components/parameters/PathId' } ]
+      responses:
+        '200':
+          description: Invitation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /couples/invitations/{id}:accept:
+    post:
+      tags: [couples]
+      operationId: acceptInvitation
+      summary: Accept an invitation -> active couple
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties: { code: { type: string } }
+      responses:
+        '201':
+          description: Couple created
+          headers: { Location: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Couple' }
+        '409':
+          description: INVITATION_USED
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '410':
+          description: INVITATION_EXPIRED
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /couples/{couple_id}:
+    get:
+      tags: [couples]
+      operationId: getCouple
+      summary: Couple summary (SHARED)
+      parameters: [ { $ref: '#/components/parameters/CoupleId' } ]
+      responses:
+        '200':
+          description: Couple
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Couple' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /couples/{couple_id}:unpair:
+    post:
+      tags: [couples]
+      operationId: unpairCouple
+      summary: Dissolve couple; revoke SHARED scope
+      parameters:
+        - { $ref: '#/components/parameters/CoupleId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Unpaired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Couple' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /consent/grants:
+    get:
+      tags: [consent]
+      operationId: listConsentGrants
+      summary: List consent grants (as proposer/grantor)
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Grants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ConsentGrant' } }
+                  next_cursor: { type: [string, 'null'] }
+    post:
+      tags: [consent]
+      operationId: proposeConsentGrant
+      summary: Propose a bounded private->shared projection
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsentGrantInput' }
+      responses:
+        '201':
+          description: Proposed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentGrant' }
+
+  /consent/grants/{id}:grant:
+    post:
+      tags: [consent]
+      operationId: grantConsent
+      summary: Owner authorizes the projection
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Granted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentGrant' }
+        '403':
+          description: CONSENT_REQUIRED / SCOPE_DENIED (only owner may grant)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /consent/grants/{id}:revoke:
+    post:
+      tags: [consent]
+      operationId: revokeConsent
+      summary: Grantor revokes a live grant
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentGrant' }
+
+  /couples/{couple_id}/agreements:
+    post:
+      tags: [agreements]
+      operationId: createAgreement
+      summary: Draft an agreement (SHARED)
+      parameters:
+        - { $ref: '#/components/parameters/CoupleId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgreementInput' }
+      responses:
+        '201':
+          description: Draft created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agreement' }
+
+  /agreements/{id}:submit:
+    post:
+      tags: [agreements]
+      operationId: submitAgreement
+      summary: Move draft -> pending_approval
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agreement' }
+
+  /agreements/{id}:approve:
+    post:
+      tags: [agreements]
+      operationId: approveAgreement
+      summary: Member approval (dual approval required to activate)
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Approval recorded (active once both approve)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agreement' }
+        '403':
+          description: DUAL_APPROVAL_REQUIRED
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: CONFLICT (already approved by this member)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /agreements/{id}:reject:
+    post:
+      tags: [agreements]
+      operationId: rejectAgreement
+      summary: Member rejection -> back to draft
+      parameters:
+        - { $ref: '#/components/parameters/PathId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agreement' }
+
+  /ai/explain-component:
+    post:
+      tags: [ai_guidance]
+      operationId: aiExplainComponent
+      summary: Explain a Guna Milan Koota component (validated structured output)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couple_id, koota]
+              properties:
+                couple_id: { type: string }
+                koota: { $ref: '#/components/schemas/KootaName' }
+      responses:
+        '200':
+          description: Structured explanation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AIExplanation' }
+        '422':
+          description: AI_VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /ai/daily-climate-summary:
+    post:
+      tags: [ai_guidance]
+      operationId: aiDailyClimateSummary
+      summary: Summarize a daily/couple climate (validated structured output)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                couple_id: { type: string }
+                date: { type: string, format: date }
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AIExplanation' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /ai/ffanr:
+    post:
+      tags: [ai_guidance]
+      operationId: aiFfanr
+      summary: Facts/Feelings/Assumptions/Needs/Requests decomposition (PRIVATE)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties: { text: { type: string } }
+      responses:
+        '200':
+          description: FFANR structure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FFANR' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /ai/opener:
+    post:
+      tags: [ai_guidance]
+      operationId: aiOpener
+      summary: Suggest conversation openers (validated structured output)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                couple_id: { type: string }
+                topic: { type: string }
+      responses:
+        '200':
+          description: Openers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openers: { type: array, items: { type: string } }
+                  provenance: { $ref: '#/components/schemas/Provenance' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /ai/compromise-options:
+    post:
+      tags: [ai_guidance]
+      operationId: aiCompromiseOptions
+      summary: Generate compromise options (SHARED, validated structured output)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couple_id, compromise_session_id]
+              properties:
+                couple_id: { type: string }
+                compromise_session_id: { type: string }
+      responses:
+        '200':
+          description: Options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  options:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title: { type: string }
+                        detail: { type: string }
+                  provenance: { $ref: '#/components/schemas/Provenance' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /ai/draft-agreement:
+    post:
+      tags: [ai_guidance]
+      operationId: aiDraftAgreement
+      summary: Draft agreement text from inputs (SHARED, validated structured output)
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couple_id]
+              properties:
+                couple_id: { type: string }
+                compromise_session_id: { type: string }
+                intent: { type: string }
+      responses:
+        '200':
+          description: Draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgreementInput' }
+        '422':
+          description: AI_VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived ES256 JWT access token. Verify against /.well-known/jwks.json.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Client-supplied key for exactly-once semantics on effectful POSTs (Redis, 24h TTL).
+      schema: { type: string, maxLength: 255 }
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    CoupleId:
+      name: couple_id
+      in: path
+      required: true
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    Problem:
+      description: Problem+json error envelope
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code, trace_id]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          enum:
+            - VALIDATION_INVALID
+            - VALIDATION_MISSING_FIELD
+            - VALIDATION_OUT_OF_RANGE
+            - AUTH_TOKEN_MISSING
+            - AUTH_TOKEN_INVALID
+            - AUTH_TOKEN_EXPIRED
+            - AUTH_REFRESH_INVALID
+            - AUTH_REFRESH_REUSE
+            - AUTH_OTP_INVALID
+            - SCOPE_DENIED
+            - COUPLE_NOT_ACTIVE
+            - CONSENT_REQUIRED
+            - DUAL_APPROVAL_REQUIRED
+            - NOT_FOUND
+            - CONFLICT
+            - INVITATION_USED
+            - INVITATION_EXPIRED
+            - IDEMPOTENCY_KEY_REUSED
+            - AI_VALIDATION_FAILED
+            - RATE_LIMITED
+            - EPHEMERIS_UNAVAILABLE
+            - INTERNAL
+        detail: { type: string }
+        trace_id: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              code: { type: string }
+              message: { type: string }
+
+    Provenance:
+      type: object
+      description: Version/attribution block stamped on every derived response (DEC-000).
+      required: [calc_timestamp, confidence]
+      properties:
+        ephemeris_provider: { type: string, enum: [swiss, moshier] }
+        ephemeris_version: { type: string }
+        ayanamsa: { type: string, enum: [lahiri, raman, kp] }
+        zodiac: { type: string, enum: [sidereal, tropical] }
+        rule_pack_id: { type: string }
+        transit_model_version: { type: string }
+        interpretation_pack_version: { type: string }
+        interest_model_version: { type: string }
+        prompt_pack_version: { type: string }
+        calc_timestamp: { type: string, format: date-time }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10 }
+        display_name: { type: string }
+        locale: { type: string, default: en-IN }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, enum: [Bearer] }
+        expires_in: { type: integer, description: Access-token lifetime in seconds (600). }
+        refresh_token: { type: string, description: Opaque, rotating; presented only to /auth/refresh. }
+        session: { $ref: '#/components/schemas/Session' }
+
+    AuthResult:
+      type: object
+      required: [tokens]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        tokens: { $ref: '#/components/schemas/TokenResponse' }
+
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        locale: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Session:
+      type: object
+      properties:
+        id: { type: string }
+        device: { type: string }
+        ip_hint: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        revoked: { type: boolean }
+
+    Job:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string }
+        kind: { type: string }
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, deletion_pending]
+        progress: { type: number, minimum: 0, maximum: 1 }
+        grace_until: { type: string, format: date-time }
+        result:
+          type: object
+          properties:
+            download_url: { type: string }
+            expires_at: { type: string, format: date-time }
+            size_bytes: { type: integer }
+        error: { $ref: '#/components/schemas/Problem' }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+
+    Place:
+      type: object
+      properties:
+        query: { type: string }
+        display: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        iana_timezone: { type: string }
+        coordinates_encrypted: { type: boolean }
+
+    BirthProfileInput:
+      type: object
+      required: [birth_date, place]
+      properties:
+        birth_date: { type: string, format: date }
+        birth_time: { type: string, description: Local civil time HH:MM:SS; separate from derived UTC. }
+        birth_time_known: { type: boolean, default: true }
+        place: { $ref: '#/components/schemas/Place' }
+
+    BirthProfile:
+      type: object
+      required: [id, version, owner_user_id, birth_date]
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        owner_user_id: { type: string }
+        birth_date: { type: string, format: date }
+        birth_time: { type: string }
+        birth_time_known: { type: boolean }
+        place: { $ref: '#/components/schemas/Place' }
+        created_at: { type: string, format: date-time }
+
+    NatalChart:
+      type: object
+      required: [id, birth_profile_id, moon, provenance]
+      properties:
+        id: { type: string }
+        birth_profile_id: { type: string }
+        birth_profile_version: { type: integer }
+        moon:
+          type: object
+          required: [rashi, nakshatra, pada]
+          properties:
+            rashi: { type: string }
+            rashi_index: { type: integer, minimum: 1, maximum: 12 }
+            nakshatra: { type: string }
+            nakshatra_index: { type: integer, minimum: 1, maximum: 27 }
+            pada: { type: integer, minimum: 1, maximum: 4 }
+            longitude_sidereal: { type: number }
+        ascendant:
+          type: object
+          properties:
+            rashi: { type: string }
+            note: { type: string }
+        tithi:
+          type: object
+          properties:
+            index: { type: integer }
+            name: { type: string }
+            paksha: { type: string, enum: [shukla, krishna] }
+            note: { type: string }
+        provenance: { $ref: '#/components/schemas/Provenance' }
+
+    KootaName:
+      type: string
+      enum: [varna, vashya, tara, yoni, graha_maitri, gana, bhakoot, nadi]
+
+    GunaMilanComponent:
+      type: object
+      required: [koota, score, max]
+      properties:
+        koota: { $ref: '#/components/schemas/KootaName' }
+        score: { type: number }
+        max: { type: number }
+        note: { type: string }
+
+    GunaMilanReport:
+      type: object
+      required: [total, components, provenance]
+      properties:
+        couple_id: { type: string }
+        total:
+          type: object
+          required: [score, max]
+          properties:
+            score: { type: number, minimum: 0, maximum: 36 }
+            max: { type: number, enum: [36] }
+        components:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items: { $ref: '#/components/schemas/GunaMilanComponent' }
+        doshas:
+          type: object
+          properties:
+            bhakoot_dosha: { type: boolean }
+            nadi_dosha: { type: boolean }
+            cancellations_applied: { type: array, items: { type: string } }
+        trace:
+          type: object
+          properties:
+            seeker: { type: object, additionalProperties: true }
+            partner: { type: object, additionalProperties: true }
+        provenance: { $ref: '#/components/schemas/Provenance' }
+
+    InterestScore:
+      type: object
+      required: [theme, score]
+      properties:
+        theme:
+          type: string
+          enum:
+            - communication
+            - intimacy
+            - adventure
+            - stability
+            - finances
+            - family
+            - career
+            - health
+            - spirituality
+            - creativity
+            - social
+            - rest
+        score: { type: number, minimum: 0, maximum: 1 }
+
+    DailyProfile:
+      type: object
+      required: [date, interest_scores, provenance]
+      properties:
+        date: { type: string, format: date }
+        local_timezone: { type: string }
+        transit_moon:
+          type: object
+          properties:
+            rashi: { type: string }
+            nakshatra: { type: string }
+            pada: { type: integer }
+        natal_moon_house: { type: integer, minimum: 1, maximum: 12 }
+        emotional_climate:
+          type: object
+          properties:
+            label: { type: string }
+            valence: { type: number, minimum: -1, maximum: 1 }
+            energy: { type: number, minimum: 0, maximum: 1 }
+        interest_scores:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items: { $ref: '#/components/schemas/InterestScore' }
+        transitions:
+          type: array
+          items:
+            type: object
+            properties:
+              event: { type: string }
+              to: { type: string }
+              at: { type: string, format: date-time }
+        disclaimer: { type: string }
+        provenance: { $ref: '#/components/schemas/Provenance' }
+
+    Invitation:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, accepted, expired, revoked] }
+        code: { type: string }
+        accept_url: { type: string }
+        inviter_user_id: { type: string }
+        invitee_hint: { type: string }
+        role: { type: string, enum: [seeker, partner] }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    CoupleMember:
+      type: object
+      properties:
+        user_id: { type: string }
+        role: { type: string, enum: [seeker, partner] }
+        private_scope: { type: string, enum: [PRIVATE_A, PRIVATE_B] }
+        membership: { type: string, enum: [active, revoked] }
+
+    Couple:
+      type: object
+      required: [id, status, members]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, active, unpaired] }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/CoupleMember' }
+        created_at: { type: string, format: date-time }
+        unpaired_at: { type: string, format: date-time }
+
+    ConsentGrantInput:
+      type: object
+      required: [couple_id, artifact_kind, source_scope, projection]
+      properties:
+        couple_id: { type: string }
+        artifact_kind: { type: string, enum: [reflection_summary, agreed_statement, feeling_note] }
+        source_scope: { type: string, enum: [PRIVATE_A, PRIVATE_B] }
+        projection:
+          type: object
+          description: Bounded, explicitly enumerated projection — never the raw private stream.
+          properties:
+            title: { type: string }
+            summary: { type: string }
+        revocation_policy: { type: string, enum: [revocable, permanent], default: revocable }
+
+    ConsentGrant:
+      type: object
+      required: [id, status, couple_id, owner_user_id]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [proposed, granted, revoked] }
+        couple_id: { type: string }
+        owner_user_id: { type: string }
+        artifact_kind: { type: string }
+        source_scope: { type: string, enum: [PRIVATE_A, PRIVATE_B] }
+        shared_artifact_id: { type: string }
+        shared_artifact_state: { type: string, enum: [live, withdrawn] }
+        revocation_policy: { type: string, enum: [revocable, permanent] }
+        created_at: { type: string, format: date-time }
+        granted_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time }
+
+    AgreementInput:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string }
+        body: { type: string }
+        compromise_session_id: { type: string }
+
+    AgreementApproval:
+      type: object
+      properties:
+        user_id: { type: string }
+        approved_at: { type: string, format: date-time }
+
+    Agreement:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [draft, pending_approval, active, rejected] }
+        author_user_id: { type: string }
+        title: { type: string }
+        body: { type: string }
+        approvals:
+          type: array
+          items: { $ref: '#/components/schemas/AgreementApproval' }
+        required: { type: integer, enum: [2] }
+        received: { type: integer }
+        activated_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    AIExplanation:
+      type: object
+      required: [summary, provenance]
+      properties:
+        summary: { type: string }
+        points: { type: array, items: { type: string } }
+        disclaimer: { type: string }
+        provenance: { $ref: '#/components/schemas/Provenance' }
+
+    FFANR:
+      type: object
+      required: [facts, feelings, assumptions, needs, requests, provenance]
+      properties:
+        facts: { type: array, items: { type: string } }
+        feelings: { type: array, items: { type: string } }
+        assumptions: { type: array, items: { type: string } }
+        needs: { type: array, items: { type: string } }
+        requests: { type: array, items: { type: string } }
+        provenance: { $ref: '#/components/schemas/Provenance' }

@@ -1,0 +1,40 @@
+{
+  "component": "varna",
+  "max": 1,
+  "keyed_by": "rashi",
+  "draft": true,
+  "review_required": true,
+  "description": "Varna (Varan / caste-temperament) koota. Derived from the Moon-sign (rashi) of each partner. Classical grouping: water signs = Brahmin, fire signs = Kshatriya, earth signs = Vaishya, air signs = Shudra.",
+  "varna_ranks": {
+    "_comment": "Higher rank number = higher varna in the ordering used by the scoring rule. Not a social value judgement; purely the classical scoring order.",
+    "Brahmin": 4,
+    "Kshatriya": 3,
+    "Vaishya": 2,
+    "Shudra": 1
+  },
+  "rashi_to_varna": {
+    "0":  "Kshatriya",
+    "1":  "Vaishya",
+    "2":  "Shudra",
+    "3":  "Brahmin",
+    "4":  "Kshatriya",
+    "5":  "Vaishya",
+    "6":  "Shudra",
+    "7":  "Brahmin",
+    "8":  "Kshatriya",
+    "9":  "Vaishya",
+    "10": "Shudra",
+    "11": "Brahmin"
+  },
+  "scoring": {
+    "directional": true,
+    "roles": "groom vs bride (seeker/partner mapped per manifest.role_mapping)",
+    "rule": "Let g = varna_rank(groom.rashi), b = varna_rank(bride.rashi). If g >= b -> 1 point, else 0.",
+    "points_if_groom_ge_bride": 1,
+    "points_otherwise": 0
+  },
+  "notes": [
+    "Rashi->varna map by element: Brahmin=Cancer,Scorpio,Pisces (water); Kshatriya=Aries,Leo,Sagittarius (fire); Vaishya=Taurus,Virgo,Capricorn (earth); Shudra=Gemini,Libra,Aquarius (air).",
+    "Directional: only a groom-varna-lower-than-bride pairing loses the point; equal or higher scores."
+  ]
+}

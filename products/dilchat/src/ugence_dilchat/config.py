@@ -1,0 +1,132 @@
+"""Configuration loading, environment separation, and the astrology provider policy.
+
+Provider/environment policy (Area A hardening):
+
+| Environment       | Permitted providers                    |
+|-------------------|----------------------------------------|
+| test              | fake                                   |
+| development       | fake or Swiss development adapter      |
+| qa (internal QA)  | approved Swiss development adapter      |
+| staging           | approved real provider only            |
+| production        | approved licensed real provider only   |
+
+``fake`` is a synthetic, non-astronomical stub: it is permitted only in ``test`` and
+``development`` (and in ``qa`` only if explicitly opted in). It is never permitted in
+``staging`` or ``production``. A missing/invalid production provider causes a safe
+startup failure — it never falls back to ``fake``.
+"""
+
+from __future__ import annotations
+
+import enum
+from functools import lru_cache
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Environment(str, enum.Enum):
+    TEST = "test"
+    DEVELOPMENT = "development"
+    QA = "qa"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+    @property
+    def is_production_like(self) -> bool:
+        return self in (Environment.STAGING, Environment.PRODUCTION)
+
+    @property
+    def allows_dev_ephemeris(self) -> bool:
+        """The Swiss development (AGPL) adapter may run only in dev/test/qa."""
+        return self in (Environment.DEVELOPMENT, Environment.TEST, Environment.QA)
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="DILCHAT_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    environment: Environment = Environment.DEVELOPMENT
+    api_v1_prefix: str = "/v1"
+    debug: bool = False
+
+    # Database. asyncpg for PostgreSQL (primary); aiosqlite accepted for unit tests.
+    database_url: str = "postgresql+asyncpg://postgres@/dilchat_dev?host=/tmp&port=5433"
+
+    # Access-token signing (ES256). In dev/test an ephemeral key is generated if unset.
+    access_token_private_key_pem: str | None = None
+    access_token_public_key_pem: str | None = None
+    access_token_ttl_seconds: int = 600  # 10 minutes
+    refresh_token_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
+    token_issuer: str = "dilchat"
+
+    # Birth-time confidence defaults (propagate to calculation provenance).
+    confidence_exact: float = 1.0
+    confidence_approximate: float = 0.5
+    confidence_unknown: float = 0.2
+
+    # --- Astrology provider selection & policy ----------------------------- #
+    # Provider id: "fake" (synthetic; test/dev only) or "swiss" (real ephemeris via
+    # pyswisseph). NOTE: the default is fake for local development, but the policy
+    # below refuses fake in qa/staging/production, so a production deployment MUST
+    # set an approved real provider or startup fails (no silent fake fallback).
+    astrology_provider: str = "fake"
+    swiss_ephemeris_mode: str = "moshier"  # "swieph" | "moshier"; no silent fallback
+    swiss_ephemeris_path: str | None = None
+    enable_swiss_ephemeris: bool = False
+    # Explicit, recorded approval that a compatible Swiss production licensing
+    # decision exists (Professional License or an accepted AGPL-compliance decision).
+    # Required before the Swiss adapter may run in staging/production.
+    swiss_production_licensed: bool = False
+    # Explicit opt-in to permit the synthetic fake provider in internal QA.
+    allow_fake_in_qa: bool = False
+
+    # ---------------------------------------------------------------------- #
+    def permitted_providers(self) -> set[str]:
+        """The provider ids permitted for the current environment (policy matrix)."""
+        env = self.environment
+        if env is Environment.TEST:
+            return {"fake"}
+        if env is Environment.DEVELOPMENT:
+            return {"fake", "swiss"}
+        if env is Environment.QA:
+            return {"swiss"} | ({"fake"} if self.allow_fake_in_qa else set())
+        # staging / production: real providers only.
+        return {"swiss"} if self.swiss_production_licensed else set()
+
+    @model_validator(mode="after")
+    def _guard(self) -> Settings:
+        permitted = self.permitted_providers()
+        if self.astrology_provider not in permitted:
+            allowed = sorted(permitted) or "none"
+            raise ValueError(
+                f"astrology_provider={self.astrology_provider!r} is not permitted in "
+                f"environment {self.environment.value!r}. Permitted: {allowed}. "
+                "See DEC-029 (provider/environment policy)."
+            )
+        if self.environment.is_production_like:
+            if self.astrology_provider == "swiss" and not self.swiss_production_licensed:
+                raise ValueError(
+                    "Swiss Ephemeris requires swiss_production_licensed=true in "
+                    "staging/production (DEC-007 licensing decision)."
+                )
+            if self.access_token_private_key_pem is None:
+                raise ValueError(
+                    "access_token_private_key_pem is required in production-like environments."
+                )
+        return self
+
+    def confidence_for_precision(self, precision: str) -> float:
+        return {
+            "EXACT": self.confidence_exact,
+            "APPROXIMATE": self.confidence_approximate,
+            "UNKNOWN": self.confidence_unknown,
+        }[precision]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

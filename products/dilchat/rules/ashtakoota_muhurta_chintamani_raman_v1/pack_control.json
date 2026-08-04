@@ -1,0 +1,76 @@
+{
+  "pack_control_id": "ashtakoota_muhurta_chintamani_raman_v1_control",
+  "rule_pack_id": "ashtakoota_muhurta_chintamani_raman_v1",
+  "semantic_version": "1.0.0-draft",
+  "tradition_scope": "north_indian_ashtakoota",
+  "total_max": 36,
+  "component_maxima": {
+    "varna": 1,
+    "vashya": 2,
+    "tara": 3,
+    "yoni": 4,
+    "graha_maitri": 5,
+    "gana": 6,
+    "bhakoot": 7,
+    "nadi": 8
+  },
+  "generated_at_utc_date": "2026-08-04",
+  "generation_tool_version": "generate_pack_control/1.0",
+  "counts": {
+    "total_rules": 23,
+    "approved_rules": 0,
+    "excluded_rules": 0,
+    "blocked_rules": 3,
+    "pending_rules": 16,
+    "unresolved_source_conflict_rule_entries": 6,
+    "unresolved_source_conflict_topics": 4,
+    "parihara_rules": 6,
+    "parihara_enabled": 0,
+    "manual_cases": 24,
+    "manual_cases_verified": 0
+  },
+  "source_conflict_topics": [
+    "bhakoot",
+    "gana",
+    "vashya",
+    "yoni"
+  ],
+  "source_edition_state": {
+    "any_source_frozen": false,
+    "overall_status": "PENDING_ACQUISITION",
+    "domain_review": "DOMAIN_REVIEW_PENDING"
+  },
+  "executable_invariant": {
+    "manifest_executable_flag": false,
+    "derived_executable": false,
+    "blockers": [
+      "16 rule(s) PENDING_DOMAIN_REVIEW",
+      "3 rule(s) BLOCKED_DOMAIN_SOURCE",
+      "6 rule(s) SOURCE_CONFLICT",
+      "no source edition is FROZEN",
+      "domain review pending",
+      "24 manual case(s) not MANUAL_VERIFIED"
+    ],
+    "rule": "executable may be true ONLY when blockers is empty; manifest.executable must never exceed derived_executable."
+  },
+  "checksums_sha256": {
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/manifest.json": "88399cbcade78ed0e2b5bc6ff1ba1f2dee448a9c918da9925a9d502bb17b474d",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/source_traceability.json": "d6be696491bc228b74123a27ed3997d526ccdf296a4f495ebfe264e4ac1af429",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/parihara.json": "0640afc961f45ecc2c248f8ec566e59d6b261c4511521479f42e88e48c5bc113",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/varna.json": "a54e37d485922d46b30f26c18b7029151b00f4f0e12f10086aee2356e7b158fe",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/vashya.json": "6b66946ec950a3028ba11955afc76eaf913d8b215166f7819649943322b48263",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/tara.json": "530a27567429d7f842c0c82ce815c84c27dbe24548d1b537144aca6601ba46c7",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/yoni.json": "d33f843fef739485d2b15b5e03e3157c3feae77eb4320a8d3202f296387cc023",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/graha_maitri.json": "f6d006063e0342d982e4283e275d6296c21b3d3f9d2716dff529d5ac95df5c04",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/gana.json": "c4fe3d404f3438c95782eae6f6d3742f7c41e0335c42e73c1d9d712e7ffcec9d",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/bhakoot.json": "49522c86ddbd3c9ef73f4f9a7d18deaf6a98aa4188da2b5a31d67fecb5a414d6",
+    "rules/ashtakoota_muhurta_chintamani_raman_v1/nadi.json": "b9746201fecad6b0364985d213bc0bda14180006cd57128044a81532f7f54350",
+    "rules/sources/GUNA_SOURCE_MANIFEST.json": "9620b6d48499d82ba8346e30684024c377b92145c2acd98e2f3ed634546f8a6f",
+    "rules/fixtures/guna_manual_cases.json": "3036376cf25fc6cf6b26a3ad3a96552023e5af7e15018a460fa998dc22d4dc25"
+  },
+  "notes": [
+    "DRAFT / NON-EXECUTABLE control block. No Guna scoring code exists.",
+    "Counts are derived from source_traceability.json; approved_rules stays 0 pre-review.",
+    "Any edit to a checksummed file changes its digest; the validator flags the drift until this file is regenerated and the change is reviewed."
+  ]
+}
