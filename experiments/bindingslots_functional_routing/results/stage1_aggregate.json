@@ -1,0 +1,163 @@
+{
+  "schema": "bindingslots_functional_routing/stage1_aggregate/v1",
+  "stage1_seeds": [
+    18,
+    19,
+    20,
+    21,
+    22
+  ],
+  "arms": [
+    "A+",
+    "R0",
+    "O1",
+    "O2",
+    "H3"
+  ],
+  "summaries": {
+    "R0": {
+      "states": {
+        "18": "FORMED_THEN_COLLAPSED",
+        "19": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+        "20": "FORMED_THEN_COLLAPSED",
+        "21": "FORMED_FUNCTIONALLY_CLEAN_AND_RETAINED",
+        "22": "TRANSIENT_RECOVERY"
+      },
+      "clean_stable_count": 1,
+      "formed_then_collapsed_count": 2,
+      "final_former_count": 3,
+      "routing_unclean_final_formers": [
+        "19"
+      ],
+      "causal_by_final_former": {
+        "19": true,
+        "21": true,
+        "22": true
+      },
+      "paired_wins_vs_R0": 0,
+      "needle_d96": {
+        "18": 0.0,
+        "19": 1.0,
+        "20": 0.0,
+        "21": 1.0,
+        "22": 0.9083333333333333
+      },
+      "quality_ok": true,
+      "distance_ok": true,
+      "full_single_gate": false
+    },
+    "O1": {
+      "states": {
+        "18": "ROUTING_PROXY_ONLY",
+        "19": "ROUTING_PROXY_ONLY",
+        "20": "ROUTING_PROXY_ONLY",
+        "21": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+        "22": "ROUTING_PROXY_ONLY"
+      },
+      "clean_stable_count": 0,
+      "formed_then_collapsed_count": 0,
+      "final_former_count": 5,
+      "routing_unclean_final_formers": [
+        "18",
+        "19",
+        "20",
+        "21",
+        "22"
+      ],
+      "causal_by_final_former": {
+        "18": false,
+        "19": false,
+        "20": false,
+        "21": true,
+        "22": false
+      },
+      "paired_wins_vs_R0": 3,
+      "needle_d96": {
+        "18": 0.9416666666666667,
+        "19": 1.0,
+        "20": 1.0,
+        "21": 1.0,
+        "22": 1.0
+      },
+      "quality_ok": true,
+      "distance_ok": true,
+      "full_single_gate": false
+    },
+    "O2": {
+      "states": {
+        "18": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+        "19": "ROUTING_PROXY_ONLY",
+        "20": "ROUTING_PROXY_ONLY",
+        "21": "ROUTING_PROXY_ONLY",
+        "22": "ROUTING_PROXY_ONLY"
+      },
+      "clean_stable_count": 0,
+      "formed_then_collapsed_count": 0,
+      "final_former_count": 5,
+      "routing_unclean_final_formers": [
+        "19",
+        "20",
+        "21",
+        "22"
+      ],
+      "causal_by_final_former": {
+        "18": false,
+        "19": false,
+        "20": false,
+        "21": false,
+        "22": false
+      },
+      "paired_wins_vs_R0": 2,
+      "needle_d96": {
+        "18": 0.9833333333333333,
+        "19": 0.9916666666666667,
+        "20": 1.0,
+        "21": 1.0,
+        "22": 0.8916666666666667
+      },
+      "quality_ok": true,
+      "distance_ok": true,
+      "full_single_gate": false
+    },
+    "H3": {
+      "states": {
+        "18": "FORMED_THEN_COLLAPSED",
+        "19": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+        "20": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+        "21": "FORMED_THEN_COLLAPSED",
+        "22": "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED"
+      },
+      "clean_stable_count": 0,
+      "formed_then_collapsed_count": 2,
+      "final_former_count": 3,
+      "routing_unclean_final_formers": [
+        "22"
+      ],
+      "causal_by_final_former": {
+        "19": false,
+        "20": false,
+        "22": true
+      },
+      "paired_wins_vs_R0": 2,
+      "needle_d96": {
+        "18": 0.0,
+        "19": 0.575,
+        "20": 0.9833333333333333,
+        "21": 0.0,
+        "22": 1.0
+      },
+      "quality_ok": true,
+      "distance_ok": true,
+      "full_single_gate": false
+    }
+  },
+  "primary_verdict": "ROUTING_PURITY_NOT_RESOLVED",
+  "selected_candidate": null,
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "protocol_deviations": [],
+  "notes": [
+    "Stage-2 development holdout is deferred by this focused phase.",
+    "READY_FOR_KDA_VALIDATION is never emitted.",
+    "One routing-unclean final former or >1 collapse disqualifies an arm's full gate; causal results never averaged."
+  ]
+}

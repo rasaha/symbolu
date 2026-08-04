@@ -1,0 +1,11 @@
+{
+  "primary_verdict": "ROUTING_PURITY_NOT_RESOLVED",
+  "selected_candidate": null,
+  "tie_break_order": [
+    "O1",
+    "O2",
+    "H3",
+    "R0"
+  ],
+  "clearing_arms": []
+}

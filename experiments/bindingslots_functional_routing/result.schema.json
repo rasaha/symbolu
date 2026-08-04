@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bindingslots_functional_routing_seed_result",
+  "type": "object",
+  "required": ["schema", "seed", "arm", "params", "needle_by_dist", "ppl", "config_hash", "code_commit", "environment_fingerprint", "checkpoint_steps", "trajectory", "train_s"],
+  "properties": {
+    "schema": {"const": "bindingslots_functional_routing/seed_result/v1"},
+    "seed": {"type": "integer"},
+    "arm": {"type": "string", "enum": ["A+", "R0", "O1", "O2", "H3"]},
+    "params": {"type": "integer"},
+    "needle_by_dist": {"type": "object", "required": ["16", "96", "220"]},
+    "ppl": {"type": "object", "required": ["256", "512"]},
+    "ablation": {"type": "object"},
+    "trajectory": {"type": "array", "description": "per-checkpoint needle_d96 + routing (write_read_overlap, read_prob_on_highest_write_slot, rank_of_highest_write_slot_under_read, address_logit_margin, entropies, grad norms)"},
+    "loss_log": {"type": "array"},
+    "config_hash": {"type": "string"},
+    "code_commit": {"type": "string"},
+    "environment_fingerprint": {"type": "object"},
+    "checkpoint_steps": {"type": "array"},
+    "train_s": {"type": "number"}
+  }
+}

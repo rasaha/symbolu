@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pt
+*.ckpt
+results/run.log
+raw_traces/

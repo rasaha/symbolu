@@ -1,0 +1,37 @@
+{
+  "schema": "bindingslots_persistence/h2_teacher_definition/v1",
+  "status": "FROZEN before training. Training-only functional teacher; absent at evaluation. Exactly ONE teacher target chosen: the address-conditioned slot-read distribution.",
+  "teacher_source_checkpoint": 600,
+  "teacher_lineage": "same seed, same arm run (H2), model state snapshotted at step 600 and frozen (deep-copied, requires_grad off) for the remainder of training",
+  "teacher_target": {
+    "name": "address_conditioned_slot_read_distribution",
+    "definition": "the per-layer read-address softmax over M=32 slots at the aux-probe query position, r_teacher[q, :], computed by the frozen capture hook on the frozen teacher model",
+    "shape_per_layer": [32],
+    "detach_behavior": "teacher tensors fully detached (stop-gradient); teacher parameters frozen"
+  },
+  "loss": {
+    "form": "L_H2 = mean_layers,batch KL(r_teacher || r_student) = sum_m r_teacher[m] * (log r_teacher[m] - log r_student[m])",
+    "student": "the live student's read-address softmax at the same aux-probe query position on the SAME current input as the teacher",
+    "reduction": "mean over aux-probe batch and layers",
+    "masking": "aux needle-probe query positions only"
+  },
+  "coefficient_schedule": {
+    "steps_1_600": 0.0,
+    "steps_601_900": 0.02,
+    "steps_901_1000": "linear decay 0.02 -> 0.0",
+    "steps_1001_1200": 0.0
+  },
+  "evaluation_coefficient": 0.0,
+  "teacher_state_hash_policy": "sha256 of the flattened step-600 teacher parameter tensors, recorded per seed in the run manifest",
+  "no_answer_label_proof": [
+    "target = read-address softmax over slots, from W_rq(norm(x)) @ slot_keys.t() — a function of the input sequence only",
+    "the aux-probe cross-entropy / answer token is NEVER used",
+    "no needle correctness, classifier verdict, evaluation-success field, or final answer logit enters the teacher target",
+    "teacher and student see the SAME current input; only slot-address distributions are compared"
+  ],
+  "instrumentation_recorded": [
+    "teacher_student_agreement", "teacher_loss_value", "target_entropy_or_concentration",
+    "correct_address_teacher_mass", "correct_address_student_mass", "kl_divergence", "teacher_checkpoint_hash"
+  ],
+  "prohibitions": ["no coefficient sweep on seeds 23-27", "no inference-time teacher", "training-only"]
+}

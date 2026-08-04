@@ -1,0 +1,56 @@
+{
+  "schema": "bindingslots_functional_routing/known_signature_validation/v1",
+  "source": "experiments/bindingslots_confirmatory/results/seeds (PR #1324)",
+  "thresholds": {
+    "correct_slot_probability_min": 0.5,
+    "correct_slot_median_rank_max": 5,
+    "correct_slot_address_margin_min": 3.0,
+    "note": "development diagnostics grounded in the known clean (seeds 15/17) vs impure (seed 16) trajectories; they do NOT replace the frozen causal gates. Metric field names: read_prob_on_highest_write_slot, rank_of_highest_write_slot_under_read, address_logit_margin (from the frozen diagnostics routing block at d96)."
+  },
+  "seeds": {
+    "13": {
+      "needle_d96_1200": 0.0,
+      "correct_slot_prob": 0.8767094761133194,
+      "correct_slot_rank": 3.09375,
+      "address_margin": 9.940383672714233,
+      "aggregate_overlap": 0.7002155631780624,
+      "routing_clean_by_thresholds": true
+    },
+    "14": {
+      "needle_d96_1200": 0.0,
+      "correct_slot_prob": 0.8195648044347763,
+      "correct_slot_rank": 1.83984375,
+      "address_margin": 6.746312379837036,
+      "aggregate_overlap": 0.7200624272227287,
+      "routing_clean_by_thresholds": true
+    },
+    "15": {
+      "needle_d96_1200": 1.0,
+      "correct_slot_prob": 0.9523581713438034,
+      "correct_slot_rank": 0.6328125,
+      "address_margin": 10.946587085723877,
+      "aggregate_overlap": 0.843612551689148,
+      "routing_clean_by_thresholds": true
+    },
+    "16": {
+      "needle_d96_1200": 1.0,
+      "correct_slot_prob": 0.2126063099130988,
+      "correct_slot_rank": 14.125,
+      "address_margin": 0.9154378548264503,
+      "aggregate_overlap": 0.1480690916068852,
+      "routing_clean_by_thresholds": false
+    },
+    "17": {
+      "needle_d96_1200": 1.0,
+      "correct_slot_prob": 0.7363732531666756,
+      "correct_slot_rank": 4.77734375,
+      "address_margin": 9.269386291503906,
+      "aggregate_overlap": 0.5496431775391102,
+      "routing_clean_by_thresholds": true
+    }
+  },
+  "diagnostic_only": true,
+  "checks": 5,
+  "failures": [],
+  "reproduces_known_signatures": true
+}

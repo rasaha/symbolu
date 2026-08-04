@@ -1,0 +1,51 @@
+{
+  "schema": "bindingslots_persistence/h1_parameter_group_manifest/v1",
+  "status": "FROZEN before training. The H1 protected group is the slot ADDRESSING circuit: per layer slot_keys + write-address projection (W_wk) + read-address projection (W_rq). Value (W_wv), gate, output (W_o), and pre-norm are EXCLUDED. Defined by exact parameter names enumerated from the frozen S model; the verifier fails if the ordered name list or its hash changes.",
+  "definition_rule": "a parameter is in the H1 group iff its qualified name contains '.mix.slots.' AND ends with one of {slot_keys, W_wk.weight, W_rq.weight}",
+  "lr_multiplier": 0.1,
+  "active_step_range": [600, 900],
+  "active_step_range_note": "0.1x base LR applied to this group for steps in [600, 900); 1.0x outside",
+  "param_count": 12,
+  "element_count": 73728,
+  "name_list_sha256": "4f245f469273023b4c540fb821d2e87c9aff7dabe2973fbddb329aa74e78a61b",
+  "ordered_names": [
+    "blocks.0.mix.slots.slot_keys",
+    "blocks.0.mix.slots.W_wk.weight",
+    "blocks.0.mix.slots.W_rq.weight",
+    "blocks.1.mix.slots.slot_keys",
+    "blocks.1.mix.slots.W_wk.weight",
+    "blocks.1.mix.slots.W_rq.weight",
+    "blocks.2.mix.slots.slot_keys",
+    "blocks.2.mix.slots.W_wk.weight",
+    "blocks.2.mix.slots.W_rq.weight",
+    "blocks.3.mix.slots.slot_keys",
+    "blocks.3.mix.slots.W_wk.weight",
+    "blocks.3.mix.slots.W_rq.weight"
+  ],
+  "group": [
+    {"name": "blocks.0.mix.slots.slot_keys", "shape": [32, 64], "dtype": "float32", "numel": 2048},
+    {"name": "blocks.0.mix.slots.W_wk.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.0.mix.slots.W_rq.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.1.mix.slots.slot_keys", "shape": [32, 64], "dtype": "float32", "numel": 2048},
+    {"name": "blocks.1.mix.slots.W_wk.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.1.mix.slots.W_rq.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.2.mix.slots.slot_keys", "shape": [32, 64], "dtype": "float32", "numel": 2048},
+    {"name": "blocks.2.mix.slots.W_wk.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.2.mix.slots.W_rq.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.3.mix.slots.slot_keys", "shape": [32, 64], "dtype": "float32", "numel": 2048},
+    {"name": "blocks.3.mix.slots.W_wk.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192},
+    {"name": "blocks.3.mix.slots.W_rq.weight", "shape": [64, 128], "dtype": "float32", "numel": 8192}
+  ],
+  "explicit_exclusions": [
+    "blocks.*.mix.slots.W_wv.weight (value projection)",
+    "blocks.*.mix.slots.gate.weight, gate.bias (write gate)",
+    "blocks.*.mix.slots.W_o.weight (slot output)",
+    "blocks.*.mix.slots.norm.weight, norm.bias (slot pre-norm)",
+    "all non-slot parameters (token/pos embeddings, window attention, block norms, FFN, final norm, tied head)"
+  ],
+  "instrumentation_recorded": [
+    "per_checkpoint_update_norm", "cumulative_displacement_from_step_600", "param_norm_at_step_600",
+    "normalized_displacement", "effective_learning_rate", "gradient_norm_where_available"
+  ],
+  "success_caveat": "H1 is NOT successful merely because parameters barely move. The frozen advancement gate requires it preserve STRONG routing (correct-slot prob/rank/margin) AND acceptable task quality — not freeze a weak circuit."
+}

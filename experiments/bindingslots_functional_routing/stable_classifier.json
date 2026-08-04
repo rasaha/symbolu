@@ -1,0 +1,64 @@
+{
+  "schema": "bindingslots_functional_routing/stable_classifier/v1",
+  "status": "FROZEN before training. Reuses the frozen Stage B per-seed formation + causal rules unchanged (classify_stage_b.py, sha256 3ca1e75f...). Adds address-specific routing thresholds and retention checkpoints. Only new metrics + verdict names are introduced; no frozen threshold changes.",
+
+  "inherited_from": {"file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py", "sha256": "3ca1e75fde529fcfb4492ba08044a0bfe53d660753de63630ab4bf08bad3c80d"},
+
+  "stage1_seeds": [18, 19, 20, 21, 22],
+  "arms": ["R0", "O1", "O2", "H3"],
+
+  "frozen_constants": {"CHANCE": 0.02, "FORM_MIN": 0.075, "FORM_MARGIN": 0.050, "STAB_MEAN": 0.080, "STAB_MEDIAN": 0.050},
+
+  "routing_metric_thresholds": {
+    "correct_slot_probability_min": 0.50,
+    "correct_slot_median_rank_max": 5,
+    "correct_slot_address_margin_min": 3.0,
+    "note": "development diagnostics grounded in the known clean (seeds 15/17) vs impure (seed 16) trajectories; they do NOT replace the frozen causal gates. Metric field names: read_prob_on_highest_write_slot, rank_of_highest_write_slot_under_read, address_logit_margin (from the frozen diagnostics routing block at d96)."
+  },
+
+  "post_scaffold_checkpoints": [600, 900, 1200],
+
+  "per_seed_states": [
+    "NEVER_FORMED", "FORMED_FUNCTIONALLY_CLEAN_AND_RETAINED", "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED",
+    "FORMED_THEN_COLLAPSED", "ROUTING_PROXY_ONLY", "LATE_FORMATION", "TRANSIENT_RECOVERY",
+    "QUALITY_FAILED", "DISTANCE_FAILED", "INVALID_RUN"
+  ],
+
+  "FORMED_FUNCTIONALLY_CLEAN_AND_RETAINED_requires_all": [
+    "needle@d96 passes frozen formation threshold vs A+ at step 1200 (endpoint retrieval)",
+    "endpoint retrieval also present at step 900 and step 600 (no collapse)",
+    "correct_slot_probability >= 0.50 at step 1200",
+    "correct_slot rank <= 5 at step 1200",
+    "correct_slot address_margin >= 3.0 at step 1200",
+    "slots_off collapses under the frozen causal threshold",
+    "randomized_address collapses under the frozen causal threshold",
+    "quality gate passes",
+    "d16 + d220 distance gates pass",
+    "no protocol deviation"
+  ],
+
+  "note_on_A+": "R0/O1/O2/H3 vs the frozen A+ window-only control. Because A+ is architecture-only (formation 0/5 historically) and this is a development screen, A+ formation is treated as ~0 baseline; the frozen forming() rule still requires needle - A+ >= 0.050, so A+ is recomputed per Stage-1 seed for the formation and causal reference (the runner trains A+ alongside when --with-aplus is set; otherwise the frozen A+=0 reference is used and recorded).",
+
+  "stage1_full_single_gate": {
+    "causally_clean_stable_formers_ge": "4/5",
+    "paired_wins_vs_R0_ge": "4/5",
+    "all_final_formers_pass_slots_off_and_randomized_address": true,
+    "formed_then_collapsed_le": "1/5",
+    "routing_unclean_final_formers": 0,
+    "quality": "PASS",
+    "distance": "PASS"
+  },
+
+  "final_verdicts": [
+    "FUNCTIONAL_ROUTING_AND_RETENTION_CANDIDATE_SELECTED",
+    "NO_FUNCTIONAL_ROUTING_INTERVENTION_SELECTED",
+    "FUNCTIONAL_ROUTING_CANDIDATE_FAILED_HOLDOUT",
+    "ROUTING_PURITY_NOT_RESOLVED",
+    "RETENTION_NOT_RESOLVED",
+    "FUNCTIONAL_ROUTING_PROTOCOL_VIOLATED",
+    "FUNCTIONAL_ROUTING_INTEGRITY_FAILED",
+    "FUNCTIONAL_ROUTING_RESOURCE_BLOCKED"
+  ],
+  "stage1_scope_note": "This focused phase runs the Stage-1 screen only (R0/O1/O2/H3 x seeds 18-22). If a single arm clears the full Stage-1 gate it is selected as FUNCTIONAL_ROUTING_AND_RETENTION_CANDIDATE (pending the deferred Stage-2 development holdout, which this phase does NOT run). Readiness never exceeds KDA_VALIDATION_BLOCKED_PENDING_INDEPENDENT_CONFIRMATION and READY_FOR_KDA_VALIDATION is never emitted.",
+  "readiness_states": ["KDA_VALIDATION_BLOCKED", "KDA_VALIDATION_BLOCKED_PENDING_INDEPENDENT_CONFIRMATION"]
+}
