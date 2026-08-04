@@ -1,0 +1,15 @@
+{
+  "schema": "bindingslots_functional_routing/seed_manifest/v1",
+  "status": "FROZEN before training. Outcome-independent, deterministic selection.",
+  "selection_rule": "next consecutive unused BindingSlots training seeds after the highest used (17). Stage 1 = 18-22, Stage 2 reserve = 23-27, independent-confirmation reserve = 28-32.",
+  "stage1_seeds": [18, 19, 20, 21, 22],
+  "stage2_reserved": [23, 24, 25, 26, 27],
+  "confirmation_reserved": [28, 29, 30, 31, 32],
+  "previously_used_bindingslots_training_seeds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "independence_proof": {
+    "method": "repo-wide grep for each seed 18-32 as a BindingSlots model-init/training seed across hybrid_llm_vnext_lab, experiments/bindingslots_confirmatory, experiments/bindingslots_functional_routing",
+    "result": "NONE of 18-32 appears as a BindingSlots model-init or training seed, nor in any five_seed / stabilization / confirmatory result artifact.",
+    "eval_rng_constants_not_training_seeds": [123, 777, 4321]
+  },
+  "replacement_policy": "outcome-based replacement forbidden; infrastructure-only failure -> next unused integer without inspecting quality; restarts retain seed + config."
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "bindingslots_functional_routing/preregistration/v1",
+  "title": "Phase-Free BindingSlots Functional Routing and Retention Development — focused Stage-1 screen",
+  "date": "2026-08-04",
+  "status": "PRE-REGISTERED. Committed and pushed BEFORE any training. No objective, schedule, threshold, classifier, seed, or verdict-mapping change after training begins.",
+
+  "scope_note": "This is the FOCUSED variant chosen for this session: a Stage-1 screen of R0 + O1 + O2 + H3 (plus the frozen A+ control) on five fresh seeds (18-22). The Stage-2 development holdout, the O3 perturbation-contrastive arm, the H1/H2 handoff arms, the conditional O1R residual arm, and the C1 combination are DEFERRED to a follow-up phase and are documented but not run here. This does not change any frozen threshold.",
+
+  "scientific_question": "Can a bounded training-only intervention make retrieval depend on the specific slot that stored the required value AND preserve that functional routing after scaffold withdrawal, without changing inference architecture, task, model size, optimizer family, evaluation protocol, or the frozen causal gates?",
+
+  "motivation_from_pr_1324": {
+    "verdict": "CONFIRMATORY_REPLICATION_FAILED (CR1 3/5)",
+    "problem_1_retention": "seeds 13,14 FORMED_THEN_COLLAPSED; aggregate overlap ~0.70 retained while needle -> 0",
+    "problem_2_purity": "seed 16 needle 1.0 but randomized_address 0.45; read-prob on written slot 0.21; written-slot rank ~14; margin ~0.9",
+    "hypothesis": "aggregate write-read overlap dissociates from retrieval through the specific stored slot (TEST, do not assume)"
+  },
+
+  "prerequisites": {
+    "pr_1300_merged": "5f0cbe45", "pr_1319_merged": "ba665e42", "pr_1324_state": "open (for review; not merged)",
+    "note": "R0 = frozen CR1 is fully recovered from merged PR #1319; PR #1324 supplies the diagnostic motivation. Development proceeds on the designated session branch (env git discipline) in a separate directory."
+  },
+
+  "arms_run_this_phase": {
+    "A+": "frozen window-only control (formation/causal/quality reference)",
+    "R0": "frozen CR1, unswapped (comparator)",
+    "O1": "correct-slot probability objective: L=-log(r[q,s*]+1e-6), replaces the aggregate-overlap auxiliary; R0 lambda schedule",
+    "O2": "correct-slot address-margin objective: L=max(0, 3.0-(z[q,s*]-max_{j!=s*}z[q,j])); R0 lambda schedule",
+    "H3": "gradual curriculum handoff: original-distribution mixture 0.0@600 -> 1.0@900; R0 objective unchanged"
+  },
+  "arms_deferred": ["O3 (held-out cyclic-shift contrastive)", "H1 (routing-LR consolidation)", "H2 (functional teacher)", "O1R (conditional residual)", "C1 (objective+handoff combination)", "Stage-2 development holdout"],
+
+  "intervention_mechanism": "Each arm runs the frozen stabilize.run_arm loop with at most ONE frozen interventions.py function swapped IN MEMORY (file hashes preserved, verified by verify_fr_prereg.py). O1/O2 swap alignment_loss; H3 swaps curriculum_batch; R0/A+ run unswapped. s*(f)=argmax_j stop_gradient(w[f,j]) (lowest index on ties). No answer label, evaluator outcome, or frozen randomized-address signal is used in training.",
+
+  "fresh_seeds": {"stage1": [18, 19, 20, 21, 22], "stage2_reserved": [23, 24, 25, 26, 27], "confirmation_reserved": [28, 29, 30, 31, 32]},
+
+  "routing_metrics": {
+    "correct_slot_probability": "read_prob_on_highest_write_slot (>= 0.50)",
+    "correct_slot_rank": "rank_of_highest_write_slot_under_read (<= 5)",
+    "correct_slot_margin": "address_logit_margin (>= 3.0)",
+    "source": "frozen diagnostics routing block at d96; aggregate overlap retained as diagnostic only",
+    "status": "development diagnostics grounded in known clean (15/17) vs impure (16) trajectories; do NOT replace the frozen causal gates"
+  },
+
+  "per_seed_states": ["NEVER_FORMED", "FORMED_FUNCTIONALLY_CLEAN_AND_RETAINED", "FORMED_FUNCTIONALLY_UNCLEAN_AND_RETAINED", "FORMED_THEN_COLLAPSED", "ROUTING_PROXY_ONLY", "LATE_FORMATION", "TRANSIENT_RECOVERY", "QUALITY_FAILED", "DISTANCE_FAILED", "INVALID_RUN"],
+
+  "stage1_full_single_gate": "causally-clean stable formers >= 4/5 AND paired wins vs R0 >= 4/5 AND every final former passes slots_off AND randomized_address AND formed_then_collapsed <= 1/5 AND routing-unclean final formers = 0 AND quality PASS AND distance PASS",
+
+  "selection": "If >=1 single arm clears the full gate, select one by: clean-stable count; paired wins vs R0; lower collapse count; fixed tie-break O1,O2,H3,R0. Else emit NO_FUNCTIONAL_ROUTING_INTERVENTION_SELECTED / ROUTING_PURITY_NOT_RESOLVED / RETENTION_NOT_RESOLVED per the diagnostic rule.",
+
+  "final_verdicts": ["FUNCTIONAL_ROUTING_AND_RETENTION_CANDIDATE_SELECTED", "NO_FUNCTIONAL_ROUTING_INTERVENTION_SELECTED", "FUNCTIONAL_ROUTING_CANDIDATE_FAILED_HOLDOUT", "ROUTING_PURITY_NOT_RESOLVED", "RETENTION_NOT_RESOLVED", "FUNCTIONAL_ROUTING_PROTOCOL_VIOLATED", "FUNCTIONAL_ROUTING_INTEGRITY_FAILED", "FUNCTIONAL_ROUTING_RESOURCE_BLOCKED"],
+  "readiness": "Even on selection, emit KDA_VALIDATION_BLOCKED_PENDING_INDEPENDENT_CONFIRMATION (Stage-2 + independent confirmation are deferred). READY_FOR_KDA_VALIDATION is never emitted.",
+
+  "no_leakage": ["training perturbation (H3 curriculum mixture) is a distinct code path from the frozen randomized_address gate", "objectives read only captured slot-address vectors; no cross_entropy / answer token / evaluator call", "s* selected via stop-gradient"],
+  "no_tuning_after_start": true,
+  "no_best_checkpoint_selection": true,
+  "no_outcome_based_seed_replacement": true,
+  "boundaries": "No Phase, KDA, MLA, quadratic attention, N x N state, new slot arch/count/dim, larger model, new tokenizer/corpus/task, new optimizer family, new distances, or inference-time change."
+}
