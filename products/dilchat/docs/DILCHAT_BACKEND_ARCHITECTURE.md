@@ -328,7 +328,7 @@ sequenceDiagram
     CP->>AU: emit(couple.paired)
     CP->>PUSH: notify A "You are now paired" (no content preview)
     CP-->>B: Couple{couple_id, members, roles}
-    Note over CP,CN: verify_membership(user, couple) now returns active;<br/>SHARED scope becomes reachable for both
+    Note over CP,CN: verify_membership(user, couple) now returns active —<br/>SHARED scope becomes reachable for both
 ```
 
 ### 5c. Shared Guna Milan scorecard generation
@@ -359,7 +359,7 @@ sequenceDiagram
         GM->>AU: emit(guna_milan.computed, rule_pack_id)
         GM-->>R: scorecard
     end
-    R-->>C: 200 Scorecard (classical score family only; AI may later explain)
+    R-->>C: 200 Scorecard (classical score family only — AI may later explain)
 ```
 
 ### 5d. Nightly global transit precompute + per-user daily profile

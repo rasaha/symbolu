@@ -48,6 +48,23 @@ reviewed and explicitly approved (see the roadmap's go/no-go gates).
 OpenAPI contract: [`docs/openapi/dilchat.openapi.yaml`](docs/openapi/dilchat.openapi.yaml).
 Versioned Guna Milan rule pack: [`rules/ashtakoota_lahiri_classical_v1/`](rules/ashtakoota_lahiri_classical_v1/).
 
+### Pre-implementation verification audit
+
+An independent audit reproduced every design claim from primary evidence. Start with the gate:
+
+| Document | Verdict |
+|----------|---------|
+| [DILCHAT_IMPLEMENTATION_READINESS_GATE.md](docs/DILCHAT_IMPLEMENTATION_READINESS_GATE.md) | **CONDITIONALLY_READY** (13 gates) |
+| [DILCHAT_ARTIFACT_VALIDATION_REPORT.md](docs/DILCHAT_ARTIFACT_VALIDATION_REPORT.md) | Machine-readable validity PASS |
+| [DILCHAT_GUNA_RULE_TRACEABILITY_AUDIT.md](docs/DILCHAT_GUNA_RULE_TRACEABILITY_AUDIT.md) | RULE_PACK_BLOCKED |
+| [DILCHAT_ASTRONOMY_REPRODUCIBILITY_AUDIT.md](docs/DILCHAT_ASTRONOMY_REPRODUCIBILITY_AUDIT.md) | REPRODUCIBLE_WITH_CONDITIONS |
+| [DILCHAT_AUTHORIZATION_AND_LEAKAGE_AUDIT.md](docs/DILCHAT_AUTHORIZATION_AND_LEAKAGE_AUDIT.md) | AUTHZ_SOUND_WITH_FINDINGS |
+| [DILCHAT_SCORE_SEPARATION_AUDIT.md](docs/DILCHAT_SCORE_SEPARATION_AUDIT.md) | ENFORCED_WITH_FINDINGS |
+| [DILCHAT_LIVING_COMPATIBILITY_SAFETY_AUDIT.md](docs/DILCHAT_LIVING_COMPATIBILITY_SAFETY_AUDIT.md) | NEEDS_SAFEGUARDS_BEFORE_PHASE_G |
+
+The audit added Decision-Log entries DEC-022…DEC-028 (fallback policy corrected; two new
+authorization controls).
+
 ## Proposed placement in the monorepo
 
 DilChat follows the self-contained `products/<name>/` convention already

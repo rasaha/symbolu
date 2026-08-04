@@ -395,7 +395,7 @@ guarantee exactly two slots per couple and one membership per user per couple.
 | couple_id | UUID FK→`couple.id` | N | SHARED | INTERNAL | |
 | source_scope | TEXT `[PRIVATE_A\|PRIVATE_B]` | N | SHARED | INTERNAL | provenance of what became shared |
 | artifact_type | TEXT | N | SHARED | INTERNAL | |
-| content_ref | TEXT | N | SHARED | SENSITIVE | ref to bounded projection (not raw private stream) |
+| content_ref | TEXT | N | SHARED | SENSITIVE | Reference to an **immutable snapshot** of the bounded, consented projection (DEC-028), stored **encrypted under the couple DEK** and consent-gated at read (see `DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md` field-encryption table). Never a live pointer into the raw private stream. |
 | consent_event_id | UUID FK→`consent_event.id` | N | SHARED | INTERNAL | **mandatory provenance to the grant/event** |
 | created_at | TIMESTAMPTZ | N | SHARED | INTERNAL | |
 | revoked_at | TIMESTAMPTZ | Y | SHARED | INTERNAL | access-freeze on unpair/revoke (§8) |

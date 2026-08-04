@@ -446,3 +446,130 @@ guardrails:
 | OQ-11 | Geocoding provider vs self-hosted | Self-hosted GeoNames authoritative; optional online typeahead for UX only. |
 | OQ-12 | AI provider & retention | Anthropic Claude with zero-retention/no-train terms; abstract behind port. |
 | OQ-13 | India-only vs international | **India-first** launch (residency + market fit); design data model for later multi-region. |
+
+---
+
+# Reconsideration Audit (DEC-022 … DEC-028)
+
+> Added by the independent pre-implementation verification audit (HEAD `9bedde0a`).
+> These are **new** entries appended to preserve history — earlier decisions are not
+> rewritten. Each load-bearing decision from §DEC-001–021 was re-examined against
+> security, implementation effort, operational burden, and vendor dependency. Most were
+> **Confirmed**; one (fallback policy) was **Corrected**; two new controls were added to
+> close findings from the authorization/leakage audit.
+
+## DEC-022 — Authentication: self-managed vs managed IdP (reconsidered)
+**Status:** Accepted — **Confirms DEC-011 with an added guardrail** · **[Technical]**
+
+| Dimension | Self-managed (DEC-011) | Managed IdP (Auth0/Cognito/Clerk/Firebase) |
+|-----------|------------------------|---------------------------------------------|
+| Security | Full control of session revocation & existence non-disclosure; but we own crypto-handling risk | Vendor-hardened auth; but coarse session control and data leaves our residency boundary |
+| Effort | Higher (build refresh rotation, OIDC) | Lower initial |
+| Ops burden | We run the auth store | Vendor runs it |
+| Vendor dependency | None | High; migration is painful |
+| Data residency (India, OQ-13) | In-house, clean | Region availability varies; DPDP exposure |
+
+**Decision:** **Keep self-managed identity** (couples data + instant revocation + residency +
+existence non-disclosure need fine control), **but** mandate **vetted libraries** — `argon2-cffi`
+(Argon2id), `authlib` for OIDC, `PyJWT`/`python-jose` for ES256 — and **prohibit hand-rolled token
+crypto**. A managed IdP remains a documented fallback if ops cost proves high.
+**Migration path:** the `identity` module already sits behind a service interface; swapping to a
+managed IdP later means reimplementing that interface, not touching callers.
+
+## DEC-023 — Geocoding: self-hosted vs privacy-minimized external (reconsidered)
+**Status:** Accepted — **Confirms DEC-017 with clarified privacy rule** · **[Technical]**
+
+| Dimension | Self-hosted GeoNames (DEC-017) | Privacy-minimized external geocoder |
+|-----------|-------------------------------|--------------------------------------|
+| Security/Privacy | Birthplace PII never leaves infra | Even "minimized" queries send partial location to a third party |
+| Effort | Dataset ingest + periodic refresh | Low |
+| Ops burden | Maintain GeoNames snapshot (`geonames-2025-Q3`) | None |
+| Vendor dependency | None | Per-call dependency + ToS/retention risk |
+
+**Decision:** **Keep self-hosted GeoNames as the authoritative coordinate source.** An optional
+online typeahead may power *search UX only* under a strict rule: **no birthplace string is sent to
+an external provider once the user has begun entering true birth data unless they opt in; nothing is
+stored provider-side; the authoritative lat/long always comes from the local dataset or explicit
+user confirmation.** No correction to DEC-017; privacy rule made explicit.
+
+## DEC-024 — Ephemeris fallback policy: per-artifact-class (CORRECTION to DEC-007)
+**Status:** Accepted — **Corrects the blanket fallback in DEC-007** · **Requires domain/QA confirmation of epsilon** · **[Technical]**
+
+DEC-007 specified a single Moshier fallback with a flat ×0.97 confidence for *all* outputs. The
+astronomy reproducibility audit found this too coarse for the **binding, immutable classical Guna
+Milan scorecard**, where a Moon sitting within a Moshier-error-width of a rashi/nakshatra/pada
+boundary could land in the wrong bucket.
+
+| Artifact class | Fallback policy (corrected) |
+|----------------|------------------------------|
+| Daily Moon climate (non-binding) | Moshier fallback **allowed** with visible provenance + lowered confidence (as before) |
+| Classical Guna Milan binding scorecard | **Fail-closed to Swiss** when natal Moon is within a safety-epsilon (sized ≥ Moshier worst-case Moon error, confirmed empirically in golden tests) of ANY rashi/nakshatra/pada boundary; otherwise may compute under Moshier **but** the report is marked `provisional` with `recompute_pending_swiss=true` and is recomputed when Swiss is available |
+| Any classical output | **Never** emit an unlabeled Moshier-based binding score |
+
+**Decision:** adopt the per-artifact-class policy above. The astrology engine spec's flat-penalty
+text is superseded for binding classical reports. Golden tests must measure Moshier's worst-case
+Moon deviation to fix the safety-epsilon. (Swiss Ephemeris licensing remains a separate blocker,
+DEC-007/OQ-10.)
+
+## DEC-025 — Authorization: RLS + app-layer vs app-only (reconsidered)
+**Status:** Accepted — **Confirms DEC-012** · **[Technical]**
+
+| Dimension | App-layer only | App-layer + Postgres RLS (DEC-012) |
+|-----------|----------------|-------------------------------------|
+| Security | Single point of failure; one missed check = leak | Defense-in-depth; DB refuses even if app check is missed |
+| Effort | Lower | RLS policy authoring + tests |
+| Ops burden | Lower | Manage `SET app.user_id` per connection; pooling care |
+| Vendor dependency | None | None (native Postgres) |
+
+**Decision:** **Keep both.** Given existence non-disclosure and the couples-data blast radius, the
+RLS backstop is justified. App-layer `ScopeContext` is the **primary** gate (owns the 404-vs-403
+existence logic); RLS is the **defense-in-depth** net. RLS policies are a required test target
+(authorization tests, `DILCHAT_TEST_AND_VALIDATION_PLAN.md`). Connection-pool `SET app.user_id`
+correctness is a Phase-D checklist item.
+
+## DEC-026 — Python 3.12 isolation in a 3.10+ monorepo (reconsidered)
+**Status:** Accepted — **Confirms DEC-010/DEC-001** · **[Technical]**
+
+| Option | Trade-off |
+|--------|-----------|
+| Isolate DilChat at 3.12 (chosen) | Matches `products/*` independence convention; own CI/venv; slight toolchain divergence |
+| Align DilChat down to 3.10 | Loses `zoneinfo`/`tomllib` maturity relied on by the astrology tz layer |
+| Bump whole monorepo to 3.12 | Cleanest long-term but out of scope for this product and risks unrelated packages |
+
+**Decision:** **Keep the 3.12 product isolation.** DilChat is excluded from the root
+`[tool.setuptools.packages.find]` and built/tested on its own 3.12 CI lane.
+**Migration path:** if/when the monorepo baseline is raised to 3.12, the isolation collapses to a
+no-op — no DilChat code change required.
+
+## DEC-027 — Background jobs re-validate scope at write time (NEW — closes AUTHZ-1)
+**Status:** Accepted · **[Technical/Security]**
+
+The authorization/leakage audit found a gap: an in-flight `arq` job (daily-profile precompute, async
+AI, export) that began before a couple unpairs could write shared/couple data after membership is
+revoked. **Decision:** every background job carries its `ScopeContext` and **re-validates couple
+membership and scope at the moment of write, inside the same transaction** (not only at enqueue). If
+membership is `revoked`, the write is rejected and an `audit` event is emitted. Shared writes are
+impossible post-unpair. This must be specified before Phase D/E implementation.
+
+## DEC-028 — SharedArtifacts are immutable snapshots, not live private pointers (NEW — closes AUTHZ-2)
+**Status:** Accepted · **[Technical/Security]**
+
+The audit flagged under-specification of "shared agreement references deleted private source
+content." **Decision:** a `SharedArtifact` (including agreement bodies and shared summaries) stores an
+**immutable snapshot of the bounded, consented content at consent time**. It never holds a live
+pointer into private-scope rows. Therefore deleting a private source **never** cascades to, breaks, or
+re-exposes a shared artifact, and a shared artifact can never be used to reconstruct private content
+beyond what was consented. Enforced by the consent-projection design (DEC-013) and a
+no-foreign-key-from-shared-to-private rule in the data model.
+
+## Reconsideration outcome summary
+
+| ID | Subject | Outcome |
+|----|---------|---------|
+| DEC-022 | Auth model | Confirmed (guardrail added) |
+| DEC-023 | Geocoding | Confirmed (privacy rule explicit) |
+| DEC-024 | Ephemeris fallback | **Corrected** (per-artifact-class) |
+| DEC-025 | RLS + app authz | Confirmed |
+| DEC-026 | Python 3.12 isolation | Confirmed |
+| DEC-027 | Job scope re-validation | **New control** (AUTHZ-1) |
+| DEC-028 | Shared snapshots | **New control** (AUTHZ-2) |
