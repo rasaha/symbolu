@@ -70,6 +70,27 @@
       "clean_stable": true,
       "category": "CLEAN_STABLE",
       "dir": "results/seeds/R0/seed_27"
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/O1R/seed_23"
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1R/seed_24"
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1R/seed_25"
     }
   ]
 }
