@@ -1,0 +1,110 @@
+name: dilchat-mobile-ci
+
+# CI for the DilChat mobile Phase 1 client (products/dilchat/mobile): install,
+# lint, strict type-check, unit/component + contract tests, config validation,
+# a no-hardcoded-production-endpoint guard, an API contract-drift check against
+# the backend OpenAPI, and a secret scan. It does NOT build device binaries,
+# require production credentials, deploy, or touch the backend CI.
+#
+# This gate is for an INTERNAL development client only. Guna Milan / compatibility
+# scoring remains blocked and is not exposed by this app.
+
+on:
+  pull_request:
+    branches:
+      - "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF"
+    paths:
+      - "products/dilchat/mobile/**"
+      - ".github/workflows/dilchat-mobile-ci.yml"
+      # Backend contract surface — mobile types are derived from this OpenAPI.
+      - "products/dilchat/src/ugence_dilchat/api/**"
+      - "products/dilchat/src/ugence_dilchat/scripts_openapi.py"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "products/dilchat/mobile/**"
+      - ".github/workflows/dilchat-mobile-ci.yml"
+      - "products/dilchat/src/ugence_dilchat/api/**"
+      - "products/dilchat/src/ugence_dilchat/scripts_openapi.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dilchat-mobile-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mobile:
+    name: Mobile lint / typecheck / test / guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      - name: Install (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Lint
+        working-directory: products/dilchat/mobile
+        run: npm run lint
+
+      - name: TypeScript (strict)
+        working-directory: products/dilchat/mobile
+        run: npm run typecheck
+
+      - name: Unit / component / contract tests
+        working-directory: products/dilchat/mobile
+        run: npm test
+
+      - name: Expo config validation
+        working-directory: products/dilchat/mobile
+        run: npm run check:config
+
+      - name: No hardcoded production endpoint
+        working-directory: products/dilchat/mobile
+        run: npm run check:endpoint
+
+      # Generate the backend OpenAPI and check the mobile client's required routes
+      # still exist and no Guna/compatibility route has appeared.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate backend OpenAPI
+        working-directory: products/dilchat
+        env:
+          DILCHAT_ENVIRONMENT: test
+        run: |
+          python -m pip install --upgrade pip >/dev/null
+          pip install -e . >/dev/null
+          python -m ugence_dilchat.scripts_openapi > "${RUNNER_TEMP}/openapi.json"
+          echo "wrote OpenAPI ($(wc -c < "${RUNNER_TEMP}/openapi.json") bytes)"
+      - name: API contract-drift check
+        working-directory: products/dilchat/mobile
+        env:
+          DILCHAT_OPENAPI_JSON: ${{ runner.temp }}/openapi.json
+        run: npm run check:contract
+
+      - name: Secret scan (mobile source)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          # Fail on obvious committed secrets in tracked source (excludes node_modules).
+          if grep -RInE 'BEGIN (RSA|EC|OPENSSH)? ?PRIVATE KEY|AKIA[0-9A-Z]{16}|xox[baprs]-|ghp_[A-Za-z0-9]{30,}|-----BEGIN' \
+               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
+               src app scripts *.json *.js 2>/dev/null; then
+            echo "Potential secret found in mobile source"; exit 1
+          fi
+          echo "secret scan: clean"
