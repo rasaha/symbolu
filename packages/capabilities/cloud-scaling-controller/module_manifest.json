@@ -1,0 +1,79 @@
+{
+  "module_name": "cloud-scaling-controller",
+  "distribution_name": "ugence-cloud-scaling-controller",
+  "import_namespace": "ugence_cloud_scaling_controller",
+  "version": "0.1.0",
+  "maturity": "beta",
+  "authority_class": "ADVISORY",
+  "execution_capability": "NONE",
+  "network_required": false,
+  "cloud_credentials_required": false,
+  "core_dependencies": [
+    "numpy>=1.24.0"
+  ],
+  "optional_dependencies": {
+    "prometheus": ["requests>=2.28.0", "prometheus-client>=0.16.0"],
+    "shadow": ["kubernetes>=26.1.0", "PyYAML>=6.0"],
+    "otel": ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"],
+    "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+  },
+  "optional_adapter_network_requirements": {
+    "prometheus": "Read-only outbound HTTP to a Prometheus server (opt-in).",
+    "shadow": "Read-only Kubernetes API access to watch HPA/state for shadow comparison (opt-in).",
+    "otel": "Outbound OTLP export to a collector (opt-in)."
+  },
+  "public_api": [
+    "CloudScalingController",
+    "Controller",
+    "InfraControllerConfig",
+    "ScalingObservation",
+    "ScalingRecommendation",
+    "ActionResult",
+    "ScalingExecutor",
+    "ExecutionReceipt",
+    "ContractError",
+    "evaluate",
+    "SCHEMA_VERSION",
+    "__version__"
+  ],
+  "input_schema_version": "1.0",
+  "output_schema_version": "1.0",
+  "legacy_imports": [
+    "cloud_controller",
+    "symbolu.cloud_controller"
+  ],
+  "forbidden_dependencies": [
+    "governance_studio",
+    "decision_governance",
+    "actiongate",
+    "agent_runtime",
+    "hybrid_llm",
+    "llm_steering",
+    "ai_hiring",
+    "control_plane",
+    "boto3",
+    "botocore",
+    "azure",
+    "google-cloud",
+    "fastapi",
+    "uvicorn"
+  ],
+  "evidence_tiers": {
+    "implemented": true,
+    "unit_tested": true,
+    "simulation_tested": true,
+    "trace_replay_tested": true,
+    "shadow_mode_capable": true,
+    "behavior_baseline_verified": true,
+    "live_cluster_validated": false,
+    "production_certified": false
+  },
+  "known_limitations": [
+    "Advisory-only: produces recommendations; does not actuate infrastructure.",
+    "Not live-cluster validated by this package; not production-certified.",
+    "identity_deviation is a pre-existing nondeterministic observability output (unseeded IdentityEMA baseline); it does not affect any scaling decision and is excluded from the behavior-baseline parity projection.",
+    "No cost-savings, customer-validation, or real-cluster-superiority claims are made.",
+    "The shadow/action operational modules ship as opt-in, non-default legacy modules behind extras; no write-capable executor is wired to or invoked by the advisory core."
+  ],
+  "source_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
+}
