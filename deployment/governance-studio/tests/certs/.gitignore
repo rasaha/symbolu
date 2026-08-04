@@ -1,0 +1,6 @@
+# Throwaway loopback test certificates are generated on demand by tests/conftest.py
+# (session autouse fixture) and by CI. They are never committed.
+*.crt
+*.key
+*.csr
+*.pem
