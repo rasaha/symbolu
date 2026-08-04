@@ -1,11 +1,37 @@
 {
-  "schema": "base-images.v1",
-  "note": "Base images the P3E Dockerfile builds FROM. Manifest digests MUST be pinned by digest (FROM repo:tag@sha256:...). They are UNRESOLVED in this build environment because the organization egress proxy denies container-registry blob/manifest CDNs (403); resolve and commit them from a registry-capable environment (the CI base-image-digest-verification job resolves when null and verifies when set).",
+  "schema": "base-images.v2",
+  "note": "Base images the P3E Dockerfile builds FROM, pinned by immutable digest. The Dockerfile FROMs pin the multi-arch INDEX digest (buildx selects the linux/amd64 child at build time); the resolved amd64 child digest is recorded for reference. Digests were resolved from the Docker Registry v2 manifest API (registry-1.docker.io). CI re-verifies the live index digest matches these committed pins and fails on any drift; changing a pin requires a reviewed repository change.",
   "platform": "linux/amd64",
-  "resolution_status": "UNRESOLVED_EGRESS_DENIED",
+  "resolution_status": "RESOLVED",
+  "resolved_via": "docker registry v2 manifest API (auth.docker.io + registry-1.docker.io)",
+  "resolution_timestamp": "2026-08-04T05:20:00Z",
   "base_images": [
-    {"role": "frontend-build", "registry": "docker.io", "repository": "library/node", "tag": "22-bookworm-slim", "manifest_digest": null},
-    {"role": "backend-build", "registry": "docker.io", "repository": "library/python", "tag": "3.11-slim-bookworm", "manifest_digest": null},
-    {"role": "runtime", "registry": "docker.io", "repository": "library/python", "tag": "3.11-slim-bookworm", "manifest_digest": null}
+    {
+      "role": "frontend-build",
+      "registry": "docker.io",
+      "repository": "library/node",
+      "tag": "22-bookworm-slim",
+      "manifest_digest": "sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46",
+      "amd64_manifest_digest": "sha256:0f65470961851f2354dc8e560853e2f428ea928436135fc7e35780ab100c7e00",
+      "platform": "linux/amd64"
+    },
+    {
+      "role": "backend-build",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.11-slim-bookworm",
+      "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+      "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
+      "platform": "linux/amd64"
+    },
+    {
+      "role": "runtime",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.11-slim-bookworm",
+      "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+      "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
+      "platform": "linux/amd64"
+    }
   ]
 }

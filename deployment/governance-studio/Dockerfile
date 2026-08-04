@@ -5,11 +5,13 @@
 # compatible, no npm/compiler/test deps in the runtime layer, no secrets, no
 # production certificate. Build context is the repository root.
 #
-# NOTE: base images use version tags here; per repository policy these SHOULD be
-# pinned to immutable digests (e.g. python:3.11-slim@sha256:...) at release time.
+# Base images are pinned to immutable multi-arch INDEX digests (buildx selects the
+# linux/amd64 child at build time). The digests are recorded in base-images.json and
+# re-verified against the live registry by the CI base-image-digest-verification job;
+# a pin change requires a reviewed repository change.
 
 # ---- Stage 1: frontend build -------------------------------------------------
-FROM node:22-bookworm-slim AS frontend
+FROM node:22-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46 AS frontend
 WORKDIR /build/frontend
 COPY apps/ugence-governance-studio/frontend/package.json apps/ugence-governance-studio/frontend/package-lock.json ./
 RUN npm ci
@@ -22,7 +24,7 @@ RUN npm run generate:api \
  && npm run build
 
 # ---- Stage 2: backend + deployment wheels -----------------------------------
-FROM python:3.11-slim-bookworm AS backend
+FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba AS backend
 WORKDIR /build
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -34,7 +36,7 @@ RUN pip install --no-cache-dir "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "s
  && pip install --no-cache-dir /build/compiler /build/awc /build/backend /build/deployment
 
 # ---- Stage 3: minimal runtime image -----------------------------------------
-FROM python:3.11-slim-bookworm AS runtime
+FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba AS runtime
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
