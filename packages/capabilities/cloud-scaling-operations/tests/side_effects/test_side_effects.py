@@ -56,7 +56,7 @@ def test_facade_construction_has_no_side_effects():
 def test_dry_run_execute_writes_no_files(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     before = set(tmp_path.iterdir())
-    import support
+    import ops_support as support
     from ugence_cloud_scaling_operations import (
         ControlledScalingExecutor, OperationsConfig)
     ControlledScalingExecutor(OperationsConfig()).execute(support.make_request(), tenant_id="t")

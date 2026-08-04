@@ -6,7 +6,7 @@ from ugence_cloud_scaling_operations import (
     OperationsConfig, TargetPolicy, ExecutionMode, GateExecutor, InMemoryAuditSink,
 )
 from ugence_cloud_scaling_operations.audit import redact, AuditEvent
-import support
+import ops_support as support
 
 
 def test_redact_scrubs_secret_keys_and_bearer():

@@ -6,7 +6,7 @@ from ugence_cloud_scaling_operations import (
     ControlledScalingExecutor, OperationsConfig, TargetPolicy, ExecutionMode,
     FakeScalingBackend,
 )
-import support
+import ops_support as support
 
 
 def _tp():

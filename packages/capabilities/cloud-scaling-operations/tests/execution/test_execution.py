@@ -10,7 +10,7 @@ from ugence_cloud_scaling_operations import (
     RollbackCoordinator, RollbackPlan, RollbackAuthorization, RollbackPolicy,
     ExecutionRequest,
 )
-import support
+import ops_support as support
 
 
 def _tp():
