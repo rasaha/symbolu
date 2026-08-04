@@ -36,6 +36,18 @@
     },
     {
       "type": "library",
+      "name": "argon2-cffi",
+      "version": "25.1.0",
+      "purl": "pkg:pypi/argon2-cffi@25.1.0"
+    },
+    {
+      "type": "library",
+      "name": "cffi",
+      "version": "2.1.1",
+      "purl": "pkg:pypi/cffi@2.1.1"
+    },
+    {
+      "type": "library",
       "name": "@tanstack/react-query",
       "version": "5.62.7",
       "purl": "pkg:npm/@tanstack/react-query@5.62.7"
@@ -76,5 +88,6 @@
       "version": "4.5.5",
       "purl": "pkg:npm/zustand@4.5.5"
     }
-  ]
+  ],
+  "note": "source-derived SBOM; an image-derived SBOM binding to the final image digest is CI-gated (base-image egress denied in this environment)."
 }

@@ -5,10 +5,12 @@
     "starlette": "1.3.1",
     "uvicorn": "0.52.1",
     "pydantic": "2.13.4",
+    "argon2-cffi": "25.1.0",
+    "cffi": "2.1.1",
     "governance-studio-deployment": null,
     "ugence-governance-studio-api": null,
     "ugence-agent-workforce-composer": null,
     "policy-workflow-compiler": null
   },
-  "note": "backend/AWC/compiler installed from the monorepo; framework deps pinned by the image build"
+  "note": "deployment runtime deps incl. Argon2id (argon2-cffi); backend/AWC/compiler from monorepo. Image-derived inventory is CI-gated."
 }

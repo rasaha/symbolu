@@ -1,0 +1,11 @@
+{
+  "schema": "base-images.v1",
+  "note": "Base images the P3E Dockerfile builds FROM. Manifest digests MUST be pinned by digest (FROM repo:tag@sha256:...). They are UNRESOLVED in this build environment because the organization egress proxy denies container-registry blob/manifest CDNs (403); resolve and commit them from a registry-capable environment (the CI base-image-digest-verification job resolves when null and verifies when set).",
+  "platform": "linux/amd64",
+  "resolution_status": "UNRESOLVED_EGRESS_DENIED",
+  "base_images": [
+    {"role": "frontend-build", "registry": "docker.io", "repository": "library/node", "tag": "22-bookworm-slim", "manifest_digest": null},
+    {"role": "backend-build", "registry": "docker.io", "repository": "library/python", "tag": "3.11-slim-bookworm", "manifest_digest": null},
+    {"role": "runtime", "registry": "docker.io", "repository": "library/python", "tag": "3.11-slim-bookworm", "manifest_digest": null}
+  ]
+}

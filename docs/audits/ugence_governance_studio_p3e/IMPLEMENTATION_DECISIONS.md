@@ -15,10 +15,10 @@
    comparison, generic 401s that never disclose username existence, and no credential
    logging. Two modes only: `production` (default) and loopback `test`.
 
-4. **Password KDF = stdlib scrypt.** Argon2id is preferred but no argon2/passlib wheel
-   is available offline; stdlib `hashlib.scrypt` (memory-hard) with `hmac.compare_digest`
-   is used, in a self-describing `scrypt$n$r$p$salt$hash` format that allows an additive
-   Argon2id migration. Documented in `SECURITY_ASSUMPTIONS.md`.
+4. **Password KDF = Argon2id** (`argon2-cffi`, installed from the allowlisted PyPI).
+   Standard `$argon2id$` encoded format, library-managed salt + constant-time verify,
+   bounded cost with excessive-parameter rejection *before* the KDF runs; legacy scrypt
+   records are verified for migration only. (Corrects the earlier offline-scrypt fallback.)
 
 5. **Fail-closed startup integrity.** 14 checks (frontend build+version, backend
    version+contract, OpenAPI hash, approved-op manifest, synthetic bundle, fixture

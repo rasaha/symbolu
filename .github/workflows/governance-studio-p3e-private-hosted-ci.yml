@@ -66,6 +66,13 @@ jobs:
       - name: backend-regression
         run: python -m pytest apps/ugence-governance-studio/backend/tests -q
 
+      - name: password-hashing-tests
+        working-directory: deployment/governance-studio
+        run: python -m pytest tests/test_passwords.py -q
+
+      - name: python-runtime-audit
+        run: pip-audit -r <(printf 'starlette\nuvicorn\nargon2-cffi\nfastapi\npydantic\n')
+
       - name: frontend-build
         working-directory: apps/ugence-governance-studio/frontend
         run: npm run build
@@ -96,6 +103,23 @@ jobs:
     needs: application
     steps:
       - uses: actions/checkout@v4
+      - name: base-image-digest-verification
+        run: |
+          # base-images.json records the digest each FROM must resolve to; verify the
+          # live registry digest still matches (requires registry egress).
+          python - <<'PY'
+          import json, subprocess
+          pins = json.load(open("deployment/governance-studio/base-images.json"))
+          for entry in pins["base_images"]:
+              ref = f'{entry["registry"]}/{entry["repository"]}:{entry["tag"]}'
+              out = subprocess.check_output(["docker", "buildx", "imagetools", "inspect", ref, "--format", "{{json .Manifest.Digest}}"]).decode().strip().strip('"')
+              pinned = entry.get("manifest_digest")
+              if pinned is None:
+                  print(f"RESOLVED (commit this) {ref} {out}")  # pin was UNRESOLVED; record for follow-up
+              else:
+                  assert out == pinned, f'{ref}: live {out} != pinned {pinned}'
+                  print(f"OK {ref} {out}")
+          PY
       - name: container-build
         run: docker build -f deployment/governance-studio/Dockerfile -t governance-studio-private-hosted:ci .
       - name: container-nonroot
