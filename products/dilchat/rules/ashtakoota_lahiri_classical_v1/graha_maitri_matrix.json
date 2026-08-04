@@ -1,0 +1,52 @@
+{
+  "component": "graha_maitri",
+  "max": 5,
+  "keyed_by": "rashi",
+  "draft": true,
+  "review_required": true,
+  "directional": false,
+  "description": "Graha Maitri (Rasyadhipati / lord-friendship) koota — mental and psychological compatibility, from the natural (Naisargika) friendship between the lords of the two Moon rashis.",
+  "rashi_to_lord": {
+    "0":  "Mars",
+    "1":  "Venus",
+    "2":  "Mercury",
+    "3":  "Moon",
+    "4":  "Sun",
+    "5":  "Mercury",
+    "6":  "Venus",
+    "7":  "Mars",
+    "8":  "Jupiter",
+    "9":  "Saturn",
+    "10": "Saturn",
+    "11": "Jupiter"
+  },
+  "planet_relationships": {
+    "_comment": "Naisargika (natural, permanent) relationship of each planet TOWARD every other planet. relation is directional per planet-row; the compound score below combines both directions. Nodes (Rahu/Ketu) are not rashi lords in this scheme and are omitted.",
+    "Sun":     { "Moon": "friend",  "Mars": "friend",  "Mercury": "neutral", "Jupiter": "friend",  "Venus": "enemy",   "Saturn": "enemy" },
+    "Moon":    { "Sun": "friend",   "Mars": "neutral", "Mercury": "friend",  "Jupiter": "neutral", "Venus": "neutral", "Saturn": "neutral" },
+    "Mars":    { "Sun": "friend",   "Moon": "friend",  "Mercury": "enemy",   "Jupiter": "friend",  "Venus": "neutral", "Saturn": "neutral" },
+    "Mercury": { "Sun": "friend",   "Moon": "enemy",   "Mars": "neutral",    "Jupiter": "neutral", "Venus": "friend",  "Saturn": "neutral" },
+    "Jupiter": { "Sun": "friend",   "Moon": "friend",  "Mars": "friend",     "Mercury": "enemy",   "Venus": "enemy",   "Saturn": "neutral" },
+    "Venus":   { "Sun": "enemy",    "Moon": "enemy",   "Mars": "neutral",    "Mercury": "friend",  "Jupiter": "neutral","Saturn": "friend" },
+    "Saturn":  { "Sun": "enemy",    "Moon": "enemy",   "Mars": "enemy",      "Mercury": "friend",  "Jupiter": "neutral","Venus": "friend" }
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [5, 4, 3, 1, 0.5, 0],
+    "rule": "Let a = relation(groomLord -> brideLord) and b = relation(brideLord -> groomLord). Combine the unordered pair {a,b} via compound_table. If groomLord == brideLord, treat as friend-friend -> 5.",
+    "compound_table": {
+      "friend+friend":   5,
+      "friend+neutral":  4,
+      "neutral+neutral": 3,
+      "friend+enemy":    1,
+      "neutral+enemy":   0.5,
+      "enemy+enemy":     0
+    }
+  },
+  "notes": [
+    "Planet natural relationships follow the BPHS-standard Naisargika table.",
+    "The compound table encodes all six mutual-relationship outcomes including neutral-neutral = 3 (max is still 5). Some schools/tables collapse or relabel the middle bands; review_required to confirm the chosen authority's exact points.",
+    "This koota uses only natural (permanent) friendship, not temporary (Tatkalika) or five-fold (Panchadha) compound relationship."
+  ]
+}

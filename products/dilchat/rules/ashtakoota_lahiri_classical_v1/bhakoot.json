@@ -1,0 +1,35 @@
+{
+  "component": "bhakoot",
+  "max": 7,
+  "keyed_by": "rashi",
+  "draft": true,
+  "review_required": true,
+  "directional": false,
+  "description": "Bhakoot (Rashi / Bhakut) koota — emotional bonding, family welfare and prosperity, from the mutual rashi-to-rashi position of the two Moon signs. Certain positional relationships form a Bhakoot dosha and score 0; all others score the full 7.",
+  "counting_rule": {
+    "description": "Compute the count from rashi A to rashi B (inclusive, forward) and from B to A. The unordered pair of counts identifies the relationship. Same rashi = 1/1.",
+    "count_inclusive": true,
+    "cycle_length": 12,
+    "formula_note": "count_ab = ((B - A) mod 12) + 1 ; count_ba = ((A - B) mod 12) + 1"
+  },
+  "penalized_relationships": {
+    "_comment": "Each is an unordered pair of mutual counts that constitutes a Bhakoot dosha (score 0).",
+    "dwidwadasha_2_12": { "counts": [2, 12], "name": "Dwir-Dwadasha (2/12)" },
+    "nava_pancham_5_9": { "counts": [5, 9], "name": "Nava-Pancham (5/9)" },
+    "shadashtaka_6_8":  { "counts": [6, 8], "name": "Shad-Ashtaka (6/8)" }
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [7, 0],
+    "rule": "If the unordered pair of mutual counts equals {2,12}, {5,9}, or {6,8} -> 0 (Bhakoot dosha). Otherwise -> 7.",
+    "points_dosha": 0,
+    "points_ok": 7,
+    "auspicious_relationships_full_score": ["1/1 (same rashi)", "3/11", "4/10", "7/7"]
+  },
+  "notes": [
+    "Bhakoot is symmetric: swapping the two rashis yields the same count-pair, so directional=false.",
+    "Bhakoot dosha is a common candidate for classical cancellation (e.g. same rashi-lord, or lords being mutual friends). No cancellation is applied unless explicitly enabled in exceptions.json.",
+    "6/8 (Shad-Ashtaka) and 2/12 (Dwir-Dwadasha) are traditionally regarded as the more serious; some schools weight them differently — this pack applies a uniform 0 for all three. review_required."
+  ]
+}

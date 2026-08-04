@@ -1,0 +1,70 @@
+{
+  "component": "sources",
+  "draft": true,
+  "pack_status": "DRAFT — pending domain-expert verification. Per DEC-009 this pack cannot back a user-facing report until every citation below is completed and verified:true, and a Vedic-astrology domain expert has signed off (OQ-1).",
+  "intended_primary_authority": {
+    "_comment": "Recommended in OQ-1: adopt one named classical authority for the v1 pack. Fill and confirm before freeze.",
+    "candidate": "B. V. Raman — Muhurta / Hindu Predictive Astrology (Ashtakoota tables)",
+    "confirmed": false
+  },
+  "citations": [
+    {
+      "component": "varna",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Rashi->varna element grouping and groom>=bride scoring rule.",
+      "verified": false
+    },
+    {
+      "component": "vashya",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Rashi->vashya group assignments (incl. half-sign handling for Sagittarius/Capricorn) and the group-pair 2/1/0.5/0 scores. High-variance table — prefer the 12x12 rashi-pair vashya table if the authority provides it.",
+      "verified": false
+    },
+    {
+      "component": "tara",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "9-tara sequence, auspicious/inauspicious classification, counting rule, and bidirectional 3/1.5/0 combine convention (confirm single- vs bi-directional per OQ-2).",
+      "verified": false
+    },
+    {
+      "component": "yoni",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Nakshatra->yoni animal map, the 14 yonis, mortal-enemy pairs, and the full 14x14 friendly(3)/neutral(2)/unfriendly(1) gradations that are currently defaulted to neutral.",
+      "verified": false
+    },
+    {
+      "component": "graha_maitri",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Rashi lords, Naisargika planet-friendship table, and compound 5/4/3/1/0.5/0 scoring (confirm whether neutral-neutral=3 band is used).",
+      "verified": false
+    },
+    {
+      "component": "gana",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Nakshatra->gana map and the directional 3x3 gana matrix (confirm groom/bride orientation and Deva-Rakshasa=1 vs 0).",
+      "verified": false
+    },
+    {
+      "component": "bhakoot",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "2/12, 5/9, 6/8 dosha counting rule and uniform 0 vs weighted treatment.",
+      "verified": false
+    },
+    {
+      "component": "nadi",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Nakshatra->nadi (Aadi/Madhya/Antya) map and same-nadi=0 / different=8 scoring. DEC-021 constitutional-only framing.",
+      "verified": false
+    },
+    {
+      "component": "exceptions",
+      "source_title": null, "author": null, "edition": null, "page": null,
+      "note": "Per-rule citations for any dosha-cancellation rule before it is enabled. See exceptions.json inline citation slots.",
+      "verified": false
+    }
+  ],
+  "notes": [
+    "Every citation must be completed (source_title, author, edition, page) and set verified:true during domain review before the pack version is frozen.",
+    "If the confirmed authority disagrees with any encoded value, do NOT edit this draft in place — mint a corrected new pack version per the immutability rule (README.md)."
+  ]
+}

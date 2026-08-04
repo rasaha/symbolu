@@ -1,0 +1,48 @@
+{
+  "component": "vashya",
+  "max": 2,
+  "keyed_by": "rashi",
+  "draft": true,
+  "review_required": true,
+  "description": "Vashya (Vasya) koota — mutual control / magnetic attraction between the two Moon rashis, scored via their vashya groups.",
+  "vashya_groups": {
+    "_comment": "Five classical vashya groups. Names given with common English glosses.",
+    "Chatushpada": "quadruped",
+    "Manava": "human / biped (Dwipada)",
+    "Jalachara": "watery / aquatic",
+    "Vanachara": "wild forest-dweller",
+    "Keeta": "insect"
+  },
+  "rashi_to_vashya": {
+    "0":  "Chatushpada",
+    "1":  "Chatushpada",
+    "2":  "Manava",
+    "3":  "Jalachara",
+    "4":  "Vanachara",
+    "5":  "Manava",
+    "6":  "Manava",
+    "7":  "Keeta",
+    "8":  "Manava",
+    "9":  "Jalachara",
+    "10": "Manava",
+    "11": "Jalachara"
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [2, 1, 0.5, 0],
+    "rule": "Look up the (groom_group, bride_group) pair in group_score_matrix. Diagonal (same group) = 2.",
+    "group_score_matrix": {
+      "_comment": "rows/cols = vashya groups. Values 2/1/0.5/0. DRAFT: same-group=2 is certain; off-diagonal values are the most source-variable cells in the whole pack and MUST be verified. The classical canonical form is actually a 12x12 rashi-pair vashya table (each rashi 'controls' specific rashis); this 5x5 group reduction is a documented simplification pending review.",
+      "Chatushpada": { "Chatushpada": 2,   "Manava": 1,   "Jalachara": 1,   "Vanachara": 1,   "Keeta": 1 },
+      "Manava":      { "Chatushpada": 1,   "Manava": 2,   "Jalachara": 1,   "Vanachara": 0,   "Keeta": 1 },
+      "Jalachara":   { "Chatushpada": 1,   "Manava": 1,   "Jalachara": 2,   "Vanachara": 1,   "Keeta": 0.5 },
+      "Vanachara":   { "Chatushpada": 1,   "Manava": 0,   "Jalachara": 1,   "Vanachara": 2,   "Keeta": 1 },
+      "Keeta":       { "Chatushpada": 1,   "Manava": 1,   "Jalachara": 0.5, "Vanachara": 1,   "Keeta": 2 }
+    }
+  },
+  "notes": [
+    "Group assignments follow the widely-used simplified table. Ambiguous half-sign signs (Sagittarius, Capricorn) are assigned by the dominant half: Sagittarius=Manava(Dwipada), Capricorn=Jalachara. Cancer=Jalachara. Verify against the chosen authority.",
+    "review_required: the authoritative implementation should prefer the classical rashi-pair (12x12) vashya table; this group matrix is a stand-in until the source table is transcribed and cited."
+  ]
+}

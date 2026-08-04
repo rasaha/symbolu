@@ -1,0 +1,376 @@
+{
+  "component": "yoni",
+  "max": 4,
+  "keyed_by": "nakshatra",
+  "draft": true,
+  "review_required": true,
+  "directional": false,
+  "description": "Yoni koota \u2014 sexual/physical and instinctive temperament compatibility, via the animal (yoni) assigned to each janma nakshatra. Scored 4 (same yoni) down to 0 (mortal-enemy yonis). Interpretation is bounded to consensual adult romantic context ONLY per DEC-021.",
+  "yonis": [
+    {
+      "index": 0,
+      "name": "Ashwa (Horse)"
+    },
+    {
+      "index": 1,
+      "name": "Gaja (Elephant)"
+    },
+    {
+      "index": 2,
+      "name": "Mesha (Sheep/Ram)"
+    },
+    {
+      "index": 3,
+      "name": "Sarpa (Serpent)"
+    },
+    {
+      "index": 4,
+      "name": "Shwan (Dog)"
+    },
+    {
+      "index": 5,
+      "name": "Marjara (Cat)"
+    },
+    {
+      "index": 6,
+      "name": "Mushaka (Rat/Mouse)"
+    },
+    {
+      "index": 7,
+      "name": "Gau (Cow)"
+    },
+    {
+      "index": 8,
+      "name": "Mahisha (Buffalo)"
+    },
+    {
+      "index": 9,
+      "name": "Vyaghra (Tiger)"
+    },
+    {
+      "index": 10,
+      "name": "Mriga (Deer)"
+    },
+    {
+      "index": 11,
+      "name": "Vanara (Monkey)"
+    },
+    {
+      "index": 12,
+      "name": "Nakula (Mongoose)"
+    },
+    {
+      "index": 13,
+      "name": "Simha (Lion)"
+    }
+  ],
+  "nakshatra_to_yoni": {
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 3,
+    "5": 4,
+    "6": 5,
+    "7": 2,
+    "8": 5,
+    "9": 6,
+    "10": 6,
+    "11": 7,
+    "12": 8,
+    "13": 9,
+    "14": 8,
+    "15": 9,
+    "16": 10,
+    "17": 10,
+    "18": 4,
+    "19": 11,
+    "20": 12,
+    "21": 11,
+    "22": 13,
+    "23": 0,
+    "24": 13,
+    "25": 7,
+    "26": 1
+  },
+  "scoring": {
+    "directional": false,
+    "unit": "points",
+    "possible_values": [
+      4,
+      3,
+      2,
+      1,
+      0
+    ],
+    "scale": {
+      "4": "same yoni",
+      "3": "friendly",
+      "2": "neutral",
+      "1": "unfriendly",
+      "0": "mortal enemy (natural predator/prey)"
+    },
+    "rule": "Look up (groomYoni, brideYoni) in yoni_score_matrix. Symmetric.",
+    "mortal_enemy_pairs": [
+      [
+        0,
+        8
+      ],
+      [
+        1,
+        13
+      ],
+      [
+        2,
+        11
+      ],
+      [
+        3,
+        12
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        7,
+        9
+      ],
+      [
+        4,
+        10
+      ]
+    ],
+    "yoni_score_matrix": {
+      "0": {
+        "0": 4,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 0,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "1": {
+        "0": 2,
+        "1": 4,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 0
+      },
+      "2": {
+        "0": 2,
+        "1": 2,
+        "2": 4,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 0,
+        "12": 2,
+        "13": 2
+      },
+      "3": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 4,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 0,
+        "13": 2
+      },
+      "4": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 4,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 0,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "5": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 4,
+        "6": 0,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "6": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 0,
+        "6": 4,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "7": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 4,
+        "8": 2,
+        "9": 0,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "8": {
+        "0": 0,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 4,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "9": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 0,
+        "8": 2,
+        "9": 4,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "10": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 0,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 4,
+        "11": 2,
+        "12": 2,
+        "13": 2
+      },
+      "11": {
+        "0": 2,
+        "1": 2,
+        "2": 0,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 4,
+        "12": 2,
+        "13": 2
+      },
+      "12": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 0,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 4,
+        "13": 2
+      },
+      "13": {
+        "0": 2,
+        "1": 0,
+        "2": 2,
+        "3": 2,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "11": 2,
+        "12": 2,
+        "13": 4
+      }
+    }
+  },
+  "notes": [
+    "DRAFT fidelity note: the diagonal (same yoni = 4) and the seven mortal-enemy pairs (= 0) are the load-bearing, well-attested values. All remaining off-diagonal cells are set to a documented neutral default of 2. The classical published 14x14 Yoni Kuta table further distinguishes friendly(3) and unfriendly(1) cells; those gradations are review_required and must be transcribed from the cited authority before freeze.",
+    "Mortal-enemy pairs: Horse-Buffalo, Elephant-Lion, Sheep-Monkey, Serpent-Mongoose, Cat-Rat, Cow-Tiger, Dog-Deer.",
+    "DEC-021: Yoni output must never be sexualized outside a consensual adult romantic context."
+  ]
+}

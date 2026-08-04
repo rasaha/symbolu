@@ -1,0 +1,81 @@
+{
+  "component": "exceptions",
+  "draft": true,
+  "review_required": true,
+  "description": "OPTIONAL classical dosha-cancellation (parihara) rules. These modify or waive a koota's dosha under stated conditions. Every rule is DISABLED by default. No exception applies unless its `enabled` flag is set true here AND its `citation` slot is verified during domain review.",
+  "policy": {
+    "default": "no_cancellation",
+    "statement": "No dosha cancellation is applied by the engine unless the specific rule below is enabled:true. Enabling any rule is a domain-review + founder decision, not an engineering default.",
+    "trace_requirement": "Whenever an enabled exception fires, its `id` MUST be recorded in the compatibility report's calculation trace. Silent cancellation is prohibited. The trace must show the raw koota score, the exception id applied, and the resulting score.",
+    "no_silent_cancellation": true
+  },
+  "exceptions": [
+    {
+      "id": "nadi_cancel_same_rashi_diff_nakshatra",
+      "component": "nadi",
+      "enabled": false,
+      "description": "Nadi dosha is considered cancelled when both partners share the same Moon rashi but have different janma nakshatras (one classical parihara).",
+      "conditions": { "same_rashi": true, "same_nakshatra": false, "same_nadi": true },
+      "effect": "waive_nadi_dosha",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "nadi_cancel_same_nakshatra_diff_pada",
+      "component": "nadi",
+      "enabled": false,
+      "description": "Nadi dosha is considered cancelled when both share the same janma nakshatra but fall in different padas (quarters).",
+      "conditions": { "same_nakshatra": true, "same_pada": false, "same_nadi": true },
+      "effect": "waive_nadi_dosha",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "nadi_cancel_lords_friends",
+      "component": "nadi",
+      "enabled": false,
+      "description": "Nadi dosha is considered mitigated when the lords of the two Moon rashis are mutual friends (school-dependent).",
+      "conditions": { "rashi_lords_mutual_friends": true, "same_nadi": true },
+      "effect": "waive_nadi_dosha",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "bhakoot_cancel_same_rashi_lord",
+      "component": "bhakoot",
+      "enabled": false,
+      "description": "Bhakoot dosha is considered cancelled when both Moon rashis share the same ruling planet (e.g. 6/8 between Aries & Scorpio both ruled by Mars, or 2/12 between signs of one lord).",
+      "conditions": { "bhakoot_dosha": true, "same_rashi_lord": true },
+      "effect": "waive_bhakoot_dosha",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "bhakoot_cancel_lords_friends",
+      "component": "bhakoot",
+      "enabled": false,
+      "description": "Bhakoot dosha is considered mitigated when the two rashi lords are mutual friends (school-dependent).",
+      "conditions": { "bhakoot_dosha": true, "rashi_lords_mutual_friends": true },
+      "effect": "waive_bhakoot_dosha",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "gana_cancel_rashi_lords_friends",
+      "component": "gana",
+      "enabled": false,
+      "description": "Deva/Rakshasa or Manushya/Rakshasa Gana affliction is considered mitigated when the rashi lords are friends or the moons are favorably placed (school-dependent).",
+      "conditions": { "gana_low_score": true, "rashi_lords_mutual_friends": true },
+      "effect": "restore_partial_gana",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    },
+    {
+      "id": "mangal_dosha_matching",
+      "component": "external_mangal",
+      "enabled": false,
+      "description": "Mangal (Manglik / Kuja) dosha is NOT part of the 36-point Ashtakoota total. It is a separate matching consideration. If DilChat later evaluates it, the neutralization/matching rules live here and are independently enabled and cited. Included as a disabled placeholder so it is never silently folded into the Guna score.",
+      "conditions": {},
+      "effect": "separate_report_flag_only",
+      "citation": { "source_title": null, "author": null, "page": null, "verified": false }
+    }
+  ],
+  "notes": [
+    "Cancellation rules vary substantially by school and by author; they are intentionally shipped disabled so the base pack produces the raw classical 36-point score.",
+    "Mangal dosha is deliberately kept OUT of the Ashtakoota 36-point sum (DEC-019 score-family separation); it may only ever be a separate flag."
+  ]
+}

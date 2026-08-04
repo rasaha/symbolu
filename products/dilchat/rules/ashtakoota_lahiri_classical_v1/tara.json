@@ -1,0 +1,44 @@
+{
+  "component": "tara",
+  "max": 3,
+  "keyed_by": "nakshatra",
+  "draft": true,
+  "review_required": true,
+  "directional": true,
+  "description": "Tara (Dina / birth-star) koota — health, longevity and fortune compatibility from counting between the two janma nakshatras. Computed in BOTH directions and combined.",
+  "taras": [
+    { "tara_number": 1, "name": "Janma",              "auspicious": false },
+    { "tara_number": 2, "name": "Sampat",             "auspicious": true },
+    { "tara_number": 3, "name": "Vipat",              "auspicious": false },
+    { "tara_number": 4, "name": "Kshema",             "auspicious": true },
+    { "tara_number": 5, "name": "Pratyak",            "auspicious": false },
+    { "tara_number": 6, "name": "Sadhaka",            "auspicious": true },
+    { "tara_number": 7, "name": "Vadha (Naidhana)",   "auspicious": false },
+    { "tara_number": 8, "name": "Mitra",              "auspicious": true },
+    { "tara_number": 9, "name": "Ati-Mitra (Parama Maitri)", "auspicious": true }
+  ],
+  "counting_rule": {
+    "description": "Count nakshatras inclusively from the FROM partner's janma nakshatra to the TO partner's janma nakshatra, moving forward through the 27-nakshatra cycle. Divide the inclusive count by 9. The remainder maps to a tara; remainder 0 is treated as tara 9.",
+    "count_inclusive": true,
+    "cycle_length": 27,
+    "divisor": 9,
+    "remainder_to_tara": { "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "0": 9 },
+    "formula_note": "inclusive_count = ((to_index - from_index) mod 27) + 1 ; remainder = inclusive_count mod 9 ; tara = remainder==0 ? 9 : remainder"
+  },
+  "scoring": {
+    "directional": true,
+    "directions": [
+      { "id": "bride_to_groom", "from": "bride", "to": "groom" },
+      { "id": "groom_to_bride", "from": "groom", "to": "bride" }
+    ],
+    "combine_rule": "Evaluate auspiciousness of the tara in each direction. Both auspicious -> 3; exactly one auspicious -> 1.5; neither auspicious -> 0.",
+    "possible_values": [3, 1.5, 0],
+    "points_both_auspicious": 3,
+    "points_one_auspicious": 1.5,
+    "points_none_auspicious": 0
+  },
+  "notes": [
+    "Auspicious taras: Sampat(2), Kshema(4), Sadhaka(6), Mitra(8), Ati-Mitra(9). Inauspicious: Janma(1), Vipat(3), Pratyak(5), Vadha/Naidhana(7).",
+    "Some schools count from the bride's star only and score out of 3 in a single direction; this pack uses the bidirectional-combine convention. review_required to confirm the school's convention (OQ-2)."
+  ]
+}
