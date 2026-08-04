@@ -25,6 +25,36 @@ class AmbiguityResolution(str, enum.Enum):
     LATER = "LATER"      # maps to fold=1
 
 
+class FieldStatus(str, enum.Enum):
+    """Certainty of a derived Moon classification over the birth-time interval."""
+
+    EXACT = "EXACT"                # single exact instant (EXACT precision)
+    STABLE = "STABLE"             # one value throughout an interval
+    AMBIGUOUS = "AMBIGUOUS"       # multiple possible rashi/nakshatra values
+    INDETERMINATE = "INDETERMINATE"  # multiple possible pada values
+    UNAVAILABLE = "UNAVAILABLE"   # could not be evaluated
+
+
+class GunaEligibility(str, enum.Enum):
+    """Future-facing eligibility metadata for a classical Guna Milan calculation.
+
+    This is metadata ONLY. No Guna engine exists or is implemented in this phase.
+    """
+
+    ELIGIBLE = "ELIGIBLE"
+    INELIGIBLE_AMBIGUOUS_NAKSHATRA = "INELIGIBLE_AMBIGUOUS_NAKSHATRA"
+    INELIGIBLE_AMBIGUOUS_REQUIRED_INPUT = "INELIGIBLE_AMBIGUOUS_REQUIRED_INPUT"
+    INELIGIBLE_MISSING_TIME = "INELIGIBLE_MISSING_TIME"
+    REQUIRES_USER_REVIEW = "REQUIRES_USER_REVIEW"
+
+
+class ProviderKind(str, enum.Enum):
+    """Whether a provider yields synthetic (non-astronomical) or real output."""
+
+    SYNTHETIC = "SYNTHETIC"  # fake provider — test/local development only
+    REAL = "REAL"            # a real ephemeris (Swiss dev adapter or licensed)
+
+
 class Scope(str, enum.Enum):
     PRIVATE_A = "PRIVATE_A"
     PRIVATE_B = "PRIVATE_B"

@@ -29,8 +29,15 @@ async def readiness(request: Request, session: AsyncSession = Depends(get_sessio
         checks["database"] = "unavailable"
         ready = False
     provider = getattr(request.app.state, "astrology_provider", None)
-    checks["astrology_provider"] = getattr(provider, "provider_id", "none")
-    checks["environment"] = request.app.state.settings.environment.value
+    provider_id = getattr(provider, "provider_id", "none")
+    checks["astrology_provider"] = provider_id
+    settings = request.app.state.settings
+    checks["environment"] = settings.environment.value
+    # Readiness must fail if a production-like environment has no permitted real
+    # provider configured (Area A) — never serve real astrology from a fake stub.
+    if settings.environment.is_production_like and (provider is None or provider_id == "fake"):
+        checks["astrology_provider"] = "invalid_for_production"
+        ready = False
     status_code = 200 if ready else 503
     return JSONResponse(
         status_code=status_code,

@@ -25,9 +25,20 @@ parts of Phase B**).
 - Birth profiles with historical-timezone local→UTC conversion (ambiguous /
   nonexistent time handling; unknown time never fabricated) and confidence
   propagation.
-- A replaceable **AstrologyProvider** interface with a deterministic default
-  (`fake`) and a development/test Swiss Ephemeris adapter; deterministic natal
-  Moon (longitude, rashi, nakshatra, pada) into immutable snapshots.
+- A replaceable **AstrologyProvider** interface governed by an environment policy
+  (DEC-029): the `fake` provider is a **synthetic test/local-development stub**
+  (never production-safe, refused in qa/staging/production, stamped
+  `synthetic_calculation=true`, never persisted as authoritative). Natal Moon is
+  evaluated as an **uncertainty interval** (EXACT / APPROXIMATE / UNKNOWN) with
+  per-field `STABLE/AMBIGUOUS/INDETERMINATE` statuses and exact half-open rational
+  boundary arithmetic — no single point estimate for uncertain input.
+- **PostgreSQL row-level security** backstop on all 10 tables (non-owner runtime
+  roles, ENABLE+FORCE, transaction-local context), proven via a non-owner role.
+
+> **Phase A/B hardening** (provider safety, birth-time uncertainty, exact
+> boundaries, RLS, fixture integrity) is recorded in
+> [`docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md`](docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md)
+> and Decision-Log entries DEC-029…DEC-035.
 - A pure **three-scope authorization** model (`PRIVATE_A`/`PRIVATE_B`/`SHARED`),
   default-deny, existence non-disclosure (404 not 403), and background-job
   scope re-validation (DEC-027).

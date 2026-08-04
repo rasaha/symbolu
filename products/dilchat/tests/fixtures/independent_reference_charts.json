@@ -1,0 +1,35 @@
+{
+  "fixture_class": "INDEPENDENT_REFERENCE_FIXTURE",
+  "status": "INDEPENDENT_REFERENCE_VALIDATION_PENDING",
+  "_definition": "Independently-sourced authoritative reference charts used to validate astronomical CORRECTNESS (not merely regression stability). Each case must come from a separately-implemented astronomy library backed by a separately-sourced JPL ephemeris, a documented authoritative calculation service, or a professionally-verified manual/reference calculation. Output from another wrapper around the SAME installed Swiss Ephemeris library does NOT qualify as independent.",
+  "_status_note": "No independently-sourced reference cases have been obtained yet (offline environment; no separately-sourced ephemeris available). The schema and validation harness exist; the REGRESSION_FIXTURE set remains for change-detection only. User-facing natal release stays gated until this file is populated and verified. The harness test reports XFAIL (INDEPENDENT_REFERENCE_VALIDATION_PENDING) while this list is empty.",
+  "_case_schema": {
+    "label": "string",
+    "source_name": "string (e.g. Skyfield + JPL DE440)",
+    "source_version": "string",
+    "source_url_or_identity": "string",
+    "retrieval_or_calculation_date": "ISO-8601 date",
+    "utc_instant": "ISO-8601 datetime (UTC)",
+    "coordinate_frame": "string (e.g. geocentric apparent ecliptic of date)",
+    "sidereal_or_tropical": "SIDEREAL | TROPICAL",
+    "ayanamsa": "string (e.g. lahiri) — required if sidereal",
+    "expected_longitude_deg": "number (sidereal Moon longitude)",
+    "tolerance_deg": "number (accepted absolute tolerance)",
+    "expected_rashi": "integer 0..11",
+    "expected_nakshatra": "integer 0..26",
+    "expected_pada": "integer 1..4",
+    "reviewer_notes": "string"
+  },
+  "_desired_coverage": [
+    "ordinary dates",
+    "rashi transitions",
+    "nakshatra transitions",
+    "pada transitions",
+    "historical timezone changes",
+    "India",
+    "a negative UTC offset",
+    "a positive non-integer UTC offset",
+    "northern and southern latitudes"
+  ],
+  "cases": []
+}

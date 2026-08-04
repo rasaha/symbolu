@@ -1,5 +1,7 @@
 # DilChat — Phase A / Phase B (non-blocked) Implementation Report
 
+> **Hardening update (Phase A/B):** Superseded in part by the Phase A/B hardening pass. See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md` and Decision-Log DEC-029…DEC-035.
+
 **Scope:** First bounded backend implementation — Phase A plus the explicitly
 non-blocked parts of Phase B. **No** user-facing Guna Milan, Living Compatibility,
 AI guidance, chat, agreements, or production deployment.

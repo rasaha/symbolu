@@ -1,5 +1,7 @@
 # DilChat — Astrology Engine Specification
 
+> **Hardening update (Phase A/B):** Boundary classification is now exact half-open rational Decimal arithmetic (no 1e-6 snap-up, DEC-033). Birth time is an uncertainty interval evaluated across the interval (DEC-031/032). Fake provider is synthetic/test-only (DEC-029). See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md` and Decision-Log DEC-029…DEC-035.
+
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Module:** `astrology`, `guna_milan`, `moon_transits` (see DEC-002 dependency order)
 **Status of this document:** Design phase. **DESIGN-ONLY — no production code.**

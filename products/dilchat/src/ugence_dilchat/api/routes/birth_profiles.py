@@ -15,12 +15,17 @@ from ..deps import (
     get_current_principal,
     get_services,
 )
-from ..schemas import BirthProfileCreateRequest, BirthProfileResponse
+from ..schemas import BirthProfileCreateRequest, BirthProfileResponse, UtcIntervalModel
 
 router = APIRouter(prefix="/birth-profiles", tags=["birth-profiles"])
 
 
 def _to_response(profile: BirthProfile) -> BirthProfileResponse:
+    interval = None
+    if profile.utc_interval_start is not None and profile.utc_interval_end is not None:
+        interval = UtcIntervalModel(
+            start=profile.utc_interval_start, end=profile.utc_interval_end
+        )
     return BirthProfileResponse(
         id=profile.id,
         version=profile.version,
@@ -31,6 +36,8 @@ def _to_response(profile: BirthProfile) -> BirthProfileResponse:
         birthplace_label=profile.birthplace_label,
         iana_timezone=profile.iana_timezone,
         utc_birth_instant=profile.utc_birth_instant,
+        utc_interval=interval,
+        uncertainty_minutes=profile.uncertainty_minutes,
         input_confidence=profile.input_confidence,
     )
 
@@ -51,6 +58,7 @@ async def _create(
         longitude=body.longitude,
         iana_timezone=body.iana_timezone,
         ambiguity_resolution=body.ambiguity_resolution,
+        uncertainty_minutes=body.uncertainty_minutes,
     )
     profile = await services.birth_profiles.create_or_version(
         principal.user_id, data, correlation_id

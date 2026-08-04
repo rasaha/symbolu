@@ -25,6 +25,21 @@ def test_no_guna_route_registered():
     assert not any("compatibility" in p.lower() for p in paths)
 
 
+def test_openapi_exposes_uncertainty_schemas():
+    app = create_app(Settings(environment=Environment.TEST, database_url="sqlite+aiosqlite://"))
+    schemas = app.openapi()["components"]["schemas"]
+    # Uncertainty-aware natal response + field-result + interval schemas present.
+    assert "NatalMoonResponse" in schemas
+    assert "FieldResultModel" in schemas
+    assert "UtcIntervalModel" in schemas
+    natal = schemas["NatalMoonResponse"]["properties"]
+    for key in ("moon_rashi", "moon_nakshatra", "moon_pada", "guna_eligibility",
+                "synthetic_calculation", "authoritative", "utc_interval"):
+        assert key in natal
+    # The single-longitude "moon_longitude"/"rashi_index" answer fields are gone.
+    assert "rashi_index" not in natal
+
+
 def test_rule_pack_is_draft_unverified_and_structurally_sound():
     manifest = json.loads((_RULE_PACK / "manifest.json").read_text())
     # DRAFT_UNVERIFIED: must remain gated out of user-facing use.

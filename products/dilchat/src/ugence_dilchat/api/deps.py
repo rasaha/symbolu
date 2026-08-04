@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..astrology.provider import AstrologyProvider
 from ..audit.service import AuditService
 from ..config import Settings
-from ..db import get_session
+from ..db import get_session, set_transaction_context
 from ..errors import DilChatError, ErrorCode
 from ..repositories.birth_profiles import BirthProfileRepository, NatalRepository
 from ..repositories.consent import ConsentRepository, SharedArtifactRepository
@@ -63,6 +63,9 @@ async def get_current_principal(
     claims = tokens.verify_access_token(token)  # raises AUTH_TOKEN_* on failure
     user_id = uuid.UUID(claims["sub"])
     session_id = uuid.UUID(claims["sid"])
+    # Upgrade the transaction-local RLS context to the authenticated user (from the
+    # cryptographically-verified JWT) BEFORE any scoped query runs (DEC-030).
+    await set_transaction_context(session, user_id=user_id, actor_type="user")
     # Server-side session check: revoked/rotated/expired sessions are rejected even
     # if the (still-unexpired) access token verifies.
     sess = await SessionRepository(session).get(session_id)

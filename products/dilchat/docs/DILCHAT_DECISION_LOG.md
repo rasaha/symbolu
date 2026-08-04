@@ -573,3 +573,91 @@ no-foreign-key-from-shared-to-private rule in the data model.
 | DEC-026 | Python 3.12 isolation | Confirmed |
 | DEC-027 | Job scope re-validation | **New control** (AUTHZ-1) |
 | DEC-028 | Shared snapshots | **New control** (AUTHZ-2) |
+
+---
+
+# Phase A/B Hardening (DEC-029 … DEC-035)
+
+> Added by the Phase A/B hardening pass (implemented on branch
+> `claude/dilchat-backend-design-e0douc`). New entries only — prior decisions are
+> preserved. See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md`.
+
+## DEC-029 — Provider/environment policy: fake is test/local-development only
+**Status:** Accepted · **[Technical]** · Supersedes the "fake is production-safe" wording.
+
+The synthetic `fake` provider is **not** production-safe for astronomical output. A
+policy matrix is enforced by `Settings` validation and the provider registry:
+`test → {fake}`, `development → {fake, swiss}`, `qa → {swiss}` (fake only with an
+explicit opt-in), `staging`/`production` → an **approved real provider only**
+(Swiss requires `swiss_production_licensed`). A missing/invalid production provider
+causes a **safe startup failure**; there is never a silent fallback to `fake`.
+Fake output is stamped `synthetic_calculation=true`, is never persisted as an
+authoritative snapshot, and readiness fails if a production-like environment has no
+real provider.
+
+## DEC-030 — RLS transaction-local context; no pooled-connection leak
+**Status:** Accepted · **[Technical/Security]**
+
+The RLS backstop context (`app.current_user_id`, `app.current_actor_type`,
+`app.current_couple_id`) is set with `set_config(..., is_local => true)` inside each
+transaction, so it cannot leak across pooled connections. The API sets a pre-auth
+`auth` context per request and upgrades to the authenticated `user` (from the
+verified JWT) before any scoped query; background workers set their own
+`worker` actor + scope before writing.
+
+## DEC-031 — Unknown birth time is interval uncertainty, not a noon chart
+**Status:** Accepted · **[Product/Technical]** · Supersedes the Phase A/B "assumed noon" behaviour.
+
+`UNKNOWN` birth time is modeled as the **entire local civil day** interval
+`[day start, next-day start)` (accounting for 23/24/25-hour DST days), evaluated
+across the interval. No canonical noon/midnight instant is fabricated. Derived Moon
+fields carry explicit statuses (`STABLE` / `AMBIGUOUS` / `INDETERMINATE`) and, when
+not stable, `possible_values` — never a single point estimate presented as the answer.
+
+## DEC-032 — Approximate birth time requires an explicit uncertainty interval
+**Status:** Accepted · **[Product/Technical]**
+
+`APPROXIMATE` precision requires an explicit `uncertainty_minutes` (± around the
+stated local time). It never silently defaults; it is rejected if ≤ 0 or > 720
+(beyond which the input must be `UNKNOWN`). The interval is converted to UTC via the
+historical IANA timezone and evaluated across its full width.
+
+## DEC-033 — Category boundaries use exact half-open rational Decimal arithmetic
+**Status:** Accepted · **[Technical]** · Removes the 1e-6 snap-up (DEC-024 boundary note).
+
+Rashi/nakshatra/pada are classified by exact `Decimal` rational floor over half-open
+intervals `[start, end)`:
+`rashi = floor(lon·12/360)`, `nakshatra = floor(lon·27/360)`,
+`pada = (floor(lon·108/360) mod 4) + 1`. The provider longitude is normalized to
+`[0,360)` and converted **once** to Decimal at a declared 9-fractional-digit
+resolution. No epsilon reassignment; provider numerical uncertainty is kept separate
+from category assignment (the interval engine handles the former).
+
+## DEC-034 — Row-level security is a mandatory database backstop
+**Status:** Accepted · **[Security]** · Makes DEC-025 concrete.
+
+PostgreSQL RLS is implemented on all 10 tables (`ENABLE` + `FORCE`) with policies
+keyed on the transaction-local context (DEC-030) and a SECURITY DEFINER
+membership-check helper. Distinct non-owner runtime roles (`dilchat_app`,
+`dilchat_worker`, `dilchat_readonly`) are `NOSUPERUSER NOBYPASSRLS` with no table
+ownership; append-only tables (`natal_chart_snapshots`, `shared_artifacts`,
+`audit_events`) grant no UPDATE/DELETE. Proven through a **non-owner role** in
+`tests/security/test_rls.py`. **Founder decision (open):** whether an ended couple
+retains read access to previously-approved shared artifacts — current policy
+**revokes** shared read on unpair (see Open Questions OQ-14).
+
+## DEC-035 — Regression vs independent-reference fixtures are distinct evidence
+**Status:** Accepted · **Requires external validation** · **[Technical]**
+
+Golden fixtures generated from DilChat's own Swiss stack are `REGRESSION_FIXTURE`
+(change detection only). Correctness validation requires
+`INDEPENDENT_REFERENCE_FIXTURE`s from a **separately-sourced** ephemeris/authority.
+None are available yet → status **`INDEPENDENT_REFERENCE_VALIDATION_PENDING`**
+(surfaced as an XFAIL, never hidden behind a green pass). User-facing natal release
+stays gated until independent cases are populated and verified.
+
+## New open question
+
+| OQ | Question | Recommendation (bounded) |
+|----|----------|--------------------------|
+| OQ-14 | Do ended couples retain read access to previously-approved shared artifacts? | **Recommend: revoke on unpair** (current RLS policy). Retained-history access is a founder decision; if adopted, add an explicit retained-history policy rather than relaxing the default. |

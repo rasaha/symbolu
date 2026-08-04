@@ -52,6 +52,8 @@ class FakeAstrologyProvider:
             fallback_used=False,
             fallback_reason=None,
             input_confidence=input_confidence,
+            provider_kind="SYNTHETIC",
+            synthetic_calculation=True,
             time_assumption=time_assumption,
         )
         trace = {"julian_day": self.julian_day(utc), **derivation.trace}

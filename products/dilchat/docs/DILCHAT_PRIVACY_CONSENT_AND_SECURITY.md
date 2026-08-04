@@ -1,5 +1,7 @@
 # DilChat — Privacy, Consent & Security Architecture
 
+> **Hardening update (Phase A/B):** PostgreSQL RLS is now implemented as a database backstop on all 10 tables with non-owner runtime roles and transaction-local context (DEC-034/DEC-030); proven via a non-owner role in tests/security/test_rls.py. See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md` and Decision-Log DEC-029…DEC-035.
+
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Status of this document:** Design phase. No production code has been written.
 **Document type:** Security & privacy architecture (design-only). This is the

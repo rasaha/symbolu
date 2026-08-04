@@ -24,12 +24,40 @@ from ugence_dilchat.services.birthtime import compute_birth_instant
 swisseph = pytest.importorskip("swisseph")
 from ugence_dilchat.astrology.swiss import SwissEphemerisProvider  # noqa: E402
 
-_FIXTURES = json.loads(
-    (pathlib.Path(__file__).parent.parent / "fixtures" / "golden_charts.json").read_text()
-)
+_FIX_DIR = pathlib.Path(__file__).parent.parent / "fixtures"
+_FIXTURES = json.loads((_FIX_DIR / "golden_charts.json").read_text())
+_INDEPENDENT = json.loads((_FIX_DIR / "independent_reference_charts.json").read_text())
 # Moon longitude regression tolerance (deg). Small because we compare the SAME
 # provider+version against its own frozen output (determinism/regression).
 _TOL = 1e-4
+
+
+def test_golden_fixtures_are_regression_class_only():
+    # These fixtures must never be presented as independent validation (Area E).
+    assert _FIXTURES["fixture_class"] == "REGRESSION_FIXTURE"
+    assert _INDEPENDENT["fixture_class"] == "INDEPENDENT_REFERENCE_FIXTURE"
+
+
+def test_independent_reference_fixtures():
+    """Validate correctness against independently-sourced charts, when present.
+
+    While no independent cases exist this reports XFAIL so the pending external
+    validation is explicit and never a silent green pass.
+    """
+    cases = _INDEPENDENT.get("cases", [])
+    if not cases:
+        pytest.xfail(
+            "INDEPENDENT_REFERENCE_VALIDATION_PENDING: no independently-sourced "
+            "reference charts yet; user-facing natal release stays gated."
+        )
+    prov = SwissEphemerisProvider(mode="moshier")  # replace with the configured real provider
+    for c in cases:
+        inst = dt.datetime.fromisoformat(c["utc_instant"])
+        d = prov.compute_moon(inst, input_confidence=1.0).derivation
+        assert abs(d.longitude - c["expected_longitude_deg"]) <= c["tolerance_deg"], c["label"]
+        assert d.rashi_index == c["expected_rashi"], c["label"]
+        assert d.nakshatra_index == c["expected_nakshatra"], c["label"]
+        assert d.pada == c["expected_pada"], c["label"]
 
 
 def _instant(case) -> dt.datetime:

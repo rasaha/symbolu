@@ -109,8 +109,14 @@ class BirthProfile(Base, TimestampMixin):
     iana_timezone: Mapped[str] = mapped_column(sa.String(64), nullable=False, info=INTERNAL)
 
     # Derived UTC birth instant; NULL when precision UNKNOWN (never fabricated).
+    # Retained for EXACT inputs (== utc_interval_start == utc_interval_end).
     utc_birth_instant: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
     input_confidence: Mapped[float] = mapped_column(sa.Float, nullable=False, info=PUBLIC)
+
+    # Birth-time uncertainty interval (Area B). Present for all precisions.
+    uncertainty_minutes: Mapped[int | None] = mapped_column(sa.Integer)  # APPROXIMATE
+    utc_interval_start: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    utc_interval_end: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
 
     __table_args__ = (
         sa.UniqueConstraint("user_id", "version", name="uq_birth_profile_user_version"),
@@ -118,6 +124,11 @@ class BirthProfile(Base, TimestampMixin):
         sa.CheckConstraint("input_confidence >= 0 AND input_confidence <= 1", name="ck_bp_conf"),
         sa.CheckConstraint("latitude >= -90 AND latitude <= 90", name="ck_bp_lat"),
         sa.CheckConstraint("longitude >= -180 AND longitude <= 180", name="ck_bp_lon"),
+        sa.CheckConstraint(
+            "uncertainty_minutes IS NULL OR "
+            "(uncertainty_minutes > 0 AND uncertainty_minutes <= 720)",
+            name="ck_bp_uncertainty",
+        ),
     )
 
 
@@ -141,12 +152,38 @@ class NatalChartSnapshot(Base):
     ayanamsa: Mapped[str] = mapped_column(sa.String(32), nullable=False)
 
     julian_day: Mapped[float] = mapped_column(sa.Float, nullable=False)
+    # Representative interval-start longitude (data, not the user-facing answer).
     moon_longitude: Mapped[float] = mapped_column(sa.Float, nullable=False)
-    rashi_index: Mapped[int] = mapped_column(sa.Integer, nullable=False)
-    rashi_name: Mapped[str] = mapped_column(sa.String(24), nullable=False)
-    nakshatra_index: Mapped[int] = mapped_column(sa.Integer, nullable=False)
-    nakshatra_name: Mapped[str] = mapped_column(sa.String(32), nullable=False)
-    pada: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    longitude_end: Mapped[float | None] = mapped_column(sa.Float)
+
+    # Definitive single values — populated ONLY when the field is EXACT/STABLE.
+    rashi_index: Mapped[int | None] = mapped_column(sa.Integer)
+    rashi_name: Mapped[str | None] = mapped_column(sa.String(24))
+    nakshatra_index: Mapped[int | None] = mapped_column(sa.Integer)
+    nakshatra_name: Mapped[str | None] = mapped_column(sa.String(32))
+    pada: Mapped[int | None] = mapped_column(sa.Integer)
+
+    # Interval + per-field uncertainty (Area B).
+    utc_interval_start: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    utc_interval_end: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    rashi_status: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    nakshatra_status: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    pada_status: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    rashi_possible: Mapped[list | None] = mapped_column(JSONVariant)
+    nakshatra_possible: Mapped[list | None] = mapped_column(JSONVariant)
+    pada_possible: Mapped[list | None] = mapped_column(JSONVariant)
+    guna_eligibility: Mapped[str] = mapped_column(sa.String(48), nullable=False)
+
+    # Provider safety (Area A).
+    provider_kind: Mapped[str] = mapped_column(
+        sa.String(16), nullable=False, default=enums.ProviderKind.REAL.value
+    )
+    synthetic: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    test_only: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    authoritative: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True)
+    requires_recalculation: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False
+    )
 
     numerical_precision_class: Mapped[str] = mapped_column(sa.String(24), nullable=False)
     fallback_used: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
@@ -168,13 +205,21 @@ class NatalChartSnapshot(Base):
             "ayanamsa",
             name="uq_natal_version_tuple",
         ),
-        sa.CheckConstraint("rashi_index >= 0 AND rashi_index <= 11", name="ck_natal_rashi"),
         sa.CheckConstraint(
-            "nakshatra_index >= 0 AND nakshatra_index <= 26", name="ck_natal_nak"
+            "rashi_index IS NULL OR (rashi_index >= 0 AND rashi_index <= 11)",
+            name="ck_natal_rashi",
         ),
-        sa.CheckConstraint("pada >= 1 AND pada <= 4", name="ck_natal_pada"),
+        sa.CheckConstraint(
+            "nakshatra_index IS NULL OR (nakshatra_index >= 0 AND nakshatra_index <= 26)",
+            name="ck_natal_nak",
+        ),
+        sa.CheckConstraint("pada IS NULL OR (pada >= 1 AND pada <= 4)", name="ck_natal_pada"),
         sa.CheckConstraint(
             "moon_longitude >= 0 AND moon_longitude < 360", name="ck_natal_lon"
+        ),
+        # A synthetic (fake) result may never be persisted as authoritative (Area A).
+        sa.CheckConstraint(
+            "NOT (synthetic AND authoritative)", name="ck_natal_no_synthetic_authoritative"
         ),
     )
 

@@ -34,6 +34,10 @@ class Provenance:
     fallback_used: bool
     fallback_reason: str | None
     input_confidence: float
+    # Provider kind & synthetic marking (Area A). ``synthetic_calculation`` is True
+    # ONLY for the fake provider; real ephemerides set it False.
+    provider_kind: str = "REAL"
+    synthetic_calculation: bool = False
     time_assumption: str | None = None
 
     def to_dict(self) -> dict:
@@ -47,6 +51,8 @@ class Provenance:
             "fallback_used": self.fallback_used,
             "fallback_reason": self.fallback_reason,
             "input_confidence": self.input_confidence,
+            "provider_kind": self.provider_kind,
+            "synthetic_calculation": self.synthetic_calculation,
         }
         if self.time_assumption is not None:
             d["time_assumption"] = self.time_assumption

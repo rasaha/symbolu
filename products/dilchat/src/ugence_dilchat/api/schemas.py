@@ -69,6 +69,13 @@ class BirthProfileCreateRequest(BaseModel):
     longitude: float = Field(ge=-180, le=180)
     iana_timezone: str = Field(min_length=1, max_length=64)
     ambiguity_resolution: AmbiguityResolution | None = None
+    # Required for APPROXIMATE precision (± minutes around the stated local time).
+    uncertainty_minutes: int | None = Field(default=None, ge=1, le=720)
+
+
+class UtcIntervalModel(BaseModel):
+    start: dt.datetime
+    end: dt.datetime
 
 
 class BirthProfileResponse(BaseModel):
@@ -81,10 +88,12 @@ class BirthProfileResponse(BaseModel):
     birthplace_label: str
     iana_timezone: str
     utc_birth_instant: dt.datetime | None
+    utc_interval: UtcIntervalModel | None
+    uncertainty_minutes: int | None
     input_confidence: float
 
 
-# --- natal ----------------------------------------------------------------- #
+# --- natal (uncertainty-aware) --------------------------------------------- #
 class ProvenanceModel(BaseModel):
     provider_id: str
     provider_version: str
@@ -95,18 +104,36 @@ class ProvenanceModel(BaseModel):
     fallback_used: bool
     fallback_reason: str | None
     input_confidence: float
+    provider_kind: str
+    synthetic_calculation: bool
     time_assumption: str | None = None
+
+
+class FieldResultModel(BaseModel):
+    """A derived Moon classification with an explicit certainty status."""
+
+    status: str  # EXACT | STABLE | AMBIGUOUS | INDETERMINATE | UNAVAILABLE
+    value: int | None = None
+    name: str | None = None
+    possible_values: list[int] | None = None
+    possible_names: list[str] | None = None
 
 
 class NatalMoonResponse(BaseModel):
     snapshot_id: uuid.UUID
     birth_profile_version: int
-    moon_longitude: float
-    rashi_index: int
-    rashi_name: str
-    nakshatra_index: int
-    nakshatra_name: str
-    pada: int
+    birth_time_precision: str
+    utc_interval: UtcIntervalModel
+    moon_longitude_start: float
+    moon_longitude_end: float | None
+    moon_rashi: FieldResultModel
+    moon_nakshatra: FieldResultModel
+    moon_pada: FieldResultModel
+    guna_eligibility: str
+    # Provider safety surface (Area A): never present a synthetic result as authoritative.
+    synthetic_calculation: bool
+    authoritative: bool
+    test_only: bool
     provenance: ProvenanceModel
 
 

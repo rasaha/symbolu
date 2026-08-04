@@ -26,6 +26,9 @@ _SAFE_PROVENANCE_KEYS = {
     "input_confidence",
     "time_assumption",
     "rule_pack_id",
+    "provider_kind",
+    "synthetic_calculation",
+    "guna_eligibility",
 }
 
 

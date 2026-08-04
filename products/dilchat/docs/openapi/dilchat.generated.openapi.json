@@ -1,0 +1,1451 @@
+{
+  "components": {
+    "schemas": {
+      "AmbiguityResolution": {
+        "description": "Which occurrence of an ambiguous (DST fall-back) local time was intended.",
+        "enum": [
+          "EARLIER",
+          "LATER"
+        ],
+        "title": "AmbiguityResolution",
+        "type": "string"
+      },
+      "BirthProfileCreateRequest": {
+        "properties": {
+          "ambiguity_resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AmbiguityResolution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "birth_date": {
+            "format": "date",
+            "title": "Birth Date",
+            "type": "string"
+          },
+          "birth_time_local": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Time Local"
+          },
+          "birth_time_precision": {
+            "$ref": "#/components/schemas/BirthTimePrecision"
+          },
+          "birthplace_label": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Birthplace Label",
+            "type": "string"
+          },
+          "iana_timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Iana Timezone",
+            "type": "string"
+          },
+          "latitude": {
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude",
+            "type": "number"
+          },
+          "preferred_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Preferred Name",
+            "type": "string"
+          },
+          "uncertainty_minutes": {
+            "anyOf": [
+              {
+                "maximum": 720.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncertainty Minutes"
+          }
+        },
+        "required": [
+          "preferred_name",
+          "birth_date",
+          "birth_time_precision",
+          "birthplace_label",
+          "latitude",
+          "longitude",
+          "iana_timezone"
+        ],
+        "title": "BirthProfileCreateRequest",
+        "type": "object"
+      },
+      "BirthProfileResponse": {
+        "properties": {
+          "birth_date": {
+            "format": "date",
+            "title": "Birth Date",
+            "type": "string"
+          },
+          "birth_time_precision": {
+            "$ref": "#/components/schemas/BirthTimePrecision"
+          },
+          "birthplace_label": {
+            "title": "Birthplace Label",
+            "type": "string"
+          },
+          "has_birth_time": {
+            "title": "Has Birth Time",
+            "type": "boolean"
+          },
+          "iana_timezone": {
+            "title": "Iana Timezone",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_confidence": {
+            "title": "Input Confidence",
+            "type": "number"
+          },
+          "preferred_name": {
+            "title": "Preferred Name",
+            "type": "string"
+          },
+          "uncertainty_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncertainty Minutes"
+          },
+          "utc_birth_instant": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utc Birth Instant"
+          },
+          "utc_interval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtcIntervalModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "preferred_name",
+          "birth_date",
+          "birth_time_precision",
+          "has_birth_time",
+          "birthplace_label",
+          "iana_timezone",
+          "utc_birth_instant",
+          "utc_interval",
+          "uncertainty_minutes",
+          "input_confidence"
+        ],
+        "title": "BirthProfileResponse",
+        "type": "object"
+      },
+      "BirthTimePrecision": {
+        "enum": [
+          "EXACT",
+          "APPROXIMATE",
+          "UNKNOWN"
+        ],
+        "title": "BirthTimePrecision",
+        "type": "string"
+      },
+      "ConsentCreateRequest": {
+        "properties": {
+          "artifact_type": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "bounded_summary": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Bounded Summary",
+            "type": "string"
+          },
+          "couple_id": {
+            "format": "uuid",
+            "title": "Couple Id",
+            "type": "string"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          }
+        },
+        "required": [
+          "couple_id",
+          "artifact_type",
+          "bounded_summary"
+        ],
+        "title": "ConsentCreateRequest",
+        "type": "object"
+      },
+      "ConsentResponse": {
+        "properties": {
+          "consent_event_id": {
+            "format": "uuid",
+            "title": "Consent Event Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "source_scope": {
+            "title": "Source Scope",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent_event_id",
+          "state",
+          "source_scope",
+          "created_at"
+        ],
+        "title": "ConsentResponse",
+        "type": "object"
+      },
+      "CoupleResponse": {
+        "properties": {
+          "couple_id": {
+            "format": "uuid",
+            "title": "Couple Id",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberModel"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "couple_id",
+          "status",
+          "members"
+        ],
+        "title": "CoupleResponse",
+        "type": "object"
+      },
+      "FieldResultModel": {
+        "description": "A derived Moon classification with an explicit certainty status.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "possible_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Possible Names"
+          },
+          "possible_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Possible Values"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "FieldResultModel",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InvitationCreateResponse": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "invitation_id": {
+            "format": "uuid",
+            "title": "Invitation Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitation_id",
+          "token",
+          "expires_at"
+        ],
+        "title": "InvitationCreateResponse",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "MemberModel": {
+        "properties": {
+          "scope_slot": {
+            "title": "Scope Slot",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "scope_slot",
+          "status"
+        ],
+        "title": "MemberModel",
+        "type": "object"
+      },
+      "NatalMoonResponse": {
+        "properties": {
+          "authoritative": {
+            "title": "Authoritative",
+            "type": "boolean"
+          },
+          "birth_profile_version": {
+            "title": "Birth Profile Version",
+            "type": "integer"
+          },
+          "birth_time_precision": {
+            "title": "Birth Time Precision",
+            "type": "string"
+          },
+          "guna_eligibility": {
+            "title": "Guna Eligibility",
+            "type": "string"
+          },
+          "moon_longitude_end": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moon Longitude End"
+          },
+          "moon_longitude_start": {
+            "title": "Moon Longitude Start",
+            "type": "number"
+          },
+          "moon_nakshatra": {
+            "$ref": "#/components/schemas/FieldResultModel"
+          },
+          "moon_pada": {
+            "$ref": "#/components/schemas/FieldResultModel"
+          },
+          "moon_rashi": {
+            "$ref": "#/components/schemas/FieldResultModel"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceModel"
+          },
+          "snapshot_id": {
+            "format": "uuid",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "synthetic_calculation": {
+            "title": "Synthetic Calculation",
+            "type": "boolean"
+          },
+          "test_only": {
+            "title": "Test Only",
+            "type": "boolean"
+          },
+          "utc_interval": {
+            "$ref": "#/components/schemas/UtcIntervalModel"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "birth_profile_version",
+          "birth_time_precision",
+          "utc_interval",
+          "moon_longitude_start",
+          "moon_longitude_end",
+          "moon_rashi",
+          "moon_nakshatra",
+          "moon_pada",
+          "guna_eligibility",
+          "synthetic_calculation",
+          "authoritative",
+          "test_only",
+          "provenance"
+        ],
+        "title": "NatalMoonResponse",
+        "type": "object"
+      },
+      "ProvenanceModel": {
+        "properties": {
+          "ayanamsa": {
+            "title": "Ayanamsa",
+            "type": "string"
+          },
+          "calculation_timestamp": {
+            "format": "date-time",
+            "title": "Calculation Timestamp",
+            "type": "string"
+          },
+          "ephemeris_mode": {
+            "title": "Ephemeris Mode",
+            "type": "string"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "fallback_used": {
+            "title": "Fallback Used",
+            "type": "boolean"
+          },
+          "input_confidence": {
+            "title": "Input Confidence",
+            "type": "number"
+          },
+          "numerical_precision_class": {
+            "title": "Numerical Precision Class",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "provider_kind": {
+            "title": "Provider Kind",
+            "type": "string"
+          },
+          "provider_version": {
+            "title": "Provider Version",
+            "type": "string"
+          },
+          "synthetic_calculation": {
+            "title": "Synthetic Calculation",
+            "type": "boolean"
+          },
+          "time_assumption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Assumption"
+          }
+        },
+        "required": [
+          "provider_id",
+          "provider_version",
+          "ephemeris_mode",
+          "ayanamsa",
+          "calculation_timestamp",
+          "numerical_precision_class",
+          "fallback_used",
+          "fallback_reason",
+          "input_confidence",
+          "provider_kind",
+          "synthetic_calculation"
+        ],
+        "title": "ProvenanceModel",
+        "type": "object"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "minLength": 1,
+            "title": "Refresh Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshRequest",
+        "type": "object"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 10,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RegisterResponse": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "RegisterResponse",
+        "type": "object"
+      },
+      "SharedArtifactCreateRequest": {
+        "properties": {
+          "consent_event_id": {
+            "format": "uuid",
+            "title": "Consent Event Id",
+            "type": "string"
+          },
+          "payload_snapshot": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Payload Snapshot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent_event_id",
+          "payload_snapshot"
+        ],
+        "title": "SharedArtifactCreateRequest",
+        "type": "object"
+      },
+      "SharedArtifactResponse": {
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_type": {
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "payload_snapshot": {
+            "title": "Payload Snapshot",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "source_scope": {
+            "title": "Source Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "artifact_type",
+          "source_scope",
+          "payload_snapshot",
+          "created_at",
+          "provenance"
+        ],
+        "title": "SharedArtifactResponse",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_in",
+          "refresh_token"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
+      "UserMeResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "status",
+          "created_at"
+        ],
+        "title": "UserMeResponse",
+        "type": "object"
+      },
+      "UtcIntervalModel": {
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "UtcIntervalModel",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "DilChat backend foundation (Ugence Labs): identity, birth profiles, deterministic natal-Moon derivation, three-scope authorization, and couple/consent/audit primitives. No user-facing Guna Milan, AI, daily transits, chat, or agreements are exposed in this phase.",
+    "title": "DilChat Backend (Phase A/B)",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "login_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/logout-all": {
+      "post": {
+        "operationId": "logout_all_v1_auth_logout_all_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout All",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "operationId": "refresh_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/register": {
+      "post": {
+        "operationId": "register_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/birth-profiles": {
+      "post": {
+        "operationId": "create_birth_profile_v1_birth_profiles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BirthProfileCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BirthProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Birth Profile",
+        "tags": [
+          "birth-profiles"
+        ]
+      }
+    },
+    "/v1/birth-profiles/me": {
+      "get": {
+        "operationId": "get_my_birth_profile_v1_birth_profiles_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BirthProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get My Birth Profile",
+        "tags": [
+          "birth-profiles"
+        ]
+      },
+      "patch": {
+        "operationId": "update_my_birth_profile_v1_birth_profiles_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BirthProfileCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BirthProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update My Birth Profile",
+        "tags": [
+          "birth-profiles"
+        ]
+      }
+    },
+    "/v1/consents": {
+      "post": {
+        "operationId": "create_consent_v1_consents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Consent",
+        "tags": [
+          "consent"
+        ]
+      }
+    },
+    "/v1/couples/current": {
+      "get": {
+        "operationId": "current_couple_v1_couples_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoupleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Current Couple",
+        "tags": [
+          "couples"
+        ]
+      }
+    },
+    "/v1/couples/invitations": {
+      "post": {
+        "operationId": "create_invitation_v1_couples_invitations_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create Invitation",
+        "tags": [
+          "couples"
+        ]
+      }
+    },
+    "/v1/couples/invitations/{token}/accept": {
+      "post": {
+        "operationId": "accept_invitation_v1_couples_invitations__token__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoupleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Invitation",
+        "tags": [
+          "couples"
+        ]
+      }
+    },
+    "/v1/couples/{couple_id}/unpair": {
+      "post": {
+        "operationId": "unpair_v1_couples__couple_id__unpair_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "couple_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Couple Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unpair",
+        "tags": [
+          "couples"
+        ]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "health_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/natal/moon": {
+      "post": {
+        "operationId": "compute_natal_moon_v1_natal_moon_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NatalMoonResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Compute Natal Moon",
+        "tags": [
+          "natal"
+        ]
+      }
+    },
+    "/v1/natal/moon/latest": {
+      "get": {
+        "operationId": "latest_natal_moon_v1_natal_moon_latest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NatalMoonResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Latest Natal Moon",
+        "tags": [
+          "natal"
+        ]
+      }
+    },
+    "/v1/readiness": {
+      "get": {
+        "operationId": "readiness_v1_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/shared-artifacts": {
+      "post": {
+        "operationId": "create_shared_artifact_v1_shared_artifacts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedArtifactCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedArtifactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Shared Artifact",
+        "tags": [
+          "consent"
+        ]
+      }
+    },
+    "/v1/shared-artifacts/{artifact_id}": {
+      "get": {
+        "operationId": "get_shared_artifact_v1_shared_artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedArtifactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Shared Artifact",
+        "tags": [
+          "consent"
+        ]
+      }
+    },
+    "/v1/users/me": {
+      "get": {
+        "operationId": "get_me_v1_users_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserMeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Me",
+        "tags": [
+          "users"
+        ]
+      }
+    }
+  }
+}

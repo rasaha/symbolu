@@ -1,9 +1,9 @@
-"""Astrology provider selection with a hard production guard.
+"""Astrology provider selection enforcing the environment policy (Area A).
 
-The Swiss provider (AGPL, dev/test only) can be selected only when BOTH the
-environment allows it and it is explicitly enabled. In any production-like
-environment the registry refuses to build it (raising ``PROVIDER_DISABLED``),
-regardless of configuration.
+This is a defence-in-depth check on top of ``Settings`` validation: even if a
+config somehow reaches here, the registry refuses a provider not permitted for the
+environment, and refuses the Swiss adapter in production-like environments without
+a recorded licensing decision. There is no silent fallback to ``fake``.
 """
 
 from __future__ import annotations
@@ -16,16 +16,27 @@ from .provider import AstrologyProvider
 
 def build_provider(settings: Settings) -> AstrologyProvider:
     provider = settings.astrology_provider
+    permitted = settings.permitted_providers()
+    if provider not in permitted:
+        raise DilChatError(
+            ErrorCode.PROVIDER_NOT_PERMITTED,
+            f"Provider {provider!r} is not permitted in environment "
+            f"{settings.environment.value!r} (permitted: {sorted(permitted) or 'none'}).",
+        )
+
     if provider == "fake":
+        # Never reachable in qa (without opt-in) / staging / production due to the
+        # permitted-set check above.
         return FakeAstrologyProvider()
+
     if provider == "swiss":
-        if not settings.environment.allows_dev_ephemeris:
+        if settings.environment.is_production_like and not settings.swiss_production_licensed:
             raise DilChatError(
-                ErrorCode.PROVIDER_DISABLED,
-                "Swiss Ephemeris is available only in development/test environments "
-                "in this phase (DEC-007 licensing boundary).",
+                ErrorCode.PROVIDER_NOT_PERMITTED,
+                "Swiss Ephemeris requires a recorded production-licensing decision "
+                "(swiss_production_licensed) in staging/production.",
             )
-        if not settings.enable_swiss_ephemeris:
+        if not settings.environment.is_production_like and not settings.enable_swiss_ephemeris:
             raise DilChatError(
                 ErrorCode.PROVIDER_DISABLED,
                 "Swiss Ephemeris is not enabled (set DILCHAT_ENABLE_SWISS_EPHEMERIS).",
@@ -36,4 +47,9 @@ def build_provider(settings: Settings) -> AstrologyProvider:
             mode=settings.swiss_ephemeris_mode,
             ephemeris_path=settings.swiss_ephemeris_path,
         )
-    raise DilChatError(ErrorCode.PROVIDER_DISABLED, f"Unknown astrology provider: {provider!r}")
+
+    raise DilChatError(ErrorCode.PROVIDER_NOT_PERMITTED, f"Unknown provider: {provider!r}")
+
+
+def is_real_provider(provider: AstrologyProvider) -> bool:
+    return getattr(provider, "provider_id", None) != "fake"

@@ -1,5 +1,7 @@
 # DilChat Backend — Data Model & Schema Design
 
+> **Hardening update (Phase A/B):** birth_profiles/natal_chart_snapshots gained uncertainty-interval, per-field status, and provider-safety columns; single-value natal columns are nullable (migration 9c2b82ab02d2). RLS added on all tables (a1b2c3d4e5f6). See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md` and Decision-Log DEC-029…DEC-035.
+
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Status of this document:** Design phase. **DESIGN-ONLY** — no production code, no
 migration files, no ORM classes. Schema is expressed as specification tables and

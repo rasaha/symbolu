@@ -44,10 +44,17 @@ async def test_register_login_profile_natal(ctx):
     natal = await ctx.client.post("/v1/natal/moon", headers=_hdr(auth))
     assert natal.status_code == 201, natal.text
     body = natal.json()
-    assert 0 <= body["rashi_index"] <= 11
-    assert 0 <= body["nakshatra_index"] <= 26
-    assert 1 <= body["pada"] <= 4
+    # EXACT input -> single-instant EXACT classifications.
+    assert body["moon_rashi"]["status"] == "EXACT"
+    assert 0 <= body["moon_rashi"]["value"] <= 11
+    assert body["moon_nakshatra"]["status"] == "EXACT"
+    assert body["moon_pada"]["status"] == "EXACT"
+    assert body["guna_eligibility"] == "ELIGIBLE"
     assert body["provenance"]["ayanamsa"] == "lahiri"
+    # Dev fake provider is synthetic and never authoritative.
+    assert body["synthetic_calculation"] is True
+    assert body["authoritative"] is False and body["test_only"] is True
+    assert body["utc_interval"]["start"] == body["utc_interval"]["end"]
 
     # Idempotent: recompute returns the same immutable snapshot.
     natal2 = await ctx.client.post("/v1/natal/moon", headers=_hdr(auth))
@@ -68,7 +75,7 @@ async def test_birth_profile_versioning(ctx):
     assert latest.json()["preferred_name"] == "Asha2"
 
 
-async def test_unknown_birth_time_low_confidence_and_no_instant(ctx):
+async def test_unknown_birth_time_is_interval_not_noon_chart(ctx):
     auth = await register_and_login(ctx.client)
     r = await _create_profile(
         ctx.client, auth, birth_time_local=None, birth_time_precision="UNKNOWN"
@@ -76,13 +83,47 @@ async def test_unknown_birth_time_low_confidence_and_no_instant(ctx):
     assert r.status_code == 201
     body = r.json()
     assert body["has_birth_time"] is False
-    assert body["utc_birth_instant"] is None
+    assert body["utc_birth_instant"] is None            # no fabricated instant
+    assert body["utc_interval"] is not None             # the whole civil day
+    assert body["uncertainty_minutes"] is None
     assert body["input_confidence"] == pytest.approx(0.2)
-    # Natal still computable but flagged with an explicit assumption.
+
+    # Natal is evaluated over the interval — NOT a single noon point estimate.
     natal = await ctx.client.post("/v1/natal/moon", headers=_hdr(auth))
     assert natal.status_code == 201
-    assert natal.json()["provenance"]["time_assumption"] == "ASSUMED_NOON_UTC_UNKNOWN_PRECISION"
-    assert natal.json()["provenance"]["input_confidence"] == pytest.approx(0.2)
+    nb = natal.json()
+    assert nb["utc_interval"]["start"] != nb["utc_interval"]["end"]
+    # Over a full day the nakshatra changes -> AMBIGUOUS; pada -> INDETERMINATE.
+    assert nb["moon_nakshatra"]["status"] in ("AMBIGUOUS", "STABLE")
+    assert nb["moon_pada"]["status"] in ("INDETERMINATE", "STABLE")
+    if nb["moon_nakshatra"]["status"] == "AMBIGUOUS":
+        assert len(nb["moon_nakshatra"]["possible_values"]) >= 2
+        assert nb["guna_eligibility"] == "INELIGIBLE_AMBIGUOUS_NAKSHATRA"
+        # No arbitrary single point estimate is presented as THE answer.
+        assert nb["moon_nakshatra"]["value"] is None
+
+
+async def test_approximate_requires_uncertainty_then_accepts(ctx):
+    auth = await register_and_login(ctx.client)
+    # Missing uncertainty_minutes for APPROXIMATE -> explicit error.
+    bad = await _create_profile(
+        ctx.client, auth, birth_time_precision="APPROXIMATE", uncertainty_minutes=None
+    )
+    assert bad.status_code == 422
+    assert bad.json()["code"] == "MISSING_APPROXIMATION_INTERVAL"
+    # With an explicit interval it is accepted and stored.
+    ok = await _create_profile(
+        ctx.client, auth, birth_time_precision="APPROXIMATE", uncertainty_minutes=20
+    )
+    assert ok.status_code == 201
+    assert ok.json()["uncertainty_minutes"] == 20
+    assert ok.json()["utc_interval"] is not None
+    natal = await ctx.client.post("/v1/natal/moon", headers=_hdr(auth))
+    assert natal.status_code == 201
+    nb = natal.json()
+    assert nb["utc_interval"]["start"] != nb["utc_interval"]["end"]
+    # Over +/-20 min the Moon moves < 0.5 deg -> pada usually stable, rashi stable.
+    assert nb["moon_rashi"]["status"] in ("STABLE", "AMBIGUOUS")
 
 
 async def test_ambiguous_time_requires_resolution_then_accepts(ctx):

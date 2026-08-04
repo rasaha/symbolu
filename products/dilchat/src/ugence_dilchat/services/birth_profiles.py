@@ -11,7 +11,7 @@ from ..config import Settings
 from ..domain.enums import AmbiguityResolution, AuditAction, BirthTimePrecision
 from ..infrastructure.orm import BirthProfile
 from ..repositories.birth_profiles import BirthProfileRepository
-from .birthtime import compute_birth_instant
+from .birthtime import compute_birth_interval
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,7 @@ class BirthProfileInput:
     longitude: float
     iana_timezone: str
     ambiguity_resolution: AmbiguityResolution | None = None
+    uncertainty_minutes: int | None = None  # required for APPROXIMATE
 
 
 class BirthProfileService:
@@ -42,12 +43,13 @@ class BirthProfileService:
     async def create_or_version(
         self, user_id: uuid.UUID, data: BirthProfileInput, correlation_id: str | None = None
     ) -> BirthProfile:
-        instant = compute_birth_instant(
+        interval = compute_birth_interval(
             birth_date=data.birth_date,
             birth_time_local=data.birth_time_local,
             precision=data.birth_time_precision,
             iana_timezone=data.iana_timezone,
             ambiguity_resolution=data.ambiguity_resolution,
+            uncertainty_minutes=data.uncertainty_minutes,
         )
         confidence = self._settings.confidence_for_precision(data.birth_time_precision.value)
 
@@ -69,8 +71,12 @@ class BirthProfileService:
             latitude=data.latitude,
             longitude=data.longitude,
             iana_timezone=data.iana_timezone,
-            utc_birth_instant=instant.utc_instant,
+            # utc_birth_instant is set only for EXACT (single instant).
+            utc_birth_instant=interval.utc_start if interval.is_exact else None,
             input_confidence=confidence,
+            uncertainty_minutes=interval.uncertainty_minutes,
+            utc_interval_start=interval.utc_start,
+            utc_interval_end=interval.utc_end,
         )
         await self._profiles.add(profile)
         await self._audit.record(

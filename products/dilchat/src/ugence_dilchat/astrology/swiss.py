@@ -83,6 +83,8 @@ class SwissEphemerisProvider:
             fallback_used=False,  # explicit mode; never a silent fallback
             fallback_reason=None,
             input_confidence=input_confidence,
+            provider_kind="REAL",
+            synthetic_calculation=False,
             time_assumption=time_assumption,
         )
         trace = {

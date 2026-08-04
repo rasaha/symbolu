@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..audit.service import AuditService
+from ..db import set_transaction_context
 from ..domain.enums import AuditAction, AuthzOutcome, Scope
 from ..repositories.couples import MembershipRepository
 from ..security.scope import authorize_job_write
@@ -34,6 +35,10 @@ async def run_shared_write_job(
     """Run ``write_fn`` only if the actor still has active membership at write time."""
     async with sessionmaker() as session:
         try:
+            # A worker sets its OWN actor + scope context before touching data (DEC-030).
+            await set_transaction_context(
+                session, user_id=actor_user_id, actor_type="worker", couple_id=couple_id
+            )
             memberships = MembershipRepository(session)
             fact = await memberships.membership_fact(
                 couple_id=couple_id, user_id=actor_user_id

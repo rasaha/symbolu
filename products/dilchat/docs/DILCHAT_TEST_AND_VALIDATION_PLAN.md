@@ -1,5 +1,7 @@
 # DilChat — Test & Validation Plan
 
+> **Hardening update (Phase A/B):** Added: interval/uncertainty tests, exact-boundary tests, provider-policy tests, non-owner RLS tests, and the REGRESSION vs INDEPENDENT_REFERENCE fixture split (DEC-035; independent validation is PENDING/XFAIL). See `DILCHAT_PHASE_A_B_HARDENING_REPORT.md` and Decision-Log DEC-029…DEC-035.
+
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Document type:** Test & Validation Plan (design phase — DESIGN ONLY, no test code)
 **Status:** Draft for review · **Owner:** Principal QA / Validation Engineer
