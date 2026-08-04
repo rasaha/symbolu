@@ -57,24 +57,36 @@ class ScalingExecutor(Protocol):
     def apply(self, recommendation: ScalingRecommendation) -> ExecutionReceipt: ...
 ```
 
-Version 0.1.0 ships **no** production write-capable executor wired to the advisory
-core, and calls **no** executor automatically.
+Version 0.1.1 ships **no** concrete executor at all. `ScalingExecutor` is an inert
+`Protocol` (no implementation in the wheel), the facade never instantiates or invokes
+one, and the CLI cannot supply one. There is no code in the wheel capable of applying
+a recommendation.
 
 ## Optional read-only adapters (opt-in extras)
 
-Existing Prometheus ingest, Kubernetes HPA/state watching (shadow mode), and
-OpenTelemetry export are retained as **optional** adapters behind extras
-(`[prometheus]`, `[shadow]`, `[otel]`). They import their SDKs lazily, are never on
-the advisory import path, and are never invoked by `CloudScalingController` or the
-CLI. Enabling them is an explicit, separately-authorized decision.
+The read-only Prometheus signal adapter (`signals/prometheus.py`, HTTP GET) and the
+read-only shadow HPA/state watcher (`shadow/hpa_watcher.py`, which reads via the
+Prometheus client / kube-state-metrics — **not** the Kubernetes SDK) are the only
+optional integrations, behind the `[prometheus]` / `[shadow]` extras. Both need only
+`requests`. They import it lazily, are never on the advisory import path, and are
+never invoked by `CloudScalingController` or the CLI. No Kubernetes/AWS/Azure/GCP SDK
+is a dependency of this distribution.
 
-### Note on legacy operational modules
+## Execution/operations code is NOT in this distribution
 
-The package source retains the controller's pre-existing operational modules
-(`action/`, `orchestrator.py`, `main.py`, `recommend/webhook.py`) so the verified
-behavior and the full regression suite are preserved. These are **not** part of the
-advisory public API, are never imported by the facade/CLI/default import path, and
-require optional extras to function. In particular `action/k8s_actuator.py` is a
-pre-existing, opt-in module that requires the `shadow` extra's `kubernetes` SDK; it
-is **not** wired to or invoked by the capability. No infrastructure-write path was
-**added** in this packaging phase.
+The controller's execution, approval, orchestration, live-telemetry and live-shadow
+modules — `action/` (K8s + gate actuators, rollback), `orchestrator.py`, `main.py`,
+`recommend/{engine,approval,webhook}.py`, `observability/{metrics_server,exporter,
+otel_exporter}.py`, `shadow/{runner,live_efficiency}.py` — were **moved out of the
+wheel** into the monorepo-only `cloud_scaling_operations` namespace. They are:
+
+- **MONOREPO-ONLY** — not packaged, not on PyPI, not importable from a wheel install;
+- **NOT a stable distributed API**;
+- **legacy/research operations code** pending separate packaging, review and
+  governance (a future `ugence-cloud-scaling-operations` distribution).
+
+The advisory package never imports `cloud_scaling_operations`; the dependency is
+strictly `cloud_scaling_operations → ugence_cloud_scaling_controller`. The
+distribution verifier opens every packaged `.py` and fails on any actuator, approver,
+orchestrator, mutation call, or concrete executor. No infrastructure-write path is
+shipped or was added.
