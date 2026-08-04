@@ -156,6 +156,8 @@ jobs:
             || { echo "FAIL: postgres-marked tests were not collected (env/service missing?)"; exit 1; }
       - name: Full DilChat test suite (strict markers, JUnit)
         run: |
+          # pipefail so a pytest failure fails the step (tee must not mask it).
+          set -o pipefail
           pytest --strict-markers -ra --junitxml="${RUNNER_TEMP}/dilchat-junit.xml" -q \
             | tee "${RUNNER_TEMP}/dilchat-pytest.txt"
       - name: Guard — no unexpected skips/xfails were introduced

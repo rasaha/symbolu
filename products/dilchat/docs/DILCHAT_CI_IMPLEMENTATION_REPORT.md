@@ -122,6 +122,28 @@ From `products/dilchat` (clean environment):
   Astropy/ERFA fixtures (astropy is **not** installed at runtime — the fixtures are
   frozen). No ephemeris files or copyrighted data are committed or uploaded.
 
+## CI bring-up corrections (first real run)
+
+The first GitHub Actions run surfaced two genuine defects, both fixed (no gate
+weakened):
+
+1. **RLS / SECURITY DEFINER tests could not connect on CI.** Their raw-asyncpg
+   `_dsn()` helper read the host only from the URL query string (defaulting to the
+   `/tmp` Unix socket) and ignored the TCP netloc host/port/password. With the CI
+   service URL (`…@localhost:5432/…`) they fell back to a nonexistent socket and
+   raised `FileNotFoundError`. Fixed in `tests/security/test_rls.py` and
+   `tests/security/test_security_definer.py`: `_dsn()` now honours the netloc
+   host/port/password with the query params still taking precedence (so the local
+   socket-style URL is unchanged). This is a test-support fix — no model,
+   migration, or app behaviour changed.
+2. **`pytest | tee` masked failures.** The step ran under `bash -e {0}` (no
+   `pipefail`), so `tee`'s exit 0 hid pytest's non-zero exit and the job went green
+   despite 14 failing tests. Fixed by `set -o pipefail` in the test step, so a test
+   failure now fails the job.
+
+Both were verified locally against a TCP (netloc) PostgreSQL URL — the CI-shaped
+scenario — yielding **197 passed, 0 skipped**.
+
 ## Known limitations
 
 - The three jobs each install the package independently (no shared build cache
