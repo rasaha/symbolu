@@ -1,0 +1,81 @@
+{
+  "module_name": "cloud-scaling-operations",
+  "distribution_name": "ugence-cloud-scaling-operations",
+  "import_namespace": "ugence_cloud_scaling_operations",
+  "version": "0.1.0",
+  "maturity": "alpha",
+  "authority_class": "CONTROLLED_EXECUTION",
+  "execution_capability": "INFRASTRUCTURE_MUTATION",
+  "advisory_only": false,
+  "contains_concrete_executor": true,
+  "requires_external_authorization": true,
+  "live_execution_enabled_by_default": false,
+  "default_execution_mode": "dry_run",
+  "cloud_credentials_required": false,
+  "core_network_required": false,
+  "production_certified": false,
+  "live_cluster_validated": false,
+  "core_dependencies": [
+    "ugence-cloud-scaling-controller>=0.1.1,<0.2"
+  ],
+  "advisory_dependency_range": ">=0.1.1,<0.2",
+  "optional_dependencies": {
+    "kubernetes": ["kubernetes>=26.1.0"],
+    "metrics": ["prometheus-client>=0.16.0"],
+    "otel": ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"],
+    "config": ["PyYAML>=6.0"],
+    "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+  },
+  "execution_modes": ["dry_run", "simulation", "shadow", "live"],
+  "mutation_entrypoints": [
+    "ugence_cloud_scaling_operations.executors.ControlledScalingExecutor.execute (LIVE)",
+    "ugence_cloud_scaling_operations.gate_executor.GateExecutor.sync (LIVE)"
+  ],
+  "public_api": [
+    "ExecutionAuthorization", "ExecutionRequest", "ExecutionResult", "ExecutionReceipt",
+    "ExecutionDenied", "ExecutionIntegrityError", "ExecutionMode",
+    "ControlledScalingExecutor", "KubernetesScalingExecutor", "GateExecutor",
+    "RollbackCoordinator", "ReadinessEvaluator", "OutcomeRecorder",
+    "OperationsConfig", "TargetPolicy", "AuthorityVerifier", "IdempotencyStore",
+    "AuditSink", "__version__"
+  ],
+  "authority_model": {
+    "state_transitions": [
+      "ADVISORY_RECOMMENDATION", "POLICY_AND_SAFETY_EVALUATION",
+      "HUMAN_OR_EXTERNAL_GOVERNANCE_APPROVAL", "EXECUTION_AUTHORIZATION",
+      "READINESS_CHECK", "CONTROLLED_EXECUTION", "OUTCOME_AND_AUDIT"
+    ],
+    "prohibited_paths": [
+      "recommendation -> direct actuator call",
+      "confidence threshold -> automatic mutation",
+      "internal auto-approval -> production execution",
+      "webhook receipt -> mutation without authorization",
+      "orchestrator tick -> mutation without authorization"
+    ],
+    "auto_approval_disposition": "auto_approve_threshold is refused when it would drive a non-dry-run actuator (hard runtime guard in the orchestrator); the supported live path (ControlledScalingExecutor) requires a separate external ExecutionAuthorization."
+  },
+  "legacy_imports": {
+    "monorepo_only": [
+      "cloud_scaling_operations.*",
+      "cloud_controller.action.*", "cloud_controller.orchestrator", "cloud_controller.main",
+      "cloud_controller.recommend.engine", "cloud_controller.recommend.approval",
+      "cloud_controller.recommend.webhook",
+      "symbolu.cloud_controller.action.*", "symbolu.cloud_controller.orchestrator"
+    ],
+    "note": "Legacy operational namespaces are monorepo-only compatibility surfaces (object identity preserved); not part of the distributed wheel and not a stable API."
+  },
+  "forbidden_core_dependencies": [
+    "kubernetes", "boto3", "botocore", "azure", "google-cloud",
+    "prometheus-client", "opentelemetry-sdk", "fastapi", "uvicorn"
+  ],
+  "reference_store_limitations": "InMemoryIdempotencyStore and InMemoryAuditSink are process-local reference implementations; they are NOT durable and NOT sufficient for multi-process production deployment.",
+  "known_limitations": [
+    "Contains infrastructure-mutation capability; installation alone does not authorize execution.",
+    "Dry-run is default; LIVE requires external authorization, target allowlists, credentials, readiness, audit sink, and idempotency storage.",
+    "In-memory idempotency/audit stores are not production-durable; exactly-once across distributed processes is NOT guaranteed.",
+    "Not live-cluster validated; not production certified. No cost/reliability/safety claim established by packaging tests.",
+    "Kubernetes/ArgoCD/webhook/metrics/OTLP integrations may require optional extras or injected clients."
+  ],
+  "provenance_policy": "Build revision generated at build/verification time from GITHUB_SHA or `git rev-parse HEAD` into artifacts/build_provenance.json (CI-generated). No self-referential commit SHA is stored here.",
+  "source_baseline_commit": "379a6366894fd2eead9460c29f4865fb1c3990de"
+}

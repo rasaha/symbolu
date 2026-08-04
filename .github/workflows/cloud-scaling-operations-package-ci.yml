@@ -1,0 +1,121 @@
+name: cloud-scaling-operations-package-ci
+
+# Scoped CI for the controlled-execution Cloud Scaling Operations package. This package
+# is execution-capable, so CI proves the authority boundary, not advisory-only-ness.
+# No real cluster credentials are used and no external infrastructure is mutated: all
+# execution tests use local fakes.
+
+on:
+  push:
+    paths:
+      - "packages/capabilities/cloud-scaling-operations/**"
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - "cloud_scaling_operations/**"
+      - "cloud_controller/**"
+      - "symbolu/__init__.py"
+      - "tests/cloud_controller/**"
+      - "conftest.py"
+      - ".github/workflows/cloud-scaling-operations-package-ci.yml"
+  pull_request:
+    paths:
+      - "packages/capabilities/cloud-scaling-operations/**"
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - "cloud_scaling_operations/**"
+      - "cloud_controller/**"
+      - "symbolu/__init__.py"
+      - "tests/cloud_controller/**"
+      - "conftest.py"
+      - ".github/workflows/cloud-scaling-operations-package-ci.yml"
+
+jobs:
+  cloud-scaling-operations-package:
+    runs-on: ubuntu-latest
+    env:
+      OPS: packages/capabilities/cloud-scaling-operations
+      ADV: packages/capabilities/cloud-scaling-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip build pytest pip-audit numpy
+
+      - name: Byte-compile (syntax) check
+        run: python -m py_compile $(git ls-files "$OPS/src" | grep '\.py$')
+
+      - name: Forbidden-import scan (core imports no cloud SDK at top level)
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          src = pathlib.Path("packages/capabilities/cloud-scaling-operations/src/ugence_cloud_scaling_operations")
+          forbidden_top = {"boto3","botocore","azure","kubernetes","prometheus_client",
+                           "opentelemetry","yaml","fastapi","uvicorn","flask"}
+          bad = []
+          for p in src.rglob("*.py"):
+              for node in ast.parse(p.read_text()).body:
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      mods = [node.module.split(".")[0]]
+                  bad += [f"{p}: {m}" for m in mods if m in forbidden_top]
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("forbidden-import scan clean")
+          PY
+
+      - name: Operations package tests (authority / execution / modes / security)
+        run: python -m pytest "$OPS/tests" -q
+
+      - name: Advisory-boundary regression (advisory stays advisory-only)
+        run: python -m pytest "$ADV/tests" -q
+
+      - name: Existing Cloud Scaling regression (legacy identity intact)
+        run: python -m pytest tests/cloud_controller -q
+
+      - name: Build wheel + sdist
+        run: python -m build "$OPS" -o "$OPS/dist"
+
+      - name: Clean-environment distribution verifier
+        run: python "$OPS/verify_cloud_scaling_operations_distribution.py"
+
+      - name: CLI smoke (non-mutating default)
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys, os
+          src = "packages/capabilities/cloud-scaling-operations/src"
+          adv = "packages/capabilities/cloud-scaling-controller/src"
+          def run(args, **kw):
+              return subprocess.run([sys.executable, "-m",
+                  "ugence_cloud_scaling_operations.cli", *args],
+                  env={"PYTHONPATH": os.pathsep.join([src, adv]), "PATH": os.environ["PATH"]},
+                  capture_output=True, text=True, **kw)
+          v = run(["version"]); assert v.returncode == 0 and "0.1.0" in v.stdout, v.stderr
+          i = run(["inspect-capabilities"]); assert "INFRASTRUCTURE_MUTATION" in i.stdout, i.stderr
+          e = run(["execute"]); assert e.returncode != 0, "execute must not mutate by default"
+          print("CLI smoke OK")
+          PY
+
+      - name: pip check + pip-audit (installed runtime closure)
+        run: |
+          python -m build "$ADV" -o "$OPS/dist"
+          python -m venv /tmp/cso-audit
+          /tmp/cso-audit/bin/python -m pip install --quiet --find-links "$OPS/dist" ugence-cloud-scaling-operations
+          /tmp/cso-audit/bin/python -m pip check
+          /tmp/cso-audit/bin/python -m pip freeze \
+            | grep -ivE "^(pip|setuptools|wheel|ugence-cloud-scaling-operations|ugence-cloud-scaling-controller)==" \
+            > /tmp/cso-reqs.txt
+          echo "auditing runtime closure:" && cat /tmp/cso-reqs.txt
+          python -m pip_audit -r /tmp/cso-reqs.txt
+
+      - name: Upload evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-operations-evidence
+          path: |
+            packages/capabilities/cloud-scaling-operations/artifacts/*.json
+            packages/capabilities/cloud-scaling-operations/dist/*
+          if-no-files-found: warn

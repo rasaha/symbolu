@@ -137,12 +137,13 @@ def test_scaling_executor_is_inert_protocol():
 
 
 def test_operations_namespace_absent_or_one_directional(monkeypatch):
-    # If the monorepo operations namespace is importable, it MUST depend on the
-    # advisory package (one-directional); the advisory package never imports it.
+    # If the canonical operations package is importable, it MUST depend on the advisory
+    # package (one-directional); the advisory package never imports it.
     import importlib.util
-    if importlib.util.find_spec("cloud_scaling_operations") is None:
-        pytest.skip("operations namespace not on path (wheel-only environment)")
-    ops_dir = pathlib.Path(importlib.util.find_spec("cloud_scaling_operations").origin).parent
+    spec = importlib.util.find_spec("ugence_cloud_scaling_operations")
+    if spec is None:
+        pytest.skip("operations package not on path (wheel-only environment)")
+    ops_dir = pathlib.Path(spec.origin).parent
     imports_advisory = any(
         "ugence_cloud_scaling_controller" in p.read_text()
         for p in ops_dir.rglob("*.py")

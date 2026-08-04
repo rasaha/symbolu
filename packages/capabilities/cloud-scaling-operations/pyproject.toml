@@ -1,0 +1,70 @@
+# Independent distribution for the controlled-execution Cloud Scaling Operations layer.
+#
+# UNLIKE the advisory wheel (ugence-cloud-scaling-controller, execution_capability
+# NONE), this package CONTAINS concrete infrastructure-mutation capability: in LIVE
+# mode with credentials and an explicit external ExecutionAuthorization it can patch
+# Kubernetes deployment scale and trigger ArgoCD syncs. Dry-run is the default runtime
+# mode — a mode, not an absence of capability.
+#
+# Authority model: every mutation requires an immutable ExecutionAuthorization minted
+# by an external authority; a recommendation/approval/confidence score is never
+# sufficient. All mutation paths fail closed.
+#
+# Dependency direction: this package depends on the advisory package; the advisory
+# package never depends on this one. The advisory implementation is NOT vendored.
+#
+# Build:  python -m build packages/capabilities/cloud-scaling-operations
+# Verify: python packages/capabilities/cloud-scaling-operations/verify_cloud_scaling_operations_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-operations"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Operations — controlled, authority-gated execution (Kubernetes/ArgoCD) for cloud scaling. Execution-capable; dry-run by default; mutation requires external authorization."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["scaling", "kubernetes", "argocd", "controlled-execution", "authorization", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Core dependency: the advisory recommendation package (one-directional). It transitively
+# provides numpy. No cloud SDK is a core dependency — dry-run/simulation/import need none.
+dependencies = [
+    "ugence-cloud-scaling-controller>=0.1.1,<0.2",
+]
+
+[project.optional-dependencies]
+# Real Kubernetes SDK — only needed to construct a live AppsV1Api client for LIVE mode.
+kubernetes = ["kubernetes>=26.1.0"]
+# Prometheus metrics export.
+metrics = ["prometheus-client>=0.16.0"]
+# OpenTelemetry export.
+otel = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"]
+# YAML config loading for the legacy orchestrator entrypoint.
+config = ["PyYAML>=6.0"]
+all = [
+    "kubernetes>=26.1.0",
+    "prometheus-client>=0.16.0",
+    "opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0",
+    "PyYAML>=6.0",
+]
+dev = ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+
+[project.scripts]
+ugence-cloud-scaling-operations = "ugence_cloud_scaling_operations.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_operations.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_operations*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_operations = ["py.typed"]
