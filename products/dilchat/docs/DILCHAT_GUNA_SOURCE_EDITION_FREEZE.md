@@ -119,3 +119,17 @@ Until then the pack is `draft: true`, `executable: false`, `authority_gate: "BLO
 - `rules/ashtakoota_muhurta_chintamani_raman_v1/source_traceability.json` — per-rule source mapping.
 - `docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md` — human-readable rule → source matrix.
 - `docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md` — reviewer package and sign-off template.
+
+---
+
+## Update — Source-material gate: `SOURCE_MATERIAL_REQUIRED`
+
+No source has moved toward `FROZEN`. In this environment no source pages are
+lawfully available (bibliographic metadata only; Internet Archive content
+403-blocked; no purchase/library/archive/user-provided pages), so rule adjudication
+is not performed. A new status `ACQUIRED_PENDING_TEXT_VERIFICATION` is added to the
+manifest for the point at which a lawful copy is in hand (provenance recorded via
+`scripts/source_intake.py`) but the text is not yet reviewer-verified — this is
+**still not frozen**. All four sources remain `EDITION_IDENTIFIED_NOT_ACQUIRED`;
+overall status stays `PENDING_ACQUISITION`. See
+`DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md` for the acquisition checklist.

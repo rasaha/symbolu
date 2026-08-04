@@ -797,3 +797,26 @@ Classical Ashtakoota assumes bride/groom roles. The methodology for same-sex or
 role-neutral couples is undefined and must not be faked as a symmetric classical
 result. Options: explicit role selection, a separate clearly-labelled
 DilChat-derived method, or deferral. Tracked as FD-3.
+
+## DEC-047 — Authority branch refreshed; SOURCE_MATERIAL_REQUIRED gate
+**Status:** Accepted (integration) · **BLOCKED (authority)** · **[Traditional Vedic rule]** · **[Technical]**
+
+The `dilchat-guna-domain-authority` branch (stranded on the older baseline
+`36d2a340` with zero unique commits) was recreated by fast-forward from the current
+default tip `e852812b` so Guna-authority work starts from the latest baseline
+(DilChat CI merged and green; baseline gate 197 passed / 0 skipped).
+
+The Guna Source Acquisition & Qualified Domain Adjudication phase requires **actual
+source text**, which is **not lawfully available** in this environment (bibliographic
+metadata only; Internet Archive content 403-blocked; no purchase/library/archive/
+user-provided pages). Gate verdict: **`SOURCE_MATERIAL_REQUIRED`** — no rule was
+adjudicated, no source was frozen, no reviewer was fabricated; every Koota/conflict/
+manual case stays at its prior honest PENDING/BLOCKED/CONFLICT status. A sanitized
+local-source intake tool (`scripts/source_intake.py`, tested) records provenance
+(SHA-256 + edition identity) for a lawful copy **without** committing the file or
+leaking its path (`ACQUIRED_PENDING_TEXT_VERIFICATION`, never FROZEN). The four
+verdicts are unchanged: VALIDATION_INFRASTRUCTURE_COMPLETE /
+ASTRONOMY_VALIDATION_PASS_WITH_BOUNDARY_CONDITIONS /
+GUNA_AUTHORITY_VALIDATION_BLOCKED / RULE_PACK_BLOCKED. Next action: obtain frozen
+source editions + qualified reviewer input; do not implement the Guna engine. See
+`DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`.

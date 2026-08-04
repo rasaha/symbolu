@@ -108,3 +108,41 @@ After the rule pack reaches `RULE_PACK_READY` or
 implement the internal deterministic classical Guna Milan engine and shared
 compatibility report using **only** domain-approved rules. **Do not** begin that
 engine now.
+
+---
+
+## Guna Source Acquisition & Qualified Domain Adjudication phase — update
+
+**Repository integration.** The `dilchat-guna-domain-authority` branch (previously
+stranded on the older baseline `36d2a340`, zero unique commits) was recreated by
+fast-forward from the current default tip `e852812b`, so authority work starts from
+the latest baseline (DilChat CI merged and green). No unique work was lost.
+
+**Baseline gate (refreshed branch):** ruff clean · mypy clean (53 files) · **197
+passed / 0 skipped** · migration up/down/up clean, single head `b2c3d4e5f6a7` · RLS +
+SECURITY DEFINER · independent astronomy · rule-pack validator PASS · no-Guna guard ·
+`RULE_PACK_BLOCKED` / `executable:false` / provider-licensing guards — all green.
+
+**Source-material gate: `SOURCE_MATERIAL_REQUIRED`.** No source pages are lawfully
+available in this environment (bibliographic metadata only; Internet Archive content
+403-blocked). Per the phase rules, **no rule was adjudicated**; no source was frozen;
+no reviewer was fabricated. A sanitized local-source intake tool
+(`scripts/source_intake.py`, tested) is provided for lawful acquisition, and an exact
+acquisition checklist is recorded in `DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`.
+
+### Four verdicts (unchanged this phase)
+
+| Axis | Verdict |
+|------|---------|
+| Technical validation | **`VALIDATION_INFRASTRUCTURE_COMPLETE`** |
+| Astronomy | **`ASTRONOMY_VALIDATION_PASS_WITH_BOUNDARY_CONDITIONS`** |
+| Guna authority | **`GUNA_AUTHORITY_VALIDATION_BLOCKED`** |
+| Rule pack | **`RULE_PACK_BLOCKED`** |
+
+Guna authority and the rule pack remain **BLOCKED** because source pages are
+unavailable, no exact edition is frozen, the four source conflicts (Vashya, Yoni,
+Gana, Bhakoot) are unresolved, page/verse traceability is incomplete, manual cases
+are pending, and qualified domain-reviewer sign-off is absent.
+
+**Exact next action:** *Obtain the frozen source editions and qualified reviewer
+input. Do not implement the Guna engine.*
