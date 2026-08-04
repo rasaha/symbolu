@@ -6,8 +6,8 @@ Prometheus text exposition from a MetricsExporter instance.
 Zero external dependencies — uses http.server from the standard library.
 
 Usage:
-    from cloud_scaling_operations.observability.exporter import MetricsExporter
-    from cloud_scaling_operations.observability.metrics_server import MetricsServer
+    from ugence_cloud_scaling_operations.observability.exporter import MetricsExporter
+    from ugence_cloud_scaling_operations.observability.metrics_server import MetricsServer
 
     exporter = MetricsExporter()
     server = MetricsServer(exporter, MetricsServerConfig(port=9090))
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional
 
-from cloud_scaling_operations.observability.exporter import MetricsExporter
+from ugence_cloud_scaling_operations.observability.exporter import MetricsExporter
 
 logger = logging.getLogger(__name__)
 

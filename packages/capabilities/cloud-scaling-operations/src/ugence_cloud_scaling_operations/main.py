@@ -15,23 +15,23 @@ from typing import Any, Dict, Optional
 
 from ugence_cloud_scaling_controller.config import InfraControllerConfig
 from ugence_cloud_scaling_controller.controller import Controller
-from cloud_scaling_operations.observability.exporter import (
+from ugence_cloud_scaling_operations.observability.exporter import (
     ExporterConfig,
     ExporterMode,
 )
-from cloud_scaling_operations.observability.metrics_server import MetricsServerConfig
-from cloud_scaling_operations.observability.otel_exporter import OtelExporterConfig
-from cloud_scaling_operations.orchestrator import (
+from ugence_cloud_scaling_operations.observability.metrics_server import MetricsServerConfig
+from ugence_cloud_scaling_operations.observability.otel_exporter import OtelExporterConfig
+from ugence_cloud_scaling_operations.orchestrator import (
     OrchestratorConfig,
     ProductionOrchestrator,
 )
 from ugence_cloud_scaling_controller.signals.pipeline import PipelineConfig
 from ugence_cloud_scaling_controller.signals.prometheus import PrometheusConfig
-from cloud_scaling_operations.recommend.engine import RecommendConfig
+from ugence_cloud_scaling_operations.recommend.engine import RecommendConfig
 from ugence_cloud_scaling_controller.recommend.confidence import ConfidenceConfig
 from ugence_cloud_scaling_controller.recommend.safety import SafetyConfig
-from cloud_scaling_operations.action.k8s_actuator import ActuatorConfig, ActuatorMode
-from cloud_scaling_operations.action.feedback import FeedbackConfig
+from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorConfig, ActuatorMode
+from ugence_cloud_scaling_operations.action.feedback import FeedbackConfig
 
 logger = logging.getLogger("ncc")
 
@@ -227,7 +227,7 @@ def _setup_logging(level_str: str) -> None:
 
 def _run_shadow(config: Dict[str, Any], args: argparse.Namespace) -> None:
     """Run in shadow mode — compare controller vs HPA without scaling."""
-    from cloud_scaling_operations.shadow.runner import ShadowConfig, ShadowRunner
+    from ugence_cloud_scaling_operations.shadow.runner import ShadowConfig, ShadowRunner
 
     target = config.get("target", {})
     ns = args.namespace or target.get("namespace", "default")

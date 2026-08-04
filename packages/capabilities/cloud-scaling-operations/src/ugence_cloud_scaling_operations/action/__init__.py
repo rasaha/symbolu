@@ -9,45 +9,45 @@ Modules:
   - OutcomeTracker: Post-action metric evaluation for learning feedback
 """
 
-from cloud_scaling_operations.action.k8s_actuator import (
+from ugence_cloud_scaling_operations.action.k8s_actuator import (
     ActuatorConfig,
     ActuatorMode,
     ExecutionResult,
     K8sActuator,
 )
-from cloud_scaling_operations.action.gate_actuator import (
+from ugence_cloud_scaling_operations.action.gate_actuator import (
     GateAction,
     GateConfig,
     GateMode,
     GateResult,
     GateActuator,
 )
-from cloud_scaling_operations.action.rollback import (
+from ugence_cloud_scaling_operations.action.rollback import (
     RollbackConfig,
     RollbackMonitor,
     RollbackVerdict,
     RollbackWatch,
 )
-from cloud_scaling_operations.action.policy import (
+from ugence_cloud_scaling_operations.action.policy import (
     BlackoutWindow,
     DeploymentPolicy,
     PolicyCheckResult,
     PolicyConfig,
     PolicyEngine,
 )
-from cloud_scaling_operations.action.readiness import (
+from ugence_cloud_scaling_operations.action.readiness import (
     ReadinessChecker,
     ReadinessConfig,
     ReadinessResult,
     ReadinessStatus,
 )
-from cloud_scaling_operations.action.outcome import (
+from ugence_cloud_scaling_operations.action.outcome import (
     OutcomeConfig,
     OutcomeRecord,
     OutcomeTracker,
     OutcomeVerdict,
 )
-from cloud_scaling_operations.action.feedback import (
+from ugence_cloud_scaling_operations.action.feedback import (
     FeedbackAdjustment,
     FeedbackConfig,
     FeedbackCycleResult,

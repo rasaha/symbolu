@@ -40,18 +40,18 @@ from ugence_cloud_scaling_controller.signals.pipeline import (
     PipelineConfig,
     CycleResult,
 )
-from cloud_scaling_operations.recommend.engine import (
+from ugence_cloud_scaling_operations.recommend.engine import (
     RecommendEngine,
     RecommendConfig,
     RecommendCycleResult,
 )
-from cloud_scaling_operations.recommend.approval import Recommendation
+from ugence_cloud_scaling_operations.recommend.approval import Recommendation
 from ugence_cloud_scaling_controller.explain.explainer import (
     Explainer,
     Explanation,
     Audience,
 )
-from cloud_scaling_operations.observability.exporter import (
+from ugence_cloud_scaling_operations.observability.exporter import (
     MetricsExporter,
     ExporterConfig,
 )
@@ -59,11 +59,11 @@ from ugence_cloud_scaling_controller.observability.decision_log import (
     DecisionLogFormatter,
     DecisionLogEntry,
 )
-from cloud_scaling_operations.observability.metrics_server import (
+from ugence_cloud_scaling_operations.observability.metrics_server import (
     MetricsServer,
     MetricsServerConfig,
 )
-from cloud_scaling_operations.observability.otel_exporter import (
+from ugence_cloud_scaling_operations.observability.otel_exporter import (
     OtelExporter,
     OtelExporterConfig,
 )
@@ -161,6 +161,24 @@ class ProductionOrchestrator:
 
         # L4-L5: Recommend + Execute
         self.recommend_engine = RecommendEngine(self.config.recommend)
+
+        # HARD AUTHORITY GUARD: the recommendation engine must never mint its own
+        # execution authority. Auto-approval may only ever drive a non-mutating
+        # (dry-run) actuator. A live actuator combined with auto-approval is refused at
+        # construction. Authorized live mutation must go through the supported
+        # ControlledScalingExecutor path, which requires an external ExecutionAuthorization.
+        if self.config.auto_approve_threshold is not None:
+            actuator = getattr(self.recommend_engine, "actuator", None)
+            if actuator is not None:
+                from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorMode
+                if getattr(actuator.config, "mode", None) != ActuatorMode.DRY_RUN:
+                    raise RuntimeError(
+                        "auto_approve_threshold may not drive a live actuator: an "
+                        "auto-approved recommendation cannot authorize its own mutation. "
+                        "Use ControlledScalingExecutor with an external "
+                        "ExecutionAuthorization for live scaling, or set the actuator to "
+                        "DRY_RUN for autonomous simulation."
+                    )
 
         # L6: Observability
         self.explainer = Explainer()

@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 from ugence_cloud_scaling_controller.controller import ActionResult
 from ugence_cloud_scaling_controller.recommend.confidence import ConfidenceResult
 from ugence_cloud_scaling_controller.recommend.safety import SafetyResult
-from cloud_scaling_operations.action.k8s_actuator import ExecutionResult
+from ugence_cloud_scaling_operations.action.k8s_actuator import ExecutionResult
 
 logger = logging.getLogger(__name__)
 

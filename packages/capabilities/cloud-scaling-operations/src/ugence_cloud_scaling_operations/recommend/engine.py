@@ -40,37 +40,37 @@ from ugence_cloud_scaling_controller.recommend.safety import (
     SafetyBounds,
     SafetyResult,
 )
-from cloud_scaling_operations.recommend.webhook import (
+from ugence_cloud_scaling_operations.recommend.webhook import (
     WebhookConfig,
     WebhookDispatcher,
 )
-from cloud_scaling_operations.recommend.approval import (
+from ugence_cloud_scaling_operations.recommend.approval import (
     ApprovalManager,
     ApprovalState,
     Recommendation,
 )
-from cloud_scaling_operations.action.k8s_actuator import (
+from ugence_cloud_scaling_operations.action.k8s_actuator import (
     ActuatorConfig,
     ExecutionResult,
     K8sActuator,
 )
-from cloud_scaling_operations.action.policy import (
+from ugence_cloud_scaling_operations.action.policy import (
     PolicyConfig,
     PolicyEngine,
 )
-from cloud_scaling_operations.action.rollback import (
+from ugence_cloud_scaling_operations.action.rollback import (
     RollbackConfig,
     RollbackMonitor,
 )
-from cloud_scaling_operations.action.outcome import (
+from ugence_cloud_scaling_operations.action.outcome import (
     OutcomeConfig,
     OutcomeTracker,
 )
-from cloud_scaling_operations.action.readiness import (
+from ugence_cloud_scaling_operations.action.readiness import (
     ReadinessChecker,
     ReadinessConfig,
 )
-from cloud_scaling_operations.action.feedback import (
+from ugence_cloud_scaling_operations.action.feedback import (
     FeedbackConfig,
     FeedbackLoop,
 )
