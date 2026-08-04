@@ -1,0 +1,10 @@
+{
+  "schema": "bindingslots_persistence/integrity_report/v1",
+  "checks": 52,
+  "failures": [],
+  "verdict": "BINDINGSLOTS_PERSISTENCE_PREREGISTRATION_VERIFIED",
+  "training_started": false,
+  "checkpoints_generated": false,
+  "results_classified": false,
+  "kda_readiness": "KDA_VALIDATION_BLOCKED"
+}

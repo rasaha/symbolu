@@ -1,0 +1,29 @@
+{
+  "schema": "bindingslots_persistence/o1r_definition/v1",
+  "status": "FROZEN before training. O1R = O1 + a standing residual correct-slot term. The coefficient 0.01 is preregistered, NOT a tuning start point.",
+  "base_objective": "O1: L_addr = -log(r[q, s*] + 1e-6); s* = argmax_j stop_gradient(w[f,j]); read/write addresses from the frozen capture hook; no answer labels",
+  "coefficient_schedule": {
+    "steps_1_300": 0.10,
+    "steps_301_600": "linear decay 0.10 -> 0.0 (identical to R0 lambda)",
+    "steps_601_1200": 0.01,
+    "residual_note": "the ONLY change vs O1 is a constant 0.01 floor for steps 601-1200 instead of 0.0"
+  },
+  "residual_coefficient": 0.01,
+  "residual_start_step": 601,
+  "residual_stop_step": 1200,
+  "evaluation_coefficient": 0.0,
+  "target_definition": "read probability r[q, s*] on the stop-gradient top-write slot s*, per layer, mean over layers and batch",
+  "reduction": "mean over aux-probe batch and layers",
+  "masking": "aux needle-probe fact/query positions only (same as O1); supervised main target unchanged (answer position mask at pos-1)",
+  "prohibitions": [
+    "no coefficient sweep on seeds 23-27",
+    "no adaptive coefficient",
+    "no outcome-based change",
+    "no early stopping",
+    "no extension after step 1200",
+    "no inference-time auxiliary objective",
+    "if 0.01 fails, REPORT the failure before proposing any other coefficient"
+  ],
+  "inference_statement": "training-only auxiliary loss; auxiliary objective absent at evaluation; no new inference-time operation or parameter",
+  "pass_rule": "O1R does NOT pass by retaining correct-slot probability alone; at step 1200 every forming seed must ALSO collapse under both slots-off and frozen randomized-addressing per the unchanged causal gate"
+}

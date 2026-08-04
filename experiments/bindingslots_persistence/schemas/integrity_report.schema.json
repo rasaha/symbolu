@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-07/schema#","title":"persistence_integrity_report","type":"object","required":["schema","checks","failures","verdict"],"properties":{"schema":{"const":"bindingslots_persistence/integrity_report/v1"},"checks":{"type":"integer"},"failures":{"type":"array"},"verdict":{"type":"string"}}}
