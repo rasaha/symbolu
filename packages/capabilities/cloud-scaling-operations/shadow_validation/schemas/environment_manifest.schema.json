@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "cluster_identifier": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object"
+    },
+    "context_name": {
+      "type": "string"
+    },
+    "environment_classification": {
+      "type": "string"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    },
+    "tls_verify": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "real_environment_observed",
+    "real_cluster_accessed",
+    "cluster_identifier",
+    "environment_classification"
+  ],
+  "title": "EnvironmentManifest",
+  "type": "object"
+}

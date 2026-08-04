@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "all_ok": {
+      "type": "boolean"
+    },
+    "cases": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "cases",
+    "all_ok"
+  ],
+  "title": "StaleStateResults",
+  "type": "object"
+}

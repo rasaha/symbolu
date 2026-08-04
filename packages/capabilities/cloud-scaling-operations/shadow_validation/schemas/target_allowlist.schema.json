@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "approved": {
+      "type": "array"
+    },
+    "cluster_identifier": {
+      "type": "string"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "maximum_target_count": {
+      "type": "integer"
+    },
+    "namespaces": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    },
+    "rejected": {
+      "type": "array"
+    },
+    "resource_kinds": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "resource_name_patterns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "cluster_identifier",
+    "namespaces",
+    "resource_kinds",
+    "maximum_target_count",
+    "approved",
+    "rejected"
+  ],
+  "title": "TargetAllowlist",
+  "type": "object"
+}

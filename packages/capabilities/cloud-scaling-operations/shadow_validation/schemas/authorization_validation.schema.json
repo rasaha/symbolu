@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "all_ok": {
+      "type": "boolean"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    },
+    "scenarios": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "total": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "scenarios",
+    "total",
+    "all_ok"
+  ],
+  "title": "AuthorizationValidation",
+  "type": "object"
+}

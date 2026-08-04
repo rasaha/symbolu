@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "all_blocked": {
+      "type": "boolean"
+    },
+    "canaries": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "passed": {
+      "type": "integer"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    },
+    "real_network_transmissions": {
+      "type": "integer"
+    },
+    "total": {
+      "type": "integer"
+    },
+    "transmitted_write_methods": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "canaries",
+    "total",
+    "passed",
+    "transmitted_write_methods",
+    "all_blocked"
+  ],
+  "title": "MutationCanaryResults",
+  "type": "object"
+}

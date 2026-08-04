@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "authorization_result": {
+      "type": "string"
+    },
+    "authorization_test_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cluster_identifier": {
+      "type": "string"
+    },
+    "current_replicas": {
+      "type": "integer"
+    },
+    "decision_id": {
+      "type": "string"
+    },
+    "execution_mode": {
+      "const": "SHADOW",
+      "type": "string"
+    },
+    "execution_status": {
+      "const": "NOT_EXECUTED",
+      "type": "string"
+    },
+    "hpa_state": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "not_executed_reason": {
+      "type": "string"
+    },
+    "observation_id": {
+      "type": "string"
+    },
+    "policy_result": {
+      "type": "string"
+    },
+    "proposed_action": {
+      "type": "string"
+    },
+    "proposed_only": {
+      "const": true,
+      "type": "boolean"
+    },
+    "recommendation_id": {
+      "type": "string"
+    },
+    "recommended_replicas": {
+      "type": "integer"
+    },
+    "resource_kind": {
+      "type": "string"
+    },
+    "resource_name": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "staleness_result": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "session_id",
+    "decision_id",
+    "cluster_identifier",
+    "namespace",
+    "resource_kind",
+    "resource_name",
+    "current_replicas",
+    "recommended_replicas",
+    "execution_mode",
+    "execution_status",
+    "proposed_only",
+    "authorization_result",
+    "staleness_result",
+    "hpa_state"
+  ],
+  "title": "ShadowDecision",
+  "type": "object"
+}
