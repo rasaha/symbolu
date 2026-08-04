@@ -1,0 +1,41 @@
+{
+  "schema": "bindingslots_functional_routing/stage1_manifest/v1",
+  "code_commit": "8c8527c80f35ba0d3fd0c9e5e0e355faf5810697",
+  "frozen_reference_config_sha256": "b5deefa7572b2bd8d3caf9157537cafc11766fbc3845c899f84a83ae64425d26",
+  "objectives_sha256": "ec4b449740b4180ea043327c27e9adb51d954a48b3fd07da1d148e0ee0fb5474",
+  "curriculum_gradual_sha256": "2430751fd3ea0601a42b07836694c80b5895a6f50d7db9d460cdfaf43f315e1c",
+  "stage1_seeds": [
+    18,
+    19,
+    20,
+    21,
+    22
+  ],
+  "arms": [
+    "A+",
+    "R0",
+    "O1",
+    "O2",
+    "H3"
+  ],
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-fc-v18-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "torch": "2.2.2+cu121",
+    "cuda_available": false,
+    "num_threads": 4,
+    "fp": "fp32"
+  },
+  "abc_json_sha256_before": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_json_sha256_after": null,
+  "restart_events": [
+    {
+      "event": "orchestrator_start",
+      "ts_monotonic": 818.931
+    }
+  ],
+  "seed_arm_status": {
+    "A+_seed18": "complete"
+  }
+}
