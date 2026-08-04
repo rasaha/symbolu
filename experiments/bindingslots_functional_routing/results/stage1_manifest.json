@@ -36,6 +36,13 @@
     }
   ],
   "seed_arm_status": {
-    "A+_seed18": "complete"
+    "A+_seed18": "complete",
+    "A+_seed19": "complete",
+    "A+_seed20": "complete",
+    "A+_seed21": "complete",
+    "A+_seed22": "complete",
+    "R0_seed18": "complete",
+    "R0_seed19": "complete",
+    "R0_seed20": "complete"
   }
 }
