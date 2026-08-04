@@ -1,75 +1,127 @@
-"""Deployment credential hashing (P3E §9).
+"""Deployment credential hashing (P3E §9, completion §5).
 
-Argon2id is preferred, but this offline build environment ships no argon2/passlib
-wheel, so we use the Python standard library's ``hashlib.scrypt`` — a memory-hard
-password KDF — with a constant-time verifier (``hmac.compare_digest``). The hash
-format is self-describing so a future Argon2id migration is additive:
+**Argon2id** is the password KDF (via the pinned `argon2-cffi`), using the standard
+encoded hash format `$argon2id$v=19$m=...,t=...,p=...$salt$hash` with a library-managed
+salt and constant-time verification. Cost parameters are bounded, and an operator-
+supplied stored hash whose parameters exceed the approved maxima is rejected **before**
+the KDF runs (so a maliciously large `m`/`t`/`p` cannot be used for a memory/CPU DoS).
 
-    scrypt$<n>$<r>$<p>$<salt_b64>$<hash_b64>
-
-No plaintext password is ever stored, logged, or printed.
+Legacy `scrypt$v=1$...` hashes are still *verified* (constant-time) for migration, but
+new hashes are always Argon2id. No plaintext password is ever stored, logged, or printed.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
 import hmac
-import os
+import re
 
-# scrypt cost parameters (RFC 7914). n must be a power of two.
-_N = 2 ** 15
-_R = 8
-_P = 1
-_DKLEN = 32
-_SALT_BYTES = 16
-_MAXMEM = 128 * _R * _N * 2  # headroom over scrypt's 128*r*n requirement
+from argon2 import PasswordHasher, Type
+from argon2.exceptions import InvalidHashError, VerifyMismatchError, VerificationError
+
+# Argon2id cost bounds (approved envelope). memory in KiB.
+ARGON2_TIME_COST = 3
+ARGON2_MEMORY_COST = 64 * 1024  # 64 MiB
+ARGON2_PARALLELISM = 4
+ARGON2_HASH_LEN = 32
+ARGON2_SALT_LEN = 16
+
+# Maximum parameters we will accept in a *stored* hash before invoking the verifier.
+MAX_ARGON2_MEMORY_COST = 256 * 1024  # 256 MiB
+MAX_ARGON2_TIME_COST = 10
+MAX_ARGON2_PARALLELISM = 8
+
+_hasher = PasswordHasher(
+    time_cost=ARGON2_TIME_COST,
+    memory_cost=ARGON2_MEMORY_COST,
+    parallelism=ARGON2_PARALLELISM,
+    hash_len=ARGON2_HASH_LEN,
+    salt_len=ARGON2_SALT_LEN,
+    type=Type.ID,
+)
+
+_ARGON2_PARAMS_RE = re.compile(r"^\$argon2id\$v=\d+\$m=(\d+),t=(\d+),p=(\d+)\$")
 
 
-def _b64(raw: bytes) -> str:
-    return base64.b64encode(raw).decode("ascii")
-
-
-def _unb64(text: str) -> bytes:
-    return base64.b64decode(text.encode("ascii"))
-
-
-def hash_password(password: str, *, salt: bytes | None = None) -> str:
-    """Return a self-describing scrypt hash string for ``password``."""
+# -- Argon2id (primary) ----------------------------------------------------
+def hash_password(password: str) -> str:
     if not password:
         raise ValueError("password must not be empty")
-    salt = salt if salt is not None else os.urandom(_SALT_BYTES)
-    dk = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=_N, r=_R, p=_P, dklen=_DKLEN, maxmem=_MAXMEM)
-    return f"scrypt${_N}${_R}${_P}${_b64(salt)}${_b64(dk)}"
+    return _hasher.hash(password)
 
 
-def is_valid_hash_format(encoded: str) -> bool:
-    try:
-        parse_hash(encoded)
-        return True
-    except (ValueError, Exception):  # noqa: BLE001 - any malformed input is invalid
+def _argon2_params_within_bounds(encoded: str) -> bool:
+    m = _ARGON2_PARAMS_RE.match(encoded)
+    if not m:
         return False
+    memory, time_cost, parallelism = (int(x) for x in m.groups())
+    return (
+        0 < memory <= MAX_ARGON2_MEMORY_COST
+        and 0 < time_cost <= MAX_ARGON2_TIME_COST
+        and 0 < parallelism <= MAX_ARGON2_PARALLELISM
+    )
 
 
-def parse_hash(encoded: str) -> tuple[int, int, int, bytes, bytes]:
-    parts = encoded.split("$")
-    if len(parts) != 6 or parts[0] != "scrypt":
-        raise ValueError("unsupported password hash format")
-    n, r, p = int(parts[1]), int(parts[2]), int(parts[3])
-    if n <= 1 or (n & (n - 1)) != 0:
-        raise ValueError("scrypt n must be a power of two > 1")
-    salt, dk = _unb64(parts[4]), _unb64(parts[5])
-    if not salt or not dk:
-        raise ValueError("empty salt or digest")
-    return n, r, p, salt, dk
+# -- legacy scrypt (verify only, for migration) ----------------------------
+_SCRYPT_MAX_N = 2 ** 20
+
+
+def _verify_scrypt(password: str, encoded: str) -> bool:
+    # accepts both "scrypt$n$r$p$salt$hash" and "scrypt$v=1$n=..$r=..$p=..$salt=..$digest=.."
+    try:
+        if encoded.startswith("scrypt$v="):
+            fields = dict(part.split("=", 1) for part in encoded.split("$")[2:] if "=" in part)
+            n, r, p = int(fields["n"]), int(fields["r"]), int(fields["p"])
+            salt = base64.b64decode(fields["salt"]); expected = base64.b64decode(fields["digest"])
+        else:
+            _, n_s, r_s, p_s, salt_b, hash_b = encoded.split("$")
+            n, r, p = int(n_s), int(r_s), int(p_s)
+            salt = base64.b64decode(salt_b); expected = base64.b64decode(hash_b)
+    except (ValueError, KeyError, Exception):  # noqa: BLE001
+        return False
+    if n <= 1 or (n & (n - 1)) != 0 or n > _SCRYPT_MAX_N:  # reject excessive/invalid cost before KDF
+        return False
+    if not salt or not expected:
+        return False
+    candidate = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=n, r=r, p=p, dklen=len(expected), maxmem=128 * r * n * 2)
+    return hmac.compare_digest(candidate, expected)
+
+
+# -- public API ------------------------------------------------------------
+def is_valid_hash_format(encoded: str) -> bool:
+    if not encoded:
+        return False
+    if encoded.startswith("$argon2id$"):
+        return _argon2_params_within_bounds(encoded)
+    if encoded.startswith("scrypt$"):
+        # structurally parseable legacy record with parameters within bounds
+        try:
+            if encoded.startswith("scrypt$v="):
+                fields = dict(part.split("=", 1) for part in encoded.split("$")[2:] if "=" in part)
+                n, r, p = int(fields["n"]), int(fields["r"]), int(fields["p"])
+                base64.b64decode(fields["salt"]); base64.b64decode(fields["digest"])
+            else:
+                _, n_s, r_s, p_s, salt_b, hash_b = encoded.split("$")
+                n, r, p = int(n_s), int(r_s), int(p_s)
+                base64.b64decode(salt_b); base64.b64decode(hash_b)
+            return n > 1 and (n & (n - 1)) == 0 and n <= _SCRYPT_MAX_N and r > 0 and p > 0
+        except (ValueError, KeyError):
+            return False
+    return False
 
 
 def verify_password(password: str, encoded: str) -> bool:
-    """Constant-time verification of ``password`` against a stored hash."""
-    try:
-        n, r, p, salt, expected = parse_hash(encoded)
-    except (ValueError, Exception):  # noqa: BLE001
+    if not encoded:
         return False
-    candidate = hashlib.scrypt(
-        password.encode("utf-8"), salt=salt, n=n, r=r, p=p, dklen=len(expected), maxmem=128 * r * n * 2
-    )
-    return hmac.compare_digest(candidate, expected)
+    if encoded.startswith("$argon2id$"):
+        if not _argon2_params_within_bounds(encoded):  # cap cost BEFORE invoking the KDF
+            return False
+        try:
+            return _hasher.verify(encoded, password)
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
+            return False
+        except Exception:  # noqa: BLE001 - any malformed record fails closed
+            return False
+    if encoded.startswith("scrypt$"):
+        return _verify_scrypt(password, encoded)
+    return False
