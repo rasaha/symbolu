@@ -62,3 +62,20 @@ handoff) with no crash, before any reserved H2 seed was run.
 
 The reserved seeds, arm definitions, classifier, gates, thresholds, coefficients, and the adaptive
 controller are unchanged.
+
+## Recorded code hashes (persistence_arms.py)
+
+- **before** (at `execution_code_commit 5cc392e1`, used by the 16 completed runs):
+  `1f3f6b7d074413cc74a3d893d64e48557f5964acf1f3a4683ecf20e0d35fc112`
+- **after** (corrected `execution_code_commit 9380bdb1`, used by H2/O1):
+  `9edbcd8d7c91bea3a9b3fac103b66d983eba53c1a3eca56524e287fb9a5ee9ca`
+- diff scope: `persistence_arms.py` — **9 insertions, 2 deletions** (the `if mask is None:` branch in
+  `run_h2` only). Machine-readable: `experiments/bindingslots_persistence/results/code_correction_record.json`.
+
+## Crashed H2 attempt
+
+The initial H2 seed23 attempt (crash) is **INVALID and NON-EVIDENTIARY** — the crash preceded
+persistence, so no H2 artifact exists. H2 seed23 was restarted **fresh from step 0** under the
+corrected harness. The 16 completed runs (A+/R0/O1R/H1) are preserved unchanged. Seeds, thresholds,
+objectives, schedules, the second-failure futility rule, the classifier, and the adaptive controller
+are unchanged. O1 runs only if the frozen trigger (O1R ∧ H1 ∧ H2 all fail) is reached.
