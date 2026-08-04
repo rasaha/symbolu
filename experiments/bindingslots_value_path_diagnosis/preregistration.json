@@ -1,0 +1,107 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/preregistration/v1",
+  "title": "Phase-Free BindingSlots Instrumented Reproduction, Value-Path Isolation, and Gradient-Conflict Diagnosis",
+  "phase_type": "DIAGNOSTIC_ONLY",
+  "implements_fix": false,
+  "scientific_questions": [
+    "Q1 Where does usable needle information disappear when the fixed routing diagnostic still prefers the written slot but end-to-end retrieval fails?",
+    "Q2 Which persistence or teacher gradients are responsible for the separate language-quality regressions?"
+  ],
+  "do_not_assume_same_cause": true,
+  "prerequisite": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "persistence_merge_commit": "05dcee8e6944d4dc59019d16ebb23f9536732562",
+    "merge_reachable_from_default_tip": true,
+    "pr_1340_closed_merged": true,
+    "reconstructed_verdict": "NO_PERSISTENCE_INTERVENTION_SELECTED",
+    "reconstructed_kda": "KDA_VALIDATION_BLOCKED",
+    "source_execution_commits": {"A+": "5cc392e1", "R0": "5cc392e1", "O1R": "5cc392e1", "H2": "9380bdb1"},
+    "gate_on_failure": "BINDINGSLOTS_DIAGNOSTIC_PREREQUISITE_FAILED"
+  },
+  "scope_restrictions_forbidden": [
+    "new persistence intervention", "coefficient tuning", "architecture changes",
+    "additional slots or dimensions", "Phase", "KDA", "MLA", "quadratic attention",
+    "model scaling", "new training objectives", "natural-language or enterprise expansion",
+    "any next-phase fix in this PR"
+  ],
+  "reproduction": {
+    "authorized_because": "no saved model-weight checkpoints exist; deterministic reproduction-for-instrumentation only",
+    "must_not_alter_training": "no training step added, removed or altered; snapshots are deepcopy pure-observers",
+    "preserved_invariants": ["arm", "seed", "source execution commit", "architecture", "configuration",
+      "task generator", "data order", "optimizer", "learning-rate schedule", "loss coefficients",
+      "scaffold timing", "evaluation schedule", "CPU FP32 environment"],
+    "hooks_default_disabled": true,
+    "hooks_disabled_reproduce_committed_trajectory": true,
+    "gate": "EXACT_EQUALITY",
+    "gate_justification": "deterministic CPU fp32; diagnostics never advance the training RNG (proven on control runs); reproduction is bit-identical. No numerical tolerance parameter is fit to data.",
+    "tolerance_frozen_on": "control runs (A+ 23/24/25, R0 24 clean, O1R 23 clean, H2 24 clean former) BEFORE failure exemplars",
+    "compared_at_every_checkpoint": ["needle_by_dist", "ppl", "binding_by_k", "supersession",
+      "source", "multihop", "trajectory (needle_d96 + routing correct-slot prob/rank/margin + grad norms)", "ablation", "loss_log"],
+    "failed_gate_classification": "INSTRUMENTED_REPRODUCTION_FAILED",
+    "capture_checkpoints": [600, 700, 900, 1200],
+    "step_700_required_for": [["H2", 23]]
+  },
+  "architecture_binding": {
+    "read_path": "u_read = sum_j r[j]*slot[j] ; c_mem = W_o(u_read) ; h_post = h_pre + c_mem",
+    "no_learned_read_or_fusion_gate": true,
+    "must_not_report": ["fusion-gate values", "fusion-gate sensitivity", "fusion-gate gradients"],
+    "frozen_source_hashes_verified_by": "verify_diagnosis.py (full sha256 in reproduction_protocol.json)"
+  },
+  "cohort": "frozen in cohort.json before any tensor inspection; symmetric {A+,R0,O1R,H2} x {23,24,25}",
+  "frozen_decision_constants": {
+    "CHANCE": 0.020833333333333332,
+    "DECODABLE_MIN": 0.5,
+    "MATERIAL_DROP": 0.2,
+    "RETRIEVAL_PRESENT_MIN": 0.5,
+    "RETRIEVAL_FAILS_MAX": 0.1,
+    "RECOVER_MIN": 0.5,
+    "CONFLICT_COS": -0.1,
+    "CONTROL_GAP": 0.15,
+    "frozen_from": "read-path structure and control runs, NOT failure exemplars",
+    "mirrored_in": "diagnosis_classify.py FROZEN_CONSTANTS"
+  },
+  "diagnosis_categories": {
+    "value_path": ["STORAGE_VALUE_DEGRADED", "ADDRESS_DISTRIBUTION_FAILED", "READ_AGGREGATION_FAILED",
+      "RESIDUAL_OR_DECODER_UTILIZATION_FAILED", "VALUE_PATH_NOT_LOCALIZED",
+      "NOT_APPLICABLE_RETRIEVAL_PRESENT"],
+    "quality": ["QUALITY_GRADIENT_CONFLICT_LOCALIZED", "QUALITY_INTERFERENCE_NOT_LOCALIZED",
+      "NOT_APPLICABLE_QUALITY_OK"]
+  },
+  "probes_A2": {
+    "analysis_only_never_written_to_model": true,
+    "fixed_probe_seed": 20260804,
+    "disjoint_from_ledger_eval_seeds": [123, 124, 125, 128, 129],
+    "fixed_train_val_test_split": [0.6, 0.2, 0.2],
+    "controls": ["shuffled-label", "non-target-slot"],
+    "interpretation": "linear-probe failure is low linear decodability, NOT proof of total information absence"
+  },
+  "oracle_isolation": {
+    "modes": ["oracle_address", "oracle_read_query", "oracle_postwrite"],
+    "touches_only": "the read vector at the query position (per layer, per example)",
+    "unchanged": ["W_o", "residual addition", "backbone", "decoder", "query-time slot values"],
+    "H2_seed23_note": "terminal randomized-address / slots-off are NON-INFORMATIVE (baseline retrieval already zero); the oracle bypasses are the evidence"
+  },
+  "gradient_diagnostics": {
+    "zero_optimizer_steps": true,
+    "grads_cleared_after_every_measurement": true,
+    "state_hashes_unchanged": true,
+    "parameter_groups": ["embeddings", "backbone", "slot_keys", "write_addr_proj", "read_addr_proj",
+      "write_value_proj", "write_gate", "memory_readout_Wo", "slot_norm"],
+    "groups_complete_and_non_overlapping": true,
+    "zero_gradient_safe_cosine": true,
+    "losses": ["language-model", "persistence auxiliary (O1R correct-slot-prob)", "H2 teacher/distillation KL"],
+    "alignment_bands_frozen_before_quality_failed_seeds": true
+  },
+  "verdicts_allowed": ["BINDINGSLOTS_BOTH_FAILURE_FAMILIES_LOCALIZED",
+    "BINDINGSLOTS_VALUE_PATH_FAILURE_LOCALIZED", "BINDINGSLOTS_QUALITY_INTERFERENCE_LOCALIZED",
+    "BINDINGSLOTS_DIAGNOSTIC_RESULTS_INCONCLUSIVE", "BINDINGSLOTS_INSTRUMENTED_REPRODUCTION_FAILED",
+    "BINDINGSLOTS_DIAGNOSTIC_PROTOCOL_VIOLATED", "BINDINGSLOTS_DIAGNOSTIC_INTEGRITY_FAILED",
+    "BINDINGSLOTS_DIAGNOSTIC_RESOURCE_BLOCKED"],
+  "always_emit": "KDA_VALIDATION_BLOCKED",
+  "cannot_unblock_kda": true,
+  "stop_condition": ["deterministic reproduction accepted or rejected", "A1-A4 complete for all accepted cohort runs",
+    "B2-B3 complete", "per-seed diagnoses generated mechanically", "integrity checks pass",
+    "artifacts committed and hashed", "one draft PR open and unmerged"],
+  "prohibitions": ["do not implement a fix", "do not tune coefficients", "do not begin KDA validation",
+    "do not begin a subsequent intervention phase"]
+}

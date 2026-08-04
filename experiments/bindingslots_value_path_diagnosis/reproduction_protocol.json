@@ -1,0 +1,42 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/reproduction_protocol/v1",
+  "authorized": "deterministic reproduction-for-instrumentation only (no saved weight checkpoints exist)",
+  "runner": "experiments/bindingslots_persistence/persistence_arms.run_arm (FROZEN, unchanged)",
+  "instrumentation_commit": "<this branch HEAD; recorded per-run in reproduction_results.json via snapshot hashes>",
+  "source_execution_commits": {"A+": "5cc392e1", "R0": "5cc392e1", "O1R": "5cc392e1", "H2": "9380bdb1"},
+  "snapshot_mechanism": {
+    "how": "torch.optim.AdamW.step is wrapped ONLY to count optimizer steps; the frozen record() entry points (diagnostics.routing_diagnostics for slot arms, stabilize._needle_at for every arm) are wrapped to deepcopy the live model at the checkpoint boundary",
+    "why_it_does_not_alter_training": [
+      "deepcopy consumes no torch global RNG and touches no optimizer state",
+      "the snapshot is taken at the TOP of a checkpoint iteration (before that iteration's optimizer step), exactly where the committed record(step) runs",
+      "transient grad-attached capture attrs (_sfs_wlogit/_sfs_rlogit) are nulled before deepcopy; they are never read by the training forward/loss and are recomputed on demand",
+      "training reproduction always uses the STOCK frozen forward; the instrumented forward is bound only to frozen snapshots"
+    ],
+    "optimizer_step_count_asserted": 1200
+  },
+  "reproduction_gate": {
+    "type": "EXACT_EQUALITY",
+    "compared_keys": ["needle_by_dist", "ppl", "binding_by_k", "supersession", "source", "multihop",
+      "trajectory", "ablation", "loss_log"],
+    "excluded": ["train_s (wall-clock timing)"],
+    "determinism_control_proof": "A+ seed 25 reproduced byte-identically (needle_by_dist and ppl exact; trajectory exact at every common checkpoint) prior to any failure-exemplar reproduction",
+    "failed_classification": "INSTRUMENTED_REPRODUCTION_FAILED"
+  },
+  "capture_checkpoints": [600, 700, 900, 1200],
+  "gradient_checkpoints": [900, 1200],
+  "cpu_fp32": true,
+  "threads": 4,
+  "threads_note": "torch.set_num_threads(4) preserved from the frozen runner; changing thread count would change fp32 reduction order and break byte-identity, so reproduction is sequential",
+  "frozen_source_hashes_sha256": {
+    "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py": "86d7065735cc917d868e850d57771175d9de61acbf62f3f7351f7462ebe9fe8a",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py": "5e95a1a17925d3935ea991c4019e3a0a94a5b481cabc5a0211e53aa2b0c6918b",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/interventions.py": "61f3b91cff92c10b9b492d4d0f52e38bace2560285914eb4bb5e55748e398155",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/diagnostics.py": "27e2fe76cd7ba473e4e1a00ecdb41ebf0bdc47ff99bd52c84f15a3bfd8c2abd2",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/stabilize.py": "ef6e090f4ce7ba923b5cd6329376d28cbb7d261d08d3a2a0c919295210fd8153",
+    "experiments/phase_lc/tasks.py": "806e2445990f9c9676ddc585c98aea97d7fffc73c53ce292ed14f6011e69d05c",
+    "experiments/bindingslots_persistence/persistence_arms.py": "9edbcd8d7c91bea3a9b3fac103b66d983eba53c1a3eca56524e287fb9a5ee9ca",
+    "experiments/bindingslots_persistence/objectives_persistence.py": "4057e2e4698cc66fe4ec7331955492b488fc237cd3dd33e54eb36b02fbee489b",
+    "experiments/bindingslots_functional_routing/objectives.py": "ec4b449740b4180ea043327c27e9adb51d954a48b3fd07da1d148e0ee0fb5474",
+    "experiments/phase_lc/results/abc.json": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482"
+  }
+}
