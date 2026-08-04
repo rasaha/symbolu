@@ -1,0 +1,424 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/cohort/v1",
+  "frozen_before_tensor_inspection": true,
+  "selection_rule": "Symmetric 4-arm x 3-seed block {A+,R0,O1R,H2} x {23,24,25} recovered mechanically from the merged persistence ledger. Covers every \u00a75-required exemplar: H2 s23 (routing-probe/eval-retrieval dissociation), H2 s24 (weak CLEAN_STABLE former), H2 s25 (quality failure), O1R quality-failed seeds (24,25) + O1R clean control (23), one R0 CLEAN_STABLE (24), one R0 FORMED_THEN_COLLAPSED (23), one R0 QUALITY_FAILED (25), and same-seed A+ controls (23,24,25) for the principal H2 and O1R exemplars.",
+  "seed_provenance": "seeds 23-25 are a strict subset of the merged persistence reserved seeds 23-27",
+  "no_replacement_policy": "FORBIDDEN to add/replace/drop any cohort member based on diagnostic outcomes",
+  "capture_checkpoints": [
+    600,
+    700,
+    900,
+    1200
+  ],
+  "step700_required_for": [
+    [
+      "H2",
+      23
+    ]
+  ],
+  "source_execution_commits": {
+    "A+": "5cc392e1",
+    "R0": "5cc392e1",
+    "O1R": "5cc392e1",
+    "H2": "9380bdb1"
+  },
+  "ledger_source": "experiments/bindingslots_persistence/results/seeds",
+  "members": [
+    {
+      "arm": "H2",
+      "seed": 23,
+      "role": "principal_value_path_exemplar__routing_probe_vs_eval_dissociation",
+      "source_execution_commit": "9380bdb1",
+      "committed_category": "FORMED_THEN_COLLAPSED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 0.0,
+        "96": 0.0,
+        "220": 0.0
+      },
+      "committed_needle_d96_1200": 0.0,
+      "committed_ppl": {
+        "256": 155.11539605437497,
+        "512": 158.0324562525946
+      },
+      "committed_correct_slot_prob_1200": 0.9584309160709381,
+      "committed_correct_slot_prob_step600": 0.9997681379318237,
+      "committed_needle_step600": 0.9583333333333334,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.05,
+      "committed_train_s": 1265.1,
+      "raw_record_sha256": "ab8431d9f243d19c4ed98d1aa5e80e4faa57842672fec9f2f1606942bf2e948d",
+      "seed_classification_sha256": "41fb0b4d260c8741470626ea605bbaa5c38d8cf4aa0e9ffa16f404d984adcc7e",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": true
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "role": "weak_clean_stable_former__control_interpretation",
+      "source_execution_commit": "9380bdb1",
+      "committed_category": "CLEAN_STABLE",
+      "committed_clean_stable": true,
+      "committed_needle_by_dist": {
+        "16": 0.35833333333333334,
+        "96": 0.2833333333333333,
+        "220": 0.175
+      },
+      "committed_needle_d96_1200": 0.2833333333333333,
+      "committed_ppl": {
+        "256": 135.68998449793685,
+        "512": 139.62714172968396
+      },
+      "committed_correct_slot_prob_1200": 0.9475260972976685,
+      "committed_correct_slot_prob_step600": 0.9986739009618759,
+      "committed_needle_step600": 1.0,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.0,
+      "committed_train_s": 1277.4,
+      "raw_record_sha256": "9062d121fe09d413d914a335cb8a8a80ee8b08fa0b419a6694c4f05a687aa153",
+      "seed_classification_sha256": "e4c9e6f5b5f1cdee29063976ce83b5c82d85df1c3c34de0d3c77a16eebf9d92f",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "role": "quality_failure__teacher_gradient_conflict_candidate",
+      "source_execution_commit": "9380bdb1",
+      "committed_category": "QUALITY_FAILED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 0.7333333333333333,
+        "96": 0.6083333333333333,
+        "220": 0.6416666666666667
+      },
+      "committed_needle_d96_1200": 0.6083333333333333,
+      "committed_ppl": {
+        "256": 145.92326998012607,
+        "512": 151.9897240907187
+      },
+      "committed_correct_slot_prob_1200": 0.9726321250200272,
+      "committed_correct_slot_prob_step600": 0.9981418251991272,
+      "committed_needle_step600": 0.9666666666666667,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.0,
+      "committed_train_s": 1334.4,
+      "raw_record_sha256": "4eb7af8f1dcd0dca0a29629f6e0a956056ac3d62c5cba61d26001f2e67c30116",
+      "seed_classification_sha256": "b5f2d18e29e7e886ada59b51edd6a28830c396d79da9dd95e6ba70284aea6c6e",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "role": "o1r_clean_stable_control__gradient_alignment_reference",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "CLEAN_STABLE",
+      "committed_clean_stable": true,
+      "committed_needle_by_dist": {
+        "16": 1.0,
+        "96": 1.0,
+        "220": 1.0
+      },
+      "committed_needle_d96_1200": 1.0,
+      "committed_ppl": {
+        "256": 131.8071393207198,
+        "512": 137.65893014040552
+      },
+      "committed_correct_slot_prob_1200": 0.7844539433717728,
+      "committed_correct_slot_prob_step600": 0.9705893397331238,
+      "committed_needle_step600": 0.975,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.0,
+      "committed_train_s": 1293.5,
+      "raw_record_sha256": "8e406c4c3b342d291f50983a5f1e55a5a52adc037f1bd82ac2f9951fcf8f9fa2",
+      "seed_classification_sha256": "17ab436febb9fd54342481b3d3d3fdfb6d52218d8d306032bba266a0020de794",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "role": "o1r_quality_failed",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "QUALITY_FAILED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 1.0,
+        "96": 1.0,
+        "220": 1.0
+      },
+      "committed_needle_d96_1200": 1.0,
+      "committed_ppl": {
+        "256": 152.61403214135484,
+        "512": 156.6868816785392
+      },
+      "committed_correct_slot_prob_1200": 0.5523513033986092,
+      "committed_correct_slot_prob_step600": 0.5567982569336891,
+      "committed_needle_step600": 1.0,
+      "committed_slots_off": 0.016666666666666666,
+      "committed_randomized_address": 1.0,
+      "committed_train_s": 1412.5,
+      "raw_record_sha256": "23165285b021b097006eb3be45615595fe10c3444ac41d761803d1c8bccfe9d1",
+      "seed_classification_sha256": "9082123bc7972b1613efdeb5e30f3151fa67cdde3cd9bd64aa0f1c9afca6b425",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "role": "o1r_quality_failed",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "QUALITY_FAILED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 1.0,
+        "96": 1.0,
+        "220": 0.9916666666666667
+      },
+      "committed_needle_d96_1200": 1.0,
+      "committed_ppl": {
+        "256": 155.09192880355343,
+        "512": 161.50543471197366
+      },
+      "committed_correct_slot_prob_1200": 0.8175502419471741,
+      "committed_correct_slot_prob_step600": 0.7516369819641113,
+      "committed_needle_step600": 1.0,
+      "committed_slots_off": 0.008333333333333333,
+      "committed_randomized_address": 0.0,
+      "committed_train_s": 1311.0,
+      "raw_record_sha256": "022010be28c0366dbbfbfad02ad4dcbf2c2d9a56678586b6e183db34a957f49b",
+      "seed_classification_sha256": "080bb96f23c5648b2e092686c5a72186a636d0abb044ec68178fa3c09e48ae4c",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "role": "r0_formed_then_collapsed_representative",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "FORMED_THEN_COLLAPSED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 0.016666666666666666,
+        "96": 0.0,
+        "220": 0.0
+      },
+      "committed_needle_d96_1200": 0.0,
+      "committed_ppl": {
+        "256": 127.28185478651642,
+        "512": 131.05488653805298
+      },
+      "committed_correct_slot_prob_1200": 0.9389475584030151,
+      "committed_correct_slot_prob_step600": 0.9997681379318237,
+      "committed_needle_step600": 0.9583333333333334,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.0,
+      "committed_train_s": 1154.0,
+      "raw_record_sha256": "4fb8756704f2e566adcae96323310a4747dcef4e36ca20380962726e189da98e",
+      "seed_classification_sha256": "ce878cb3cd5ab04981f77f08c3361f3a9afaff2ad660a48d54c4bd256f479cdb",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "R0",
+      "seed": 24,
+      "role": "r0_clean_stable_representative",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "CLEAN_STABLE",
+      "committed_clean_stable": true,
+      "committed_needle_by_dist": {
+        "16": 0.9916666666666667,
+        "96": 1.0,
+        "220": 1.0
+      },
+      "committed_needle_d96_1200": 1.0,
+      "committed_ppl": {
+        "256": 147.1090080625085,
+        "512": 150.97423654319508
+      },
+      "committed_correct_slot_prob_1200": 0.9378282576799393,
+      "committed_correct_slot_prob_step600": 0.9986739009618759,
+      "committed_needle_step600": 1.0,
+      "committed_slots_off": 0.0,
+      "committed_randomized_address": 0.016666666666666666,
+      "committed_train_s": 1082.5,
+      "raw_record_sha256": "8409be20cf54cba193fcd61a918c09953b4d7f21606208bc851be8451e03162d",
+      "seed_classification_sha256": "f13d9d18cce2651d9d2426dc1b2a9045479d9352e1008e6fcd0e274d1082f803",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "role": "r0_quality_failed_representative",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": "QUALITY_FAILED",
+      "committed_clean_stable": false,
+      "committed_needle_by_dist": {
+        "16": 0.24166666666666667,
+        "96": 0.11666666666666667,
+        "220": 0.18333333333333332
+      },
+      "committed_needle_d96_1200": 0.11666666666666667,
+      "committed_ppl": {
+        "256": 140.34317543662377,
+        "512": 148.58163866349116
+      },
+      "committed_correct_slot_prob_1200": 0.80562724173069,
+      "committed_correct_slot_prob_step600": 0.9981418251991272,
+      "committed_needle_step600": 0.9666666666666667,
+      "committed_slots_off": 0.025,
+      "committed_randomized_address": 0.025,
+      "committed_train_s": 1147.3,
+      "raw_record_sha256": "5b684165914111d964fb87770844fb51b21d46f49be88decc859026e84bfd83d",
+      "seed_classification_sha256": "601737719c04a4db907479f531cb501bd5181a90c3d52f1a90b882cdc0420bda",
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "A+",
+      "seed": 23,
+      "role": "same_seed_aplus_control_for_seed23_exemplars",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": null,
+      "committed_clean_stable": null,
+      "committed_needle_by_dist": {
+        "16": 0.0,
+        "96": 0.0,
+        "220": 0.0
+      },
+      "committed_needle_d96_1200": 0.0,
+      "committed_ppl": {
+        "256": 133.60035262464214,
+        "512": 137.89460851418437
+      },
+      "committed_correct_slot_prob_1200": null,
+      "committed_correct_slot_prob_step600": null,
+      "committed_needle_step600": null,
+      "committed_slots_off": null,
+      "committed_randomized_address": null,
+      "committed_train_s": 299.9,
+      "raw_record_sha256": "1992dec197f343f85c1537b43c391b058e3c5ba3b5bba910de47d6adc6b74c3f",
+      "seed_classification_sha256": null,
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "A+",
+      "seed": 24,
+      "role": "same_seed_aplus_control_for_seed24_exemplars",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": null,
+      "committed_clean_stable": null,
+      "committed_needle_by_dist": {
+        "16": 0.03333333333333333,
+        "96": 0.03333333333333333,
+        "220": 0.016666666666666666
+      },
+      "committed_needle_d96_1200": 0.03333333333333333,
+      "committed_ppl": {
+        "256": 123.23473989529208,
+        "512": 125.86487873112448
+      },
+      "committed_correct_slot_prob_1200": null,
+      "committed_correct_slot_prob_step600": null,
+      "committed_needle_step600": null,
+      "committed_slots_off": null,
+      "committed_randomized_address": null,
+      "committed_train_s": 282.8,
+      "raw_record_sha256": "8ed1f2e8b2a100e584ce34f5def66415bc35291b354f7a4190a6d02323244254",
+      "seed_classification_sha256": null,
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    },
+    {
+      "arm": "A+",
+      "seed": 25,
+      "role": "same_seed_aplus_control_for_seed25_exemplars",
+      "source_execution_commit": "5cc392e1",
+      "committed_category": null,
+      "committed_clean_stable": null,
+      "committed_needle_by_dist": {
+        "16": 0.06666666666666667,
+        "96": 0.025,
+        "220": 0.016666666666666666
+      },
+      "committed_needle_d96_1200": 0.025,
+      "committed_ppl": {
+        "256": 115.32251839351353,
+        "512": 119.91652246325795
+      },
+      "committed_correct_slot_prob_1200": null,
+      "committed_correct_slot_prob_step600": null,
+      "committed_needle_step600": null,
+      "committed_slots_off": null,
+      "committed_randomized_address": null,
+      "committed_train_s": 268.5,
+      "raw_record_sha256": "c74631629e7c80ef15d6c1ad3fb67c6875dd63b24bce20750a0559d3449c5fea",
+      "seed_classification_sha256": null,
+      "capture_checkpoints": [
+        600,
+        700,
+        900,
+        1200
+      ],
+      "step700_required_evidence": false
+    }
+  ]
+}
