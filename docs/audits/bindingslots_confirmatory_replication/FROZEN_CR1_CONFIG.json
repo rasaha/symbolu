@@ -1,0 +1,175 @@
+{
+  "schema": "bindingslots_confirmatory/frozen_cr1_config/v1",
+  "status": "FROZEN. Recovered byte-for-byte from the merged PR #1319 SELECTED_CANDIDATE.json + EXPERIMENT_MATRIX.json. No value here may change after the preregistration commit is pushed.",
+  "provenance": {
+    "prerequisite_pr_1300_merge_commit": "5f0cbe45",
+    "prerequisite_pr_1319_merge_commit": "ba665e42af8c60fd9aa9e7381020edc9a3d618bb",
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "recovered_from": [
+      "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/SELECTED_CANDIDATE.json",
+      "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/EXPERIMENT_MATRIX.json",
+      "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/ACCEPTANCE_GATES.json"
+    ]
+  },
+
+  "candidate": {
+    "id": "CR1",
+    "family": "3_scaffold",
+    "desc": "curriculum + temporary write-read alignment",
+    "slot_lr": 0.002,
+    "slot_warmup": 60,
+    "nonslot_lr": 0.002,
+    "nonslot_warmup": 60,
+    "orthogonal_keys": false,
+    "curriculum": true,
+    "alignment": true
+  },
+
+  "architecture": {
+    "hidden_dimension": 128,
+    "attention_heads": 4,
+    "layers": 4,
+    "local_window": 64,
+    "slots": 32,
+    "slot_key_dimension": 64,
+    "sequence_length": 160,
+    "output_head": "tied token embedding",
+    "dtype": "fp32",
+    "target_parameters": 2000000,
+    "slot_arm_parameters": 2000104,
+    "aplus_control_parameters": 2000392,
+    "ff_hidden_slot_arm": 1177,
+    "num_slot_mixers": 4,
+    "vocab_size": 1291,
+    "architecture_signature_sha256": "6e8672bd3df43f81241f4fe965508055b2500cceba5c66b59b012e2ff4a7cff1",
+    "num_param_tensors": 88,
+    "slot_read_write_equations": "UNCHANGED from frozen BindingSlots (legacy_phase_lc_slots.py)",
+    "inference_path": "UNCHANGED; alignment adds no inference-time op or parameter"
+  },
+
+  "optimizer": {
+    "family": "AdamW",
+    "baseline_lr": 0.002,
+    "weight_decay": 0.01,
+    "baseline_warmup": 60,
+    "gradient_clip": 1.0,
+    "dropout": 0.0,
+    "betas": "torch AdamW defaults (0.9, 0.999)",
+    "grouped": false,
+    "note": "CR1 uses a single AdamW parameter group (grouped=false); Family-1 optimizer grouping is NOT part of CR1."
+  },
+
+  "training": {
+    "training_steps": 1200,
+    "batch_size": 16,
+    "threads": 4,
+    "checkpoints": [0, 60, 120, 300, 600, 900, 1200],
+    "eval_needle_seed": 123,
+    "data_order_rng": "random.Random(seed*991+7)",
+    "model_init": "random.seed(seed); torch.manual_seed(seed)"
+  },
+
+  "curriculum": {
+    "enabled": true,
+    "total_steps": 1200,
+    "boundaries": [300, 700, 1200],
+    "phase_1_steps_1_300": "needle only, distance ~ d16, low distractors (pure needle batches at distance=16)",
+    "phase_2_steps_301_700": "70% needle at distance in {16,96}, 30% binding k=2 for interference",
+    "phase_3_steps_701_1200": "ORIGINAL ABC_MIX task distribution (frozen train_batch); includes d16/d96/d220",
+    "final_500_steps_original": true,
+    "handoff": "at step 700 the curriculum hands off to the original ABC_MIX distribution for the final 500 steps",
+    "example_count_preserved": "batch_size 16 x 1200 steps, identical example count to baseline",
+    "leakage_rule": "supervised target is always only the answer position (mask at pos-1)"
+  },
+
+  "alignment": {
+    "enabled": true,
+    "objective": "label-free write-read overlap; per layer overlap = sum_m write_weight[m]*read_weight[m]; L_align = -log(mean_overlap + 1e-6)",
+    "epsilon": 1e-6,
+    "write_weight": "slot write-address softmax over M slots at the fact VALUE-token position",
+    "read_weight": "slot read-address softmax over M slots at the query position",
+    "signal_source": "auxiliary needle probe batch B_align=8, mixed d16/d96, drawn each step during the alignment window; its cross-entropy is NEVER added to the loss",
+    "lambda_schedule": {
+      "steps_1_300": 0.10,
+      "steps_301_600": "linear decay 0.10 -> 0.0",
+      "steps_601_1200": 0.0
+    },
+    "alignment_coefficient_peak": 0.10,
+    "alignment_decay": "linear over steps 301..600",
+    "alignment_zero_point": 600,
+    "zero_during_all_evaluation": true,
+    "no_inference_time_op_or_param": true,
+    "main_distribution_during_alignment": "ORIGINAL ABC_MIX (alignment is an ADDED auxiliary term)"
+  },
+
+  "evaluation": {
+    "primary_metric": "needle@d96 (chance ~= 0.02)",
+    "distances": [16, 96, 220],
+    "ppl_contexts": [256, 512],
+    "checkpoint_cadence": [0, 60, 120, 300, 600, 900, 1200]
+  },
+
+  "gates": {
+    "chance_needle_d96": 0.02,
+    "formation_rule_all_required": [
+      "S_needle_d96 >= 0.075",
+      "S_minus_Aplus_d96 >= 0.050",
+      "S_needle_d96 >= chance + 0.050 (>= 0.07)"
+    ],
+    "stage_b_gates_frozen": {
+      "b1_formation_count_ge": "4 of 5",
+      "b2_mean_S_minus_Aplus_d96_ge": 0.080,
+      "b3_median_S_minus_Aplus_d96_ge": 0.050,
+      "b4_S_gt_Aplus_d96_in_ge": "4 of 5",
+      "b5_candidate_formation_gt_B0_formation": true,
+      "b6_parameter_match_rel_tol": 0.0005,
+      "b7_ppl_mean_cand256_le_1.20x_Aplus256_and_le_2_of_5_exceed_by_25pct": true,
+      "b8_causal_gate_every_forming_seed": true,
+      "b9_d16_no_material_regression_and_d220_ge_3_forming_positive": true,
+      "b10_no_NxN_bounded_state_O(M*D)": true,
+      "b11_no_Phase_no_KDA_no_MLA": true
+    },
+    "causal_collapse_per_forming_seed": {
+      "ablations": ["slots_off", "randomized_address"],
+      "each_must": [
+        "reduce needle@d96 by >= 0.050 absolute",
+        "reduce the slot gain (baseline - A+) by >= 50%",
+        "post-ablation <= max(A+_needle_d96 + 0.030, 0.050)"
+      ]
+    },
+    "ppl_quality_gate": {
+      "mean_cand256_le_1.20x_mean_Aplus256": true,
+      "le_2_of_5_exceed_Aplus256_by_gt_25pct": true
+    },
+    "distance_gate": {
+      "d16_material_regression_if_S_lt_Aplus_by_gt": 0.050,
+      "d220_secondary": ">= 3 forming seeds retain positive S - A+ at d220"
+    }
+  },
+
+  "frozen_code_hashes_sha256": {
+    "experiments/phase_lc/results/abc.json": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py": "5e95a1a17925d3935ea991c4019e3a0a94a5b481cabc5a0211e53aa2b0c6918b",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py": "51b94840786e28b1529db9470eff4a7dc01a991edfb149b55d8ec77c18a30dc2",
+    "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py": "e836b9e1e47cf7f948333e14083a402b71409fa95da05f05f18f2343032cd7a2",
+    "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py": "86d7065735cc917d868e850d57771175d9de61acbf62f3f7351f7462ebe9fe8a",
+    "experiments/phase_lc/tasks.py": "806e2445990f9c9676ddc585c98aea97d7fffc73c53ce292ed14f6011e69d05c",
+    "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json": "1833db22587fffd33abbc379afeeb93d720f45a1b73bbaccc3c76dfc7fb59afa",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/EXPERIMENT_MATRIX.json": "cab332daebc8c27d933462e7569aaee7b5fbe9184d16456030f9e16c1d038014",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/ACCEPTANCE_GATES.json": "4bbd5d5940d30f4a99fb3f2a540a220725cf30bfe02aabf7954221d2e149158e",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/SELECTION_RULE.json": "5e8f350478b21aac46c93a41abce18af40cd5317cdff98f07b6552a1270c7d1b",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/interventions.py": "61f3b91cff92c10b9b492d4d0f52e38bace2560285914eb4bb5e55748e398155",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/stabilize.py": "ef6e090f4ce7ba923b5cd6329376d28cbb7d261d08d3a2a0c919295210fd8153",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/diagnostics.py": "27e2fe76cd7ba473e4e1a00ecdb41ebf0bdc47ff99bd52c84f15a3bfd8c2abd2",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py": "3ca1e75fde529fcfb4492ba08044a0bfe53d660753de63630ab4bf08bad3c80d",
+    "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/SELECTED_CANDIDATE.json": "360df8903815d139df0f83f1501fc084c933d6726af13ff43100fc2144707833"
+  },
+
+  "prior_stage_b_result_seeds_8_12": {
+    "A+_formation_count": 0,
+    "B0_formation_count": 3,
+    "CR1_formation_count": 4,
+    "cr1_needle_d96": {"8": 0.992, "9": 0.000, "10": 0.992, "11": 1.000, "12": 0.967},
+    "seed9_note": "retention failure: needle peaked 1.000 at step 300 then decayed to 0.000 after lambda->0 (step 600) + curriculum handoff (step 700)"
+  }
+}

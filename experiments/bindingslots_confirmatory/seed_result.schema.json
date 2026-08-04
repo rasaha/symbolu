@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bindingslots_confirmatory_seed_result",
+  "type": "object",
+  "required": ["schema", "seed", "arm", "params", "needle_by_dist", "ppl", "config_hash", "code_commit", "environment_fingerprint", "checkpoint_steps", "train_s"],
+  "properties": {
+    "schema": {"const": "bindingslots_confirmatory/seed_result/v1"},
+    "seed": {"type": "integer"},
+    "arm": {"type": "string", "enum": ["A+", "B0", "CR1"]},
+    "params": {"type": "integer"},
+    "ff": {"type": "integer"},
+    "needle_by_dist": {
+      "type": "object",
+      "required": ["16", "96", "220"],
+      "properties": {"16": {"type": "number"}, "96": {"type": "number"}, "220": {"type": "number"}}
+    },
+    "ppl": {"type": "object", "required": ["256", "512"]},
+    "ablation": {"type": "object"},
+    "config_hash": {"type": "string"},
+    "code_commit": {"type": "string"},
+    "environment_fingerprint": {"type": "object"},
+    "checkpoint_steps": {"type": "array", "items": {"type": "integer"}},
+    "trajectory": {"type": "array", "description": "per-checkpoint needle_d96 + routing diagnostics (write-read overlap, address entropy, grad norms, slot utilization)"},
+    "loss_log": {"type": "array"},
+    "retention_category": {"type": "string", "enum": ["NEVER_FORMED", "FORMED_AND_RETAINED", "FORMED_THEN_COLLAPSED", "LATE_FORMATION", "TRANSIENT_RECOVERY", "OTHER_PREDEFINED", "NOT_APPLICABLE"]},
+    "checkpoint_hashes": {"type": "object"},
+    "resume_history": {"type": "array"},
+    "raw_trace_archive_hash": {"type": ["string", "null"]},
+    "raw_trace_location": {"type": ["string", "null"]},
+    "train_s": {"type": "number"}
+  }
+}

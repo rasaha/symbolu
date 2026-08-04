@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bindingslots_confirmatory_run_manifest",
+  "type": "object",
+  "required": ["schema", "preregistration_commit", "code_commit", "frozen_cr1_config_sha256", "classifier_sha256", "fresh_seeds", "arms", "environment", "abc_json_sha256_before", "restart_events"],
+  "properties": {
+    "schema": {"const": "bindingslots_confirmatory/run_manifest/v1"},
+    "preregistration_commit": {"type": "string"},
+    "code_commit": {"type": "string"},
+    "frozen_cr1_config_sha256": {"type": "string"},
+    "classifier_sha256": {"type": "string"},
+    "fresh_seeds": {"type": "array", "items": {"type": "integer"}, "minItems": 5, "maxItems": 5},
+    "arms": {"type": "array", "items": {"type": "string"}},
+    "environment": {"type": "object"},
+    "abc_json_sha256_before": {"type": "string"},
+    "abc_json_sha256_after": {"type": ["string", "null"]},
+    "restart_events": {"type": "array"},
+    "seed_arm_status": {"type": "object"},
+    "raw_trace_archive_hashes": {"type": "object"}
+  }
+}

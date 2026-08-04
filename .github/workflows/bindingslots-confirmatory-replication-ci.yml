@@ -1,0 +1,145 @@
+name: bindingslots-confirmatory-replication-ci
+
+# Scoped CI for the BindingSlots confirmatory replication of frozen CR1.
+#
+# The push/PR job is TORCH-FREE and never runs the training matrix: it verifies the pre-registration
+# integrity, the frozen CR1 configuration, the fresh-seed proof, the mechanical classifier, the
+# causal gates, restart determinism, the artifact schemas, curated evidence, historical-artifact
+# integrity, the lab verifier, and terminology. It can verify committed results WITHOUT retraining.
+#
+# The expensive confirmatory run (A+/B0/CR1 x seeds 13-17) is available ONLY via manual dispatch.
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_confirmatory/**'
+      - 'docs/audits/bindingslots_confirmatory_replication/**'
+      - 'docs/research/bindingslots/**'
+      - '.github/workflows/bindingslots-confirmatory-replication-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_confirmatory/**'
+      - 'docs/audits/bindingslots_confirmatory_replication/**'
+      - '.github/workflows/bindingslots-confirmatory-replication-ci.yml'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'confirmatory_run | classify_only | verify_only'
+        required: true
+        default: 'verify_only'
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # --- historical-artifact-integrity (pre) ---
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      # --- preregistration + frozen-config + fresh-seed-proof ---
+      - name: Confirmatory pre-registration integrity (frozen-config + fresh-seed-proof)
+        run: python experiments/bindingslots_confirmatory/verify_confirmatory_prereg.py
+
+      # --- classifier-tests + causal-gate-tests + restart-determinism + artifact-schema + curated-evidence ---
+      - name: Classifier / causal / restart / schema / evidence tests
+        run: python experiments/bindingslots_confirmatory/tests/test_confirmatory.py
+
+      - name: Retention categorizer self-test
+        run: python experiments/bindingslots_confirmatory/retention.py
+
+      # --- curated-evidence: if results are committed, re-verify the verdict WITHOUT retraining ---
+      - name: Re-derive verdict from committed curated results (no training)
+        run: |
+          D=experiments/bindingslots_confirmatory/results/seeds
+          if [ -f "$D/CR1_results.json" ] && [ -f "$D/A+_results.json" ] && [ -f "$D/B0_results.json" ]; then
+            python experiments/bindingslots_confirmatory/classify_confirmatory.py --results-dir "$D"
+          else
+            echo "no committed results yet (RESOURCE_BLOCKED path) — skipping re-derivation"
+          fi
+
+      # --- lab-verifier + historical-artifact protection ---
+      - name: Lab integrity verifier
+        run: python hybrid_llm_vnext_lab/scripts/verify_lab.py
+      - name: Historical-artifact protection
+        run: python hybrid_llm_vnext_lab/scripts/verify_historical_artifact_protection.py
+
+      # --- terminology ---
+      - name: Terminology / no premature KDA promotion / no forbidden architecture
+        run: |
+          set -e
+          D=experiments/bindingslots_confirmatory
+          BARE=$(grep -rniE "READY_FOR_KDA_VALIDATION[^_]" $D docs/audits/bindingslots_confirmatory_replication docs/research/bindingslots 2>/dev/null | grep -viE "NOT_READY|ELIGIBLE_FOR_NEXT|KDA_VALIDATION_BLOCKED|not emitted|never emit" || true)
+          test -z "$BARE" || (echo "bare KDA-ready claim:" && echo "$BARE" && exit 1)
+          # scan only the harness modules (the verifier + tests legitimately list these tokens in a denylist)
+          FORB=$(grep -rniE "PhaseAttentionLayer|HybridPhaseTransformer|^import kda|^import mla|import MultiLatentAttention" \
+                 $D/run_confirmatory.py $D/classify_confirmatory.py $D/retention.py 2>/dev/null || true)
+          test -z "$FORB" || (echo "forbidden import:" && echo "$FORB" && exit 1)
+          ! test -f $D/pyproject.toml && ! test -f $D/setup.py && echo "no packaging files"
+
+      # --- historical-artifact-integrity (post) ---
+      - name: Frozen abc.json unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
+
+  run_confirmatory:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Disk space guard
+        run: df -h .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+      - name: Confirmatory pre-registration integrity
+        run: python experiments/bindingslots_confirmatory/verify_confirmatory_prereg.py
+      - name: Install CPU torch
+        if: ${{ inputs.job == 'confirmatory_run' }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu "numpy<2" "torch==2.*"
+          python -c "import torch;print('torch',torch.__version__)"
+      - name: Run confirmatory matrix (A+/B0/CR1 x seeds 13-17)
+        if: ${{ inputs.job == 'confirmatory_run' }}
+        run: OMP_NUM_THREADS=4 python experiments/bindingslots_confirmatory/run_confirmatory.py
+      - name: Classify (from committed or freshly-produced results)
+        if: ${{ inputs.job == 'confirmatory_run' || inputs.job == 'classify_only' }}
+        run: |
+          D=experiments/bindingslots_confirmatory/results/seeds
+          if [ -f "$D/CR1_results.json" ]; then
+            python experiments/bindingslots_confirmatory/classify_confirmatory.py --results-dir "$D" \
+              --out experiments/bindingslots_confirmatory/results/aggregate_result.json
+          else echo "no results to classify"; fi
+      - name: Verify only
+        if: ${{ inputs.job == 'verify_only' }}
+        run: |
+          python experiments/bindingslots_confirmatory/verify_confirmatory_prereg.py
+          python hybrid_llm_vnext_lab/scripts/verify_lab.py
+      - name: Frozen abc.json unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
+      - name: Upload confirmatory artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindingslots-confirmatory-results
+          path: experiments/bindingslots_confirmatory/results/**
+          if-no-files-found: ignore

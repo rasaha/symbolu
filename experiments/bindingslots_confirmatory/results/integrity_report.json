@@ -1,0 +1,100 @@
+{
+  "schema": "bindingslots_confirmatory/integrity_report/v1",
+  "frozen_code_hashes_ok": true,
+  "frozen_code_checks": [
+    {
+      "file": "experiments/phase_lc/results/abc.json",
+      "expected": "b31989a3135b150e",
+      "got": "b31989a3135b150e",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/neural_slots_only/models.py",
+      "expected": "5e95a1a17925d393",
+      "got": "5e95a1a17925d393",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/neural_slots_only/evaluate.py",
+      "expected": "51b94840786e28b1",
+      "got": "51b94840786e28b1",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/neural_slots_only/tasks_adapter.py",
+      "expected": "e836b9e1e47cf7f9",
+      "got": "e836b9e1e47cf7f9",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/src/binding_slots/legacy_phase_lc_slots.py",
+      "expected": "86d7065735cc917d",
+      "got": "86d7065735cc917d",
+      "ok": true
+    },
+    {
+      "file": "experiments/phase_lc/tasks.py",
+      "expected": "806e2445990f9c96",
+      "got": "806e2445990f9c96",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/five_seed_slots/ACCEPTANCE_GATES.json",
+      "expected": "1833db22587fffd3",
+      "got": "1833db22587fffd3",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/EXPERIMENT_MATRIX.json",
+      "expected": "cab332daebc8c27d",
+      "got": "cab332daebc8c27d",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/ACCEPTANCE_GATES.json",
+      "expected": "4bbd5d5940d30f4a",
+      "got": "4bbd5d5940d30f4a",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/SELECTION_RULE.json",
+      "expected": "5e8f350478b21aac",
+      "got": "5e8f350478b21aac",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/interventions.py",
+      "expected": "61f3b91cff92c10b",
+      "got": "61f3b91cff92c10b",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/stabilize.py",
+      "expected": "ef6e090f4ce7ba92",
+      "got": "ef6e090f4ce7ba92",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/diagnostics.py",
+      "expected": "27e2fe76cd7ba473",
+      "got": "27e2fe76cd7ba473",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py",
+      "expected": "3ca1e75fde529fcf",
+      "got": "3ca1e75fde529fcf",
+      "ok": true
+    },
+    {
+      "file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/SELECTED_CANDIDATE.json",
+      "expected": "360df8903815d139",
+      "got": "360df8903815d139",
+      "ok": true
+    }
+  ],
+  "abc_json_sha256_before": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_json_sha256_after": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+  "abc_json_unchanged": true,
+  "integrity_ok": true
+}

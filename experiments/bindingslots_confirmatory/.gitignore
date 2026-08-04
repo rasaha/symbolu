@@ -1,0 +1,11 @@
+# Transient training checkpoints / large model state are never committed (repository policy).
+# Curated per-seed JSON summaries + aggregate results ARE committed under results/.
+*.pt
+*.ckpt
+*.bin
+results/**/checkpoints/
+results/**/*.pt
+raw_traces/
+
+# transient run log
+results/run.log
