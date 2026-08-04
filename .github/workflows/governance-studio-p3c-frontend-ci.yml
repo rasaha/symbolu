@@ -92,10 +92,14 @@ jobs:
           cache-dependency-path: apps/ugence-governance-studio/frontend/package-lock.json
       - name: Install backend + tooling
         run: |
+          # Install the compiler + AWC editables in the SAME resolver transaction as the
+          # backend so the backend's local `ugence-agent-workforce-composer` dependency
+          # resolves from the monorepo instead of being sought on PyPI.
           pip install -c apps/ugence-governance-studio/backend/constraints.txt \
             "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest \
+            -e packages/tooling/policy-workflow-compiler \
+            -e packages/capabilities/agent-workforce-composer \
             apps/ugence-governance-studio/backend
-          pip install -e packages/capabilities/agent-workforce-composer
 
       - name: p3b-prerequisite
         run: python -m pytest apps/ugence-governance-studio/backend/tests -q
