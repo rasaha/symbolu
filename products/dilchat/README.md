@@ -5,12 +5,23 @@ DilChat is a mobile-first couples compatibility and communication product
 built in the first bounded implementation phase (**Phase A + the non-blocked
 parts of Phase B**).
 
-> **Status: Phase A/B foundation — NOT production-ready.**
+> **Status: internal development baseline — NOT production-ready.**
+> - **Internal development baseline** (backend + validation infrastructure only).
+> - **Guna authority: BLOCKED** — classical editions not frozen, four source
+>   conflicts unresolved, qualified Jyotisha/Sanskrit review pending.
+> - **Rule pack: non-executable** (`RULE_PACK_BLOCKED`; `executable:false`, all
+>   parihara disabled, 0 rules approved).
+> - **Swiss production licensing: unresolved** (AGPL vs professional license; DEC-007/OQ-10).
+> - **User-facing compatibility: disabled** — no Guna score, no compatibility
+>   endpoint, no report is produced or exposed.
+>
 > This package deliberately contains **no** user-facing Guna Milan, Living
 > Compatibility, AI/LLM guidance, daily transits, shared/private chat,
 > agreements, mobile/web clients, billing, or production-deployment code. See the
-> design and audit documents under [`docs/`](docs/) and the phase report,
-> [`docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md`](docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md).
+> design and audit documents under [`docs/`](docs/), the phase report
+> [`docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md`](docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md),
+> and the merge record
+> [`docs/DILCHAT_MERGE_READINESS_REPORT.md`](docs/DILCHAT_MERGE_READINESS_REPORT.md).
 
 ## What this package implements
 
