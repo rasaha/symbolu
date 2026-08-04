@@ -1,0 +1,22 @@
+{
+  "schema": "bindingslots_persistence/seed_classification/v1",
+  "arm": "R0",
+  "seed": 23,
+  "clean_stable": false,
+  "category": "FORMED_THEN_COLLAPSED",
+  "needle_d96_1200": 0.0,
+  "aplus_needle_d96_1200": 0.0,
+  "correct_slot_prob_1200": 0.9389475584030151,
+  "correct_slot_rank_1200": 0.20703125,
+  "address_margin_1200": 7.712489128112793,
+  "routing_clean": true,
+  "slots_off": 0.0,
+  "randomized_address": 0.0,
+  "slots_off_ok": false,
+  "randomized_address_ok": false,
+  "quality_ok": true,
+  "distance_ok": false,
+  "needle_step600": 0.9583333333333334,
+  "needle_step1200": 0.0,
+  "correct_slot_prob_step600": 0.9997681379318237
+}

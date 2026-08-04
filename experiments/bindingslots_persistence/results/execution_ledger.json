@@ -35,6 +35,41 @@
       "clean_stable": false,
       "category": "REFERENCE",
       "dir": "results/seeds/A+/seed_27"
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "clean_stable": false,
+      "category": "FORMED_THEN_COLLAPSED",
+      "dir": "results/seeds/R0/seed_23"
+    },
+    {
+      "arm": "R0",
+      "seed": 24,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/R0/seed_24"
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/R0/seed_25"
+    },
+    {
+      "arm": "R0",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "FORMED_THEN_COLLAPSED",
+      "dir": "results/seeds/R0/seed_26"
+    },
+    {
+      "arm": "R0",
+      "seed": 27,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/R0/seed_27"
     }
   ]
 }
