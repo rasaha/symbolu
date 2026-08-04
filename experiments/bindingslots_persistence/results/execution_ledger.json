@@ -154,6 +154,20 @@
       "clean_stable": false,
       "category": "QUALITY_FAILED",
       "dir": "results/seeds/O1/seed_25"
+    },
+    {
+      "arm": "O1",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_26"
+    },
+    {
+      "arm": "O1",
+      "seed": 27,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_27"
     }
   ]
 }
