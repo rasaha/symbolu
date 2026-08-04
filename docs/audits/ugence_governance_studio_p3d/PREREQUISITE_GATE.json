@@ -1,0 +1,29 @@
+{
+  "gate": "GOVERNANCE_STUDIO_P3D prerequisite",
+  "results": {
+    "pr_1322_p3c_hardening_merged": true,
+    "pr_1321_p3c_explorer_merged": true,
+    "pr_1318_p3b_api_merged": true,
+    "pr_1320_p3b_packaging_merged": true,
+    "backend_reports_0_1_0": true,
+    "api_contract_v1": true,
+    "openapi_in_sync_unchanged": true,
+    "awc_0_2_1": true,
+    "compiler_0_2_0": true,
+    "awc_dependency_bounded_lt_0_3_0": true,
+    "deployment_pin_0_2_1": true,
+    "ready_fails_for_unsupported_awc": true,
+    "fixture_three_way_manifest_v1_v2": true,
+    "c1_all_four_scenario_e2e": true,
+    "c2_permission_requirement_vs_proposal": true,
+    "c3_blocking_dependency_audit": true,
+    "c4_measured_wcag_contrast": true,
+    "contract_adequacy_verified_no_block": true,
+    "platform_freeze_digest_unchanged": true,
+    "working_tree_clean": true,
+    "no_existing_p3d_branch_or_frontend": true
+  },
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+  "verdict": "PASS"
+}

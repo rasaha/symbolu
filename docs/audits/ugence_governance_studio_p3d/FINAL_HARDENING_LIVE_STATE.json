@@ -1,0 +1,36 @@
+{
+  "phase": "governance_studio_p3d_final_hardening",
+  "live_default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_branch_tip": "340c29e1ca9b0457b4a79b810ec6f9d204894160",
+  "pr_1323": {
+    "state": "open",
+    "merged": false,
+    "merge_commit": null,
+    "base_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "head_branch": "claude/governance-studio-p3d-planning-explorer",
+    "head_commit_start": "0beadfeadc348418a5913c7dfb46e86b2e84cf97",
+    "checks_total": 0,
+    "mergeable_state": "unstable"
+  },
+  "later_hardening_pr_exists": false,
+  "changed_files_vs_base": 73,
+  "working_tree_clean": true,
+  "branch_decision": "pr_open_unmerged__apply_to_same_branch__push_to_1323__no_second_pr",
+  "working_branch": "claude/governance-studio-p3d-planning-explorer",
+  "baseline": {
+    "type_check": "clean",
+    "lint": "clean",
+    "vitest": "61 passed / 11 files",
+    "verify_openapi": "in_sync",
+    "verify_boundary": "PASS",
+    "verify_terminology": "PASS",
+    "verify_contrast": "PASS (34 pairs, lowest 4.09)",
+    "audit_dependencies": "PASS",
+    "playwright_e2e": "8 passed",
+    "platform_freeze": "PASS"
+  },
+  "frozen": {
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  }
+}

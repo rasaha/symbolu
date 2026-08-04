@@ -17,7 +17,7 @@ export default {
           0: "#f5f7fa",
           1: "#c7cedb",
           2: "#8b95a7",
-          3: "#727d90",
+          3: "#828da0",
         },
         state: {
           // Brightened to meet WCAG 2.2 AA on the app's dark tinted surfaces

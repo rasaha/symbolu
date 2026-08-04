@@ -95,3 +95,59 @@ export const explainEligibility = (scenarioId: string, roleId?: string) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(roleId ? { scenario_id: scenarioId, role_id: roleId } : { scenario_id: scenarioId }),
   }).then((e) => e.result);
+
+// -- P3D planning endpoints (decoded at the boundary) ----------------------
+import {
+  decodeCompare,
+  decodeExplainPlan,
+  decodePlan,
+  decodeRanking,
+  decodeReplay,
+  decodeWhatIf,
+} from "./decoders";
+
+export interface PlanSource {
+  scenario_id: string;
+  logical_time?: number;
+  perturbation?: { operation: string; params: Record<string, unknown> };
+}
+
+const enc = encodeURIComponent;
+const postJson = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+export const getScenarioRanking = (id: string) =>
+  envelope<unknown>(`/api/v1/scenarios/${enc(id)}/ranking`).then((e) => decodeRanking(e.result));
+
+export const getScenarioPlan = (id: string) =>
+  envelope<unknown>(`/api/v1/scenarios/${enc(id)}/plan`).then((e) => decodePlan(e.result));
+
+export const explainPlan = (scenarioId: string) =>
+  envelope<unknown>("/api/v1/explanations/plan", postJson({ scenario_id: scenarioId })).then((e) =>
+    decodeExplainPlan(e.result),
+  );
+
+export const explainRanking = (scenarioId: string) =>
+  envelope<unknown>("/api/v1/explanations/ranking", postJson({ scenario_id: scenarioId })).then(
+    (e) => e.result,
+  );
+
+export const replayPlan = (scenarioId: string, expectedPlan?: Record<string, unknown>) =>
+  envelope<unknown>(
+    "/api/v1/plans/replay",
+    postJson(expectedPlan ? { scenario_id: scenarioId, expected_plan: expectedPlan } : { scenario_id: scenarioId }),
+  ).then((e) => decodeReplay(e.result));
+
+export const comparePlans = (left: PlanSource, right: PlanSource) =>
+  envelope<unknown>("/api/v1/plans/compare", postJson({ left, right })).then((e) => decodeCompare(e.result));
+
+export const scenarioWhatIf = (id: string, operation: string, params: Record<string, unknown>) =>
+  envelope<unknown>(`/api/v1/scenarios/${enc(id)}/what-if`, postJson({ operation, params })).then((e) =>
+    decodeWhatIf(e.result),
+  );
+
+export const getScenarioExport = (id: string) =>
+  envelope<Record<string, unknown>>(`/api/v1/scenarios/${enc(id)}/export`).then((e) => e.result);

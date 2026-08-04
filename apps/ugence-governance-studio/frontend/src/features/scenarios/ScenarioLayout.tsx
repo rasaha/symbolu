@@ -11,6 +11,13 @@ const NAV = [
   { to: "workflow", label: "Workflow" },
   { to: "registry", label: "Registry" },
   { to: "eligibility", label: "Eligibility" },
+  { to: "ranking", label: "Ranking" },
+  { to: "composition", label: "Composition" },
+  { to: "permissions", label: "Permissions" },
+  { to: "fallbacks", label: "Fallbacks" },
+  { to: "replay", label: "Replay" },
+  { to: "compare", label: "Comparison" },
+  { to: "what-if", label: "What-If" },
 ];
 
 export function ScenarioLayout() {

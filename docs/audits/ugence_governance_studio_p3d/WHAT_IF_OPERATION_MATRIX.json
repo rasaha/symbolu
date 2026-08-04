@@ -1,0 +1,149 @@
+{
+  "check": "governance_studio_p3d_what_if_operation_matrix",
+  "backend": "real local ugence-governance-studio-api (governance_studio.api.v1)",
+  "scenario": "procurement",
+  "immutable_baseline": {
+    "distinct_baseline_fingerprints": 1,
+    "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+    "note": "identical across all nine operations => the frozen scenario/base plan is never mutated; each operation evaluates a fresh temporary copy"
+  },
+  "all_http_200": true,
+  "operations": [
+    {
+      "scenario_id": "procurement",
+      "operation": "FORBID_PROVIDER",
+      "request_params": {
+        "provider": "anthropic"
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:6eebd9448a5cd7cab16c3b808f6a40b40ae36b7aa977278d8589aa80325311c6",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "REQUIRE_RESIDENCY",
+      "request_params": {
+        "residency": "IN"
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:8d81d428e8b340e49218705a6e8adf1ce455a2204d0a3ba4fcbb65e2b023b419",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "TIGHTEN_COST_CEILING",
+      "request_params": {
+        "ceiling": 1.0
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:db59c3dbd281722ed81b4b82f4b706e2450166aa0f54d697ba266917008493a1",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "TIGHTEN_LATENCY_CEILING",
+      "request_params": {
+        "ceiling": 100.0
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:ac6661db4e66d61fb639252f13b819df27a262b734ddeac2b6f986a59132143b",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "REVOKE_AGENT_VERSION",
+      "request_params": {
+        "agent_version": "agent_general_analyst@1.0.0"
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:c135cb2d261faaa5caa20f5173054edf17f0bb52a32dc57bad182e17ec91f7dd",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "EXPIRE_EVIDENCE",
+      "request_params": {},
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:9d5fc415be64ecb17287b15b26e51bcde5576d0b42cb42eb135917b12012df21",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "TIGHTEN_PERMISSION_POLICY",
+      "request_params": {
+        "permission": "invoke_tool"
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "COMPLETE",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:35beacfb462a26ec31e49152af760701257b596a3cc5cd6035d0b7ec5f67e6c3",
+      "assignment_changes": 0,
+      "permission_changes": 3,
+      "fallback_changes": 1
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "TIGHTEN_PROVIDER_CONCENTRATION",
+      "request_params": {
+        "limit_pct": 25
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:49e1b3b73bef3c3d82c6298be11a2d4f0d6f20dc47fd548ba6adfe2fe212fa6d",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    },
+    {
+      "scenario_id": "procurement",
+      "operation": "REMOVE_CANDIDATE",
+      "request_params": {
+        "agent_id": "agent_general_analyst",
+        "agent_version": "1.0.0"
+      },
+      "http_status": 200,
+      "baseline_state": "COMPLETE",
+      "modified_state": "NO_FEASIBLE_TEAM",
+      "baseline_fingerprint": "sha256:c19735272e08e3df4c494b38a1287d6a8f13092ab0757989143102022361e900",
+      "modified_fingerprint": "sha256:f6a62b45925d2d094af812d2aabc4ce076e6121933df0f824549fe83ec142f94",
+      "assignment_changes": 3,
+      "permission_changes": 3,
+      "fallback_changes": 3
+    }
+  ],
+  "reset_semantics": "reset clears only client-held what-if state (submitted op+params and the result view); it issues no request and cannot alter the baseline",
+  "outcomes_api_supplied": "modified_state, modified plan fingerprint and plan_diff are taken verbatim from the backend response; the browser computes no ranking/composition/diff"
+}

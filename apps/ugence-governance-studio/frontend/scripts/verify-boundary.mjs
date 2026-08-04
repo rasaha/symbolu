@@ -35,20 +35,11 @@ function isImportLine(line) {
     t.includes(" from '") || t.startsWith("require(");
 }
 
-// P3D-only API operations must not be referenced anywhere in the frontend.
-const BANNED_API_PATHS = [
-  "/api/v1/ranking/",
-  "/api/v1/composition/",
-  "/api/v1/plans/replay",
-  "/api/v1/plans/compare",
-  "/api/v1/scenarios/${", // guard against building a what-if url — check literal below
-  "/what-if",
-  "/workflows/adapt",
-  "/workflows/validate",
-  "/workflows/compare-adaptations",
-  "/explanations/plan",
-  "/explanations/ranking",
-];
+// P3D consumes the ranking / plan / replay / compare / what-if / plan-explanation
+// endpoints, so those are no longer forbidden. The architecture boundary that
+// remains is: no AWC/compiler/backend/private imports and no model-provider SDK
+// (BANNED_IMPORT_MODULES + BANNED_ANYWHERE). No API path is banned in P3D.
+const BANNED_API_PATHS = [];
 
 function walk(dir) {
   const out = [];

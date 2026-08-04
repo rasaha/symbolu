@@ -10,7 +10,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, "..", "src");
 
 const BANNED = [
-  // ranking / selection / assignment language
+  // ranking / selection language that would misrepresent a recommendation
   "recommended agent",
   "preferred agent",
   "preferred eligible",
@@ -19,24 +19,26 @@ const BANNED = [
   "ranking score",
   "rank score",
   "recommended candidate",
-  "authorized to execute",
-  "permission granted",
   "agent selected",
   "selected agent",
   "assigned agent",
-  // P3D permission-PROPOSAL / granting / provisioning language (C2). P3C displays
-  // permission REQUIREMENTS used during eligibility, never composition-time
-  // proposals or grants. These phrases only appear if that boundary is crossed;
-  // the correct negated banner text ("No permission granting") does not match them.
-  "permission proposal",
-  "proposed permission",
-  "permission-bound proposal",
-  "permission bound proposal",
+  // grant / provisioning / authorization / execution language (§19). P3D DISPLAYS
+  // permission proposals and feasibility (now legitimate), but must never imply
+  // that access was granted, credentials issued, runtime permissions activated,
+  // or an external system changed. Negated notes ("do not grant/provision/activate")
+  // do not match these positive bigrams.
+  "permission granted",
   "grant permission",
   "granting permission to",
   "provision permission",
   "permission provisioning",
-  "permission-feasibility",
+  "runtime provisioning",
+  "access granted",
+  "credentials issued",
+  "permission activated",
+  "permissions became active",
+  "authorized to execute",
+  "action authorized",
 ];
 
 function walk(dir) {

@@ -40,3 +40,46 @@ export const useEligibilityExplanation = (id: string | undefined, roleId: string
     enabled: !!id,
     ...IMMUTABLE,
   });
+
+// -- P3D planning hooks (immutable per scenario/params) --------------------
+import {
+  comparePlans,
+  explainPlan,
+  getScenarioPlan,
+  getScenarioRanking,
+  replayPlan,
+  scenarioWhatIf,
+  getScenarioExport,
+  type PlanSource,
+} from "@/api/client";
+
+export const useRanking = (id: string | undefined) =>
+  useQuery({ queryKey: ["ranking", id], queryFn: () => getScenarioRanking(id!), enabled: !!id, ...IMMUTABLE });
+
+export const usePlan = (id: string | undefined) =>
+  useQuery({ queryKey: ["plan", id], queryFn: () => getScenarioPlan(id!), enabled: !!id, ...IMMUTABLE });
+
+export const useExplainPlan = (id: string | undefined) =>
+  useQuery({ queryKey: ["explainplan", id], queryFn: () => explainPlan(id!), enabled: !!id, ...IMMUTABLE });
+
+export const useReplay = (id: string | undefined, enabled: boolean) =>
+  useQuery({ queryKey: ["replay", id], queryFn: () => replayPlan(id!), enabled: !!id && enabled, ...IMMUTABLE });
+
+export const useCompare = (left: PlanSource | null, right: PlanSource | null) =>
+  useQuery({
+    queryKey: ["compare", left, right],
+    queryFn: () => comparePlans(left!, right!),
+    enabled: !!left && !!right,
+    ...IMMUTABLE,
+  });
+
+export const useWhatIf = (id: string | undefined, op: string | null, params: Record<string, unknown> | null) =>
+  useQuery({
+    queryKey: ["whatif", id, op, params],
+    queryFn: () => scenarioWhatIf(id!, op!, params ?? {}),
+    enabled: !!id && !!op && !!params,
+    ...IMMUTABLE,
+  });
+
+export const useScenarioExport = (id: string | undefined, enabled: boolean) =>
+  useQuery({ queryKey: ["export", id], queryFn: () => getScenarioExport(id!), enabled: !!id && enabled, ...IMMUTABLE });
