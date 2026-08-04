@@ -1,8 +1,10 @@
-// Controlled What-If Explorer (§24, §25). Only the nine allowlisted bounded
-// operations, driven by constrained controls (dropdowns from pinned data,
+// Controlled What-If Explorer (§24, §25; C2). Only the nine allowlisted bounded
+// operations, driven by constrained controls (selects from pinned registry data,
 // validated numeric inputs). No arbitrary JSON/policy/URL/code input. The frozen
-// scenario is never mutated — the API evaluates a temporary copy.
-import { useMemo, useState } from "react";
+// scenario is never mutated — the API evaluates a temporary copy and returns the
+// modified plan and diff. Request assembly is delegated to the pure, table-tested
+// OPERATION_SPECS so the submitted payload is exact and never silently defaulted.
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useRegistry, useWhatIf } from "@/hooks/queries";
 import { PlanningNote } from "@/components/MaturityBanner";
@@ -11,71 +13,63 @@ import { planState } from "@/lib/domain-p3d";
 import { LoadingState, QueryError } from "@/design-system/states";
 import { WHAT_IF_OPERATIONS, type WhatIfOperation } from "@/api/types-p3d";
 import type { AgentProfile } from "@/api/types";
-
-const PERMISSION_CHOICES = ["read_context", "write_context", "invoke_tool"];
+import {
+  OPERATION_SPECS,
+  PERMISSION_CHOICES,
+  seedDefaults,
+  type WhatIfOptions,
+} from "./operations";
 
 export function WhatIfScreen() {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const registry = useRegistry(scenarioId);
   const [op, setOp] = useState<WhatIfOperation>("FORBID_PROVIDER");
   const [submitted, setSubmitted] = useState<{ op: WhatIfOperation; params: Record<string, unknown> } | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
 
-  const profiles = useMemo(
-    () => (registry.data?.registry_snapshot.agent_profiles ?? []) as AgentProfile[],
-    [registry.data],
-  );
-  const providers = useMemo(() => [...new Set(profiles.map((p) => p.provider_id))].sort(), [profiles]);
-  const residencies = useMemo(() => [...new Set(profiles.map((p) => p.residency).filter(Boolean))].sort(), [profiles]);
-  const agents = useMemo(() => profiles.map((p) => ({ id: p.agent_id, v: p.agent_version })), [profiles]);
+  const options = useMemo<WhatIfOptions>(() => {
+    const profiles = (registry.data?.registry_snapshot.agent_profiles ?? []) as AgentProfile[];
+    return {
+      providers: [...new Set(profiles.map((p) => p.provider_id))].sort(),
+      residencies: [...new Set(profiles.map((p) => p.residency).filter(Boolean))].sort(),
+      agentRefs: profiles.map((p) => `${p.agent_id}@${p.agent_version}`),
+      permissions: PERMISSION_CHOICES,
+    };
+  }, [registry.data]);
 
+  const [fields, setFields] = useState<Record<string, string>>(() => seedDefaults("FORBID_PROVIDER", options));
+
+  // When the pinned registry loads, fill any empty select with its first allowed
+  // option so the displayed selection equals what will be submitted (never a silent
+  // default). Existing user selections and numeric inputs are left untouched.
+  useEffect(() => {
+    setFields((f) => {
+      const seeded = seedDefaults(op, options);
+      const merged = { ...f };
+      for (const k of Object.keys(seeded)) if (!merged[k]) merged[k] = seeded[k];
+      return merged;
+    });
+  }, [options, op]);
+
+  const changeOp = (next: WhatIfOperation) => {
+    setOp(next);
+    setSubmitted(null);
+    setFields(seedDefaults(next, options)); // drop stale fields from the previous operation
+  };
   const set = (k: string, v: string) => setFields((f) => ({ ...f, [k]: v }));
+
+  const spec = OPERATION_SPECS[op];
+  const built = spec.build(fields, options);
+  const canApply = "params" in built;
+
   const whatif = useWhatIf(scenarioId, submitted?.op ?? null, submitted?.params ?? null);
 
-  function buildParams(): Record<string, unknown> | null {
-    switch (op) {
-      case "FORBID_PROVIDER":
-        return { provider: fields.provider || providers[0] };
-      case "REQUIRE_RESIDENCY":
-        return { residency: fields.residency || residencies[0] || "IN" };
-      case "TIGHTEN_COST_CEILING":
-      case "TIGHTEN_LATENCY_CEILING": {
-        const n = Number(fields.ceiling);
-        if (!Number.isFinite(n) || n < 0) return null;
-        return { ceiling: n };
-      }
-      case "REVOKE_AGENT_VERSION": {
-        const a = fields.agent || (agents[0] && `${agents[0].id}@${agents[0].v}`);
-        return a ? { agent_version: a } : null;
-      }
-      case "EXPIRE_EVIDENCE":
-        return {};
-      case "TIGHTEN_PERMISSION_POLICY":
-        return { permission: fields.permission || PERMISSION_CHOICES[0] };
-      case "TIGHTEN_PROVIDER_CONCENTRATION": {
-        const n = Number(fields.limit_pct);
-        if (!Number.isInteger(n) || n < 0 || n > 100) return null;
-        return { limit_pct: n };
-      }
-      case "REMOVE_CANDIDATE": {
-        const sel = fields.candidate || (agents[0] && `${agents[0].id}@${agents[0].v}`);
-        if (!sel) return null;
-        const [agent_id, agent_version] = sel.split("@");
-        return { agent_id, agent_version };
-      }
-      default:
-        return null;
-    }
-  }
-
   const submit = () => {
-    const params = buildParams();
-    if (params === null) return;
-    setSubmitted({ op, params });
+    if (!("params" in built)) return;
+    setSubmitted({ op, params: built.params }); // exact params only for the current operation
   };
   const reset = () => {
     setSubmitted(null);
-    setFields({});
+    setFields(seedDefaults(op, options));
   };
 
   return (
@@ -92,12 +86,12 @@ export function WhatIfScreen() {
       <Card className="flex flex-wrap items-end gap-3 p-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="op" className="text-[11px] text-ink-3">Perturbation (bounded)</label>
-          <select id="op" value={op} onChange={(e) => { setOp(e.target.value as WhatIfOperation); setFields({}); }} className="rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1">
+          <select id="op" value={op} onChange={(e) => changeOp(e.target.value as WhatIfOperation)} className="rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1">
             {WHAT_IF_OPERATIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
-        <Controls op={op} fields={fields} set={set} providers={providers} residencies={residencies} agents={agents} />
-        <button type="button" onClick={submit} className="rounded border border-[#6aa9ff] bg-surface-3 px-3 py-1.5 text-sm text-ink-0 hover:bg-surface-2" data-testid="whatif-apply">
+        <Controls op={op} fields={fields} set={set} options={options} />
+        <button type="button" onClick={submit} disabled={!canApply} className="rounded border border-[#6aa9ff] bg-surface-3 px-3 py-1.5 text-sm text-ink-0 hover:bg-surface-2 disabled:opacity-50" data-testid="whatif-apply">
           Apply
         </button>
         {submitted && (
@@ -105,6 +99,7 @@ export function WhatIfScreen() {
             Reset to baseline
           </button>
         )}
+        {!canApply && <span className="text-[11px] text-state-ineligible" data-testid="whatif-invalid">{built.error}</span>}
       </Card>
 
       {whatif.isLoading && <LoadingState label="Evaluating what-if…" />}
@@ -142,49 +137,48 @@ export function WhatIfScreen() {
 }
 
 function Controls({
-  op, fields, set, providers, residencies, agents,
+  op, fields, set, options,
 }: {
   op: WhatIfOperation;
   fields: Record<string, string>;
   set: (k: string, v: string) => void;
-  providers: string[];
-  residencies: string[];
-  agents: { id: string; v: string }[];
+  options: WhatIfOptions;
 }) {
-  const sel = (id: string, key: string, opts: { value: string; label: string }[]) => (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[11px] text-ink-3">{key}</label>
-      <select id={id} value={fields[key] ?? ""} onChange={(e) => set(key, e.target.value)} className="rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1">
-        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  );
-  const numField = (id: string, key: string, label: string) => (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[11px] text-ink-3">{label}</label>
-      <input id={id} type="number" min={0} value={fields[key] ?? ""} onChange={(e) => set(key, e.target.value)} className="w-28 rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1" />
-    </div>
-  );
-
-  switch (op) {
-    case "FORBID_PROVIDER":
-      return sel("f-provider", "provider", providers.map((p) => ({ value: p, label: p })));
-    case "REQUIRE_RESIDENCY":
-      return sel("f-residency", "residency", [...residencies, "IN"].map((r) => ({ value: r, label: r })));
-    case "TIGHTEN_COST_CEILING":
-    case "TIGHTEN_LATENCY_CEILING":
-      return numField("f-ceiling", "ceiling", "ceiling");
-    case "REVOKE_AGENT_VERSION":
-      return sel("f-agentv", "agent", agents.map((a) => ({ value: `${a.id}@${a.v}`, label: `${a.id}@${a.v}` })));
-    case "EXPIRE_EVIDENCE":
-      return <span className="text-[11px] text-ink-3">Advances logical time past evidence validity.</span>;
-    case "TIGHTEN_PERMISSION_POLICY":
-      return sel("f-perm", "permission", PERMISSION_CHOICES.map((p) => ({ value: p, label: p })));
-    case "TIGHTEN_PROVIDER_CONCENTRATION":
-      return numField("f-pct", "limit_pct", "limit %");
-    case "REMOVE_CANDIDATE":
-      return sel("f-cand", "candidate", agents.map((a) => ({ value: `${a.id}@${a.v}`, label: `${a.id}@${a.v}` })));
-    default:
-      return null;
+  const spec = OPERATION_SPECS[op];
+  if (spec.controls.length === 0) {
+    return <span className="text-[11px] text-ink-3">No parameters — advances logical time past evidence validity.</span>;
   }
+  return (
+    <>
+      {spec.controls.map((c) => {
+        const id = `wf-${op}-${c.key}`;
+        if (c.kind === "select") {
+          const opts = c.options(options);
+          return (
+            <div key={c.key} className="flex flex-col gap-1">
+              <label htmlFor={id} className="text-[11px] text-ink-3">{c.label}</label>
+              <select id={id} value={fields[c.key] ?? ""} onChange={(e) => set(c.key, e.target.value)} className="rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1">
+                {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          );
+        }
+        return (
+          <div key={c.key} className="flex flex-col gap-1">
+            <label htmlFor={id} className="text-[11px] text-ink-3">{c.label}</label>
+            <input
+              id={id}
+              type="number"
+              min={c.min}
+              max={c.max}
+              step={c.integer ? 1 : "any"}
+              value={fields[c.key] ?? ""}
+              onChange={(e) => set(c.key, e.target.value)}
+              className="w-28 rounded border border-surface-border bg-surface-0 px-2 py-1 text-sm text-ink-1"
+            />
+          </div>
+        );
+      })}
+    </>
+  );
 }

@@ -42,10 +42,18 @@ export function CompositionScreen() {
       </header>
       <PlanningNote />
 
-      {p.plan_state === "NO_FEASIBLE_TEAM" ? (
-        <NoFeasibleTeam plan={p} />
-      ) : (
+      {p.plan_state === "NO_FEASIBLE_TEAM" && <NoFeasibleTeam plan={p} />}
+      {p.plan_state === "SEARCH_SPACE_EXCEEDED" && <SearchSpaceExceeded plan={p} />}
+      {p.plan_state === "INVALID_INPUT" && <InvalidInput plan={p} />}
+
+      {(p.plan_state === "COMPLETE" || p.plan_state === "PARTIAL") && (
         <>
+          {p.plan_state === "PARTIAL" && (
+            <p className="rounded border border-state-indeterminate/40 bg-state-indeterminate/10 p-3 text-sm text-ink-1" data-testid="partial-notice">
+              Partial team: some roles are filled below; the remaining roles could not be filled under the pinned
+              registry and policies. Unfilled roles are listed as returned — none are fabricated.
+            </p>
+          )}
           {/* assignments */}
           <div className="overflow-x-auto rounded-lg border border-surface-border">
             <table className="min-w-[760px] w-full text-sm">
@@ -221,6 +229,53 @@ function NoFeasibleTeam({ plan }: { plan: import("@/api/types-p3d").AgentTeamPla
             {plan.team_constraint_results.filter((c) => !c.satisfied).map((c) => c.constraint).join(", ") || "see search statistics"}
           </Field>
           <Field label="Search termination">{plan.search_statistics.termination_reason}</Field>
+          <Field label="Plan fingerprint"><Fingerprint value={plan.plan_fingerprint} label="plan" /></Field>
+        </dl>
+      </Section>
+    </Card>
+  );
+}
+
+function SearchSpaceExceeded({ plan }: { plan: import("@/api/types-p3d").AgentTeamPlan }) {
+  const s = plan.search_statistics;
+  return (
+    <Card className="border-state-invalid/40 p-4" data-testid="search-space-exceeded">
+      <Section title="Search space exceeded">
+        <p className="mb-2 text-sm text-ink-1">
+          The composition search hit its bounded limit before a team could be confirmed. No team is
+          shown because none was confirmed — the browser runs no search and invents no best-effort team.
+          This is a valid planning outcome returned by the backend, not a request failure; re-running
+          would re-invoke the backend search, never any client-side search.
+        </p>
+        <dl>
+          <Field label="Search space size">{String(s.search_space_size)}</Field>
+          <Field label="Assignments explored">{String(s.assignments_explored)}</Field>
+          <Field label="Assignments pruned">{String(s.assignments_pruned)}</Field>
+          <Field label="Termination reason">{s.termination_reason}</Field>
+          <Field label="Unfilled roles">{displayOrUnresolved(plan.unfilled_roles, "list")}</Field>
+          <Field label="Plan fingerprint"><Fingerprint value={plan.plan_fingerprint} label="plan" /></Field>
+        </dl>
+      </Section>
+    </Card>
+  );
+}
+
+function InvalidInput({ plan }: { plan: import("@/api/types-p3d").AgentTeamPlan }) {
+  return (
+    <Card className="border-state-invalid/40 p-4" data-testid="invalid-input">
+      <Section title="Invalid input">
+        <p className="mb-2 text-sm text-ink-1">
+          The planning inputs failed the backend's canonical validation, so no plan was composed. No
+          assignment, permission proposal or fallback is shown because none exists — nothing is
+          fabricated, and the browser computes no ranking or composition. This is a domain validation
+          result, distinct from malformed transport JSON or a network failure.
+        </p>
+        <dl>
+          <Field label="Validation diagnostics">
+            {plan.team_constraint_results.filter((c) => !c.satisfied).map((c) => c.constraint).join(", ")
+              || plan.search_statistics.termination_reason || "see backend diagnostics"}
+          </Field>
+          <Field label="Unfilled roles">{displayOrUnresolved(plan.unfilled_roles, "list")}</Field>
           <Field label="Plan fingerprint"><Fingerprint value={plan.plan_fingerprint} label="plan" /></Field>
         </dl>
       </Section>

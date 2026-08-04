@@ -15,8 +15,11 @@
     "generate:api": "node scripts/generate-api.mjs",
     "verify:openapi": "node scripts/verify-openapi.mjs",
     "verify:boundary": "node scripts/verify-boundary.mjs",
+    "verify:api-boundary": "node scripts/verify-api-boundary.mjs",
     "verify:terminology": "node scripts/verify-terminology.mjs",
     "verify:contrast": "node scripts/verify-contrast.mjs",
+    "verify:version": "node scripts/verify-version.mjs",
+    "verify:tracked-sources": "node scripts/verify-tracked-sources.mjs",
     "audit:dependencies": "node scripts/verify-dependency-audit.mjs",
     "e2e": "playwright test"
   },

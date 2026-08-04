@@ -6,6 +6,9 @@ import {
   evaluatePairs,
   parseHex,
   relativeLuminance,
+  validateClassifications,
+  isLargeText,
+  requiredRatio,
 } from "../scripts/verify-contrast.mjs";
 
 describe("contrast math (C4)", () => {
@@ -76,5 +79,58 @@ describe("canonical token contrast (C4)", () => {
 
   it("every pair meets its WCAG threshold", () => {
     for (const r of rows) expect(r.ratio, r.name).toBeGreaterThanOrEqual(r.threshold);
+  });
+
+  it("resolves the former 4.09 pair: every normal-text pair meets 4.5", () => {
+    const normal = rows.filter((r: { content_type: string }) => r.content_type === "normal_text");
+    for (const r of normal) expect(r.ratio, r.name).toBeGreaterThanOrEqual(4.5);
+    // no pair relies on a large-text or inactive-component exception
+    expect(rows.every((r: { content_type: string }) => r.content_type !== "large_text")).toBe(true);
+    expect(rows.every((r: { content_type: string }) => r.content_type !== "inactive_component_exception")).toBe(true);
+  });
+});
+
+describe("contrast classification enforcement (C3)", () => {
+  it("the real token set classifies cleanly", () => {
+    expect(validateClassifications(buildPairs())).toEqual([]);
+  });
+
+  it("large-text WCAG rule (≥24px, or ≥18.66px bold)", () => {
+    expect(isLargeText(24, 400)).toBe(true);
+    expect(isLargeText(19, 700)).toBe(true);
+    expect(isLargeText(16, 700)).toBe(false);
+    expect(isLargeText(18, 400)).toBe(false);
+  });
+
+  it("normal text requires 4.5, non-text/large/focus require 3.0", () => {
+    expect(requiredRatio("normal_text")).toBe(4.5);
+    expect(requiredRatio("large_text")).toBe(3.0);
+    expect(requiredRatio("non_text_ui")).toBe(3.0);
+    expect(requiredRatio("focus_indicator")).toBe(3.0);
+    expect(requiredRatio("inactive_component_exception")).toBe(0);
+  });
+
+  const base = { name: "x", fg: "#ffffff", bg: "#000000", font_size_px: 14, font_weight: 400, rationale: "r" };
+  it("rejects a missing content_type", () => {
+    expect(validateClassifications([{ ...base, content_type: undefined }]).length).toBeGreaterThan(0);
+  });
+  it("rejects an unknown content_type", () => {
+    expect(validateClassifications([{ ...base, content_type: "huge_text" }])[0]).toMatch(/unknown content_type/);
+  });
+  it("rejects normal text below 4.5 (cannot borrow the 3:1 threshold)", () => {
+    // ~4.0:1 grey on white — below normal-text 4.5
+    const errs = validateClassifications([{ ...base, fg: "#8a8a8a", bg: "#ffffff", content_type: "normal_text" }]);
+    expect(errs.some((e: string) => e.includes("below required 4.5"))).toBe(true);
+  });
+  it("rejects large_text classification without qualifying size/weight", () => {
+    const errs = validateClassifications([{ ...base, font_size_px: 14, font_weight: 400, content_type: "large_text" }]);
+    expect(errs.some((e: string) => e.includes("large_text classification without qualifying"))).toBe(true);
+  });
+  it("rejects an inactive-component exception without rationale", () => {
+    const errs = validateClassifications([{ ...base, content_type: "inactive_component_exception", rationale: "" }]);
+    expect(errs.some((e: string) => e.includes("without documented rationale"))).toBe(true);
+  });
+  it("rejects a missing foreground/background", () => {
+    expect(validateClassifications([{ ...base, fg: "", content_type: "normal_text" }]).some((e: string) => e.includes("missing foreground"))).toBe(true);
   });
 });
