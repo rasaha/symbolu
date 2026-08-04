@@ -1,0 +1,435 @@
+{
+  "authority_class": "CONTROLLED_EXECUTION",
+  "auto_approval_present_in": [
+    "cloud_scaling_operations/orchestrator.py",
+    "cloud_scaling_operations/main.py"
+  ],
+  "canonical_namespace": "ugence_cloud_scaling_operations",
+  "distribution": "ugence-cloud-scaling-operations",
+  "execution_capability": "INFRASTRUCTURE_MUTATION",
+  "listener_modules": [
+    "cloud_scaling_operations/observability/metrics_server.py"
+  ],
+  "modules": [
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/__init__.py",
+      "public_symbols": [],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/__init__.py",
+      "public_symbols": [],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.shadow.divergence"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/feedback.py",
+      "public_symbols": [
+        "FeedbackSignal",
+        "FeedbackConfig",
+        "FeedbackAdjustment",
+        "FeedbackCycleResult",
+        "FeedbackLoop"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "mutation entrypoint \u2014 MUST be gated by ExecutionAuthorization in the controlled facade",
+      "credential_requirements": true,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": true,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/gate_actuator.py",
+      "public_symbols": [
+        "GateMode",
+        "GateAction",
+        "GateConfig",
+        "GateResult",
+        "GateActuator"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "mutation entrypoint \u2014 MUST be gated by ExecutionAuthorization in the controlled facade",
+      "credential_requirements": true,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": true,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/k8s_actuator.py",
+      "public_symbols": [
+        "ActuatorMode",
+        "ActuatorConfig",
+        "ExecutionResult",
+        "K8sActuator"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": [
+        "kubernetes"
+      ]
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/outcome.py",
+      "public_symbols": [
+        "OutcomeVerdict",
+        "OutcomeConfig",
+        "OutcomeRecord",
+        "OutcomeTracker"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/policy.py",
+      "public_symbols": [
+        "BlackoutWindow",
+        "DeploymentPolicy",
+        "PolicyConfig",
+        "PolicyCheckResult",
+        "PolicyEngine"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/readiness.py",
+      "public_symbols": [
+        "ReadinessStatus",
+        "ReadinessConfig",
+        "ReadinessResult",
+        "ReadinessChecker"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/action/rollback.py",
+      "public_symbols": [
+        "RollbackVerdict",
+        "RollbackConfig",
+        "RollbackWatch",
+        "RollbackMonitor"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.config",
+        "ugence_cloud_scaling_controller.controller",
+        "ugence_cloud_scaling_controller.recommend.confidence",
+        "ugence_cloud_scaling_controller.recommend.safety",
+        "ugence_cloud_scaling_controller.signals.pipeline",
+        "ugence_cloud_scaling_controller.signals.prometheus"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/main.py",
+      "public_symbols": [
+        "main"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": [
+        "yaml"
+      ]
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.observability"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/observability/__init__.py",
+      "public_symbols": [],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/observability/exporter.py",
+      "public_symbols": [
+        "ExporterMode",
+        "ExporterConfig",
+        "BuiltinMetric",
+        "BuiltinHistogram",
+        "MetricsExporter"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": [
+        "prometheus_client"
+      ]
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": true,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/observability/metrics_server.py",
+      "public_symbols": [
+        "MetricsServerConfig",
+        "MetricsServer"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/observability/otel_exporter.py",
+      "public_symbols": [
+        "OtelExporterConfig",
+        "OtelExporter"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": [
+        "opentelemetry"
+      ]
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.config",
+        "ugence_cloud_scaling_controller.controller",
+        "ugence_cloud_scaling_controller.explain.explainer",
+        "ugence_cloud_scaling_controller.observability.decision_log",
+        "ugence_cloud_scaling_controller.signals.pipeline"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/orchestrator.py",
+      "public_symbols": [
+        "OrchestratorConfig",
+        "OrchestrationCycleResult",
+        "ProductionOrchestrator"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.recommend"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/recommend/__init__.py",
+      "public_symbols": [],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.controller",
+        "ugence_cloud_scaling_controller.recommend.confidence",
+        "ugence_cloud_scaling_controller.recommend.safety"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/recommend/approval.py",
+      "public_symbols": [
+        "ApprovalState",
+        "Recommendation",
+        "ApprovalManager"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.controller",
+        "ugence_cloud_scaling_controller.recommend.confidence",
+        "ugence_cloud_scaling_controller.recommend.safety"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/recommend/engine.py",
+      "public_symbols": [
+        "RecommendConfig",
+        "RecommendCycleResult",
+        "RecommendEngine"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": true,
+      "imported_advisory_interfaces": [],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/recommend/webhook.py",
+      "public_symbols": [
+        "WebhookTarget",
+        "WebhookConfig",
+        "WebhookFormatter",
+        "SlackFormatter",
+        "PagerDutyFormatter",
+        "OpsGenieFormatter",
+        "WebhookDispatcher"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.shadow"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/shadow/__init__.py",
+      "public_symbols": [],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.observability.efficiency_observer"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": true,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/shadow/live_efficiency.py",
+      "public_symbols": [
+        "LiveEfficiencyConfig",
+        "LiveCycle",
+        "LiveEfficiencyReport",
+        "LiveEfficiencyShadow"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    },
+    {
+      "authority_note": "non-mutating support/observe",
+      "credential_requirements": false,
+      "imported_advisory_interfaces": [
+        "ugence_cloud_scaling_controller.controller",
+        "ugence_cloud_scaling_controller.shadow.divergence",
+        "ugence_cloud_scaling_controller.shadow.hpa_watcher",
+        "ugence_cloud_scaling_controller.shadow.reporter",
+        "ugence_cloud_scaling_controller.signals.pipeline",
+        "ugence_cloud_scaling_controller.signals.prometheus"
+      ],
+      "listener_capability": false,
+      "mutation_capability": false,
+      "network_capability": false,
+      "packaging_decision": "PACKAGE_INTO_ugence_cloud_scaling_operations",
+      "path": "cloud_scaling_operations/shadow/runner.py",
+      "public_symbols": [
+        "ShadowConfig",
+        "ShadowCycleResult",
+        "ShadowRunner"
+      ],
+      "subprocess_capability": false,
+      "third_party_deps": []
+    }
+  ],
+  "mutation_entrypoints": [
+    "cloud_scaling_operations/action/gate_actuator.py",
+    "cloud_scaling_operations/action/k8s_actuator.py"
+  ],
+  "source_namespace": "cloud_scaling_operations"
+}

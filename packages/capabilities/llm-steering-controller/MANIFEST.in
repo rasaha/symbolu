@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include module_manifest.json
+include src/ugence_llm_steering_controller/py.typed
+recursive-include fixtures *.json
+# Exclude tests, scripts, docs, examples, and CI-generated evidence from the sdist/wheel.
+recursive-exclude tests *
+recursive-exclude scripts *
+recursive-exclude docs *
+recursive-exclude examples *
+recursive-exclude artifacts *
+global-exclude __pycache__ *.pyc

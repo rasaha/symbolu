@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "cluster_identifier": {
+      "type": "string"
+    },
+    "current_replicas": {
+      "type": "integer"
+    },
+    "desired_replicas": {
+      "type": "integer"
+    },
+    "generation": {
+      "type": "integer"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "observation_timestamp": {
+      "type": "number"
+    },
+    "observed_generation": {
+      "type": "integer"
+    },
+    "resource_kind": {
+      "type": "string"
+    },
+    "resource_name": {
+      "type": "string"
+    },
+    "resource_uid": {
+      "type": "string"
+    },
+    "resource_version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "cluster_identifier",
+    "namespace",
+    "resource_kind",
+    "resource_name",
+    "resource_uid",
+    "resource_version",
+    "current_replicas",
+    "observation_timestamp"
+  ],
+  "title": "ObservationRecord",
+  "type": "object"
+}

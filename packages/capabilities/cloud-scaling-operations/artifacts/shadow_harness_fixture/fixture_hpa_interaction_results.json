@@ -1,0 +1,55 @@
+{
+  "all_ok": true,
+  "cases": [
+    {
+      "case": "no_hpa",
+      "classification": "NO_HPA",
+      "contention_risk": false,
+      "expected": "NO_HPA",
+      "ok": true,
+      "within_bounds": null
+    },
+    {
+      "case": "compatible",
+      "classification": "HPA_OBSERVED_COMPATIBLE",
+      "contention_risk": false,
+      "expected": "HPA_OBSERVED_COMPATIBLE",
+      "ok": true,
+      "within_bounds": true
+    },
+    {
+      "case": "bounds_conflict",
+      "classification": "HPA_BOUNDS_CONFLICT",
+      "contention_risk": true,
+      "expected": "HPA_BOUNDS_CONFLICT",
+      "ok": true,
+      "within_bounds": false
+    },
+    {
+      "case": "direction_conflict",
+      "classification": "HPA_OBSERVED_CONFLICT",
+      "contention_risk": true,
+      "expected": "HPA_OBSERVED_CONFLICT",
+      "ok": true,
+      "within_bounds": true
+    },
+    {
+      "case": "state_incomplete",
+      "classification": "HPA_STATE_INCOMPLETE",
+      "contention_risk": false,
+      "expected": "HPA_STATE_INCOMPLETE",
+      "ok": true,
+      "within_bounds": null
+    }
+  ],
+  "classifications_present": [
+    "HPA_BOUNDS_CONFLICT",
+    "HPA_OBSERVED_COMPATIBLE",
+    "HPA_OBSERVED_CONFLICT",
+    "HPA_STATE_INCOMPLETE",
+    "NO_HPA"
+  ],
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "real_cluster_accessed": false,
+  "real_environment_observed": false
+}

@@ -1,0 +1,154 @@
+{
+  "expect": {
+    "status": "RECOMMENDED"
+  },
+  "name": "policy_version_change",
+  "registry": {
+    "models": [
+      {
+        "availability_class": "global",
+        "capabilities": [
+          "chat",
+          "code"
+        ],
+        "context_limit": 128000,
+        "cost_class": "medium",
+        "latency_class": "fast",
+        "modalities_in": [
+          "text"
+        ],
+        "modalities_out": [
+          "text"
+        ],
+        "model_id": "gpt-fast",
+        "provider_id": "openai",
+        "quality_tier": "advanced",
+        "regions": [
+          "us",
+          "eu"
+        ],
+        "reliability_class": "high",
+        "structured_output": true,
+        "tool_use": true
+      },
+      {
+        "availability_class": "broad",
+        "capabilities": [
+          "chat",
+          "code",
+          "vision"
+        ],
+        "context_limit": 200000,
+        "cost_class": "high",
+        "latency_class": "medium",
+        "modalities_in": [
+          "text",
+          "image"
+        ],
+        "modalities_out": [
+          "text"
+        ],
+        "model_id": "claude-premium",
+        "privacy_tier": "high",
+        "provider_id": "anthropic",
+        "quality_tier": "frontier",
+        "regions": [
+          "us"
+        ],
+        "reliability_class": "very_high",
+        "structured_output": true,
+        "tool_use": true
+      },
+      {
+        "capabilities": [
+          "chat"
+        ],
+        "context_limit": 32000,
+        "cost_class": "very_low",
+        "latency_class": "medium",
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "onprem-small",
+        "privacy_tier": "high",
+        "provider_id": "local",
+        "quality_tier": "standard",
+        "regions": [
+          "eu"
+        ],
+        "reliability_class": "medium"
+      },
+      {
+        "capabilities": [
+          "chat"
+        ],
+        "context_limit": 64000,
+        "cost_class": "very_low",
+        "latency_class": "very_fast",
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "trainy-cheap",
+        "privacy_tier": "standard",
+        "provider_id": "trainy",
+        "quality_tier": "economy",
+        "regions": [
+          "us"
+        ],
+        "reliability_class": "low"
+      },
+      {
+        "context_limit": 8000,
+        "cost_class": "low",
+        "deprecation_state": "deprecated",
+        "latency_class": "fast",
+        "modalities_in": [
+          "text"
+        ],
+        "model_id": "legacy-deprecated",
+        "provider_id": "openai",
+        "quality_tier": "standard",
+        "regions": [
+          "us"
+        ]
+      }
+    ],
+    "providers": [
+      {
+        "provider_id": "openai",
+        "regions": [
+          "us",
+          "eu"
+        ],
+        "trains_on_data": false
+      },
+      {
+        "provider_id": "anthropic",
+        "regions": [
+          "us"
+        ],
+        "trains_on_data": false
+      },
+      {
+        "provider_id": "trainy",
+        "regions": [
+          "us"
+        ],
+        "trains_on_data": true
+      },
+      {
+        "deployment_mode": "on_prem",
+        "provider_id": "local",
+        "regions": [
+          "eu"
+        ]
+      }
+    ]
+  },
+  "request": {
+    "policy_version": "steering-policy-CUSTOM-9",
+    "requirements": {
+      "estimated_input_tokens": 2000
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "properties": {
+    "cases": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "classifications_present": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "evidence_class": {
+      "const": "FAKE_LOCAL_FIXTURE",
+      "type": "string"
+    },
+    "real_cluster_accessed": {
+      "type": "boolean"
+    },
+    "real_environment_observed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "evidence_class",
+    "cases",
+    "classifications_present"
+  ],
+  "title": "HpaInteractionResults",
+  "type": "object"
+}

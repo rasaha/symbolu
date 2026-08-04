@@ -1,0 +1,169 @@
+{
+  "all_ok": true,
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "real_cluster_accessed": false,
+  "real_environment_observed": false,
+  "scenarios": [
+    {
+      "denial_code": null,
+      "denial_reason": null,
+      "expected_result": "AUTHORIZED_FOR_SHADOW_PLAN",
+      "ok": true,
+      "result": "AUTHORIZED_FOR_SHADOW_PLAN",
+      "scenario": "valid_matching_authorization"
+    },
+    {
+      "denial_code": "missing_authorization",
+      "denial_reason": "no authorization supplied",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "missing_authorization"
+    },
+    {
+      "denial_code": "expired",
+      "denial_reason": "authorization expired",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "expired_authorization"
+    },
+    {
+      "denial_code": "not_yet_valid",
+      "denial_reason": "authorization not yet valid",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "not_yet_valid_authorization"
+    },
+    {
+      "denial_code": "malformed",
+      "denial_reason": "missing authorization_id/nonce",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "malformed_authorization"
+    },
+    {
+      "denial_code": "tenant_mismatch",
+      "denial_reason": "tenant mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "tenant_mismatch"
+    },
+    {
+      "denial_code": "cluster_mismatch",
+      "denial_reason": "cluster mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "cluster_mismatch"
+    },
+    {
+      "denial_code": "namespace_mismatch",
+      "denial_reason": "namespace mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "namespace_mismatch"
+    },
+    {
+      "denial_code": "resource_kind_mismatch",
+      "denial_reason": "resource kind mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "resource_kind_mismatch"
+    },
+    {
+      "denial_code": "resource_name_mismatch",
+      "denial_reason": "resource name mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "resource_name_mismatch"
+    },
+    {
+      "denial_code": "action_mismatch",
+      "denial_reason": "action mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "action_mismatch"
+    },
+    {
+      "denial_code": "bounds_violation",
+      "denial_reason": "target 8 outside authorized bounds",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "replica_bounds_exceeded"
+    },
+    {
+      "denial_code": "delta_violation",
+      "denial_reason": "delta 6 exceeds max",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "maximum_delta_exceeded"
+    },
+    {
+      "denial_code": "recommendation_mismatch",
+      "denial_reason": "recommendation mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "recommendation_mismatch"
+    },
+    {
+      "denial_code": "policy_version_mismatch",
+      "denial_reason": "policy version mismatch",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "policy_version_mismatch"
+    },
+    {
+      "denial_code": "stale_observation",
+      "denial_reason": "observation age 9999.0s",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "stale_observation"
+    },
+    {
+      "denial_code": "untrusted_issuer",
+      "denial_reason": "issuer 'rogue' not trusted",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "untrusted_issuer"
+    },
+    {
+      "denial_code": "bad_signature",
+      "denial_reason": "invalid signature",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "invalid_test_signature"
+    },
+    {
+      "denial_code": "nonce_replay",
+      "denial_reason": "authorization nonce replayed",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "reused_nonce"
+    },
+    {
+      "denial_code": "reused_authorization_changed_target",
+      "denial_reason": "idempotency key reused with a different request",
+      "expected_result": "DENIED",
+      "ok": true,
+      "result": "DENIED",
+      "scenario": "reused_authorization_changed_target"
+    }
+  ],
+  "total": 20
+}

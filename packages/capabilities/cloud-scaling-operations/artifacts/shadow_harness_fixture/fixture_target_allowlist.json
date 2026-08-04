@@ -1,0 +1,33 @@
+{
+  "approved": [
+    "fake-cluster/shadow-test/Deployment/frontend"
+  ],
+  "cluster_identifier": "fake-cluster",
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "maximum_target_count": 20,
+  "namespaces": [
+    "shadow-test"
+  ],
+  "real_cluster_accessed": false,
+  "real_environment_observed": false,
+  "rejected": [
+    {
+      "reason": "namespace 'kube-system' not allowlisted",
+      "target": "fake-cluster/kube-system/Deployment/frontend"
+    },
+    {
+      "reason": "kind 'Secret' is credential-bearing/forbidden",
+      "target": "fake-cluster/shadow-test/Secret/db-creds"
+    }
+  ],
+  "resource_kinds": [
+    "Deployment",
+    "StatefulSet",
+    "HorizontalPodAutoscaler"
+  ],
+  "resource_name_patterns": [
+    "frontend",
+    "worker",
+    "api"
+  ]
+}

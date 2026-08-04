@@ -1,0 +1,13 @@
+/dist/
+/build/
+*.egg-info/
+__pycache__/
+*.pyc
+.venv/
+/artifacts/distribution_verification.json
+/artifacts/package_inventory.json
+/artifacts/dependency_audit.json
+/artifacts/build_provenance.json
+/artifacts/sbom.json
+/artifacts/evidence_sha256.json
+/artifacts/shadow_harness/

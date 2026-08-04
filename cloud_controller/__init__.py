@@ -34,7 +34,7 @@ import importlib as _importlib
 import sys as _sys
 
 _CANON = "ugence_cloud_scaling_controller"
-_OPS = "cloud_scaling_operations"
+_OPS = "ugence_cloud_scaling_operations"
 _LEGACY = "cloud_controller"
 
 # Legacy submodule dotted-name prefixes that now live in the OPERATIONS namespace.
@@ -78,8 +78,8 @@ def _ensure_importable(dist_name: str, *rel_dir_parts: str) -> None:
 
 
 _ensure_importable(_CANON, "packages", "capabilities", "cloud-scaling-controller", "src")
-# Operations namespace lives at the repository root (monorepo-only).
-_ensure_importable(_OPS)
+# Operations now live in the independent ugence-cloud-scaling-operations package.
+_ensure_importable(_OPS, "packages", "capabilities", "cloud-scaling-operations", "src")
 
 
 class _CloudControllerFinder:
