@@ -1,0 +1,42 @@
+{
+  "check": "governance_studio_p3d_final_contrast_classification",
+  "report_schema": "governance_studio.contrast_report.v2",
+  "report_path": "apps/ugence-governance-studio/frontend/artifacts/contrast-report.json",
+  "former_lowest": {
+    "pair": "button text (disabled) on surface-2",
+    "ratio": 4.09,
+    "prior_classification": "large",
+    "prior_fg": "#727d90"
+  },
+  "resolution": "raised ink-3 token #727d90 -> #828da0; reclassified affected pairs as normal_text; no large_text or inactive_component_exception used",
+  "token_change": {
+    "ink-3": {
+      "before": "#727d90",
+      "after": "#828da0"
+    }
+  },
+  "pair_count": 34,
+  "failed_pairs": [],
+  "classification_errors": [],
+  "lowest_passing_ratio": 4.69,
+  "lowest_normal_text_ratio": 4.69,
+  "lowest_pair": {
+    "name": "deterministic-service state foreground/background",
+    "foreground": "#8b95a7",
+    "background": "#1a2e34",
+    "content_type": "normal_text",
+    "font_size_px": 12,
+    "font_weight": 600,
+    "ratio": 4.69,
+    "required_ratio": 4.5,
+    "rationale": "Status pill label 12px/600 meets normal-text 4.5."
+  },
+  "content_types": [
+    "normal_text",
+    "large_text",
+    "non_text_ui",
+    "focus_indicator",
+    "inactive_component_exception"
+  ],
+  "result": "PASS"
+}

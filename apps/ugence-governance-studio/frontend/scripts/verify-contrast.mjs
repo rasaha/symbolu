@@ -18,8 +18,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.dirname(HERE);
 const REPORT_PATH = path.join(FRONTEND, "artifacts", "contrast-report.json");
 
-const THRESHOLDS = { normal: 4.5, large: 3.0, nontext: 3.0 };
-
 // WCAG 2.2 content-type classification (C3). Each pair declares WHAT it is; the
 // required ratio is derived from that classification plus the rendered typography,
 // so a pair can never quietly borrow the wrong (lower) threshold.
@@ -32,7 +30,7 @@ export function isLargeText(px, weight) {
 
 // Required ratio for a classified pair. inactive_component_exception has no minimum
 // (WCAG 1.4.3 exempts inactive components) but MUST carry a rationale.
-export function requiredRatio(contentType, px, weight) {
+export function requiredRatio(contentType) {
   switch (contentType) {
     case "normal_text": return 4.5;
     case "large_text": return 3.0;
@@ -61,7 +59,7 @@ export function validateClassifications(pairs) {
       errors.push(`${where}: inactive_component_exception without documented rationale`);
     }
     // normal text must use 4.5 (never the 3:1 large/non-text threshold)
-    const req = requiredRatio(p.content_type, p.font_size_px, p.font_weight);
+    const req = requiredRatio(p.content_type);
     if (p.content_type === "normal_text" && req !== 4.5) errors.push(`${where}: normal_text must require 4.5`);
     if (p.fg && p.bg) {
       const ratio = contrastRatio(p.fg, p.bg);
@@ -131,7 +129,7 @@ export function buildPairs() {
   const add = (name, fg, bg, content_type, px, weight, rationale) =>
     p.push({
       name, fg, bg, content_type, font_size_px: px, font_weight: weight, rationale,
-      kind: KIND[content_type], threshold: requiredRatio(content_type, px, weight),
+      kind: KIND[content_type], threshold: requiredRatio(content_type),
     });
 
   add("primary body text on primary background", T("ink", "1"), s0, "normal_text", 16, 400, "Primary body copy at 16px/400 meets normal-text 4.5.");
