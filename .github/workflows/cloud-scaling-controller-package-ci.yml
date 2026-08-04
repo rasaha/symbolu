@@ -1,0 +1,136 @@
+name: cloud-scaling-controller-package-ci
+
+# Scoped CI for the independent Cloud Scaling Controller capability package.
+# Advisory-only and offline: no live cluster, no cloud credentials, no network
+# actuation. The clean-install proof builds a wheel and installs it into an isolated
+# virtual environment created outside the repository.
+
+on:
+  push:
+    paths:
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - "cloud_controller/**"
+      - "symbolu/__init__.py"
+      - "tests/cloud_controller/**"
+      - "docs/audits/cloud_scaling_controller/**"
+      - "conftest.py"
+      - ".github/workflows/cloud-scaling-controller-package-ci.yml"
+  pull_request:
+    paths:
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - "cloud_controller/**"
+      - "symbolu/__init__.py"
+      - "tests/cloud_controller/**"
+      - "docs/audits/cloud_scaling_controller/**"
+      - "conftest.py"
+      - ".github/workflows/cloud-scaling-controller-package-ci.yml"
+
+jobs:
+  cloud-scaling-package:
+    runs-on: ubuntu-latest
+    env:
+      # PYTHONPATH is deliberately NOT set job-wide: the clean-install verifier and
+      # build steps must not see the monorepo source path. Test steps that need the
+      # legacy shims rely on the repo-root conftest.py (which adds src + repo root).
+      PKG: packages/capabilities/cloud-scaling-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip build pytest pip-audit numpy
+
+      - name: Source duplication audit (single-source verifier)
+        run: python "$PKG/scripts/audit_single_source.py"
+
+      - name: Forbidden-import scan (core imports no cloud SDK / Ugence package)
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          src = pathlib.Path("packages/capabilities/cloud-scaling-controller/src/ugence_cloud_scaling_controller")
+          # Modules that must never be imported at MODULE TOP LEVEL (they gate the core
+          # import surface). Optional integrations import these lazily inside functions.
+          forbidden_top = {
+              "boto3", "botocore", "azure", "kubernetes", "requests",
+              "prometheus_client", "opentelemetry", "yaml", "fastapi", "uvicorn", "flask",
+              "governance_studio", "decision_governance", "actiongate", "agent_runtime",
+              "hybrid_llm", "ai_hiring", "control_plane",
+          }
+          violations = []
+          for p in src.rglob("*.py"):
+              tree = ast.parse(p.read_text())
+              for node in tree.body:  # module top-level only
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      mods = [node.module.split(".")[0]]
+                  for m in mods:
+                      if m in forbidden_top:
+                          violations.append(f"{p}: top-level import {m}")
+          if violations:
+              print("\n".join(violations)); sys.exit(1)
+          print("forbidden-import scan clean")
+          PY
+
+      - name: Byte-compile (syntax) check
+        run: python -m py_compile $(git ls-files "$PKG/src" | grep '\.py$')
+
+      - name: Package-local tests (isolation)
+        run: python -m pytest "$PKG/tests" -q
+
+      - name: Existing Cloud Scaling regression tests
+        run: python -m pytest tests/cloud_controller -q
+
+      - name: Behavior-baseline parity
+        run: python -m pytest "$PKG/tests/behavior/test_baseline_parity.py" -q
+
+      - name: Build wheel + sdist
+        run: python -m build "$PKG" -o "$PKG/dist"
+
+      - name: Clean-environment distribution verifier
+        run: python "$PKG/verify_cloud_scaling_controller_distribution.py"
+
+      - name: CLI smoke test (offline)
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          src = "packages/capabilities/cloud-scaling-controller/src"
+          def run(args, **kw):
+              return subprocess.run([sys.executable, "-m", "ugence_cloud_scaling_controller.cli", *args],
+                                    env={"PYTHONPATH": src, "PATH": __import__("os").environ["PATH"]},
+                                    capture_output=True, text=True, **kw)
+          v = run(["version"]); assert v.returncode == 0 and "0.1.0" in v.stdout, v.stderr
+          d = run(["demo"]); assert d.returncode == 0 and '"advisory_only": true' in d.stdout, d.stderr
+          e = run(["evaluate", "--input", "-"], input='{"metrics":{"cpu":0.9},"current_replicas":3}')
+          assert e.returncode == 0 and '"schema_version": "1.0"' in e.stdout, e.stderr
+          bad = run(["evaluate", "--input", "-"], input="{not json")
+          assert bad.returncode != 0, "invalid input must exit nonzero"
+          print("CLI smoke OK")
+          PY
+
+      - name: pip check + pip-audit (installed wheel runtime closure)
+        run: |
+          python -m venv /tmp/csc-audit
+          /tmp/csc-audit/bin/python -m pip install --quiet --find-links "$PKG/dist" ugence-cloud-scaling-controller
+          /tmp/csc-audit/bin/python -m pip check
+          # Audit the package's RUNTIME dependency closure (numpy), not the venv's build
+          # tooling (pip/setuptools/wheel are not our dependencies). The local package
+          # itself is not on PyPI and is excluded.
+          /tmp/csc-audit/bin/python -m pip freeze \
+            | grep -ivE "^(pip|setuptools|wheel|ugence-cloud-scaling-controller)==" \
+            > /tmp/csc-runtime-reqs.txt
+          echo "auditing runtime closure:" && cat /tmp/csc-runtime-reqs.txt
+          python -m pip_audit -r /tmp/csc-runtime-reqs.txt
+
+      - name: Upload evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-controller-evidence
+          path: |
+            packages/capabilities/cloud-scaling-controller/artifacts/*.json
+            packages/capabilities/cloud-scaling-controller/dist/*
+          if-no-files-found: warn

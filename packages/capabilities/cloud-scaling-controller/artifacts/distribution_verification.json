@@ -1,0 +1,136 @@
+{
+  "checks": [
+    {
+      "check": "build_wheel_and_sdist",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "wheel_no_foreign_top_level",
+      "detail": "foreign=[]",
+      "passed": true
+    },
+    {
+      "check": "wheel_ships_py_typed",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "wheel_excludes_tests_caches_secrets_git",
+      "detail": "bad=[]",
+      "passed": true
+    },
+    {
+      "check": "wheel_single_controller_copy",
+      "detail": "copies=['ugence_cloud_scaling_controller/controller.py']",
+      "passed": true
+    },
+    {
+      "check": "wheel_excludes_legacy_namespaces",
+      "detail": "legacy=[]",
+      "passed": true
+    },
+    {
+      "check": "install_wheel_only",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "pip_check",
+      "detail": "No broken requirements found.",
+      "passed": true
+    },
+    {
+      "check": "metadata_version",
+      "detail": "got='0.1.0'",
+      "passed": true
+    },
+    {
+      "check": "isolated_probe_ran",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "import_canonical_package",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "no_monorepo_path_in_module",
+      "detail": "/tmp/tmp536mdjjf/venv/lib/python3.11/site-packages/ugence_cloud_scaling_controller/__init__.py",
+      "passed": true
+    },
+    {
+      "check": "demo_executes",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "advisory_only_invariant",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "json_serialization",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "correlation_id_preserved",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "no_forbidden_packages_installed",
+      "detail": "present=[]",
+      "passed": true
+    },
+    {
+      "check": "legacy_imports_not_shipped_in_wheel",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "cli_version",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "cli_demo",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "cli_evaluate",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "cli_nonzero_on_invalid",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "check": "installed_single_implementation",
+      "detail": "found=['controller.py']",
+      "passed": true
+    },
+    {
+      "check": "core_dependency_is_numpy_only",
+      "detail": "core_reqs=['numpy>=1.24.0']",
+      "passed": true
+    }
+  ],
+  "distribution": "ugence-cloud-scaling-controller",
+  "expected_version": "0.1.0",
+  "import_namespace": "ugence_cloud_scaling_controller",
+  "sdist": {
+    "name": "ugence_cloud_scaling_controller-0.1.0.tar.gz",
+    "sha256": "efadc44d0aa8154b3b08637dfec1b529d4ef77c45f7453e7134e64b7a134773d"
+  },
+  "verdict": "VERIFIED",
+  "wheel": {
+    "name": "ugence_cloud_scaling_controller-0.1.0-py3-none-any.whl",
+    "sha256": "a8d51bbd5ea21028a5f71ca850327fe42837e8b7ae10f2ae06f05db3ed2f3fe8"
+  }
+}

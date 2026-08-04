@@ -1,0 +1,81 @@
+# Independent distribution for the canonical Ugence Cloud Scaling Controller.
+#
+# This is the ONE canonical source tree (``src/ugence_cloud_scaling_controller``) for
+# the coherence-aware adaptive scaling controller: it consumes normalized workload /
+# infrastructure observations and produces deterministic, explainable scaling
+# RECOMMENDATIONS. It is provider-neutral and advisory-only by default — it never
+# scales infrastructure, calls a cloud-provider API, changes an HPA, runs kubectl or
+# Terraform, opens a network listener, or invokes an LLM.
+#
+# Dependency policy: the core requires Python + NumPy only. Optional read-only signal
+# adapters and exporters live behind extras (prometheus / shadow / otel), each backed
+# by real code. No cloud-provider SDK, web framework, database driver, model-provider
+# SDK, or Ugence governance/agent/control-plane package is a runtime dependency.
+#
+# The legacy ``cloud_controller`` (repo root) and ``symbolu.cloud_controller``
+# namespaces are logic-free compatibility surfaces that re-export this package with
+# object identity preserved.
+#
+# Build:  python -m build packages/capabilities/cloud-scaling-controller
+# Verify: python packages/capabilities/cloud-scaling-controller/verify_cloud_scaling_controller_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-controller"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Controller — deterministic, provider-neutral, advisory-only adaptive scaling recommendations from normalized workload observations."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["scaling", "autoscaling", "controller", "kubernetes", "advisory", "deterministic", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Core runtime dependency: NumPy only.
+dependencies = [
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+# Read-only Prometheus ingestion adapter (requests) + Prometheus metrics exporter.
+prometheus = [
+    "requests>=2.28.0",
+    "prometheus-client>=0.16.0",
+]
+# Read-only Kubernetes HPA/state watcher for shadow-mode comparison + YAML config.
+shadow = [
+    "kubernetes>=26.1.0",
+    "PyYAML>=6.0",
+]
+# OpenTelemetry metric/trace export (optional observability).
+otel = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+]
+# Development / verification tooling.
+dev = [
+    "pytest>=7.0",
+    "build>=1.0",
+    "pip-audit>=2.6",
+]
+
+[project.scripts]
+ugence-cloud-scaling = "ugence_cloud_scaling_controller.cli:main"
+
+# Read statically from the version module's literal so the build backend never imports
+# the package to resolve the version.
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_controller.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_controller*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_controller = ["py.typed"]
