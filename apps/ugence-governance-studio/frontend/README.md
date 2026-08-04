@@ -66,13 +66,16 @@ Configure the API URL with `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`)
 npm run type-check         # strict TS
 npm run lint               # eslint, 0 warnings
 npm run test               # vitest: unit + component + decoders + a11y (axe)
-npm run verify:openapi     # generated-client drift vs frozen contract
-npm run verify:boundary    # no AWC/compiler/backend imports, no model SDKs
-npm run verify:terminology # no grant/provisioning/authorization/execution language
-npm run verify:contrast    # measured WCAG 2.2 token contrast (34 pairs)
-npm run audit:dependencies # blocking: fail on high/critical production vulnerabilities
-npm run build              # production build
-npm run e2e                # Playwright: all four scenarios against the real backend
+npm run verify:openapi       # generated-client drift vs frozen contract
+npm run verify:api-boundary  # positive allowlist: only approved public operations consumed
+npm run verify:boundary      # no AWC/compiler/backend imports, no model SDKs
+npm run verify:terminology   # no grant/provisioning/authorization/execution language
+npm run verify:contrast      # measured WCAG 2.2 token contrast, content-type classified (34 pairs)
+npm run verify:version       # package/lockfile/docs all report 0.2.0
+npm run verify:tracked-sources # every imported source file is git-tracked (clean-checkout safety)
+npm run audit:dependencies   # blocking: fail on high/critical production vulnerabilities
+npm run build                # production build
+npm run e2e                  # Playwright: all scenarios + nine-operation what-if matrix (real backend)
 ```
 
 ## Boundaries

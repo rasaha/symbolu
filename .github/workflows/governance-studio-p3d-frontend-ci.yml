@@ -43,6 +43,8 @@ jobs:
 
       - name: openapi-client-freeze
         run: npm run verify:openapi
+      - name: public-api-operation-allowlist
+        run: npm run verify:api-boundary
       - name: architecture-boundary
         run: npm run verify:boundary
       - name: terminology
@@ -51,16 +53,24 @@ jobs:
         run: npx vitest run tests/permission-scope.test.tsx
       - name: contrast-verification
         run: npm run verify:contrast
+      - name: contrast-classification
+        run: npx vitest run tests/contrast.test.ts
+      - name: frontend-version-consistency
+        run: npm run verify:version
+      - name: tracked-source-verification
+        run: npm run verify:tracked-sources
       - name: production-dependency-audit
         run: npm run audit:dependencies
       - name: dependency-exception-validation
-        run: npx vitest run tests/dependency-audit.test.ts tests/contrast.test.ts
+        run: npx vitest run tests/dependency-audit.test.ts
       - name: typecheck
         run: npm run type-check
       - name: lint
         run: npm run lint
       - name: response-decoder-tests
         run: npx vitest run tests/decoders.test.ts
+      - name: api-allowlist-tests
+        run: npx vitest run tests/api-allowlist.test.ts
       - name: unit-tests
         run: npx vitest run tests/unit.test.ts tests/client.test.ts
       - name: component-tests
@@ -69,6 +79,8 @@ jobs:
         run: npx vitest run tests/p3d-screens.test.tsx -t "Ranking Explorer"
       - name: composition-ui-suite
         run: npx vitest run tests/p3d-screens.test.tsx -t "Composition Explorer"
+      - name: plan-state-domain-rendering
+        run: npx vitest run tests/plan-states.test.tsx
       - name: permission-proposal-suite
         run: npx vitest run tests/p3d-screens.test.tsx -t "Permission proposals"
       - name: fallback-suite
@@ -79,12 +91,29 @@ jobs:
         run: npx vitest run tests/p3d-screens.test.tsx -t "Comparison"
       - name: what-if-suite
         run: npx vitest run tests/p3d-screens.test.tsx -t "Controlled what-if"
+      - name: what-if-request-matrix
+        run: npx vitest run tests/whatif-mapping.test.ts tests/whatif-screen.test.tsx
       - name: accessibility-suite
         run: npx vitest run tests/a11y.test.tsx
       - name: production-build
         run: npm run build
       - name: bundle-report
         run: du -sh dist && ls -la dist/assets
+      - name: clean-checkout-build
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -e
+          TMP="$(mktemp -d)"
+          # archive the committed tree (frontend + the frozen contract it reads)
+          git archive HEAD apps/ugence-governance-studio/frontend apps/ugence-governance-studio/contracts | tar -x -C "$TMP"
+          cd "$TMP/apps/ugence-governance-studio/frontend"
+          test -f src/lib/config.ts && test -f src/lib/domain.ts && test -f src/lib/domain-p3d.ts
+          npm ci
+          npm run verify:tracked-sources
+          npm run verify:version
+          npm run verify:api-boundary
+          npm run type-check
+          npm run build
 
   integration:
     runs-on: ubuntu-latest
@@ -156,6 +185,11 @@ jobs:
         working-directory: apps/ugence-governance-studio/frontend
         # all four planning-explorer scenario flows against the real local backend
         run: npx playwright test e2e/planning-explorer.spec.ts
+
+      - name: what-if-real-backend-matrix
+        working-directory: apps/ugence-governance-studio/frontend
+        # all nine controlled what-if operations against the real local backend
+        run: npx playwright test e2e/what-if-matrix.spec.ts
 
       - name: platform-freeze
         run: python -m platform_freeze.verify

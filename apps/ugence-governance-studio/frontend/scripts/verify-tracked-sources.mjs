@@ -29,7 +29,7 @@ export function parseSpecifiers(text) {
 }
 
 // Resolve a specifier to an existing file path, or null for bare packages / unresolved.
-export function resolveSpecifier(spec, fromFile, { frontendDir, srcDir }) {
+export function resolveSpecifier(spec, fromFile, { srcDir }) {
   let baseNoExt;
   if (spec.startsWith("@/")) baseNoExt = path.join(srcDir, spec.slice(2));
   else if (spec.startsWith(".")) baseNoExt = path.resolve(path.dirname(fromFile), spec);
