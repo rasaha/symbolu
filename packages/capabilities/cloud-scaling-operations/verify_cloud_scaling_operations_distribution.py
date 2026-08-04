@@ -140,9 +140,11 @@ def main() -> int:
 import json, sys, socket, threading, importlib.util as iu
 _os = socket.socket
 flags = {"socket": False, "threads0": threading.active_count()}
-def boom(*a, **k):
-    flags["socket"] = True; return _os(*a, **k)
-socket.socket = boom
+class _Tracked(_os):   # subclass so stdlib (ssl) can still subclass socket
+    def __init__(self, *a, **k):
+        flags["socket"] = True
+        super().__init__(*a, **k)
+socket.socket = _Tracked
 import ugence_cloud_scaling_operations as O
 from ugence_cloud_scaling_operations import (
     ControlledScalingExecutor, OperationsConfig, ExecutionMode, ExecutionRequest,
