@@ -1,0 +1,14 @@
+{
+  "schema": "runtime-package-inventory.v1",
+  "python_runtime": {
+    "fastapi": "0.141.1",
+    "starlette": "1.3.1",
+    "uvicorn": "0.52.1",
+    "pydantic": "2.13.4",
+    "governance-studio-deployment": null,
+    "ugence-governance-studio-api": null,
+    "ugence-agent-workforce-composer": null,
+    "policy-workflow-compiler": null
+  },
+  "note": "backend/AWC/compiler installed from the monorepo; framework deps pinned by the image build"
+}

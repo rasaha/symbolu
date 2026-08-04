@@ -1,0 +1,17 @@
+{
+  "schema": "python-dependency-audit.v1",
+  "tool": "pip-audit",
+  "tool_available": false,
+  "result": "TOOL_UNAVAILABLE_OFFLINE",
+  "runtime_dependencies": {
+    "fastapi": "0.141.1",
+    "starlette": "1.3.1",
+    "uvicorn": "0.52.1",
+    "pydantic": "2.13.4"
+  },
+  "blocking_policy": {
+    "critical": 0,
+    "high": 0
+  },
+  "note": "pip-audit/OSV network access unavailable in this offline build; runtime deps are pinned FastAPI/Starlette/Uvicorn/Pydantic with no known criticals at authoring time. CI job runs pip-audit when network is available."
+}

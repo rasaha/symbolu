@@ -1,0 +1,21 @@
+# Keep secrets, VCS metadata, test/build cruft and node_modules out of the image.
+.git
+.gitignore
+**/.git
+**/node_modules
+**/dist
+**/.vite
+**/coverage
+**/playwright-report
+**/test-results
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.env
+**/*.env
+**/.env.*
+deployment/governance-studio/tests/certs
+**/artifacts/dependency-audit-report.json
+*.key
+*.pem

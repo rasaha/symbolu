@@ -1,0 +1,30 @@
+{
+  "schema_version": "1",
+  "deployment": "governance-studio-private-hosted",
+  "deployment_version": "0.1.0",
+  "single_process": true,
+  "exposed_ports": ["8443/tcp"],
+  "runtime_user": "10001:10001",
+  "read_only_root_filesystem": true,
+  "writable_paths": ["/tmp", "/var/run/ugence-studio"],
+  "tls": {"minimum_version": "TLSv1.2", "plaintext_listener": false},
+  "authentication": "http_basic_over_https",
+  "unauthenticated_paths": ["/healthz", "/readyz"],
+  "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY",
+  "external_network_egress": "none",
+  "capabilities_dropped": "ALL",
+  "no_new_privileges": true,
+  "frozen": {
+    "frontend_version": "0.2.0",
+    "backend_api_version": "0.1.0",
+    "api_contract": "governance_studio.api.v1",
+    "awc_version": "0.2.1",
+    "compiler_version": "0.2.0",
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656"
+  },
+  "prohibited": [
+    "permission_granting", "credential_provisioning", "business_action_authorization",
+    "agent_execution", "external_model_calls", "external_tool_calls", "production_data",
+    "multitenancy", "persistent_database"
+  ]
+}

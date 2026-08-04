@@ -1,0 +1,8 @@
+{
+  "schema": "container-scan.v1",
+  "result": "NOT_EXECUTED",
+  "reason": "no Docker daemon in build environment; image not built/run here",
+  "ci_gated": true,
+  "scanner": "trivy",
+  "target": "governance-studio-private-hosted:0.1.0"
+}
