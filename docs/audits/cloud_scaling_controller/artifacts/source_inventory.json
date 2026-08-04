@@ -1,0 +1,1400 @@
+{
+  "copies": {
+    "canonical_top": {
+      "path": "cloud_controller/",
+      "runtime_role": "CANONICAL executable implementation (superset; unique replay/ subpackage, newer signals/prometheus.py, observability/efficiency_observer.py, shadow/live_efficiency.py)",
+      "tracked_py_files": 61
+    },
+    "nested_duplicate": {
+      "path": "cloud_controller/cloud_controller/",
+      "runtime_role": "STALE nested duplicate; imported by no live code; byte-identical to canonical except older signals/prometheus.py",
+      "tracked_py_files": 46
+    },
+    "symbolu_duplicate": {
+      "path": "symbolu/cloud_controller/",
+      "runtime_role": "DEAD physical copy shadowed at runtime by symbolu/__init__.py _SymboluFinder which routes symbolu.cloud_controller.* -> top-level cloud_controller.*; differs from canonical only by import-path prefix except older signals/prometheus.py",
+      "tracked_py_files": 46
+    }
+  },
+  "files": [
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/__init__.py",
+      "sha256": "91f76b93f43239bd3c6b784fc025586a432daf1cd9334e86beef81a6b8960eb3",
+      "size_bytes": 830
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/__init__.py",
+      "sha256": "9f4e723df13024b252f2ce2e521a4bf557e28cff949df79916d9fc389b2c5e59",
+      "size_bytes": 2303
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.feedback",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/feedback.py",
+      "sha256": "3bc81bff2615bf95e0fb3b2c79ec4553aabde99c28bf5b12aaf0a9ccf9f81b30",
+      "size_bytes": 20743
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.gate_actuator",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/gate_actuator.py",
+      "sha256": "c581bdb4234dab7a108e504f9ffd9e550a6bd2752d40ad0a6f421d09d6e7f61d",
+      "size_bytes": 12380
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.k8s_actuator",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/k8s_actuator.py",
+      "sha256": "140450f0418ef99a719a1f7e17edf97a9be720a70270f4055225e6820d0aea71",
+      "size_bytes": 11749
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.outcome",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/outcome.py",
+      "sha256": "8edd3a8f75d88cec1c32b48cfdec36791dbc115ab6a4ddb8da09a6f3e394abcc",
+      "size_bytes": 12954
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.policy",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/policy.py",
+      "sha256": "e1f3ad69ac3c8ced864d0b08a77f34ff03e01b9f8fcfd682e6550df996965cdf",
+      "size_bytes": 7512
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.readiness",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/readiness.py",
+      "sha256": "e829e31869943ee994b5c593253b2cea37adfa137266a7a74cd9f75cacc319dc",
+      "size_bytes": 5665
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.action.rollback",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/action/rollback.py",
+      "sha256": "8685e812213f7fb22a79c9b2bc2b15172347515a0380bb5640ae033cf6b6eaba",
+      "size_bytes": 13005
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.config",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/config.py",
+      "sha256": "731d31c4eaf9e496d65352cf71ee1ac1434f18baa8c2f288ba0b8ec65a514e88",
+      "size_bytes": 5439
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.controller",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/controller.py",
+      "sha256": "61102f3bb67e405386ac33fbdf38ba275f07872b51ca2a426c4f74721f119925",
+      "size_bytes": 41383
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/__init__.py",
+      "sha256": "4c2afc88e95f390b4ce605100132ad9d6bcbe8d8c5e002f8fdf9932cfed04d7a",
+      "size_bytes": 568
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.adaptive_gain",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/adaptive_gain.py",
+      "sha256": "41bf5d60055ab97677693980e8c4729225fd0237e0098d53e777e22c9b59b10f",
+      "size_bytes": 4617
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.coherence",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/coherence.py",
+      "sha256": "d991a7a5c8739807b9224bc70456839b32078490e7995d37320637453159ff92",
+      "size_bytes": 7748
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.damping",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/damping.py",
+      "sha256": "ff56422107f6f3fae56917a0a38868f31fd7b1c51b31ece85d41934ff49f9426",
+      "size_bytes": 6702
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.identity_ema",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/identity_ema.py",
+      "sha256": "0f39b927bd63620b7791ff8531e9d290f520600fa7f2c432c676cf35033db86c",
+      "size_bytes": 9196
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.plasticity_gate",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/plasticity_gate.py",
+      "sha256": "8b5b51dd65dcb9bc7a8ae861fb5656e042b5306ec2021fdb7d5b0cd23e660246",
+      "size_bytes": 3451
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.core.replay_buffer",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/core/replay_buffer.py",
+      "sha256": "d582bf25de2c8179fd7cac7853484995784093386ae8bede453678b07f249097",
+      "size_bytes": 2800
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.explain",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/explain/__init__.py",
+      "sha256": "59ed22f66ea628202d0f0a20e1f29751b1fcfbb9d2aebe36947e4a157b078d7a",
+      "size_bytes": 319
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.explain.explainer",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/explain/explainer.py",
+      "sha256": "aff11688e357ee071d7d5fc6dea6eed72246f9ec1e18e3978de524db02197376",
+      "size_bytes": 17344
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.main",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/main.py",
+      "sha256": "851a7074f99683d508aac28407fb80734d4207300b65c74e47460550f5d02a48",
+      "size_bytes": 10503
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/__init__.py",
+      "sha256": "3ce29109f618f3c77f9c577fb230b15fbe4996763c32abe2de9eb251dc53fc53",
+      "size_bytes": 1706
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.benchmark",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/benchmark.py",
+      "sha256": "d7a4a35ea0c6db7c0879901aebabda73da40717844ff35382530e78c52dd791d",
+      "size_bytes": 24754
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.decision_log",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/decision_log.py",
+      "sha256": "943f1462c827d5a52a10ecdad6888a04b5c05dd81c5f4ab588fabbba33d4f724",
+      "size_bytes": 16227
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.edge_cases",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/edge_cases.py",
+      "sha256": "37610a28e4e693c2087ce226b968acf881650c967af8394c119107774dcac652",
+      "size_bytes": 69176
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.efficiency_estimator",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/efficiency_estimator.py",
+      "sha256": "ae457c8b89741b76413a5efd6276717d2a53ca912d6e5ddc1442bbeb6f92d54f",
+      "size_bytes": 21851
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.efficiency_observer",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/efficiency_observer.py",
+      "sha256": "6e3dad6dfd7bd83ae5f083ede25995252af0f7c1f6a3ec19d8a2586523c50479",
+      "size_bytes": 4186
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.exporter",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/exporter.py",
+      "sha256": "f792c83c763c9a2e888b5300246c65951c1d9706d2150d2186966b8cf44e4a42",
+      "size_bytes": 27246
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.metrics_server",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/metrics_server.py",
+      "sha256": "135625009aee4d089c0fa402377d7f3739710846f3972a233c744fa8927b5966",
+      "size_bytes": 5380
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.otel_exporter",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/otel_exporter.py",
+      "sha256": "e59b5a2c73553969343859d5e6511f3129947ed781f19a27ddc0f3427af7b64c",
+      "size_bytes": 14658
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.observability.scaling_report",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/observability/scaling_report.py",
+      "sha256": "71f045295f5ed9a0b210f5699c309acd23c1b6670a67504d517bc5d4879baf0d",
+      "size_bytes": 24545
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.orchestrator",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/orchestrator.py",
+      "sha256": "2013308673cd888063c7396bf83d39077d67d2cb6b113472613d5a08bd95b798",
+      "size_bytes": 18530
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/__init__.py",
+      "sha256": "318148c722bd9779042acca1b4b2d1f73d8b1e3de11945a5ff327367abc011a6",
+      "size_bytes": 1387
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend.approval",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/approval.py",
+      "sha256": "faf480ff3671b066641b8314ecb53c854ba81a6d1fe0b09cb64d198a5a75adb7",
+      "size_bytes": 9291
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend.confidence",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/confidence.py",
+      "sha256": "90ea9a44d7175436029692a4eff006a8ca2670ddcbe21fccc1800ecd87ae6002",
+      "size_bytes": 4314
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend.engine",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/engine.py",
+      "sha256": "72f57d45555fa7cba51713b9b6f276086eceb34c2c5e6d03242e7f01427c6e6b",
+      "size_bytes": 20560
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend.safety",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/safety.py",
+      "sha256": "e80274afce2b457fe2dd51afd52dc7a0b9b87b249dfe5c4b9d5b90edda64268b",
+      "size_bytes": 5892
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.recommend.webhook",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/recommend/webhook.py",
+      "sha256": "46b8ef3e7f8dd1afeacd8e2463f9eb22b20ed44c3584e786e1c60d8184e0cd55",
+      "size_bytes": 10359
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/__init__.py",
+      "sha256": "eb302b6c7fe3abb4da01b930fea573b21a72d27f848e1488bc79fb2846278a5f",
+      "size_bytes": 1699
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/__init__.py",
+      "sha256": "105744a895f3fdfb86de3d6df704ec78e0aa7afed5bf56b45247288e12f7aebf",
+      "size_bytes": 847
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.alibaba_microservices",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/alibaba_microservices.py",
+      "sha256": "92e4aaea5d314335a3458b0350fd5d3462931d2a70e812bdf22ced69928e56a4",
+      "size_bytes": 4186
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.azure_llm",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/azure_llm.py",
+      "sha256": "fbbf2a5c430fc6be1ed244d4068c85e7b82442b55188d3fe97b7c6881cb0e6c2",
+      "size_bytes": 4261
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.azure_vm_noise",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/azure_vm_noise.py",
+      "sha256": "ef9ec0e819ac8e2d19d22cc788c37923000a2d3e44486e13c777b275a7ebc35d",
+      "size_bytes": 3834
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.base",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/base.py",
+      "sha256": "17692c32ea750478a9b344ed873aed27044f344a91e90490739aa1d3e2d757ab",
+      "size_bytes": 5816
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.google_borg",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/google_borg.py",
+      "sha256": "02d0899957e3c482970bf40a1756c2cd04c0e7cb5e62e3ff9e757181f9c1c61e",
+      "size_bytes": 3686
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.adapters.partner_prometheus",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/adapters/partner_prometheus.py",
+      "sha256": "5357cd7514a8fdb3f109ea91b666dce0b58488d9eb44b319070a8df1d797f68e",
+      "size_bytes": 10065
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.efficiency_observer",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/efficiency_observer.py",
+      "sha256": "de83a0f06a3ee95cb6443bf2b3589291781bf2fd9c9214a056ccefd658971184",
+      "size_bytes": 412
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.harness",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/harness.py",
+      "sha256": "4e433074cef376f048bc85dcc7f699a58a1b22dbad836e3021dacd0007605f55",
+      "size_bytes": 8820
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.replay_source",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/replay_source.py",
+      "sha256": "587e40e3ad2c0125810560fa9e65d20fa725af16053f59738900bb375ed9602f",
+      "size_bytes": 3998
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.report",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/report.py",
+      "sha256": "a8c0f8e3e621dbd625aeea04b23a09351b0c1efc2064dbdcf942ffb35c8ae925",
+      "size_bytes": 8577
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.replay.tier_a",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/replay/tier_a.py",
+      "sha256": "4a528787e3b9d3e61d12c17dd139c3676bfb61dd64f42f6f00c7547bd65eb6cf",
+      "size_bytes": 24739
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/__init__.py",
+      "sha256": "62a81b2fbdb0d0978c990b84598982bbe3b3b62f3ef8826c8ab40ba9d5f84cc6",
+      "size_bytes": 845
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow.divergence",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/divergence.py",
+      "sha256": "b51c3dedda056291c87f73abf35a34d974ee75e615bb706d761a3717d2aa665e",
+      "size_bytes": 15117
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow.hpa_watcher",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/hpa_watcher.py",
+      "sha256": "95e581e4af57651fa428b952673e41d22a58d3c848a1ed9fe2c72e07cac8c5b3",
+      "size_bytes": 5488
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow.live_efficiency",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/live_efficiency.py",
+      "sha256": "92e0acb5d80b4c1892eb599f9d3f1f9d3b7633bf3401c719a80781c03383859c",
+      "size_bytes": 9519
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow.reporter",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/reporter.py",
+      "sha256": "95890e48e41df24ad3b796ff88d37ee4ff91a63deb3962e543e279e8f90fefe0",
+      "size_bytes": 7336
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.shadow.runner",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/shadow/runner.py",
+      "sha256": "de3a2726e5a27c0f0b114eb0a006ce208c97f88de4d7e66a0f5967a1b2e31184",
+      "size_bytes": 10356
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.signals",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/signals/__init__.py",
+      "sha256": "3bba2e50d7aa0a89552c84694c1b660096a90d858928389ef91fb44f99070d2d",
+      "size_bytes": 755
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.signals.normalizer",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/signals/normalizer.py",
+      "sha256": "4945a19bf931336cc4062ea70bf403226aa4fd2b6481e189adffee3fd4d8ba60",
+      "size_bytes": 11900
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.signals.pipeline",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/signals/pipeline.py",
+      "sha256": "ffb2f6c7dc8e26bd419eb4c4a6cf2e5f2f5141bf26c81d611bf42726987aecd3",
+      "size_bytes": 14383
+    },
+    {
+      "byte_identical_to_canonical": null,
+      "copy": "canonical_top",
+      "import_namespace": "cloud_controller.signals.prometheus",
+      "import_path_only_difference": null,
+      "path": "cloud_controller/signals/prometheus.py",
+      "sha256": "669da3930f8bf2c370c62c205a614f7798a555dd8cd780a0e1a7c6175d9b0ea4",
+      "size_bytes": 11589
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/__init__.py",
+      "sha256": "91f76b93f43239bd3c6b784fc025586a432daf1cd9334e86beef81a6b8960eb3",
+      "size_bytes": 830
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/__init__.py",
+      "sha256": "9f4e723df13024b252f2ce2e521a4bf557e28cff949df79916d9fc389b2c5e59",
+      "size_bytes": 2303
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.feedback",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/feedback.py",
+      "sha256": "3bc81bff2615bf95e0fb3b2c79ec4553aabde99c28bf5b12aaf0a9ccf9f81b30",
+      "size_bytes": 20743
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.gate_actuator",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/gate_actuator.py",
+      "sha256": "c581bdb4234dab7a108e504f9ffd9e550a6bd2752d40ad0a6f421d09d6e7f61d",
+      "size_bytes": 12380
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.k8s_actuator",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/k8s_actuator.py",
+      "sha256": "140450f0418ef99a719a1f7e17edf97a9be720a70270f4055225e6820d0aea71",
+      "size_bytes": 11749
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.outcome",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/outcome.py",
+      "sha256": "8edd3a8f75d88cec1c32b48cfdec36791dbc115ab6a4ddb8da09a6f3e394abcc",
+      "size_bytes": 12954
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.policy",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/policy.py",
+      "sha256": "e1f3ad69ac3c8ced864d0b08a77f34ff03e01b9f8fcfd682e6550df996965cdf",
+      "size_bytes": 7512
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.readiness",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/readiness.py",
+      "sha256": "e829e31869943ee994b5c593253b2cea37adfa137266a7a74cd9f75cacc319dc",
+      "size_bytes": 5665
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.action.rollback",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/action/rollback.py",
+      "sha256": "8685e812213f7fb22a79c9b2bc2b15172347515a0380bb5640ae033cf6b6eaba",
+      "size_bytes": 13005
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.config",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/config.py",
+      "sha256": "731d31c4eaf9e496d65352cf71ee1ac1434f18baa8c2f288ba0b8ec65a514e88",
+      "size_bytes": 5439
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.controller",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/controller.py",
+      "sha256": "61102f3bb67e405386ac33fbdf38ba275f07872b51ca2a426c4f74721f119925",
+      "size_bytes": 41383
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/__init__.py",
+      "sha256": "4c2afc88e95f390b4ce605100132ad9d6bcbe8d8c5e002f8fdf9932cfed04d7a",
+      "size_bytes": 568
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.adaptive_gain",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/adaptive_gain.py",
+      "sha256": "41bf5d60055ab97677693980e8c4729225fd0237e0098d53e777e22c9b59b10f",
+      "size_bytes": 4617
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.coherence",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/coherence.py",
+      "sha256": "d991a7a5c8739807b9224bc70456839b32078490e7995d37320637453159ff92",
+      "size_bytes": 7748
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.damping",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/damping.py",
+      "sha256": "ff56422107f6f3fae56917a0a38868f31fd7b1c51b31ece85d41934ff49f9426",
+      "size_bytes": 6702
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.identity_ema",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/identity_ema.py",
+      "sha256": "0f39b927bd63620b7791ff8531e9d290f520600fa7f2c432c676cf35033db86c",
+      "size_bytes": 9196
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.plasticity_gate",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/plasticity_gate.py",
+      "sha256": "8b5b51dd65dcb9bc7a8ae861fb5656e042b5306ec2021fdb7d5b0cd23e660246",
+      "size_bytes": 3451
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.core.replay_buffer",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/core/replay_buffer.py",
+      "sha256": "d582bf25de2c8179fd7cac7853484995784093386ae8bede453678b07f249097",
+      "size_bytes": 2800
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.explain",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/explain/__init__.py",
+      "sha256": "59ed22f66ea628202d0f0a20e1f29751b1fcfbb9d2aebe36947e4a157b078d7a",
+      "size_bytes": 319
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.explain.explainer",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/explain/explainer.py",
+      "sha256": "aff11688e357ee071d7d5fc6dea6eed72246f9ec1e18e3978de524db02197376",
+      "size_bytes": 17344
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.main",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/main.py",
+      "sha256": "851a7074f99683d508aac28407fb80734d4207300b65c74e47460550f5d02a48",
+      "size_bytes": 10503
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/__init__.py",
+      "sha256": "3ce29109f618f3c77f9c577fb230b15fbe4996763c32abe2de9eb251dc53fc53",
+      "size_bytes": 1706
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.benchmark",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/benchmark.py",
+      "sha256": "d7a4a35ea0c6db7c0879901aebabda73da40717844ff35382530e78c52dd791d",
+      "size_bytes": 24754
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.decision_log",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/decision_log.py",
+      "sha256": "943f1462c827d5a52a10ecdad6888a04b5c05dd81c5f4ab588fabbba33d4f724",
+      "size_bytes": 16227
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.edge_cases",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/edge_cases.py",
+      "sha256": "37610a28e4e693c2087ce226b968acf881650c967af8394c119107774dcac652",
+      "size_bytes": 69176
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.efficiency_estimator",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/efficiency_estimator.py",
+      "sha256": "ae457c8b89741b76413a5efd6276717d2a53ca912d6e5ddc1442bbeb6f92d54f",
+      "size_bytes": 21851
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.exporter",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/exporter.py",
+      "sha256": "f792c83c763c9a2e888b5300246c65951c1d9706d2150d2186966b8cf44e4a42",
+      "size_bytes": 27246
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.metrics_server",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/metrics_server.py",
+      "sha256": "135625009aee4d089c0fa402377d7f3739710846f3972a233c744fa8927b5966",
+      "size_bytes": 5380
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.otel_exporter",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/otel_exporter.py",
+      "sha256": "e59b5a2c73553969343859d5e6511f3129947ed781f19a27ddc0f3427af7b64c",
+      "size_bytes": 14658
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.observability.scaling_report",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/observability/scaling_report.py",
+      "sha256": "71f045295f5ed9a0b210f5699c309acd23c1b6670a67504d517bc5d4879baf0d",
+      "size_bytes": 24545
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.orchestrator",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/orchestrator.py",
+      "sha256": "2013308673cd888063c7396bf83d39077d67d2cb6b113472613d5a08bd95b798",
+      "size_bytes": 18530
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/__init__.py",
+      "sha256": "318148c722bd9779042acca1b4b2d1f73d8b1e3de11945a5ff327367abc011a6",
+      "size_bytes": 1387
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend.approval",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/approval.py",
+      "sha256": "faf480ff3671b066641b8314ecb53c854ba81a6d1fe0b09cb64d198a5a75adb7",
+      "size_bytes": 9291
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend.confidence",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/confidence.py",
+      "sha256": "90ea9a44d7175436029692a4eff006a8ca2670ddcbe21fccc1800ecd87ae6002",
+      "size_bytes": 4314
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend.engine",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/engine.py",
+      "sha256": "72f57d45555fa7cba51713b9b6f276086eceb34c2c5e6d03242e7f01427c6e6b",
+      "size_bytes": 20560
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend.safety",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/safety.py",
+      "sha256": "e80274afce2b457fe2dd51afd52dc7a0b9b87b249dfe5c4b9d5b90edda64268b",
+      "size_bytes": 5892
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.recommend.webhook",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/recommend/webhook.py",
+      "sha256": "46b8ef3e7f8dd1afeacd8e2463f9eb22b20ed44c3584e786e1c60d8184e0cd55",
+      "size_bytes": 10359
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.shadow",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/shadow/__init__.py",
+      "sha256": "62a81b2fbdb0d0978c990b84598982bbe3b3b62f3ef8826c8ab40ba9d5f84cc6",
+      "size_bytes": 845
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.shadow.divergence",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/shadow/divergence.py",
+      "sha256": "b51c3dedda056291c87f73abf35a34d974ee75e615bb706d761a3717d2aa665e",
+      "size_bytes": 15117
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.shadow.hpa_watcher",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/shadow/hpa_watcher.py",
+      "sha256": "95e581e4af57651fa428b952673e41d22a58d3c848a1ed9fe2c72e07cac8c5b3",
+      "size_bytes": 5488
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.shadow.reporter",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/shadow/reporter.py",
+      "sha256": "95890e48e41df24ad3b796ff88d37ee4ff91a63deb3962e543e279e8f90fefe0",
+      "size_bytes": 7336
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.shadow.runner",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/shadow/runner.py",
+      "sha256": "de3a2726e5a27c0f0b114eb0a006ce208c97f88de4d7e66a0f5967a1b2e31184",
+      "size_bytes": 10356
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.signals",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/signals/__init__.py",
+      "sha256": "3bba2e50d7aa0a89552c84694c1b660096a90d858928389ef91fb44f99070d2d",
+      "size_bytes": 755
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.signals.normalizer",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/signals/normalizer.py",
+      "sha256": "4945a19bf931336cc4062ea70bf403226aa4fd2b6481e189adffee3fd4d8ba60",
+      "size_bytes": 11900
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.signals.pipeline",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/signals/pipeline.py",
+      "sha256": "ffb2f6c7dc8e26bd419eb4c4a6cf2e5f2f5141bf26c81d611bf42726987aecd3",
+      "size_bytes": 14383
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "nested_duplicate",
+      "import_namespace": "cloud_controller.cloud_controller.signals.prometheus",
+      "import_path_only_difference": false,
+      "path": "cloud_controller/cloud_controller/signals/prometheus.py",
+      "sha256": "443a418dba49992f87b4791684a5f88eb3b9edf09c88eaa40148a0daa5fe1564",
+      "size_bytes": 10842
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/__init__.py",
+      "sha256": "d98f348fc75fe7ab7fd12dbe3ab7d50b05e3f08f3b5b6fdb02a7ca3d9801dc76",
+      "size_bytes": 854
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/action/__init__.py",
+      "sha256": "085736e7cae3eb8aaf6768f4a4fc80523c1e05641f831553546871003da84625",
+      "size_bytes": 2359
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.feedback",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/action/feedback.py",
+      "sha256": "60aa00d0bc05b26f9227e166457c60fc145a8d60e1aafd820576869afbde7e9b",
+      "size_bytes": 20767
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.gate_actuator",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/gate_actuator.py",
+      "sha256": "c581bdb4234dab7a108e504f9ffd9e550a6bd2752d40ad0a6f421d09d6e7f61d",
+      "size_bytes": 12380
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.k8s_actuator",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/k8s_actuator.py",
+      "sha256": "140450f0418ef99a719a1f7e17edf97a9be720a70270f4055225e6820d0aea71",
+      "size_bytes": 11749
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.outcome",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/outcome.py",
+      "sha256": "8edd3a8f75d88cec1c32b48cfdec36791dbc115ab6a4ddb8da09a6f3e394abcc",
+      "size_bytes": 12954
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.policy",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/policy.py",
+      "sha256": "e1f3ad69ac3c8ced864d0b08a77f34ff03e01b9f8fcfd682e6550df996965cdf",
+      "size_bytes": 7512
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.readiness",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/readiness.py",
+      "sha256": "e829e31869943ee994b5c593253b2cea37adfa137266a7a74cd9f75cacc319dc",
+      "size_bytes": 5665
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.action.rollback",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/action/rollback.py",
+      "sha256": "8685e812213f7fb22a79c9b2bc2b15172347515a0380bb5640ae033cf6b6eaba",
+      "size_bytes": 13005
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.config",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/config.py",
+      "sha256": "731d31c4eaf9e496d65352cf71ee1ac1434f18baa8c2f288ba0b8ec65a514e88",
+      "size_bytes": 5439
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.controller",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/controller.py",
+      "sha256": "06173b72ec86e64b05fec36774b806eb1405e6330b6c71d7acfa75bc7e2ac100",
+      "size_bytes": 41439
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/core/__init__.py",
+      "sha256": "ce5c27ccfc440aa9a19d83a916e31b9ada5270e3c2dc93cbefadefe144fd0db1",
+      "size_bytes": 616
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.adaptive_gain",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/core/adaptive_gain.py",
+      "sha256": "41bf5d60055ab97677693980e8c4729225fd0237e0098d53e777e22c9b59b10f",
+      "size_bytes": 4617
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.coherence",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/core/coherence.py",
+      "sha256": "de9bc6ba505241d374106440aa750446e4b4fe8d0bbed527ccf2e31a9ae32145",
+      "size_bytes": 7756
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.damping",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/core/damping.py",
+      "sha256": "ff56422107f6f3fae56917a0a38868f31fd7b1c51b31ece85d41934ff49f9426",
+      "size_bytes": 6702
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.identity_ema",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/core/identity_ema.py",
+      "sha256": "0f39b927bd63620b7791ff8531e9d290f520600fa7f2c432c676cf35033db86c",
+      "size_bytes": 9196
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.plasticity_gate",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/core/plasticity_gate.py",
+      "sha256": "8b5b51dd65dcb9bc7a8ae861fb5656e042b5306ec2021fdb7d5b0cd23e660246",
+      "size_bytes": 3451
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.core.replay_buffer",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/core/replay_buffer.py",
+      "sha256": "d582bf25de2c8179fd7cac7853484995784093386ae8bede453678b07f249097",
+      "size_bytes": 2800
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.explain",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/explain/__init__.py",
+      "sha256": "872053d0648c8720630a7ed2f368d6e9e52935c0af9c38da84ea46dfc4482a34",
+      "size_bytes": 327
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.explain.explainer",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/explain/explainer.py",
+      "sha256": "cc0d9eadf26841f3ee53d0fef66e8c272d97bd72894dda5c84d87641bc39ee7c",
+      "size_bytes": 17352
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.main",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/main.py",
+      "sha256": "1c85155abb6ff1e769542a9738be9e409096106239a147c71a21f1a66ee1dbbc",
+      "size_bytes": 10615
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/__init__.py",
+      "sha256": "fb728f8297176c55961e6d0ad0deba107ca4d0e7b3da467c5f3ea4716d14304c",
+      "size_bytes": 1754
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.benchmark",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/benchmark.py",
+      "sha256": "189f185da74ace76e83e65ff65481c454bdc07cf5eb9fa7f356453a7e2837256",
+      "size_bytes": 24770
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.decision_log",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/decision_log.py",
+      "sha256": "eab80e99c84bcf714284b352a048301b37c83d10f4de6ef8227868aa5e629076",
+      "size_bytes": 16251
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.edge_cases",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/edge_cases.py",
+      "sha256": "5b0977d9ecfefcba80e92fc4c9f8b86398f477221f40657f321f41c2ef636e5f",
+      "size_bytes": 69208
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.efficiency_estimator",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/observability/efficiency_estimator.py",
+      "sha256": "ae457c8b89741b76413a5efd6276717d2a53ca912d6e5ddc1442bbeb6f92d54f",
+      "size_bytes": 21851
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.exporter",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/observability/exporter.py",
+      "sha256": "f792c83c763c9a2e888b5300246c65951c1d9706d2150d2186966b8cf44e4a42",
+      "size_bytes": 27246
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.metrics_server",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/metrics_server.py",
+      "sha256": "1e11473c05c21640e029231806f593a7431e0002e7b4d6b29a7a7328fd127ab6",
+      "size_bytes": 5404
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.otel_exporter",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/observability/otel_exporter.py",
+      "sha256": "e59b5a2c73553969343859d5e6511f3129947ed781f19a27ddc0f3427af7b64c",
+      "size_bytes": 14658
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.observability.scaling_report",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/observability/scaling_report.py",
+      "sha256": "ecce01f6c816c5e309795902fedde3b915a73e9f1f2163afabcb4360ab2b5246",
+      "size_bytes": 24553
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.orchestrator",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/orchestrator.py",
+      "sha256": "edfc2efd47c2ffa3c3bcc00279171c9efd545e2ab74af10e542ed7c3e5c2b1ed",
+      "size_bytes": 18610
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/recommend/__init__.py",
+      "sha256": "bd2bd7ae469b523513687627f99f6e6d34c294b1f95d262978464563993ff276",
+      "size_bytes": 1427
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend.approval",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/recommend/approval.py",
+      "sha256": "a150c76609d5ba681720ac8c68bd52128816fb801b08bc10e232b0a13b0f42dd",
+      "size_bytes": 9323
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend.confidence",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/recommend/confidence.py",
+      "sha256": "1bb486034eaa8fa09d8bca48f9e34e6da857879178e4c3e764ef14b4b9214e06",
+      "size_bytes": 4322
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend.engine",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/recommend/engine.py",
+      "sha256": "be3f5929ed3354ab57b3c5cec1450e6091bdc45a31fb453f35a977fb3ef7849c",
+      "size_bytes": 20648
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend.safety",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/recommend/safety.py",
+      "sha256": "e80274afce2b457fe2dd51afd52dc7a0b9b87b249dfe5c4b9d5b90edda64268b",
+      "size_bytes": 5892
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.recommend.webhook",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/recommend/webhook.py",
+      "sha256": "46b8ef3e7f8dd1afeacd8e2463f9eb22b20ed44c3584e786e1c60d8184e0cd55",
+      "size_bytes": 10359
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.shadow",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/shadow/__init__.py",
+      "sha256": "4a65ea7effc1b0cd3ff714d365f97346597c9cf69b45fc26479cd461b80c92f0",
+      "size_bytes": 877
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.shadow.divergence",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/shadow/divergence.py",
+      "sha256": "ebf10593a8d9451fbc775bd37b7414c78a7ca0a23f08ebcc05ec83e49c6b9b81",
+      "size_bytes": 15133
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.shadow.hpa_watcher",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/shadow/hpa_watcher.py",
+      "sha256": "2160e14eafc0b7a9e1299269785efd67479166e2832917f80d7aa7adeae69b3d",
+      "size_bytes": 5496
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.shadow.reporter",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/shadow/reporter.py",
+      "sha256": "e3e6396d20fc9f9741da02f7074b6b4fcea5729ed4cb10eb86c292aeee1d1e2e",
+      "size_bytes": 7344
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.shadow.runner",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/shadow/runner.py",
+      "sha256": "02eb55a63d5bb6b65f1b5e31e68fe04774f6c3c3aea64a9e700506c5f2400d0f",
+      "size_bytes": 10412
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.signals",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/signals/__init__.py",
+      "sha256": "0b0752debfdcd2a9a7dfe26dfb8896ed7d3a016e02d3044b127605f9acc0a456",
+      "size_bytes": 779
+    },
+    {
+      "byte_identical_to_canonical": true,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.signals.normalizer",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/signals/normalizer.py",
+      "sha256": "4945a19bf931336cc4062ea70bf403226aa4fd2b6481e189adffee3fd4d8ba60",
+      "size_bytes": 11900
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.signals.pipeline",
+      "import_path_only_difference": true,
+      "path": "symbolu/cloud_controller/signals/pipeline.py",
+      "sha256": "9341d1c2e94b8bb04715a71ed7e24f78cf49373590b5aeaa781b34cb495567d3",
+      "size_bytes": 14415
+    },
+    {
+      "byte_identical_to_canonical": false,
+      "copy": "symbolu_duplicate",
+      "import_namespace": "symbolu.cloud_controller.signals.prometheus",
+      "import_path_only_difference": false,
+      "path": "symbolu/cloud_controller/signals/prometheus.py",
+      "sha256": "443a418dba49992f87b4791684a5f88eb3b9edf09c88eaa40148a0daa5fe1564",
+      "size_bytes": 10842
+    }
+  ],
+  "generated_against_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363",
+  "repository": "rasaha/symbolu"
+}
