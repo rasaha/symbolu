@@ -1,0 +1,11 @@
+{
+  "schema": "bindingslots_persistence/selection_decision/v1",
+  "selected_candidate": null,
+  "primary_verdict": "NO_PERSISTENCE_INTERVENTION_SELECTED",
+  "tie_break_order": [
+    "O1R",
+    "H1",
+    "H2"
+  ],
+  "note": "unrun arms are NOT_EVALUATED, never failed or inferior"
+}

@@ -1,0 +1,7 @@
+{
+  "schema": "bindingslots_persistence/execution_integrity_report/v1",
+  "replay_reproducible": true,
+  "run_count": 24,
+  "verdict": "NO_PERSISTENCE_INTERVENTION_SELECTED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED"
+}

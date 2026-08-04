@@ -1,0 +1,136 @@
+{
+  "arm": "A+",
+  "seed": 24,
+  "params": 2000392,
+  "ff": 1378,
+  "needle_by_dist": {
+    "16": 0.03333333333333333,
+    "96": 0.03333333333333333,
+    "220": 0.016666666666666666
+  },
+  "ppl": {
+    "256": 123.23473989529208,
+    "512": 125.86487873112448
+  },
+  "binding_by_k": {
+    "2": 0.041666666666666664,
+    "4": 0.025,
+    "8": 0.016666666666666666
+  },
+  "supersession": {
+    "current_acc": 0.016666666666666666,
+    "stale_error": 0.008333333333333333
+  },
+  "source": 0.075,
+  "multihop": 0.016666666666666666,
+  "warmups_by_group": [
+    60
+  ],
+  "grouped_optimizer": false,
+  "param_group_audit": {
+    "slot_group_params": 0,
+    "nonslot_group_params": 52,
+    "slot_group_numel": 0,
+    "nonslot_group_numel": 2000392,
+    "total_numel": 2000392,
+    "numel_reconciles": true,
+    "no_duplicates": true,
+    "no_omissions": true,
+    "slot_param_names": [],
+    "nonslot_param_count": 52
+  },
+  "init_audit": null,
+  "trajectory": [
+    {
+      "step": 0,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 60,
+      "needle_d96": 0.016666666666666666
+    },
+    {
+      "step": 120,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 300,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 600,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 700,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 900,
+      "needle_d96": 0.0
+    },
+    {
+      "step": 1200,
+      "needle_d96": 0.03333333333333333
+    }
+  ],
+  "loss_log": [
+    {
+      "step": 0,
+      "main_loss": 6.942717552185059,
+      "aux": null,
+      "lr": [
+        3.3333333333333335e-05
+      ]
+    },
+    {
+      "step": 60,
+      "main_loss": 4.297084331512451,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 120,
+      "main_loss": 3.9893572330474854,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 300,
+      "main_loss": 3.9908220767974854,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 600,
+      "main_loss": 4.038336277008057,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 700,
+      "main_loss": 2.5711452960968018,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    },
+    {
+      "step": 900,
+      "main_loss": 4.009052276611328,
+      "aux": null,
+      "lr": [
+        0.002
+      ]
+    }
+  ],
+  "train_s": 282.8
+}

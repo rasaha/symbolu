@@ -1,0 +1,109 @@
+name: bindingslots-persistence-execution-ci
+
+# Execution-authorized CI: validates COMMITTED training evidence without rerunning the matrix.
+# Active only when a valid execution_authorization.json references the merged amendment (101951cb).
+# Torch-free: it reclassifies from evidence and replays the adaptive planner.
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_persistence/**'
+      - 'docs/audits/bindingslots_persistence_execution/**'
+      - '.github/workflows/bindingslots-persistence-execution-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_persistence/**'
+      - '.github/workflows/bindingslots-persistence-execution-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  execution-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Authorization + frozen-definition integrity
+        run: |
+          python - <<'PY'
+          import json, hashlib, pathlib, sys
+          base = pathlib.Path("experiments/bindingslots_persistence")
+          plan = json.loads((base/"adaptive_execution_plan.json").read_text())
+          for rel, want in plan["frozen_source_hashes_sha256"].items():
+              got = hashlib.sha256((base/rel).read_bytes()).hexdigest()
+              if got != want:
+                  print("FAIL frozen changed:", rel); sys.exit(1)
+          auth = base/"execution_authorization.json"
+          if auth.exists():
+              a = json.loads(auth.read_text())
+              if a["pr_1332_merge_commit"] != "101951cb8bbccca32b6e3faa371bc675371dca89":
+                  print("FAIL: authorization does not reference merged amendment"); sys.exit(1)
+              print("execution-authorized mode: authorization valid")
+          else:
+              print("preregistration mode: no authorization")
+          PY
+
+      - name: Adaptive-plan + execution tests
+        run: |
+          python experiments/bindingslots_persistence/tests/test_adaptive_plan.py
+          python experiments/bindingslots_persistence/tests/test_execution.py
+
+      - name: Reproducible replay from committed evidence (no retraining)
+        run: |
+          if [ -f experiments/bindingslots_persistence/results/execution_ledger.json ]; then
+            python experiments/bindingslots_persistence/build_execution_report.py
+          else
+            echo "no execution ledger yet (nothing to replay)"
+          fi
+
+      - name: Evidence follows the controller (no unplanned arm/seed, seeds 23-27, runs to 1200)
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          base = pathlib.Path("experiments/bindingslots_persistence/results")
+          led = base/"execution_ledger.json"
+          if not led.exists():
+              print("no ledger; skipping"); sys.exit(0)
+          order = json.loads(led.read_text())["order"]
+          for e in order:
+              assert e["seed"] in (23,24,25,26,27), f"unplanned seed {e}"
+              assert e["arm"] in ("A+","R0","O1","O1R","H1","H2"), f"unplanned arm {e}"
+              rec = json.loads((base/"seeds"/e["arm"]/f"seed_{e['seed']}"/"raw_record.json").read_text())
+              steps = [t["step"] for t in rec.get("trajectory",[])]
+              assert 1200 in steps, f"{e} did not run to step 1200"
+          print(f"evidence valid: {len(order)} runs, all to step 1200")
+          PY
+
+      - name: Historical-artifact protection + lab verifier
+        run: |
+          python hybrid_llm_vnext_lab/scripts/verify_historical_artifact_protection.py
+          python hybrid_llm_vnext_lab/scripts/verify_lab.py
+
+      - name: Terminology discipline
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          bad=[]
+          for root in ("experiments/bindingslots_persistence","docs/audits/bindingslots_persistence_execution"):
+              rp=pathlib.Path(root)
+              if not rp.exists(): continue
+              for p in rp.rglob("*"):
+                  if p.suffix not in (".md",".json",".py"): continue
+                  for i,l in enumerate(p.read_text().splitlines(),1):
+                      if re.search(r"READY_FOR_KDA_VALIDATION[^_]",l) and not re.search(r"never emit|not emit|BLOCKED|NOT_READY",l):
+                          bad.append(f"{p}:{i}")
+          print("FAIL bare KDA-ready:",bad) if bad else print("terminology ok")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Frozen abc.json unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"

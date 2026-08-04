@@ -1,6 +1,6 @@
 {
   "schema": "bindingslots_persistence/integrity_report/v1",
-  "checks": 52,
+  "checks": 48,
   "failures": [],
   "verdict": "BINDINGSLOTS_PERSISTENCE_PREREGISTRATION_VERIFIED",
   "training_started": false,

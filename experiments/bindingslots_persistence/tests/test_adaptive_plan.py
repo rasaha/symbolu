@@ -144,6 +144,14 @@ def test_o1_does_not_run_after_candidate_success():
 
 # ---------- scope ----------
 def test_no_training_or_results():
+    # preregistration-mode invariant only; execution-authorized mode permits committed evidence
+    auth = EXP / "execution_authorization.json"
+    if auth.exists():
+        try:
+            if json.loads(auth.read_text()).get("pr_1332_merge_commit") == "101951cb8bbccca32b6e3faa371bc675371dca89":
+                return
+        except Exception:
+            pass
     sd = EXP / "results" / "seeds"
     assert not (sd.exists() and any(sd.iterdir()))
     for banned in ("aggregate_classification.json", "selection_decision.json"):

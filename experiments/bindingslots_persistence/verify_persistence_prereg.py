@@ -90,15 +90,25 @@ def main() -> int:
         if not (HERE / "schemas" / f"{s}.schema.json").exists():
             fails.append(f"missing schema {s}")
 
-    # NO training-result files exist
-    seeds_dir = HERE / "results" / "seeds"
-    checks += 1
-    if seeds_dir.exists() and any(seeds_dir.iterdir()):
-        fails.append("training-result files exist under results/seeds")
-    for banned in ("aggregate_classification.json", "selection_decision.json", "stage_aggregate.json"):
+    # NO training-result files exist -- enforced ONLY in preregistration mode. In
+    # execution-authorized mode (a valid execution_authorization.json referencing the merged
+    # amendment 101951cb) training outputs are permitted and validated by the execution CI instead.
+    auth = HERE / "execution_authorization.json"
+    exec_mode = False
+    if auth.exists():
+        try:
+            exec_mode = json.loads(auth.read_text()).get("pr_1332_merge_commit") == "101951cb8bbccca32b6e3faa371bc675371dca89"
+        except Exception:
+            exec_mode = False
+    if not exec_mode:
+        seeds_dir = HERE / "results" / "seeds"
         checks += 1
-        if (HERE / "results" / banned).exists():
-            fails.append(f"training-outcome file exists: {banned}")
+        if seeds_dir.exists() and any(seeds_dir.iterdir()):
+            fails.append("training-result files exist under results/seeds (preregistration mode)")
+        for banned in ("aggregate_classification.json", "selection_decision.json", "stage_aggregate.json"):
+            checks += 1
+            if (HERE / "results" / banned).exists():
+                fails.append(f"training-outcome file exists: {banned}")
 
     # no forbidden architecture tokens in phase code
     checks += 1

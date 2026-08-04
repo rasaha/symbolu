@@ -1,0 +1,6 @@
+{
+  "action": "terminate",
+  "verdict": "NO_PERSISTENCE_INTERVENTION_SELECTED",
+  "selected": null,
+  "kda_readiness": "KDA_VALIDATION_BLOCKED"
+}

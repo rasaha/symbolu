@@ -1,0 +1,173 @@
+{
+  "schema": "bindingslots_persistence/execution_ledger/v1",
+  "order": [
+    {
+      "arm": "A+",
+      "seed": 23,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_23"
+    },
+    {
+      "arm": "A+",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_24"
+    },
+    {
+      "arm": "A+",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_25"
+    },
+    {
+      "arm": "A+",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_26"
+    },
+    {
+      "arm": "A+",
+      "seed": 27,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_27"
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "clean_stable": false,
+      "category": "FORMED_THEN_COLLAPSED",
+      "dir": "results/seeds/R0/seed_23"
+    },
+    {
+      "arm": "R0",
+      "seed": 24,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/R0/seed_24"
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/R0/seed_25"
+    },
+    {
+      "arm": "R0",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "FORMED_THEN_COLLAPSED",
+      "dir": "results/seeds/R0/seed_26"
+    },
+    {
+      "arm": "R0",
+      "seed": 27,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/R0/seed_27"
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/O1R/seed_23"
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1R/seed_24"
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1R/seed_25"
+    },
+    {
+      "arm": "H1",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/H1/seed_23"
+    },
+    {
+      "arm": "H1",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/H1/seed_24"
+    },
+    {
+      "arm": "H1",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/H1/seed_25"
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "clean_stable": false,
+      "category": "FORMED_THEN_COLLAPSED",
+      "dir": "results/seeds/H2/seed_23"
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/H2/seed_24"
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/H2/seed_25"
+    },
+    {
+      "arm": "O1",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/O1/seed_23"
+    },
+    {
+      "arm": "O1",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_24"
+    },
+    {
+      "arm": "O1",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "QUALITY_FAILED",
+      "dir": "results/seeds/O1/seed_25"
+    },
+    {
+      "arm": "O1",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_26"
+    },
+    {
+      "arm": "O1",
+      "seed": 27,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/O1/seed_27"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "bindingslots_persistence/code_correction_record/v1",
+  "authorized_by": "user (explicit authorization after H2 seed23 crash)",
+  "change": "add the `if mask is None:` branch to run_h2, making its loop behaviorally identical to the frozen reference loop (stabilize.py:138); no other change",
+  "scope": "run_h2 only; run_aplus/run_r0/run_o1/run_o1r/run_h1 and the classifier are byte-identical",
+  "persistence_arms_sha256_before": "1f3f6b7d074413cc74a3d893d64e48557f5964acf1f3a4683ecf20e0d35fc112",
+  "persistence_arms_sha256_after": "9edbcd8d7c91bea3a9b3fac103b66d983eba53c1a3eca56524e287fb9a5ee9ca",
+  "pre_correction_execution_code_commit": "5cc392e15416b5a53bcdf2da93efcc03e303a299",
+  "corrected_execution_code_commit": "9380bdb1540ebbdbaf6de4ca5dec84d89b6c029e",
+  "runs_at_pre_correction_commit": [
+    "A+ x5",
+    "R0 x5",
+    "O1R x3 (futile)",
+    "H1 x3 (futile)"
+  ],
+  "runs_at_corrected_commit": [
+    "H2 (restarted fresh from seed 23)",
+    "O1 diagnostic only if the frozen trigger is reached"
+  ],
+  "crashed_h2_attempt": "INVALID and NON-EVIDENTIARY; no H2 artifact was persisted (crash preceded persistence); H2 seed23 restarted fresh from step 0",
+  "unchanged": [
+    "seeds 23-27",
+    "thresholds",
+    "objectives",
+    "schedules",
+    "futility rule (2nd failure)",
+    "classifier",
+    "adaptive controller",
+    "frozen definition hashes"
+  ],
+  "16_completed_runs": "preserved unchanged",
+  "o1_rule": "O1 runs only if O1R AND H1 AND H2 all fail (frozen adaptive trigger); never selectable"
+}

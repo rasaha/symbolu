@@ -1,0 +1,45 @@
+{
+  "schema": "bindingslots_persistence/causal_ablation_result/v1",
+  "arm": "H1",
+  "seed": 24,
+  "step": 1200,
+  "ablation": {
+    "baseline": 0.9416666666666667,
+    "slots_off": 0.0,
+    "randomized_address": 0.20833333333333334,
+    "shuffle_values": 0.24166666666666667,
+    "write_gate_zero": 0.0,
+    "slot_keys_randomized": 0.9666666666666667,
+    "slot_diagnostics": [
+      {
+        "slot_write_gate_mean": 0.011025100946426392,
+        "slot_util_entropy": 2.335865020751953,
+        "slot_util_max": 0.2955085337162018,
+        "read_addr_max_mean": 0.08506350219249725,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.6203155517578125,
+        "slot_util_entropy": 3.4626681804656982,
+        "slot_util_max": 0.03690579533576965,
+        "read_addr_max_mean": 0.04172082990407944,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.7209088802337646,
+        "slot_util_entropy": 3.464885711669922,
+        "slot_util_max": 0.033233724534511566,
+        "read_addr_max_mean": 0.043990928679704666,
+        "num_slots": 32
+      },
+      {
+        "slot_write_gate_mean": 0.4108818471431732,
+        "slot_util_entropy": 3.462844133377075,
+        "slot_util_max": 0.036475613713264465,
+        "read_addr_max_mean": 0.039625365287065506,
+        "num_slots": 32
+      }
+    ]
+  },
+  "aplus_same_seed_d96": 0.03333333333333333
+}

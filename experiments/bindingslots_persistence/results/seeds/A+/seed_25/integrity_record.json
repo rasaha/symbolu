@@ -1,0 +1,7 @@
+{
+  "schema": "bindingslots_persistence/integrity_record/v1",
+  "arm": "A+",
+  "seed": 25,
+  "raw_record_sha256": "c74631629e7c80ef15d6c1ad3fb67c6875dd63b24bce20750a0559d3449c5fea",
+  "code_commit": "5cc392e15416b5a53bcdf2da93efcc03e303a299"
+}
