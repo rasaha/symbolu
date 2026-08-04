@@ -1,0 +1,89 @@
+{
+  "schema": "bindingslots_persistence/adaptive_execution_plan/v1",
+  "status": "PROTOCOL AMENDMENT (execution order + futility only). All scientific gates unchanged. No training had started at amendment time.",
+  "preregistration_merge_commit": "78be653642c3ec7adc385572c75c411cc0ce4fe0",
+  "amends": "the merged PR #1331 persistence preregistration",
+
+  "amendment_scope": {
+    "changes_only": ["execution order", "futility stopping", "conditional omission of later arms"],
+    "does_not_change": [
+      "seeds 23-27", "same-seed A+ requirement", "O1 objective", "O1R coefficient 0.01",
+      "O1R steps 601-1200", "H1 parameter group", "H1 multiplier 0.1x", "H1 interval 600-900",
+      "H2 step-600 same-seed teacher", "H2 teacher target",
+      "checkpoints 0/60/120/300/600/700/900/1200", "quality gates", "distance gates",
+      "formation rule", "routing thresholds", "slots_off ablation", "randomized_address ablation",
+      "CLEAN_STABLE definition", "advancement clean_stable>=4/5", "candidate must beat R0"
+    ]
+  },
+
+  "fixed_seed_order": [23, 24, 25, 26, 27],
+  "within_seed_early_stopping": "PROHIBITED. Every seed used for classification runs through step 1200. No seed is stopped early for any reason (good step-600 routing, needle 1.0, early prob>0.50, promising intermediate checkpoint, unlikely recovery).",
+
+  "reference_block": {
+    "arms": ["A+", "R0"],
+    "order": "A+ x [23,24,25,26,27] then R0 x [23,24,25,26,27]",
+    "mandatory_runs": 10,
+    "futility_applies": false,
+    "reason": "A+ same-seed value is required by the causal-collapse threshold; every candidate must beat the COMPLETE frozen R0 reference"
+  },
+
+  "candidate_order": ["O1R", "H1", "H2"],
+  "candidate_stage_rule": {
+    "seed_order": [23, 24, 25, 26, 27],
+    "futility_rule": "stop the arm immediately after its SECOND seed that is not CLEAN_STABLE (with two non-CLEAN_STABLE seeds, clean_stable>=4/5 is mathematically impossible)",
+    "success_rule": "an arm SUCCEEDS only after ALL FIVE of its seeds have completed AND clean_stable_count >= 4/5 AND clean_stable_count > R0 clean_stable_count AND all mandatory quality/distance/integrity gates pass",
+    "no_four_seed_success": "success is never declared from four completed seeds with the fifth unrun",
+    "on_success": "select this candidate, STOP the intervention screen, do NOT run later candidates, do NOT run the O1 diagnostic"
+  },
+
+  "o1_diagnostic_branch": {
+    "runs_only_when": "O1R failed AND H1 failed AND H2 failed",
+    "seeds": [23, 24, 25, 26, 27],
+    "selectable": false,
+    "purpose": "determine whether the previously observed phenotype (routing forms near step 600, decays by 1200, needle may survive via causal impurity) appears on the reserved seeds",
+    "not_required_after_any_candidate_success": true,
+    "must_not": "rescue or redefine a failed persistence intervention"
+  },
+
+  "run_count_bounds": {
+    "best_case": {"path": "A+ 5 + R0 5 + O1R 5", "runs": 15, "condition": "O1R passes on 5 completed seeds"},
+    "worst_case": {"runs": 30, "condition": "all planned runs required"},
+    "note": "savings come ONLY from omitting scientifically unnecessary later runs; never from weakening evidence"
+  },
+
+  "resume_behavior": "the controller is a pure deterministic function of completed-seed results; resume = recompute the plan from persisted completed results; never reinterpret existing results",
+
+  "skipped_run_reason_codes": [
+    "NOT_REACHED", "EARLIER_CANDIDATE_SELECTED", "ARM_FUTILITY_REACHED",
+    "DIAGNOSTIC_NOT_REQUIRED", "COMPLETED", "INTERRUPTED_RESUMABLE",
+    "INTEGRITY_FAILED", "RESOURCE_BLOCKED"
+  ],
+
+  "guardrails": [
+    "deterministic decision tree, NOT outcome-driven tuning",
+    "arm order fixed before training",
+    "seeds fixed before training",
+    "futility boundary follows directly from the 4/5 success requirement",
+    "no success from fewer than five completed candidate seeds",
+    "later arms omitted only after an earlier arm has FULLY passed",
+    "an unrun arm is NOT_EVALUATED, never failed or inferior",
+    "selecting O1R first does not prove superiority to unrun H1/H2; only that O1R passed the frozen gate and later testing was unnecessary for this decision"
+  ],
+
+  "prohibited": [
+    "coefficient changes", "threshold changes", "seed replacement", "outcome-based seed reordering",
+    "best-checkpoint selection", "stopping a seed before step 1200", "adding arms",
+    "changing H1 parameters", "changing the H2 teacher", "relaxing causal-collapse requirements",
+    "selecting on raw needle performance", "manual candidate selection", "training in the amendment task"
+  ],
+
+  "frozen_source_hashes_sha256": {
+    "arm_definitions.json": "731730e0c925eefb2ce8ee17a2ea6d17daa5cec0b45f6af4e9feec4761eac829",
+    "classifier.json": "f4ba0a4dc5261663ef3487c9d1cbc1a4b8750f399a91e92e68e3027cc298765e",
+    "o1r_definition.json": "f2fce21da4fafda9b67e360b8b256ae303b214310fa8222b07c35f5b5aaeac52",
+    "h1_parameter_group_manifest.json": "7c193bc67ccfdab22962f9c66f24ad70cd26eae16e60de6a84ad40ca9d59ceb1",
+    "h2_teacher_definition.json": "519c542b3d74b77b22f40b027095f39aa1638a4c05ed08ad3ccec0631a85e377",
+    "frozen_reference_config.json": "bbfbdf47fec6ba72f2ccc424796a2c8cd23a28ac0ab70f4ce93c5b3a632e112c",
+    "seed_manifest.json": "ec8a0c605eea8293320e699df27818ac77bb77039d8c34e91af7f34b102c595e"
+  }
+}

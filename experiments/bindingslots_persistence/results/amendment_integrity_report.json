@@ -1,0 +1,12 @@
+{
+  "schema": "bindingslots_persistence/amendment_integrity_report/v1",
+  "checks": 34,
+  "failures": [],
+  "verdict": "BINDINGSLOTS_PERSISTENCE_ADAPTIVE_AMENDMENT_VERIFIED",
+  "training_started": false,
+  "checkpoints_generated": false,
+  "results_classified": false,
+  "best_case_runs": 15,
+  "worst_case_runs": 30,
+  "kda_readiness": "KDA_VALIDATION_BLOCKED"
+}
