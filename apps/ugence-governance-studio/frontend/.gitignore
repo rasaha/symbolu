@@ -13,3 +13,4 @@ artifacts/dependency-audit-report.json
 # rule). Our application source lives in `src/lib/`, so re-include it here.
 !src/lib/
 !src/lib/**
+frontend-build.json
