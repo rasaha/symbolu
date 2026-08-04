@@ -1,0 +1,24 @@
+{
+  "schema": "bindingslots_persistence/run_manifest/v1",
+  "arm": "H1",
+  "seed": 24,
+  "execution_order": 14,
+  "source_commit": "5cc392e15416b5a53bcdf2da93efcc03e303a299",
+  "execution_code_commit": "5cc392e15416b5a53bcdf2da93efcc03e303a299",
+  "frozen_config_digest": "bbfbdf47fec6ba72f2ccc424796a2c8cd23a28ac0ab70f4ce93c5b3a632e112c",
+  "adaptive_plan_digest": "91abb543d263c4a108702f6a00433797614d7b78184800eb8bc9034e0bd526bd",
+  "classifier_digest": "f4ba0a4dc5261663ef3487c9d1cbc1a4b8750f399a91e92e68e3027cc298765e",
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-fc-v18-x86_64-with-glibc2.39",
+    "torch": "2.2.2+cu121",
+    "cuda": false,
+    "fp": "fp32",
+    "threads": 4
+  },
+  "device": "cpu",
+  "restart_count": 0,
+  "params": 2000104,
+  "train_s": 1104.9,
+  "artifact_hash": "c50bf94cd128652d58f2356f72f19f87ac61b328920a6f4d457905f7276604e9"
+}

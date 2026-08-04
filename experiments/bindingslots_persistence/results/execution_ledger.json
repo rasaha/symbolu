@@ -91,6 +91,20 @@
       "clean_stable": false,
       "category": "QUALITY_FAILED",
       "dir": "results/seeds/O1R/seed_25"
+    },
+    {
+      "arm": "H1",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/H1/seed_23"
+    },
+    {
+      "arm": "H1",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN",
+      "dir": "results/seeds/H1/seed_24"
     }
   ]
 }
