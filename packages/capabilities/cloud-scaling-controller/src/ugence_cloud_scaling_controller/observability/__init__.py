@@ -1,4 +1,10 @@
-"""Observability — production logging, decision audit trail, metrics export, and benchmarks."""
+"""Observability — offline decision audit trail, benchmarks, edge-case harness.
+
+Advisory-only: these components analyze and report; they do not open a network
+listener or export telemetry. Live telemetry (HTTP metrics server, Prometheus push,
+OpenTelemetry export) is NOT part of the advisory distribution — it lives in the
+monorepo-only ``cloud_scaling_operations.observability`` namespace.
+"""
 
 from ugence_cloud_scaling_controller.observability.decision_log import (
     DecisionLogEntry,
@@ -16,21 +22,6 @@ from ugence_cloud_scaling_controller.observability.benchmark import (
     SweepReport,
     SweepVariant,
 )
-from ugence_cloud_scaling_controller.observability.exporter import (
-    BuiltinHistogram,
-    BuiltinMetric,
-    ExporterConfig,
-    ExporterMode,
-    MetricsExporter,
-)
-from ugence_cloud_scaling_controller.observability.metrics_server import (
-    MetricsServer,
-    MetricsServerConfig,
-)
-from ugence_cloud_scaling_controller.observability.otel_exporter import (
-    OtelExporter,
-    OtelExporterConfig,
-)
 from ugence_cloud_scaling_controller.observability.edge_cases import (
     EdgeCaseHarness,
     EdgeCaseReport,
@@ -46,8 +37,6 @@ __all__ = [
     "BenchmarkConfig",
     "BenchmarkHarness",
     "BenchmarkReport",
-    "BuiltinHistogram",
-    "BuiltinMetric",
     "EdgeCaseHarness",
     "EdgeCaseReport",
     "EdgeCaseResult",
@@ -59,14 +48,7 @@ __all__ = [
     "DecisionLogEntry",
     "DecisionLogFormatter",
     "DecisionPhase",
-    "ExporterConfig",
-    "ExporterMode",
     "HPASimulator",
-    "MetricsExporter",
-    "MetricsServer",
-    "MetricsServerConfig",
-    "OtelExporter",
-    "OtelExporterConfig",
     "ParameterSweep",
     "PatternType",
     "ScenarioScore",

@@ -26,7 +26,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
-from ugence_cloud_scaling_controller.shadow.runner import ShadowRunner, ShadowConfig, ShadowCycleResult
+from cloud_scaling_operations.shadow.runner import ShadowRunner, ShadowConfig, ShadowCycleResult
 from ugence_cloud_scaling_controller.observability.efficiency_observer import (
     EfficiencyObserver,
     ObservedCycle,

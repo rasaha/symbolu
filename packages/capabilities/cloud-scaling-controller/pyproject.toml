@@ -7,10 +7,13 @@
 # scales infrastructure, calls a cloud-provider API, changes an HPA, runs kubectl or
 # Terraform, opens a network listener, or invokes an LLM.
 #
-# Dependency policy: the core requires Python + NumPy only. Optional read-only signal
-# adapters and exporters live behind extras (prometheus / shadow / otel), each backed
-# by real code. No cloud-provider SDK, web framework, database driver, model-provider
-# SDK, or Ugence governance/agent/control-plane package is a runtime dependency.
+# Dependency policy: the core requires Python + NumPy only. The single optional
+# runtime dependency is `requests` (behind the read-only `prometheus` / `shadow`
+# extras) for the read-only Prometheus signal adapter. No cloud-provider SDK
+# (kubernetes/boto3/azure/google-cloud), web framework, database driver,
+# model-provider SDK, or Ugence governance/agent/control-plane package is a
+# dependency. Execution/operations code lives OUTSIDE this distribution in the
+# monorepo-only `cloud_scaling_operations` namespace.
 #
 # The legacy ``cloud_controller`` (repo root) and ``symbolu.cloud_controller``
 # namespaces are logic-free compatibility surfaces that re-export this package with
@@ -42,21 +45,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Read-only Prometheus ingestion adapter (requests) + Prometheus metrics exporter.
+# Read-only Prometheus ingestion adapter (signals/prometheus.py uses requests for
+# HTTP GET queries only). This is the sole optional runtime dependency of packaged
+# code after the operations code was separated out (v0.1.1).
 prometheus = [
     "requests>=2.28.0",
-    "prometheus-client>=0.16.0",
 ]
-# Read-only Kubernetes HPA/state watcher for shadow-mode comparison + YAML config.
+# Read-only shadow evaluation: the HPA/state watcher reads via the Prometheus client
+# (kube-state-metrics), NOT the Kubernetes SDK — so it needs only `requests`. No
+# Kubernetes/AWS/Azure/GCP SDK is a dependency of this distribution.
 shadow = [
-    "kubernetes>=26.1.0",
-    "PyYAML>=6.0",
-]
-# OpenTelemetry metric/trace export (optional observability).
-otel = [
-    "opentelemetry-api>=1.20.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-exporter-otlp>=1.20.0",
+    "requests>=2.28.0",
 ]
 # Development / verification tooling.
 dev = [

@@ -40,18 +40,18 @@ from ugence_cloud_scaling_controller.signals.pipeline import (
     PipelineConfig,
     CycleResult,
 )
-from ugence_cloud_scaling_controller.recommend.engine import (
+from cloud_scaling_operations.recommend.engine import (
     RecommendEngine,
     RecommendConfig,
     RecommendCycleResult,
 )
-from ugence_cloud_scaling_controller.recommend.approval import Recommendation
+from cloud_scaling_operations.recommend.approval import Recommendation
 from ugence_cloud_scaling_controller.explain.explainer import (
     Explainer,
     Explanation,
     Audience,
 )
-from ugence_cloud_scaling_controller.observability.exporter import (
+from cloud_scaling_operations.observability.exporter import (
     MetricsExporter,
     ExporterConfig,
 )
@@ -59,11 +59,11 @@ from ugence_cloud_scaling_controller.observability.decision_log import (
     DecisionLogFormatter,
     DecisionLogEntry,
 )
-from ugence_cloud_scaling_controller.observability.metrics_server import (
+from cloud_scaling_operations.observability.metrics_server import (
     MetricsServer,
     MetricsServerConfig,
 )
-from ugence_cloud_scaling_controller.observability.otel_exporter import (
+from cloud_scaling_operations.observability.otel_exporter import (
     OtelExporter,
     OtelExporterConfig,
 )
