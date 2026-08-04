@@ -1,0 +1,82 @@
+name: bindingslots-persistence-amendment-ci
+
+# Torch-free CI for the adaptive-execution amendment. NO training job. Training requires a separate,
+# later authorization.
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_persistence/adaptive_plan.py'
+      - 'experiments/bindingslots_persistence/adaptive_execution_plan.json'
+      - 'experiments/bindingslots_persistence/verify_amendment.py'
+      - 'experiments/bindingslots_persistence/tests/test_adaptive_plan.py'
+      - 'docs/audits/bindingslots_persistence_preregistration/ADAPTIVE_EXECUTION_AMENDMENT.md'
+      - '.github/workflows/bindingslots-persistence-amendment-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_persistence/adaptive_plan.py'
+      - 'experiments/bindingslots_persistence/adaptive_execution_plan.json'
+      - 'experiments/bindingslots_persistence/verify_amendment.py'
+      - 'experiments/bindingslots_persistence/tests/test_adaptive_plan.py'
+      - '.github/workflows/bindingslots-persistence-amendment-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  amendment-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Amendment integrity (order/futility only, definitions unchanged, no training)
+        run: python experiments/bindingslots_persistence/verify_amendment.py
+
+      - name: Decision-tree + futility-math + five-seed-success tests
+        run: python experiments/bindingslots_persistence/tests/test_adaptive_plan.py
+
+      - name: Original preregistration integrity still holds
+        run: python experiments/bindingslots_persistence/verify_persistence_prereg.py
+
+      - name: No training outputs exist
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          sd = pathlib.Path("experiments/bindingslots_persistence/results/seeds")
+          banned = [pathlib.Path("experiments/bindingslots_persistence/results/aggregate_classification.json"),
+                    pathlib.Path("experiments/bindingslots_persistence/results/selection_decision.json")]
+          bad = (sd.exists() and any(sd.iterdir())) or any(b.exists() for b in banned)
+          print("FAIL: training outputs present" if bad else "no training outputs")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Historical-artifact protection + lab verifier
+        run: |
+          python hybrid_llm_vnext_lab/scripts/verify_historical_artifact_protection.py
+          python hybrid_llm_vnext_lab/scripts/verify_lab.py
+
+      - name: Terminology discipline
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          bad=[]
+          for root in ("experiments/bindingslots_persistence","docs/audits/bindingslots_persistence_preregistration"):
+              for p in pathlib.Path(root).rglob("*"):
+                  if p.suffix not in (".md",".json",".py"): continue
+                  for i,l in enumerate(p.read_text().splitlines(),1):
+                      if re.search(r"READY_FOR_KDA_VALIDATION[^_]",l) and not re.search(r"never emit|not emit|BLOCKED|NOT_READY",l):
+                          bad.append(f"{p}:{i}")
+          print("FAIL bare KDA-ready:",bad) if bad else print("terminology ok")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Frozen abc.json unchanged (post)
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json UNCHANGED"
