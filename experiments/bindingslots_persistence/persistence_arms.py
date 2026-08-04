@@ -225,8 +225,15 @@ def run_h2(seed, steps=1200):
 
         x, y, mask, _phase = IV.curriculum_batch(step, stream, vocab, B, N, rng, T)
         lo = model(x)
-        sel = mask.reshape(-1)
-        main = F.cross_entropy(lo.reshape(-1, lo.size(-1))[sel], y.reshape(-1)[sel])
+        # AUTHORIZED FIDELITY CORRECTION (user-authorized after the seed23 crash): mirror the frozen
+        # reference loop's mask handling (stabilize.py:138). curriculum_batch returns mask=None in the
+        # phase-3 (>=700) ABC_MIX handoff; the original H2 copy omitted this branch and crashed at step
+        # 700. This restores byte-fidelity to the reference loop; no scientific behavior change.
+        if mask is None:
+            main = F.cross_entropy(lo.reshape(-1, lo.size(-1)), y.reshape(-1))
+        else:
+            sel = mask.reshape(-1)
+            main = F.cross_entropy(lo.reshape(-1, lo.size(-1))[sel], y.reshape(-1)[sel])
         total = main
         # R0 alignment (steps < 600), byte-identical to CR1
         lam = IV.lambda_align(step)
