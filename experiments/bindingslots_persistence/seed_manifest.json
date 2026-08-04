@@ -1,0 +1,14 @@
+{
+  "schema": "bindingslots_persistence/seed_manifest/v1",
+  "status": "FROZEN before training. Outcome-independent, fixed. Cannot be replaced due to failure, interruption, or unfavorable results.",
+  "stage_seeds": [23, 24, 25, 26, 27],
+  "selection_rule": "the reserved Stage-2 seeds from the functional-routing preregistration (next consecutive unused integers after Stage-1 seeds 18-22), chosen before any outcome was known.",
+  "previously_used_bindingslots_training_seeds": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22],
+  "freshness_proof": {
+    "method": "repo-wide grep for each of 23-27 as a BindingSlots model-init/training seed across hybrid_llm_vnext_lab, experiments/bindingslots_confirmatory, experiments/bindingslots_functional_routing, experiments/bindingslots_persistence",
+    "result": "NONE of 23-27 appears as a BindingSlots model-init/training seed, nor in any prior selection, tuning, or holdout result.",
+    "eval_rng_constants_not_training_seeds": [123, 777, 4321]
+  },
+  "replacement_policy": "outcome-based replacement FORBIDDEN. No replacement due to failure, interruption, or unfavorable results. (A future, separately-authorized training phase may only replace a seed for a documented infrastructure-only failure using the next unused integer, chosen without inspecting quality.)",
+  "planned_matrix": {"arms": ["A+", "R0", "O1", "O1R", "H1", "H2"], "seeds": [23, 24, 25, 26, 27], "planned_runs": 30, "runs_started_this_phase": 0}
+}

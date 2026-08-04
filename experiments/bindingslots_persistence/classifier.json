@@ -1,0 +1,49 @@
+{
+  "schema": "bindingslots_persistence/classifier/v1",
+  "status": "FROZEN before training. Reuses the frozen Stage B formation + causal-collapse rules unchanged (classify_stage_b.py, sha256 3ca1e75f...) and the functional-routing routing thresholds. Same-seed A+ reference preserved exactly.",
+  "inherited_from": {"file": "hybrid_llm_vnext_lab/experiments/slot_formation_stabilization/classify_stage_b.py", "sha256": "3ca1e75fde529fcfb4492ba08044a0bfe53d660753de63630ab4bf08bad3c80d"},
+  "seeds": [23, 24, 25, 26, 27],
+  "arms": ["A+", "R0", "O1", "O1R", "H1", "H2"],
+  "frozen_constants": {"CHANCE": 0.02, "FORM_MIN": 0.075, "FORM_MARGIN": 0.050, "STAB_MEAN": 0.080, "STAB_MEDIAN": 0.050},
+  "routing_metric_thresholds": {"correct_slot_probability_min": 0.50, "correct_slot_median_rank_max": 5, "correct_slot_address_margin_min": 3.0},
+  "same_seed_aplus_threshold": "post_ablation <= max(A+_same_seed_needle_d96 + 0.030, 0.050) — A+ is the SAME-SEED freshly trained A+, never a pinned/pooled/assumed value",
+
+  "CLEAN_STABLE_requires_all_at_step_1200": [
+    "needle@d96 passes the frozen formation rule vs same-seed A+",
+    "correct_slot_probability >= 0.50",
+    "correct_slot_rank <= 5",
+    "address_margin >= 3.0",
+    "slots_off collapses per the frozen threshold",
+    "randomized_address collapses per the frozen threshold",
+    "quality gate passes",
+    "d16 + d220 distance gates pass"
+  ],
+
+  "retention_categories": {
+    "NEVER_FORMED": "peak needle < FORM_MIN and not formed at 1200",
+    "FORMED_THEN_COLLAPSED": "peak needle >= FORM_MIN but not formed at 1200",
+    "FORMED_AND_RETAINED_BUT_CAUSALLY_UNCLEAN": "formed+retained at 1200 but fails slots_off or randomized_address collapse",
+    "FORMED_AND_CLEAN_BUT_ROUTING_METRICS_DECAYED": "formed+retained+causally-collapses at 1200 but correct-slot prob/rank/margin below threshold (proxy decayed)",
+    "CLEAN_STABLE": "all CLEAN_STABLE conditions hold",
+    "QUALITY_FAILED": "quality gate fails",
+    "INTEGRITY_FAILED": "integrity/param check fails"
+  },
+  "classifier_distinguishes": ["proxy_retained (routing metrics)", "function_retained (needle at 600/900/1200)", "causal_dependence_retained (both ablations collapse)"],
+  "discipline": "An arm is NOT 'stabilized' if correct-slot probability stays high while randomized-addressing fails to collapse retrieval. Causal results are never averaged across seeds; one causally-unclean forming seed is a failed seed.",
+
+  "arm_advancement_gate": {
+    "clean_stable_count_ge": "4/5",
+    "and_clean_stable_gt_R0": true,
+    "and_all_mandatory_quality_and_integrity_gates_pass": true,
+    "raw_needle_5of5_cannot_compensate_for": ["low correct-slot prob", "poor rank", "insufficient margin", "randomized-address non-collapse", "slots-off non-collapse", "quality failure", "distance failure"]
+  },
+
+  "primary_trajectory_comparison": "routing quality at step 600 vs routing quality retained at step 1200 (correct-slot prob/rank/margin) — the direct test of the diagnosed decay-after-withdrawal failure.",
+
+  "verdicts_future_training_phase_only": [
+    "FUNCTIONAL_ROUTING_PERSISTENCE_CANDIDATE_SELECTED", "NO_PERSISTENCE_INTERVENTION_SELECTED",
+    "ROUTING_PURITY_NOT_RESOLVED", "RETENTION_NOT_RESOLVED",
+    "PERSISTENCE_PROTOCOL_VIOLATED", "PERSISTENCE_INTEGRITY_FAILED", "PERSISTENCE_RESOURCE_BLOCKED"
+  ],
+  "verdicts_note": "These are for the SEPARATELY-AUTHORIZED training phase. This preregistration task produces NO scientific verdict and selects NO candidate. Readiness remains KDA_VALIDATION_BLOCKED; READY_FOR_KDA_VALIDATION is never emitted."
+}

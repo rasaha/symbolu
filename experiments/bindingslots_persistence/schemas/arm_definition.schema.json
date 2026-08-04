@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-07/schema#","title":"persistence_arm_definition","type":"object","required":["schema","arms","matrix"],"properties":{"schema":{"const":"bindingslots_persistence/arm_definitions/v1"},"arms":{"type":"object"},"matrix":{"type":"object"}}}

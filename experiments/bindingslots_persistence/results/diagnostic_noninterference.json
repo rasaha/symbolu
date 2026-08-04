@@ -1,0 +1,36 @@
+{
+  "schema": "bindingslots_persistence/diagnostic_noninterference/v1",
+  "fixture": {
+    "seed": 3,
+    "steps": 80,
+    "inject_at": 40,
+    "note": "seed 3 is a previously-used fixture seed, NOT a persistence seed; no training result committed"
+  },
+  "test1_state_invariance": {
+    "params_unchanged": true,
+    "python_rng_unchanged": true,
+    "torch_rng_unchanged": true,
+    "optimizer_unchanged": true,
+    "pass": true
+  },
+  "test2_ab_trajectory": {
+    "final_param_hash_A": "b3b8d976c9049719",
+    "final_param_hash_B": "b3b8d976c9049719",
+    "final_param_hash_equal": true,
+    "next_step_loss_A": 4.02853155,
+    "next_step_loss_B": 4.02853155,
+    "next_step_loss_equal": true,
+    "pass": true
+  },
+  "step_700_noninterference_proven": true,
+  "checks_covered": [
+    "python RNG",
+    "torch CPU RNG",
+    "params",
+    "optimizer state",
+    "grad buffers (zeroed)",
+    "next-step loss",
+    "final param hash",
+    "train/eval mode restoration"
+  ]
+}
