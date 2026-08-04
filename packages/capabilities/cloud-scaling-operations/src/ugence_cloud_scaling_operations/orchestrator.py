@@ -155,23 +155,17 @@ class ProductionOrchestrator:
     ):
         self.config = config or OrchestratorConfig()
 
-        # L0-L3: Signal pipeline (Prometheus → Normalizer → Controller)
-        self.pipeline = SignalPipeline(self.config.pipeline, controller=controller)
-        self.controller = self.pipeline.controller
-
-        # L4-L5: Recommend + Execute
-        self.recommend_engine = RecommendEngine(self.config.recommend)
-
-        # HARD AUTHORITY GUARD: the recommendation engine must never mint its own
-        # execution authority. Auto-approval may only ever drive a non-mutating
-        # (dry-run) actuator. A live actuator combined with auto-approval is refused at
-        # construction. Authorized live mutation must go through the supported
-        # ControlledScalingExecutor path, which requires an external ExecutionAuthorization.
+        # HARD AUTHORITY GUARD (fail fast, before any construction): the recommendation
+        # engine must never mint its own execution authority. Auto-approval may only
+        # ever drive a non-mutating (dry-run) actuator. A live actuator combined with
+        # auto-approval is refused at construction. Authorized live mutation must go
+        # through ControlledScalingExecutor with an external ExecutionAuthorization.
         if self.config.auto_approve_threshold is not None:
-            actuator = getattr(self.recommend_engine, "actuator", None)
-            if actuator is not None:
+            rec_cfg = getattr(self.config, "recommend", None)
+            act_cfg = getattr(rec_cfg, "actuator", None) if rec_cfg is not None else None
+            if act_cfg is not None:
                 from ugence_cloud_scaling_operations.action.k8s_actuator import ActuatorMode
-                if getattr(actuator.config, "mode", None) != ActuatorMode.DRY_RUN:
+                if getattr(act_cfg, "mode", None) != ActuatorMode.DRY_RUN:
                     raise RuntimeError(
                         "auto_approve_threshold may not drive a live actuator: an "
                         "auto-approved recommendation cannot authorize its own mutation. "
@@ -179,6 +173,13 @@ class ProductionOrchestrator:
                         "ExecutionAuthorization for live scaling, or set the actuator to "
                         "DRY_RUN for autonomous simulation."
                     )
+
+        # L0-L3: Signal pipeline (Prometheus → Normalizer → Controller)
+        self.pipeline = SignalPipeline(self.config.pipeline, controller=controller)
+        self.controller = self.pipeline.controller
+
+        # L4-L5: Recommend + Execute
+        self.recommend_engine = RecommendEngine(self.config.recommend)
 
         # L6: Observability
         self.explainer = Explainer()
