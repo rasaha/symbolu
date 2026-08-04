@@ -137,9 +137,9 @@ def test_json_round_trip():
 
 
 def test_stable_schema_version():
-    assert SCHEMA_VERSION == "1.0"
+    assert SCHEMA_VERSION == "1.1"
     rec = _ctrl().recommend(ScalingObservation(metrics={"cpu": 0.5}, current_replicas=2))
-    assert rec.schema_version == "1.0"
+    assert rec.schema_version == "1.1"
 
 
 def test_advisory_only_invariants():
@@ -167,3 +167,36 @@ def test_from_dict_requires_metrics_and_replicas():
 def test_recommend_accepts_plain_mapping():
     rec = _ctrl().recommend({"metrics": {"cpu": 0.9}, "current_replicas": 3})
     assert isinstance(rec, ScalingRecommendation)
+
+
+def test_determinism_disclosure_present():
+    rec = _ctrl().recommend(ScalingObservation(metrics={"cpu": 0.7}, current_replicas=4))
+    d = rec.determinism
+    assert d["scope"] == "decision-deterministic"
+    assert d["identity_bootstrapped"] is False  # fresh controller, not bootstrapped
+    assert "identity_deviation" in d["nondeterministic_fields"]
+
+
+def test_decision_fields_deterministic_across_fresh_instances():
+    # Decision fields must be identical across repeated fresh instances; only the
+    # disclosed nondeterministic diagnostic (identity_deviation) may differ.
+    obs = ScalingObservation(
+        metrics={"cpu": 0.85, "memory": 0.8, "latency_p99": 0.7,
+                 "error_rate": 0.1, "queue_depth": 0.6},
+        current_replicas=5, phase="peak",
+    )
+    a = _ctrl().recommend(obs)
+    b = _ctrl().recommend(obs)
+    for f in ("recommendation", "replica_delta", "recommended_replicas",
+              "action_score", "pressure", "component_breakdown"):
+        assert getattr(a, f) == getattr(b, f), f
+    # The disclosed field is allowed to differ (unseeded identity baseline).
+    # (We do not assert it differs — only that it is disclosed as nondeterministic.)
+
+
+def test_identity_bootstrapped_reflected_after_bootstrap():
+    ctrl = CloudScalingController()
+    ctrl.bootstrap([{"cpu": 0.3, "memory": 0.3, "latency_p99": 0.2,
+                     "error_rate": 0.0, "queue_depth": 0.1}] * 20)
+    rec = ctrl.recommend(ScalingObservation(metrics={"cpu": 0.5}, current_replicas=3))
+    assert rec.determinism["identity_bootstrapped"] is True

@@ -24,6 +24,7 @@ from .config import InfraControllerConfig
 from .controller import Controller, ActionResult
 from .contracts import (
     SCHEMA_VERSION,
+    NONDETERMINISTIC_FIELDS,
     ContractError,
     ScalingObservation,
     ScalingRecommendation,
@@ -127,11 +128,22 @@ class CloudScalingController:
         )
         return self._to_recommendation(obs, result)
 
-    @staticmethod
     def _to_recommendation(
-        obs: ScalingObservation, result: ActionResult
+        self, obs: ScalingObservation, result: ActionResult
     ) -> ScalingRecommendation:
         recommended = obs.current_replicas + int(result.replica_delta)
+        determinism = {
+            "scope": "decision-deterministic",
+            "identity_bootstrapped": bool(self._controller.bootstrapped),
+            "nondeterministic_fields": list(NONDETERMINISTIC_FIELDS),
+            "note": (
+                "Decision fields (recommendation, replica_delta, recommended_replicas, "
+                "action_score, pressure, component_breakdown) are deterministic for a "
+                "fixed config + input sequence. identity_deviation is a diagnostic "
+                "derived from an unseeded identity baseline and varies between fresh "
+                "controllers before deterministic bootstrap."
+            ),
+        }
         return ScalingRecommendation(
             schema_version=SCHEMA_VERSION,
             correlation_id=obs.correlation_id,
@@ -146,6 +158,7 @@ class CloudScalingController:
             explanation=result.explain(),
             controller_step=int(result.step),
             metrics_snapshot=_jsonable(dict(result.metrics_snapshot)),
+            determinism=determinism,
             advisory_only=True,
             actuation_performed=False,
         )

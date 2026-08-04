@@ -2,9 +2,9 @@
 
 Purely observational, zero write permissions: a divergence tracker, a read-only HPA
 state watcher, and a proof-of-value reporter. The live-loop *runners*
-(``ShadowRunner``, ``LiveEfficiencyShadow``) that can drive a real cluster and host
-an operations RecommendEngine are NOT part of the advisory distribution — they live
-in the monorepo-only ``cloud_scaling_operations.shadow`` namespace.
+that can drive a real cluster and host an operations recommend engine are NOT part
+of the advisory distribution — they live in the monorepo-only operations shadow
+namespace.
 """
 
 from ugence_cloud_scaling_controller.shadow.divergence import (

@@ -4,9 +4,9 @@ These are advisory-only: confidence scoring gates *whether* to surface a
 recommendation, and safety bounds clamp recommended deltas. Neither approves nor
 executes anything.
 
-The approval → execution → notification stages (RecommendEngine, ApprovalManager,
-WebhookDispatcher) are NOT part of the advisory distribution; they live in the
-monorepo-only ``cloud_scaling_operations.recommend`` namespace.
+The approval → execution → notification stages (the recommend engine, approval
+manager, and webhook dispatcher) are NOT part of the advisory distribution; they
+live in the monorepo-only operations recommend namespace.
 """
 
 from ugence_cloud_scaling_controller.recommend.confidence import (

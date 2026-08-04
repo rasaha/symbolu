@@ -25,8 +25,15 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Mapping, Optional, Protocol, runtime_checkable
 
 # The stable schema version for both the input and output contracts. Bump only on a
-# breaking change to the field set or semantics.
-SCHEMA_VERSION = "1.0"
+# breaking change to the field set or semantics. Output schema 1.1 adds the
+# ``determinism`` disclosure block (see ScalingRecommendation).
+SCHEMA_VERSION = "1.1"
+
+# Fields that are NOT decision-deterministic. ``identity_deviation`` is derived from
+# an unseeded IdentityEMA baseline and varies between fresh controller instances
+# before a deterministic bootstrap; the "Identity Drift" line of ``explanation``
+# reflects it. No decision field depends on it.
+NONDETERMINISTIC_FIELDS = ("identity_deviation",)
 
 # Canonical, currently-CONSUMED normalized signal keys — exactly the controller's
 # metric groups (INFRA_KEYS + APP_KEYS + BUSINESS_KEYS). Only these five affect the
@@ -193,6 +200,14 @@ class ScalingRecommendation:
     explanation: str
     controller_step: int
     metrics_snapshot: Dict[str, float]
+    # Honest determinism disclosure (output schema 1.1). Example::
+    #   {"scope": "decision-deterministic", "identity_bootstrapped": false,
+    #    "nondeterministic_fields": ["identity_deviation"]}
+    # The decision fields (recommendation, replica_delta, recommended_replicas,
+    # action_score, pressure, and the plasticity/gain/damping/coherence breakdowns)
+    # are deterministic for a fixed config + input sequence. Fields listed in
+    # ``nondeterministic_fields`` are diagnostic and vary before bootstrap.
+    determinism: Dict[str, Any] = field(default_factory=dict)
     advisory_only: bool = True
     actuation_performed: bool = False
 

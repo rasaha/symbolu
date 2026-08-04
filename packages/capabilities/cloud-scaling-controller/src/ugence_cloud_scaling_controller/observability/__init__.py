@@ -3,7 +3,7 @@
 Advisory-only: these components analyze and report; they do not open a network
 listener or export telemetry. Live telemetry (HTTP metrics server, Prometheus push,
 OpenTelemetry export) is NOT part of the advisory distribution — it lives in the
-monorepo-only ``cloud_scaling_operations.observability`` namespace.
+monorepo-only operations observability namespace.
 """
 
 from ugence_cloud_scaling_controller.observability.decision_log import (
