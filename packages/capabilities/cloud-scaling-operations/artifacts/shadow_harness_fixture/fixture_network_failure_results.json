@@ -1,0 +1,93 @@
+{
+  "all_contained": true,
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "real_cluster_accessed": false,
+  "real_environment_observed": false,
+  "scenarios": [
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "timeout",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "tls_verification_failure",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "dns_failure",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "unauthorized",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "forbidden",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "not_found",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "partial_list_failure",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "metrics_unavailable",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "watch_disconnect",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "rate_limited",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "scenario": "temporary_server_error",
+      "transmitted_write_methods": []
+    },
+    {
+      "bounded": true,
+      "contained": true,
+      "no_mutation": true,
+      "resumed": true,
+      "scenario": "watch_resume_and_client_restart",
+      "transmitted_write_methods": []
+    }
+  ]
+}

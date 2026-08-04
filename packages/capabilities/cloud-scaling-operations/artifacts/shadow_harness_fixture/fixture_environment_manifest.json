@@ -1,0 +1,40 @@
+{
+  "cluster_identifier": "fake-cluster",
+  "config": {
+    "cluster_identifier": "fake-cluster",
+    "context_name": "fake-read-only-context",
+    "environment_classification": "disposable_test_fixture",
+    "execution_mode": "SHADOW",
+    "fixture_markers": [
+      "FAKE_LOCAL_FIXTURE",
+      "NOT_REAL_ENVIRONMENT_EVIDENCE"
+    ],
+    "is_fixture": true,
+    "maximum_observation_age_seconds": 120.0,
+    "maximum_target_count": 20,
+    "metrics_enabled": true,
+    "mutation_enabled": false,
+    "namespace_allowlist": [
+      "shadow-test"
+    ],
+    "request_timeout_seconds": 10.0,
+    "resource_kind_allowlist": [
+      "Deployment",
+      "StatefulSet",
+      "HorizontalPodAutoscaler"
+    ],
+    "resource_name_allowlist": [
+      "frontend",
+      "worker",
+      "api"
+    ],
+    "tls_verify": true,
+    "watch_enabled": true
+  },
+  "context_name": "fake-read-only-context",
+  "environment_classification": "disposable_test_fixture",
+  "evidence_class": "FAKE_LOCAL_FIXTURE",
+  "real_cluster_accessed": false,
+  "real_environment_observed": false,
+  "tls_verify": true
+}
