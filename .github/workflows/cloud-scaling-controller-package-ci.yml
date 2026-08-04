@@ -10,6 +10,7 @@ on:
     paths:
       - "packages/capabilities/cloud-scaling-controller/**"
       - "cloud_controller/**"
+      - "cloud_scaling_operations/**"
       - "symbolu/__init__.py"
       - "tests/cloud_controller/**"
       - "docs/audits/cloud_scaling_controller/**"
@@ -19,6 +20,7 @@ on:
     paths:
       - "packages/capabilities/cloud-scaling-controller/**"
       - "cloud_controller/**"
+      - "cloud_scaling_operations/**"
       - "symbolu/__init__.py"
       - "tests/cloud_controller/**"
       - "docs/audits/cloud_scaling_controller/**"
@@ -78,6 +80,18 @@ jobs:
       - name: Byte-compile (syntax) check
         run: python -m py_compile $(git ls-files "$PKG/src" | grep '\.py$')
 
+      - name: Advisory-boundary gates (no executor / mutation / approval / orchestrator)
+        # Static gates over the packaged source: no execution modules, no forbidden
+        # symbols (K8sActuator/GateActuator/ProductionOrchestrator/RecommendEngine/...),
+        # no Kubernetes/ArgoCD mutation calls, no Kubernetes SDK import, no concrete
+        # executor, no auto-approval, advisory package never imports operations.
+        run: python -m pytest "$PKG/tests/boundaries" -q
+
+      - name: Decision-determinism + diagnostic-nondeterminism-disclosure gates
+        run: |
+          python -m pytest "$PKG/tests/contract/test_contracts.py" -q -k \
+            "determinism or deterministic or schema_version"
+
       - name: Package-local tests (isolation)
         run: python -m pytest "$PKG/tests" -q
 
@@ -91,6 +105,13 @@ jobs:
         run: python -m build "$PKG" -o "$PKG/dist"
 
       - name: Clean-environment distribution verifier
+        # Blocking gate: builds a wheel, inspects PACKAGED source for forbidden paths /
+        # symbols / mutation calls / concrete executor, installs wheel-only in an
+        # isolated venv, checks advisory invariants + determinism disclosure, confirms
+        # forbidden Ugence/cloud packages and legacy/operations namespaces are absent,
+        # and generates build_provenance.json bound to the actual build revision
+        # (fails on a dirty tree, missing revision, hash mismatch, version mismatch,
+        # or baseline-as-build-commit).
         run: python "$PKG/verify_cloud_scaling_controller_distribution.py"
 
       - name: CLI smoke test (offline)
@@ -102,10 +123,10 @@ jobs:
               return subprocess.run([sys.executable, "-m", "ugence_cloud_scaling_controller.cli", *args],
                                     env={"PYTHONPATH": src, "PATH": __import__("os").environ["PATH"]},
                                     capture_output=True, text=True, **kw)
-          v = run(["version"]); assert v.returncode == 0 and "0.1.0" in v.stdout, v.stderr
+          v = run(["version"]); assert v.returncode == 0 and "0.1.1" in v.stdout, v.stderr
           d = run(["demo"]); assert d.returncode == 0 and '"advisory_only": true' in d.stdout, d.stderr
           e = run(["evaluate", "--input", "-"], input='{"metrics":{"cpu":0.9},"current_replicas":3}')
-          assert e.returncode == 0 and '"schema_version": "1.0"' in e.stdout, e.stderr
+          assert e.returncode == 0 and '"schema_version": "1.1"' in e.stdout, e.stderr
           bad = run(["evaluate", "--input", "-"], input="{not json")
           assert bad.returncode != 0, "invalid input must exit nonzero"
           print("CLI smoke OK")

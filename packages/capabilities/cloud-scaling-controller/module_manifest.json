@@ -2,25 +2,26 @@
   "module_name": "cloud-scaling-controller",
   "distribution_name": "ugence-cloud-scaling-controller",
   "import_namespace": "ugence_cloud_scaling_controller",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "maturity": "beta",
   "authority_class": "ADVISORY",
   "execution_capability": "NONE",
-  "network_required": false,
+  "concrete_executor_in_distribution": false,
+  "infrastructure_mutation_capability": false,
   "cloud_credentials_required": false,
+  "network_required": false,
+  "core_network_required": false,
   "core_dependencies": [
     "numpy>=1.24.0"
   ],
   "optional_dependencies": {
-    "prometheus": ["requests>=2.28.0", "prometheus-client>=0.16.0"],
-    "shadow": ["kubernetes>=26.1.0", "PyYAML>=6.0"],
-    "otel": ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"],
+    "prometheus": ["requests>=2.28.0"],
+    "shadow": ["requests>=2.28.0"],
     "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
   },
   "optional_adapter_network_requirements": {
-    "prometheus": "Read-only outbound HTTP to a Prometheus server (opt-in).",
-    "shadow": "Read-only Kubernetes API access to watch HPA/state for shadow comparison (opt-in).",
-    "otel": "Outbound OTLP export to a collector (opt-in)."
+    "prometheus": "Read-only outbound HTTP GET to a Prometheus server (opt-in).",
+    "shadow": "Read-only HPA/state reads via the Prometheus client (kube-state-metrics); no Kubernetes SDK, no mutation (opt-in)."
   },
   "public_api": [
     "CloudScalingController",
@@ -36,12 +37,31 @@
     "SCHEMA_VERSION",
     "__version__"
   ],
+  "public_api_notes": {
+    "ScalingExecutor": "Inert Protocol (interface only). No concrete executor is shipped or invoked; the facade/CLI cannot supply or call one.",
+    "ExecutionReceipt": "Typed result for an external executor; never produced by this distribution."
+  },
   "input_schema_version": "1.0",
-  "output_schema_version": "1.0",
-  "legacy_imports": [
-    "cloud_controller",
-    "symbolu.cloud_controller"
-  ],
+  "output_schema_version": "1.1",
+  "decision_deterministic": true,
+  "diagnostic_deterministic_before_bootstrap": false,
+  "nondeterministic_fields": ["identity_deviation"],
+  "operations_code_distribution": "NOT_INCLUDED",
+  "operations_code_location": "cloud_scaling_operations/ (monorepo-only; not packaged; may become a separate ugence-cloud-scaling-operations distribution in a future, separately-governed phase)",
+  "legacy_imports": {
+    "advisory_monorepo": ["cloud_controller", "symbolu.cloud_controller"],
+    "operations_monorepo_only": [
+      "cloud_controller.action.*",
+      "cloud_controller.orchestrator",
+      "cloud_controller.main",
+      "cloud_controller.recommend.engine",
+      "cloud_controller.recommend.approval",
+      "cloud_controller.recommend.webhook",
+      "symbolu.cloud_controller.action.*",
+      "symbolu.cloud_controller.orchestrator"
+    ],
+    "note": "Operational legacy imports resolve to cloud_scaling_operations and are MONOREPO-ONLY; they are NOT part of the distributed wheel and NOT a stable distributed API."
+  },
   "forbidden_dependencies": [
     "governance_studio",
     "decision_governance",
@@ -51,10 +71,13 @@
     "llm_steering",
     "ai_hiring",
     "control_plane",
+    "kubernetes",
     "boto3",
     "botocore",
     "azure",
     "google-cloud",
+    "prometheus-client",
+    "opentelemetry-sdk",
     "fastapi",
     "uvicorn"
   ],
@@ -69,11 +92,13 @@
     "production_certified": false
   },
   "known_limitations": [
-    "Advisory-only: produces recommendations; does not actuate infrastructure.",
+    "Advisory-only: produces recommendations; contains no code capable of applying them.",
     "Not live-cluster validated by this package; not production-certified.",
-    "identity_deviation is a pre-existing nondeterministic observability output (unseeded IdentityEMA baseline); it does not affect any scaling decision and is excluded from the behavior-baseline parity projection.",
+    "Decision-deterministic; identity_deviation is a diagnostic that varies before deterministic bootstrap (see output determinism block). It affects no scaling decision.",
     "No cost-savings, customer-validation, or real-cluster-superiority claims are made.",
-    "The shadow/action operational modules ship as opt-in, non-default legacy modules behind extras; no write-capable executor is wired to or invoked by the advisory core."
+    "Execution/approval/orchestration code is NOT included in this distribution; it lives in the monorepo-only cloud_scaling_operations namespace."
   ],
-  "source_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
+  "provenance_policy": "The static manifest carries stable metadata only. The actual build revision is generated at build/verification time from GITHUB_SHA or `git rev-parse HEAD` into artifacts/build_provenance.json (evidence_class CI_GENERATED_BUILD_EVIDENCE). No self-referential commit SHA is stored here.",
+  "build_revision_source": "GITHUB_SHA | git rev-parse HEAD",
+  "source_baseline_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
 }

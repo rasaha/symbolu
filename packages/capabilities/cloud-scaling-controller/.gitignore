@@ -4,3 +4,11 @@
 __pycache__/
 *.pyc
 .venv/
+
+# CI-generated build evidence — produced fresh by the distribution verifier and
+# uploaded as CI artifacts; never committed (would falsely represent a build run).
+/artifacts/distribution_verification.json
+/artifacts/package_inventory.json
+/artifacts/dependency_audit.json
+/artifacts/build_provenance.json
+/artifacts/evidence_sha256.json
