@@ -1,9 +1,16 @@
 # DilChat Backend (Ugence Labs)
 
+[![dilchat-ci](https://github.com/rasaha/symbolu/actions/workflows/dilchat-ci.yml/badge.svg?branch=claude%2Fsetup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF)](https://github.com/rasaha/symbolu/actions/workflows/dilchat-ci.yml)
+
 DilChat is a mobile-first couples compatibility and communication product
 ([dilchat.com](https://dilchat.com)). This package is the **backend foundation**
 built in the first bounded implementation phase (**Phase A + the non-blocked
 parts of Phase B**).
+
+> The `dilchat-ci` badge reflects the **internal development baseline** gate only
+> (static quality, PostgreSQL migrations + full tests, OpenAPI + Guna fail-closed
+> guards). It is **not** a production-readiness signal — Guna Milan remains
+> **blocked and non-executable**.
 
 > **Status: internal development baseline — NOT production-ready.**
 > - **Internal development baseline** (backend + validation infrastructure only).

@@ -23,17 +23,22 @@ if not _DB_URL or "postgresql" not in _DB_URL:
 
 
 def _dsn() -> dict:
-    # postgresql+asyncpg://postgres@/dilchat_test?host=/tmp&port=5433
+    # Accepts both socket-style (…/dilchat_test?host=/tmp&port=5433) and TCP
+    # netloc (…:pw@host:port/dilchat_test) URLs. Query params win; the netloc
+    # host/port/password are the fallback (used by CI's PostgreSQL service).
     from urllib.parse import parse_qs, urlparse
 
     u = urlparse(_DB_URL.replace("+asyncpg", ""))
     q = parse_qs(u.query)
-    return {
+    dsn = {
         "user": u.username or "postgres",
         "database": u.path.lstrip("/"),
-        "host": q.get("host", ["/tmp"])[0],
-        "port": int(q.get("port", ["5432"])[0]),
+        "host": q.get("host", [u.hostname or "/tmp"])[0],
+        "port": int(q.get("port", [str(u.port or 5432)])[0]),
     }
+    if u.password:
+        dsn["password"] = u.password
+    return dsn
 
 
 async def _connect():
