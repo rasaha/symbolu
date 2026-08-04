@@ -1,0 +1,50 @@
+{
+  "schema": "bindingslots_persistence/execution_authorization/v1",
+  "authorization": "explicit training authorization for the merged adaptive BindingSlots persistence screen",
+  "pr_1331_merge_commit": "78be653642c3ec7adc385572c75c411cc0ce4fe0",
+  "pr_1332_merge_commit": "101951cb8bbccca32b6e3faa371bc675371dca89",
+  "execution_branch": "claude/bindingslots-persistence-adaptive-execution",
+  "frozen_protocol_hashes": {
+    "arm_definitions.json": "731730e0c925eefb2ce8ee17a2ea6d17daa5cec0b45f6af4e9feec4761eac829",
+    "classifier.json": "f4ba0a4dc5261663ef3487c9d1cbc1a4b8750f399a91e92e68e3027cc298765e",
+    "o1r_definition.json": "f2fce21da4fafda9b67e360b8b256ae303b214310fa8222b07c35f5b5aaeac52",
+    "h1_parameter_group_manifest.json": "7c193bc67ccfdab22962f9c66f24ad70cd26eae16e60de6a84ad40ca9d59ceb1",
+    "h2_teacher_definition.json": "519c542b3d74b77b22f40b027095f39aa1638a4c05ed08ad3ccec0631a85e377",
+    "frozen_reference_config.json": "bbfbdf47fec6ba72f2ccc424796a2c8cd23a28ac0ab70f4ce93c5b3a632e112c",
+    "seed_manifest.json": "ec8a0c605eea8293320e699df27818ac77bb77039d8c34e91af7f34b102c595e"
+  },
+  "adaptive_plan_hash": "91abb543d263c4a108702f6a00433797614d7b78184800eb8bc9034e0bd526bd",
+  "classifier_hash": "f4ba0a4dc5261663ef3487c9d1cbc1a4b8750f399a91e92e68e3027cc298765e",
+  "seed_manifest_hash": "ec8a0c605eea8293320e699df27818ac77bb77039d8c34e91af7f34b102c595e",
+  "authorization_scope": "the merged adaptive BindingSlots persistence screen only",
+  "authorizes_training_seeds": [
+    23,
+    24,
+    25,
+    26,
+    27
+  ],
+  "max_run_count": 30,
+  "min_run_count": 15,
+  "does_not_authorize": [
+    "coefficient tuning",
+    "new arms",
+    "new seeds",
+    "seed replacement",
+    "architecture changes",
+    "KDA experiments",
+    "production packaging",
+    "independent holdout confirmation"
+  ],
+  "kda_prohibition": "KDA validation remains BLOCKED; READY_FOR_KDA_VALIDATION is never emitted",
+  "no_training_before_amendment_attestation": "verified: results/ contained only preregistration + integrity report artifacts (no reserved-seed training) at authorization time",
+  "environment": {
+    "python": "3.11.15",
+    "platform": "Linux-6.18.5-fc-v18-x86_64-with-glibc2.39",
+    "torch": "2.2.2+cu121",
+    "cuda": false,
+    "fp": "fp32",
+    "threads": 4
+  },
+  "date_note": "stamped by git commit metadata (Date.now unavailable in-harness)"
+}
