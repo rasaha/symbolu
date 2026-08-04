@@ -1,0 +1,60 @@
+{
+  "schema": "bindingslots_functional_routing/prerequisite_gate/v1",
+  "audit_date": "2026-08-04",
+  "prerequisite_verdict": "BINDINGSLOTS_FUNCTIONAL_ROUTING_PREREQUISITE_VERIFIED",
+  "verdict_note": "R0 = frozen CR1 is fully recovered from the merged PR #1319; PR #1324 (confirmatory) is open for review (not merged) and supplies the diagnostic motivation, which is reconstructible from its committed curated evidence on this branch. Development proceeds on the designated session branch per environment git discipline.",
+
+  "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_branch_tip_at_audit": "e496a67978245e57bb9dcbfab2387a3af18781b4",
+  "working_branch": "claude/bindingslots-confirmatory-replication-d117c1",
+
+  "prerequisites": {
+    "pr_1300": {"merged": true, "merge_commit": "5f0cbe45"},
+    "pr_1319": {"merged": true, "merge_commit": "ba665e42"},
+    "pr_1324": {"state": "open (for review, not merged)", "head": "b2e1a000"}
+  },
+
+  "confirmatory_reconstruction": {
+    "primary_verdict": "CONFIRMATORY_REPLICATION_FAILED",
+    "slot_formation": "SLOT_FORMATION_NOT_REPLICATED",
+    "kda_readiness": "KDA_VALIDATION_BLOCKED",
+    "cr1_formation": "3/5", "b0_formation": "0/5", "aplus_formation": "0/5",
+    "cr1_vs_b0_paired_wins": "3/5", "cr1_vs_aplus_paired_wins": "3/5",
+    "formed_then_collapsed": [13, 14],
+    "randomized_address_impurity": [16],
+    "clean_retained": [15, 17],
+    "reconstructed_from": "experiments/bindingslots_confirmatory/results (committed curated trajectories)"
+  },
+
+  "integrity": {
+    "abc_json_sha256": "b31989a3135b150ef4cf693e42f173aadb51bba876b6e956da73f022d539b482",
+    "abc_json_unchanged": true,
+    "architecture_signature": "6e8672bd3df43f81241f4fe965508055b2500cceba5c66b59b012e2ff4a7cff1",
+    "frozen_cr1_config_sha256_confirmatory": "ce4d93ea311da931c30a845b4437b45b5cb1d287c2e8bd1a03ce7d8054957f70",
+    "inherited_classifier_sha256": "3ca1e75fde529fcfb4492ba08044a0bfe53d660753de63630ab4bf08bad3c80d",
+    "no_phase_kda_mla_in_frozen_impl": true,
+    "verifiers": {
+      "functional_routing_prereg_integrity": "23 checks, 0 failures",
+      "known_signature_reproduction": "5 checks, 0 failures (seeds 13-17 reproduce clean/impure/collapse signatures)",
+      "lab_verifier": "81 checks, 0 failures (at confirmatory audit)",
+      "historical_artifact_protection": "8 checks, 0 failures"
+    }
+  },
+
+  "conservative_language_confirmed": [
+    "trajectories demonstrate a strong scaffold-era routing state existed",
+    "trajectories do not establish the precise cause of later collapse (a hypothesis to test)"
+  ],
+
+  "seed_audit": {
+    "previously_used_bindingslots_training_seeds": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],
+    "stage1_seeds": [18,19,20,21,22],
+    "stage2_reserved": [23,24,25,26,27],
+    "confirmation_reserved": [28,29,30,31,32],
+    "contamination_check": "seeds 18-32 appear nowhere as a BindingSlots model-init/training seed"
+  },
+
+  "environment": {"python": "3.11.15", "torch": "2.2.2+cu121", "cuda": false, "threads": 4, "fp": "fp32"},
+  "working_tree_clean_at_audit": true,
+  "existing_functional_routing_branch_or_pr": "none"
+}
