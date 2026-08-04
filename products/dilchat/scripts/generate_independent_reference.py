@@ -139,7 +139,8 @@ def interval_case(cid, label, date, tz, lat, lon, hemi, notes=""):
 
     z = zoneinfo.ZoneInfo(tz)
     start = dt.datetime.combine(date, dt.time(0, 0), tzinfo=z).astimezone(dt.UTC)
-    end = dt.datetime.combine(date + dt.timedelta(days=1), dt.time(0, 0), tzinfo=z).astimezone(dt.UTC)
+    _next = dt.datetime.combine(date + dt.timedelta(days=1), dt.time(0, 0), tzinfo=z)
+    end = _next.astimezone(dt.UTC)
     return {
         "fixture_id": cid, "fixture_class": "INDEPENDENT_REFERENCE_FIXTURE",
         "evidence_status": "VERIFIED_INDEPENDENT", "label": label,
@@ -269,7 +270,8 @@ def main() -> None:
         "cases": cases,
     }
     import pathlib
-    p = pathlib.Path(__file__).parent.parent / "tests" / "fixtures" / "independent_reference_charts.json"
+    p = (pathlib.Path(__file__).parent.parent / "tests" / "fixtures"
+         / "independent_reference_charts.json")
     p.write_text(json.dumps(out, indent=2))
     print(f"wrote {len(cases)} INDEPENDENT_REFERENCE cases -> {p}")
 

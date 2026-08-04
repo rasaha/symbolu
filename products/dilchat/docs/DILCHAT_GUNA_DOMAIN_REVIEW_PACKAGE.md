@@ -20,16 +20,26 @@ source intentions, conflicts, exclusions, and sample calculations.
 - **Directional role mapping (OQ-2):** seeker→bride, partner→groom is a *default* and is
   **unconfirmed**; it affects Varna, Tara, and Gana.
 
-## 2. Selected editions (PENDING)
+## 2. Identified editions (real, but NOT frozen)
 
-All `PENDING_ACQUISITION`; see `docs/DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md`.
+Specific real editions have now been **identified** by bibliographic search (real ISBNs / catalogue
+IDs). This is **edition identification, not acquisition and not freeze**: no copy was acquired, no
+page was opened (Internet Archive content endpoints returned HTTP 403 in this environment), and **no
+source is `FROZEN`**. All remain `EDITION_IDENTIFIED_NOT_ACQUIRED` / `PENDING_ACQUISITION`. See
+`docs/DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`, `docs/DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md`, and
+`rules/sources/GUNA_SOURCE_MANIFEST.json`.
 
-| Source | Title | Author/translator | Edition | Status |
+| Source | Title | Author / translator | Identified edition (real) | Status |
 |---|---|---|---|---|
-| `MC-NORMATIVE` | Muhurta Chintamani (Melapaka Prakarana) | Rama Daivajna | **PENDING** | PENDING_ACQUISITION |
-| `RAMAN-ENGINEERING` | Muhurtha (Electional Astrology) | B. V. Raman | **PENDING** | PENDING_ACQUISITION |
-| `BPHS-XREF` | Brihat Parashara Hora Shastra | attr. Parashara | **PENDING** | PENDING_ACQUISITION |
-| `KALAPRAKASIKA-XREF` | Kalaprakasika | tr. N. P. Subramania Iyer | **PENDING** | PENDING_ACQUISITION |
+| `MC-NORMATIVE` | Muhurta Chintamani (Melapaka Prakarana) | Rama Daivajna; tr. Girish Chand Sharma | Sagar Publications, New Delhi, 1996 (Sanskrit + English); Sanskrit normative ref: Haridas Sanskrit Series #185 (Chowkhamba) | `EDITION_IDENTIFIED_NOT_ACQUIRED` |
+| `RAMAN-ENGINEERING` | Muhurtha (Electional Astrology) | B. V. Raman | UBSPD, 1993 · ISBN 978-8185674681 (printing must be pinned) | `EDITION_IDENTIFIED_NOT_ACQUIRED` |
+| `BPHS-XREF` | Brihat Parashara Hora Shastra | attr. Parashara; tr. R. Santhanam | Ranjan Publications, 1984 · ISBN 978-8188230600 (Naisargika friendship only) | `EDITION_IDENTIFIED_NOT_ACQUIRED` |
+| `KALAPRAKASIKA-XREF` | Kalaprakasika | tr. N. P. Subramania Iyer | Gyan Publishing House · ISBN 9788121236591 (reprint of the 1917 ed.) — supplementary only | `EDITION_IDENTIFIED_NOT_ACQUIRED` |
+
+The English translations and modern reprints are **in copyright**; no scan or OCR is committed. The
+**Sanskrit normative text governs** over the English bridge on any conflict. Editions move to
+`FROZEN_*` only after acquisition, page/verse access, pagination pinning, checksum, and reviewer
+confirmation of usability.
 
 ## 3. Source hierarchy
 
@@ -76,7 +86,10 @@ table form + gradations; Tara directional counting; Yoni friendly/unfriendly gra
 Naisargika-only; Gana Deva×Rakshasa; Bhakoot dosha + cancellation; Nadi classification + same-rashi/
 same-lord exceptions; directional bride/groom ordering; regional North/South differences.
 
-## 7. Every source conflict
+## 7. Every source conflict (4 topics; one dossier each)
+
+Each conflict has a dossier in `docs/DILCHAT_GUNA_RULE_ADJUDICATION_LEDGER.md` §3 (both candidate
+values preserved; never silently resolved):
 
 1. **Vashya** — 12×12 canonical rashi-pair table vs 5×5 group reduction; off-diagonal gradations. `PENDING`.
 2. **Yoni** — friendly(3) vs unfriendly(1) off-diagonal cells. `PENDING`.
@@ -159,4 +172,47 @@ Date:                     ____________________________
 Signature:                ____________________________
 ```
 
-**No reviewer approval is recorded. This package is `DOMAIN_REVIEW_PENDING`.**
+## 15. Companion artifacts produced this phase
+
+This package is the reviewer entry point. The supporting artifacts produced in the *Guna Source
+Acquisition, Rule Adjudication, and Domain Sign-off Preparation* phase are:
+
+| Artifact | Purpose |
+|---|---|
+| `docs/DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md` | Bibliographic identification of the four editions (real ISBNs / catalogue IDs); honest not-acquired / not-frozen status. |
+| `rules/sources/GUNA_SOURCE_MANIFEST.json` | Machine-readable edition record; `overall_status: PENDING_ACQUISITION`. |
+| `docs/DILCHAT_GUNA_V1_TRADITION_SCOPE.md` | v1 tradition scope (North-Indian Ashtakoota; OQ-1/OQ-2 open). |
+| `docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md` + `rules/…/source_traceability.json` | Per-rule → source mapping (23 rules, 0 approved). |
+| `docs/DILCHAT_GUNA_RULE_ADJUDICATION_LEDGER.md` | Per-koota rule adjudication ledger + the four source-conflict dossiers (§3), all PENDING/BLOCKED/SOURCE_CONFLICT. |
+| `docs/DILCHAT_GUNA_FOUNDER_DECISIONS.md` | Founder-decision record (OQ-1/OQ-2 and constraint decisions). |
+| `docs/DILCHAT_PARIHARA_ADJUDICATION_REPORT.md` + `docs/DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md` + `rules/…/parihara.json` | Parihara adjudication and deterministic precedence (6 rules, all disabled). |
+| `docs/DILCHAT_GUNA_MANUAL_CALCULATION_REPORT.md` + `rules/fixtures/guna_manual_cases.json` | 24 manual cases → 22 required categories (structural coverage; 0 verified). |
+| `rules/…/pack_control.json` + `scripts/validate_rule_pack.py` | Machine-readable control block (0 approved, 0 verified) and the coverage/invariant validator. |
+| `docs/DILCHAT_GUNA_DOMAIN_REVIEW_RECORD.md` | Blank reviewer sign-off record (all fields `PENDING`). |
+
+Counts at package time: **23 traceability rules + 6 parihara rules, 0 approved; 0 pariharas enabled;
+24 manual cases, 0 verified; 4 unresolved conflict topics; no edition frozen.**
+
+## 16. What the reviewer must explicitly approve or reject
+
+Nothing below is pre-approved. Each item requires an explicit reviewer verdict
+(APPROVE / APPROVE-WITH-LIMITATION / REJECT), recorded in
+`docs/DILCHAT_GUNA_DOMAIN_REVIEW_RECORD.md`:
+
+1. **Source hierarchy** — MC → Raman → BPHS → Kalaprakasika, and the four frozen editions.
+2. **Tradition scope (OQ-1)** — North-Indian Ashtakoota only, or add a South-Indian Dashakoota variant.
+3. **Role directionality (OQ-2)** — the seeker/partner → bride/groom mapping (affects Varna, Tara, Gana).
+4. **Each of the 8 kootas** — Varna, Vashya, Tara, Yoni, Graha Maitri, Gana, Bhakoot, Nadi.
+5. **Each score matrix** — Vashya (12×12 vs 5×5), Yoni 14×14 (gradations BLOCKED), Graha Maitri 6-band
+   (Naisargika only), Gana 3×3 (Deva×Rakshasa), plus the Varna/Tara/Bhakoot/Nadi scoring rules.
+6. **Each exception / parihara (6)** — the four Nadi/Bhakoot cancellations/reliefs, the BLOCKED Nadi
+   relief, and the Mangal separate-flag placeholder (outside the 36-pt sum).
+7. **Each of the 4 source conflicts** — resolve with a cited decision or retain as `SOURCE_CONFLICT`.
+8. **Each of the 24 manual cases** — independently recomputed against the frozen edition before any
+   promotion to a golden fixture.
+9. **Each v1 exclusion** — Vashya 12×12 not-transcribed, Yoni gradations, `nadi_relief_lords_friends`,
+   all-pariharas-disabled, Mangal outside the sum (DEC-019), South-Indian variants out of scope.
+10. **Constraints** — DEC-019 (Mangal outside the sum) and DEC-021 (Nadi constitutional-only).
+
+**No reviewer approval is recorded. Every slot in §14 and in the sign-off record is empty. This
+package is `DOMAIN_REVIEW_PENDING`; no source is `FROZEN`; no rule is `DOMAIN_APPROVED`.**

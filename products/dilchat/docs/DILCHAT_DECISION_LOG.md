@@ -733,3 +733,67 @@ could accumulate weak rules into an invented probability. Outcomes: NO_DOSHA /
 DOSHA_PRESENT / DOSHA_CANCELLED / DOSHA_PARTIALLY_RELIEVED / SOURCE_CONFLICT /
 REQUIRES_DOMAIN_REVIEW. All rules ship disabled/PENDING. See
 `DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md` and `parihara.json`.
+
+## DEC-042 — Guna source editions IDENTIFIED (not frozen)
+**Status:** Requires acquisition + domain review · **[Traditional Vedic rule]**
+
+Real, citable candidate editions were identified for all four sources — MC:
+Girish Chand Sharma tr. (Sagar Publications, 1996) + Haridas Sanskrit Series #185;
+Raman: *Muhurtha (Electional Astrology)* (UBSPD, 1993, ISBN 978-8185674681); BPHS:
+R. Santhanam (Ranjan Publications, 1984, ISBN 978-8188230600); Kalaprakasika:
+N. P. Subramania Iyer (Gyan Publishing House, ISBN 9788121236591). Status
+`EDITION_IDENTIFIED_NOT_ACQUIRED`; **none frozen** — Internet Archive content was
+blocked (HTTP 403), no scan opened, no pagination verified. Overall
+`PENDING_ACQUISITION`. No scans committed. See `GUNA_SOURCE_MANIFEST.json` (v2) and
+`DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`.
+
+## DEC-043 — v1 tradition scope drafted; role-neutral methodology deferred
+**Status:** Draft · **Requires founder approval** · **[Product]** · **[Traditional Vedic rule]**
+
+DilChat Classical Ashtakoota v1 is scoped to **one** explicitly-selected textual
+tradition (North-Indian per MC; sidereal; Lahiri; 27-fold nakshatra, Abhijit
+excluded; Naisargika-only friendship). It is **not** described as universal or
+pan-Indian. For same-sex / role-neutral couples the traditional bride/groom model
+is **not** assumed preserved and **no** symmetric classical result is invented;
+such methodology is marked unsupported / separately-defined and **deferred** to
+founder + reviewer (OQ-15). See `DILCHAT_GUNA_V1_TRADITION_SCOPE.md`.
+
+## DEC-044 — Machine-readable pack controls + fail-closed validator
+**Status:** Accepted · **[Technical]**
+
+The rule pack carries `pack_control.json` (immutable pack ID, semantic version,
+component maxima, honest counts, per-file sha256 checksums, and a **derived
+`executable` invariant** that is `false` while any rule is pending/blocked/
+conflicted, any edition is unfrozen, domain review is pending, or any manual case
+is unverified). `scripts/validate_rule_pack.py` enforces JSON validity, duplicate
+keys, matrix dimensions/ranges, unique rule IDs, reference integrity, checksum
+drift, and the executable/parihara/manual invariants; `test_rule_pack_controls.py`
+proves the guards fail closed. No Guna scoring code is added.
+
+## DEC-045 — Four separate authority verdicts
+**Status:** Accepted · **[Technical]** · **[Traditional Vedic rule]**
+
+The authority gate reports four independent verdicts: **technical validation**
+(`VALIDATION_INFRASTRUCTURE_COMPLETE`), **astronomy**
+(`ASTRONOMY_VALIDATION_PASS_WITH_BOUNDARY_CONDITIONS`), **Guna authority**
+(`GUNA_AUTHORITY_VALIDATION_BLOCKED`), and **rule pack** (`RULE_PACK_BLOCKED`).
+The Guna/rule-pack verdicts stay blocked while editions are unfrozen, conflicts
+unresolved, manual cases unverified, or domain review pending. See
+`DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md`.
+
+## DEC-046 — Founder decisions FD-1…FD-10 surfaced (not decided)
+**Status:** Requires founder approval · **[Product]**
+
+Ten founder/tradition decisions are surfaced without being decided (v1 tradition,
+bride/groom mapping, same-sex policy, regional strategy, Bhakoot relief type, Nadi
+pada exceptions, unresolved-koota blocking policy, user tradition selection, full
+vs reduced first release, product copy). Engineering stays fail-closed until each
+is recorded. See `DILCHAT_GUNA_FOUNDER_DECISIONS.md`.
+
+## OQ-15 — Same-sex / role-neutral compatibility methodology
+**Status:** Open · **Requires founder approval + domain review**
+
+Classical Ashtakoota assumes bride/groom roles. The methodology for same-sex or
+role-neutral couples is undefined and must not be faked as a symmetric classical
+result. Options: explicit role selection, a separate clearly-labelled
+DilChat-derived method, or deferral. Tracked as FD-3.

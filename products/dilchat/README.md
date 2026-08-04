@@ -40,23 +40,41 @@ parts of Phase B**).
 > [`docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md`](docs/DILCHAT_PHASE_A_B_HARDENING_REPORT.md)
 > and Decision-Log entries DEC-029…DEC-035.
 
-### Astrology & Guna authority validation (this phase)
+### Astrology & Guna authority validation
 
-| Workstream | Document | Verdict |
-|------------|----------|---------|
-| Consolidated gate | [DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md](docs/DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md) | **AUTHORITY_VALIDATION_COMPLETE_WITH_EXPLICIT_EXCLUSIONS** · rule pack **RULE_PACK_BLOCKED** |
-| A · Independent astronomy | [DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md](docs/DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md) | PASS (≤ 19.8″ vs Astropy/ERFA) |
-| B · Interval completeness | [DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md](docs/DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md) | PROVEN_WITH_LIMITATIONS |
-| C · SECURITY DEFINER / RLS | [DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md](docs/DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md) | SECURITY_DEFINER_RLS_HARDENED |
-| D · Source freeze | [DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md](docs/DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md) · [`rules/sources/GUNA_SOURCE_MANIFEST.json`](rules/sources/GUNA_SOURCE_MANIFEST.json) | PENDING_ACQUISITION |
-| E · Rule traceability | [DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md](docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md) · [`rules/ashtakoota_muhurta_chintamani_raman_v1/`](rules/ashtakoota_muhurta_chintamani_raman_v1/) | per-Koota BLOCKED/CONFLICT |
-| F · Parihara model | [DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md](docs/DILCHAT_PARIHARA_PRECEDENCE_AND_STACKING.md) | ordered deterministic; rules PENDING |
-| G · Domain review | [DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md](docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md) | DOMAIN_REVIEW_PENDING |
+Prior-phase astronomy/security evidence:
+[independent astronomy](docs/DILCHAT_INDEPENDENT_ASTRO_REFERENCE_VALIDATION.md) (PASS, ≤ 19.8″ vs Astropy/ERFA),
+[interval completeness](docs/DILCHAT_INTERVAL_BOUNDARY_COMPLETENESS_PROOF.md) (PROVEN_WITH_LIMITATIONS),
+[SECURITY DEFINER / RLS](docs/DILCHAT_SECURITY_DEFINER_RLS_AUDIT.md) (HARDENED).
 
-Decision-Log entries DEC-036…DEC-041. The classical Guna rule pack
+**Guna source acquisition, adjudication & sign-off preparation (this phase).**
+Four separate verdicts — see
+[the authority gate](docs/DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md):
+
+| Axis | Verdict |
+|------|---------|
+| Technical validation | `VALIDATION_INFRASTRUCTURE_COMPLETE` |
+| Astronomy | `ASTRONOMY_VALIDATION_PASS_WITH_BOUNDARY_CONDITIONS` |
+| Guna authority | **`GUNA_AUTHORITY_VALIDATION_BLOCKED`** |
+| Rule pack | **`RULE_PACK_BLOCKED`** |
+
+| Workstream | Document |
+|------------|----------|
+| Source acquisition (real editions identified, none frozen) | [DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md](docs/DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md) · [DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md](docs/DILCHAT_GUNA_SOURCE_EDITION_FREEZE.md) · [`GUNA_SOURCE_MANIFEST.json`](rules/sources/GUNA_SOURCE_MANIFEST.json) |
+| v1 tradition scope | [DILCHAT_GUNA_V1_TRADITION_SCOPE.md](docs/DILCHAT_GUNA_V1_TRADITION_SCOPE.md) |
+| Rule adjudication ledger + 4 conflict dossiers | [DILCHAT_GUNA_RULE_ADJUDICATION_LEDGER.md](docs/DILCHAT_GUNA_RULE_ADJUDICATION_LEDGER.md) · [DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md](docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md) |
+| Parihara adjudication (ordered deterministic) | [DILCHAT_PARIHARA_ADJUDICATION_REPORT.md](docs/DILCHAT_PARIHARA_ADJUDICATION_REPORT.md) |
+| Manual calculation cases (24 / all 22 categories) | [DILCHAT_GUNA_MANUAL_CALCULATION_REPORT.md](docs/DILCHAT_GUNA_MANUAL_CALCULATION_REPORT.md) |
+| Domain review (pending) | [DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md](docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md) · [DILCHAT_GUNA_DOMAIN_REVIEW_RECORD.md](docs/DILCHAT_GUNA_DOMAIN_REVIEW_RECORD.md) |
+| Founder decisions (FD-1…FD-10) | [DILCHAT_GUNA_FOUNDER_DECISIONS.md](docs/DILCHAT_GUNA_FOUNDER_DECISIONS.md) |
+| Machine-readable pack controls | [`pack_control.json`](rules/ashtakoota_muhurta_chintamani_raman_v1/pack_control.json) · `scripts/validate_rule_pack.py` |
+
+Decision-Log entries DEC-036…DEC-046, OQ-15. The classical Guna rule pack
 `ashtakoota_muhurta_chintamani_raman_v1` is **draft, non-executable** and cannot
-back user-facing output until the authority gate clears; the earlier
-`ashtakoota_lahiri_classical_v1` pack is retained as deprecated draft evidence.
+back user-facing output until source editions are frozen, the four source
+conflicts are resolved, manual cases are reviewer-verified, and a qualified
+Jyotisha/Sanskrit reviewer signs off. The earlier `ashtakoota_lahiri_classical_v1`
+pack is retained as deprecated draft evidence.
 - A pure **three-scope authorization** model (`PRIVATE_A`/`PRIVATE_B`/`SHARED`),
   default-deny, existence non-disclosure (404 not 403), and background-job
   scope re-validation (DEC-027).

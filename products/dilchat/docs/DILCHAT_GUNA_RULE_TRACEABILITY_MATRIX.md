@@ -14,6 +14,18 @@ Human-readable view of
 **Source IDs:** `MC` = MC-NORMATIVE · `RAMAN` = RAMAN-ENGINEERING · `BPHS` = BPHS-XREF ·
 `KALA` = KALAPRAKASIKA-XREF.
 
+> **Editions are now IDENTIFIED but NOT frozen.** Real, externally-verifiable candidate editions
+> (publisher / translator / ISBN / catalogue identifiers) are recorded in
+> `rules/sources/GUNA_SOURCE_MANIFEST.json` — e.g. Raman *Muhurtha (Electional Astrology)*
+> ISBN-13 978-8185674681 (UBSPD) and BPHS (tr. R. Santhanam) ISBN-13 978-8188230600. Their status is
+> `EDITION_IDENTIFIED_NOT_ACQUIRED` and the overall status is still `PENDING_ACQUISITION`: no copy has
+> been acquired, opened, paginated, or reviewer-confirmed here. Consequently every `chapter` /
+> `verse` / `page` field remains **`null` / `PENDING`** and no value below is invented.
+
+**Counts (from `pack_control.json`):** 23 traceability rules · 0 approved · 3 `BLOCKED_DOMAIN_SOURCE` ·
+16 `PENDING_DOMAIN_REVIEW` · 6 conflict rule-entries across 4 conflict topics · 6 parihara rules, all
+`enabled: false` · 24 manual cases, 0 verified.
+
 ---
 
 ## Varna (max 1) — directional

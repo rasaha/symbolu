@@ -1,15 +1,20 @@
 # DilChat Guna Milan — Source Edition Freeze
 
-**Status: `PENDING_ACQUISITION` — NO edition is frozen. NO source has been physically acquired or verified in this environment.**
+**Status: `PENDING_ACQUISITION` — editions are now IDENTIFIED (real ISBNs / catalogue IDs), but NO
+edition is frozen. NO source has been acquired, opened, paginated, or verified in this environment.**
 
 This document summarizes the bibliographic edition-freeze record for the DilChat v1 Ashtakoota
 (Guna Milan) rule pack `ashtakoota_muhurta_chintamani_raman_v1`. It is derived from
-`rules/sources/GUNA_SOURCE_MANIFEST.json`.
+`rules/sources/GUNA_SOURCE_MANIFEST.json` (`guna_source_manifest_v2`), and the full acquisition
+narrative is in `docs/DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`.
 
-> **Honesty statement.** Nothing below is approved. No page number, verse number, or edition
-> identifier has been confirmed. Every source is `PENDING_ACQUISITION`; every rule that cites a
-> source is `PENDING_DOMAIN_REVIEW`, `BLOCKED_DOMAIN_SOURCE`, or `SOURCE_CONFLICT`. Internet
-> consensus is **not** accepted as textual authority.
+> **Honesty statement.** Nothing below is approved. Specific candidate editions have now been
+> **identified** from catalogue metadata (publisher / translator / ISBN / archive identifier), but no
+> page number, verse number, printing, or edition identity has been **confirmed** — no copy was
+> acquired or opened here (Internet Archive content endpoints returned HTTP 403 through the environment
+> proxy). Every source is `PENDING_ACQUISITION` with `edition_identification: EDITION_IDENTIFIED_NOT_
+> ACQUIRED`; every rule that cites a source is `PENDING_DOMAIN_REVIEW`, `BLOCKED_DOMAIN_SOURCE`, or
+> `SOURCE_CONFLICT`. Internet consensus is **not** accepted as textual authority.
 
 ---
 
@@ -20,11 +25,19 @@ This document summarizes the bibliographic edition-freeze record for the DilChat
 | `FROZEN_PRIMARY` | Normative classical edition physically acquired, verified, and locked. **Not reached.** |
 | `FROZEN_ENGINEERING` | Engineering-interpretation edition acquired and locked. **Not reached.** |
 | `FROZEN_CROSS_REFERENCE` | Cross-reference edition acquired and locked. **Not reached.** |
-| `PENDING_ACQUISITION` | Intended source named; not yet acquired or verified. **Current state of all sources.** |
+| `PENDING_ACQUISITION` | Source named; not yet acquired or verified. **Current overall state of all sources.** |
 | `PENDING_DOMAIN_REVIEW` | Awaiting qualified Jyotisha + Sanskrit reviewer sign-off. |
 | `REJECTED_SOURCE` | Considered and rejected as authority. |
 
-**Overall status: `PENDING_ACQUISITION`.**
+### Edition-identification legend (distinct from freeze status)
+
+| Value | Meaning |
+|---|---|
+| `EDITION_IDENTIFIED_NOT_ACQUIRED` | A specific, real, citable edition has been identified from catalogue metadata, but no copy has been acquired and no page opened or verified here. **Current state of all four sources.** |
+| `ACQUIRED_PENDING_VERIFICATION` | A copy is legally in hand, but pagination / identity / usability is not yet reviewer-confirmed. **Not reached.** |
+| `FROZEN_ANY` | Edition known, pages accessible, pagination stable, identity unambiguous, immutable checksum/permalink recorded, text usable for adjudication, reviewer confirmed. **Not reached.** |
+
+**Overall status: `PENDING_ACQUISITION`.** Identifying an edition is **not** acquiring or freezing it.
 
 ---
 
@@ -34,16 +47,34 @@ The pack declares a strict authority order. Where the normative and engineering 
 to differ, the difference is recorded as `SOURCE_CONFLICT` and **both** candidate values are kept —
 it is never silently resolved.
 
-| Rank | Source ID | Role | Canonical title | Author / translator | Status |
+| Rank | Source ID | Role | Canonical title | Author / translator | Freeze status |
 |---|---|---|---|---|---|
 | 1 | `MC-NORMATIVE` | Normative classical authority | *Muhurta Chintamani*, Melapaka Prakarana | Rama Daivajna | `PENDING_ACQUISITION` |
 | 2 | `RAMAN-ENGINEERING` | Engineering interpretation | *Muhurtha (Electional Astrology)*, Marriage Adaptability | B. V. Raman | `PENDING_ACQUISITION` |
-| 3 | `BPHS-XREF` | Foundational cross-reference (Naisargika friendship only) | *Brihat Parashara Hora Shastra* | attr. Parashara (tr. e.g. R. Santhanam) | `PENDING_ACQUISITION` |
+| 3 | `BPHS-XREF` | Foundational cross-reference (Naisargika friendship only) | *Brihat Parashara Hora Shastra* | attr. Parashara (tr. R. Santhanam) | `PENDING_ACQUISITION` |
 | 4 | `KALAPRAKASIKA-XREF` | Supplementary cross-check (only where exact page/verse exists) | *Kalaprakasika* | tr. N. P. Subramania Iyer | `PENDING_ACQUISITION` |
 
-For each source, the edition-specific fields (`publisher`, `publication_year`, `edition_number`,
-`isbn_or_identifier`, `page_range`, `verse_range`, `acquisition_date`, `file_checksum`) are **`null`**.
-They remain `null` until a physical copy is acquired and frozen.
+### Identified candidate editions (real metadata — not yet acquired)
+
+Each row is `edition_identification: EDITION_IDENTIFIED_NOT_ACQUIRED`. See the acquisition report for
+sourcing, catalogue URLs, and copyright posture.
+
+| Source ID | Candidate edition | Publisher / year | ISBN / identifier |
+|---|---|---|---|
+| `MC-NORMATIVE` (English bridge) | tr. Girish Chand Sharma (Sanskrit + English, commentary) | Sagar Publications, 1996 | ISBN **PENDING**; Open Library `OL63483W` |
+| `MC-NORMATIVE` (Sanskrit reference) | w/ Pt. Kapileshwar Shastri (Sanskrit) | Haridas Sanskrit Series #185, Chowkhamba; year **PENDING** | archive item `muhurt-chintamani-...-185-haridas-sanskrit-series` (content 403, not opened) |
+| `RAMAN-ENGINEERING` (primary) | B. V. Raman, *Muhurtha (Electional Astrology)* | UBSPD, 1993 (cited 13th ed./reprint) | ISBN-13 978-8185674681 / ISBN-10 818567468X |
+| `RAMAN-ENGINEERING` (alternate) | B. V. Raman, MLBD reprint | Motilal Banarsidass; year **PENDING** | ISBN 9789359662923 (also 9789359661070) |
+| `BPHS-XREF` | tr. R. Santhanam, 2-vol set (Naisargika friendship only) | Ranjan Publications, 1984 | ISBN-13 978-8188230600 / ISBN-10 818823060X |
+| `KALAPRAKASIKA-XREF` | tr. N. P. Subramania Iyer (reprint of 1917 ed.) | Gyan Publishing House / Asian Educational Services; year **PENDING** | ISBN 9788121236591 (pb) / 9788121236607 (hb) |
+
+**Note on Raman printings:** table pagination differs between the UBSPD and MLBD printings; exactly
+**one** printing must be pinned before any page citation is recorded.
+
+Beyond the identified edition and ISBN/identifier above, the freeze-critical fields
+(`edition_number`/printing confirmation, `page_range`, `verse_range`, `chapter`, `acquisition_date`,
+`file_checksum`) remain **PENDING / `null`**. They stay unfilled until a copy is acquired, opened,
+reviewer-verified, and frozen.
 
 ---
 
@@ -65,10 +96,12 @@ Per `GUNA_SOURCE_MANIFEST.json`:
 ## 4. What "freeze" will require
 
 A source moves from `PENDING_ACQUISITION` to a `FROZEN_*` status only when **all** of the following
-are recorded in `GUNA_SOURCE_MANIFEST.json`:
+are recorded in `GUNA_SOURCE_MANIFEST.json`. Step 1 is now **partially** advanced (candidate editions
+and ISBNs identified); the printing pin and everything from step 2 onward remain **PENDING**.
 
-1. Exact edition selected (publisher, year, edition number, ISBN/identifier).
-2. Physical copy acquired; `acquisition_date` set.
+1. Exact edition selected (publisher, year, edition number/printing, ISBN/identifier) — candidates
+   identified; final printing pin **PENDING**.
+2. Physical (or authorized-digital) copy acquired; `acquisition_date` set.
 3. `file_checksum` recorded for any privately-held (non-committed) scan used at review time.
 4. Relevant `chapter` / `verse_range` / `page_range` filled for every rule that cites it.
 5. Qualified Jyotisha + Sanskrit reviewer sign-off recorded (see the Domain Review Package).
@@ -79,7 +112,10 @@ Until then the pack is `draft: true`, `executable: false`, `authority_gate: "BLO
 
 ## 5. Related artifacts
 
-- `rules/sources/GUNA_SOURCE_MANIFEST.json` — the machine-readable edition-freeze record.
+- `rules/sources/GUNA_SOURCE_MANIFEST.json` — the machine-readable edition-freeze record (`v2`).
+- `docs/DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md` — full acquisition narrative, environment
+  limitation, and the human acquire-and-freeze checklist.
+- `docs/DILCHAT_GUNA_V1_TRADITION_SCOPE.md` — precisely what DilChat v1 claims to implement.
 - `rules/ashtakoota_muhurta_chintamani_raman_v1/source_traceability.json` — per-rule source mapping.
 - `docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md` — human-readable rule → source matrix.
 - `docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md` — reviewer package and sign-off template.
