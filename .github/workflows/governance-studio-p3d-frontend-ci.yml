@@ -107,9 +107,10 @@ jobs:
           # archive the committed tree (frontend + the frozen contract it reads)
           git archive HEAD apps/ugence-governance-studio/frontend apps/ugence-governance-studio/contracts | tar -x -C "$TMP"
           cd "$TMP/apps/ugence-governance-studio/frontend"
+          # the archived tree is not a git repo, so tracked-source (git ls-files) runs
+          # in the main job; here we prove the committed files alone build cleanly.
           test -f src/lib/config.ts && test -f src/lib/domain.ts && test -f src/lib/domain-p3d.ts
           npm ci
-          npm run verify:tracked-sources
           npm run verify:version
           npm run verify:api-boundary
           npm run type-check
