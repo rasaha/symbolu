@@ -1,27 +1,31 @@
 """COMPATIBILITY-ONLY legacy namespace for the Cloud Scaling Controller.
 
-Canonical package: ``ugence_cloud_scaling_controller``
-(distribution ``ugence-cloud-scaling-controller``, under
+Advisory canonical package: ``ugence_cloud_scaling_controller`` (distribution
+``ugence-cloud-scaling-controller``, under
 ``packages/capabilities/cloud-scaling-controller/src``).
 
-The Cloud Scaling Controller algorithm no longer lives here. Every module was
-**moved** (via ``git mv``) into the canonical package. This module makes the legacy
-dotted names (``cloud_controller.controller``, ``cloud_controller.core.coherence``,
-``cloud_controller.signals.prometheus`` …) resolve to the *same object* in the
-canonical package — object identity preserved — so existing
+Monorepo-only operations namespace: ``cloud_scaling_operations`` (execution,
+approval, orchestration, live telemetry, live-shadow runners — NOT distributed).
+
+The Cloud Scaling code no longer lives here. This module makes the legacy dotted
+names resolve to the *same object* in whichever target now owns them, so existing
 ``import cloud_controller...`` / ``from cloud_controller... import ...`` statements
-keep working unchanged, with identical behavior, serialization, and errors.
+keep working unchanged:
 
-**No scaling algorithm, configuration, or observability implementation lives here.**
-This is a thin re-export shim for a documented compatibility period; new code should
-import ``ugence_cloud_scaling_controller`` directly (see
-``docs/LEGACY_IMPORT_MIGRATION.md``).
+  * Advisory submodules (controller, config, core.*, signals.*, shadow readers,
+    replay.*, offline observability, recommend.confidence/safety, explain.*) →
+    ``ugence_cloud_scaling_controller.<sub>``.
+  * Operational submodules (action.*, orchestrator, main, recommend.engine/approval/
+    webhook, observability.metrics_server/exporter/otel_exporter, shadow.runner,
+    shadow.live_efficiency) → ``cloud_scaling_operations.<sub>``.
 
-Mechanism: a meta-path finder that maps ``cloud_controller.<sub>`` to
-``ugence_cloud_scaling_controller.<sub>`` and caches the *same* module object under
-the legacy name. This mirrors the ``symbolu`` package's own compatibility finder, so
-the chain ``symbolu.cloud_controller.<sub>`` -> ``cloud_controller.<sub>`` ->
-``ugence_cloud_scaling_controller.<sub>`` yields one shared object.
+The operational legacy imports are **MONOREPO-ONLY**, are **NOT part of the
+``ugence-cloud-scaling-controller`` distribution**, and are **NOT a stable
+distributed API** (see ``docs/LEGACY_IMPORT_MIGRATION.md``). In a wheel-only install
+they do not resolve — only the advisory namespace ships.
+
+**No scaling algorithm, configuration, execution, or observability implementation
+lives here.** This is a thin routing shim for a documented compatibility period.
 """
 
 from __future__ import annotations
@@ -30,38 +34,59 @@ import importlib as _importlib
 import sys as _sys
 
 _CANON = "ugence_cloud_scaling_controller"
+_OPS = "cloud_scaling_operations"
 _LEGACY = "cloud_controller"
 
+# Legacy submodule dotted-name prefixes that now live in the OPERATIONS namespace.
+# Everything else routes to the advisory canonical package.
+_OPS_PREFIXES = (
+    "action",
+    "orchestrator",
+    "main",
+    "recommend.engine",
+    "recommend.approval",
+    "recommend.webhook",
+    "observability.metrics_server",
+    "observability.exporter",
+    "observability.otel_exporter",
+    "shadow.runner",
+    "shadow.live_efficiency",
+)
 
-def _ensure_canonical_importable() -> None:
-    """Source-checkout bootstrap: put the canonical package's ``src`` directory on
-    ``sys.path`` only if the canonical package is not already importable. Installed as
-    a wheel it is already importable and this is a no-op.
-    """
+
+def _is_ops(sub: str) -> bool:
+    return any(sub == p or sub.startswith(p + ".") for p in _OPS_PREFIXES)
+
+
+def _ensure_importable(dist_name: str, *rel_dir_parts: str) -> None:
+    """Source-checkout bootstrap: add a directory to ``sys.path`` if ``dist_name`` is
+    not already importable. No-op when installed as a wheel."""
     import importlib.util
 
-    if importlib.util.find_spec(_CANON) is not None:
+    if importlib.util.find_spec(dist_name) is not None:
         return
     import pathlib
 
     here = pathlib.Path(__file__).resolve()
     for parent in here.parents:
-        cand = parent / "packages" / "capabilities" / "cloud-scaling-controller" / "src"
-        if (cand / _CANON / "__init__.py").exists():
+        cand = parent.joinpath(*rel_dir_parts)
+        marker = cand / dist_name / "__init__.py"
+        if marker.exists():
             if str(cand) not in _sys.path:
                 _sys.path.insert(0, str(cand))
             return
 
 
-_ensure_canonical_importable()
+_ensure_importable(_CANON, "packages", "capabilities", "cloud-scaling-controller", "src")
+# Operations namespace lives at the repository root (monorepo-only).
+_ensure_importable(_OPS)
 
 
 class _CloudControllerFinder:
-    """Redirect ``cloud_controller.<sub>`` imports to the canonical package."""
+    """Redirect ``cloud_controller.<sub>`` to advisory or operations targets."""
 
     @classmethod
     def find_spec(cls, fullname, path=None, target=None):
-        # Only claim submodules; ``cloud_controller`` itself is this real shim package.
         if fullname.startswith(_LEGACY + "."):
             import importlib.util
 
@@ -80,16 +105,17 @@ class _CloudControllerFinder:
     def _load(cls, fullname):
         if fullname in _sys.modules:
             return _sys.modules[fullname]
-        target = _CANON + fullname[len(_LEGACY):]  # cloud_controller.X -> ugence...X
-        real = _importlib.import_module(target)
-        _sys.modules[fullname] = real  # identity: same object as canonical
+        sub = fullname[len(_LEGACY) + 1:]  # e.g. "action.k8s_actuator" or "controller"
+        root = _OPS if _is_ops(sub) else _CANON
+        real = _importlib.import_module(f"{root}.{sub}")
+        _sys.modules[fullname] = real  # identity: same object as the target
         return real
 
 
 if not any(f is _CloudControllerFinder for f in _sys.meta_path):
     _sys.meta_path.insert(0, _CloudControllerFinder)
 
-# Curated top-level re-export (identity preserved) — mirror the canonical package's
+# Curated top-level re-export (identity preserved) — mirror the advisory package's
 # small public API so ``from cloud_controller import Controller`` also works.
 from ugence_cloud_scaling_controller import (  # noqa: E402,F401
     ActionResult,

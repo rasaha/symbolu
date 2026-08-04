@@ -16,8 +16,8 @@ Import namespace: `ugence_cloud_scaling_controller`.
 | `ExecutionReceipt` | dataclass | Result type for an optional executor (never produced here). |
 | `ContractError` | exception | Raised on invalid input (fail-closed). |
 | `evaluate` | function | One-shot convenience: `evaluate(obs, config=None) -> ScalingRecommendation`. |
-| `SCHEMA_VERSION` | str | `"1.0"`. |
-| `__version__` | str | `"0.1.0"`. |
+| `SCHEMA_VERSION` | str | `"1.1"` (output schema). |
+| `__version__` | str | `"0.1.1"`. |
 
 ## `CloudScalingController`
 
@@ -53,13 +53,29 @@ Unknown signals are accepted and ignored by the pressure computation
 
 ## `ScalingRecommendation`
 
+Output schema version: **`1.1`**.
+
 Fields: `schema_version`, `correlation_id`, `recommendation`, `replica_delta`,
 `current_replicas`, `recommended_replicas`, `action_score`, `pressure`,
 `component_breakdown`, `identity_deviation`, `explanation`, `controller_step`,
-`metrics_snapshot`, `advisory_only` (always `True`), `actuation_performed`
-(always `False`).
+`metrics_snapshot`, `determinism`, `advisory_only` (always `True`),
+`actuation_performed` (always `False`).
 
-Methods: `to_dict()` and `to_json(indent=None)` — deterministic (sorted) field ordering.
+`determinism` is a disclosure block, e.g.::
+
+    {"scope": "decision-deterministic",
+     "identity_bootstrapped": false,
+     "nondeterministic_fields": ["identity_deviation"],
+     "note": "..."}
+
+Decision fields (`recommendation`, `replica_delta`, `recommended_replicas`,
+`action_score`, `pressure`, `component_breakdown`) are deterministic for a fixed
+config + input sequence. `identity_deviation` is a diagnostic that varies before
+bootstrap (see [EVIDENCE_AND_LIMITATIONS.md](EVIDENCE_AND_LIMITATIONS.md)); the whole
+JSON result is **not** claimed fully deterministic.
+
+Methods: `to_dict()` and `to_json(indent=None)` — deterministic (sorted) field
+ordering.
 
 `recommendation` values: `no_action`, `observe_out`, `observe_in`,
 `scale_out_<n>`, `scale_in_<n>`. `recommended_replicas == current_replicas + replica_delta`.

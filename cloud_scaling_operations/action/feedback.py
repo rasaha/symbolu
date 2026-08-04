@@ -35,8 +35,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
 
-from ugence_cloud_scaling_controller.action.outcome import OutcomeRecord, OutcomeVerdict
-from ugence_cloud_scaling_controller.action.rollback import RollbackWatch, RollbackVerdict
+from cloud_scaling_operations.action.outcome import OutcomeRecord, OutcomeVerdict
+from cloud_scaling_operations.action.rollback import RollbackWatch, RollbackVerdict
 
 # Lazy import to avoid circular: feedback → divergence → shadow → engine → feedback
 # DivergenceRecord and Verdict are only needed at runtime, not module load.

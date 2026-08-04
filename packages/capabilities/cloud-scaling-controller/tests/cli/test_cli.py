@@ -24,7 +24,7 @@ def test_demo_command_emits_json(capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["advisory_only"] is True
     assert out["actuation_performed"] is False
-    assert out["schema_version"] == "1.0"
+    assert out["schema_version"] == "1.1"
 
 
 def test_demo_is_deterministic_in_decision_fields(capsys):
@@ -55,7 +55,7 @@ def test_evaluate_from_file_and_output(tmp_path, capsys):
     rc = cli.main(["evaluate", "--input", str(obs), "--output", str(out)])
     assert rc == 0
     written = json.loads(out.read_text())
-    assert written["schema_version"] == "1.0"
+    assert written["schema_version"] == "1.1"
 
 
 def test_evaluate_sequence_array(tmp_path, capsys):

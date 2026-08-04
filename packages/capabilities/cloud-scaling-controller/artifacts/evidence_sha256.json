@@ -1,7 +1,0 @@
-{
-  "dependency_audit.json": "db339657b6bee4d28fc0fedafe940833d5815ea32fdcc2153c6b0cbcc0d544d8",
-  "distribution_verification.json": "c212f5718570470883f047144eb08dc89c5bee386c4435075d26b958df467bfc",
-  "evidence_sha256.json": "59801b73ee9c19bda5c98b9b222d551fc054160d53dca1b7e6e0ae0e1f0cfecd",
-  "package_inventory.json": "46454124b12058fb6d7e6b0359e450b310c45dc31ddb619fc192db780d5c3e83",
-  "prepackaging_behavior_baseline.json": "d8c2aeded86d07bd20c604faae8202d9b81a9249dc9fd6d32be6701c39127371"
-}

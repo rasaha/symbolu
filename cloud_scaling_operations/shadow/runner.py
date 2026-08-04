@@ -33,7 +33,7 @@ from ugence_cloud_scaling_controller.shadow.divergence import (
     DivergenceRecord,
 )
 from ugence_cloud_scaling_controller.shadow.reporter import ShadowReporter, ShadowReport
-from ugence_cloud_scaling_controller.recommend.engine import (
+from cloud_scaling_operations.recommend.engine import (
     RecommendEngine,
     RecommendConfig,
     RecommendCycleResult,

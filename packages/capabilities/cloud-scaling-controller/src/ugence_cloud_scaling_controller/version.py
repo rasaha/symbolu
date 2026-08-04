@@ -4,4 +4,4 @@ Read statically by the build backend (``[tool.setuptools.dynamic]``) so the
 version never requires importing the package.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

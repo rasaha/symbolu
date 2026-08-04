@@ -1,8 +1,10 @@
-"""Shadow Mode — run controller alongside HPA, log divergence, prove value.
+"""Shadow evaluation — read-only primitives for HPA/controller comparison.
 
-Stage 3: Purely observational. Zero write permissions.
-Compares controller recommendations against HPA actions,
-tracks outcomes, and generates proof-of-value reports.
+Purely observational, zero write permissions: a divergence tracker, a read-only HPA
+state watcher, and a proof-of-value reporter. The live-loop *runners*
+that can drive a real cluster and host an operations recommend engine are NOT part
+of the advisory distribution — they live in the monorepo-only operations shadow
+namespace.
 """
 
 from ugence_cloud_scaling_controller.shadow.divergence import (
@@ -19,10 +21,6 @@ from ugence_cloud_scaling_controller.shadow.reporter import (
     ShadowReporter,
     ShadowReport,
 )
-from ugence_cloud_scaling_controller.shadow.runner import (
-    ShadowRunner,
-    ShadowConfig,
-)
 
 __all__ = [
     "DivergenceTracker",
@@ -33,6 +31,4 @@ __all__ = [
     "HPAAction",
     "ShadowReporter",
     "ShadowReport",
-    "ShadowRunner",
-    "ShadowConfig",
 ]

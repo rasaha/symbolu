@@ -62,7 +62,10 @@ Action_t = d_t * G_t * P_t * S_t
 
 ## Determinism
 
-For a fixed config and input sequence, all decision fields (`action_score`,
-`recommendation`, `replica_delta`, `pressure`, and the plasticity/gain/damping/
-coherence breakdowns) are deterministic. The only nondeterministic field is
-`identity_deviation` (see [EVIDENCE_AND_LIMITATIONS.md](EVIDENCE_AND_LIMITATIONS.md)).
+**Decision-deterministic.** For a fixed config and input sequence, all decision
+fields (`action_score`, `recommendation`, `replica_delta`, `recommended_replicas`,
+`pressure`, and the plasticity/gain/damping/coherence breakdowns) are deterministic
+across repeated fresh instances. `identity_deviation` is **diagnostically
+nondeterministic before bootstrap** (unseeded IdentityEMA baseline) and affects no
+decision; each recommendation discloses this in its `determinism` block. See
+[EVIDENCE_AND_LIMITATIONS.md](EVIDENCE_AND_LIMITATIONS.md).

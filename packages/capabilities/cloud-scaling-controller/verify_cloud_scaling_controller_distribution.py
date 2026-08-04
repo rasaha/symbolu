@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Clean-environment distribution verifier for ugence-cloud-scaling-controller.
+"""Advisory-boundary distribution verifier for ugence-cloud-scaling-controller (0.1.1).
 
-Builds the wheel + sdist, installs ONLY the wheel into an isolated virtual environment
-created OUTSIDE the repository (sanitized PYTHONPATH, cwd outside the repo), and asserts
-the independent capability behaves correctly with none of the forbidden dependencies.
+Builds wheel + sdist, inspects the PACKAGED Python source inside the wheel for any
+execution capability, installs ONLY the wheel into an isolated venv created OUTSIDE
+the repository, and asserts the distribution is genuinely advisory-only. Generates
+build provenance bound to the actual build revision and fails on any tampered or
+inconsistent evidence.
 
-Produces machine-readable evidence:
+Emits CI-generated build evidence (NOT committed):
   artifacts/distribution_verification.json
   artifacts/package_inventory.json
   artifacts/dependency_audit.json
+  artifacts/build_provenance.json
+  artifacts/evidence_sha256.json
 
 Exits nonzero on ANY failed assertion.
 """
@@ -18,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,19 +35,36 @@ PKG = Path(__file__).resolve().parent
 ARTIFACTS = PKG / "artifacts"
 DIST_NAME = "ugence-cloud-scaling-controller"
 IMPORT_NAME = "ugence_cloud_scaling_controller"
-EXPECTED_VERSION = "0.1.0"
+EXPECTED_VERSION = "0.1.1"
+BASELINE_COMMIT = "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
 
 FORBIDDEN_UGENCE = [
     "governance_studio", "decision_governance", "actiongate", "actiongate_provider",
     "agent_runtime", "hybrid_llm", "llm_steering", "ai_hiring", "control_plane",
-    "governance_providers", "governance_contracts",
+    "governance_providers", "governance_contracts", "cloud_scaling_operations",
 ]
-FORBIDDEN_CLOUD_SDK = [
-    "boto3", "botocore", "azure", "google.cloud", "kubernetes",
-]
-# Extras are optional; a bare-core install must NOT pull these either.
-FORBIDDEN_CORE_EXTRAS = ["requests", "prometheus_client", "opentelemetry", "yaml",
+FORBIDDEN_CLOUD_SDK = ["boto3", "botocore", "azure", "google.cloud", "kubernetes"]
+FORBIDDEN_CORE_EXTRAS = ["prometheus_client", "opentelemetry", "yaml",
                          "fastapi", "uvicorn", "flask"]
+
+# Mandatory wheel-content prohibitions (section 10).
+FORBIDDEN_WHEEL_PATH_SUBSTR = [
+    "/action/", "/orchestrator.py", "/main.py",
+    "/recommend/engine.py", "/recommend/approval.py", "/recommend/webhook.py",
+    "/observability/metrics_server.py", "/observability/exporter.py",
+    "/observability/otel_exporter.py", "/shadow/runner.py", "/shadow/live_efficiency.py",
+]
+FORBIDDEN_WHEEL_SYMBOLS = [
+    "K8sActuator", "GateActuator", "ProductionOrchestrator", "ActuatorMode",
+    "SCALE_PATCH", "ARGOCD_SYNC", "patch_namespaced_deployment_scale",
+    "auto_approve_threshold", "auto-approved", "trigger_sync", "argocd_token",
+    "ExecutionResult", "RecommendEngine",
+]
+# K8s/ArgoCD mutation call patterns that must not appear in any packaged source.
+FORBIDDEN_MUTATION_PATTERNS = [
+    "patch_namespaced_deployment", "replace_namespaced", "create_namespaced",
+    "delete_namespaced", "argocd", "ArgoCD",
+]
 
 
 class Checks:
@@ -52,8 +74,7 @@ class Checks:
 
     def check(self, name, passed, detail=""):
         self.results.append({"check": name, "passed": bool(passed), "detail": str(detail)})
-        status = "PASS" if passed else "FAIL"
-        print(f"  [{status}] {name}" + (f" — {detail}" if detail else ""))
+        print(f"  [{'PASS' if passed else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
         if not passed:
             self.ok = False
 
@@ -77,18 +98,18 @@ def main() -> int:
     ARTIFACTS.mkdir(exist_ok=True)
     c = Checks()
     evidence = {"distribution": DIST_NAME, "import_namespace": IMPORT_NAME,
-                "expected_version": EXPECTED_VERSION}
+                "expected_version": EXPECTED_VERSION, "evidence_class": "CI_GENERATED_BUILD_EVIDENCE"}
 
-    # Build into a temp dir OUTSIDE the repo.
     build_root = Path(tempfile.mkdtemp(prefix="csc-dist-"))
     dist_dir = build_root / "dist"
     dist_dir.mkdir()
     print("[build] wheel + sdist")
     b = _run([sys.executable, "-m", "build", str(PKG), "-o", str(dist_dir)])
-    c.check("build_wheel_and_sdist", b.returncode == 0, b.stderr.strip().splitlines()[-1] if b.returncode else "")
+    c.check("build_wheel_and_sdist", b.returncode == 0,
+            (b.stderr.strip().splitlines() or [""])[-1] if b.returncode else "")
     if b.returncode != 0:
         print(b.stderr)
-        _finalize(c, evidence, {}, {}, build_root)
+        _finalize(c, evidence, {}, {}, None, build_root)
         return 1
 
     wheel = _latest(dist_dir, f"{IMPORT_NAME}-*.whl")
@@ -96,68 +117,96 @@ def main() -> int:
     evidence["wheel"] = {"name": wheel.name, "sha256": _sha256(wheel)}
     evidence["sdist"] = {"name": sdist.name, "sha256": _sha256(sdist)}
 
-    # ---- Wheel content inspection (steps 16-18) ----
+    # ---- Wheel content inspection (open each packaged .py) ----
     with zipfile.ZipFile(wheel) as z:
         names = z.namelist()
+        py_sources = {n: z.read(n).decode("utf-8", "ignore")
+                      for n in names if n.endswith(".py")}
     tops = {n.split("/", 1)[0] for n in names if "/" in n}
     foreign = {t for t in tops if not (t == IMPORT_NAME or t.endswith(".dist-info"))}
     c.check("wheel_no_foreign_top_level", not foreign, f"foreign={sorted(foreign)}")
     c.check("wheel_ships_py_typed", f"{IMPORT_NAME}/py.typed" in names)
-    bad = [n for n in names if any(x in n.lower() for x in
-           ("test", "__pycache__", ".pyc", "secret", ".git", "conftest"))]
-    c.check("wheel_excludes_tests_caches_secrets_git", not bad, f"bad={bad[:5]}")
-    controller_copies = [n for n in names if n.endswith("/controller.py")]
-    c.check("wheel_single_controller_copy", len(controller_copies) == 1, f"copies={controller_copies}")
-    # legacy namespaces must NOT be in the wheel
-    legacy_in_wheel = [n for n in names if n.startswith("cloud_controller/") or n.startswith("symbolu/")]
-    c.check("wheel_excludes_legacy_namespaces", not legacy_in_wheel, f"legacy={legacy_in_wheel[:5]}")
+    junk = [n for n in names if any(x in n.lower() for x in
+            ("test", "__pycache__", ".pyc", "secret", ".git", "conftest"))]
+    c.check("wheel_excludes_tests_caches_secrets_git", not junk, f"junk={junk[:5]}")
+    controllers = [n for n in names if n.endswith("/controller.py")]
+    c.check("wheel_single_controller_copy", len(controllers) == 1, f"copies={controllers}")
+    legacy = [n for n in names if n.startswith("cloud_controller/")
+              or n.startswith("symbolu/") or n.startswith("cloud_scaling_operations/")]
+    c.check("wheel_excludes_legacy_and_operations", not legacy, f"present={legacy[:5]}")
+
+    # Forbidden PATHS
+    path_hits = [n for n in names for sub in FORBIDDEN_WHEEL_PATH_SUBSTR if sub in "/" + n]
+    c.check("wheel_no_forbidden_paths", not path_hits, f"hits={sorted(set(path_hits))[:6]}")
+
+    # Forbidden SYMBOLS inside packaged source
+    sym_hits = {}
+    for n, src in py_sources.items():
+        for sym in FORBIDDEN_WHEEL_SYMBOLS:
+            if re.search(r"\b" + re.escape(sym) + r"\b", src):
+                sym_hits.setdefault(sym, []).append(n)
+    c.check("wheel_no_forbidden_symbols", not sym_hits,
+            f"{ {k: v[:1] for k, v in sym_hits.items()} }")
+
+    # No K8s/ArgoCD mutation call patterns
+    mut_hits = {}
+    for n, src in py_sources.items():
+        for pat in FORBIDDEN_MUTATION_PATTERNS:
+            if pat in src:
+                mut_hits.setdefault(pat, []).append(n)
+    c.check("wheel_no_kubernetes_or_argocd_mutations", not mut_hits,
+            f"{ {k: v[:1] for k, v in mut_hits.items()} }")
+
+    # No concrete executor: ScalingExecutor is a Protocol; no .apply(...) implementation
+    # that mutates, and no auto-approval.
+    exec_hits = [n for n, s in py_sources.items()
+                 if "def apply(self, recommendation" in s and "Protocol" not in s and "..." not in s]
+    c.check("wheel_no_concrete_executor", not exec_hits, f"{exec_hits}")
+    approve_hits = [n for n, s in py_sources.items()
+                    if re.search(r"\bdef approve\b", s) or "auto_approve" in s]
+    c.check("wheel_no_auto_approval_or_approver", not approve_hits, f"{approve_hits}")
 
     package_inventory = {
         "wheel": wheel.name, "sha256": evidence["wheel"]["sha256"],
         "entry_count": len(names), "top_level": sorted(tops),
-        "members": sorted(names),
-        "controller_copies": controller_copies,
+        "packaged_python_modules": sorted(py_sources),
+        "controller_copies": controllers,
     }
 
-    # ---- Isolated install + runtime checks (steps 2-15) ----
+    # ---- Isolated install + runtime checks ----
+    probe_out = {}
+    requires = []
+    core_reqs = []
     with tempfile.TemporaryDirectory() as td:
         env_dir = Path(td) / "venv"
         venv.create(env_dir, with_pip=True, clear=True, system_site_packages=False)
         py = env_dir / "bin" / "python"
         script = env_dir / "bin" / "ugence-cloud-scaling"
-        # Sanitized environment: no PYTHONPATH, no monorepo on path.
         clean_env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
         clean_env["PYTHONPATH"] = ""
-        work = Path(td) / "work"  # cwd OUTSIDE the repository
+        work = Path(td) / "work"
         work.mkdir()
 
-        # Install OUR package from the locally-built wheel (--find-links prefers it);
-        # the index is left available only so the declared PyPI core dep (numpy) can
-        # resolve. No other Ugence/monorepo package is installed.
         inst = _run([str(py), "-m", "pip", "install", "--quiet",
                      "--find-links", str(dist_dir), DIST_NAME], env=clean_env)
-        c.check("install_wheel_only", inst.returncode == 0, inst.stderr.strip()[-200:] if inst.returncode else "")
+        c.check("install_wheel_only", inst.returncode == 0,
+                inst.stderr.strip()[-200:] if inst.returncode else "")
 
         pc = _run([str(py), "-m", "pip", "check"], env=clean_env)
-        c.check("pip_check", pc.returncode == 0, pc.stdout.strip() + pc.stderr.strip())
+        c.check("pip_check", pc.returncode == 0, (pc.stdout + pc.stderr).strip())
 
-        # Version via importlib.metadata.
         ver = _run([str(py), "-I", "-c",
                     "import importlib.metadata as m;print(m.version('%s'))" % DIST_NAME],
                    cwd=str(work), env=clean_env)
-        got_ver = ver.stdout.strip()
-        c.check("metadata_version", got_ver == EXPECTED_VERSION, f"got={got_ver!r}")
+        c.check("metadata_version", ver.stdout.strip() == EXPECTED_VERSION,
+                f"got={ver.stdout.strip()!r}")
 
-        # Import + no-monorepo-path + demo + JSON + version, all in one isolated run.
         probe = r"""
 import json, sys
 import importlib.util as _iu
 import ugence_cloud_scaling_controller as U
 from ugence_cloud_scaling_controller import CloudScalingController, ScalingObservation
-out = {}
-out["version"] = U.__version__
-out["module_file"] = U.__file__
-# deterministic demo via CLI fixture path (single evaluate)
+out = {"version": U.__version__, "module_file": U.__file__}
 c = CloudScalingController()
 rec = c.recommend(ScalingObservation(metrics={"cpu":0.92,"memory":0.88,"latency_p99":0.81,
                   "error_rate":0.2,"queue_depth":0.7}, current_replicas=4, phase="peak",
@@ -167,68 +216,86 @@ out["recommendation"] = d["recommendation"]
 out["advisory_only"] = d["advisory_only"]
 out["actuation_performed"] = d["actuation_performed"]
 out["correlation_id"] = d["correlation_id"]
-out["json_ok"] = json.loads(rec.to_json())["schema_version"] == "1.0"
-# forbidden imports present after a full cycle?
+out["json_ok"] = json.loads(rec.to_json())["schema_version"] == "1.1"
+out["determinism_present"] = isinstance(d.get("determinism"), dict) and \
+    "identity_deviation" in d["determinism"].get("nondeterministic_fields", [])
 forbidden = %r + %r + %r
 out["forbidden_importable"] = [m for m in forbidden if _iu.find_spec(m.split(".")[0]) is not None]
-# legacy namespaces must NOT be importable from the wheel-only install
 out["legacy_cloud_controller_importable"] = _iu.find_spec("cloud_controller") is not None
+out["operations_importable"] = _iu.find_spec("cloud_scaling_operations") is not None
 print(json.dumps(out))
 """ % (FORBIDDEN_UGENCE, FORBIDDEN_CLOUD_SDK, FORBIDDEN_CORE_EXTRAS)
         pr = _run([str(py), "-I", "-c", probe], cwd=str(work), env=clean_env)
         c.check("isolated_probe_ran", pr.returncode == 0, pr.stderr.strip()[-300:] if pr.returncode else "")
-        probe_out = {}
         if pr.returncode == 0:
             probe_out = json.loads(pr.stdout.strip().splitlines()[-1])
             c.check("import_canonical_package", probe_out.get("version") == EXPECTED_VERSION)
-            mod_file = probe_out.get("module_file", "")
-            c.check("no_monorepo_path_in_module", str(PKG) not in mod_file and "site-packages" in mod_file,
-                    mod_file)
+            mf = probe_out.get("module_file", "")
+            c.check("no_monorepo_path_in_module", str(PKG) not in mf and "site-packages" in mf, mf)
             c.check("demo_executes", bool(probe_out.get("recommendation")))
             c.check("advisory_only_invariant", probe_out.get("advisory_only") is True
                     and probe_out.get("actuation_performed") is False)
-            c.check("json_serialization", probe_out.get("json_ok") is True)
+            c.check("json_serialization_schema_1_1", probe_out.get("json_ok") is True)
+            c.check("determinism_disclosure_present", probe_out.get("determinism_present") is True)
             c.check("correlation_id_preserved", probe_out.get("correlation_id") == "verify-1")
             c.check("no_forbidden_packages_installed", not probe_out.get("forbidden_importable"),
                     f"present={probe_out.get('forbidden_importable')}")
             c.check("legacy_imports_not_shipped_in_wheel",
                     probe_out.get("legacy_cloud_controller_importable") is False)
+            c.check("operations_not_shipped_in_wheel",
+                    probe_out.get("operations_importable") is False)
 
-        # CLI console-script smoke (version + demo + evaluate via stdin).
         cli_ver = _run([str(script), "version"], cwd=str(work), env=clean_env)
         c.check("cli_version", cli_ver.returncode == 0 and EXPECTED_VERSION in cli_ver.stdout)
         cli_demo = _run([str(script), "demo"], cwd=str(work), env=clean_env)
-        demo_ok = cli_demo.returncode == 0 and '"advisory_only": true' in cli_demo.stdout
-        c.check("cli_demo", demo_ok, cli_demo.stderr.strip()[-160:] if not demo_ok else "")
+        c.check("cli_demo", cli_demo.returncode == 0 and '"advisory_only": true' in cli_demo.stdout,
+                cli_demo.stderr.strip()[-160:] if cli_demo.returncode else "")
         cli_eval = _run([str(script), "evaluate", "--input", "-"], cwd=str(work),
                         env=clean_env, input='{"metrics":{"cpu":0.9},"current_replicas":3}')
-        c.check("cli_evaluate", cli_eval.returncode == 0 and '"schema_version": "1.0"' in cli_eval.stdout)
+        c.check("cli_evaluate", cli_eval.returncode == 0 and '"schema_version": "1.1"' in cli_eval.stdout)
         cli_bad = _run([str(script), "evaluate", "--input", "-"], cwd=str(work),
                        env=clean_env, input="{not json")
         c.check("cli_nonzero_on_invalid", cli_bad.returncode != 0)
 
-        # Single implementation copy inside the installed site-packages.
         sp = _run([str(py), "-I", "-c",
                    "import ugence_cloud_scaling_controller as U, pathlib, json;"
                    "p=pathlib.Path(U.__file__).parent;"
-                   "print(json.dumps([str(x.relative_to(p)) for x in p.rglob('controller.py')]))"],
+                   "print(json.dumps(sorted(str(x.relative_to(p)) for x in p.rglob('controller.py'))))"],
                   cwd=str(work), env=clean_env)
-        installed_controllers = json.loads(sp.stdout.strip()) if sp.returncode == 0 else ["<error>"]
+        installed_controllers = json.loads(sp.stdout.strip()) if sp.returncode == 0 else ["<err>"]
         c.check("installed_single_implementation", installed_controllers == ["controller.py"],
                 f"found={installed_controllers}")
 
-        # Dependency audit from the installed distribution metadata.
         dep = _run([str(py), "-I", "-c",
                     "import importlib.metadata as m, json;"
-                    "d=m.distribution('%s');"
-                    "print(json.dumps({'requires': d.requires or []}))" % DIST_NAME],
+                    "print(json.dumps({'requires': m.distribution('%s').requires or []}))" % DIST_NAME],
                    cwd=str(work), env=clean_env)
         requires = json.loads(dep.stdout.strip())["requires"] if dep.returncode == 0 else []
-        # Core (non-extra) requirements only.
         core_reqs = [r for r in requires if "extra ==" not in r]
         c.check("core_dependency_is_numpy_only",
-                all("numpy" in r.lower() for r in core_reqs) and len(core_reqs) >= 1,
-                f"core_reqs={core_reqs}")
+                core_reqs and all("numpy" in r.lower() for r in core_reqs), f"core_reqs={core_reqs}")
+        c.check("no_cloud_sdk_in_declared_deps",
+                not any(any(sdk in r.lower() for sdk in ("kubernetes", "boto3", "azure", "google-cloud"))
+                        for r in requires), f"requires={requires}")
+
+    # ---- Build provenance + fail conditions ----
+    prov_path = ARTIFACTS / "build_provenance.json"
+    gp = _run([sys.executable, str(PKG / "scripts" / "generate_build_provenance.py"),
+               "--wheel", str(wheel), "--sdist", str(sdist), "--out", str(prov_path)])
+    c.check("build_provenance_generated", gp.returncode == 0, gp.stderr.strip()[-200:] if gp.returncode else "")
+    provenance = json.loads(prov_path.read_text()) if prov_path.exists() else {}
+    c.check("provenance_build_revision_present", bool(provenance.get("build_commit")))
+    c.check("provenance_tree_clean", provenance.get("dirty_tree") is False,
+            "working tree is dirty" if provenance.get("dirty_tree") else "")
+    c.check("provenance_wheel_hash_matches",
+            provenance.get("wheel", {}).get("sha256") == evidence["wheel"]["sha256"])
+    c.check("provenance_sdist_hash_matches",
+            provenance.get("sdist", {}).get("sha256") == evidence["sdist"]["sha256"])
+    c.check("provenance_version_matches_manifest",
+            provenance.get("package_version") == EXPECTED_VERSION)
+    c.check("provenance_build_not_baseline_commit",
+            provenance.get("build_commit") and provenance.get("build_commit") != BASELINE_COMMIT,
+            "build_commit must not be the pre-packaging baseline commit")
 
     dependency_audit = {
         "distribution": DIST_NAME,
@@ -236,31 +303,27 @@ print(json.dumps(out))
         "core_requirements": core_reqs,
         "forbidden_ugence_checked": FORBIDDEN_UGENCE,
         "forbidden_cloud_sdk_checked": FORBIDDEN_CLOUD_SDK,
-        "forbidden_core_extras_checked": FORBIDDEN_CORE_EXTRAS,
-        "forbidden_importable_in_clean_env": probe_out.get("forbidden_importable", None),
+        "forbidden_importable_in_clean_env": probe_out.get("forbidden_importable"),
     }
 
-    _finalize(c, evidence, package_inventory, dependency_audit, build_root)
+    _finalize(c, evidence, package_inventory, dependency_audit, provenance, build_root)
     return 0 if c.ok else 1
 
 
-def _finalize(c: "Checks", evidence, package_inventory, dependency_audit, build_root):
+def _finalize(c, evidence, package_inventory, dependency_audit, provenance, build_root):
     evidence["checks"] = c.results
     evidence["verdict"] = "VERIFIED" if c.ok else "FAILED"
     ARTIFACTS.mkdir(exist_ok=True)
-    (ARTIFACTS / "distribution_verification.json").write_text(
-        json.dumps(evidence, indent=2, sort_keys=True))
+    (ARTIFACTS / "distribution_verification.json").write_text(json.dumps(evidence, indent=2, sort_keys=True))
     if package_inventory:
-        (ARTIFACTS / "package_inventory.json").write_text(
-            json.dumps(package_inventory, indent=2, sort_keys=True))
+        (ARTIFACTS / "package_inventory.json").write_text(json.dumps(package_inventory, indent=2, sort_keys=True))
     if dependency_audit:
-        (ARTIFACTS / "dependency_audit.json").write_text(
-            json.dumps(dependency_audit, indent=2, sort_keys=True))
-    # Add self-hashes for the evidence artifacts.
-    hashes = {p.name: _sha256(p) for p in sorted(ARTIFACTS.glob("*.json"))}
+        (ARTIFACTS / "dependency_audit.json").write_text(json.dumps(dependency_audit, indent=2, sort_keys=True))
+    hashes = {p.name: _sha256(p) for p in sorted(ARTIFACTS.glob("*.json")) if p.name != "evidence_sha256.json"}
     (ARTIFACTS / "evidence_sha256.json").write_text(json.dumps(hashes, indent=2, sort_keys=True))
-    shutil.rmtree(build_root, ignore_errors=True)
-    print("\n" + ("DISTRIBUTION VERIFIED" if c.ok else "DISTRIBUTION VERIFICATION FAILED"))
+    if build_root:
+        shutil.rmtree(build_root, ignore_errors=True)
+    print("\n" + ("ADVISORY DISTRIBUTION VERIFIED" if c.ok else "ADVISORY DISTRIBUTION VERIFICATION FAILED"))
     print(f"evidence: {ARTIFACTS}/distribution_verification.json")
 
 

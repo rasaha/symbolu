@@ -1,11 +1,12 @@
-"""Recommend Mode — human-in-the-loop scaling recommendations.
+"""Advisory recommendation helpers — confidence scoring and safety bounds.
 
-Stage 4 of the Neural Cloud Controller. The controller generates
-actionable recommendations, sends notifications via webhooks,
-and waits for human approval before execution.
+These are advisory-only: confidence scoring gates *whether* to surface a
+recommendation, and safety bounds clamp recommended deltas. Neither approves nor
+executes anything.
 
-Flow: Controller decision → Confidence check → Safety bounds →
-      Webhook notification → Human approval → Execute (Stage 5)
+The approval → execution → notification stages (the recommend engine, approval
+manager, and webhook dispatcher) are NOT part of the advisory distribution; they
+live in the monorepo-only operations recommend namespace.
 """
 
 from ugence_cloud_scaling_controller.recommend.confidence import (
@@ -18,23 +19,6 @@ from ugence_cloud_scaling_controller.recommend.safety import (
     SafetyBounds,
     SafetyResult,
 )
-from ugence_cloud_scaling_controller.recommend.webhook import (
-    WebhookConfig,
-    WebhookTarget,
-    WebhookDispatcher,
-    SlackFormatter,
-    PagerDutyFormatter,
-    OpsGenieFormatter,
-)
-from ugence_cloud_scaling_controller.recommend.approval import (
-    ApprovalState,
-    Recommendation,
-    ApprovalManager,
-)
-from ugence_cloud_scaling_controller.recommend.engine import (
-    RecommendConfig,
-    RecommendEngine,
-)
 
 __all__ = [
     "ConfidenceLevel",
@@ -43,15 +27,4 @@ __all__ = [
     "SafetyConfig",
     "SafetyBounds",
     "SafetyResult",
-    "WebhookConfig",
-    "WebhookTarget",
-    "WebhookDispatcher",
-    "SlackFormatter",
-    "PagerDutyFormatter",
-    "OpsGenieFormatter",
-    "ApprovalState",
-    "Recommendation",
-    "ApprovalManager",
-    "RecommendConfig",
-    "RecommendEngine",
 ]
