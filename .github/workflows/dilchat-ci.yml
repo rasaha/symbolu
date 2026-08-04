@@ -1,0 +1,293 @@
+name: dilchat-ci
+
+# Dedicated CI quality gate for the merged DilChat internal backend baseline
+# (products/dilchat). Runs the ACTUAL package suite: static quality, PostgreSQL
+# migrations + full pytest, and the OpenAPI / Guna fail-closed guards.
+#
+# This workflow validates an INTERNAL development baseline only. It does NOT
+# enable, test, or imply user-facing Guna Milan, public astrology deployment, or
+# production launch. The environment is classified as `test` throughout.
+
+on:
+  pull_request:
+    branches:
+      - "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF"
+    paths:
+      - "products/dilchat/**"
+      - ".github/workflows/dilchat-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "products/dilchat/**"
+      - ".github/workflows/dilchat-ci.yml"
+  workflow_dispatch:
+
+# Least privilege: read-only checkout is all this gate needs. No write scopes,
+# no secrets, no deployment, no pull_request_target.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same PR/branch.
+concurrency:
+  group: dilchat-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # CI is explicitly a TEST environment (never production/public).
+  DILCHAT_ENVIRONMENT: test
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  static:
+    name: Static quality (ruff, mypy, import, app)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/dilchat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: products/dilchat/pyproject.toml
+      - name: Install (test + dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,dev]"
+      - name: Ruff
+        run: ruff check src tests scripts
+      - name: Mypy
+        run: mypy src
+      - name: Import smoke
+        run: python -c "import ugence_dilchat; from ugence_dilchat.app import create_app; print('import OK')"
+      - name: FastAPI app-construction smoke
+        run: |
+          python - <<'PY'
+          from ugence_dilchat.app import create_app
+          from ugence_dilchat.config import Environment, Settings
+          app = create_app(Settings(environment=Environment.TEST, database_url="sqlite+aiosqlite://"))
+          spec = app.openapi()
+          assert spec["openapi"].startswith("3.1"), spec["openapi"]
+          print("app OK:", len(spec["paths"]), "paths")
+          PY
+
+  postgres-and-tests:
+    name: PostgreSQL migrations + full test suite
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          # Test-only static CI password. NOT a secret and NOT reused anywhere.
+          POSTGRES_PASSWORD: dilchat_ci_test_pw
+          POSTGRES_DB: dilchat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dilchat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # asyncpg URLs pointing at the service container (NOT the dev machine's 5433).
+      DILCHAT_DATABASE_URL: postgresql+asyncpg://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_test
+      DILCHAT_TEST_DATABASE_URL: postgresql+asyncpg://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_test
+    defaults:
+      run:
+        working-directory: products/dilchat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: products/dilchat/pyproject.toml
+      - name: Install (test + dev + swiss dev-only)
+        # `swiss` (pyswisseph) is required so the committed Swiss dev-only tests
+        # actually run instead of being importorskip-skipped. Dev/test boundary
+        # only; never a production/public enablement.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,dev,swiss]"
+      - name: Wait for PostgreSQL readiness
+        run: |
+          python - <<'PY'
+          import asyncio, os, sys
+          import asyncpg
+          async def main():
+              dsn = os.environ["DILCHAT_TEST_DATABASE_URL"].replace("postgresql+asyncpg://", "postgresql://")
+              for attempt in range(1, 31):
+                  try:
+                      conn = await asyncpg.connect(dsn)
+                      await conn.execute("select 1")
+                      await conn.close()
+                      print(f"PostgreSQL ready (attempt {attempt})")
+                      return
+                  except Exception as exc:  # noqa: BLE001
+                      print(f"waiting for PostgreSQL ({attempt}): {exc}")
+                      await asyncio.sleep(2)
+              print("PostgreSQL never became ready", file=sys.stderr)
+              sys.exit(1)
+          asyncio.run(main())
+          PY
+      - name: Migrations — upgrade base -> head
+        run: alembic upgrade head
+      - name: Confirm exactly one Alembic head
+        run: |
+          count=$(alembic heads | grep -c '(head)')
+          echo "alembic heads with (head): $count"
+          test "$count" -eq 1
+      - name: Migrations — downgrade to base then re-upgrade to head
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+      - name: Guard — PostgreSQL tests are genuinely collected (no silent skip)
+        run: |
+          out=$(pytest -m postgres --collect-only -q | tail -1)
+          echo "postgres-marked collection: $out"
+          echo "$out" | grep -qE '[1-9][0-9]* tests collected' \
+            || { echo "FAIL: postgres-marked tests were not collected (env/service missing?)"; exit 1; }
+      - name: Full DilChat test suite (strict markers, JUnit)
+        run: |
+          pytest --strict-markers -ra --junitxml="${RUNNER_TEMP}/dilchat-junit.xml" -q \
+            | tee "${RUNNER_TEMP}/dilchat-pytest.txt"
+      - name: Guard — no unexpected skips/xfails were introduced
+        run: |
+          summary=$(tail -3 "${RUNNER_TEMP}/dilchat-pytest.txt")
+          echo "$summary"
+          # The committed suite expects 0 skipped / 0 xfailed with swiss + PostgreSQL present.
+          if echo "$summary" | grep -qiE 'skipped|xfail'; then
+            echo "FAIL: unexpected skipped/xfailed tests (all deps should be present in CI)"; exit 1
+          fi
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dilchat-junit
+          path: ${{ runner.temp }}/dilchat-junit.xml
+          retention-days: 14
+          if-no-files-found: warn
+
+  contract-and-guards:
+    name: OpenAPI 3.1 + Guna fail-closed guards
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/dilchat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: products/dilchat/pyproject.toml
+      - name: Install (test + dev + OpenAPI validator)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,dev]"
+          pip install "openapi-spec-validator>=0.7"
+      - name: OpenAPI generation + no-Guna-route guard (script)
+        run: |
+          python -m ugence_dilchat.scripts_openapi > "${RUNNER_TEMP}/dilchat-openapi.json"
+          echo "OpenAPI written; scripts_openapi no-guna guard passed"
+      - name: OpenAPI 3.1 validation + route-schema inspection
+        run: |
+          python - <<'PY'
+          from ugence_dilchat.app import create_app
+          from ugence_dilchat.config import Environment, Settings
+          from openapi_spec_validator import validate
+          app = create_app(Settings(environment=Environment.TEST, database_url="sqlite+aiosqlite://"))
+          spec = app.openapi()
+          assert spec["openapi"].startswith("3.1"), spec["openapi"]
+          validate(spec)
+          banned = ("guna", "compatibility", "kundli", "milan", "ashtakoot",
+                    "koota", "kuta", "dosha", "matchmaking", "matchmak")
+          paths = sorted(spec["paths"])
+          # Stronger than path-only string matching: inspect path, operationId,
+          # summary and tags of every operation for classical-matching exposure.
+          offenders = []
+          for p, ops in spec["paths"].items():
+              if any(b in p.lower() for b in banned):
+                  offenders.append(("path", p))
+              for method, op in ops.items():
+                  if not isinstance(op, dict):
+                      continue
+                  meta = " ".join(str(op.get(k, "")) for k in ("operationId", "summary", "description"))
+                  meta += " " + " ".join(op.get("tags", []) or [])
+                  if any(b in meta.lower() for b in banned):
+                      offenders.append((f"{method} {p}", meta))
+          assert not offenders, f"forbidden classical-matching exposure: {offenders}"
+          print(f"OpenAPI 3.1 VALID; {len(paths)} paths; no Guna/compatibility exposure")
+          for p in paths:
+              print("  ", p)
+          PY
+      - name: Rule-pack validation (JSON, dup-key, checksum, maxima=36, refs, executable-state, parihara, manual)
+        run: python scripts/validate_rule_pack.py
+      - name: Guna fail-closed guards
+        run: |
+          python - <<'PY'
+          import json, pathlib, re
+          root = pathlib.Path(".")
+          pack = root / "rules" / "ashtakoota_muhurta_chintamani_raman_v1"
+          control = json.loads((pack / "pack_control.json").read_text())
+          manifest = json.loads((pack / "manifest.json").read_text())
+          parihara = json.loads((pack / "parihara.json").read_text())
+          sources = json.loads((root / "rules" / "sources" / "GUNA_SOURCE_MANIFEST.json").read_text())
+          inv = control["executable_invariant"]
+          assert manifest["executable"] is False, "manifest.executable must be False"
+          assert inv["derived_executable"] is False, "derived_executable must be False"
+          assert inv["blockers"], "blockers must be non-empty (RULE_PACK_BLOCKED)"
+          assert control["counts"]["approved_rules"] == 0, "no approved rules permitted"
+          assert control["counts"]["unresolved_source_conflict_topics"] >= 1, "conflicts must stay explicit"
+          assert all(r["enabled"] is False for r in parihara["rules"]), "all parihara must be disabled"
+          assert sources["overall_status"] == "PENDING_ACQUISITION", "no source may be frozen"
+          assert not any(s["review_status"].startswith("FROZEN") for s in sources["sources"]), "no frozen source"
+          # No fabricated reviewer approval in the sign-off record.
+          record = (root / "docs" / "DILCHAT_GUNA_DOMAIN_REVIEW_RECORD.md").read_text()
+          assert "DOMAIN_REVIEW_PENDING" in record, "domain review must remain pending"
+          # No production Guna-scoring module: no scoring symbols in src.
+          hits = []
+          for py in (root / "src").rglob("*.py"):
+              txt = py.read_text()
+              for m in re.finditer(r"def\s+\w*(guna|ashtakoot|koota|compatibility_score)\w*\s*\(", txt, re.I):
+                  hits.append(f"{py}: {m.group(0)}")
+          assert not hits, f"unexpected Guna-scoring code in src: {hits}"
+          print("Guna fail-closed guards PASSED: RULE_PACK_BLOCKED, executable=false, "
+                "0 approved, parihara disabled, no frozen source, no reviewer, no scoring module")
+          PY
+      - name: Provider / licensing fail-closed guard
+        run: |
+          python - <<'PY'
+          from ugence_dilchat.config import Environment, Settings
+          def refused(**kw):
+              try:
+                  Settings(database_url="postgresql+asyncpg://x@/y",
+                           access_token_private_key_pem="x", **kw)
+                  return False
+              except Exception:
+                  return True
+          # Production-like config cannot start with fake, or unlicensed Swiss.
+          assert refused(environment=Environment.PRODUCTION, astrology_provider="fake"), \
+              "PRODUCTION must refuse the fake provider"
+          assert refused(environment=Environment.STAGING, astrology_provider="fake"), \
+              "STAGING must refuse the fake provider"
+          assert refused(environment=Environment.PRODUCTION, astrology_provider="swiss",
+                         enable_swiss_ephemeris=True, swiss_production_licensed=False), \
+              "PRODUCTION must refuse unlicensed Swiss"
+          print("Provider/licensing fail-closed guard PASSED")
+          PY
+      - name: Upload OpenAPI artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dilchat-openapi
+          path: ${{ runner.temp }}/dilchat-openapi.json
+          retention-days: 14
+          if-no-files-found: warn
