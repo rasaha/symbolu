@@ -1,0 +1,26 @@
+{
+  "check": "governance_studio_p3e_synthetic_data_inventory",
+  "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY",
+  "source_contract": "governance_studio.api.v1",
+  "scenario_ids": [
+    "customer_support",
+    "cybersecurity_no_feasible_team",
+    "cybersecurity_success",
+    "procurement"
+  ],
+  "fixture_hashes": {
+    "customer_support": "sha256:9cfb966615d0c244b97d24dd7df3a17036b9e3dfb1f463d08f9e3ac4e7cd59d4",
+    "cybersecurity_no_feasible_team": "sha256:3eebff71ccc6aaaaeee9fb7493093d3101787779e55ec4f2f0cbe07754198799",
+    "cybersecurity_success": "sha256:36852b764e2c8bc513d0596206422a49e7b649de9bbeff6da94e734c661fb076",
+    "procurement": "sha256:1df40604557e980aeb301b3100e635111670cae72d9a54c2256a4b19d545cc8e"
+  },
+  "bundle_hash": "sha256:c0e5ac73048824f07543f38f67a445cd289ff481f26505c3446bc7609e4dfcdc",
+  "enforcement": "startup integrity fails closed (SYNTHETIC_DATA_BOUNDARY_FAILED) on missing/extra/tampered fixtures, wrong classification, or scenario_root override",
+  "no_override_vectors": [
+    "filesystem path",
+    "URL",
+    "user upload",
+    "environment variable",
+    "remote fixture fetch"
+  ]
+}

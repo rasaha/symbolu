@@ -1,0 +1,33 @@
+{
+  "phase": "governance_studio_p3e",
+  "live_default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+  "default_branch_tip": "e496a67978245e57bb9dcbfab2387a3af18781b4",
+  "pr_1323": {
+    "state": "merged",
+    "merged": true,
+    "merged_at": "2026-08-04T03:05:29Z",
+    "head_commit": "8b9042426e3e113ab48b1ce100db192508e4b2ab",
+    "merged_by": "rasaha",
+    "merged_into_default": true
+  },
+  "working_branch": "claude/governance-studio-p3e-private-hosted",
+  "versions": {
+    "frontend": "0.2.0",
+    "backend_api": "0.1.0",
+    "api_contract": "governance_studio.api.v1",
+    "awc": "0.2.1",
+    "compiler": "0.2.0",
+    "deployment_bundle": "0.1.0"
+  },
+  "frozen": {
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "scenario_ids": ["procurement", "customer_support", "cybersecurity_success", "cybersecurity_no_feasible_team"],
+  "environment": {
+    "docker_cli_present": true,
+    "docker_daemon_running": false,
+    "container_build_run_executable": false,
+    "note": "OCI build/run gates NOT_EXECUTED; deployment application verified directly over HTTPS via uvicorn"
+  }
+}
