@@ -1,0 +1,297 @@
+{
+  "distribution": "ugence-llm-steering-controller",
+  "import_namespace": "ugence_llm_steering_controller",
+  "public_api": [
+    {
+      "kind": "class",
+      "methods": [
+        "provider",
+        "model",
+        "from_dict",
+        "to_dict",
+        "fingerprint"
+      ],
+      "name": "CandidateRegistry"
+    },
+    {
+      "fields": [
+        "model_id",
+        "provider_id",
+        "total",
+        "components",
+        "weighted",
+        "measurement_basis"
+      ],
+      "kind": "dataclass",
+      "name": "CandidateScore"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "ContractError"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "DeprecationState"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "ExecutionStatus"
+    },
+    {
+      "fields": [
+        "permitted",
+        "ordered_candidates",
+        "conditions",
+        "escalation_recommended",
+        "escalation_conditions"
+      ],
+      "kind": "dataclass",
+      "name": "FallbackRecommendation"
+    },
+    {
+      "kind": "class",
+      "methods": [
+        "recommend",
+        "recommend_or_raise"
+      ],
+      "name": "LLMSteeringController"
+    },
+    {
+      "fields": [
+        "model_id",
+        "provider_id",
+        "modalities_in",
+        "modalities_out",
+        "context_limit",
+        "structured_output",
+        "tool_use",
+        "regions",
+        "privacy_tier",
+        "cost_class",
+        "latency_class",
+        "quality_tier",
+        "reliability_class",
+        "availability_class",
+        "deprecation_state",
+        "capabilities",
+        "policy_tags",
+        "est_cost_per_ktok",
+        "est_latency_ms"
+      ],
+      "kind": "dataclass",
+      "name": "ModelCandidate"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "NoEligibleCandidate"
+    },
+    {
+      "kind": "value",
+      "name": "POLICY_VERSION",
+      "value": "steering-policy-1.0"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "PolicyViolation"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "PrivacyClass"
+    },
+    {
+      "fields": [
+        "provider_id",
+        "display_name",
+        "regions",
+        "deployment_mode",
+        "trains_on_data",
+        "policy_tags"
+      ],
+      "kind": "dataclass",
+      "name": "ProviderCandidate"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "QualityPreference"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "RegistryError"
+    },
+    {
+      "fields": [
+        "name",
+        "satisfied",
+        "provenance",
+        "detail"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingConstraint"
+    },
+    {
+      "fields": [
+        "stages",
+        "eligible_order",
+        "rejected_order"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingDecisionTrace"
+    },
+    {
+      "fields": [
+        "registry_fingerprint",
+        "request_fingerprint",
+        "policy_fingerprint",
+        "candidates_considered",
+        "eligible_count",
+        "rejected",
+        "scores"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingEvidence"
+    },
+    {
+      "fields": [
+        "summary",
+        "reasons",
+        "weight_preset",
+        "tie_break_rule"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingExplanation"
+    },
+    {
+      "fields": [
+        "preference",
+        "weight_overrides",
+        "policy_version"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingPolicy"
+    },
+    {
+      "fields": [
+        "decision_id",
+        "recommended_model",
+        "recommended_provider",
+        "ranked_alternatives",
+        "score",
+        "ranked_scores",
+        "constraints_evaluated",
+        "constraints_satisfied",
+        "constraints_rejected",
+        "policy_version",
+        "confidence",
+        "confidence_basis",
+        "explanation",
+        "fallback",
+        "evidence",
+        "trace",
+        "execution_status",
+        "recommendation_only"
+      ],
+      "kind": "dataclass",
+      "name": "RoutingRecommendation"
+    },
+    {
+      "kind": "value",
+      "name": "SCHEMA_VERSION",
+      "value": "1.0"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "SteeringError"
+    },
+    {
+      "fields": [
+        "task_category",
+        "requirements",
+        "tenant",
+        "policy_domain",
+        "latency_budget_ms",
+        "cost_budget",
+        "quality_preference",
+        "privacy_classification",
+        "data_residency",
+        "approved_providers",
+        "prohibited_providers",
+        "approved_models",
+        "prohibited_models",
+        "fallback_permitted",
+        "escalation_permitted",
+        "determinism_required",
+        "request_timestamp",
+        "policy_version"
+      ],
+      "kind": "dataclass",
+      "name": "SteeringRequest"
+    },
+    {
+      "fields": [
+        "status",
+        "policy_version",
+        "decision_id",
+        "recommendation",
+        "evidence",
+        "trace",
+        "reason",
+        "execution_status",
+        "recommendation_only"
+      ],
+      "kind": "dataclass",
+      "name": "SteeringResult"
+    },
+    {
+      "kind": "class",
+      "methods": [],
+      "name": "SteeringStatus"
+    },
+    {
+      "fields": [
+        "required_modalities",
+        "min_context_window",
+        "estimated_input_tokens",
+        "structured_output_required",
+        "tool_use_required",
+        "required_capabilities"
+      ],
+      "kind": "dataclass",
+      "name": "TaskRequirements"
+    },
+    {
+      "kind": "value",
+      "name": "VERSION",
+      "value": "0.1.0"
+    },
+    {
+      "kind": "value",
+      "name": "__version__",
+      "value": "0.1.0"
+    },
+    {
+      "kind": "function",
+      "name": "build_controller",
+      "signature": "(registry: 'Dict[str, Any]') -> 'LLMSteeringController'"
+    },
+    {
+      "kind": "function",
+      "name": "recommend",
+      "signature": "(registry: 'Dict[str, Any]', request: 'Dict[str, Any]', policy: 'Optional[Dict[str, Any]]' = None) -> 'SteeringResult'"
+    },
+    {
+      "kind": "function",
+      "name": "validate_registry",
+      "signature": "(d: 'Dict[str, Any]') -> 'Tuple[bool, List[str]]'"
+    }
+  ],
+  "version": "0.1.0"
+}

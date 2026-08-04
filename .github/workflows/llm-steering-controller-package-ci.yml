@@ -1,0 +1,180 @@
+name: llm-steering-controller-package-ci
+
+# Scoped CI for the independent advisory LLM Steering Controller capability package.
+# Advisory-only and offline: no provider credentials, no network, no model execution.
+# The clean-install proof builds a wheel and installs it into an isolated virtual
+# environment created outside the repository.
+
+on:
+  push:
+    paths:
+      - "packages/capabilities/llm-steering-controller/**"
+      - "docs/audits/llm_steering/**"
+      - "artifacts/llm_steering/**"
+      - "conftest.py"
+      - ".github/workflows/llm-steering-controller-package-ci.yml"
+  pull_request:
+    paths:
+      - "packages/capabilities/llm-steering-controller/**"
+      - "docs/audits/llm_steering/**"
+      - "artifacts/llm_steering/**"
+      - "conftest.py"
+      - ".github/workflows/llm-steering-controller-package-ci.yml"
+
+jobs:
+  llm-steering-package:
+    runs-on: ubuntu-latest
+    env:
+      # PYTHONPATH is deliberately NOT set job-wide: the clean-install verifier and build
+      # steps must not see the monorepo source path. Package-local test steps rely on the
+      # package conftest.py (which adds src).
+      PKG: packages/capabilities/llm-steering-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip build pytest pip-audit
+
+      - name: Source duplication audit (single-source verifier)
+        run: python "$PKG/scripts/audit_single_source.py"
+
+      - name: Forbidden-import scan (core imports no provider SDK / network / Ugence package)
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          src = pathlib.Path("packages/capabilities/llm-steering-controller/src/ugence_llm_steering_controller")
+          forbidden = {
+              "openai", "anthropic", "boto3", "botocore", "google", "vertexai", "cohere",
+              "mistralai", "requests", "httpx", "urllib3", "aiohttp",
+              "socket", "subprocess", "urllib", "http", "ssl", "asyncio",
+              "threading", "multiprocessing",
+              "governance_studio", "decision_governance", "actiongate", "agent_runtime",
+              "hybrid_llm", "ai_hiring", "control_plane", "model_selection_pilot",
+              "model_selection_experiment", "model_selection_reconciliation", "execution_gate",
+          }
+          violations = []
+          for p in src.rglob("*.py"):
+              tree = ast.parse(p.read_text())
+              for node in ast.walk(tree):
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      mods = [node.module.split(".")[0]]
+                  for m in mods:
+                      if m in forbidden:
+                          violations.append(f"{p}: import {m}")
+          if violations:
+              print("\n".join(violations)); sys.exit(1)
+          print("forbidden-import scan clean")
+          PY
+
+      - name: Byte-compile (syntax) check
+        run: python -m py_compile $(git ls-files "$PKG/src" | grep '\.py$')
+
+      - name: Advisory-boundary gates (no provider execution / network / credential usage)
+        run: python -m pytest "$PKG/tests/boundaries" -q
+
+      - name: Import-side-effect + network/credential prohibition gates
+        run: python -m pytest "$PKG/tests/side_effects" -q
+
+      - name: Contract / policy / scoring / recommendation / registry tests
+        run: python -m pytest "$PKG/tests/contract" "$PKG/tests/constraints" "$PKG/tests/policy" "$PKG/tests/scoring" "$PKG/tests/recommendation" "$PKG/tests/registry" -q
+
+      - name: Fixture simulation tests
+        run: python -m pytest "$PKG/tests/simulation" -q
+
+      - name: CLI tests
+        run: python -m pytest "$PKG/tests/cli" -q
+
+      - name: Public API / compatibility + single-source packaging tests
+        run: python -m pytest "$PKG/tests/compatibility" "$PKG/tests/packaging" -q
+
+      - name: Full package test suite
+        run: python -m pytest "$PKG/tests" -q
+
+      - name: Canonical-source consistency (fixtures reproducible)
+        run: python "$PKG/scripts/generate_fixtures.py" && git diff --exit-code "$PKG/fixtures"
+
+      - name: Build wheel + sdist
+        run: python -m build "$PKG" -o "$PKG/dist"
+
+      - name: Clean-environment distribution verifier (build + wheel inspection + isolated probe + SBOM + provenance)
+        run: python "$PKG/verify_llm_steering_controller_distribution.py"
+
+      - name: Secret scan (no credentials in package tree)
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path("packages/capabilities/llm-steering-controller")
+          pat = re.compile(r"(sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-)")
+          hits = []
+          for p in root.rglob("*"):
+              if p.is_file() and p.suffix in {".py", ".json", ".md", ".toml", ".txt", ".cfg", ".ini"}:
+                  if "artifacts/" in str(p) or "/dist/" in str(p):
+                      continue
+                  try:
+                      t = p.read_text(encoding="utf-8", errors="ignore")
+                  except Exception:
+                      continue
+                  if pat.search(t):
+                      hits.append(str(p))
+          if hits:
+              print("secret-like content in:", hits); sys.exit(1)
+          print("secret scan clean")
+          PY
+
+      - name: pip check + pip-audit (installed wheel runtime closure)
+        run: |
+          python -m venv /tmp/lsc-audit
+          /tmp/lsc-audit/bin/python -m pip install --quiet --find-links "$PKG/dist" ugence-llm-steering-controller
+          /tmp/lsc-audit/bin/python -m pip check
+          # The core has no third-party runtime deps (stdlib only); audit whatever closure exists,
+          # excluding build tooling and the local package itself.
+          /tmp/lsc-audit/bin/python -m pip freeze \
+            | grep -ivE "^(pip|setuptools|wheel|ugence-llm-steering-controller)==" \
+            > /tmp/lsc-runtime-reqs.txt || true
+          echo "auditing runtime closure:" && cat /tmp/lsc-runtime-reqs.txt
+          if [ -s /tmp/lsc-runtime-reqs.txt ]; then \
+            python -m pip_audit -r /tmp/lsc-runtime-reqs.txt; \
+          else \
+            echo "no third-party runtime dependencies to audit (stdlib only)"; \
+          fi
+
+      - name: Terminology & claims check (no over-claiming in package docs)
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path("packages/capabilities/llm-steering-controller")
+          banned = [r"production[- ]ready", r"production[- ]certified", r"best model",
+                    r"guarantee[sd]? (?:cost|latency|quality|reliability)", r"AGI"]
+          allow_context = "not"  # docs may say "no production-ready claim" etc.
+          problems = []
+          for p in list(root.rglob("*.md")) + [root / "README.md"]:
+              if not p.exists():
+                  continue
+              # Strip markdown emphasis so "**No** AGI" reads as "no agi" for negation checks.
+              text = re.sub(r"[*_`]", "", p.read_text(encoding="utf-8", errors="ignore").lower())
+              for b in banned:
+                  for m in re.finditer(b, text):
+                      window = text[max(0, m.start()-24):m.start()]
+                      if "no " in window or "not " in window or "never" in window or "does not" in window:
+                          continue
+                      problems.append(f"{p}: '{m.group(0)}'")
+          if problems:
+              print("possible over-claim(s):", problems); sys.exit(1)
+          print("terminology & claims check clean")
+          PY
+
+      - name: Upload evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-steering-controller-evidence
+          path: |
+            packages/capabilities/llm-steering-controller/artifacts/*.json
+            packages/capabilities/llm-steering-controller/dist/*
+          if-no-files-found: warn

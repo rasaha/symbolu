@@ -1,0 +1,40 @@
+{
+  "audit": "LLM Steering Controller — call graph (who imports / consumes what)",
+  "baseline_default_tip": "cbf899043f46db171e9a9ca0f3bcdc9f42442bc1",
+  "notes": [
+    "Edges are Python import relationships (from -> to) established by ast/grep over .py files.",
+    "The new ugence_llm_steering_controller has no in-repo callers by design: it is an advisory package consumed by a separately-governed runtime, not wired into execution paths in this phase."
+  ],
+  "nodes": [
+    {"id": "ugence_llm_steering_controller", "kind": "CANONICAL_STEERING_CORE"},
+    {"id": "ugence_model_selection", "kind": "STEERING_POLICY (selection leaf)"},
+    {"id": "execution_gate", "kind": "LEGACY_COMPATIBILITY"},
+    {"id": "control_plane.adapters", "kind": "consumer"},
+    {"id": "governed_inference_pilot.adapters.execution_gate", "kind": "consumer"},
+    {"id": "control_plane_shadow.adapters.execution_gate_adapter", "kind": "consumer"},
+    {"id": "control_plane_shadow.adapters.model_policy_adapter", "kind": "consumer"},
+    {"id": "execution_gate_shadow", "kind": "consumer"},
+    {"id": "model_selection_experiment.policy", "kind": "RESEARCH_ONLY"},
+    {"id": "model_selection_reconciliation.variants", "kind": "RESEARCH_ONLY"},
+    {"id": "model_selection_pilot.policy", "kind": "RESEARCH_ONLY"},
+    {"id": "model_selection_pilot.provider", "kind": "PROVIDER_EXECUTION_ADAPTER"},
+    {"id": "model_selection_pilot.execute", "kind": "PROVIDER_EXECUTION_ADAPTER"}
+  ],
+  "edges": [
+    {"from": "control_plane.adapters", "to": "ugence_model_selection", "detail": "from ugence_model_selection import gate/model/policy/registry/states"},
+    {"from": "governed_inference_pilot.adapters.execution_gate", "to": "ugence_model_selection", "detail": "from ugence_model_selection.gate import ..."},
+    {"from": "execution_gate", "to": "ugence_model_selection", "detail": "aliases submodules into sys.modules (identity preserved)"},
+    {"from": "execution_gate_shadow", "to": "execution_gate", "detail": "from execution_gate.gate import ExecutionGate"},
+    {"from": "control_plane_shadow.adapters.execution_gate_adapter", "to": "execution_gate", "detail": "from execution_gate import gate/model/states"},
+    {"from": "control_plane_shadow.adapters.model_policy_adapter", "to": "model_selection_experiment.policy", "detail": "from model_selection_experiment import policy as msp"},
+    {"from": "model_selection_reconciliation.variants", "to": "model_selection_experiment.policy", "detail": "from model_selection_experiment import policy as base"},
+    {"from": "model_selection_pilot.execute", "to": "model_selection_pilot.provider", "detail": "provider execution dispatch"},
+    {"from": "model_selection_pilot.arms", "to": "model_selection_pilot.policy", "detail": "internal"},
+    {"from": "ugence_llm_steering_controller", "to": "(stdlib only)", "detail": "no cross-package imports; leaf"}
+  ],
+  "dependency_direction": {
+    "steering_controller_depends_on": ["python stdlib only"],
+    "steering_controller_is_depended_on_by": ["(none in-repo this phase; a separately-governed runtime is the intended consumer)"],
+    "invariant": "No import edge from ugence_llm_steering_controller to any provider SDK, model_selection_pilot/experiment, control_plane, agent_runtime, or hybrid_llm."
+  }
+}
