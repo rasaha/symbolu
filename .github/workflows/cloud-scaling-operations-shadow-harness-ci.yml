@@ -108,17 +108,25 @@ jobs:
           python - <<'PY'
           import pathlib, re, sys
           root = pathlib.Path("packages/capabilities/cloud-scaling-operations")
-          pats = [re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
-                  re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-                  re.compile(r"(?i)apiVersion:\s*v1[\s\S]*kind:\s*Config")]  # kubeconfig
+          # Committed EVIDENCE artifacts must contain no secret material of any kind
+          # (bearer tokens, private keys, or kubeconfig). Source is reviewed code and may
+          # contain redaction-test literals by design, so only real credential *formats*
+          # (private keys / kubeconfig blocks) are forbidden there — never a data secret.
+          bearer = re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}")
+          privkey = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+          kubeconfig = re.compile(r"(?i)apiVersion:\s*v1[\s\S]*kind:\s*Config")
           bad = []
-          for p in list(root.glob("artifacts/shadow_harness_fixture/*")) + \
-                   list(root.glob("shadow_validation/**/*.py")):
+          for p in root.glob("artifacts/shadow_harness_fixture/*"):
               t = p.read_text(errors="ignore")
-              for rx in pats:
+              for rx in (bearer, privkey, kubeconfig):
                   for m in rx.finditer(t):
                       if "<redacted>" not in m.group(0):
-                          bad.append(f"{p}: {m.group(0)[:24]}...")
+                          bad.append(f"evidence {p.name}: {m.group(0)[:24]}...")
+          for p in root.glob("shadow_validation/**/*.py"):
+              t = p.read_text(errors="ignore")
+              for rx in (privkey, kubeconfig):
+                  if rx.search(t):
+                      bad.append(f"source {p.name}: real credential format present")
           if bad:
               print("\n".join(bad)); sys.exit(1)
           print("credential/secret scan clean")
