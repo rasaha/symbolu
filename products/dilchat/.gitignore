@@ -1,0 +1,12 @@
+# DilChat product-local ignores
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+.env
+# Swiss Ephemeris data files are NOT committed (licensing + size).
+*.se1

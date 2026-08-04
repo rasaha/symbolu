@@ -1,99 +1,135 @@
-# DilChat — Backend Design Specification
+# DilChat Backend (Ugence Labs)
 
-**DilChat** is a mobile-first couples compatibility and communication product by
-**Ugence Labs** (site: [dilchat.com](https://dilchat.com)). It begins with
-traditional Vedic Guna Milan compatibility, then helps couples understand and
-work through their differences using private AI conversations, a shared couple
-workspace, guided conversations, compromise building, and jointly approved
-agreements.
+DilChat is a mobile-first couples compatibility and communication product
+([dilchat.com](https://dilchat.com)). This package is the **backend foundation**
+built in the first bounded implementation phase (**Phase A + the non-blocked
+parts of Phase B**).
 
-> **Product thesis:** *Other astrology applications tell couples whether they
-> match. DilChat helps couples understand their differences and build
-> compatibility together.*
+> **Status: Phase A/B foundation — NOT production-ready.**
+> This package deliberately contains **no** user-facing Guna Milan, Living
+> Compatibility, AI/LLM guidance, daily transits, shared/private chat,
+> agreements, mobile/web clients, billing, or production-deployment code. See the
+> design and audit documents under [`docs/`](docs/) and the phase report,
+> [`docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md`](docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md).
 
-## Status
+## What this package implements
 
-**Design phase — specifications only.** This directory currently contains the
-implementation-ready backend design. **No production backend code has been
-written.** Implementation does not begin until these specifications are
-reviewed and explicitly approved (see the roadmap's go/no-go gates).
+- FastAPI application factory (`/v1`), health + readiness probes, structured
+  problem+json errors, request correlation IDs, environment separation.
+- PostgreSQL foundation (SQLAlchemy 2 async, Alembic migrations) with the 10
+  authorized entities: `users`, `user_sessions`, `birth_profiles`,
+  `natal_chart_snapshots`, `couples`, `couple_memberships`, `couple_invitations`,
+  `consent_events`, `shared_artifacts`, `audit_events`.
+- Self-managed identity: Argon2id passwords, ES256 access tokens, rotating opaque
+  refresh sessions with reuse detection and revocation.
+- Birth profiles with historical-timezone local→UTC conversion (ambiguous /
+  nonexistent time handling; unknown time never fabricated) and confidence
+  propagation.
+- A replaceable **AstrologyProvider** interface with a deterministic default
+  (`fake`) and a development/test Swiss Ephemeris adapter; deterministic natal
+  Moon (longitude, rashi, nakshatra, pada) into immutable snapshots.
+- A pure **three-scope authorization** model (`PRIVATE_A`/`PRIVATE_B`/`SHARED`),
+  default-deny, existence non-disclosure (404 not 403), and background-job
+  scope re-validation (DEC-027).
+- Couple/invitation/consent primitives and immutable, self-contained shared
+  artifacts (DEC-028). Append-only audit that never stores secrets or raw
+  sensitive payloads.
 
-## Three distinct concepts (never merged)
+## Swiss Ephemeris — DEVELOPMENT-ONLY licensing notice
 
-1. **Classical Compatibility** — traditional Ashtakoota Guna Milan (8 Kootas,
-   max 36). Fixed by natal data + a versioned rule pack. AI may *explain* it but
-   never recalculate or alter it.
-2. **Daily Emotional & Interest Climate** — DilChat interpretations derived from
-   the current sidereal Moon transit relative to each person's natal Moon. Not a
-   classical guaranteed prediction.
-3. **Living Compatibility** — derived from actual couple interactions,
-   agreements, and consented feedback. Kept strictly separate from the classical
-   Guna Milan score.
+This package can use the **Swiss Ephemeris** (via `pyswisseph`) **only for
+internal development, tests, and reference validation**. `pyswisseph` wraps the
+**AGPL-3.0** edition of the Swiss Ephemeris.
 
-## Design documents (`docs/`)
+- It is **disabled by default** (`DILCHAT_ASTROLOGY_PROVIDER=fake`,
+  `DILCHAT_ENABLE_SWISS_EPHEMERIS=false`).
+- The configuration and provider registry **refuse to enable it in any
+  `staging`/`production` environment** (see `config.py` and
+  `astrology/registry.py`).
+- Public or proprietary production deployment remains **blocked** until Ugence
+  Labs either satisfies the AGPL obligations **or** obtains the Swiss Ephemeris
+  Professional License (DEC-007 / OQ-10). The free edition is **not** an
+  unrestricted commercial license.
+- No production deployment manifest or public Swiss Ephemeris service is included
+  in this phase. `.se1` data files are not committed.
 
-| # | Document | Purpose |
-|---|----------|---------|
-| 1 | [DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md](docs/DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md) | Goals, personas, journeys, functional/non-functional requirements, MVP boundaries, non-goals, success criteria. |
-| 2 | [DILCHAT_BACKEND_ARCHITECTURE.md](docs/DILCHAT_BACKEND_ARCHITECTURE.md) | System context, components, data flows, trust boundaries, Mermaid diagrams. |
-| 3 | [DILCHAT_ASTROLOGY_ENGINE_SPEC.md](docs/DILCHAT_ASTROLOGY_ENGINE_SPEC.md) | Astronomy, sidereal config, Guna Milan algorithms, transit engine, interest themes, pseudocode, golden tests. |
-| 4 | [DILCHAT_DATA_MODEL.md](docs/DILCHAT_DATA_MODEL.md) | ERD, tables, keys, private/shared ownership, encryption classification, retention, unpairing behavior. |
-| 5 | [DILCHAT_API_SPEC.md](docs/DILCHAT_API_SPEC.md) | REST endpoints, schemas, auth, scopes, idempotency, errors, pagination, versioning. |
-| 6 | [DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md](docs/DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md) | Three-scope model, consent state machine, threat model, abuse cases, encryption, audit. |
-| 7 | [DILCHAT_AI_INTEGRATION_SPEC.md](docs/DILCHAT_AI_INTEGRATION_SPEC.md) | Allowed/prohibited AI tasks, structured schemas, prompt versioning, safety, human approval. |
-| 8 | [DILCHAT_TEST_AND_VALIDATION_PLAN.md](docs/DILCHAT_TEST_AND_VALIDATION_PLAN.md) | Unit/integration/authorization/property/golden/DR tests. |
-| 9 | [DILCHAT_IMPLEMENTATION_ROADMAP.md](docs/DILCHAT_IMPLEMENTATION_ROADMAP.md) | Phases A–G, dependencies, risks, gates, sprint breakdown, MVP cut line. |
-| 10 | [DILCHAT_DECISION_LOG.md](docs/DILCHAT_DECISION_LOG.md) | **Canonical** architecture decisions and open questions. Read this first. |
+## Requirements
 
-OpenAPI contract: [`docs/openapi/dilchat.openapi.yaml`](docs/openapi/dilchat.openapi.yaml).
-Versioned Guna Milan rule pack: [`rules/ashtakoota_lahiri_classical_v1/`](rules/ashtakoota_lahiri_classical_v1/).
+- Python **3.12+** (this product is pinned independently of the monorepo root).
+- PostgreSQL **16** for real use and migration/integration tests.
 
-### Pre-implementation verification audit
+## Install
 
-An independent audit reproduced every design claim from primary evidence. Start with the gate:
+```bash
+cd products/dilchat
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -e ".[test,dev]"       # add ,swiss for the dev-only Swiss adapter
+```
 
-| Document | Verdict |
-|----------|---------|
-| [DILCHAT_IMPLEMENTATION_READINESS_GATE.md](docs/DILCHAT_IMPLEMENTATION_READINESS_GATE.md) | **CONDITIONALLY_READY** (13 gates) |
-| [DILCHAT_ARTIFACT_VALIDATION_REPORT.md](docs/DILCHAT_ARTIFACT_VALIDATION_REPORT.md) | Machine-readable validity PASS |
-| [DILCHAT_GUNA_RULE_TRACEABILITY_AUDIT.md](docs/DILCHAT_GUNA_RULE_TRACEABILITY_AUDIT.md) | RULE_PACK_BLOCKED |
-| [DILCHAT_ASTRONOMY_REPRODUCIBILITY_AUDIT.md](docs/DILCHAT_ASTRONOMY_REPRODUCIBILITY_AUDIT.md) | REPRODUCIBLE_WITH_CONDITIONS |
-| [DILCHAT_AUTHORIZATION_AND_LEAKAGE_AUDIT.md](docs/DILCHAT_AUTHORIZATION_AND_LEAKAGE_AUDIT.md) | AUTHZ_SOUND_WITH_FINDINGS |
-| [DILCHAT_SCORE_SEPARATION_AUDIT.md](docs/DILCHAT_SCORE_SEPARATION_AUDIT.md) | ENFORCED_WITH_FINDINGS |
-| [DILCHAT_LIVING_COMPATIBILITY_SAFETY_AUDIT.md](docs/DILCHAT_LIVING_COMPATIBILITY_SAFETY_AUDIT.md) | NEEDS_SAFEGUARDS_BEFORE_PHASE_G |
+## Local development
 
-The audit added Decision-Log entries DEC-022…DEC-028 (fallback policy corrected; two new
-authorization controls).
+```bash
+# 1. Start a throwaway local PostgreSQL (dev only; not a production manifest).
+bash scripts/dev_db.sh
+export DILCHAT_DATABASE_URL='postgresql+asyncpg://postgres@/dilchat_dev?host=/tmp&port=5433'
+export DILCHAT_ENVIRONMENT=development
 
-## Proposed placement in the monorepo
+# 2. Apply migrations.
+alembic upgrade head
 
-DilChat follows the self-contained `products/<name>/` convention already
-established by `products/code-governance/`:
+# 3. Run the API.
+uvicorn ugence_dilchat.app:create_app --factory --port 8080
+# Health:    GET http://localhost:8080/v1/health
+# Readiness: GET http://localhost:8080/v1/readiness
+# OpenAPI:   http://localhost:8080/v1/openapi.json  (or `dilchat-openapi`)
+```
+
+## Environment variables
+
+See [`.env.example`](.env.example) for the full reference (all prefixed
+`DILCHAT_`). Key ones: `DILCHAT_ENVIRONMENT`, `DILCHAT_DATABASE_URL`,
+`DILCHAT_ACCESS_TOKEN_PRIVATE_KEY_PEM` (required in staging/production),
+`DILCHAT_ASTROLOGY_PROVIDER`, `DILCHAT_ENABLE_SWISS_EPHEMERIS`,
+`DILCHAT_SWISS_EPHEMERIS_MODE`.
+
+## Migrations
+
+```bash
+alembic upgrade head            # apply
+alembic downgrade base          # roll back
+alembic revision --autogenerate -m "message"   # new migration (review before commit)
+```
+
+## Tests
+
+```bash
+# Fast suite (SQLite in-memory; no server needed):
+pytest -m "not postgres"
+
+# Full suite incl. PostgreSQL migration test:
+export DILCHAT_TEST_DATABASE_URL='postgresql+asyncpg://postgres@/dilchat_test?host=/tmp&port=5433'
+pytest
+
+# Lint & types:
+ruff check src tests
+mypy src
+```
+
+Golden astrology fixtures under `tests/fixtures/` are **development validation
+only** (computed with Swiss Moshier mode) and are **not** evidence that the draft
+Guna rule pack is correct.
+
+## Layout
 
 ```
 products/dilchat/
-  README.md              # this file
-  docs/                  # the 10 design documents + OpenAPI
-  rules/                 # versioned Guna Milan rule packs (JSON)
-  # src/, tests/, examples/, pyproject.toml  -> added at implementation time
+  pyproject.toml  alembic.ini  .env.example
+  src/ugence_dilchat/   app.py config.py errors.py db.py base.py
+    api/ (routes)  services/  repositories/  infrastructure/ (orm)
+    security/  astrology/  audit/  jobs/  domain/
+  migrations/           Alembic env + versioned migrations
+  tests/                unit/ integration/ security/ fixtures/
+  scripts/              dev_db.sh
+  rules/                versioned Guna Milan rule pack (DRAFT, gated out)
+  docs/                 design + audit documents
 ```
-
-## Canonical technology decisions (see the Decision Log)
-
-Python 3.12+ · FastAPI · PostgreSQL 16 · Redis 7 · arq workers · Swiss
-Ephemeris (`pyswisseph`) with Moshier fallback · Lahiri sidereal ayanamsa ·
-self-managed auth (Argon2id + ES256 JWT + rotating refresh sessions) ·
-AIProvider port (default Anthropic Claude) · React Native mobile · Next.js web ·
-self-hosted geocoding/timezone. Modular monolith with 15 strongly isolated
-modules and three enforced privacy scopes (`PRIVATE_A`, `PRIVATE_B`, `SHARED`).
-
-## Reading order
-
-1. `DILCHAT_DECISION_LOG.md` (the canon)
-2. `DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`
-3. `DILCHAT_BACKEND_ARCHITECTURE.md`
-4. `DILCHAT_DATA_MODEL.md` + `DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md`
-5. `DILCHAT_ASTROLOGY_ENGINE_SPEC.md` + `rules/`
-6. `DILCHAT_API_SPEC.md` + `DILCHAT_AI_INTEGRATION_SPEC.md`
-7. `DILCHAT_TEST_AND_VALIDATION_PLAN.md`
-8. `DILCHAT_IMPLEMENTATION_ROADMAP.md`

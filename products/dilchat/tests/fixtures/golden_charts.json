@@ -1,0 +1,87 @@
+{
+  "_note": "DEV VALIDATION ONLY. Computed with pyswisseph Moshier mode (AGPL dev edition, arcminute analytical). NOT independently oracle-verified and NOT evidence the draft Guna rule pack is correct. Provider version pinned below.",
+  "provider_id": "swiss",
+  "provider_version": "pyswisseph-2.10.03",
+  "ephemeris_mode": "moshier",
+  "ayanamsa": "lahiri",
+  "cases": [
+    {
+      "label": "Mumbai, India",
+      "birth_date": "1990-05-15",
+      "birth_time_local": "14:30:00",
+      "iana_timezone": "Asia/Kolkata",
+      "utc_instant": "1990-05-15T09:00:00+00:00",
+      "moon_longitude": 271.893544,
+      "rashi_index": 9,
+      "rashi_name": "Capricorn",
+      "nakshatra_index": 20,
+      "nakshatra_name": "Uttara Ashadha",
+      "pada": 2
+    },
+    {
+      "label": "Delhi, India",
+      "birth_date": "1985-11-02",
+      "birth_time_local": "06:15:00",
+      "iana_timezone": "Asia/Kolkata",
+      "utc_instant": "1985-11-02T00:45:00+00:00",
+      "moon_longitude": 62.457095,
+      "rashi_index": 2,
+      "rashi_name": "Gemini",
+      "nakshatra_index": 4,
+      "nakshatra_name": "Mrigashira",
+      "pada": 3
+    },
+    {
+      "label": "Greenwich (UTC)",
+      "birth_date": "2000-01-01",
+      "birth_time_local": "00:00:00",
+      "iana_timezone": "UTC",
+      "utc_instant": "2000-01-01T00:00:00+00:00",
+      "moon_longitude": 193.440163,
+      "rashi_index": 6,
+      "rashi_name": "Libra",
+      "nakshatra_index": 14,
+      "nakshatra_name": "Swati",
+      "pada": 3
+    },
+    {
+      "label": "New York, USA",
+      "birth_date": "1975-07-20",
+      "birth_time_local": "23:45:00",
+      "iana_timezone": "America/New_York",
+      "utc_instant": "1975-07-21T03:45:00+00:00",
+      "moon_longitude": 250.201998,
+      "rashi_index": 8,
+      "rashi_name": "Sagittarius",
+      "nakshatra_index": 18,
+      "nakshatra_name": "Mula",
+      "pada": 4
+    },
+    {
+      "label": "London, UK",
+      "birth_date": "1965-03-21",
+      "birth_time_local": "12:00:00",
+      "iana_timezone": "Europe/London",
+      "utc_instant": "1965-03-21T11:00:00+00:00",
+      "moon_longitude": 206.904966,
+      "rashi_index": 6,
+      "rashi_name": "Libra",
+      "nakshatra_index": 15,
+      "nakshatra_name": "Vishakha",
+      "pada": 3
+    },
+    {
+      "label": "Chennai, India",
+      "birth_date": "2010-12-31",
+      "birth_time_local": "18:30:00",
+      "iana_timezone": "Asia/Kolkata",
+      "utc_instant": "2010-12-31T13:00:00+00:00",
+      "moon_longitude": 209.011731,
+      "rashi_index": 6,
+      "rashi_name": "Libra",
+      "nakshatra_index": 15,
+      "nakshatra_name": "Vishakha",
+      "pada": 3
+    }
+  ]
+}
