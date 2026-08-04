@@ -227,3 +227,64 @@ now on file) but changes **nothing** about executability: the pack remains `draf
 - `docs/DILCHAT_GUNA_RULE_TRACEABILITY_MATRIX.md` — per-rule → source mapping.
 - `docs/DILCHAT_GUNA_DOMAIN_REVIEW_PACKAGE.md` — reviewer package and sign-off template.
 - `docs/DILCHAT_ASTROLOGY_GUNA_AUTHORITY_GATE.md` — consolidated authority gate.
+
+---
+
+## Source-material availability gate (Guna Source Acquisition & Qualified Domain Adjudication phase)
+
+**Verdict: `SOURCE_MATERIAL_REQUIRED`.**
+
+This phase requires *actual source text*, not bibliographic metadata. In this
+isolated build environment **no source pages are available in a legally usable
+form**:
+
+- catalogue/bibliographic search worked and identified real editions (recorded in
+  `GUNA_SOURCE_MANIFEST.json`), but
+- Internet Archive **content** endpoints are HTTP 403-blocked (only listing pages
+  are reachable), and
+- there is **no** purchased copy, library-access copy, lawful archive copy, or
+  user-provided page image in this environment.
+
+Search snippets, uncorrected OCR, second-hand summaries, unsourced internet tables,
+AI-generated Sanskrit/translations, and different editions with uncertain pagination
+are **not** acceptable authority. Therefore, per the phase rules, **no rule is
+adjudicated** in this phase and every Koota / conflict / manual case remains at its
+prior honest `PENDING_DOMAIN_REVIEW` / `BLOCKED_DOMAIN_SOURCE` / `SOURCE_CONFLICT`
+status. Nothing is frozen; no reviewer is fabricated.
+
+### Local-source intake process (available now)
+
+`scripts/source_intake.py` records **sanitized provenance** for a lawful local copy
+**without** copying it into the repository and **without** leaking its path:
+computes SHA-256 + byte size, keeps only the file basename, rejects non-lawful
+access methods, and emits `freeze_status: ACQUIRED_PENDING_TEXT_VERIFICATION`
+(never `FROZEN`). Covered by `tests/unit/test_source_intake.py`.
+
+```bash
+python scripts/source_intake.py \
+  --file /path/to/lawful/copy.pdf \
+  --source-id MC-NORMATIVE \
+  --edition "Muhurta Chintamani, Girish Chand Sharma tr., Sagar Publications, 1996" \
+  --acquisition-method purchased_ebook \
+  --access-date YYYY-MM-DD
+```
+
+### Exact acquisition checklist (to lift the gate)
+
+1. **MC-NORMATIVE** — acquire a lawful copy of *Muhurta Chintamani* (Melapaka
+   Prakarana). Recommended: Girish Chand Sharma tr. (Sagar, 1996, English + Sanskrit)
+   **and** a Sanskrit normative reference (e.g. Haridas Sanskrit Series #185). Pin the
+   printing; run `source_intake.py`; record chapter/verse/page for each Melapaka rule.
+2. **RAMAN-ENGINEERING** — acquire *Muhurtha (Electional Astrology)*, B. V. Raman
+   (UBSPD 1993, ISBN 978-8185674681, or the MLBD reprint). Pin the printing (pagination
+   varies); capture the Marriage Adaptability chapter and every Ashtakoota/Kuta table.
+3. **BPHS-XREF** — acquire R. Santhanam tr. (Ranjan Publications, 1984,
+   ISBN 978-8188230600); use only the Naisargika (natural) friendship chapter.
+4. **KALAPRAKASIKA-XREF** — acquire N. P. Subramania Iyer tr. (Gyan, ISBN
+   9788121236591) only where a precise cited rule is needed; do not blend regionally.
+5. For each acquired source, run `source_intake.py`, then a **qualified Jyotisha +
+   Sanskrit reviewer** verifies the text/pagination before any source is set
+   `FROZEN_*` and any rule is adjudicated.
+
+Until steps 1–5 are complete, the Guna authority and rule-pack verdicts remain
+**BLOCKED** and no Guna engine may be implemented.

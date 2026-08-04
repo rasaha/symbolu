@@ -5,13 +5,16 @@
   "purpose": "Bibliographic edition record for the DilChat v1 Ashtakoota rule pack. Records candidate classical, engineering, and cross-reference editions with an honest acquisition/verification status. NO source below has been physically acquired, its pages read, or its content verified in this environment; therefore NONE is FROZEN and NO rule is domain-approved. No copyrighted book text or scan is committed.",
   "committed_evidence_policy": "Only bibliographic metadata, catalogue/archive identifiers, page/verse references, brief legally-compliant quotations (added at review time), reviewer notes, file hashes, and acquisition records may be committed. Full scans / OCR of copyrighted works must NOT be committed unless Ugence Labs holds clear redistribution rights.",
   "environment_limitation": "This phase ran in an isolated build environment. Bibliographic search engines were reachable and returned verifiable catalogue records (Open Library, Amazon/AbeBooks, publisher pages, Internet Archive listing pages). Internet Archive item CONTENT endpoints returned HTTP 403 through the environment proxy, so no scan page was opened, no pagination was verified, and no Melapaka Prakarana / Marriage Adaptability text was read here. Edition identity below is therefore CANDIDATE metadata pending human acquisition and reviewer access.",
+  "source_material_gate": "SOURCE_MATERIAL_REQUIRED — as of the Guna Source Acquisition & Qualified Domain Adjudication phase, no source pages are available in a legally usable form in this environment (bibliographic metadata only; Internet Archive content 403-blocked; no purchase/library/archive/user-provided pages). Per the phase gate, rule adjudication is NOT performed. A local-source intake tool (scripts/source_intake.py) exists to record sanitized provenance (SHA-256 + edition identity, no repo copy, no path leak) once a lawful copy is obtained. See DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md.",
   "source_status_legend": [
     "FROZEN_PRIMARY", "FROZEN_ENGINEERING", "FROZEN_CROSS_REFERENCE",
-    "ACQUIRED_PENDING_VERIFICATION", "EDITION_IDENTIFIED_NOT_ACQUIRED",
+    "ACQUIRED_PENDING_TEXT_VERIFICATION", "ACQUIRED_PENDING_VERIFICATION",
+    "EDITION_IDENTIFIED_NOT_ACQUIRED",
     "PENDING_ACQUISITION", "PENDING_DOMAIN_REVIEW", "REJECTED_SOURCE"
   ],
   "edition_identification_legend": {
     "EDITION_IDENTIFIED_NOT_ACQUIRED": "A specific, real, citable edition has been identified from catalogue metadata, but the physical/authorized-digital copy has NOT been acquired and its pages have NOT been opened or verified in this environment.",
+    "ACQUIRED_PENDING_TEXT_VERIFICATION": "A lawful copy is in hand and its provenance (SHA-256, edition identity, acquisition method/date) has been recorded via scripts/source_intake.py, but the relevant text/pagination has NOT yet been verified by a qualified reviewer. NOT frozen.",
     "ACQUIRED_PENDING_VERIFICATION": "A copy has been legally acquired and is in hand, but pagination / bibliographic identity / usability for rule adjudication is not yet confirmed by a qualified reviewer.",
     "FROZEN_ANY": "Edition known, relevant pages/verses accessible, pagination stable, bibliographic identity unambiguous, immutable checksum recorded, text usable for rule adjudication, and reviewer has confirmed usability."
   },
