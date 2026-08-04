@@ -1,0 +1,10 @@
+{
+  "schema": "image-metadata.v1",
+  "result": "NOT_EXECUTED",
+  "reason": "organization egress proxy denies container-registry blob CDNs (403); base image cannot be pulled, so the OCI image cannot be built/scanned here",
+  "ci_gated": true,
+  "daemon_available": true,
+  "image": "governance-studio-private-hosted:0.1.0",
+  "digest": null,
+  "base": "python:3.11-slim-bookworm (unpullable here)"
+}

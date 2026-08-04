@@ -1,0 +1,27 @@
+{
+  "gate": "GOVERNANCE_STUDIO_P3E prerequisite",
+  "results": {
+    "pr_1323_merged": true,
+    "p3d_verdicts_reconstruct": true,
+    "frontend_0_2_0": true,
+    "backend_api_0_1_0": true,
+    "contract_governance_studio_api_v1": true,
+    "awc_0_2_1": true,
+    "compiler_0_2_0": true,
+    "approved_operations_17": true,
+    "unapproved_operations_0": true,
+    "what_if_operations_9": true,
+    "plan_states_5": true,
+    "vitest_150": true,
+    "playwright_9": true,
+    "clean_build": true,
+    "openapi_sha_unchanged": true,
+    "platform_digest_unchanged": true,
+    "src_lib_tracking_effective": true,
+    "no_existing_p3e_branch_or_pr": true,
+    "working_tree_clean": true
+  },
+  "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+  "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+  "verdict": "PASS"
+}

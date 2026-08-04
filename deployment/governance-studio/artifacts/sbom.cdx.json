@@ -1,0 +1,93 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "governance-studio-private-hosted",
+      "version": "0.1.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "fastapi",
+      "version": "0.141.1",
+      "purl": "pkg:pypi/fastapi@0.141.1"
+    },
+    {
+      "type": "library",
+      "name": "starlette",
+      "version": "1.3.1",
+      "purl": "pkg:pypi/starlette@1.3.1"
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "version": "0.52.1",
+      "purl": "pkg:pypi/uvicorn@0.52.1"
+    },
+    {
+      "type": "library",
+      "name": "pydantic",
+      "version": "2.13.4",
+      "purl": "pkg:pypi/pydantic@2.13.4"
+    },
+    {
+      "type": "library",
+      "name": "argon2-cffi",
+      "version": "25.1.0",
+      "purl": "pkg:pypi/argon2-cffi@25.1.0"
+    },
+    {
+      "type": "library",
+      "name": "cffi",
+      "version": "2.1.1",
+      "purl": "pkg:pypi/cffi@2.1.1"
+    },
+    {
+      "type": "library",
+      "name": "@tanstack/react-query",
+      "version": "5.62.7",
+      "purl": "pkg:npm/@tanstack/react-query@5.62.7"
+    },
+    {
+      "type": "library",
+      "name": "clsx",
+      "version": "2.1.1",
+      "purl": "pkg:npm/clsx@2.1.1"
+    },
+    {
+      "type": "library",
+      "name": "lucide-react",
+      "version": "0.462.0",
+      "purl": "pkg:npm/lucide-react@0.462.0"
+    },
+    {
+      "type": "library",
+      "name": "react",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react@18.3.1"
+    },
+    {
+      "type": "library",
+      "name": "react-dom",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react-dom@18.3.1"
+    },
+    {
+      "type": "library",
+      "name": "react-router-dom",
+      "version": "6.28.0",
+      "purl": "pkg:npm/react-router-dom@6.28.0"
+    },
+    {
+      "type": "library",
+      "name": "zustand",
+      "version": "4.5.5",
+      "purl": "pkg:npm/zustand@4.5.5"
+    }
+  ],
+  "note": "source-derived SBOM; an image-derived SBOM binding to the final image digest is CI-gated (base-image egress denied in this environment)."
+}

@@ -1,0 +1,45 @@
+# Private reference deployment (P3E §21). Single hardened service, one TLS port.
+# Secrets and certificates are provided via an operator .env / mounted files — never
+# committed. Copy .env.example to .env and fill it in; keep .env out of version control.
+services:
+  governance-studio:
+    build:
+      context: ../..            # repository root
+      dockerfile: deployment/governance-studio/Dockerfile
+    image: governance-studio-private-hosted:0.1.0
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /var/run/ugence-studio
+    ports:
+      - "8443:8443"
+    environment:
+      UGENCE_STUDIO_DEPLOYMENT_MODE: production
+      UGENCE_STUDIO_USERNAME: ${UGENCE_STUDIO_USERNAME:?set in .env}
+      UGENCE_STUDIO_PASSWORD_HASH: ${UGENCE_STUDIO_PASSWORD_HASH:?generate with generate_password_hash}
+      UGENCE_STUDIO_ALLOWED_HOSTS: ${UGENCE_STUDIO_ALLOWED_HOSTS:?comma-separated hostnames}
+      UGENCE_STUDIO_TLS_CERT_FILE: /run/secrets/tls/server.crt
+      UGENCE_STUDIO_TLS_KEY_FILE: /run/secrets/tls/server.key
+    volumes:
+      # certificate material is mounted READ-ONLY; the private key is never baked in
+      - type: bind
+        source: ${UGENCE_STUDIO_TLS_DIR:?path to a directory containing server.crt and server.key}
+        target: /run/secrets/tls
+        read_only: true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "python", "/app/container-healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

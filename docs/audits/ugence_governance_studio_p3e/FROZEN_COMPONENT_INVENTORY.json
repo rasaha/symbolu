@@ -1,0 +1,17 @@
+{
+  "deployment_bundle": {"name": "governance-studio-private-hosted", "version": "0.1.0"},
+  "frozen_components": {
+    "frontend": {"version": "0.2.0", "packaged_as": "static build (dist) + build marker"},
+    "backend_api": {"version": "0.1.0", "contract": "governance_studio.api.v1", "packaged_as": "create_app() imported unmodified"},
+    "awc": {"version": "0.2.1"},
+    "compiler": {"version": "0.2.0"},
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036"
+  },
+  "synthetic_bundle": {
+    "scenario_ids": ["procurement", "customer_support", "cybersecurity_success", "cybersecurity_no_feasible_team"],
+    "manifest": "deployment/governance-studio/synthetic-scenarios-manifest.json",
+    "data_classification": "SYNTHETIC_DEMONSTRATION_ONLY"
+  },
+  "new_deployment_package": "governance_studio_deployment (wrapper only; changes no governance semantics)"
+}
