@@ -1,0 +1,14 @@
+{
+  "metrics": {
+    "cpu": 0.92,
+    "memory": 0.88,
+    "latency_p99": 0.81,
+    "error_rate": 0.2,
+    "queue_depth": 0.7
+  },
+  "current_replicas": 4,
+  "deploy_active": false,
+  "phase": "peak",
+  "recent_pod_restarts": 0,
+  "correlation_id": "example-001"
+}
