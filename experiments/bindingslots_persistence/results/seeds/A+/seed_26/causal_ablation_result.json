@@ -1,0 +1,8 @@
+{
+  "schema": "bindingslots_persistence/causal_ablation_result/v1",
+  "arm": "A+",
+  "seed": 26,
+  "step": 1200,
+  "ablation": {},
+  "aplus_same_seed_d96": null
+}

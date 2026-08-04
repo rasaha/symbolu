@@ -1,0 +1,40 @@
+{
+  "schema": "bindingslots_persistence/execution_ledger/v1",
+  "order": [
+    {
+      "arm": "A+",
+      "seed": 23,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_23"
+    },
+    {
+      "arm": "A+",
+      "seed": 24,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_24"
+    },
+    {
+      "arm": "A+",
+      "seed": 25,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_25"
+    },
+    {
+      "arm": "A+",
+      "seed": 26,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_26"
+    },
+    {
+      "arm": "A+",
+      "seed": 27,
+      "clean_stable": false,
+      "category": "REFERENCE",
+      "dir": "results/seeds/A+/seed_27"
+    }
+  ]
+}

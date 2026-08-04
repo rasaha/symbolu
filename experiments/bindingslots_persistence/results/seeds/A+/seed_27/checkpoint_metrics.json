@@ -1,0 +1,103 @@
+{
+  "schema": "bindingslots_persistence/checkpoint_metrics/v1",
+  "arm": "A+",
+  "seed": 27,
+  "checkpoints": [
+    {
+      "step": 0,
+      "needle_d96": 0.0,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 60,
+      "needle_d96": 0.025,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 120,
+      "needle_d96": 0.0,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 300,
+      "needle_d96": 0.0,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 600,
+      "needle_d96": 0.008333333333333333,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 700,
+      "needle_d96": 0.008333333333333333,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 900,
+      "needle_d96": 0.0,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    },
+    {
+      "step": 1200,
+      "needle_d96": 0.0,
+      "routing": {
+        "read_prob_on_highest_write_slot": null,
+        "rank_of_highest_write_slot_under_read": null,
+        "address_logit_margin": null,
+        "write_read_overlap": null,
+        "read_entropy": null,
+        "write_entropy": null
+      }
+    }
+  ]
+}
