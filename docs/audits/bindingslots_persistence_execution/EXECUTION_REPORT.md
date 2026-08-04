@@ -39,9 +39,11 @@ No candidate > R0's 2 clean-stable, and none ≥ 4/5 → **no selection**.
 
 ## Two failure families (the scientific result)
 
-The interventions **largely solved the addressing-decay problem** — O1R/H1/H2 retain correct-slot
-routing (prob 0.78–0.99 at step 1200) — yet clean-stable retrieval still failed, via **two distinct
-modes**:
+Several persistence interventions retained a **strong written-slot preference on the fixed routing
+diagnostic** after scaffold withdrawal — O1R/H1/H2 hold correct-slot probability 0.78–0.99 at step
+1200 (vs plain O1's decay to 0.17–0.25). This demonstrates that *diagnostic routing decay can be
+mitigated*, but it did **not** produce reliable, quality-preserving end-to-end retrieval across the
+evaluation distribution — clean-stable retrieval still failed, via **two distinct modes**:
 
 1. **Quality interference** — persistent supervision raises perplexity above the frozen 1.20×A+ gate:
    O1R s24/s25, H1 s25, H2 s25 (and R0 s25). Retrieval is fine; **quality** fails.
