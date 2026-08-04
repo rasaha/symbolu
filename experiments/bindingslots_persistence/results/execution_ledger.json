@@ -133,6 +133,13 @@
       "clean_stable": false,
       "category": "QUALITY_FAILED",
       "dir": "results/seeds/H2/seed_25"
+    },
+    {
+      "arm": "O1",
+      "seed": 23,
+      "clean_stable": true,
+      "category": "CLEAN_STABLE",
+      "dir": "results/seeds/O1/seed_23"
     }
   ]
 }
