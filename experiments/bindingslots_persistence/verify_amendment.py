@@ -88,11 +88,19 @@ def main() -> int:
     except AP.ProtocolError:
         chk(True, "")
 
-    # 8) NO training outputs / runner exists
-    sd = HERE / "results" / "seeds"
-    chk(not (sd.exists() and any(sd.iterdir())), "training-result files exist under results/seeds")
-    for banned in ("aggregate_classification.json", "selection_decision.json"):
-        chk(not (HERE / "results" / banned).exists(), f"training-outcome file exists: {banned}")
+    # 8) NO training outputs -- enforced ONLY in preregistration mode (see verifier note).
+    auth = HERE / "execution_authorization.json"
+    exec_mode = False
+    if auth.exists():
+        try:
+            exec_mode = json.loads(auth.read_text()).get("pr_1332_merge_commit") == "101951cb8bbccca32b6e3faa371bc675371dca89"
+        except Exception:
+            exec_mode = False
+    if not exec_mode:
+        sd = HERE / "results" / "seeds"
+        chk(not (sd.exists() and any(sd.iterdir())), "training-result files exist under results/seeds")
+        for banned in ("aggregate_classification.json", "selection_decision.json"):
+            chk(not (HERE / "results" / banned).exists(), f"training-outcome file exists: {banned}")
     # adaptive_plan must contain no training call
     apsrc = (HERE / "adaptive_plan.py").read_text()
     chk("run_arm" not in apsrc and "build_matched" not in apsrc and "backward()" not in apsrc,

@@ -23,7 +23,20 @@ FROZEN = json.loads((EXP / "frozen_reference_config.json").read_text())
 
 
 # ---- scope: no training / no results ----
+def _exec_mode():
+    auth = EXP / "execution_authorization.json"
+    if not auth.exists():
+        return False
+    try:
+        return json.loads(auth.read_text()).get("pr_1332_merge_commit") == "101951cb8bbccca32b6e3faa371bc675371dca89"
+    except Exception:
+        return False
+
+
 def test_no_training_result_files():
+    # preregistration-mode invariant only; execution-authorized mode permits committed evidence
+    if _exec_mode():
+        return
     sd = EXP / "results" / "seeds"
     assert not (sd.exists() and any(sd.iterdir()))
     for banned in ("aggregate_classification.json", "selection_decision.json"):

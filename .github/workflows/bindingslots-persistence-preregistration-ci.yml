@@ -48,15 +48,18 @@ jobs:
           print("step-700 non-interference proven")
           PY
 
-      - name: No training outputs exist
+      - name: No training outputs exist (preregistration mode only)
         run: |
           python - <<'PY'
-          import pathlib, sys
-          sd = pathlib.Path("experiments/bindingslots_persistence/results/seeds")
-          banned = [pathlib.Path("experiments/bindingslots_persistence/results/aggregate_classification.json"),
-                    pathlib.Path("experiments/bindingslots_persistence/results/selection_decision.json")]
+          import json, pathlib, sys
+          base = pathlib.Path("experiments/bindingslots_persistence")
+          auth = base/"execution_authorization.json"
+          if auth.exists() and json.loads(auth.read_text()).get("pr_1332_merge_commit") == "101951cb8bbccca32b6e3faa371bc675371dca89":
+              print("execution-authorized mode: training outputs permitted (validated by execution CI)"); sys.exit(0)
+          sd = base/"results"/"seeds"
+          banned = [base/"results"/"aggregate_classification.json", base/"results"/"selection_decision.json"]
           bad = (sd.exists() and any(sd.iterdir())) or any(b.exists() for b in banned)
-          print("FAIL: training outputs present" if bad else "no training outputs")
+          print("FAIL: training outputs present in preregistration mode" if bad else "no training outputs")
           sys.exit(1 if bad else 0)
           PY
 
