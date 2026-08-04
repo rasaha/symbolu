@@ -112,19 +112,23 @@ jobs:
           # (bearer tokens, private keys, or kubeconfig). Source is reviewed code and may
           # contain redaction-test literals by design, so only real credential *formats*
           # (private keys / kubeconfig blocks) are forbidden there — never a data secret.
-          bearer = re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}")
-          privkey = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+          bearer = re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}")   # tokens / authorization headers
+          privkey = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")
+          cert = re.compile(r"-----BEGIN CERTIFICATE-----")
           kubeconfig = re.compile(r"(?i)apiVersion:\s*v1[\s\S]*kind:\s*Config")
+          jwt = re.compile(r"eyJ[A-Za-z0-9_-]{6,}\.eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}")  # bare SA/JWT tokens
+          evidence_pats = (bearer, privkey, cert, kubeconfig, jwt)
+          source_pats = (privkey, cert, kubeconfig)  # credential *formats* never valid in source
           bad = []
           for p in root.glob("artifacts/shadow_harness_fixture/*"):
               t = p.read_text(errors="ignore")
-              for rx in (bearer, privkey, kubeconfig):
+              for rx in evidence_pats:
                   for m in rx.finditer(t):
                       if "<redacted>" not in m.group(0):
                           bad.append(f"evidence {p.name}: {m.group(0)[:24]}...")
           for p in root.glob("shadow_validation/**/*.py"):
               t = p.read_text(errors="ignore")
-              for rx in (privkey, kubeconfig):
+              for rx in source_pats:
                   if rx.search(t):
                       bad.append(f"source {p.name}: real credential format present")
           if bad:
