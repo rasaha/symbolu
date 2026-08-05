@@ -1,0 +1,271 @@
+{
+  "added_params": {
+    "000": 0,
+    "001": 131,
+    "010": 1041,
+    "011": 1172,
+    "100": 569,
+    "101": 700,
+    "110": 1610,
+    "111": 1741
+  },
+  "budget_sufficient": true,
+  "cell000_reference": {
+    "740": {
+      "T1": 0.9266666769981384,
+      "T3": 0.9200000166893005,
+      "T4_addr_null_excluded": 0.7733333110809326,
+      "T4_correct_latest": 0.5533333420753479
+    },
+    "741": {
+      "T1": 0.8999999761581421,
+      "T3": 0.9066666960716248,
+      "T4_addr_null_excluded": 0.6933333277702332,
+      "T4_correct_latest": 0.46666666865348816
+    },
+    "742": {
+      "T1": 0.8533333539962769,
+      "T3": 0.9066666960716248,
+      "T4_addr_null_excluded": 0.7400000095367432,
+      "T4_correct_latest": 0.54666668176651
+    }
+  },
+  "cells": [
+    "000",
+    "100",
+    "010",
+    "001",
+    "110",
+    "101",
+    "011",
+    "111"
+  ],
+  "determinism": {
+    "byte_identical": true,
+    "cell": "111",
+    "hash": "f26564ce19ef1cef4bc83508cdb4523f2e7b12f3aa94312b1b5beebd2fc71b85",
+    "seed": 740
+  },
+  "dev_mean_T4_null_inclusive": {
+    "000": 0.522222230831782,
+    "001": 0.5133333504199982,
+    "010": 0.5422222316265106,
+    "011": 0.5333333214124044,
+    "100": 0.5355555613835653,
+    "101": 0.5422222216924032,
+    "110": 0.5377777814865112,
+    "111": 0.5355555613835653
+  },
+  "dev_seeds": [
+    740,
+    741,
+    742
+  ],
+  "factor_activity_detail": {
+    "740:001:F3": {
+      "active": true,
+      "magnitude": 0.29431837797164917
+    },
+    "740:010:F2": {
+      "active": true,
+      "magnitude": 0.8429630994796753
+    },
+    "740:011:F2": {
+      "active": true,
+      "magnitude": 0.8377930521965027
+    },
+    "740:011:F3": {
+      "active": true,
+      "magnitude": 0.30658456683158875
+    },
+    "740:100:F1": {
+      "active": true,
+      "magnitude": 2.0270475298166275
+    },
+    "740:101:F1": {
+      "active": true,
+      "magnitude": 2.092345491051674
+    },
+    "740:101:F3": {
+      "active": true,
+      "magnitude": 0.3147291839122772
+    },
+    "740:110:F1": {
+      "active": true,
+      "magnitude": 1.9878964275121689
+    },
+    "740:110:F2": {
+      "active": true,
+      "magnitude": 0.7769457697868347
+    },
+    "740:111:F1": {
+      "active": true,
+      "magnitude": 2.056865409016609
+    },
+    "740:111:F2": {
+      "active": true,
+      "magnitude": 0.7707678079605103
+    },
+    "740:111:F3": {
+      "active": true,
+      "magnitude": 0.35251864790916443
+    },
+    "741:001:F3": {
+      "active": true,
+      "magnitude": 0.29534104466438293
+    },
+    "741:010:F2": {
+      "active": true,
+      "magnitude": 0.8532112836837769
+    },
+    "741:011:F2": {
+      "active": true,
+      "magnitude": 0.8500739336013794
+    },
+    "741:011:F3": {
+      "active": true,
+      "magnitude": 0.3004654049873352
+    },
+    "741:100:F1": {
+      "active": true,
+      "magnitude": 1.6388792917132378
+    },
+    "741:101:F1": {
+      "active": true,
+      "magnitude": 1.7060858309268951
+    },
+    "741:101:F3": {
+      "active": true,
+      "magnitude": 0.32280921936035156
+    },
+    "741:110:F1": {
+      "active": true,
+      "magnitude": 1.584609568119049
+    },
+    "741:110:F2": {
+      "active": true,
+      "magnitude": 0.7955430746078491
+    },
+    "741:111:F1": {
+      "active": true,
+      "magnitude": 1.6349826157093048
+    },
+    "741:111:F2": {
+      "active": true,
+      "magnitude": 0.7937082648277283
+    },
+    "741:111:F3": {
+      "active": true,
+      "magnitude": 0.2883123755455017
+    },
+    "742:001:F3": {
+      "active": true,
+      "magnitude": 0.31538891792297363
+    },
+    "742:010:F2": {
+      "active": true,
+      "magnitude": 0.8269542455673218
+    },
+    "742:011:F2": {
+      "active": true,
+      "magnitude": 0.8251296281814575
+    },
+    "742:011:F3": {
+      "active": true,
+      "magnitude": 0.32706835865974426
+    },
+    "742:100:F1": {
+      "active": true,
+      "magnitude": 3.761564813554287
+    },
+    "742:101:F1": {
+      "active": true,
+      "magnitude": 3.778418928384781
+    },
+    "742:101:F3": {
+      "active": true,
+      "magnitude": 0.3326164782047272
+    },
+    "742:110:F1": {
+      "active": true,
+      "magnitude": 3.6805571913719177
+    },
+    "742:110:F2": {
+      "active": true,
+      "magnitude": 0.8092052340507507
+    },
+    "742:111:F1": {
+      "active": true,
+      "magnitude": 3.686157025396824
+    },
+    "742:111:F2": {
+      "active": true,
+      "magnitude": 0.8076490163803101
+    },
+    "742:111:F3": {
+      "active": true,
+      "magnitude": 0.2802141308784485
+    }
+  },
+  "factor_activity_ok": true,
+  "leakage": {
+    "all_pass": true,
+    "eval_ids_unseen": {
+      "leaked_targets": 0,
+      "pass": true
+    },
+    "factor_no_table_import": {
+      "banned_hits": [],
+      "pass": true
+    },
+    "factor_scoring_no_oracle": {
+      "pass": true,
+      "problems": [],
+      "signature_ok": {
+        "forward": true,
+        "scores": true
+      }
+    },
+    "inherited_suite_pass": true,
+    "latest_heuristic_uninformative": {
+      "global_latest_heuristic_accuracy": 0.08,
+      "pass": true
+    },
+    "lexical_overlap_uninformative": {
+      "chance": 0.03125,
+      "lexical_overlap_accuracy": 0.04,
+      "pass": true
+    },
+    "no_answer_in_key": {
+      "keys_with_status_token": 0,
+      "pass": true
+    },
+    "no_exact_overlap": {
+      "max_shared_tokens": 0,
+      "pass": true
+    },
+    "no_status_in_query": {
+      "pass": true,
+      "queries_with_status_token": 0
+    },
+    "no_table_import": {
+      "banned_hits": [],
+      "pass": true
+    },
+    "pools_disjoint": {
+      "dev": 134,
+      "final": 124,
+      "pass": true,
+      "train": 522
+    }
+  },
+  "leakage_all_pass": true,
+  "oracle_equivariance": {
+    "null_invariant": true,
+    "pass": true,
+    "real_equivariant": true
+  },
+  "purpose": "correctness/determinism/factor-activity/leakage/budget ONLY; no tuning, no gate-setting",
+  "schema": "bindingslots_e1_3factor/dev/v1",
+  "wall_clock_sec": 309.4
+}
