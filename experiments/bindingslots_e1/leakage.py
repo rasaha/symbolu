@@ -97,17 +97,17 @@ def check_lexical_overlap_uninformative(eps):
 
 
 def check_no_table_import():
-    """E1/B0 ordinary inference imports no external ephemeral table."""
-    import models
-    import engine
-    srcs = []
-    for m in (models, engine):
-        try:
-            srcs.append(open(m.__file__).read())
-        except Exception:
-            pass
+    """E1/B0 ordinary inference imports no external ephemeral table. Scans source text by path (no
+    import) so it runs in a torch-free environment."""
+    import pathlib
+    here = pathlib.Path(__file__).resolve().parent
     banned = ("ephemeral_table", "EphemeralTable", "v100_table", "external_fallback")
-    hit = [b for s in srcs for b in banned if b in s]
+    hit = []
+    for fn in ("models.py", "engine.py"):
+        p = here / fn
+        if p.exists():
+            s = p.read_text()
+            hit += [f"{fn}:{b}" for b in banned if b in s]
     return {"pass": not hit, "banned_hits": hit}
 
 
