@@ -1,0 +1,78 @@
+name: bindingslots-addr-gen-ci
+
+# Torch-free CI for the address-generalization / gradient-isolation phase: gate/futility/verdict
+# tests, template-separation/leakage check, and (when committed) verdict + KDA-blocked invariants.
+# Does not retrain (the arms require torch and are produced offline).
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_address_generalization/**'
+      - 'docs/audits/bindingslots_address_generalization/**'
+      - '.github/workflows/bindingslots-addr-gen-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_address_generalization/**'
+      - '.github/workflows/bindingslots-addr-gen-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  addr-gen-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Torch-free gate/futility/verdict tests
+        run: python experiments/bindingslots_address_generalization/tests/test_ag_classify.py
+
+      - name: Instrumentation tests (RESOURCE_BLOCKED without torch -> green)
+        run: python experiments/bindingslots_address_generalization/tests/test_ag_impl.py
+
+      - name: Query-template separation (no leakage)
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          base = pathlib.Path("experiments/bindingslots_address_generalization")
+          sys.path.insert(0, str(base))
+          from ag_meta import QUERY_TEMPLATES
+          tr = set(map(tuple, QUERY_TEMPLATES["train"])) | set(map(tuple, QUERY_TEMPLATES["dev"]))
+          te = set(map(tuple, QUERY_TEMPLATES["test"]))
+          assert te.isdisjoint(tr), "eval/test template leaked into training"
+          assert ("the","code","for","ENT","is") in te
+          reg = json.loads((base/"seed_registry.json").read_text())
+          assert reg["phase_seeds"] == [28,29,30,31,32]
+          print("templates disjoint; seeds 28-32 OK")
+          PY
+
+      - name: Verdict + KDA-blocked invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_address_generalization/results/aggregate_verdict.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              allowed = {"JOINT_BINDINGSLOTS_INTERVENTION_CANDIDATE_SELECTED",
+                "READ_ADDRESS_GENERALIZATION_CANDIDATE_SELECTED","ROUTING_GRADIENT_ISOLATION_CANDIDATE_SELECTED",
+                "BOTH_COMPONENTS_PASS_JOINT_ARM_NOT_RUN","NO_BINDINGSLOTS_INTERVENTION_SELECTED",
+                "BINDINGSLOTS_INTERVENTION_RESULTS_INCONCLUSIVE","BINDINGSLOTS_INTERVENTION_PROTOCOL_VIOLATED",
+                "BINDINGSLOTS_INTERVENTION_INTEGRITY_FAILED","BINDINGSLOTS_INTERVENTION_RESOURCE_BLOCKED"}
+              assert d["primary_verdict"] in allowed, d["primary_verdict"]
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED"
+              assert d["ready_for_kda_validation"] is False
+              print("verdict:", d["primary_verdict"], "| KDA blocked")
+          else:
+              print("no verdict yet")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

@@ -1,0 +1,142 @@
+{
+  "schema": "bindingslots_address_generalization/aggregate_conclusion/v1",
+  "primary_verdict": "NO_BINDINGSLOTS_INTERVENTION_SELECTED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "independent_confirmation_required": false,
+  "ready_for_kda_validation": false,
+  "seeds": [
+    28,
+    29,
+    30,
+    31,
+    32
+  ],
+  "a1": {
+    "pass": false,
+    "conditions": {
+      "incomplete": true
+    },
+    "rows": [
+      {
+        "arm": "A1",
+        "seed": 28,
+        "quality_qualified": true,
+        "clean_stable": false,
+        "eval_prob": 0.2620331645011902,
+        "eval_top1": 0.59375,
+        "ordinary_needle": 0.025,
+        "oracle_needle": 0.9833333333333333,
+        "prob_delta_vs_b0": -0.5619134902954102,
+        "top1_delta_vs_b0": -0.2541666626930237,
+        "approaches_oracle": false,
+        "needle_noninf_vs_b0": false,
+        "prob_noninf_vs_b0": false,
+        "wak_cos_teacher_window": -0.2714946025314973,
+        "b0_wak_cos_teacher_window": 0.05051036340356249,
+        "g1_negative_cosine_updates": 0
+      },
+      {
+        "arm": "A1",
+        "seed": 29,
+        "quality_qualified": true,
+        "clean_stable": false,
+        "eval_prob": 0.17257219552993774,
+        "eval_top1": 0.47083333134651184,
+        "ordinary_needle": 0.0,
+        "oracle_needle": 1.0,
+        "prob_delta_vs_b0": -0.18709596991539001,
+        "top1_delta_vs_b0": 0.004166662693023682,
+        "approaches_oracle": false,
+        "needle_noninf_vs_b0": true,
+        "prob_noninf_vs_b0": false,
+        "wak_cos_teacher_window": 0.023194140412380243,
+        "b0_wak_cos_teacher_window": 0.2506324267227239,
+        "g1_negative_cosine_updates": 0
+      }
+    ]
+  },
+  "g1": {
+    "pass": false,
+    "conditions": {
+      "incomplete": true
+    },
+    "rows": [
+      {
+        "arm": "G1",
+        "seed": 28,
+        "quality_qualified": true,
+        "clean_stable": true,
+        "eval_prob": 0.7301401495933533,
+        "eval_top1": 0.8854166865348816,
+        "ordinary_needle": 0.9833333333333333,
+        "oracle_needle": 0.9833333333333333,
+        "prob_delta_vs_b0": -0.09380650520324707,
+        "top1_delta_vs_b0": 0.03750002384185791,
+        "approaches_oracle": true,
+        "needle_noninf_vs_b0": true,
+        "prob_noninf_vs_b0": false,
+        "wak_cos_teacher_window": -0.0009569558967991808,
+        "b0_wak_cos_teacher_window": 0.05051036340356249,
+        "g1_negative_cosine_updates": 444
+      },
+      {
+        "arm": "G1",
+        "seed": 29,
+        "quality_qualified": true,
+        "clean_stable": false,
+        "eval_prob": 0.49978458881378174,
+        "eval_top1": 0.5791666507720947,
+        "ordinary_needle": 0.0,
+        "oracle_needle": 1.0,
+        "prob_delta_vs_b0": 0.14011642336845398,
+        "top1_delta_vs_b0": 0.11249998211860657,
+        "approaches_oracle": false,
+        "needle_noninf_vs_b0": true,
+        "prob_noninf_vs_b0": true,
+        "wak_cos_teacher_window": 0.03155355745428721,
+        "b0_wak_cos_teacher_window": 0.2506324267227239,
+        "g1_negative_cosine_updates": 474
+      },
+      {
+        "arm": "G1",
+        "seed": 30,
+        "quality_qualified": true,
+        "clean_stable": false,
+        "eval_prob": 0.011816540732979774,
+        "eval_top1": 0.04374999925494194,
+        "ordinary_needle": 0.0,
+        "oracle_needle": 0.7916666666666666,
+        "prob_delta_vs_b0": -0.4971375670284033,
+        "top1_delta_vs_b0": -0.5791666395962238,
+        "approaches_oracle": false,
+        "needle_noninf_vs_b0": true,
+        "prob_noninf_vs_b0": false,
+        "wak_cos_teacher_window": 0.09578027983795752,
+        "b0_wak_cos_teacher_window": 0.039638685355258746,
+        "g1_negative_cosine_updates": 508
+      }
+    ]
+  },
+  "ag": {
+    "ran": false,
+    "pass": false,
+    "conditions": {},
+    "rows": []
+  },
+  "leakage_ok": true,
+  "frozen_thresholds": {
+    "QUALITY_RATIO": 1.2,
+    "MATERIAL_PROB_DELTA": 0.15,
+    "TOP1_DELTA": 0.15,
+    "APPROACH_ORACLE_RATIO": 0.8,
+    "G1_CONFLICT_MAX_COS": -0.02,
+    "G1_CONFLICT_REDUCE_FRAC": 0.5,
+    "NONINF_NEEDLE": 0.05,
+    "NONINF_PROB": 0.05,
+    "OTHER_GROUP_CONFLICT": -0.1,
+    "NEED": 4,
+    "NSEEDS": 5
+  },
+  "next_phase_mapping": "controlled intervention redesign based on the failed mechanism gates",
+  "scope": "intervention-development only; candidates require independent confirmation; KDA blocked"
+}
