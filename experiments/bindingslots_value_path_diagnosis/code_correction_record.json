@@ -1,0 +1,38 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/code_correction_record/v1",
+  "title": "Authorized spec-fidelity correction to the value-path diagnosis classifier",
+  "authorization": "explicit user decision: 'Documented spec-fidelity correction (recommended)'",
+  "authorized_after_seeing": "the H2 seed 23 (and R0 seed 23) reproduced diagnostics, which exposed the divergence",
+  "file": "experiments/bindingslots_value_path_diagnosis/diagnosis_classify.py",
+  "before_sha256": "db79114f7f928b684c52013439b058080c79adc2c400b583adec5b1d453c3db7",
+  "after_sha256": "53456bf129a2ec0a92f5865a6418c761aa794ecf82ff1c312d538b0cf8967551",
+  "before_commit": "71fdcc84",
+  "trigger": {
+    "seed": "H2 s23 (confirmed on R0 s23)",
+    "observation": "the A2 linear probe reads the collapsed query-time slot at ~chance (H2 s23 query-decode 0.062), yet the oracle bypasses prove the value is functionally recoverable (A4a=1.0, A4b=1.0) and the oracle correct-slot address fully restores retrieval (A3=1.0).",
+    "problem": "the committed classifier gated ADDRESS/READ/RESIDUAL rules on A2 LINEAR decodability, so it would have classified an unambiguous address-distribution failure as VALUE_PATH_NOT_LOCALIZED, contradicting the spec's own interpretation."
+  },
+  "spec_basis": [
+    "§9: a linear-probe failure must NOT be claimed as proof of total information absence",
+    "§10: 'oracle address restores retrieval -> evaluation-time address distribution failed'",
+    "§11 A4a: the direct query-time read tests whether the ordinary read distribution/aggregation prevents use of a STILL-VALID target-slot value"
+  ],
+  "change": {
+    "what": "operationalize 'query-time slot remains decodable/recoverable' (used by ADDRESS_DISTRIBUTION_FAILED, READ_AGGREGATION_FAILED, RESIDUAL_OR_DECODER_UTILIZATION_FAILED) as query_recoverable = (A4a direct-read recovers) OR (A2 query linearly decodable). Linear decodability is sufficient but not necessary.",
+    "unchanged": [
+      "all frozen thresholds (DECODABLE_MIN, MATERIAL_DROP, RETRIEVAL_PRESENT_MIN, RETRIEVAL_FAILS_MAX, RECOVER_MIN, CONFLICT_COS, CONTROL_GAP) are IDENTICAL",
+      "STORAGE_VALUE_DEGRADED keeps the explicit '(linearly) decodable' A2 wording of §14",
+      "the quality (gradient-conflict) rules are unchanged",
+      "the A2 linear-decodability profile is still computed and reported as supporting evidence"
+    ],
+    "before_rule": "if query_linearly_decodable and ordinary_fails and oracle_address_recovers: ADDRESS_DISTRIBUTION_FAILED (and analogously for READ/RESIDUAL)",
+    "after_rule": "if query_recoverable and ordinary_fails and oracle_address_recovers: ADDRESS_DISTRIBUTION_FAILED (and analogously for READ/RESIDUAL); query_recoverable = A4a-recovers OR A2-linearly-decodable"
+  },
+  "integrity": {
+    "is_result_tuning": false,
+    "why_not": "the change replaces a mis-operationalization with the spec's own functional definition; it was authorized, it does not alter any threshold, and it does not select among competing outcomes to obtain a desired verdict. NOT_LOCALIZED remains reachable and is unit-tested (test_not_localized_when_neither_linear_nor_functional_recoverable).",
+    "reproduction_unaffected": "this is a classifier-only change; the reproduced training runs, snapshots, captured tensors, and reproduction gate are untouched",
+    "tests_added": ["test_address_failed_via_functional_recoverability_not_linear_probe",
+                    "test_not_localized_when_neither_linear_nor_functional_recoverable"]
+  }
+}

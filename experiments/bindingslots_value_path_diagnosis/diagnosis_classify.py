@@ -42,34 +42,43 @@ def value_path_diagnosis(m):
     if nb >= RETRIEVAL_PRESENT_MIN:
         return "NOT_APPLICABLE_RETRIEVAL_PRESENT", {"needle_baseline": nb,
                                                     "reason": "ordinary retrieval present"}
-    post_dec = m["postwrite_decodable"] >= DECODABLE_MIN
-    query_dec = m["query_decodable"] >= DECODABLE_MIN
-    query_lost = (m["postwrite_decodable"] - m["query_decodable"]) >= MATERIAL_DROP
+    post_lin_dec = m["postwrite_decodable"] >= DECODABLE_MIN     # A2 linear (STORAGE uses this)
+    query_lin_dec = m["query_decodable"] >= DECODABLE_MIN        # A2 linear
+    query_lin_lost = (m["postwrite_decodable"] - m["query_decodable"]) >= MATERIAL_DROP
     ordinary_fails = nb <= RETRIEVAL_FAILS_MAX
-    addr_rec = m["oracle_address_needle"] >= RECOVER_MIN
-    read_rec = m["oracle_read_query_needle"] >= RECOVER_MIN
-    post_rec = m["oracle_postwrite_needle"] >= RECOVER_MIN
+    addr_rec = m["oracle_address_needle"] >= RECOVER_MIN         # A3
+    read_rec = m["oracle_read_query_needle"] >= RECOVER_MIN      # A4a
+    post_rec = m["oracle_postwrite_needle"] >= RECOVER_MIN       # A4b
+    # AUTHORIZED SPEC-FIDELITY CORRECTION (see code_correction_record.json): the §14 ADDRESS/READ/
+    # RESIDUAL rules require the "query-time slot [to] remain decodable". §9 warns a linear-probe
+    # failure is NOT proof of information absence, and §11 A4a defines the functional test of whether
+    # the still-valid target-slot value is usable. So "recoverable" is operationalized functionally:
+    # the query-time slot value is recoverable if reading it directly recovers retrieval (A4a) OR it
+    # is linearly decodable (A2). Linear decodability is sufficient but not necessary. STORAGE keeps
+    # the explicit "linearly decodable" wording (A2). Frozen thresholds are unchanged.
+    query_recoverable = read_rec or query_lin_dec
     reasons = {"needle_baseline": nb, "postwrite_decodable": m["postwrite_decodable"],
-               "query_decodable": m["query_decodable"], "post_dec": post_dec, "query_dec": query_dec,
-               "query_decodability_lost": query_lost, "ordinary_retrieval_fails": ordinary_fails,
-               "oracle_address_recovers": addr_rec, "oracle_read_query_recovers": read_rec,
-               "oracle_postwrite_recovers": post_rec}
+               "query_decodable": m["query_decodable"], "postwrite_linearly_decodable": post_lin_dec,
+               "query_linearly_decodable": query_lin_dec, "query_recoverable_functional_or_linear":
+               query_recoverable, "query_linear_decodability_lost": query_lin_lost,
+               "ordinary_retrieval_fails": ordinary_fails, "oracle_address_recovers": addr_rec,
+               "oracle_read_query_recovers": read_rec, "oracle_postwrite_recovers": post_rec}
 
-    # STORAGE_VALUE_DEGRADED: post-write decodable, query decodability materially lost, restoring
-    # the post-write value recovers retrieval.
-    if post_dec and query_lost and post_rec:
+    # STORAGE_VALUE_DEGRADED (§14 says "linearly decodable"): post-write linearly decodable, query
+    # linearly loses decodability, restoring the post-write value recovers retrieval.
+    if post_lin_dec and query_lin_lost and post_rec:
         return "STORAGE_VALUE_DEGRADED", reasons
-    # ADDRESS_DISTRIBUTION_FAILED: query slot still decodable, ordinary retrieval fails, oracle
+    # ADDRESS_DISTRIBUTION_FAILED: query slot remains recoverable, ordinary retrieval fails, oracle
     # one-hot address restores retrieval.
-    if query_dec and ordinary_fails and addr_rec:
+    if query_recoverable and ordinary_fails and addr_rec:
         return "ADDRESS_DISTRIBUTION_FAILED", reasons
-    # READ_AGGREGATION_FAILED: query slot decodable, oracle address does NOT recover, but the direct
-    # query-time slot read recovers.
-    if query_dec and (not addr_rec) and read_rec:
+    # READ_AGGREGATION_FAILED: query slot recoverable, oracle address does NOT recover, but the
+    # direct query-time slot read recovers.
+    if query_recoverable and (not addr_rec) and read_rec:
         return "READ_AGGREGATION_FAILED", reasons
     # RESIDUAL_OR_DECODER_UTILIZATION_FAILED: target-slot info recoverable, the oracle memory
     # contribution is delivered to the residual (A4b applied), yet retrieval still does not recover.
-    if (post_dec or query_dec) and (not post_rec) and (not addr_rec) and (not read_rec):
+    if (post_lin_dec or query_recoverable) and (not post_rec) and (not addr_rec) and (not read_rec):
         return "RESIDUAL_OR_DECODER_UTILIZATION_FAILED", reasons
     return "VALUE_PATH_NOT_LOCALIZED", reasons
 

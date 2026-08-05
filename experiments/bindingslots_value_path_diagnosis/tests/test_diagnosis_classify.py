@@ -46,6 +46,26 @@ def test_residual_or_decoder_utilization_failed():
     assert c == "RESIDUAL_OR_DECODER_UTILIZATION_FAILED"
 
 
+def test_address_failed_via_functional_recoverability_not_linear_probe():
+    # H2 s23 case: query slot NOT linearly decodable (probe at chance) but functionally recoverable
+    # (A4a=1.0) and oracle address restores (A3=1.0). Must classify ADDRESS_DISTRIBUTION_FAILED,
+    # not VALUE_PATH_NOT_LOCALIZED (authorized spec-fidelity correction; §9/§10/§11).
+    c, r = DC.value_path_diagnosis(_m(postwrite_decodable=0.06, query_decodable=0.06,
+                                      oracle_address_needle=1.0, oracle_read_query_needle=1.0,
+                                      oracle_postwrite_needle=1.0))
+    assert c == "ADDRESS_DISTRIBUTION_FAILED"
+    assert r["query_recoverable_functional_or_linear"] is True
+    assert r["query_linearly_decodable"] is False
+
+
+def test_not_localized_when_neither_linear_nor_functional_recoverable():
+    # nothing decodable and no oracle recovers -> honest NOT_LOCALIZED
+    c, _ = DC.value_path_diagnosis(_m(postwrite_decodable=0.06, query_decodable=0.06,
+                                      oracle_address_needle=0.0, oracle_read_query_needle=0.0,
+                                      oracle_postwrite_needle=0.0))
+    assert c == "VALUE_PATH_NOT_LOCALIZED"
+
+
 def test_retrieval_present_not_applicable():
     c, _ = DC.value_path_diagnosis(_m(needle_baseline=0.8))
     assert c == "NOT_APPLICABLE_RETRIEVAL_PRESENT"
