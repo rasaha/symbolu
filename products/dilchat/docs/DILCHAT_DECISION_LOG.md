@@ -820,3 +820,58 @@ ASTRONOMY_VALIDATION_PASS_WITH_BOUNDARY_CONDITIONS /
 GUNA_AUTHORITY_VALIDATION_BLOCKED / RULE_PACK_BLOCKED. Next action: obtain frozen
 source editions + qualified reviewer input; do not implement the Guna engine. See
 `DILCHAT_GUNA_SOURCE_ACQUISITION_REPORT.md`.
+
+## DEC-048 — V1 hidden Guna structural prior combined with Moon receptivity and conversation evidence
+**Status:** Accepted (V1 product direction) · **Requires founder approval → APPROVED** · **[Product]** · **[DilChat proprietary interpretation]**
+
+The founder approved DilChat's **V1 AI Assist personalization direction** as a
+**separate proprietary track** from the classical-authority track (which stays
+blocked — DEC-042…DEC-047 unchanged). Key points: (1) the internal Guna Milan
+pattern logic stays **proprietary and hidden**; (2) **no user-visible** Guna
+score/Koota/Dosha/source-table/weights (`USER_VISIBLE_GUNA_SCORE_DISABLED`); (3) no
+external Jyotisha/Sanskrit reviewer is required for this V1 personalization model
+(distinct from the classical track's still-blocking reviewer requirement); (4)
+Guna-derived signals are **one internal input** with a **strong cold-start role**;
+(5) the current relative Moon movement supplies a **separate, temporary**
+receptivity signal (never a claim of actual emotion); (6) Guna and Moon are
+**composed, not competing**; (7) the engine also uses conversation context, prior
+shared conversations, explicit interests/boundaries, inferred preferences,
+reaction to prior suggestions, and communication patterns; (8) **observed
+conversation behavior progressively dominates**.
+
+The structural prior is weighted **60 %** at eligible cold start, declining to a
+**30 % floor** driven by **qualified evidence** (never elapsed time or raw message
+count). Precedence (highest first): safety → explicit boundary → repeated observed
+behavior → explicit interest → recent shared-conversation context → Moon
+receptivity → Guna prior. Four independently versioned components:
+`structural_relationship_prior_v1`, `moon_receptivity_context_v1`,
+`conversation_evidence_model_v1`, `ai_assist_guidance_fusion_v1` (LLM wording last).
+
+New documentation statuses (documentation only, **not** runtime enablement):
+`CLASSICAL_GUNA_AUTHORITY_VALIDATION_BLOCKED`, `CLASSICAL_RULE_PACK_NON_EXECUTABLE`,
+`HEURISTIC_GUNA_STRUCTURAL_PRIOR_V1_APPROVED_FOR_REQUIREMENTS`,
+`USER_VISIBLE_GUNA_SCORE_DISABLED`. **No implementation, no API/model/migration, no
+runtime rule pack** is added or enabled. Sequencing: Mobile Phase 2 → secure shared
+chat (Phase 3) → conversation evidence (4A) → Guna prior (4B) → Moon context (4C) →
+AI Assist overlay (4D); AI Assist must not be built before secure chat and privacy
+boundaries exist. See `DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`,
+`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`,
+`DILCHAT_AI_ASSIST_CHAT_OVERLAY_SPEC.md`,
+`DILCHAT_AI_ASSIST_PRIVACY_PROVENANCE_AND_SAFETY.md`,
+`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`,
+`DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md`, and
+`DILCHAT_AI_ASSIST_FOUNDER_DECISIONS.md`.
+
+## OQ-16 — AI Assist implementation choices (17 open questions)
+**Status:** Open · **Requires founder/engineering decision**
+
+Seventeen AI Assist implementation choices are surfaced without being decided
+(OQ-AIA-1…OQ-AIA-17): exact 60→30 decay curve; evidence-event minimum/quality
+thresholds; topic-confidence thresholds; max Moon modifier magnitude; Moon
+expiration period; topic-taxonomy ownership; per-source personalization controls;
+inferred-preference retention/deletion; recommendation-feedback UI; whether users
+see broad provenance labels; LLM provider + data-retention; shared-chat retention;
+abuse/coercion safeguards; sensitive-language localization; recommendation-quality
+metrics; rollback/feature-flag strategy; whether "Avoid Topics" is renamed
+"Approach Carefully." See `DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md` (Open
+questions).
