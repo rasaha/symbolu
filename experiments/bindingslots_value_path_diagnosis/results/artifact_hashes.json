@@ -1,0 +1,16 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/artifact_hashes/v1",
+  "sha256": {
+    "aggregate_conclusion.json": "1f175b5eb7b2b5392dbcaa8d27fc7aed2dcc08ccfda0c5f266fd5a5c84cad8da",
+    "gradient_alignment.json": "e9c4b016d95560a995dd4c9452e90b11c870836e4099c0cdc78732e4fa30734a",
+    "gradient_norms.json": "bb7102261d62530d1acfb96ace3ba8965d053b9225ed96e313cb647a679b5ceb",
+    "integrity_report.json": "637e2d2d8c1a99a0bacf5fe3a039a03f90b9250a667036036aeaae0244a9838c",
+    "linear_probe_results.json": "51bad169574855891c23ee75bbb69f635e1cc2325e343eb088bcf1f595044b8b",
+    "oracle_address_results.json": "4a4317bff79d6ab53f8fa163ac48dfdcb77153452c11554e525d8f9e4a821f15",
+    "oracle_value_results.json": "b1121d9b9908ecc2f97b4b9921b276ebb79f3b336725d68be83885cd5da1cde2",
+    "per_seed_diagnosis.json": "93050ed02a1081156a50db91904cfc2a080e45e3cc6f508664479d59045ad6dd",
+    "reproduction_results.json": "57cb958cef1c2517a027f34b81f3f03c3f9859d5754cea75b0879713e292862e",
+    "slot_value_integrity.json": "88d135b68e583634cd0e042291175c5780d26729b46e570c2574b6eaf3974093",
+    "tensor_manifest.json": "3710581da27e64bbe5be3d84e47e374ced0b8865385b79b63f5e6a165e4e2e81"
+  }
+}

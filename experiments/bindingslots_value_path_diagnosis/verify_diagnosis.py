@@ -64,16 +64,17 @@ def main() -> int:
     # No fusion-gate metric is REPORTED and no readiness is EMITTED. These are value-level checks over
     # the produced results artifacts (prose prohibitions in the prereg legitimately name both tokens,
     # so grepping text would false-positive; we inspect parsed JSON keys/values instead).
-    def _walk(o):
+    def _walk_pairs(o):
+        # yield (key, value) for every dict entry, and ('', leaf) for list/scalar leaves
         if isinstance(o, dict):
             for k, v in o.items():
-                yield ("key", str(k))
-                yield from _walk(v)
+                yield (str(k), v)
+                yield from _walk_pairs(v)
         elif isinstance(o, list):
             for v in o:
-                yield from _walk(v)
+                yield from _walk_pairs(v)
         else:
-            yield ("val", o)
+            yield ("", o)
 
     leak = []
     for f in sorted((HERE / "results").glob("*.json")) if (HERE / "results").exists() else []:
@@ -81,10 +82,13 @@ def main() -> int:
             obj = json.loads(f.read_text())
         except Exception:
             continue
-        for kind, item in _walk(obj):
-            if kind == "key" and "fusion_gate" in item.lower():
-                leak.append(f"fusion-gate metric key in {f.name}: {item}")
-            if isinstance(item, str) and item == "READY_FOR_KDA_VALIDATION":
+        for k, v in _walk_pairs(obj):
+            # A fusion-gate METRIC is a key naming a fusion gate whose value is a number. A boolean
+            # declaration that there is NO fusion gate (e.g. no_learned_read_or_fusion_gate: true) is
+            # explicitly allowed.
+            if "fusion_gate" in k.lower() and isinstance(v, (int, float)) and not isinstance(v, bool):
+                leak.append(f"fusion-gate metric reported in {f.name}: {k}={v}")
+            if isinstance(v, str) and v == "READY_FOR_KDA_VALIDATION":
                 leak.append(f"READY_FOR_KDA emitted as a value in {f.name}")
     ok(len(leak) == 0, "no_ready_for_kda_no_fusion_gate_metric")
 
