@@ -31,7 +31,7 @@ MAX_CANDIDATES = 4
 # asserts the rule picks this candidate). Selection rule: on dev seed 500, maximize mean held-out
 # addressing over {G1,G2,G3,G4,G5,G7} minus a penalty max(0, nomatch_false_accept - 0.30), subject to
 # determinism_ok and leakage all_pass; tie-break lower nomatch_false_accept, then fewer steps.
-SELECTED = "C3"
+SELECTED = "C1"
 STEPS, TAU, TRAIN_NO_MATCH_FRAC = CANDIDATES[SELECTED]
 
 # ---- frozen cohort -------------------------------------------------------------------

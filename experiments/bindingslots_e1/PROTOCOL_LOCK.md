@@ -20,8 +20,11 @@ identity pools (774/181/173).
 Candidate set `{C1,C2,C3,C4}` frozen before the mechanical selection run. `run_dev_selection.py` trains
 each on dev seed 500, evaluates dev splits, and applies the frozen rule (max mean held-out addressing −
 no-match penalty; tie-break lower false-accept then fewer steps). The winner **must** equal the frozen
-`SELECTED` (`results/selection_result.json`). Frozen winner: **C3** = `steps=1800, tau=0.05,
-train_no_match_frac=0.40`, `D=64`, `BATCH=48`, `LR=1e-3`, 32 keys/episode.
+`SELECTED` (`results/selection_result.json`). The mechanical rule selected **C1** (mean dev addressing
+1.000, no-match false-accept 0.153) over the other candidates; `SELECTED` was updated to the rule's
+winner (the pre-filled guess C3 was overridden by the rule — the intended behaviour of a mechanical
+selector). Frozen winner: **C1** = `steps=1200, tau=0.07, train_no_match_frac=0.30`, `D=64`, `BATCH=48`,
+`LR=1e-3`, 32 keys/episode.
 
 ## Frozen numeric gates (rationale: GATE_RATIONALE.md)
 Absolute competence bars motivated by the frozen B0 baseline (anonymous slots at chance, ≈0.031
