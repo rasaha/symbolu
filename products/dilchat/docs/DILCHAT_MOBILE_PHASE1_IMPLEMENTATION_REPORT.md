@@ -37,10 +37,14 @@ settings/sign-out, compatibility-unavailable.
 
 ## Session security
 
-- Tokens only in `expo-secure-store` (never AsyncStorage/logs/analytics).
+- Tokens only in `expo-secure-store`, pinned `WHEN_UNLOCKED_THIS_DEVICE_ONLY`
+  (excluded from device backups / Keychain sync); never AsyncStorage/logs/analytics.
 - Bearer auth + server-side session revocation honored.
 - Session restoration on launch; **one** controlled refresh+retry on 401, then
   sign-out on failure (no infinite retry).
+- **Single-flight refresh:** concurrent 401s share ONE backend refresh. The
+  backend rotates refresh tokens and revokes the whole session chain on reuse, so
+  de-duplicating the refresh prevents a spurious sign-out under parallel requests.
 - Sign-out and account-switch clear credentials **and** the React Query cache.
 - API base URL configuration-driven; no hardcoded production endpoint (CI-guarded).
 
@@ -62,20 +66,30 @@ settings/sign-out, compatibility-unavailable.
 
 ## Tests (mobile)
 
-`@testing-library/react-native` + jest-expo. **10 suites, 48 tests, all passing.**
-Coverage: birth-profile validation; API error normalization; secure-storage
+`@testing-library/react-native` + jest-expo. **10 suites, 53 tests, all passing.**
+Coverage: birth-profile validation + serialization (midnight, DST-transition,
+device-zone independence); API error normalization; secure-storage
 save/restore/clear; HttpClient (success, 204, non-ok→ApiError, single refresh+retry,
-onAuthLost, bearer header, no token logging); sign-in / profile / consent (gated) /
-paired (unpair) / compatibility (no score) screens; and a contract-level
-integration test driving the real client + endpoints against a fetch mock over the
-full journey. Fixtures use only synthetic names/dates/places/codes.
+**concurrent-401 single-flight**, refresh reset, onAuthLost, bearer header, no
+token logging); sign-in / profile / consent (gated) / paired (unpair) /
+compatibility (no score) screens; and a contract-level test driving the real
+client + endpoints against a fetch mock over the full journey.
+
+**Live backend integration (new): 9/9.** `integration/live.backend.test.ts`
+drives the PRODUCTION client + endpoints against a real FastAPI + PostgreSQL 16
+(fresh migrated DB, started by `scripts/run-integration.sh`; Node's real fetch).
+It exercises real JWT, refresh-token rotation + reuse detection, request/response
+schemas, problem+json errors, invitation lifecycle, consent-gated pairing, RLS
+privacy isolation, and unpairing revocation — and FAILS (never skips) when the
+backend is unavailable. Fixtures use only synthetic names/dates/places/codes.
 
 ## Verified gates (exact)
 
 **Mobile** (`products/dilchat/mobile`, Node 22.22.2):
 - `npx tsc --noEmit` → **exit 0**
 - `npx eslint . --ext .ts,.tsx --max-warnings=0` → **exit 0**
-- `npx jest --ci` → **10 suites / 48 tests passed**
+- `npx jest --ci` → **10 suites / 53 tests passed**
+- `npm run test:integration` → **9/9 vs real FastAPI + PostgreSQL 16**
 - `npm run check:config` → OK · `npm run check:endpoint` → OK ·
   `npm run check:contract` (vs live backend OpenAPI) → **13 routes present, no
   Guna/compatibility route**
@@ -91,14 +105,20 @@ full journey. Fixtures use only synthetic names/dates/places/codes.
 `.github/workflows/dilchat-mobile-ci.yml` (actionlint-clean): install → lint →
 strict type-check → tests → config validation → no-prod-endpoint guard → API
 contract-drift (generates the backend OpenAPI and checks required routes + no
-Guna/compatibility route) → secret scan. `contents: read` only; no production
-credentials; no device build; no deployment. The backend `dilchat-ci` workflow is
-unchanged.
+Guna/compatibility route) → secret scan. A second **`integration` job** stands up
+PostgreSQL 16 + the real FastAPI backend and runs the production client against it
+(`npm run test:integration`), failing if the backend is unavailable. `contents:
+read` only; no production credentials; no device build; no deployment. The backend
+`dilchat-ci` workflow is unchanged.
 
 ## Known limitations
 
 - CI does not build device binaries or run a simulator (no emulator available);
-  on-device verification is a documented manual step.
+  on-device verification is a documented manual step (Phase 2 device pilot).
+- `expo-doctor` / `expo config` / `expo export` cannot run in this install: a
+  transitive `ajv-keywords` package resolves a `.ts` source file inside
+  `@expo/cli` and exits 1. Config validation uses the deterministic
+  `check:config`; a true Metro export/bundle is deferred to Phase 2.
 - API models are hand-written and guarded by contract-drift rather than generated.
 - Birthplace entry is manual (label + lat/long + IANA zone); no place-search yet.
 - App-preview redaction on backgrounding is a noted future hardening (no sensitive

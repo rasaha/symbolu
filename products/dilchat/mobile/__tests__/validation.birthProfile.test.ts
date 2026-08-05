@@ -104,4 +104,33 @@ describe("toRequest", () => {
     expect(req.birthplace_label).toBe("Pune");
     expect(req.iana_timezone).toBe("Asia/Kolkata");
   });
+
+  it("preserves midnight local time verbatim (no off-by-a-day tz shift)", () => {
+    const e = validateDraft(baseDraft({ birth_time_local: "00:00" }));
+    expect(e.birth_time_local).toBeUndefined();
+    const req = toRequest(baseDraft({ birth_time_local: "00:00" }));
+    expect(req.birth_time_local).toBe("00:00");
+    expect(req.birth_date).toBe("1990-05-14");
+  });
+
+  it("passes a DST-transition local date/time through unchanged (client never resolves it)", () => {
+    // 02:30 on a US spring-forward night is a non-existent local instant. The
+    // client must NOT try to resolve or shift it — it forwards the literal
+    // strings + IANA zone and lets the backend be authoritative.
+    const draft = baseDraft({
+      birth_date: "2021-03-14",
+      birth_time_local: "02:30",
+      iana_timezone: "America/New_York",
+    });
+    const req = toRequest(draft);
+    expect(req.birth_date).toBe("2021-03-14");
+    expect(req.birth_time_local).toBe("02:30");
+    expect(req.iana_timezone).toBe("America/New_York");
+  });
+
+  it("uses the entered birth zone, never the device zone", () => {
+    // Regardless of where the device is, the birthplace zone is what gets sent.
+    const req = toRequest(baseDraft({ iana_timezone: "Pacific/Auckland" }));
+    expect(req.iana_timezone).toBe("Pacific/Auckland");
+  });
 });

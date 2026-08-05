@@ -84,6 +84,51 @@ describe("HttpClient", () => {
     expect((secondInit.headers as Record<string, string>)["Authorization"]).toBe("Bearer access-2");
   });
 
+  it("single-flights refresh: concurrent 401s trigger exactly ONE refresh", async () => {
+    // The backend rotates refresh tokens and revokes the whole session chain on
+    // reuse; parallel refreshes with the same token would force a spurious
+    // sign-out. Requests with the stale token 401; the refreshed token succeeds.
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      const auth = (init.headers as Record<string, string>)["Authorization"];
+      return auth === "Bearer access-2"
+        ? jsonResponse(200, { ok: true })
+        : jsonResponse(401, { detail: "expired" });
+    });
+    const refresh = jest.fn(async () => {
+      // Overlap window: both requests are parked on this single refresh.
+      await new Promise((r) => setTimeout(r, 10));
+      return "access-2";
+    });
+    const client = new HttpClient(makeProvider({ refresh }));
+    const [a, b, c] = await Promise.all([
+      client.get<{ ok: boolean }>("/v1/users/me"),
+      client.get<{ ok: boolean }>("/v1/couples/current"),
+      client.get<{ ok: boolean }>("/v1/birth-profiles/me"),
+    ]);
+    expect(a).toEqual({ ok: true });
+    expect(b).toEqual({ ok: true });
+    expect(c).toEqual({ ok: true });
+    // One shared refresh for all three concurrent 401s — not three.
+    expect(refresh).toHaveBeenCalledTimes(1);
+    // Three initial 401s + three retries with the new token.
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("refreshes again for a later, non-overlapping 401 (in-flight promise resets)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, { detail: "expired" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "u1" }))
+      .mockResolvedValueOnce(jsonResponse(401, { detail: "expired" }))
+      .mockResolvedValueOnce(jsonResponse(200, { id: "u2" }));
+    const refresh = jest.fn(async () => "access-2");
+    const client = new HttpClient(makeProvider({ refresh }));
+    await client.get("/v1/users/me");
+    await client.get("/v1/users/me");
+    // Two separate (sequential) auth failures ⇒ two refreshes; the dedupe window
+    // only collapses genuinely concurrent refreshes.
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
   it("calls onAuthLost and rethrows when refresh fails on a 401", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(401, { detail: "expired" }));
     const refresh = jest.fn(async () => null);

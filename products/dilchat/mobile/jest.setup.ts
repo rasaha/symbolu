@@ -4,6 +4,7 @@
 const mockSecureStoreMem = new Map<string, string>();
 
 jest.mock("expo-secure-store", () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: "WHEN_UNLOCKED_THIS_DEVICE_ONLY",
   setItemAsync: async (k: string, v: string) => {
     mockSecureStoreMem.set(k, v);
   },

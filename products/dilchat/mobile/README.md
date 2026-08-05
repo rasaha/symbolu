@@ -65,6 +65,15 @@ npm run check:contract         # API contract-drift (set DILCHAT_OPENAPI_JSON)
 npm run check:config           # Expo config validation (shape + plugins + no baked endpoint)
 ```
 
+Live backend integration (production client vs real FastAPI + PostgreSQL):
+
+```bash
+# starts a fresh migrated DB + uvicorn, runs the production client, tears down:
+PYTHON=python BACKEND_DIR="$PWD/.." \
+  DILCHAT_DATABASE_URL='postgresql+asyncpg://postgres@/dilchat_ci?host=/tmp&port=5433' \
+  npm run test:integration
+```
+
 Contract-drift with a live backend:
 
 ```bash

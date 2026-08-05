@@ -9,14 +9,23 @@ import * as SecureStore from "expo-secure-store";
 const ACCESS_KEY = "dilchat.access_token";
 const REFRESH_KEY = "dilchat.refresh_token";
 
+/**
+ * Keep credentials on THIS device only: excluded from encrypted device backups
+ * and from Keychain iCloud sync, so tokens can never be restored onto another
+ * device. Requires the device to be unlocked to read them.
+ */
+const SECURE_OPTS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 export interface StoredTokens {
   accessToken: string;
   refreshToken: string;
 }
 
 export async function saveTokens(t: StoredTokens): Promise<void> {
-  await SecureStore.setItemAsync(ACCESS_KEY, t.accessToken);
-  await SecureStore.setItemAsync(REFRESH_KEY, t.refreshToken);
+  await SecureStore.setItemAsync(ACCESS_KEY, t.accessToken, SECURE_OPTS);
+  await SecureStore.setItemAsync(REFRESH_KEY, t.refreshToken, SECURE_OPTS);
 }
 
 export async function getAccessToken(): Promise<string | null> {

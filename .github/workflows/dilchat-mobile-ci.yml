@@ -108,3 +108,61 @@ jobs:
             echo "Potential secret found in mobile source"; exit 1
           fi
           echo "secret scan: clean"
+
+  # Live integration: drives the PRODUCTION mobile API client + session layer
+  # (real HttpClient/endpoints, Node's real fetch) against the actual FastAPI
+  # backend and a PostgreSQL 16 database. It exercises real JWT, rotating refresh
+  # tokens with reuse detection, request/response schemas, problem+json errors,
+  # invitation lifecycle, consent-gated pairing, RLS privacy isolation, and
+  # unpairing revocation. It FAILS (never skips) if the backend is unavailable.
+  integration:
+    name: Mobile ↔ live FastAPI + PostgreSQL integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dilchat_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend (for alembic + uvicorn)
+        working-directory: products/dilchat
+        run: |
+          python -m pip install --upgrade pip >/dev/null
+          pip install -e .
+
+      - name: Install mobile (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Run live integration (fresh migrated DB + real FastAPI)
+        working-directory: products/dilchat/mobile
+        env:
+          PYTHON: python
+          BACKEND_DIR: ${{ github.workspace }}/products/dilchat
+          DILCHAT_ENVIRONMENT: development
+          # The postgres service database is fresh for each run; alembic migrates it to head.
+          DILCHAT_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dilchat_ci
+          DILCHAT_INTEGRATION_RUN_ID: ci-${{ github.run_id }}
+          PORT: "8091"
+        run: npm run test:integration
