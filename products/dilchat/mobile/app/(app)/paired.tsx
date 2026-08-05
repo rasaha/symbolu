@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { Link, useRouter } from "expo-router";
 
-import { userMessageFor } from "@/api/errors";
+import { ApiError, userMessageFor } from "@/api/errors";
 import { useCurrentCouple, useUnpair } from "@/query/hooks";
 import { Body, Button, Card, ErrorText, Heading, Loading, Screen } from "@/ui/components";
 
@@ -17,6 +17,8 @@ export default function Paired(): React.ReactElement {
   const unpair = useUnpair();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Guards against a second unpair mutation from a rapid/double confirm tap.
+  const inFlight = useRef(false);
 
   if (couple.isLoading) {
     return (
@@ -53,12 +55,32 @@ export default function Paired(): React.ReactElement {
 
   const onUnpair = async (): Promise<void> => {
     setError(null);
+    if (inFlight.current) return; // no duplicate / concurrent unpair
+    inFlight.current = true;
     try {
       await unpair.mutateAsync(data.couple_id);
       router.replace("/(app)/home");
     } catch (e) {
-      setError(userMessageFor(e));
+      // If the couple is already gone (e.g. the server committed the unpair but
+      // the response was lost, or the partner unpaired first), that IS the
+      // intended end state — treat 404/409 as done rather than blind-retrying.
+      if (e instanceof ApiError && e.kind === "http" && (e.status === 404 || e.status === 409)) {
+        await couple.refetch();
+        router.replace("/(app)/home");
+      } else {
+        // Ambiguous transport failure: do NOT auto-retry a destructive action.
+        // Show a neutral recovery state and let the user refresh authoritative
+        // server state or retry deliberately.
+        setError(userMessageFor(e));
+      }
+    } finally {
+      inFlight.current = false;
     }
+  };
+
+  const onRefresh = async (): Promise<void> => {
+    setError(null);
+    await couple.refetch();
   };
 
   return (
@@ -83,7 +105,18 @@ export default function Paired(): React.ReactElement {
         Ending the connection immediately revokes any shared access between the two accounts.
       </Body>
 
-      {error ? <ErrorText>{error}</ErrorText> : null}
+      {error ? (
+        <>
+          <ErrorText>{error}</ErrorText>
+          <Button
+            title="Check current status"
+            variant="secondary"
+            testID="refresh-status"
+            onPress={onRefresh}
+            loading={couple.isRefetching}
+          />
+        </>
+      ) : null}
 
       {confirming ? (
         <Card>
