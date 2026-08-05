@@ -1,0 +1,158 @@
+{
+  "added_params_per_cell": {
+    "000": 0,
+    "001": 131,
+    "010": 1041,
+    "011": 1172,
+    "100": 569,
+    "101": 700,
+    "110": 1610,
+    "111": 1741
+  },
+  "component_means_cell000": {
+    "correct_entity": 0.6693,
+    "null_rate": 0.3013,
+    "right_entity_wrong_older": 0.0813,
+    "wrong_entity": 0.0293
+  },
+  "determinism_ok": true,
+  "factorial_effects_on_T4": {
+    "F1": 0.0337,
+    "F1xF2": 0.001,
+    "F1xF2xF3": -0.0003,
+    "F1xF3": -0.0023,
+    "F2": -0.009,
+    "F2xF3": 0.0003,
+    "F3": -0.0003
+  },
+  "factorial_effects_on_abstention": {
+    "F1": -0.0587,
+    "F1xF2": 0.0033,
+    "F1xF2xF3": 0.0007,
+    "F1xF3": 0.004,
+    "F2": 0.0007,
+    "F2xF3": -0.002,
+    "F3": -0.0
+  },
+  "factorial_effects_on_right_entity_wrong_older": {
+    "F1": 0.0153,
+    "F1xF2": -0.0047,
+    "F1xF2xF3": 0.0007,
+    "F1xF3": -0.002,
+    "F2": 0.008,
+    "F2xF3": 0.0013,
+    "F3": -0.0013
+  },
+  "factorial_effects_on_wrong_entity": {
+    "F1": 0.0097,
+    "F1xF2": 0.0003,
+    "F1xF2xF3": -0.001,
+    "F1xF3": 0.0003,
+    "F2": 0.0003,
+    "F2xF3": 0.0003,
+    "F3": 0.0017
+  },
+  "gates": {
+    "T1_min": 0.8,
+    "T2_min": 0.8,
+    "T3_min": 0.8,
+    "T4_improvement_over_000_min": 0.05,
+    "T4_min": 0.85,
+    "T6_min": 0.8,
+    "T7_min": 0.8,
+    "T9_min_no_material_regression": 0.9,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_max_false_reject": 0.15,
+    "required_seeds_pass": 4
+  },
+  "improvement_over_000": {
+    "000": 0.0,
+    "001": 0.0013,
+    "010": -0.0107,
+    "011": -0.008,
+    "100": 0.0347,
+    "101": 0.032,
+    "110": 0.0267,
+    "111": 0.024
+  },
+  "interaction_note": "F1xF2 pre-flagged from the diagnostics (D2 1.4% vs D3 68%); reported below.",
+  "interpretation": "Minimal, non-oracle, capacity-fixed learnable factors do NOT recover the T4 latest-state shortfall on the temporal family: no cell reaches T4>=0.85 (null-inclusive) nor improves the reference by >=0.05. Only F1 (learned null gating) yields a positive main effect; F2 and F3 are ~0. E1_TEMPORAL_TRANSFER_PARTIAL stands; KDA remains blocked.",
+  "leakage_ok": true,
+  "mean_T4_null_excluded_addressing": {
+    "000": 0.796,
+    "001": 0.788,
+    "010": 0.784,
+    "011": 0.7813,
+    "100": 0.7773,
+    "101": 0.7733,
+    "110": 0.7653,
+    "111": 0.7613
+  },
+  "mean_T4_null_inclusive": {
+    "000": 0.588,
+    "001": 0.5893,
+    "010": 0.5773,
+    "011": 0.58,
+    "100": 0.6227,
+    "101": 0.62,
+    "110": 0.6147,
+    "111": 0.612
+  },
+  "preserved": [
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "protocol_ok": true,
+  "qualifies": {
+    "000": false,
+    "001": false,
+    "010": false,
+    "011": false,
+    "100": false,
+    "101": false,
+    "110": false,
+    "111": false
+  },
+  "reference_cell": "000",
+  "reference_mean_T4_null_inclusive": 0.588,
+  "schema": "bindingslots_e1_3factor/analysis/v1",
+  "seeds_passing_all_primary": {
+    "000": 0,
+    "001": 0,
+    "010": 0,
+    "011": 0,
+    "100": 0,
+    "101": 0,
+    "110": 0,
+    "111": 0
+  },
+  "selected_cell": null,
+  "selection_rule": [
+    "fewest enabled factors",
+    "lowest added parameter count",
+    "highest worst-seed T4",
+    "highest mean T4"
+  ],
+  "t5_diagnostic_only": {
+    "000": 0.3547,
+    "001": 0.3547,
+    "010": 0.3533,
+    "011": 0.3493,
+    "100": 0.3507,
+    "101": 0.348,
+    "110": 0.3453,
+    "111": 0.3467
+  },
+  "verdict": "T4_FACTORIAL_NO_INTERVENTION_SELECTED",
+  "worst_seed_T4": {
+    "000": 0.5333,
+    "001": 0.5333,
+    "010": 0.5333,
+    "011": 0.54,
+    "100": 0.56,
+    "101": 0.56,
+    "110": 0.56,
+    "111": 0.56
+  }
+}
