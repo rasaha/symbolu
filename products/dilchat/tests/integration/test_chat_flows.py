@@ -167,6 +167,49 @@ async def test_page_size_maximum_enforced(ctx):
     assert r.status_code == 422  # exceeds le=100 bound at the schema layer
 
 
+async def test_default_page_size_is_fifty_and_cursor_walks_remainder(ctx):
+    """Omitting ?limit returns exactly the configured default (50), not everything.
+
+    Seeds 51 messages so the default page is strictly smaller than the total, then
+    walks the returned cursor to prove the 51st message comes back exactly once with
+    no gap or duplicate. Directly exercises the route's default-limit branch (the
+    audit noted only the maximum, not the default, had a behavioural assertion).
+    """
+    assert ctx.settings.chat_page_default == 50  # the default under test
+    a, b, couple = await _pair(ctx.client)
+    conv = (await _conversation(ctx.client, a))["conversation_id"]
+
+    total = 51
+    for i in range(1, total + 1):
+        assert (await _send(ctx.client, a, conv, f"c{i}", f"m{i}")).status_code == 201
+
+    # No ?limit -> the route falls back to chat_page_default (50), NOT an unbounded list.
+    page1 = (
+        await ctx.client.get(f"/v1/conversations/{conv}/messages", headers=_hdr(a))
+    ).json()
+    assert len(page1["messages"]) == 50
+    assert page1["has_more"] is True
+    assert page1["next_cursor"]
+    seqs1 = [m["server_sequence"] for m in page1["messages"]]
+    assert seqs1 == list(range(1, 51))  # ascending, gapless
+
+    # Walk from the returned cursor: exactly the remaining message, then done.
+    page2 = (
+        await ctx.client.get(
+            f"/v1/conversations/{conv}/messages?cursor={page1['next_cursor']}",
+            headers=_hdr(a),
+        )
+    ).json()
+    assert [m["server_sequence"] for m in page2["messages"]] == [51]
+    assert page2["has_more"] is False
+    assert page2["next_cursor"] is None
+
+    # Union across the two pages == every message exactly once (no duplicate, no skip).
+    all_seqs = seqs1 + [51]
+    assert sorted(all_seqs) == list(range(1, total + 1))
+    assert len(set(all_seqs)) == total
+
+
 async def test_malformed_cursor_returns_400(ctx):
     a, b, couple = await _pair(ctx.client)
     conv = (await _conversation(ctx.client, a))["conversation_id"]

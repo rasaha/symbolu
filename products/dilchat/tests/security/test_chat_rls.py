@@ -227,6 +227,83 @@ async def test_app_may_insert_outbox_in_transaction():
         await conn.close()
 
 
+async def test_outbox_app_role_cannot_update_or_delete_worker_may_update():
+    """The application role can never mutate ``chat_outbox``; only the worker may UPDATE.
+
+    The audit flagged that only outbox SELECT/INSERT were asserted. This proves the
+    full least-privilege posture directly under the real non-owner runtime role:
+    the app role cannot SELECT / UPDATE / DELETE the outbox nor weaken its RLS, yet
+    can still INSERT an allow-listed event in its own transaction, while the worker
+    relay retains its documented read + mark-published (UPDATE) capability. The test
+    fails if ``UPDATE chat_outbox`` ever succeeds under the application role.
+    """
+    conn = await _connect()
+    try:
+        ids = await _seed(conn)  # seeds one MESSAGE_CREATED outbox row (conv1)
+
+        # The runtime role must be a genuine non-owner, else the denials are vacuous.
+        async def role_props(c):
+            return await c.fetchrow(
+                "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+            )
+
+        props = await _as(conn, ids["a"], role_props)
+        assert props["rolsuper"] is False
+        assert props["rolbypassrls"] is False
+
+        async def app_select(c):
+            return await c.fetchval("SELECT count(*) FROM chat_outbox")
+
+        async def app_update(c):
+            await c.execute("UPDATE chat_outbox SET published_at = now()")
+
+        async def app_delete(c):
+            await c.execute("DELETE FROM chat_outbox")
+
+        # App actor: no read, no update, no delete on the outbox.
+        with pytest.raises(asyncpg.PostgresError):
+            await _as(conn, ids["a"], app_select)
+        with pytest.raises(asyncpg.PostgresError):
+            await _as(conn, ids["a"], app_update)
+        with pytest.raises(asyncpg.PostgresError):
+            await _as(conn, ids["a"], app_delete)
+
+        # App actor cannot weaken the outbox RLS protections either.
+        async def app_disable_rls(c):
+            await c.execute("ALTER TABLE chat_outbox DISABLE ROW LEVEL SECURITY")
+
+        async def app_drop_policy(c):
+            await c.execute("DROP POLICY chat_outbox_worker_write ON chat_outbox")
+
+        with pytest.raises(asyncpg.PostgresError):
+            await _as(conn, ids["a"], app_disable_rls)
+        with pytest.raises(asyncpg.PostgresError):
+            await _as(conn, ids["a"], app_drop_policy)
+
+        # App actor CAN still insert an allow-listed event in its own transaction.
+        async def app_insert(c):
+            await c.execute(
+                "INSERT INTO chat_outbox (id,event_type,schema_version,conversation_id,"
+                " couple_id,payload,created_at) "
+                "VALUES ($1,'MESSAGE_CREATED',1,$2,$3,'{}'::jsonb,now())",
+                uuid.uuid4(), ids["conv1"], ids["couple1"],
+            )
+
+        await _as(conn, ids["a"], app_insert)
+
+        # Worker relay: retains read + mark-published (UPDATE) on the outbox.
+        async def worker_update(c):
+            return await c.execute("UPDATE chat_outbox SET published_at = now()")
+
+        status = await _as(
+            conn, ids["a"], worker_update, role="dilchat_worker", actor="worker"
+        )
+        assert status.startswith("UPDATE ")
+        assert int(status.split()[1]) >= 1  # at least the seeded row was marked published
+    finally:
+        await conn.close()
+
+
 async def test_runtime_role_cannot_disable_rls_or_drop_chat_policy():
     conn = await _connect()
     try:
