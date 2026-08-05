@@ -1,0 +1,730 @@
+{
+  "schema": "bindingslots_e1_confirmation/per_seed/v1",
+  "per_seed": [
+    {
+      "seed": 5140,
+      "metrics": {
+        "G1_addr": 0.9866666793823242,
+        "G2_addr": 0.9666666388511658,
+        "G3_addr": 1.0,
+        "G4_addr": 0.9933333396911621,
+        "G5_addr": 1.0,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9133333563804626,
+        "G1_false_reject": 0.07999999821186066,
+        "answer_availability": 0.9200000166893005,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.14000000059604645,
+        "nomatch_recall": 0.8599999994039536,
+        "nomatch_precision": 0.9148936187076914,
+        "nomatch_confident_false_accept": 0.0,
+        "b0_G1_e2e": 0.03333333507180214,
+        "improvement_over_b0": 0.8800000213086605,
+        "oracle_to_predicted_gap": 0.08666664361953735
+      },
+      "gates": {
+        "generalization": {
+          "G1": true,
+          "G2": true,
+          "G3": true,
+          "G4": true,
+          "G5": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_fa": true,
+          "false_reject": true,
+          "availability": true
+        },
+        "e2e": {
+          "ordinary": true,
+          "improvement": true,
+          "oracle": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0333333015441895,
+          "mean_top1_margin": 2.50370454788208,
+          "e2e": 0.9133333563804626,
+          "false_reject": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "addressing_top1": 0.9666666388511658,
+          "mean_correct_key_rank": 1.0466666221618652,
+          "mean_top1_margin": 2.0170400142669678,
+          "e2e": 0.3866666555404663,
+          "false_reject": 0.6066666841506958,
+          "answer_availability": 0.3933333456516266,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.522406816482544,
+          "e2e": 0.9733333587646484,
+          "false_reject": 0.02666666731238365,
+          "answer_availability": 0.9733333587646484,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.5055482387542725,
+          "e2e": 0.9733333587646484,
+          "false_reject": 0.02666666731238365,
+          "answer_availability": 0.9733333587646484,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.343621015548706,
+          "e2e": 0.9333333373069763,
+          "false_reject": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "false_accept": 0.14000000059604645,
+          "confident_false_accept": 0.0
+        },
+        "G7_stable": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.175196886062622,
+          "e2e": 0.95333331823349,
+          "false_reject": 0.046666666865348816,
+          "answer_availability": 0.95333331823349,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G2_paraphrase": {
+          "e2e": 0.0533333346247673,
+          "addressing_top1": 0.0533333346247673
+        },
+        "G3_hard_names": {
+          "e2e": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G4_same_entity_diff_attr": {
+          "e2e": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G5_recombined": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G6_no_match": {
+          "false_accept": 1.0
+        },
+        "G7_stable": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        }
+      },
+      "e1_param_sha256": "ba95c160da957e77da4266f4b89ba1c025bf922a7d102513b226f0c42beac9c4"
+    },
+    {
+      "seed": 5141,
+      "metrics": {
+        "G1_addr": 1.0,
+        "G2_addr": 0.9800000190734863,
+        "G3_addr": 1.0,
+        "G4_addr": 1.0,
+        "G5_addr": 0.9933333396911621,
+        "G7_addr": 0.9933333396911621,
+        "G1_e2e": 0.9266666769981384,
+        "G1_false_reject": 0.07333333045244217,
+        "answer_availability": 0.9266666769981384,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.2199999988079071,
+        "nomatch_recall": 0.7800000011920929,
+        "nomatch_precision": 0.9140625032059688,
+        "nomatch_confident_false_accept": 0.019999999552965164,
+        "b0_G1_e2e": 0.019999999552965164,
+        "improvement_over_b0": 0.9066666774451733,
+        "oracle_to_predicted_gap": 0.07333332300186157
+      },
+      "gates": {
+        "generalization": {
+          "G1": true,
+          "G2": true,
+          "G3": true,
+          "G4": true,
+          "G5": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_fa": true,
+          "false_reject": true,
+          "availability": true
+        },
+        "e2e": {
+          "ordinary": true,
+          "improvement": true,
+          "oracle": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.348654270172119,
+          "e2e": 0.9266666769981384,
+          "false_reject": 0.07333333045244217,
+          "answer_availability": 0.9266666769981384,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 2.002521276473999,
+          "e2e": 0.46666666865348816,
+          "false_reject": 0.5333333611488342,
+          "answer_availability": 0.46666666865348816,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.56490421295166,
+          "e2e": 0.9399999976158142,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.498753547668457,
+          "e2e": 0.95333331823349,
+          "false_reject": 0.046666666865348816,
+          "answer_availability": 0.95333331823349,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.4335734844207764,
+          "e2e": 0.9333333373069763,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "false_accept": 0.2199999988079071,
+          "confident_false_accept": 0.019999999552965164
+        },
+        "G7_stable": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.051807403564453,
+          "e2e": 0.9399999976158142,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G2_paraphrase": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G3_hard_names": {
+          "e2e": 0.006666666828095913,
+          "addressing_top1": 0.006666666828095913
+        },
+        "G4_same_entity_diff_attr": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G5_recombined": {
+          "e2e": 0.03999999910593033,
+          "addressing_top1": 0.03999999910593033
+        },
+        "G6_no_match": {
+          "false_accept": 1.0
+        },
+        "G7_stable": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        }
+      },
+      "e1_param_sha256": "dcd18a49cfb9af5c4b704aef460b1f3f3faab566f840825223256a56d3c5fa57"
+    },
+    {
+      "seed": 5142,
+      "metrics": {
+        "G1_addr": 0.9933333396911621,
+        "G2_addr": 0.9733333587646484,
+        "G3_addr": 1.0,
+        "G4_addr": 1.0,
+        "G5_addr": 0.9866666793823242,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.95333331823349,
+        "G1_false_reject": 0.03999999910593033,
+        "answer_availability": 0.9599999785423279,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.1666666716337204,
+        "nomatch_recall": 0.8333333283662796,
+        "nomatch_precision": 0.954198473998803,
+        "nomatch_confident_false_accept": 0.013333333656191826,
+        "b0_G1_e2e": 0.046666666865348816,
+        "improvement_over_b0": 0.9066666513681412,
+        "oracle_to_predicted_gap": 0.04666668176651001
+      },
+      "gates": {
+        "generalization": {
+          "G1": true,
+          "G2": true,
+          "G3": true,
+          "G4": true,
+          "G5": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_fa": true,
+          "false_reject": true,
+          "availability": true
+        },
+        "e2e": {
+          "ordinary": true,
+          "improvement": true,
+          "oracle": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.6332156658172607,
+          "e2e": 0.95333331823349,
+          "false_reject": 0.03999999910593033,
+          "answer_availability": 0.9599999785423279,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "addressing_top1": 0.9733333587646484,
+          "mean_correct_key_rank": 1.0333333015441895,
+          "mean_top1_margin": 1.993141531944275,
+          "e2e": 0.3266666531562805,
+          "false_reject": 0.6666666865348816,
+          "answer_availability": 0.3333333432674408,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.646450996398926,
+          "e2e": 0.9599999785423279,
+          "false_reject": 0.03999999910593033,
+          "answer_availability": 0.9599999785423279,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.5476431846618652,
+          "e2e": 0.9666666388511658,
+          "false_reject": 0.03333333507180214,
+          "answer_availability": 0.9666666388511658,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0133333206176758,
+          "mean_top1_margin": 2.5293641090393066,
+          "e2e": 0.9333333373069763,
+          "false_reject": 0.0533333346247673,
+          "answer_availability": 0.9466666579246521,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "false_accept": 0.1666666716337204,
+          "confident_false_accept": 0.013333333656191826
+        },
+        "G7_stable": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.2439539432525635,
+          "e2e": 0.9466666579246521,
+          "false_reject": 0.0533333346247673,
+          "answer_availability": 0.9466666579246521,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "e2e": 0.046666666865348816,
+          "addressing_top1": 0.046666666865348816
+        },
+        "G2_paraphrase": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G3_hard_names": {
+          "e2e": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G4_same_entity_diff_attr": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G5_recombined": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G6_no_match": {
+          "false_accept": 1.0
+        },
+        "G7_stable": {
+          "e2e": 0.046666666865348816,
+          "addressing_top1": 0.046666666865348816
+        }
+      },
+      "e1_param_sha256": "6a0f308e2f51935f3488ebec650dde4c12cbd2adcc78c071cbf6d4914f9392b9"
+    },
+    {
+      "seed": 5143,
+      "metrics": {
+        "G1_addr": 0.9933333396911621,
+        "G2_addr": 0.9866666793823242,
+        "G3_addr": 1.0,
+        "G4_addr": 0.9933333396911621,
+        "G5_addr": 0.9933333396911621,
+        "G7_addr": 0.9933333396911621,
+        "G1_e2e": 0.9399999976158142,
+        "G1_false_reject": 0.05999999865889549,
+        "answer_availability": 0.9399999976158142,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.1066666692495346,
+        "nomatch_recall": 0.8933333307504654,
+        "nomatch_precision": 0.9370629382106377,
+        "nomatch_confident_false_accept": 0.006666666828095913,
+        "b0_G1_e2e": 0.02666666731238365,
+        "improvement_over_b0": 0.9133333303034306,
+        "oracle_to_predicted_gap": 0.06000000238418579
+      },
+      "gates": {
+        "generalization": {
+          "G1": true,
+          "G2": true,
+          "G3": true,
+          "G4": true,
+          "G5": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_fa": true,
+          "false_reject": true,
+          "availability": true
+        },
+        "e2e": {
+          "ordinary": true,
+          "improvement": true,
+          "oracle": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.4576268196105957,
+          "e2e": 0.9399999976158142,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0133333206176758,
+          "mean_top1_margin": 2.036989450454712,
+          "e2e": 0.41333332657814026,
+          "false_reject": 0.5866666436195374,
+          "answer_availability": 0.41333332657814026,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.611238479614258,
+          "e2e": 0.9733333587646484,
+          "false_reject": 0.02666666731238365,
+          "answer_availability": 0.9733333587646484,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.495058298110962,
+          "e2e": 0.9599999785423279,
+          "false_reject": 0.03999999910593033,
+          "answer_availability": 0.9599999785423279,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.3943870067596436,
+          "e2e": 0.9133333563804626,
+          "false_reject": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "false_accept": 0.1066666692495346,
+          "confident_false_accept": 0.006666666828095913
+        },
+        "G7_stable": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.306762218475342,
+          "e2e": 0.9399999976158142,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G2_paraphrase": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G3_hard_names": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G4_same_entity_diff_attr": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G5_recombined": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G6_no_match": {
+          "false_accept": 1.0
+        },
+        "G7_stable": {
+          "e2e": 0.006666666828095913,
+          "addressing_top1": 0.006666666828095913
+        }
+      },
+      "e1_param_sha256": "b89a2cfc7804513cd7a96a10a64c4d56963d31238e54eadd5d06252d12b74a73"
+    },
+    {
+      "seed": 5144,
+      "metrics": {
+        "G1_addr": 1.0,
+        "G2_addr": 0.9399999976158142,
+        "G3_addr": 0.9933333396911621,
+        "G4_addr": 0.9933333396911621,
+        "G5_addr": 1.0,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9800000190734863,
+        "G1_false_reject": 0.019999999552965164,
+        "answer_availability": 0.9800000190734863,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.12666666507720947,
+        "nomatch_recall": 0.8733333349227905,
+        "nomatch_precision": 0.9776119408275501,
+        "nomatch_confident_false_accept": 0.006666666828095913,
+        "b0_G1_e2e": 0.03999999910593033,
+        "improvement_over_b0": 0.940000019967556,
+        "oracle_to_predicted_gap": 0.019999980926513672
+      },
+      "gates": {
+        "generalization": {
+          "G1": true,
+          "G2": true,
+          "G3": true,
+          "G4": true,
+          "G5": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_fa": true,
+          "false_reject": true,
+          "availability": true
+        },
+        "e2e": {
+          "ordinary": true,
+          "improvement": true,
+          "oracle": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.4547345638275146,
+          "e2e": 0.9800000190734863,
+          "false_reject": 0.019999999552965164,
+          "answer_availability": 0.9800000190734863,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "addressing_top1": 0.9399999976158142,
+          "mean_correct_key_rank": 1.0800000429153442,
+          "mean_top1_margin": 1.6444377899169922,
+          "e2e": 0.3333333432674408,
+          "false_reject": 0.6666666865348816,
+          "answer_availability": 0.3333333432674408,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 2.5029478073120117,
+          "e2e": 0.9666666388511658,
+          "false_reject": 0.03333333507180214,
+          "answer_availability": 0.9666666388511658,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 2.3977463245391846,
+          "e2e": 0.9599999785423279,
+          "false_reject": 0.03999999910593033,
+          "answer_availability": 0.9599999785423279,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 2.4966046810150146,
+          "e2e": 0.9399999976158142,
+          "false_reject": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "false_accept": 0.12666666507720947,
+          "confident_false_accept": 0.006666666828095913
+        },
+        "G7_stable": {
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.326533079147339,
+          "e2e": 0.9466666579246521,
+          "false_reject": 0.0533333346247673,
+          "answer_availability": 0.9466666579246521,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "e2e": 0.03999999910593033,
+          "addressing_top1": 0.03999999910593033
+        },
+        "G2_paraphrase": {
+          "e2e": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G3_hard_names": {
+          "e2e": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G4_same_entity_diff_attr": {
+          "e2e": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G5_recombined": {
+          "e2e": 0.006666666828095913,
+          "addressing_top1": 0.006666666828095913
+        },
+        "G6_no_match": {
+          "false_accept": 1.0
+        },
+        "G7_stable": {
+          "e2e": 0.046666666865348816,
+          "addressing_top1": 0.046666666865348816
+        }
+      },
+      "e1_param_sha256": "237334d4b901043b7d7ce2b3162bcddef3b6f564b8bab5ec7a21d90942393222"
+    }
+  ]
+}

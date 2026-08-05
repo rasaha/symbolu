@@ -1,0 +1,36 @@
+{
+  "schema": "bindingslots_e1_confirmation/leakage/v1",
+  "no_exact_overlap": {
+    "pass": true,
+    "max_shared_tokens": 0
+  },
+  "pools_disjoint": {
+    "pass": true,
+    "train": 1101,
+    "dev": 245,
+    "final": 194
+  },
+  "eval_ids_unseen": {
+    "pass": true,
+    "leaked_targets": 0
+  },
+  "no_answer_in_key": {
+    "pass": true,
+    "keys_with_value_token": 0
+  },
+  "no_opaque_identifier": {
+    "pass": true,
+    "vocab": 286,
+    "note": "no per-identity opaque id token exists"
+  },
+  "lexical_overlap_uninformative": {
+    "pass": true,
+    "lexical_overlap_accuracy": 0.04888888888888889,
+    "chance": 0.03125
+  },
+  "no_table_import": {
+    "pass": true,
+    "banned_hits": []
+  },
+  "all_pass": true
+}
