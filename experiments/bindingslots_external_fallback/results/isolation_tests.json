@@ -1,0 +1,18 @@
+{
+  "schema": "bindingslots_external_fallback/isolation/v1",
+  "correct_session_lookup": true,
+  "wrong_session_no_disclosure": true,
+  "wrong_tenant_no_disclosure": true,
+  "expired_not_returned": true,
+  "deleted_not_returned": true,
+  "latest_version_selected": true,
+  "stale_version_addressable": true,
+  "missing_key": true,
+  "unauthorized_blocked": true,
+  "malformed_key": true,
+  "cleanup_after_session": true,
+  "table_unavailable_raises": true,
+  "cross_session_leakage_count": 0,
+  "cross_tenant_leakage_count": 0,
+  "all_pass": true
+}

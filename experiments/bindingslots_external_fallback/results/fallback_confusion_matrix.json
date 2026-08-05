@@ -1,0 +1,11 @@
+{
+  "schema": "bindingslots_external_fallback/confusion/v1",
+  "confusion": {
+    "tp": 380,
+    "fp": 14,
+    "tn": 111,
+    "fn": 95
+  },
+  "failure_detection_recall": 0.8,
+  "failure_detection_precision": 0.9644670050761421
+}
