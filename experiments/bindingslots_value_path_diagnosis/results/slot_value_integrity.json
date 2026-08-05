@@ -1,0 +1,1355 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/slot_value_integrity/v1",
+  "runs": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99028367,
+              "cosine_postwrite_query_min": 0.77045095,
+              "normalized_l2_drift_mean": 0.06385852,
+              "norm_ratio_query_over_postwrite_mean": 0.95869082,
+              "sign_change_rate_mean": 0.01666667,
+              "saturation_fraction_mean": 0.00996094,
+              "n_later_writes_to_sstar_mean": 1.18333328,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.97680348,
+              "read_prob_on_sstar_mean": 1.0
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.71891719,
+              "cosine_postwrite_query_min": -0.57866341,
+              "normalized_l2_drift_mean": 0.65088069,
+              "norm_ratio_query_over_postwrite_mean": 1.1090821,
+              "sign_change_rate_mean": 0.1796875,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 50.60833359,
+              "explicit_overwrite_fraction": 0.69166666,
+              "write_gate_at_fact_mean": 0.81608433,
+              "read_prob_on_sstar_mean": 0.94913805
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.71947962,
+              "cosine_postwrite_query_min": -0.56658036,
+              "normalized_l2_drift_mean": 0.65812004,
+              "norm_ratio_query_over_postwrite_mean": 1.07155812,
+              "sign_change_rate_mean": 0.18665364,
+              "saturation_fraction_mean": 0.00976562,
+              "n_later_writes_to_sstar_mean": 42.24166489,
+              "explicit_overwrite_fraction": 0.63333333,
+              "write_gate_at_fact_mean": 0.74014932,
+              "read_prob_on_sstar_mean": 0.78610885
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.72027117,
+              "cosine_postwrite_query_min": -0.31325084,
+              "normalized_l2_drift_mean": 0.6783188,
+              "norm_ratio_query_over_postwrite_mean": 1.04845119,
+              "sign_change_rate_mean": 0.19804688,
+              "saturation_fraction_mean": 0.00878906,
+              "n_later_writes_to_sstar_mean": 3.0583334,
+              "explicit_overwrite_fraction": 0.85833335,
+              "write_gate_at_fact_mean": 0.53156459,
+              "read_prob_on_sstar_mean": 0.42106026
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.72027117,
+            "cosine_postwrite_query_min": -0.31325084,
+            "normalized_l2_drift_mean": 0.6783188,
+            "norm_ratio_query_over_postwrite_mean": 1.04845119,
+            "sign_change_rate_mean": 0.19804688,
+            "saturation_fraction_mean": 0.00878906,
+            "n_later_writes_to_sstar_mean": 3.0583334,
+            "explicit_overwrite_fraction": 0.85833335,
+            "write_gate_at_fact_mean": 0.53156459,
+            "read_prob_on_sstar_mean": 0.42106026
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 1.0,
+              "cosine_postwrite_query_min": 0.99999982,
+              "normalized_l2_drift_mean": 2.07e-06,
+              "norm_ratio_query_over_postwrite_mean": 0.99999845,
+              "sign_change_rate_mean": 0.0,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 0.97500002,
+              "explicit_overwrite_fraction": 0.78333336,
+              "write_gate_at_fact_mean": 0.97460693,
+              "read_prob_on_sstar_mean": 1.0
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.89113432,
+              "cosine_postwrite_query_min": 0.21877924,
+              "normalized_l2_drift_mean": 0.42069882,
+              "norm_ratio_query_over_postwrite_mean": 0.81848085,
+              "sign_change_rate_mean": 0.12799479,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.67196977,
+              "read_prob_on_sstar_mean": 0.9995535
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.89375818,
+              "cosine_postwrite_query_min": 0.21780628,
+              "normalized_l2_drift_mean": 0.40604696,
+              "norm_ratio_query_over_postwrite_mean": 0.78241068,
+              "sign_change_rate_mean": 0.11341146,
+              "saturation_fraction_mean": 0.00865885,
+              "n_later_writes_to_sstar_mean": 101.05000305,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.59289998,
+              "read_prob_on_sstar_mean": 0.9988178
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.70962441,
+              "cosine_postwrite_query_min": -0.10517067,
+              "normalized_l2_drift_mean": 0.66804612,
+              "norm_ratio_query_over_postwrite_mean": 0.72019136,
+              "sign_change_rate_mean": 0.24361978,
+              "saturation_fraction_mean": 0.00865885,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.86666667,
+              "write_gate_at_fact_mean": 0.78611755,
+              "read_prob_on_sstar_mean": 0.99896079
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.70962441,
+            "cosine_postwrite_query_min": -0.10517067,
+            "normalized_l2_drift_mean": 0.66804612,
+            "norm_ratio_query_over_postwrite_mean": 0.72019136,
+            "sign_change_rate_mean": 0.24361978,
+            "saturation_fraction_mean": 0.00865885,
+            "n_later_writes_to_sstar_mean": 103.0,
+            "explicit_overwrite_fraction": 0.86666667,
+            "write_gate_at_fact_mean": 0.78611755,
+            "read_prob_on_sstar_mean": 0.99896079
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.9982689,
+              "cosine_postwrite_query_min": 0.91566461,
+              "normalized_l2_drift_mean": 0.01488434,
+              "norm_ratio_query_over_postwrite_mean": 0.99134094,
+              "sign_change_rate_mean": 0.00423177,
+              "saturation_fraction_mean": 0.00852865,
+              "n_later_writes_to_sstar_mean": 1.04166663,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.99668688,
+              "read_prob_on_sstar_mean": 0.98694414
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.88338941,
+              "cosine_postwrite_query_min": -0.23283507,
+              "normalized_l2_drift_mean": 0.37422472,
+              "norm_ratio_query_over_postwrite_mean": 0.95677215,
+              "sign_change_rate_mean": 0.11386719,
+              "saturation_fraction_mean": 0.00924479,
+              "n_later_writes_to_sstar_mean": 77.66666412,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.6383487,
+              "read_prob_on_sstar_mean": 0.40419611
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.90229887,
+              "cosine_postwrite_query_min": -0.39686862,
+              "normalized_l2_drift_mean": 0.35847852,
+              "norm_ratio_query_over_postwrite_mean": 0.81871825,
+              "sign_change_rate_mean": 0.10130208,
+              "saturation_fraction_mean": 0.0094401,
+              "n_later_writes_to_sstar_mean": 95.92500305,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.29172221,
+              "read_prob_on_sstar_mean": 0.99025279
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.8871038,
+              "cosine_postwrite_query_min": 0.14551486,
+              "normalized_l2_drift_mean": 0.42245418,
+              "norm_ratio_query_over_postwrite_mean": 0.82695508,
+              "sign_change_rate_mean": 0.12213542,
+              "saturation_fraction_mean": 0.00963542,
+              "n_later_writes_to_sstar_mean": 99.22499847,
+              "explicit_overwrite_fraction": 0.99166667,
+              "write_gate_at_fact_mean": 0.76957154,
+              "read_prob_on_sstar_mean": 0.82268709
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.8871038,
+            "cosine_postwrite_query_min": 0.14551486,
+            "normalized_l2_drift_mean": 0.42245418,
+            "norm_ratio_query_over_postwrite_mean": 0.82695508,
+            "sign_change_rate_mean": 0.12213542,
+            "saturation_fraction_mean": 0.00963542,
+            "n_later_writes_to_sstar_mean": 99.22499847,
+            "explicit_overwrite_fraction": 0.99166667,
+            "write_gate_at_fact_mean": 0.76957154,
+            "read_prob_on_sstar_mean": 0.82268709
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99859375,
+              "cosine_postwrite_query_min": 0.94505203,
+              "normalized_l2_drift_mean": 0.01505028,
+              "norm_ratio_query_over_postwrite_mean": 0.9907586,
+              "sign_change_rate_mean": 0.00377604,
+              "saturation_fraction_mean": 0.00872396,
+              "n_later_writes_to_sstar_mean": 1.06666672,
+              "explicit_overwrite_fraction": 0.97500002,
+              "write_gate_at_fact_mean": 0.95354688,
+              "read_prob_on_sstar_mean": 0.91547847
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.69037288,
+              "cosine_postwrite_query_min": -0.54736733,
+              "normalized_l2_drift_mean": 0.72401392,
+              "norm_ratio_query_over_postwrite_mean": 1.04332566,
+              "sign_change_rate_mean": 0.21106771,
+              "saturation_fraction_mean": 0.00924479,
+              "n_later_writes_to_sstar_mean": 56.22499847,
+              "explicit_overwrite_fraction": 0.89999998,
+              "write_gate_at_fact_mean": 0.1276907,
+              "read_prob_on_sstar_mean": 0.87266135
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.81659228,
+              "cosine_postwrite_query_min": 0.08914991,
+              "normalized_l2_drift_mean": 0.5740608,
+              "norm_ratio_query_over_postwrite_mean": 1.0349412,
+              "sign_change_rate_mean": 0.17532553,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 75.64167023,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.12344907,
+              "read_prob_on_sstar_mean": 0.97973609
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.96211874,
+              "cosine_postwrite_query_min": 0.80659634,
+              "normalized_l2_drift_mean": 0.24976283,
+              "norm_ratio_query_over_postwrite_mean": 0.97632802,
+              "sign_change_rate_mean": 0.10397135,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 93.3833313,
+              "explicit_overwrite_fraction": 0.75833333,
+              "write_gate_at_fact_mean": 0.89300495,
+              "read_prob_on_sstar_mean": 0.98023635
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.96211874,
+            "cosine_postwrite_query_min": 0.80659634,
+            "normalized_l2_drift_mean": 0.24976283,
+            "norm_ratio_query_over_postwrite_mean": 0.97632802,
+            "sign_change_rate_mean": 0.10397135,
+            "saturation_fraction_mean": 0.00891927,
+            "n_later_writes_to_sstar_mean": 93.3833313,
+            "explicit_overwrite_fraction": 0.75833333,
+            "write_gate_at_fact_mean": 0.89300495,
+            "read_prob_on_sstar_mean": 0.98023635
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99968898,
+              "cosine_postwrite_query_min": 0.9925288,
+              "normalized_l2_drift_mean": 0.00942515,
+              "norm_ratio_query_over_postwrite_mean": 0.99241805,
+              "sign_change_rate_mean": 0.00195312,
+              "saturation_fraction_mean": 0.00950521,
+              "n_later_writes_to_sstar_mean": 1.05833328,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.94722921,
+              "read_prob_on_sstar_mean": 0.99997061
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.6138379,
+              "cosine_postwrite_query_min": -0.77879113,
+              "normalized_l2_drift_mean": 0.77062112,
+              "norm_ratio_query_over_postwrite_mean": 1.08432209,
+              "sign_change_rate_mean": 0.23268229,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 21.29999924,
+              "explicit_overwrite_fraction": 0.375,
+              "write_gate_at_fact_mean": 0.78939998,
+              "read_prob_on_sstar_mean": 0.00863641
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.93245983,
+              "cosine_postwrite_query_min": -0.17332755,
+              "normalized_l2_drift_mean": 0.2382177,
+              "norm_ratio_query_over_postwrite_mean": 0.96362901,
+              "sign_change_rate_mean": 0.06686198,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 1.27499998,
+              "explicit_overwrite_fraction": 0.51666665,
+              "write_gate_at_fact_mean": 0.74594343,
+              "read_prob_on_sstar_mean": 0.0092076
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.8959769,
+              "cosine_postwrite_query_min": -0.14301097,
+              "normalized_l2_drift_mean": 0.31259403,
+              "norm_ratio_query_over_postwrite_mean": 0.94640505,
+              "sign_change_rate_mean": 0.09609375,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 1.67499995,
+              "explicit_overwrite_fraction": 0.59166664,
+              "write_gate_at_fact_mean": 0.62728137,
+              "read_prob_on_sstar_mean": 0.01020492
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.8959769,
+            "cosine_postwrite_query_min": -0.14301097,
+            "normalized_l2_drift_mean": 0.31259403,
+            "norm_ratio_query_over_postwrite_mean": 0.94640505,
+            "sign_change_rate_mean": 0.09609375,
+            "saturation_fraction_mean": 0.00911458,
+            "n_later_writes_to_sstar_mean": 1.67499995,
+            "explicit_overwrite_fraction": 0.59166664,
+            "write_gate_at_fact_mean": 0.62728137,
+            "read_prob_on_sstar_mean": 0.01020492
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 1.0,
+              "cosine_postwrite_query_min": 0.99999982,
+              "normalized_l2_drift_mean": 2.07e-06,
+              "norm_ratio_query_over_postwrite_mean": 0.99999845,
+              "sign_change_rate_mean": 0.0,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 0.97500002,
+              "explicit_overwrite_fraction": 0.78333336,
+              "write_gate_at_fact_mean": 0.97460693,
+              "read_prob_on_sstar_mean": 1.0
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.89113432,
+              "cosine_postwrite_query_min": 0.21877924,
+              "normalized_l2_drift_mean": 0.42069882,
+              "norm_ratio_query_over_postwrite_mean": 0.81848085,
+              "sign_change_rate_mean": 0.12799479,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.67196977,
+              "read_prob_on_sstar_mean": 0.9995535
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.89375818,
+              "cosine_postwrite_query_min": 0.21780628,
+              "normalized_l2_drift_mean": 0.40604696,
+              "norm_ratio_query_over_postwrite_mean": 0.78241068,
+              "sign_change_rate_mean": 0.11341146,
+              "saturation_fraction_mean": 0.00865885,
+              "n_later_writes_to_sstar_mean": 101.05000305,
+              "explicit_overwrite_fraction": 0.94999999,
+              "write_gate_at_fact_mean": 0.59289998,
+              "read_prob_on_sstar_mean": 0.9988178
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.70962441,
+              "cosine_postwrite_query_min": -0.10517067,
+              "normalized_l2_drift_mean": 0.66804612,
+              "norm_ratio_query_over_postwrite_mean": 0.72019136,
+              "sign_change_rate_mean": 0.24361978,
+              "saturation_fraction_mean": 0.00865885,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.86666667,
+              "write_gate_at_fact_mean": 0.78611755,
+              "read_prob_on_sstar_mean": 0.99896079
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.70962441,
+            "cosine_postwrite_query_min": -0.10517067,
+            "normalized_l2_drift_mean": 0.66804612,
+            "norm_ratio_query_over_postwrite_mean": 0.72019136,
+            "sign_change_rate_mean": 0.24361978,
+            "saturation_fraction_mean": 0.00865885,
+            "n_later_writes_to_sstar_mean": 103.0,
+            "explicit_overwrite_fraction": 0.86666667,
+            "write_gate_at_fact_mean": 0.78611755,
+            "read_prob_on_sstar_mean": 0.99896079
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99996907,
+              "cosine_postwrite_query_min": 0.99945009,
+              "normalized_l2_drift_mean": 0.00542692,
+              "norm_ratio_query_over_postwrite_mean": 0.9954645,
+              "sign_change_rate_mean": 0.00097656,
+              "saturation_fraction_mean": 0.01002604,
+              "n_later_writes_to_sstar_mean": 1.00833333,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.97782236,
+              "read_prob_on_sstar_mean": 5e-08
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.99292064,
+              "cosine_postwrite_query_min": 0.84292006,
+              "normalized_l2_drift_mean": 0.1150801,
+              "norm_ratio_query_over_postwrite_mean": 1.02260327,
+              "sign_change_rate_mean": 0.03144531,
+              "saturation_fraction_mean": 0.00898437,
+              "n_later_writes_to_sstar_mean": 96.28333282,
+              "explicit_overwrite_fraction": 0.92500001,
+              "write_gate_at_fact_mean": 0.63937509,
+              "read_prob_on_sstar_mean": 0.00177389
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.9968344,
+              "cosine_postwrite_query_min": 0.93914366,
+              "normalized_l2_drift_mean": 0.08080321,
+              "norm_ratio_query_over_postwrite_mean": 1.00681067,
+              "sign_change_rate_mean": 0.01705729,
+              "saturation_fraction_mean": 0.00963542,
+              "n_later_writes_to_sstar_mean": 99.52500153,
+              "explicit_overwrite_fraction": 0.875,
+              "write_gate_at_fact_mean": 0.78341728,
+              "read_prob_on_sstar_mean": 0.42995387
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.99588841,
+              "cosine_postwrite_query_min": 0.94649768,
+              "normalized_l2_drift_mean": 0.08708359,
+              "norm_ratio_query_over_postwrite_mean": 0.98886579,
+              "sign_change_rate_mean": 0.01927083,
+              "saturation_fraction_mean": 0.01171875,
+              "n_later_writes_to_sstar_mean": 98.08333588,
+              "explicit_overwrite_fraction": 0.88333333,
+              "write_gate_at_fact_mean": 0.84091389,
+              "read_prob_on_sstar_mean": 0.57925373
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.99588841,
+            "cosine_postwrite_query_min": 0.94649768,
+            "normalized_l2_drift_mean": 0.08708359,
+            "norm_ratio_query_over_postwrite_mean": 0.98886579,
+            "sign_change_rate_mean": 0.01927083,
+            "saturation_fraction_mean": 0.01171875,
+            "n_later_writes_to_sstar_mean": 98.08333588,
+            "explicit_overwrite_fraction": 0.88333333,
+            "write_gate_at_fact_mean": 0.84091389,
+            "read_prob_on_sstar_mean": 0.57925373
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99999082,
+              "cosine_postwrite_query_min": 0.99926698,
+              "normalized_l2_drift_mean": 0.00117677,
+              "norm_ratio_query_over_postwrite_mean": 0.99911898,
+              "sign_change_rate_mean": 0.00032552,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 1.0,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.95131284,
+              "read_prob_on_sstar_mean": 0.99999803
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.93613183,
+              "cosine_postwrite_query_min": 0.60474586,
+              "normalized_l2_drift_mean": 0.33450288,
+              "norm_ratio_query_over_postwrite_mean": 0.83963513,
+              "sign_change_rate_mean": 0.09752604,
+              "saturation_fraction_mean": 0.00904948,
+              "n_later_writes_to_sstar_mean": 95.92500305,
+              "explicit_overwrite_fraction": 0.88333333,
+              "write_gate_at_fact_mean": 0.66244966,
+              "read_prob_on_sstar_mean": 0.99158996
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.88698351,
+              "cosine_postwrite_query_min": 0.3926127,
+              "normalized_l2_drift_mean": 0.46128643,
+              "norm_ratio_query_over_postwrite_mean": 0.76532471,
+              "sign_change_rate_mean": 0.13665365,
+              "saturation_fraction_mean": 0.00924479,
+              "n_later_writes_to_sstar_mean": 99.47499847,
+              "explicit_overwrite_fraction": 0.72500002,
+              "write_gate_at_fact_mean": 0.78050297,
+              "read_prob_on_sstar_mean": 0.99144882
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.90578282,
+              "cosine_postwrite_query_min": 0.61227667,
+              "normalized_l2_drift_mean": 0.42514727,
+              "norm_ratio_query_over_postwrite_mean": 0.79096431,
+              "sign_change_rate_mean": 0.12858073,
+              "saturation_fraction_mean": 0.00957031,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.82499999,
+              "write_gate_at_fact_mean": 0.87304664,
+              "read_prob_on_sstar_mean": 0.99972302
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.90578282,
+            "cosine_postwrite_query_min": 0.61227667,
+            "normalized_l2_drift_mean": 0.42514727,
+            "norm_ratio_query_over_postwrite_mean": 0.79096431,
+            "sign_change_rate_mean": 0.12858073,
+            "saturation_fraction_mean": 0.00957031,
+            "n_later_writes_to_sstar_mean": 103.0,
+            "explicit_overwrite_fraction": 0.82499999,
+            "write_gate_at_fact_mean": 0.87304664,
+            "read_prob_on_sstar_mean": 0.99972302
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99248314,
+              "cosine_postwrite_query_min": 0.89053309,
+              "normalized_l2_drift_mean": 0.05761582,
+              "norm_ratio_query_over_postwrite_mean": 0.9539144,
+              "sign_change_rate_mean": 0.01425781,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 1.13333333,
+              "explicit_overwrite_fraction": 0.98333335,
+              "write_gate_at_fact_mean": 0.99271113,
+              "read_prob_on_sstar_mean": 0.99960434
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.80471075,
+              "cosine_postwrite_query_min": -0.55467433,
+              "normalized_l2_drift_mean": 0.44522303,
+              "norm_ratio_query_over_postwrite_mean": 0.9585622,
+              "sign_change_rate_mean": 0.15234375,
+              "saturation_fraction_mean": 0.00839844,
+              "n_later_writes_to_sstar_mean": 19.24166679,
+              "explicit_overwrite_fraction": 0.67500001,
+              "write_gate_at_fact_mean": 0.42761901,
+              "read_prob_on_sstar_mean": 0.65922165
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.98707044,
+              "cosine_postwrite_query_min": 0.94148707,
+              "normalized_l2_drift_mean": 0.17824863,
+              "norm_ratio_query_over_postwrite_mean": 1.04053605,
+              "sign_change_rate_mean": 0.05416667,
+              "saturation_fraction_mean": 0.0078125,
+              "n_later_writes_to_sstar_mean": 101.52500153,
+              "explicit_overwrite_fraction": 0.625,
+              "write_gate_at_fact_mean": 0.88216472,
+              "read_prob_on_sstar_mean": 0.78868794
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.97029471,
+              "cosine_postwrite_query_min": 0.79686368,
+              "normalized_l2_drift_mean": 0.21919654,
+              "norm_ratio_query_over_postwrite_mean": 0.96370071,
+              "sign_change_rate_mean": 0.04772135,
+              "saturation_fraction_mean": 0.00878906,
+              "n_later_writes_to_sstar_mean": 100.78333282,
+              "explicit_overwrite_fraction": 0.84166664,
+              "write_gate_at_fact_mean": 0.95307153,
+              "read_prob_on_sstar_mean": 0.79214585
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.97029471,
+            "cosine_postwrite_query_min": 0.79686368,
+            "normalized_l2_drift_mean": 0.21919654,
+            "norm_ratio_query_over_postwrite_mean": 0.96370071,
+            "sign_change_rate_mean": 0.04772135,
+            "saturation_fraction_mean": 0.00878906,
+            "n_later_writes_to_sstar_mean": 100.78333282,
+            "explicit_overwrite_fraction": 0.84166664,
+            "write_gate_at_fact_mean": 0.95307153,
+            "read_prob_on_sstar_mean": 0.79214585
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99836755,
+              "cosine_postwrite_query_min": 0.94418633,
+              "normalized_l2_drift_mean": 0.01767208,
+              "norm_ratio_query_over_postwrite_mean": 0.98631287,
+              "sign_change_rate_mean": 0.00416667,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 1.04999995,
+              "explicit_overwrite_fraction": 0.0,
+              "write_gate_at_fact_mean": 0.99532634,
+              "read_prob_on_sstar_mean": 0.99998987
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.84145999,
+              "cosine_postwrite_query_min": 0.38035727,
+              "normalized_l2_drift_mean": 0.53629845,
+              "norm_ratio_query_over_postwrite_mean": 0.91181654,
+              "sign_change_rate_mean": 0.16640624,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 98.69999695,
+              "explicit_overwrite_fraction": 0.875,
+              "write_gate_at_fact_mean": 0.65140277,
+              "read_prob_on_sstar_mean": 0.99921745
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.80439019,
+              "cosine_postwrite_query_min": 0.18234697,
+              "normalized_l2_drift_mean": 0.59622258,
+              "norm_ratio_query_over_postwrite_mean": 0.97843361,
+              "sign_change_rate_mean": 0.19798177,
+              "saturation_fraction_mean": 0.00872396,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.79166669,
+              "write_gate_at_fact_mean": 0.80589586,
+              "read_prob_on_sstar_mean": 0.99843401
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.71239984,
+              "cosine_postwrite_query_min": -0.30414012,
+              "normalized_l2_drift_mean": 0.72181916,
+              "norm_ratio_query_over_postwrite_mean": 0.96915567,
+              "sign_change_rate_mean": 0.23183593,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 102.90000153,
+              "explicit_overwrite_fraction": 0.95833331,
+              "write_gate_at_fact_mean": 0.29597375,
+              "read_prob_on_sstar_mean": 0.99731612
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.71239984,
+            "cosine_postwrite_query_min": -0.30414012,
+            "normalized_l2_drift_mean": 0.72181916,
+            "norm_ratio_query_over_postwrite_mean": 0.96915567,
+            "sign_change_rate_mean": 0.23183593,
+            "saturation_fraction_mean": 0.00891927,
+            "n_later_writes_to_sstar_mean": 102.90000153,
+            "explicit_overwrite_fraction": 0.95833331,
+            "write_gate_at_fact_mean": 0.29597375,
+            "read_prob_on_sstar_mean": 0.99731612
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99903053,
+              "cosine_postwrite_query_min": 0.93685561,
+              "normalized_l2_drift_mean": 0.01194286,
+              "norm_ratio_query_over_postwrite_mean": 0.99205476,
+              "sign_change_rate_mean": 0.003125,
+              "saturation_fraction_mean": 0.0094401,
+              "n_later_writes_to_sstar_mean": 0.83333331,
+              "explicit_overwrite_fraction": 0.075,
+              "write_gate_at_fact_mean": 0.99683034,
+              "read_prob_on_sstar_mean": 0.09511942
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.38330212,
+              "cosine_postwrite_query_min": -0.54335338,
+              "normalized_l2_drift_mean": 1.34668231,
+              "norm_ratio_query_over_postwrite_mean": 1.36823022,
+              "sign_change_rate_mean": 0.36054689,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 92.57499695,
+              "explicit_overwrite_fraction": 0.81666666,
+              "write_gate_at_fact_mean": 0.752918,
+              "read_prob_on_sstar_mean": 0.39547139
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.58645988,
+              "cosine_postwrite_query_min": -0.42093676,
+              "normalized_l2_drift_mean": 0.85536766,
+              "norm_ratio_query_over_postwrite_mean": 0.91127491,
+              "sign_change_rate_mean": 0.30364582,
+              "saturation_fraction_mean": 0.00846354,
+              "n_later_writes_to_sstar_mean": 99.47499847,
+              "explicit_overwrite_fraction": 0.97500002,
+              "write_gate_at_fact_mean": 0.68791789,
+              "read_prob_on_sstar_mean": 0.77033681
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.81378567,
+              "cosine_postwrite_query_min": -0.38005856,
+              "normalized_l2_drift_mean": 0.65951151,
+              "norm_ratio_query_over_postwrite_mean": 1.19439888,
+              "sign_change_rate_mean": 0.15338542,
+              "saturation_fraction_mean": 0.00833333,
+              "n_later_writes_to_sstar_mean": 71.29166412,
+              "explicit_overwrite_fraction": 0.69999999,
+              "write_gate_at_fact_mean": 0.47434303,
+              "read_prob_on_sstar_mean": 0.74489743
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.81378567,
+            "cosine_postwrite_query_min": -0.38005856,
+            "normalized_l2_drift_mean": 0.65951151,
+            "norm_ratio_query_over_postwrite_mean": 1.19439888,
+            "sign_change_rate_mean": 0.15338542,
+            "saturation_fraction_mean": 0.00833333,
+            "n_later_writes_to_sstar_mean": 71.29166412,
+            "explicit_overwrite_fraction": 0.69999999,
+            "write_gate_at_fact_mean": 0.47434303,
+            "read_prob_on_sstar_mean": 0.74489743
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99999994,
+              "cosine_postwrite_query_min": 0.99999464,
+              "normalized_l2_drift_mean": 0.000359,
+              "norm_ratio_query_over_postwrite_mean": 0.99969065,
+              "sign_change_rate_mean": 6.51e-05,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 0.80833334,
+              "explicit_overwrite_fraction": 0.10833333,
+              "write_gate_at_fact_mean": 0.97560889,
+              "read_prob_on_sstar_mean": 0.30863914
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.64283204,
+              "cosine_postwrite_query_min": -0.50514299,
+              "normalized_l2_drift_mean": 0.85995942,
+              "norm_ratio_query_over_postwrite_mean": 1.19453251,
+              "sign_change_rate_mean": 0.24381511,
+              "saturation_fraction_mean": 0.009375,
+              "n_later_writes_to_sstar_mean": 73.44166565,
+              "explicit_overwrite_fraction": 0.89166665,
+              "write_gate_at_fact_mean": 0.64929491,
+              "read_prob_on_sstar_mean": 0.58073223
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.81590784,
+              "cosine_postwrite_query_min": -0.07440767,
+              "normalized_l2_drift_mean": 0.5228281,
+              "norm_ratio_query_over_postwrite_mean": 1.04973936,
+              "sign_change_rate_mean": 0.15319011,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 58.08333206,
+              "explicit_overwrite_fraction": 0.97500002,
+              "write_gate_at_fact_mean": 0.37284312,
+              "read_prob_on_sstar_mean": 0.58745599
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.93704116,
+              "cosine_postwrite_query_min": -0.35954043,
+              "normalized_l2_drift_mean": 0.28096879,
+              "norm_ratio_query_over_postwrite_mean": 0.89435333,
+              "sign_change_rate_mean": 0.08079427,
+              "saturation_fraction_mean": 0.01022135,
+              "n_later_writes_to_sstar_mean": 95.48332977,
+              "explicit_overwrite_fraction": 0.89166665,
+              "write_gate_at_fact_mean": 0.64907414,
+              "read_prob_on_sstar_mean": 0.68477637
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.93704116,
+            "cosine_postwrite_query_min": -0.35954043,
+            "normalized_l2_drift_mean": 0.28096879,
+            "norm_ratio_query_over_postwrite_mean": 0.89435333,
+            "sign_change_rate_mean": 0.08079427,
+            "saturation_fraction_mean": 0.01022135,
+            "n_later_writes_to_sstar_mean": 95.48332977,
+            "explicit_overwrite_fraction": 0.89166665,
+            "write_gate_at_fact_mean": 0.64907414,
+            "read_prob_on_sstar_mean": 0.68477637
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99425095,
+              "cosine_postwrite_query_min": 0.8717258,
+              "normalized_l2_drift_mean": 0.10377531,
+              "norm_ratio_query_over_postwrite_mean": 0.91529095,
+              "sign_change_rate_mean": 0.02115885,
+              "saturation_fraction_mean": 0.01009115,
+              "n_later_writes_to_sstar_mean": 1.42499995,
+              "explicit_overwrite_fraction": 0.41666666,
+              "write_gate_at_fact_mean": 0.99190867,
+              "read_prob_on_sstar_mean": 0.53228229
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.98541492,
+              "cosine_postwrite_query_min": 0.88512599,
+              "normalized_l2_drift_mean": 0.18188684,
+              "norm_ratio_query_over_postwrite_mean": 0.91263849,
+              "sign_change_rate_mean": 0.05768229,
+              "saturation_fraction_mean": 0.00996094,
+              "n_later_writes_to_sstar_mean": 93.6333313,
+              "explicit_overwrite_fraction": 0.875,
+              "write_gate_at_fact_mean": 0.53081006,
+              "read_prob_on_sstar_mean": 0.90308166
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.99730039,
+              "cosine_postwrite_query_min": 0.98385215,
+              "normalized_l2_drift_mean": 0.07871453,
+              "norm_ratio_query_over_postwrite_mean": 0.96742505,
+              "sign_change_rate_mean": 0.04309896,
+              "saturation_fraction_mean": 0.00794271,
+              "n_later_writes_to_sstar_mean": 77.0083313,
+              "explicit_overwrite_fraction": 0.89166665,
+              "write_gate_at_fact_mean": 0.77454132,
+              "read_prob_on_sstar_mean": 0.56597108
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.99143589,
+              "cosine_postwrite_query_min": 0.89010692,
+              "normalized_l2_drift_mean": 0.14953062,
+              "norm_ratio_query_over_postwrite_mean": 0.91016549,
+              "sign_change_rate_mean": 0.03893229,
+              "saturation_fraction_mean": 0.0078125,
+              "n_later_writes_to_sstar_mean": 98.69999695,
+              "explicit_overwrite_fraction": 0.95833331,
+              "write_gate_at_fact_mean": 0.8553614,
+              "read_prob_on_sstar_mean": 0.95770079
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.99143589,
+            "cosine_postwrite_query_min": 0.89010692,
+            "normalized_l2_drift_mean": 0.14953062,
+            "norm_ratio_query_over_postwrite_mean": 0.91016549,
+            "sign_change_rate_mean": 0.03893229,
+            "saturation_fraction_mean": 0.0078125,
+            "n_later_writes_to_sstar_mean": 98.69999695,
+            "explicit_overwrite_fraction": 0.95833331,
+            "write_gate_at_fact_mean": 0.8553614,
+            "read_prob_on_sstar_mean": 0.95770079
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 1.0,
+              "cosine_postwrite_query_min": 0.99999976,
+              "normalized_l2_drift_mean": 4.639e-05,
+              "norm_ratio_query_over_postwrite_mean": 0.99996048,
+              "sign_change_rate_mean": 0.0,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 1.0,
+              "explicit_overwrite_fraction": 0.48333332,
+              "write_gate_at_fact_mean": 0.9867022,
+              "read_prob_on_sstar_mean": 0.47089463
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.87607765,
+              "cosine_postwrite_query_min": 0.18801787,
+              "normalized_l2_drift_mean": 0.45842415,
+              "norm_ratio_query_over_postwrite_mean": 1.03369915,
+              "sign_change_rate_mean": 0.14544271,
+              "saturation_fraction_mean": 0.00904948,
+              "n_later_writes_to_sstar_mean": 89.97499847,
+              "explicit_overwrite_fraction": 0.98333335,
+              "write_gate_at_fact_mean": 0.53028291,
+              "read_prob_on_sstar_mean": 0.75286782
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.97376812,
+              "cosine_postwrite_query_min": 0.78695011,
+              "normalized_l2_drift_mean": 0.20869201,
+              "norm_ratio_query_over_postwrite_mean": 0.98985958,
+              "sign_change_rate_mean": 0.06608073,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 64.08333588,
+              "explicit_overwrite_fraction": 0.875,
+              "write_gate_at_fact_mean": 0.5014199,
+              "read_prob_on_sstar_mean": 0.66998512
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.95940667,
+              "cosine_postwrite_query_min": 0.88197315,
+              "normalized_l2_drift_mean": 0.27976942,
+              "norm_ratio_query_over_postwrite_mean": 0.98331428,
+              "sign_change_rate_mean": 0.10488281,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 102.97499847,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.83227718,
+              "read_prob_on_sstar_mean": 0.99809188
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.95940667,
+            "cosine_postwrite_query_min": 0.88197315,
+            "normalized_l2_drift_mean": 0.27976942,
+            "norm_ratio_query_over_postwrite_mean": 0.98331428,
+            "sign_change_rate_mean": 0.10488281,
+            "saturation_fraction_mean": 0.00911458,
+            "n_later_writes_to_sstar_mean": 102.97499847,
+            "explicit_overwrite_fraction": 1.0,
+            "write_gate_at_fact_mean": 0.83227718,
+            "read_prob_on_sstar_mean": 0.99809188
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99997211,
+              "cosine_postwrite_query_min": 0.99803519,
+              "normalized_l2_drift_mean": 0.00422234,
+              "norm_ratio_query_over_postwrite_mean": 0.99671638,
+              "sign_change_rate_mean": 0.00091146,
+              "saturation_fraction_mean": 0.00872396,
+              "n_later_writes_to_sstar_mean": 1.00833333,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.9798761,
+              "read_prob_on_sstar_mean": 7.198e-05
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.9073143,
+              "cosine_postwrite_query_min": 0.31128508,
+              "normalized_l2_drift_mean": 0.37284899,
+              "norm_ratio_query_over_postwrite_mean": 0.9624691,
+              "sign_change_rate_mean": 0.10807291,
+              "saturation_fraction_mean": 0.00898437,
+              "n_later_writes_to_sstar_mean": 43.58333206,
+              "explicit_overwrite_fraction": 0.82499999,
+              "write_gate_at_fact_mean": 0.71366775,
+              "read_prob_on_sstar_mean": 0.1347831
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.89913625,
+              "cosine_postwrite_query_min": 0.34660563,
+              "normalized_l2_drift_mean": 0.42387491,
+              "norm_ratio_query_over_postwrite_mean": 1.05059004,
+              "sign_change_rate_mean": 0.11679687,
+              "saturation_fraction_mean": 0.00878906,
+              "n_later_writes_to_sstar_mean": 20.03333282,
+              "explicit_overwrite_fraction": 0.82499999,
+              "write_gate_at_fact_mean": 0.83553958,
+              "read_prob_on_sstar_mean": 0.05716864
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.95188308,
+              "cosine_postwrite_query_min": 0.75203824,
+              "normalized_l2_drift_mean": 0.3072547,
+              "norm_ratio_query_over_postwrite_mean": 0.99904591,
+              "sign_change_rate_mean": 0.09492187,
+              "saturation_fraction_mean": 0.009375,
+              "n_later_writes_to_sstar_mean": 98.97499847,
+              "explicit_overwrite_fraction": 0.85000002,
+              "write_gate_at_fact_mean": 0.76892406,
+              "read_prob_on_sstar_mean": 0.60007566
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.95188308,
+            "cosine_postwrite_query_min": 0.75203824,
+            "normalized_l2_drift_mean": 0.3072547,
+            "norm_ratio_query_over_postwrite_mean": 0.99904591,
+            "sign_change_rate_mean": 0.09492187,
+            "saturation_fraction_mean": 0.009375,
+            "n_later_writes_to_sstar_mean": 98.97499847,
+            "explicit_overwrite_fraction": 0.85000002,
+            "write_gate_at_fact_mean": 0.76892406,
+            "read_prob_on_sstar_mean": 0.60007566
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99999082,
+              "cosine_postwrite_query_min": 0.99926698,
+              "normalized_l2_drift_mean": 0.00117677,
+              "norm_ratio_query_over_postwrite_mean": 0.99911898,
+              "sign_change_rate_mean": 0.00032552,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 1.0,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.95131284,
+              "read_prob_on_sstar_mean": 0.99999803
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.93613183,
+              "cosine_postwrite_query_min": 0.60474586,
+              "normalized_l2_drift_mean": 0.33450288,
+              "norm_ratio_query_over_postwrite_mean": 0.83963513,
+              "sign_change_rate_mean": 0.09752604,
+              "saturation_fraction_mean": 0.00904948,
+              "n_later_writes_to_sstar_mean": 95.92500305,
+              "explicit_overwrite_fraction": 0.88333333,
+              "write_gate_at_fact_mean": 0.66244966,
+              "read_prob_on_sstar_mean": 0.99158996
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.88698351,
+              "cosine_postwrite_query_min": 0.3926127,
+              "normalized_l2_drift_mean": 0.46128643,
+              "norm_ratio_query_over_postwrite_mean": 0.76532471,
+              "sign_change_rate_mean": 0.13665365,
+              "saturation_fraction_mean": 0.00924479,
+              "n_later_writes_to_sstar_mean": 99.47499847,
+              "explicit_overwrite_fraction": 0.72500002,
+              "write_gate_at_fact_mean": 0.78050297,
+              "read_prob_on_sstar_mean": 0.99144882
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.90578282,
+              "cosine_postwrite_query_min": 0.61227667,
+              "normalized_l2_drift_mean": 0.42514727,
+              "norm_ratio_query_over_postwrite_mean": 0.79096431,
+              "sign_change_rate_mean": 0.12858073,
+              "saturation_fraction_mean": 0.00957031,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.82499999,
+              "write_gate_at_fact_mean": 0.87304664,
+              "read_prob_on_sstar_mean": 0.99972302
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.90578282,
+            "cosine_postwrite_query_min": 0.61227667,
+            "normalized_l2_drift_mean": 0.42514727,
+            "norm_ratio_query_over_postwrite_mean": 0.79096431,
+            "sign_change_rate_mean": 0.12858073,
+            "saturation_fraction_mean": 0.00957031,
+            "n_later_writes_to_sstar_mean": 103.0,
+            "explicit_overwrite_fraction": 0.82499999,
+            "write_gate_at_fact_mean": 0.87304664,
+            "read_prob_on_sstar_mean": 0.99972302
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "A1": {
+        "1200": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.87692553,
+              "cosine_postwrite_query_min": 0.66005492,
+              "normalized_l2_drift_mean": 0.52296847,
+              "norm_ratio_query_over_postwrite_mean": 0.64364618,
+              "sign_change_rate_mean": 0.15585938,
+              "saturation_fraction_mean": 0.00898437,
+              "n_later_writes_to_sstar_mean": 2.38333344,
+              "explicit_overwrite_fraction": 1.0,
+              "write_gate_at_fact_mean": 0.94426227,
+              "read_prob_on_sstar_mean": 0.29069179
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.94884479,
+              "cosine_postwrite_query_min": 0.58730358,
+              "normalized_l2_drift_mean": 0.29271141,
+              "norm_ratio_query_over_postwrite_mean": 0.97342193,
+              "sign_change_rate_mean": 0.09264323,
+              "saturation_fraction_mean": 0.00872396,
+              "n_later_writes_to_sstar_mean": 89.125,
+              "explicit_overwrite_fraction": 0.93333334,
+              "write_gate_at_fact_mean": 0.66323888,
+              "read_prob_on_sstar_mean": 0.61363125
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.9141162,
+              "cosine_postwrite_query_min": 0.17393547,
+              "normalized_l2_drift_mean": 0.32704324,
+              "norm_ratio_query_over_postwrite_mean": 0.90990037,
+              "sign_change_rate_mean": 0.1078776,
+              "saturation_fraction_mean": 0.00859375,
+              "n_later_writes_to_sstar_mean": 36.70000076,
+              "explicit_overwrite_fraction": 0.88333333,
+              "write_gate_at_fact_mean": 0.68410099,
+              "read_prob_on_sstar_mean": 0.3141416
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.91139036,
+              "cosine_postwrite_query_min": 0.37257642,
+              "normalized_l2_drift_mean": 0.38782427,
+              "norm_ratio_query_over_postwrite_mean": 1.00316644,
+              "sign_change_rate_mean": 0.11816406,
+              "saturation_fraction_mean": 0.0094401,
+              "n_later_writes_to_sstar_mean": 11.71666622,
+              "explicit_overwrite_fraction": 0.85833335,
+              "write_gate_at_fact_mean": 0.61888224,
+              "read_prob_on_sstar_mean": 0.28150073
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.91139036,
+            "cosine_postwrite_query_min": 0.37257642,
+            "normalized_l2_drift_mean": 0.38782427,
+            "norm_ratio_query_over_postwrite_mean": 1.00316644,
+            "sign_change_rate_mean": 0.11816406,
+            "saturation_fraction_mean": 0.0094401,
+            "n_later_writes_to_sstar_mean": 11.71666622,
+            "explicit_overwrite_fraction": 0.85833335,
+            "write_gate_at_fact_mean": 0.61888224,
+            "read_prob_on_sstar_mean": 0.28150073
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        },
+        "600": {
+          "distance": 96,
+          "n": 120,
+          "per_layer": [
+            {
+              "layer": 0,
+              "cosine_postwrite_query_mean": 0.99836755,
+              "cosine_postwrite_query_min": 0.94418633,
+              "normalized_l2_drift_mean": 0.01767208,
+              "norm_ratio_query_over_postwrite_mean": 0.98631287,
+              "sign_change_rate_mean": 0.00416667,
+              "saturation_fraction_mean": 0.00911458,
+              "n_later_writes_to_sstar_mean": 1.04999995,
+              "explicit_overwrite_fraction": 0.0,
+              "write_gate_at_fact_mean": 0.99532634,
+              "read_prob_on_sstar_mean": 0.99998987
+            },
+            {
+              "layer": 1,
+              "cosine_postwrite_query_mean": 0.84145999,
+              "cosine_postwrite_query_min": 0.38035727,
+              "normalized_l2_drift_mean": 0.53629845,
+              "norm_ratio_query_over_postwrite_mean": 0.91181654,
+              "sign_change_rate_mean": 0.16640624,
+              "saturation_fraction_mean": 0.0093099,
+              "n_later_writes_to_sstar_mean": 98.69999695,
+              "explicit_overwrite_fraction": 0.875,
+              "write_gate_at_fact_mean": 0.65140277,
+              "read_prob_on_sstar_mean": 0.99921745
+            },
+            {
+              "layer": 2,
+              "cosine_postwrite_query_mean": 0.80439019,
+              "cosine_postwrite_query_min": 0.18234697,
+              "normalized_l2_drift_mean": 0.59622258,
+              "norm_ratio_query_over_postwrite_mean": 0.97843361,
+              "sign_change_rate_mean": 0.19798177,
+              "saturation_fraction_mean": 0.00872396,
+              "n_later_writes_to_sstar_mean": 103.0,
+              "explicit_overwrite_fraction": 0.79166669,
+              "write_gate_at_fact_mean": 0.80589586,
+              "read_prob_on_sstar_mean": 0.99843401
+            },
+            {
+              "layer": 3,
+              "cosine_postwrite_query_mean": 0.71239984,
+              "cosine_postwrite_query_min": -0.30414012,
+              "normalized_l2_drift_mean": 0.72181916,
+              "norm_ratio_query_over_postwrite_mean": 0.96915567,
+              "sign_change_rate_mean": 0.23183593,
+              "saturation_fraction_mean": 0.00891927,
+              "n_later_writes_to_sstar_mean": 102.90000153,
+              "explicit_overwrite_fraction": 0.95833331,
+              "write_gate_at_fact_mean": 0.29597375,
+              "read_prob_on_sstar_mean": 0.99731612
+            }
+          ],
+          "summary_last_layer": {
+            "layer": 3,
+            "cosine_postwrite_query_mean": 0.71239984,
+            "cosine_postwrite_query_min": -0.30414012,
+            "normalized_l2_drift_mean": 0.72181916,
+            "norm_ratio_query_over_postwrite_mean": 0.96915567,
+            "sign_change_rate_mean": 0.23183593,
+            "saturation_fraction_mean": 0.00891927,
+            "n_later_writes_to_sstar_mean": 102.90000153,
+            "explicit_overwrite_fraction": 0.95833331,
+            "write_gate_at_fact_mean": 0.29597375,
+            "read_prob_on_sstar_mean": 0.99731612
+          },
+          "primary_question": "does the correct slot still contain a recoverable representation of the written fact at query time (A2 answers decodability; A1 the drift)"
+        }
+      }
+    }
+  ]
+}
