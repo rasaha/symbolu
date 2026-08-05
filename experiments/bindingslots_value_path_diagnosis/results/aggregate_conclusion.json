@@ -1,0 +1,76 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/aggregate_conclusion/v1",
+  "primary_verdict": "BINDINGSLOTS_BOTH_FAILURE_FAMILIES_LOCALIZED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "ready_for_kda_validation": false,
+  "cohort_size": 12,
+  "reproduction_accepted": 12,
+  "reproduction_failed": 0,
+  "value_path_localizations": [
+    "ADDRESS_DISTRIBUTION_FAILED",
+    "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+    "VALUE_PATH_NOT_LOCALIZED"
+  ],
+  "quality_localizations": [
+    "NOT_APPLICABLE_QUALITY_OK",
+    "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+    "QUALITY_INTERFERENCE_NOT_LOCALIZED"
+  ],
+  "per_seed_summary": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality": "NOT_APPLICABLE_QUALITY_OK"
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality": "NOT_APPLICABLE_QUALITY_OK"
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "quality": "NOT_APPLICABLE_QUALITY_OK"
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "value_path": "ADDRESS_DISTRIBUTION_FAILED",
+      "quality": "NOT_APPLICABLE_QUALITY_OK"
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality": "QUALITY_GRADIENT_CONFLICT_LOCALIZED"
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality": "QUALITY_GRADIENT_CONFLICT_LOCALIZED"
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality": "QUALITY_GRADIENT_CONFLICT_LOCALIZED"
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "value_path": "ADDRESS_DISTRIBUTION_FAILED",
+      "quality": "NOT_APPLICABLE_QUALITY_OK"
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "quality": "QUALITY_INTERFERENCE_NOT_LOCALIZED"
+    }
+  ],
+  "scope": "diagnostic only; no fix, no tuning, no next intervention phase, no KDA"
+}

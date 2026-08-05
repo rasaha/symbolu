@@ -1,0 +1,909 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/gradient_alignment/v1",
+  "bands": {
+    "CONFLICT_COS": -0.1,
+    "CONTROL_GAP": 0.15
+  },
+  "runs": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "alignment_lm_vs_persist": {
+        "900": {
+          "embeddings": {
+            "cosine": 0.00106731,
+            "zero_gradient": false,
+            "norm_a": 1.49905753,
+            "norm_b": 0.79224861
+          },
+          "backbone": {
+            "cosine": -0.01579777,
+            "zero_gradient": false,
+            "norm_a": 0.28616878,
+            "norm_b": 0.32122442
+          },
+          "slot_keys": {
+            "cosine": -0.09094509,
+            "zero_gradient": false,
+            "norm_a": 0.00046668,
+            "norm_b": 0.18960376
+          },
+          "write_addr_proj": {
+            "cosine": 0.09061207,
+            "zero_gradient": false,
+            "norm_a": 0.00099095,
+            "norm_b": 0.00342191
+          },
+          "read_addr_proj": {
+            "cosine": -0.05688385,
+            "zero_gradient": false,
+            "norm_a": 0.00131847,
+            "norm_b": 0.12498656
+          },
+          "write_value_proj": {
+            "cosine": 0.01098746,
+            "zero_gradient": false,
+            "norm_a": 0.06792243,
+            "norm_b": 0.13940905
+          },
+          "write_gate": {
+            "cosine": -0.09857247,
+            "zero_gradient": false,
+            "norm_a": 0.02019287,
+            "norm_b": 0.03454091
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.03314101,
+            "zero_gradient": false,
+            "norm_a": 0.08392486,
+            "norm_b": 0.14285232
+          },
+          "slot_norm": {
+            "cosine": 0.09269439,
+            "zero_gradient": false,
+            "norm_a": 0.02595719,
+            "norm_b": 0.17937016
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": -0.00661546,
+            "zero_gradient": false,
+            "norm_a": 0.37162018,
+            "norm_b": 0.29144958
+          },
+          "backbone": {
+            "cosine": 0.00590735,
+            "zero_gradient": false,
+            "norm_a": 0.08097439,
+            "norm_b": 0.14314641
+          },
+          "slot_keys": {
+            "cosine": -0.10557109,
+            "zero_gradient": false,
+            "norm_a": 0.00059854,
+            "norm_b": 0.10810361
+          },
+          "write_addr_proj": {
+            "cosine": 0.24023736,
+            "zero_gradient": false,
+            "norm_a": 0.00087524,
+            "norm_b": 0.00629091
+          },
+          "read_addr_proj": {
+            "cosine": -0.02831515,
+            "zero_gradient": false,
+            "norm_a": 0.00111907,
+            "norm_b": 0.11390717
+          },
+          "write_value_proj": {
+            "cosine": -0.04520011,
+            "zero_gradient": false,
+            "norm_a": 0.01686589,
+            "norm_b": 0.07002727
+          },
+          "write_gate": {
+            "cosine": 0.06057896,
+            "zero_gradient": false,
+            "norm_a": 0.01286476,
+            "norm_b": 0.02289314
+          },
+          "memory_readout_Wo": {
+            "cosine": 0.03436908,
+            "zero_gradient": false,
+            "norm_a": 0.02157737,
+            "norm_b": 0.12344176
+          },
+          "slot_norm": {
+            "cosine": 0.01353671,
+            "zero_gradient": false,
+            "norm_a": 0.00831299,
+            "norm_b": 0.08207486
+          }
+        }
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": {
+          "cosine": -9.344e-05,
+          "zero_gradient": false,
+          "norm_a": 1.52990699,
+          "norm_b": 0.92484528
+        },
+        "1200": {
+          "cosine": -0.00390926,
+          "zero_gradient": false,
+          "norm_a": 0.38153729,
+          "norm_b": 0.39685455
+        }
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": {
+          "embeddings": {
+            "cosine": 0.00356815,
+            "zero_gradient": false,
+            "norm_a": 0.33101419,
+            "norm_b": 0.01480756
+          },
+          "backbone": {
+            "cosine": 0.01717464,
+            "zero_gradient": false,
+            "norm_a": 0.06427468,
+            "norm_b": 0.00872134
+          },
+          "slot_keys": {
+            "cosine": 0.0044227,
+            "zero_gradient": false,
+            "norm_a": 0.00209266,
+            "norm_b": 0.00471552
+          },
+          "write_addr_proj": {
+            "cosine": 0.19407517,
+            "zero_gradient": false,
+            "norm_a": 0.00655332,
+            "norm_b": 0.00012171
+          },
+          "read_addr_proj": {
+            "cosine": 0.00319301,
+            "zero_gradient": false,
+            "norm_a": 0.00161173,
+            "norm_b": 0.00170598
+          },
+          "write_value_proj": {
+            "cosine": 0.0242738,
+            "zero_gradient": false,
+            "norm_a": 0.0147155,
+            "norm_b": 0.00250396
+          },
+          "write_gate": {
+            "cosine": 0.2464552,
+            "zero_gradient": false,
+            "norm_a": 0.01471719,
+            "norm_b": 0.00065096
+          },
+          "memory_readout_Wo": {
+            "cosine": 0.03602644,
+            "zero_gradient": false,
+            "norm_a": 0.01681901,
+            "norm_b": 0.00552623
+          },
+          "slot_norm": {
+            "cosine": 0.00787825,
+            "zero_gradient": false,
+            "norm_a": 0.01029812,
+            "norm_b": 0.0027571
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": -0.02550733,
+            "zero_gradient": false,
+            "norm_a": 0.28202662,
+            "norm_b": 0.12293467
+          },
+          "backbone": {
+            "cosine": 0.00908244,
+            "zero_gradient": false,
+            "norm_a": 0.06997398,
+            "norm_b": 0.06629127
+          },
+          "slot_keys": {
+            "cosine": 0.02184818,
+            "zero_gradient": false,
+            "norm_a": 0.01392894,
+            "norm_b": 0.02520706
+          },
+          "write_addr_proj": {
+            "cosine": 0.09753396,
+            "zero_gradient": false,
+            "norm_a": 0.01298298,
+            "norm_b": 0.00041074
+          },
+          "read_addr_proj": {
+            "cosine": 0.00466256,
+            "zero_gradient": false,
+            "norm_a": 0.01462707,
+            "norm_b": 0.01778989
+          },
+          "write_value_proj": {
+            "cosine": 0.0053335,
+            "zero_gradient": false,
+            "norm_a": 0.02963359,
+            "norm_b": 0.02523035
+          },
+          "write_gate": {
+            "cosine": 0.09105473,
+            "zero_gradient": false,
+            "norm_a": 0.10198318,
+            "norm_b": 0.00778431
+          },
+          "memory_readout_Wo": {
+            "cosine": 0.04300143,
+            "zero_gradient": false,
+            "norm_a": 0.02646374,
+            "norm_b": 0.04312936
+          },
+          "slot_norm": {
+            "cosine": 0.0020198,
+            "zero_gradient": false,
+            "norm_a": 0.01888179,
+            "norm_b": 0.03342886
+          }
+        }
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": {
+          "cosine": 0.00528124,
+          "zero_gradient": false,
+          "norm_a": 0.33839387,
+          "norm_b": 0.01910974
+        },
+        "1200": {
+          "cosine": -0.0145759,
+          "zero_gradient": false,
+          "norm_a": 0.31192043,
+          "norm_b": 0.15532698
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": {
+          "embeddings": {
+            "cosine": -0.007248,
+            "zero_gradient": false,
+            "norm_a": 0.44185713,
+            "norm_b": 0.02703824
+          },
+          "backbone": {
+            "cosine": -0.07457083,
+            "zero_gradient": false,
+            "norm_a": 0.06026633,
+            "norm_b": 0.00848081
+          },
+          "slot_keys": {
+            "cosine": 0.43952748,
+            "zero_gradient": false,
+            "norm_a": 0.01096923,
+            "norm_b": 0.00250745
+          },
+          "write_addr_proj": {
+            "cosine": 0.27141447,
+            "zero_gradient": false,
+            "norm_a": 0.00126873,
+            "norm_b": 0.00068241
+          },
+          "read_addr_proj": {
+            "cosine": -0.03407129,
+            "zero_gradient": false,
+            "norm_a": 0.00401514,
+            "norm_b": 0.00250926
+          },
+          "write_value_proj": {
+            "cosine": -0.10367648,
+            "zero_gradient": false,
+            "norm_a": 0.03361086,
+            "norm_b": 0.00497294
+          },
+          "write_gate": {
+            "cosine": -0.20662567,
+            "zero_gradient": false,
+            "norm_a": 0.09020735,
+            "norm_b": 0.0066929
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.16703921,
+            "zero_gradient": false,
+            "norm_a": 0.03360141,
+            "norm_b": 0.00550552
+          },
+          "slot_norm": {
+            "cosine": -0.14833324,
+            "zero_gradient": false,
+            "norm_a": 0.01365639,
+            "norm_b": 0.00339532
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": -0.00353606,
+            "zero_gradient": false,
+            "norm_a": 0.93610257,
+            "norm_b": 0.17411874
+          },
+          "backbone": {
+            "cosine": 0.02744142,
+            "zero_gradient": false,
+            "norm_a": 0.19776294,
+            "norm_b": 0.06560519
+          },
+          "slot_keys": {
+            "cosine": -0.03154568,
+            "zero_gradient": false,
+            "norm_a": 0.00151246,
+            "norm_b": 0.01783812
+          },
+          "write_addr_proj": {
+            "cosine": -0.10102771,
+            "zero_gradient": false,
+            "norm_a": 0.00386558,
+            "norm_b": 0.00607723
+          },
+          "read_addr_proj": {
+            "cosine": -0.01981542,
+            "zero_gradient": false,
+            "norm_a": 0.00210442,
+            "norm_b": 0.02014224
+          },
+          "write_value_proj": {
+            "cosine": -0.05755332,
+            "zero_gradient": false,
+            "norm_a": 0.0515568,
+            "norm_b": 0.04043478
+          },
+          "write_gate": {
+            "cosine": -0.33548535,
+            "zero_gradient": false,
+            "norm_a": 0.05181761,
+            "norm_b": 0.05234624
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.1250517,
+            "zero_gradient": false,
+            "norm_a": 0.06836287,
+            "norm_b": 0.04551193
+          },
+          "slot_norm": {
+            "cosine": -0.13087744,
+            "zero_gradient": false,
+            "norm_a": 0.02189895,
+            "norm_b": 0.037278
+          }
+        }
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": {
+          "cosine": -0.02099655,
+          "zero_gradient": false,
+          "norm_a": 0.45769486,
+          "norm_b": 0.03044563
+        },
+        "1200": {
+          "cosine": -0.00875227,
+          "zero_gradient": false,
+          "norm_a": 0.96205473,
+          "norm_b": 0.20786685
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": {
+          "embeddings": {
+            "cosine": 0.00365214,
+            "zero_gradient": false,
+            "norm_a": 0.70453024,
+            "norm_b": 0.01976813
+          },
+          "backbone": {
+            "cosine": 0.02540817,
+            "zero_gradient": false,
+            "norm_a": 0.17175825,
+            "norm_b": 0.00609966
+          },
+          "slot_keys": {
+            "cosine": 0.02819648,
+            "zero_gradient": false,
+            "norm_a": 0.00361913,
+            "norm_b": 0.00567373
+          },
+          "write_addr_proj": {
+            "cosine": 0.0239263,
+            "zero_gradient": false,
+            "norm_a": 0.0074365,
+            "norm_b": 0.00010102
+          },
+          "read_addr_proj": {
+            "cosine": -0.00068501,
+            "zero_gradient": false,
+            "norm_a": 0.00154692,
+            "norm_b": 0.00197023
+          },
+          "write_value_proj": {
+            "cosine": 0.07407267,
+            "zero_gradient": false,
+            "norm_a": 0.02034131,
+            "norm_b": 0.00405074
+          },
+          "write_gate": {
+            "cosine": 0.03861984,
+            "zero_gradient": false,
+            "norm_a": 0.02042104,
+            "norm_b": 0.00056881
+          },
+          "memory_readout_Wo": {
+            "cosine": 0.01259599,
+            "zero_gradient": false,
+            "norm_a": 0.02677424,
+            "norm_b": 0.00533375
+          },
+          "slot_norm": {
+            "cosine": 0.14924106,
+            "zero_gradient": false,
+            "norm_a": 0.014032,
+            "norm_b": 0.00321834
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": -0.0076682,
+            "zero_gradient": false,
+            "norm_a": 0.28608927,
+            "norm_b": 0.04378552
+          },
+          "backbone": {
+            "cosine": 0.05969954,
+            "zero_gradient": false,
+            "norm_a": 0.06508453,
+            "norm_b": 0.01390287
+          },
+          "slot_keys": {
+            "cosine": 0.0051851,
+            "zero_gradient": false,
+            "norm_a": 0.00302847,
+            "norm_b": 0.00860319
+          },
+          "write_addr_proj": {
+            "cosine": -0.20627641,
+            "zero_gradient": false,
+            "norm_a": 0.00278372,
+            "norm_b": 0.000147
+          },
+          "read_addr_proj": {
+            "cosine": -0.00153351,
+            "zero_gradient": false,
+            "norm_a": 0.00329823,
+            "norm_b": 0.00392413
+          },
+          "write_value_proj": {
+            "cosine": 0.02816486,
+            "zero_gradient": false,
+            "norm_a": 0.01050085,
+            "norm_b": 0.0093518
+          },
+          "write_gate": {
+            "cosine": 0.15063411,
+            "zero_gradient": false,
+            "norm_a": 0.00848271,
+            "norm_b": 0.00046647
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.0014513,
+            "zero_gradient": false,
+            "norm_a": 0.01028072,
+            "norm_b": 0.01450138
+          },
+          "slot_norm": {
+            "cosine": -0.05788374,
+            "zero_gradient": false,
+            "norm_a": 0.00617365,
+            "norm_b": 0.00746404
+          }
+        }
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": {
+          "cosine": 0.00562953,
+          "zero_gradient": false,
+          "norm_a": 0.7262457,
+          "norm_b": 0.02278846
+        },
+        "1200": {
+          "cosine": -0.00279659,
+          "zero_gradient": false,
+          "norm_a": 0.29392233,
+          "norm_b": 0.050521
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "alignment_lm_vs_persist": {
+        "900": {
+          "embeddings": {
+            "cosine": 0.00150796,
+            "zero_gradient": false,
+            "norm_a": 0.44992271,
+            "norm_b": 3.03157187
+          },
+          "backbone": {
+            "cosine": -0.005195,
+            "zero_gradient": false,
+            "norm_a": 0.05339262,
+            "norm_b": 0.62511319
+          },
+          "slot_keys": {
+            "cosine": -0.05890033,
+            "zero_gradient": false,
+            "norm_a": 0.00017993,
+            "norm_b": 0.34145299
+          },
+          "write_addr_proj": {
+            "cosine": -0.07354493,
+            "zero_gradient": false,
+            "norm_a": 0.00014815,
+            "norm_b": 0.0083652
+          },
+          "read_addr_proj": {
+            "cosine": -0.07106624,
+            "zero_gradient": false,
+            "norm_a": 7.054e-05,
+            "norm_b": 0.24799964
+          },
+          "write_value_proj": {
+            "cosine": -0.04983864,
+            "zero_gradient": false,
+            "norm_a": 0.02166323,
+            "norm_b": 0.38436025
+          },
+          "write_gate": {
+            "cosine": -0.54287215,
+            "zero_gradient": false,
+            "norm_a": 0.00747194,
+            "norm_b": 0.10561255
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.01447639,
+            "zero_gradient": false,
+            "norm_a": 0.03548352,
+            "norm_b": 0.37692073
+          },
+          "slot_norm": {
+            "cosine": -0.14103923,
+            "zero_gradient": false,
+            "norm_a": 0.00779649,
+            "norm_b": 0.20297201
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": 0.00813478,
+            "zero_gradient": false,
+            "norm_a": 0.32986954,
+            "norm_b": 0.72196972
+          },
+          "backbone": {
+            "cosine": -0.02057016,
+            "zero_gradient": false,
+            "norm_a": 0.05850191,
+            "norm_b": 0.17959279
+          },
+          "slot_keys": {
+            "cosine": -0.04438514,
+            "zero_gradient": false,
+            "norm_a": 0.00187993,
+            "norm_b": 0.41158545
+          },
+          "write_addr_proj": {
+            "cosine": -0.11513014,
+            "zero_gradient": false,
+            "norm_a": 0.00170627,
+            "norm_b": 0.01384782
+          },
+          "read_addr_proj": {
+            "cosine": -0.15530297,
+            "zero_gradient": false,
+            "norm_a": 0.00106949,
+            "norm_b": 0.19506194
+          },
+          "write_value_proj": {
+            "cosine": -0.07055716,
+            "zero_gradient": false,
+            "norm_a": 0.02965695,
+            "norm_b": 0.15335804
+          },
+          "write_gate": {
+            "cosine": -0.26079123,
+            "zero_gradient": false,
+            "norm_a": 0.02417447,
+            "norm_b": 0.0490593
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.06846023,
+            "zero_gradient": false,
+            "norm_a": 0.03605883,
+            "norm_b": 0.16251597
+          },
+          "slot_norm": {
+            "cosine": -0.11335666,
+            "zero_gradient": false,
+            "norm_a": 0.01300883,
+            "norm_b": 0.10431651
+          }
+        }
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": {
+          "cosine": 0.00042765,
+          "zero_gradient": false,
+          "norm_a": 0.45498973,
+          "norm_b": 3.17759204
+        },
+        "1200": {
+          "cosine": 0.00151476,
+          "zero_gradient": false,
+          "norm_a": 0.33929452,
+          "norm_b": 0.90777671
+        }
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "alignment_lm_vs_persist": {
+        "900": {
+          "embeddings": {
+            "cosine": 0.0006033,
+            "zero_gradient": false,
+            "norm_a": 0.88959545,
+            "norm_b": 0.56096864
+          },
+          "backbone": {
+            "cosine": 0.04659535,
+            "zero_gradient": false,
+            "norm_a": 0.25510183,
+            "norm_b": 0.20555037
+          },
+          "slot_keys": {
+            "cosine": -0.00529443,
+            "zero_gradient": false,
+            "norm_a": 0.00279773,
+            "norm_b": 0.70935589
+          },
+          "write_addr_proj": {
+            "cosine": -0.38112126,
+            "zero_gradient": false,
+            "norm_a": 0.00589583,
+            "norm_b": 0.00120331
+          },
+          "read_addr_proj": {
+            "cosine": -0.08402345,
+            "zero_gradient": false,
+            "norm_a": 0.00205356,
+            "norm_b": 0.18905328
+          },
+          "write_value_proj": {
+            "cosine": -0.07078724,
+            "zero_gradient": false,
+            "norm_a": 0.08950927,
+            "norm_b": 0.13456708
+          },
+          "write_gate": {
+            "cosine": 0.04965669,
+            "zero_gradient": false,
+            "norm_a": 0.09578144,
+            "norm_b": 0.01845832
+          },
+          "memory_readout_Wo": {
+            "cosine": -0.02432489,
+            "zero_gradient": false,
+            "norm_a": 0.08707154,
+            "norm_b": 0.1606333
+          },
+          "slot_norm": {
+            "cosine": 0.06185028,
+            "zero_gradient": false,
+            "norm_a": 0.04061644,
+            "norm_b": 0.07827208
+          }
+        },
+        "1200": {
+          "embeddings": {
+            "cosine": -0.00055283,
+            "zero_gradient": false,
+            "norm_a": 1.51368201,
+            "norm_b": 0.47975123
+          },
+          "backbone": {
+            "cosine": 0.03166852,
+            "zero_gradient": false,
+            "norm_a": 0.49253833,
+            "norm_b": 0.17373316
+          },
+          "slot_keys": {
+            "cosine": 0.10334514,
+            "zero_gradient": false,
+            "norm_a": 0.00392083,
+            "norm_b": 0.51015955
+          },
+          "write_addr_proj": {
+            "cosine": -0.24753473,
+            "zero_gradient": false,
+            "norm_a": 0.00604708,
+            "norm_b": 0.00039606
+          },
+          "read_addr_proj": {
+            "cosine": -0.10191609,
+            "zero_gradient": false,
+            "norm_a": 0.01079987,
+            "norm_b": 0.11784981
+          },
+          "write_value_proj": {
+            "cosine": 0.01985841,
+            "zero_gradient": false,
+            "norm_a": 0.08528749,
+            "norm_b": 0.08895788
+          },
+          "write_gate": {
+            "cosine": -0.05884845,
+            "zero_gradient": false,
+            "norm_a": 0.16859049,
+            "norm_b": 0.01228093
+          },
+          "memory_readout_Wo": {
+            "cosine": 0.08262149,
+            "zero_gradient": false,
+            "norm_a": 0.10600111,
+            "norm_b": 0.11591259
+          },
+          "slot_norm": {
+            "cosine": 0.01087935,
+            "zero_gradient": false,
+            "norm_a": 0.03913284,
+            "norm_b": 0.08132294
+          }
+        }
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": {
+          "cosine": 0.0019592,
+          "zero_gradient": false,
+          "norm_a": 0.93935907,
+          "norm_b": 0.97266829
+        },
+        "1200": {
+          "cosine": 0.00287437,
+          "zero_gradient": false,
+          "norm_a": 1.60660005,
+          "norm_b": 0.74999273
+        }
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_persist": {
+        "900": null,
+        "1200": null
+      },
+      "global_alignment_lm_vs_teacher": {
+        "900": null,
+        "1200": null
+      }
+    }
+  ]
+}

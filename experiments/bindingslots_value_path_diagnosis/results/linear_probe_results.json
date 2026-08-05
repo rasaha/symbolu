@@ -1,0 +1,1583 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/linear_probe_results/v1",
+  "probe_config": {
+    "seed": 20260804,
+    "n": 240,
+    "distance": 96,
+    "split": [
+      0.6,
+      0.2,
+      0.2
+    ],
+    "fit_steps": 300,
+    "chance": 0.0208
+  },
+  "runs": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.5,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.75,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.75,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.70833333
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.20833333,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.22916667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.1875,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.16666667
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.52083331,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.125,
+              "m_query_test_acc": 0.75,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.8125,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0625
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.8125,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.0625,
+            "decodability_drop_postwrite_to_query": -0.77083333
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.5,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.10416666,
+              "m_query_test_acc": 0.66666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.10416666,
+            "query_decodable": 0.66666669,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.56250002
+          }
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.625,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.22916667,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.22916667,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.20833334
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.70833331,
+              "m_query_test_acc": 0.6875,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.375,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.29166666,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.3125,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0625
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.3125,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.0625,
+            "decodability_drop_postwrite_to_query": -0.27083333
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.14583333,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.22916667,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.20833333,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.20833333,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.20833333
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.10416666,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.02083333,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.02083333
+          }
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.5,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.75,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.75,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.70833333
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.41666666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.54166669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.60416669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.60416669,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": -0.56250002
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.54166669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.125,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.10416666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.10416666,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.10416666
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.60416669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.10416666,
+              "m_query_test_acc": 0.35416666,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.10416666,
+              "m_query_test_acc": 0.3125,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.10416666,
+            "query_decodable": 0.3125,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.20833334
+          }
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.35416666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.29166666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.29166666,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": -0.29166666
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.02083333,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": 0.0
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.04166667,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": 0.0
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.0625,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0625,
+            "query_decodable": 0.0625,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": 0.0
+          }
+        }
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.52083331,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.60416669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.66666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.66666669,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.66666669
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.4375,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.5,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.5,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.47916667
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.375,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.4375,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.58333331,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.58333331,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.54166665
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.3125,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.5625,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.52083331,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.52083331,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.49999998
+          }
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.1875,
+              "m_query_test_acc": 0.83333331,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.1875,
+              "m_query_test_acc": 0.39583334,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.1875,
+              "m_query_test_acc": 0.60416669,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.1875,
+            "query_decodable": 0.60416669,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": -0.41666669
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.125,
+              "m_query_test_acc": 0.72916669,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.10416666,
+              "m_query_test_acc": 0.35416666,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.14583333,
+              "m_query_test_acc": 0.45833334,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.14583333,
+            "query_decodable": 0.45833334,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.31250001
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.8125,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.29166666,
+              "m_query_test_acc": 0.83333331,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.375,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.375,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.33333333
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.10416666,
+              "m_query_test_acc": 0.79166669,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.66666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.14583333,
+              "m_query_test_acc": 0.41666666,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.14583333,
+            "query_decodable": 0.41666666,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.27083333
+          }
+        }
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.45833334,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.39583334,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.39583334,
+            "non_target_control": 0.04166667,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": -0.39583334
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.22916667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0625
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.375,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.3125,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.3125,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.29166667
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.08333334,
+              "m_query_test_acc": 0.0625,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.14583333,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.10416666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.10416666,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.0625
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.125,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.04166667,
+            "query_decodable": 0.02083333,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": 0.02083333
+          }
+        }
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.04166667,
+              "m_query_test_acc": 0.35416666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.29166666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.29166666,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": -0.29166666
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.14583333,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.0625,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.0625,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.08333334
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.0625,
+            "non_target_control": 0.0625,
+            "shuffled_label_control": 0.08333334,
+            "decodability_drop_postwrite_to_query": -0.0625
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.0625,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.08333334,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0625
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.02083333,
+            "query_decodable": 0.04166667,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0625,
+            "decodability_drop_postwrite_to_query": -0.02083333
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.1875,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.0,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.0,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.04166667,
+            "decodability_drop_postwrite_to_query": 0.0
+          }
+        }
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "stagewise": {
+        "600": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.52083331,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.60416669,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.66666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.66666669,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.66666669
+          }
+        },
+        "700": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.33333334,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.47916666,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.04166667
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.5625,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0,
+            "query_decodable": 0.5625,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": -0.5625
+          }
+        },
+        "900": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.0,
+              "m_query_test_acc": 0.02083333,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.10416666,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0625,
+            "query_decodable": 0.04166667,
+            "non_target_control": 0.02083333,
+            "shuffled_label_control": 0.02083333,
+            "decodability_drop_postwrite_to_query": 0.02083333
+          }
+        },
+        "1200": {
+          "n": 240,
+          "distance": 96,
+          "chance": 0.0208,
+          "per_layer": [
+            {
+              "layer": 0,
+              "m_postwrite_test_acc": 0.91666669,
+              "m_query_test_acc": 0.91666669,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 1,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.04166667,
+              "non_target_test_acc": 0.02083333,
+              "m_query_shuffled_label_test_acc": 0.02083333
+            },
+            {
+              "layer": 2,
+              "m_postwrite_test_acc": 0.02083333,
+              "m_query_test_acc": 0.08333334,
+              "non_target_test_acc": 0.04166667,
+              "m_query_shuffled_label_test_acc": 0.0
+            },
+            {
+              "layer": 3,
+              "m_postwrite_test_acc": 0.0625,
+              "m_query_test_acc": 0.16666667,
+              "non_target_test_acc": 0.0,
+              "m_query_shuffled_label_test_acc": 0.0
+            }
+          ],
+          "summary_last_layer": {
+            "postwrite_decodable": 0.0625,
+            "query_decodable": 0.16666667,
+            "non_target_control": 0.0,
+            "shuffled_label_control": 0.0,
+            "decodability_drop_postwrite_to_query": -0.10416667
+          }
+        }
+      }
+    }
+  ]
+}

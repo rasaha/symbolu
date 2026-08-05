@@ -1,0 +1,21 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/tensor_manifest/v1",
+  "read_path": "u_read = sum_j r[j]*slot[j] ; c_mem = W_o(u_read) ; h_post = h_pre + c_mem",
+  "no_learned_read_or_fusion_gate": true,
+  "captured_per_slot_layer_at_query_and_fact": {
+    "v_fact": "written fact representation W_wv(norm(x)) at fact position [B,D]",
+    "waddr_fact": "write-address distribution at fact position [B,M]",
+    "sstar": "selected write-slot index argmax(waddr_fact) [B]",
+    "m_postwrite": "target slot immediately after write slots[fact_pos,s*] [B,D]",
+    "m_query": "target slot at query time slots[query_pos,s*] [B,D]",
+    "raddr_query": "read-address distribution at query [B,M]",
+    "read_query": "ordinary weighted read u_read at query [B,D]",
+    "c_mem_query": "projected memory contribution W_o(u_read) at query [B,D]",
+    "read_prob_on_sstar": "read probability placed on s* at query [B]",
+    "w_to_sstar": "gated write mass into s* over all positions [B,N]",
+    "gate_fact": "write gate at fact position [B]"
+  },
+  "answer_position_logits": "head(norm(h_final))[query_pos] over vocab",
+  "decoder_state": "final pre-head normalized residual (tied-head readout)",
+  "note": "h_pre/h_post are the residual stream immediately around the slot contribution add (block_x + local(x_norm) then + c_mem); A4b restores c_mem=W_o(m_postwrite)."
+}

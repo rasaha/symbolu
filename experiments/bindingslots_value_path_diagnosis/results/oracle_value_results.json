@@ -1,0 +1,329 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/oracle_value_results/v1",
+  "runs": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.7631321,
+        "target_logit_mean": 12.14757442,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.0389603,
+        "c_mem_norm_mean": 4.02281046
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.76182508,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.04842632,
+        "c_mem_norm_mean": 3.96386671,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": -0.00130701
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 6.02525139,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.04586413,
+        "c_mem_norm_mean": 3.9752512,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.26211929
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.76537943,
+        "target_logit_mean": 12.25005054,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.06907736,
+        "c_mem_norm_mean": 6.12136889
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.79828501,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.08136556,
+        "c_mem_norm_mean": 6.37481928,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.03290558
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.88178253,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.04740391,
+        "c_mem_norm_mean": 8.23801041,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.1164031
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 0.28333333,
+        "answer_logit_margin_mean": -1.08041537,
+        "target_logit_mean": 5.38551807,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.15962087,
+        "c_mem_norm_mean": 18.05548477
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 0.35833332,
+        "answer_logit_margin_mean": -0.35972187,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.10208997,
+        "c_mem_norm_mean": 11.62521744,
+        "needle_delta_vs_ordinary": 0.07499999,
+        "margin_delta_vs_ordinary": 0.7206935
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 0.38333333,
+        "answer_logit_margin_mean": -0.24159393,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.11224338,
+        "c_mem_norm_mean": 12.84104633,
+        "needle_delta_vs_ordinary": 0.09999999,
+        "margin_delta_vs_ordinary": 0.83882144
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 0.0,
+        "answer_logit_margin_mean": -6.01793861,
+        "target_logit_mean": -0.78144366,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.0980965,
+        "c_mem_norm_mean": 15.21862411
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 6.43387604,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.0909565,
+        "c_mem_norm_mean": 15.46081352,
+        "needle_delta_vs_ordinary": 1.0,
+        "margin_delta_vs_ordinary": 12.45181465
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 6.44904995,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.09845942,
+        "c_mem_norm_mean": 15.77464676,
+        "needle_delta_vs_ordinary": 1.0,
+        "margin_delta_vs_ordinary": 12.46698856
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 0.60833335,
+        "answer_logit_margin_mean": 0.31168741,
+        "target_logit_mean": 7.09054756,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.11234948,
+        "c_mem_norm_mean": 8.68336678
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 0.60833335,
+        "answer_logit_margin_mean": 0.30969444,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.11358455,
+        "c_mem_norm_mean": 8.59114933,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": -0.00199297
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 0.69166666,
+        "answer_logit_margin_mean": 0.88857543,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.09684816,
+        "c_mem_norm_mean": 8.28078365,
+        "needle_delta_vs_ordinary": 0.08333331,
+        "margin_delta_vs_ordinary": 0.57688802
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 4.31166887,
+        "target_logit_mean": 11.27182961,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.08635802,
+        "c_mem_norm_mean": 8.70815182
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 4.45324039,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.08091333,
+        "c_mem_norm_mean": 8.82522774,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.14157152
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 4.51854658,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.07959681,
+        "c_mem_norm_mean": 7.26750135,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.20687771
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.03440094,
+        "target_logit_mean": 11.94601345,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.08239407,
+        "c_mem_norm_mean": 4.47307825
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.42277002,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.08232103,
+        "c_mem_norm_mean": 4.45829678,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.38836908
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 1.0,
+        "answer_logit_margin_mean": 5.6579752,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.07450189,
+        "c_mem_norm_mean": 4.93892527,
+        "needle_delta_vs_ordinary": 0.0,
+        "margin_delta_vs_ordinary": 0.62357426
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 0.0,
+        "answer_logit_margin_mean": -9.50553703,
+        "target_logit_mean": -0.80168307,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.01877316,
+        "c_mem_norm_mean": 3.18124938
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 0.99166667,
+        "answer_logit_margin_mean": 5.58683825,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.13303658,
+        "c_mem_norm_mean": 2.85517287,
+        "needle_delta_vs_ordinary": 0.99166667,
+        "margin_delta_vs_ordinary": 15.09237528
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 0.99166667,
+        "answer_logit_margin_mean": 5.59987211,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.07508372,
+        "c_mem_norm_mean": 2.83870578,
+        "needle_delta_vs_ordinary": 0.99166667,
+        "margin_delta_vs_ordinary": 15.10540915
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "ordinary": {
+        "mode": "ordinary",
+        "distance": 96,
+        "needle_acc": 0.11666667,
+        "answer_logit_margin_mean": -2.98284006,
+        "target_logit_mean": 4.12384176,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.02449547,
+        "c_mem_norm_mean": 4.60226727
+      },
+      "A4a_oracle_read_query": {
+        "mode": "oracle_read_query",
+        "distance": 96,
+        "needle_acc": 0.84166664,
+        "answer_logit_margin_mean": 2.27145433,
+        "n": 120,
+        "c_mem_answer_cosine_mean": 0.01318172,
+        "c_mem_norm_mean": 4.90307426,
+        "needle_delta_vs_ordinary": 0.72499997,
+        "margin_delta_vs_ordinary": 5.2542944
+      },
+      "A4b_oracle_postwrite": {
+        "mode": "oracle_postwrite",
+        "distance": 96,
+        "needle_acc": 0.98333335,
+        "answer_logit_margin_mean": 4.59282207,
+        "n": 120,
+        "c_mem_answer_cosine_mean": -0.0250678,
+        "c_mem_norm_mean": 4.8611393,
+        "needle_delta_vs_ordinary": 0.86666668,
+        "margin_delta_vs_ordinary": 7.57566214
+      }
+    }
+  ]
+}

@@ -1,0 +1,445 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/per_seed_diagnosis/v1",
+  "frozen_constants": {
+    "CHANCE": 0.020833333333333332,
+    "DECODABLE_MIN": 0.5,
+    "MATERIAL_DROP": 0.2,
+    "RETRIEVAL_PRESENT_MIN": 0.5,
+    "RETRIEVAL_FAILS_MAX": 0.1,
+    "RECOVER_MIN": 0.5,
+    "CONFLICT_COS": -0.1,
+    "CONTROL_GAP": 0.15
+  },
+  "per_seed": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "value_path_diagnosis": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "value_path_reasons": {
+        "needle_baseline": 1.0,
+        "reason": "ordinary retrieval present"
+      },
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "quality_reasons": {
+        "quality_failed": false
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "CLEAN_STABLE",
+      "measurements": {
+        "needle_baseline": 1.0,
+        "oracle_address_needle": 1.0,
+        "oracle_read_query_needle": 1.0,
+        "oracle_postwrite_needle": 1.0,
+        "postwrite_decodable": 0.10416666,
+        "query_decodable": 0.66666669,
+        "quality_failed": false,
+        "failed_alignment_by_group": {},
+        "control_alignment_by_group": {},
+        "quality_control_seed": null
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "value_path_diagnosis": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "value_path_reasons": {
+        "needle_baseline": 1.0,
+        "reason": "ordinary retrieval present"
+      },
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "quality_reasons": {
+        "quality_failed": false
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "CLEAN_STABLE",
+      "measurements": {
+        "needle_baseline": 1.0,
+        "oracle_address_needle": 1.0,
+        "oracle_read_query_needle": 1.0,
+        "oracle_postwrite_needle": 1.0,
+        "postwrite_decodable": 0.0,
+        "query_decodable": 0.02083333,
+        "quality_failed": false,
+        "failed_alignment_by_group": {
+          "embeddings": -0.00661546,
+          "backbone": 0.00590735,
+          "slot_keys": -0.10557109,
+          "write_addr_proj": 0.24023736,
+          "read_addr_proj": -0.02831515,
+          "write_value_proj": -0.04520011,
+          "write_gate": 0.06057896,
+          "memory_readout_Wo": 0.03436908,
+          "slot_norm": 0.01353671
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.00661546,
+          "backbone": 0.00590735,
+          "slot_keys": -0.10557109,
+          "write_addr_proj": 0.24023736,
+          "read_addr_proj": -0.02831515,
+          "write_value_proj": -0.04520011,
+          "write_gate": 0.06057896,
+          "memory_readout_Wo": 0.03436908,
+          "slot_norm": 0.01353671
+        },
+        "quality_control_seed": 23
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "value_path_diagnosis": "VALUE_PATH_NOT_LOCALIZED",
+      "value_path_reasons": {
+        "needle_baseline": 0.28333333,
+        "postwrite_decodable": 0.10416666,
+        "query_decodable": 0.3125,
+        "postwrite_linearly_decodable": false,
+        "query_linearly_decodable": false,
+        "query_recoverable_functional_or_linear": false,
+        "query_linear_decodability_lost": false,
+        "ordinary_retrieval_fails": false,
+        "oracle_address_recovers": false,
+        "oracle_read_query_recovers": false,
+        "oracle_postwrite_recovers": false
+      },
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "quality_reasons": {
+        "quality_failed": false
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "CLEAN_STABLE",
+      "measurements": {
+        "needle_baseline": 0.28333333,
+        "oracle_address_needle": 0.35833332,
+        "oracle_read_query_needle": 0.35833332,
+        "oracle_postwrite_needle": 0.38333333,
+        "postwrite_decodable": 0.10416666,
+        "query_decodable": 0.3125,
+        "quality_failed": false,
+        "failed_alignment_by_group": {
+          "embeddings": -0.02550733,
+          "backbone": 0.00908244,
+          "slot_keys": 0.02184818,
+          "write_addr_proj": 0.09753396,
+          "read_addr_proj": 0.00466256,
+          "write_value_proj": 0.0053335,
+          "write_gate": 0.09105473,
+          "memory_readout_Wo": 0.04300143,
+          "slot_norm": 0.0020198
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.02550733,
+          "backbone": 0.00908244,
+          "slot_keys": 0.02184818,
+          "write_addr_proj": 0.09753396,
+          "read_addr_proj": 0.00466256,
+          "write_value_proj": 0.0053335,
+          "write_gate": 0.09105473,
+          "memory_readout_Wo": 0.04300143,
+          "slot_norm": 0.0020198
+        },
+        "quality_control_seed": 24
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "value_path_diagnosis": "ADDRESS_DISTRIBUTION_FAILED",
+      "value_path_reasons": {
+        "needle_baseline": 0.0,
+        "postwrite_decodable": 0.0625,
+        "query_decodable": 0.0625,
+        "postwrite_linearly_decodable": false,
+        "query_linearly_decodable": false,
+        "query_recoverable_functional_or_linear": true,
+        "query_linear_decodability_lost": false,
+        "ordinary_retrieval_fails": true,
+        "oracle_address_recovers": true,
+        "oracle_read_query_recovers": true,
+        "oracle_postwrite_recovers": true
+      },
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "quality_reasons": {
+        "quality_failed": false
+      },
+      "baseline_collapsed_ablations_non_informative": true,
+      "committed_category": "FORMED_THEN_COLLAPSED",
+      "measurements": {
+        "needle_baseline": 0.0,
+        "oracle_address_needle": 1.0,
+        "oracle_read_query_needle": 1.0,
+        "oracle_postwrite_needle": 1.0,
+        "postwrite_decodable": 0.0625,
+        "query_decodable": 0.0625,
+        "quality_failed": false,
+        "failed_alignment_by_group": {
+          "embeddings": -0.00353606,
+          "backbone": 0.02744142,
+          "slot_keys": -0.03154568,
+          "write_addr_proj": -0.10102771,
+          "read_addr_proj": -0.01981542,
+          "write_value_proj": -0.05755332,
+          "write_gate": -0.33548535,
+          "memory_readout_Wo": -0.1250517,
+          "slot_norm": -0.13087744
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.02550733,
+          "backbone": 0.00908244,
+          "slot_keys": 0.02184818,
+          "write_addr_proj": 0.09753396,
+          "read_addr_proj": 0.00466256,
+          "write_value_proj": 0.0053335,
+          "write_gate": 0.09105473,
+          "memory_readout_Wo": 0.04300143,
+          "slot_norm": 0.0020198
+        },
+        "quality_control_seed": 24
+      }
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "value_path_diagnosis": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "value_path_reasons": {
+        "needle_baseline": 0.60833335,
+        "reason": "ordinary retrieval present"
+      },
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "quality_reasons": {
+        "quality_failed": true,
+        "conflicted_groups": [
+          {
+            "group": "write_addr_proj",
+            "failed_cos": -0.20627641,
+            "control_cos": 0.09753396
+          }
+        ],
+        "n_conflicted": 1
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "QUALITY_FAILED",
+      "measurements": {
+        "needle_baseline": 0.60833335,
+        "oracle_address_needle": 0.60833335,
+        "oracle_read_query_needle": 0.60833335,
+        "oracle_postwrite_needle": 0.69166666,
+        "postwrite_decodable": 0.02083333,
+        "query_decodable": 0.52083331,
+        "quality_failed": true,
+        "failed_alignment_by_group": {
+          "embeddings": -0.0076682,
+          "backbone": 0.05969954,
+          "slot_keys": 0.0051851,
+          "write_addr_proj": -0.20627641,
+          "read_addr_proj": -0.00153351,
+          "write_value_proj": 0.02816486,
+          "write_gate": 0.15063411,
+          "memory_readout_Wo": -0.0014513,
+          "slot_norm": -0.05788374
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.02550733,
+          "backbone": 0.00908244,
+          "slot_keys": 0.02184818,
+          "write_addr_proj": 0.09753396,
+          "read_addr_proj": 0.00466256,
+          "write_value_proj": 0.0053335,
+          "write_gate": 0.09105473,
+          "memory_readout_Wo": 0.04300143,
+          "slot_norm": 0.0020198
+        },
+        "quality_control_seed": 24
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "value_path_diagnosis": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "value_path_reasons": {
+        "needle_baseline": 1.0,
+        "reason": "ordinary retrieval present"
+      },
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "quality_reasons": {
+        "quality_failed": true,
+        "conflicted_groups": [
+          {
+            "group": "write_addr_proj",
+            "failed_cos": -0.11513014,
+            "control_cos": 0.24023736
+          },
+          {
+            "group": "write_gate",
+            "failed_cos": -0.26079123,
+            "control_cos": 0.06057896
+          }
+        ],
+        "n_conflicted": 2
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "QUALITY_FAILED",
+      "measurements": {
+        "needle_baseline": 1.0,
+        "oracle_address_needle": 1.0,
+        "oracle_read_query_needle": 1.0,
+        "oracle_postwrite_needle": 1.0,
+        "postwrite_decodable": 0.14583333,
+        "query_decodable": 0.41666666,
+        "quality_failed": true,
+        "failed_alignment_by_group": {
+          "embeddings": 0.00813478,
+          "backbone": -0.02057016,
+          "slot_keys": -0.04438514,
+          "write_addr_proj": -0.11513014,
+          "read_addr_proj": -0.15530297,
+          "write_value_proj": -0.07055716,
+          "write_gate": -0.26079123,
+          "memory_readout_Wo": -0.06846023,
+          "slot_norm": -0.11335666
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.00661546,
+          "backbone": 0.00590735,
+          "slot_keys": -0.10557109,
+          "write_addr_proj": 0.24023736,
+          "read_addr_proj": -0.02831515,
+          "write_value_proj": -0.04520011,
+          "write_gate": 0.06057896,
+          "memory_readout_Wo": 0.03436908,
+          "slot_norm": 0.01353671
+        },
+        "quality_control_seed": 23
+      }
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "value_path_diagnosis": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "value_path_reasons": {
+        "needle_baseline": 1.0,
+        "reason": "ordinary retrieval present"
+      },
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "quality_reasons": {
+        "quality_failed": true,
+        "conflicted_groups": [
+          {
+            "group": "write_addr_proj",
+            "failed_cos": -0.24753473,
+            "control_cos": 0.24023736
+          }
+        ],
+        "n_conflicted": 1
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "QUALITY_FAILED",
+      "measurements": {
+        "needle_baseline": 1.0,
+        "oracle_address_needle": 1.0,
+        "oracle_read_query_needle": 1.0,
+        "oracle_postwrite_needle": 1.0,
+        "postwrite_decodable": 0.04166667,
+        "query_decodable": 0.02083333,
+        "quality_failed": true,
+        "failed_alignment_by_group": {
+          "embeddings": -0.00055283,
+          "backbone": 0.03166852,
+          "slot_keys": 0.10334514,
+          "write_addr_proj": -0.24753473,
+          "read_addr_proj": -0.10191609,
+          "write_value_proj": 0.01985841,
+          "write_gate": -0.05884845,
+          "memory_readout_Wo": 0.08262149,
+          "slot_norm": 0.01087935
+        },
+        "control_alignment_by_group": {
+          "embeddings": -0.00661546,
+          "backbone": 0.00590735,
+          "slot_keys": -0.10557109,
+          "write_addr_proj": 0.24023736,
+          "read_addr_proj": -0.02831515,
+          "write_value_proj": -0.04520011,
+          "write_gate": 0.06057896,
+          "memory_readout_Wo": 0.03436908,
+          "slot_norm": 0.01353671
+        },
+        "quality_control_seed": 23
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "value_path_diagnosis": "ADDRESS_DISTRIBUTION_FAILED",
+      "value_path_reasons": {
+        "needle_baseline": 0.0,
+        "postwrite_decodable": 0.0,
+        "query_decodable": 0.0,
+        "postwrite_linearly_decodable": false,
+        "query_linearly_decodable": false,
+        "query_recoverable_functional_or_linear": true,
+        "query_linear_decodability_lost": false,
+        "ordinary_retrieval_fails": true,
+        "oracle_address_recovers": true,
+        "oracle_read_query_recovers": true,
+        "oracle_postwrite_recovers": true
+      },
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "quality_reasons": {
+        "quality_failed": false
+      },
+      "baseline_collapsed_ablations_non_informative": true,
+      "committed_category": "FORMED_THEN_COLLAPSED",
+      "measurements": {
+        "needle_baseline": 0.0,
+        "oracle_address_needle": 0.99166667,
+        "oracle_read_query_needle": 0.99166667,
+        "oracle_postwrite_needle": 0.99166667,
+        "postwrite_decodable": 0.0,
+        "query_decodable": 0.0,
+        "quality_failed": false,
+        "failed_alignment_by_group": {},
+        "control_alignment_by_group": {},
+        "quality_control_seed": null
+      }
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "value_path_diagnosis": "VALUE_PATH_NOT_LOCALIZED",
+      "value_path_reasons": {
+        "needle_baseline": 0.11666667,
+        "postwrite_decodable": 0.0625,
+        "query_decodable": 0.16666667,
+        "postwrite_linearly_decodable": false,
+        "query_linearly_decodable": false,
+        "query_recoverable_functional_or_linear": true,
+        "query_linear_decodability_lost": false,
+        "ordinary_retrieval_fails": false,
+        "oracle_address_recovers": true,
+        "oracle_read_query_recovers": true,
+        "oracle_postwrite_recovers": true
+      },
+      "quality_diagnosis": "QUALITY_INTERFERENCE_NOT_LOCALIZED",
+      "quality_reasons": {
+        "quality_failed": true,
+        "conflicted_groups": [],
+        "n_conflicted": 0
+      },
+      "baseline_collapsed_ablations_non_informative": false,
+      "committed_category": "QUALITY_FAILED",
+      "measurements": {
+        "needle_baseline": 0.11666667,
+        "oracle_address_needle": 0.84166664,
+        "oracle_read_query_needle": 0.84166664,
+        "oracle_postwrite_needle": 0.98333335,
+        "postwrite_decodable": 0.0625,
+        "query_decodable": 0.16666667,
+        "quality_failed": true,
+        "failed_alignment_by_group": {},
+        "control_alignment_by_group": {},
+        "quality_control_seed": null
+      }
+    }
+  ]
+}
