@@ -26,7 +26,8 @@ RESULTS = HERE / "results"
 PROG = RESULTS / "_progress"
 VPD = REPO / "experiments" / "bindingslots_value_path_diagnosis"
 AG = REPO / "experiments" / "bindingslots_address_generalization"
-for p in (str(HERE), str(VPD), str(AG)):
+SBS = REPO / "hybrid_llm_vnext_lab" / "experiments" / "slot_formation_stabilization"
+for p in (str(HERE), str(VPD), str(AG), str(SBS)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
