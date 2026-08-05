@@ -1,0 +1,19 @@
+{
+  "schema": "bindingslots_external_fallback/lookup_key_proof/v1",
+  "result": "EXTERNAL_MEMORY_LOOKUP_KEY_AVAILABLE",
+  "task": "frozen needle task (phase_lc/tasks.py needle)",
+  "write_fact": "[the, code, for, ENT_t, is, VAL_t, .] — presents the explicit fact ENT_t -> VAL_t",
+  "query": "[the, code, for, ENT_t, is] -> predict VAL_t",
+  "legitimate_lookup_key": {
+    "key": "entity id token ENT_t",
+    "derivable_at_inference": true,
+    "reason": "ENT_t appears in the query context the system observes at query time; it is extracted from the query tokens, not from any label/oracle."
+  },
+  "stored_value_is_observed_not_oracle": "the value VAL_t is written to the table at WRITE time from the explicit fact the system observed (ENT_t is VAL_t) — the same information written to slots. It is NOT a hidden answer label, correct slot index, or evaluator ground truth.",
+  "forbidden_signals_not_used": [
+    "correct slot index from evaluator", "hidden answer label", "needle identity not present in the query",
+    "oracle information available only to the test harness"
+  ],
+  "no_benchmark_redesign": "the benchmark is used unchanged; the lookup key is a pre-existing legitimate property of the needle query (the entity id in the query).",
+  "key_extraction_rule": "at write time key = (session_id, tenant_id, entity_id=ENT_t, version); at query time the entity id is parsed from the query span 'the code for <ENT> is' — the token following 'for' before 'is'."
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "bindingslots_external_fallback/lifecycle_policy/v1",
+  "session_model": "each retrieval episode is its own session; entity_id -> value unique within an episode",
+  "ttl": {"default_ttl_s": 3600, "expired_never_returned": true},
+  "versions": {"auto_increment_per_key": true, "latest_non_deleted_non_expired_wins": true, "specific_version_addressable": true},
+  "deletion": {"soft_delete_flag": "deleted=1", "deleted_never_returned": true},
+  "isolation": {"scope": "(session_id, tenant_id)", "cross_session_disclosure": "impossible by PK scoping", "cross_tenant_disclosure": "impossible by PK scoping", "authorization_scope_enforced": true},
+  "cleanup": {"on_session_completion": "DELETE all rows for the session", "deterministic": true},
+  "unavailable_behavior": "raise TableUnavailable; caller returns a structured abstention (never fabricates a table result)"
+}
