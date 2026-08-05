@@ -1,0 +1,140 @@
+{
+  "added_params_per_cell": {
+    "000": 0,
+    "001": 131,
+    "010": 1041,
+    "011": 1172,
+    "100": 569,
+    "101": 700,
+    "110": 1610,
+    "111": 1741
+  },
+  "always_preserve": [
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "base_recipe": {
+    "BATCH": 48,
+    "D": 64,
+    "LR": 0.001,
+    "STEPS": 1200,
+    "TAU": 0.07,
+    "TRAIN_EPISODES": 1500,
+    "TRAIN_NO_MATCH_FRAC": 0.3
+  },
+  "cells": [
+    "000",
+    "100",
+    "010",
+    "001",
+    "110",
+    "101",
+    "011",
+    "111"
+  ],
+  "dev_integrity": {
+    "determinism_byte_identical": true,
+    "dev_wall_clock_sec": 309.4,
+    "factor_activity_ok": true,
+    "leakage_all_pass": true,
+    "oracle_equivariance": true
+  },
+  "factors_per_cell": {
+    "000": [],
+    "001": [
+      "F3"
+    ],
+    "010": [
+      "F2"
+    ],
+    "011": [
+      "F2",
+      "F3"
+    ],
+    "100": [
+      "F1"
+    ],
+    "101": [
+      "F1",
+      "F3"
+    ],
+    "110": [
+      "F1",
+      "F2"
+    ],
+    "111": [
+      "F1",
+      "F2",
+      "F3"
+    ]
+  },
+  "frozen_source_sha256": {
+    "factor_config.py": "a443e6ea015eed6238a4fb8eb41cdba2d53c275737e7f0e593c50261eea2bd63",
+    "factor_eval.py": "b6fe9056000da81285926bd7a7d2602020c9b08be8be30faa0ad09d2299f0309",
+    "factor_gates.py": "561ba3d253ef5cb64890a983a9a2593dd877f5d63f5f1e2f0ed75dde8af627c1",
+    "factor_leakage.py": "f5305d4b7d045f633697b46d2d61f049c0bcd3e2ca1012a0d40a25e4145709c7",
+    "factor_model.py": "e86146c2fb65763969a76e778e71d53e938188cd83a9a6d1cbcdf48104b7e238",
+    "factor_train.py": "9330fbb06fc022bcec0310d8827d5887088cc02fbbb542decf975b07cce28482",
+    "run_lib.py": "38627be3b49f5433799a90b2b9a765eca6afe31f69a82e550af17b50c136bb35"
+  },
+  "gates": {
+    "T1_min": 0.8,
+    "T2_min": 0.8,
+    "T3_min": 0.8,
+    "T4_improvement_over_000_min": 0.05,
+    "T4_min": 0.85,
+    "T6_min": 0.8,
+    "T7_min": 0.8,
+    "T9_min_no_material_regression": 0.9,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_max_false_reject": 0.15,
+    "required_seeds_pass": 4
+  },
+  "locked_before": "first final/reserved seed",
+  "metric_conventions": {
+    "T4_gated": "null-inclusive correct_latest = P(argmax over K+1 == target index)",
+    "T4_improvement_baseline": "cell 000 mean T4 (null-inclusive)",
+    "T5": "reported diagnostic only; excluded from gates, selection, and verdict",
+    "inherited_splits_gated": "null-excluded addressing_top1 = P(argmax over real keys == target)"
+  },
+  "never_emit": [
+    "E1_TEMPORAL_TRANSFER_VALIDATED",
+    "E1_STRUCTURAL_TRANSFER_CONFIRMED",
+    "any KDA-unblocking verdict"
+  ],
+  "prior_seed_count": 37,
+  "schema": "bindingslots_e1_3factor/protocol_lock/v1",
+  "seed_disjoint_from_prior": true,
+  "seeds": {
+    "dev": [
+      740,
+      741,
+      742
+    ],
+    "eval_n_per_split": 150,
+    "final": [
+      7140,
+      7141,
+      7142,
+      7143,
+      7144
+    ],
+    "required_seeds_pass": 4,
+    "train": 74
+  },
+  "selection_rule": [
+    "fewest enabled factors",
+    "lowest added parameter count",
+    "highest worst-seed T4",
+    "highest mean T4"
+  ],
+  "verdict_vocabulary": [
+    "T4_FACTORIAL_SINGLE_FACTOR_SELECTED",
+    "T4_FACTORIAL_COMBINATION_SELECTED",
+    "T4_FACTORIAL_ALL_FACTORS_REQUIRED",
+    "T4_FACTORIAL_NO_INTERVENTION_SELECTED",
+    "T4_FACTORIAL_PROTOCOL_VIOLATED",
+    "T4_FACTORIAL_RESOURCE_BLOCKED"
+  ]
+}
