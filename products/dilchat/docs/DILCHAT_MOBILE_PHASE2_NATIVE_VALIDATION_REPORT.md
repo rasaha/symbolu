@@ -72,7 +72,24 @@ committed.
 
 | Classification | Result |
 |---|---|
-| `ANDROID_GRADLE_DEBUG_BUILD_PASS` | **PASS** — `android-build` job **green** on head `3a3fc2c6` (run `30985814565`, job `92240243881`). `./gradlew --no-daemon assembleDebug` on JDK 17.0.19 (Temurin) produced `app/build/outputs/apk/debug/app-debug.apk` (142,440,484 bytes; ~6.7 min compile); manifest hardening guard passed; APK sanity OK (valid zip with `AndroidManifest.xml`). |
+| `ANDROID_GRADLE_DEBUG_BUILD_PASS` | **PASS** (deterministic) — `android-build` job **green** on head `c5bcee1f` (run `30987083271`, ~6.8 min compile). `./gradlew --no-daemon assembleDebug` on JDK 17.0.19 (Temurin) produced `app/build/outputs/apk/debug/app-debug.apk` (≈142 MB); manifest hardening guard + APK sanity passed. First observed green on head `3a3fc2c6`. |
+
+### 4.1 Defect found & fixed during Track A — Gradle heap OOM (reproducibility)
+
+The `assembleDebug` step **intermittently** failed with
+`java.lang.OutOfMemoryError: Java heap space` inside the Hermes AAR
+`JetifyTransform`: Expo's generated `android/gradle.properties` defaults to
+`-Xmx2048m`, marginal for that transform on a loaded runner (it passed on one
+head and OOM'd on the next with identical inputs). **Fix:** the job now appends
+`org.gradle.jvmargs=-Xmx4g …` to the generated `gradle.properties` after prebuild
+(later keys win), making the compile deterministic. Severity: medium (flaky gate);
+in Track A scope (Gradle reproducibility). Config-only; no app/native source
+changed. Re-verified green across a full compile on head `c5bcee1f`.
+
+> Note: a one-off `integration` job failure on head `bb3b2537` (8/9 API calls
+> erroring after `/v1/health` passed) was a **transient** backend/DB hiccup — the
+> job passed on the four surrounding heads with identical inputs and again on the
+> re-run at `c5bcee1f`. No code or harness change was required.
 | `ANDROID_RELEASE_LIKE_COMPILE` | **bounded — not run.** `assembleRelease` requires a release `signingConfig`; production signing is explicitly out of Track A scope. A debug-signed release compile is deferred to the device/signing track. |
 
 ## 5. NOT executable on this host (recorded, not fabricated)
