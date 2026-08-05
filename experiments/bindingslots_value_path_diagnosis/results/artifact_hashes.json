@@ -2,6 +2,7 @@
   "schema": "bindingslots_value_path_diagnosis/artifact_hashes/v1",
   "sha256": {
     "aggregate_conclusion.json": "1f175b5eb7b2b5392dbcaa8d27fc7aed2dcc08ccfda0c5f266fd5a5c84cad8da",
+    "classifier_amendment_comparison.json": "a5340f355d69eba73d3870a8f9358599710a92ce54913ff8fdead447fb61ff64",
     "gradient_alignment.json": "e9c4b016d95560a995dd4c9452e90b11c870836e4099c0cdc78732e4fa30734a",
     "gradient_norms.json": "bb7102261d62530d1acfb96ace3ba8965d053b9225ed96e313cb647a679b5ceb",
     "integrity_report.json": "637e2d2d8c1a99a0bacf5fe3a039a03f90b9250a667036036aeaae0244a9838c",

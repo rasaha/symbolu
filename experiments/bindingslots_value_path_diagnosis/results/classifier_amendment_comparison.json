@@ -1,0 +1,98 @@
+{
+  "schema": "bindingslots_value_path_diagnosis/classifier_amendment_comparison/v1",
+  "purpose": "preserve BOTH the original preregistered classifier output and the authorized amended output on the identical committed measurements (\u00a74)",
+  "original_classifier": {
+    "file": "diagnosis_classify_preregistered_v1.py",
+    "source_commit": "71fdcc84",
+    "sha256": "db79114f7f928b684c52013439b058080c79adc2c400b583adec5b1d453c3db7",
+    "value_path_rule": "gated on A2 LINEAR decodability",
+    "aggregate_verdict": "BINDINGSLOTS_QUALITY_INTERFERENCE_LOCALIZED"
+  },
+  "amended_classifier": {
+    "file": "diagnosis_classify.py",
+    "authorized_correction_commit": "f137653b",
+    "sha256": "53456bf129a2ec0a92f5865a6418c761aa794ecf82ff1c312d538b0cf8967551",
+    "value_path_rule": "query_recoverable = A4a-direct-read recovers OR A2 linearly decodable (functional, per \u00a79/\u00a710/\u00a711); STORAGE keeps explicit 'linearly decodable'",
+    "aggregate_verdict": "BINDINGSLOTS_BOTH_FAILURE_FAMILIES_LOCALIZED"
+  },
+  "thresholds_unchanged": true,
+  "seeds_whose_value_path_changed": [
+    "H2 s23",
+    "R0 s23"
+  ],
+  "not_localized_still_reachable_under_amended": true,
+  "per_seed": [
+    {
+      "arm": "R0",
+      "seed": 24,
+      "original_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "amended_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "changed": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 23,
+      "original_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "amended_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "changed": false
+    },
+    {
+      "arm": "H2",
+      "seed": 24,
+      "original_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "amended_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "changed": false
+    },
+    {
+      "arm": "H2",
+      "seed": 23,
+      "original_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "amended_value_path": "ADDRESS_DISTRIBUTION_FAILED",
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "changed": true
+    },
+    {
+      "arm": "H2",
+      "seed": 25,
+      "original_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "amended_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "changed": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 24,
+      "original_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "amended_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "changed": false
+    },
+    {
+      "arm": "O1R",
+      "seed": 25,
+      "original_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "amended_value_path": "NOT_APPLICABLE_RETRIEVAL_PRESENT",
+      "quality_diagnosis": "QUALITY_GRADIENT_CONFLICT_LOCALIZED",
+      "changed": false
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "original_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "amended_value_path": "ADDRESS_DISTRIBUTION_FAILED",
+      "quality_diagnosis": "NOT_APPLICABLE_QUALITY_OK",
+      "changed": true
+    },
+    {
+      "arm": "R0",
+      "seed": 25,
+      "original_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "amended_value_path": "VALUE_PATH_NOT_LOCALIZED",
+      "quality_diagnosis": "QUALITY_INTERFERENCE_NOT_LOCALIZED",
+      "changed": false
+    }
+  ]
+}

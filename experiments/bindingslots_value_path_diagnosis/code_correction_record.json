@@ -28,6 +28,19 @@
     "before_rule": "if query_linearly_decodable and ordinary_fails and oracle_address_recovers: ADDRESS_DISTRIBUTION_FAILED (and analogously for READ/RESIDUAL)",
     "after_rule": "if query_recoverable and ordinary_fails and oracle_address_recovers: ADDRESS_DISTRIBUTION_FAILED (and analogously for READ/RESIDUAL); query_recoverable = A4a-recovers OR A2-linearly-decodable"
   },
+  "output_preservation": {
+    "requirement": "the repository must preserve BOTH the original preregistered classifier output and the amended output (§4)",
+    "original_classifier_source_preserved": "diagnosis_classify_preregistered_v1.py (verbatim copy of commit 71fdcc84, sha256 db79114f7f928b684c52013439b058080c79adc2c400b583adec5b1d453c3db7)",
+    "original_aggregate_verdict": "BINDINGSLOTS_QUALITY_INTERFERENCE_LOCALIZED",
+    "original_value_path_for_collapsed_seeds": "VALUE_PATH_NOT_LOCALIZED (H2 s23, R0 s23)",
+    "amended_aggregate_verdict": "BINDINGSLOTS_BOTH_FAILURE_FAMILIES_LOCALIZED",
+    "amended_value_path_for_collapsed_seeds": "ADDRESS_DISTRIBUTION_FAILED (H2 s23, R0 s23)",
+    "both_outputs_artifact": "results/classifier_amendment_comparison.json",
+    "generator": "gen_amendment_comparison.py (re-applies both classifier versions to the identical committed measurements)",
+    "seeds_changed_by_amendment": ["H2 s23", "R0 s23"],
+    "quality_diagnoses_unchanged_by_amendment": true,
+    "not_localized_still_reachable": true
+  },
   "integrity": {
     "is_result_tuning": false,
     "why_not": "the change replaces a mis-operationalization with the spec's own functional definition; it was authorized, it does not alter any threshold, and it does not select among competing outcomes to obtain a desired verdict. NOT_LOCALIZED remains reachable and is unit-tested (test_not_localized_when_neither_linear_nor_functional_recoverable).",
