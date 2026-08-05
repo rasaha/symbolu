@@ -32,6 +32,9 @@ jobs:
       - name: T4 error-classification spec tests
         run: python experiments/bindingslots_e1_temporal/tests/test_t4_spec.py
 
+      - name: T4 counterfactual spec tests
+        run: python experiments/bindingslots_e1_temporal/tests/test_cf_spec.py
+
       - name: Verdict invariants (if evidence present)
         run: |
           python - <<'PY'

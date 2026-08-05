@@ -1,0 +1,130 @@
+{
+  "schema": "bindingslots_e1_temporal/t4_counterfactual/v1",
+  "method": "zero-training frozen-E1 replay (byte-identical) + oracle counterfactual selections",
+  "byte_identical_param_hashes": true,
+  "param_hash_report": {
+    "6140": {
+      "replayed": "f81e72c8e41c78d75055669c5a6adf57bdbe212b48e24553f0cb682abcc4a625",
+      "committed": "f81e72c8e41c78d75055669c5a6adf57bdbe212b48e24553f0cb682abcc4a625",
+      "byte_identical": true
+    },
+    "6141": {
+      "replayed": "71d88f557b44ae10967b43f9fdc849c7a0fa2ece5c11cc5ea908ecbb6133ebb5",
+      "committed": "71d88f557b44ae10967b43f9fdc849c7a0fa2ece5c11cc5ea908ecbb6133ebb5",
+      "byte_identical": true
+    },
+    "6142": {
+      "replayed": "17867d70e00f9c65d990ee8473ede40077f2d795b74d2522be1988c68ec645b0",
+      "committed": "17867d70e00f9c65d990ee8473ede40077f2d795b74d2522be1988c68ec645b0",
+      "byte_identical": true
+    },
+    "6143": {
+      "replayed": "cf8a07ab7bd06ea7c8c95c78f873cdb8ee472e6d80215207ef8c4c6a77d07f5b",
+      "committed": "cf8a07ab7bd06ea7c8c95c78f873cdb8ee472e6d80215207ef8c4c6a77d07f5b",
+      "byte_identical": true
+    },
+    "6144": {
+      "replayed": "3cf6afc7f551bd390b782b5a3caba69d45519aebfeaae810868e44e25cb51fe0",
+      "committed": "3cf6afc7f551bd390b782b5a3caba69d45519aebfeaae810868e44e25cb51fe0",
+      "byte_identical": true
+    }
+  },
+  "d0_reproduces_committed_T4_addressing": true,
+  "n_T4_queries": 750,
+  "d0_failures": 294,
+  "arms": {
+    "d0": {
+      "correct_latest_rate": 0.608,
+      "value_rate": 0.6226666666666667,
+      "null_rate": 0.30533333333333335,
+      "recovery_of_d0_failures": 0.0
+    },
+    "d1": {
+      "correct_latest_rate": 0.7893333333333333,
+      "value_rate": 0.8146666666666667,
+      "null_rate": 0.0,
+      "recovery_of_d0_failures": 0.46258503401360546
+    },
+    "d2": {
+      "correct_latest_rate": 0.6133333333333333,
+      "value_rate": 0.624,
+      "null_rate": 0.32,
+      "recovery_of_d0_failures": 0.013605442176870748
+    },
+    "d3": {
+      "correct_latest_rate": 0.8746666666666667,
+      "value_rate": 0.892,
+      "null_rate": 0.0,
+      "recovery_of_d0_failures": 0.6802721088435374
+    },
+    "d4": {
+      "value_rate": 1.0,
+      "correct_latest_rate": 1.0,
+      "recovery_of_d0_failures": 1.0
+    },
+    "d5": {
+      "correct_latest_rate": 1.0,
+      "value_rate": 1.0,
+      "recovery_of_d0_failures": 1.0
+    }
+  },
+  "d1_recovery": 0.46258503401360546,
+  "d2_recovery": 0.013605442176870748,
+  "d3_recovery": 0.6802721088435374,
+  "d4_value_fail_rate": 0.0,
+  "within_entity_latest_d3": 0.8746666666666667,
+  "components_of_d0_failures": {
+    "abstention": 0.46258503401360546,
+    "entity": 0.21768707482993194,
+    "latest_ranking": 0.3197278911564626
+  },
+  "transitions_D0_to_D1": {
+    "NULL_OR_ABSTAIN": {
+      "wrong_entity": 63,
+      "correct_latest": 136,
+      "right_entity_older": 30
+    },
+    "RIGHT_ENTITY_WRONG_OLDER": {
+      "right_entity_older": 50
+    },
+    "WRONG_ENTITY": {
+      "wrong_entity": 15
+    }
+  },
+  "transitions_D0_to_D3": {
+    "NULL_OR_ABSTAIN": {
+      "right_entity_older": 40,
+      "correct_latest": 189
+    },
+    "RIGHT_ENTITY_WRONG_OLDER": {
+      "right_entity_older": 50
+    },
+    "WRONG_ENTITY": {
+      "correct_latest": 11,
+      "right_entity_older": 4
+    }
+  },
+  "attribution_scalars": {
+    "byte_identical": true,
+    "oracle_valid": true,
+    "d1_rec": 0.46258503401360546,
+    "d2_rec": 0.013605442176870748,
+    "d3_rec": 0.6802721088435374,
+    "d4_fail_rate": 0.0,
+    "abstention_component": 0.46258503401360546,
+    "entity_component": 0.21768707482993194,
+    "latest_component": 0.3197278911564626,
+    "within_entity_latest_d3": 0.8746666666666667,
+    "entity_recovered_from_wrongentity_majority": true,
+    "latest_older_majority_in_residual": true
+  },
+  "conclusion": "T4_SHORTFALL_MIXED",
+  "value_path_secondary_invariant": false,
+  "recommendation": "future preregistered factorial separating null-gating, entity retrieval, and latest ranking",
+  "preserved": [
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "t5_note": "T5 predecessor/successor remains OUTSIDE this conclusion and recommendation"
+}

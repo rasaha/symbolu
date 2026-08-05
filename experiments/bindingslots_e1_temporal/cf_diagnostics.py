@@ -81,8 +81,8 @@ def run_seed(model, seed):
                      "d0_correct": d0 == ti, "d1_correct": d1 == ti, "d2_correct": d2 == ti,
                      "d3_correct": d3 == ti, "d4_value_ok": val_ok(d4), "d5_correct": d5 == ti,
                      "d1_out": outcome(d1, ti, recs, K), "d3_out": outcome(d3, ti, recs, K),
-                     "d0_value_ok": val_ok(d0), "d1_value_ok": val_ok(d1), "d3_value_ok": val_ok(d3),
-                     "d5_value_ok": val_ok(d5),
+                     "d0_value_ok": val_ok(d0), "d1_value_ok": val_ok(d1), "d2_value_ok": val_ok(d2),
+                     "d3_value_ok": val_ok(d3), "d5_value_ok": val_ok(d5),
                      "correct_latest_rank": rank, "n_ent_records": len(ent_idx),
                      "d0_entity_ok": d0 != K and recs[d0]["ent"] == recs[ti]["ent"]})
     return rows
@@ -113,7 +113,9 @@ def main():
         srows = [r for r in all_rows if r["seed"] == seed]
         # addressing (null-excluded) = D1 correct rate (argmax over keys)
         d0_addr_by_seed[seed] = sum(1 for r in srows if r["d1_correct"]) / len(srows) if srows else None
-    d0_reproduces = all(abs(d0_addr_by_seed[s] - committed_T4[s]) < 1e-9 for s in C.FINAL_SEEDS) if byte_identical else False
+    # param-hash equality already guarantees byte-identical predictions; this aggregate cross-check uses
+    # a float32-appropriate tolerance (committed T4 was a torch float32 mean).
+    d0_reproduces = all(abs(d0_addr_by_seed[s] - committed_T4[s]) < 1e-4 for s in C.FINAL_SEEDS) if byte_identical else False
 
     def rec(arm):
         return (sum(1 for r in fails if r[f"{arm}_correct"]) / F) if F else 0.0
