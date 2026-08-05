@@ -1,0 +1,106 @@
+{
+  "schema": "bindingslots_e1/reserved_eval/v1",
+  "reserved_seeds": [
+    2028,
+    2029,
+    2030,
+    2031,
+    2032
+  ],
+  "required_to_pass": 4,
+  "seeds_passing_all_primary": 5,
+  "futility_stopped": false,
+  "worst_seed_G1_addr": 0.9800000190734863,
+  "summary": [
+    {
+      "seed": 2028,
+      "all_primary_pass": true,
+      "groups": {
+        "generalization": true,
+        "nomatch": true,
+        "e2e": true,
+        "stable": true
+      },
+      "G1_addr": 0.9866666793823242,
+      "G1_e2e": 0.9466666579246521,
+      "b0_G1_e2e": 0.05999999865889549,
+      "improvement_over_b0": 0.8866666592657566,
+      "nomatch_false_accept": 0.12666666507720947,
+      "nomatch_recall": 0.8733333349227905,
+      "nomatch_precision": 0.9492753622014717,
+      "G7_addr": 0.9933333396911621
+    },
+    {
+      "seed": 2029,
+      "all_primary_pass": true,
+      "groups": {
+        "generalization": true,
+        "nomatch": true,
+        "e2e": true,
+        "stable": true
+      },
+      "G1_addr": 1.0,
+      "G1_e2e": 0.9200000166893005,
+      "b0_G1_e2e": 0.02666666731238365,
+      "improvement_over_b0": 0.8933333493769169,
+      "nomatch_false_accept": 0.07333333045244217,
+      "nomatch_recall": 0.9266666695475578,
+      "nomatch_precision": 0.9205298031870668,
+      "G7_addr": 1.0
+    },
+    {
+      "seed": 2030,
+      "all_primary_pass": true,
+      "groups": {
+        "generalization": true,
+        "nomatch": true,
+        "e2e": true,
+        "stable": true
+      },
+      "G1_addr": 1.0,
+      "G1_e2e": 0.9466666579246521,
+      "b0_G1_e2e": 0.03999999910593033,
+      "improvement_over_b0": 0.9066666588187218,
+      "nomatch_false_accept": 0.10000000149011612,
+      "nomatch_recall": 0.8999999985098839,
+      "nomatch_precision": 0.9440559426896339,
+      "G7_addr": 1.0
+    },
+    {
+      "seed": 2031,
+      "all_primary_pass": true,
+      "groups": {
+        "generalization": true,
+        "nomatch": true,
+        "e2e": true,
+        "stable": true
+      },
+      "G1_addr": 0.9800000190734863,
+      "G1_e2e": 0.9066666960716248,
+      "b0_G1_e2e": 0.019999999552965164,
+      "improvement_over_b0": 0.8866666965186596,
+      "nomatch_false_accept": 0.11999999731779099,
+      "nomatch_recall": 0.880000002682209,
+      "nomatch_precision": 0.916666668606922,
+      "G7_addr": 1.0
+    },
+    {
+      "seed": 2032,
+      "all_primary_pass": true,
+      "groups": {
+        "generalization": true,
+        "nomatch": true,
+        "e2e": true,
+        "stable": true
+      },
+      "G1_addr": 1.0,
+      "G1_e2e": 0.9399999976158142,
+      "b0_G1_e2e": 0.03999999910593033,
+      "improvement_over_b0": 0.8999999985098839,
+      "nomatch_false_accept": 0.09333333373069763,
+      "nomatch_recall": 0.9066666662693024,
+      "nomatch_precision": 0.9379310357584822,
+      "G7_addr": 1.0
+    }
+  ]
+}

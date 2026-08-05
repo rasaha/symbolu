@@ -1,0 +1,885 @@
+{
+  "schema": "bindingslots_e1/per_seed_reserved/v1",
+  "per_seed": [
+    {
+      "seed": 2028,
+      "metrics": {
+        "G1_addr": 0.9866666793823242,
+        "G2_addr": 0.9800000190734863,
+        "G3_addr": 0.9933333396911621,
+        "G4_addr": 1.0,
+        "G5_addr": 1.0,
+        "G7_addr": 0.9933333396911621,
+        "G1_e2e": 0.9466666579246521,
+        "G1_false_reject": 0.046666666865348816,
+        "answer_availability": 0.95333331823349,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.12666666507720947,
+        "nomatch_recall": 0.8733333349227905,
+        "nomatch_precision": 0.9492753622014717,
+        "nomatch_confident_false_accept": 0.006666666828095913,
+        "b0_G1_e2e": 0.05999999865889549,
+        "improvement_over_b0": 0.8866666592657566,
+        "oracle_to_predicted_gap": 0.0533333420753479
+      },
+      "gates": {
+        "generalization": {
+          "G1_unseen_identity": true,
+          "G2_paraphrase": true,
+          "G3_hard_names": true,
+          "G4_same_entity_diff_attr": true,
+          "G5_recombined": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_false_accept": true,
+          "false_reject": true,
+          "answer_availability": true
+        },
+        "e2e": {
+          "ordinary_retrieval": true,
+          "improvement_over_b0": true,
+          "oracle_value": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7_stable": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0133333206176758,
+          "mean_top1_margin": 3.490785837173462,
+          "e2e_retrieval_accuracy": 0.9466666579246521,
+          "false_reject_rate": 0.046666666865348816,
+          "answer_availability": 0.95333331823349,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 2.9200820922851562,
+          "e2e_retrieval_accuracy": 0.6200000047683716,
+          "false_reject_rate": 0.3799999952316284,
+          "answer_availability": 0.6200000047683716,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.5528385639190674,
+          "e2e_retrieval_accuracy": 0.9599999785423279,
+          "false_reject_rate": 0.03999999910593033,
+          "answer_availability": 0.9599999785423279,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.630573034286499,
+          "e2e_retrieval_accuracy": 0.9666666388511658,
+          "false_reject_rate": 0.03333333507180214,
+          "answer_availability": 0.9666666388511658,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.516117811203003,
+          "e2e_retrieval_accuracy": 0.9399999976158142,
+          "false_reject_rate": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "n": 150,
+          "n_valid": 0,
+          "n_nomatch": 150,
+          "false_accept_rate": 0.12666666507720947,
+          "nomatch_accuracy": 0.8733333349227905,
+          "nomatch_confident_falseaccept_rate": 0.006666666828095913
+        },
+        "G7_stable": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 4.447507858276367,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.05999999865889549,
+          "addressing_top1": 0.05999999865889549
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.0533333346247673,
+          "addressing_top1": 0.0533333346247673
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.046666666865348816,
+          "addressing_top1": 0.046666666865348816
+        },
+        "G5_recombined": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G6_no_match": {
+          "n": 150,
+          "false_accept_rate": 1.0,
+          "nomatch_accuracy": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        }
+      },
+      "e1_param_sha256": "94dfaa6529d38f94c6905b83b985efa03bb78d30a7a5352bf4e6d711944b3fb0",
+      "b0_param_sha256": "93405abfecf15f928a1cf1593b52b221b047691be03eab9364e19581ae194f09"
+    },
+    {
+      "seed": 2029,
+      "metrics": {
+        "G1_addr": 1.0,
+        "G2_addr": 0.9866666793823242,
+        "G3_addr": 0.9733333587646484,
+        "G4_addr": 0.9933333396911621,
+        "G5_addr": 0.9933333396911621,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9200000166893005,
+        "G1_false_reject": 0.07999999821186066,
+        "answer_availability": 0.9200000166893005,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.07333333045244217,
+        "nomatch_recall": 0.9266666695475578,
+        "nomatch_precision": 0.9205298031870668,
+        "nomatch_confident_false_accept": 0.0,
+        "b0_G1_e2e": 0.02666666731238365,
+        "improvement_over_b0": 0.8933333493769169,
+        "oracle_to_predicted_gap": 0.07999998331069946
+      },
+      "gates": {
+        "generalization": {
+          "G1_unseen_identity": true,
+          "G2_paraphrase": true,
+          "G3_hard_names": true,
+          "G4_same_entity_diff_attr": true,
+          "G5_recombined": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_false_accept": true,
+          "false_reject": true,
+          "answer_availability": true
+        },
+        "e2e": {
+          "ordinary_retrieval": true,
+          "improvement_over_b0": true,
+          "oracle_value": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7_stable": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.5155632495880127,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0133333206176758,
+          "mean_top1_margin": 2.840010404586792,
+          "e2e_retrieval_accuracy": 0.6000000238418579,
+          "false_reject_rate": 0.4000000059604645,
+          "answer_availability": 0.6000000238418579,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9733333587646484,
+          "mean_correct_key_rank": 1.0333333015441895,
+          "mean_top1_margin": 3.3814029693603516,
+          "e2e_retrieval_accuracy": 0.8866666555404663,
+          "false_reject_rate": 0.09333333373069763,
+          "answer_availability": 0.9066666960716248,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.164746046066284,
+          "e2e_retrieval_accuracy": 0.8799999952316284,
+          "false_reject_rate": 0.1133333370089531,
+          "answer_availability": 0.8866666555404663,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.468331813812256,
+          "e2e_retrieval_accuracy": 0.9266666769981384,
+          "false_reject_rate": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "n": 150,
+          "n_valid": 0,
+          "n_nomatch": 150,
+          "false_accept_rate": 0.07333333045244217,
+          "nomatch_accuracy": 0.9266666769981384,
+          "nomatch_confident_falseaccept_rate": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 4.2376017570495605,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.0533333346247673,
+          "addressing_top1": 0.0533333346247673
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G5_recombined": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G6_no_match": {
+          "n": 150,
+          "false_accept_rate": 1.0,
+          "nomatch_accuracy": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        }
+      },
+      "e1_param_sha256": "3390a03d584f5d46d464b3d454bab26ee4c28a717e369d8413242c2099516489",
+      "b0_param_sha256": "e87ed1c23658edf91e1e96c7d8404585fa1e15474eec85fc3b115c8168076c73"
+    },
+    {
+      "seed": 2030,
+      "metrics": {
+        "G1_addr": 1.0,
+        "G2_addr": 0.9733333587646484,
+        "G3_addr": 1.0,
+        "G4_addr": 0.9933333396911621,
+        "G5_addr": 1.0,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9466666579246521,
+        "G1_false_reject": 0.0533333346247673,
+        "answer_availability": 0.9466666579246521,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.10000000149011612,
+        "nomatch_recall": 0.8999999985098839,
+        "nomatch_precision": 0.9440559426896339,
+        "nomatch_confident_false_accept": 0.006666666828095913,
+        "b0_G1_e2e": 0.03999999910593033,
+        "improvement_over_b0": 0.9066666588187218,
+        "oracle_to_predicted_gap": 0.0533333420753479
+      },
+      "gates": {
+        "generalization": {
+          "G1_unseen_identity": true,
+          "G2_paraphrase": true,
+          "G3_hard_names": true,
+          "G4_same_entity_diff_attr": true,
+          "G5_recombined": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_false_accept": true,
+          "false_reject": true,
+          "answer_availability": true
+        },
+        "e2e": {
+          "ordinary_retrieval": true,
+          "improvement_over_b0": true,
+          "oracle_value": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7_stable": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.6121456623077393,
+          "e2e_retrieval_accuracy": 0.9466666579246521,
+          "false_reject_rate": 0.0533333346247673,
+          "answer_availability": 0.9466666579246521,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9733333587646484,
+          "mean_correct_key_rank": 1.0266666412353516,
+          "mean_top1_margin": 2.9704413414001465,
+          "e2e_retrieval_accuracy": 0.5866666436195374,
+          "false_reject_rate": 0.41333332657814026,
+          "answer_availability": 0.5866666436195374,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.5392065048217773,
+          "e2e_retrieval_accuracy": 0.9399999976158142,
+          "false_reject_rate": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 3.3716654777526855,
+          "e2e_retrieval_accuracy": 0.9066666960716248,
+          "false_reject_rate": 0.09333333373069763,
+          "answer_availability": 0.9066666960716248,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.5304996967315674,
+          "e2e_retrieval_accuracy": 0.8999999761581421,
+          "false_reject_rate": 0.10000000149011612,
+          "answer_availability": 0.8999999761581421,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "n": 150,
+          "n_valid": 0,
+          "n_nomatch": 150,
+          "false_accept_rate": 0.10000000149011612,
+          "nomatch_accuracy": 0.8999999761581421,
+          "nomatch_confident_falseaccept_rate": 0.006666666828095913
+        },
+        "G7_stable": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 4.437841415405273,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03999999910593033,
+          "addressing_top1": 0.03999999910593033
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.0533333346247673,
+          "addressing_top1": 0.0533333346247673
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G5_recombined": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G6_no_match": {
+          "n": 150,
+          "false_accept_rate": 1.0,
+          "nomatch_accuracy": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03999999910593033,
+          "addressing_top1": 0.03999999910593033
+        }
+      },
+      "e1_param_sha256": "b9d5c07f41d84b3e2c5f50c2717fb5d840f1b87c228a25638190408880811ae7",
+      "b0_param_sha256": "74e7f16fe39e620d29f8b5b65abfafd3412d9b7e98f9a7549eec66b484fdf8a9"
+    },
+    {
+      "seed": 2031,
+      "metrics": {
+        "G1_addr": 0.9800000190734863,
+        "G2_addr": 0.9800000190734863,
+        "G3_addr": 0.9933333396911621,
+        "G4_addr": 0.9800000190734863,
+        "G5_addr": 0.9800000190734863,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9066666960716248,
+        "G1_false_reject": 0.07999999821186066,
+        "answer_availability": 0.9200000166893005,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.11999999731779099,
+        "nomatch_recall": 0.880000002682209,
+        "nomatch_precision": 0.916666668606922,
+        "nomatch_confident_false_accept": 0.0,
+        "b0_G1_e2e": 0.019999999552965164,
+        "improvement_over_b0": 0.8866666965186596,
+        "oracle_to_predicted_gap": 0.09333330392837524
+      },
+      "gates": {
+        "generalization": {
+          "G1_unseen_identity": true,
+          "G2_paraphrase": true,
+          "G3_hard_names": true,
+          "G4_same_entity_diff_attr": true,
+          "G5_recombined": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_false_accept": true,
+          "false_reject": true,
+          "answer_availability": true
+        },
+        "e2e": {
+          "ordinary_retrieval": true,
+          "improvement_over_b0": true,
+          "oracle_value": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7_stable": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 3.376311779022217,
+          "e2e_retrieval_accuracy": 0.9066666960716248,
+          "false_reject_rate": 0.07999999821186066,
+          "answer_availability": 0.9200000166893005,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 3.1181740760803223,
+          "e2e_retrieval_accuracy": 0.6600000262260437,
+          "false_reject_rate": 0.3400000035762787,
+          "answer_availability": 0.6600000262260437,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9933333396911621,
+          "mean_correct_key_rank": 1.006666660308838,
+          "mean_top1_margin": 3.6380982398986816,
+          "e2e_retrieval_accuracy": 0.9399999976158142,
+          "false_reject_rate": 0.0533333346247673,
+          "answer_availability": 0.9466666579246521,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 3.257051706314087,
+          "e2e_retrieval_accuracy": 0.9399999976158142,
+          "false_reject_rate": 0.046666666865348816,
+          "answer_availability": 0.95333331823349,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9800000190734863,
+          "mean_correct_key_rank": 1.0199999809265137,
+          "mean_top1_margin": 3.491818428039551,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "n": 150,
+          "n_valid": 0,
+          "n_nomatch": 150,
+          "false_accept_rate": 0.11999999731779099,
+          "nomatch_accuracy": 0.8799999952316284,
+          "nomatch_confident_falseaccept_rate": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 4.462771892547607,
+          "e2e_retrieval_accuracy": 0.9333333373069763,
+          "false_reject_rate": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.019999999552965164,
+          "addressing_top1": 0.019999999552965164
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.013333333656191826,
+          "addressing_top1": 0.013333333656191826
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G5_recombined": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.05999999865889549,
+          "addressing_top1": 0.05999999865889549
+        },
+        "G6_no_match": {
+          "n": 150,
+          "false_accept_rate": 1.0,
+          "nomatch_accuracy": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        }
+      },
+      "e1_param_sha256": "f4f74aa5a566787d178fe9d5a0f9500980aca7103bbe6bb682d5397281287e45",
+      "b0_param_sha256": "9793666f1811c51daf5b801fde3c96386c01518f0a9c5077aca1de27699a3732"
+    },
+    {
+      "seed": 2032,
+      "metrics": {
+        "G1_addr": 1.0,
+        "G2_addr": 1.0,
+        "G3_addr": 0.9866666793823242,
+        "G4_addr": 1.0,
+        "G5_addr": 1.0,
+        "G7_addr": 1.0,
+        "G1_e2e": 0.9399999976158142,
+        "G1_false_reject": 0.05999999865889549,
+        "answer_availability": 0.9399999976158142,
+        "oracle_key_value_accuracy": 1.0,
+        "nomatch_false_accept": 0.09333333373069763,
+        "nomatch_recall": 0.9066666662693024,
+        "nomatch_precision": 0.9379310357584822,
+        "nomatch_confident_false_accept": 0.006666666828095913,
+        "b0_G1_e2e": 0.03999999910593033,
+        "improvement_over_b0": 0.8999999985098839,
+        "oracle_to_predicted_gap": 0.06000000238418579
+      },
+      "gates": {
+        "generalization": {
+          "G1_unseen_identity": true,
+          "G2_paraphrase": true,
+          "G3_hard_names": true,
+          "G4_same_entity_diff_attr": true,
+          "G5_recombined": true
+        },
+        "nomatch": {
+          "false_accept": true,
+          "recall": true,
+          "precision": true,
+          "confident_false_accept": true,
+          "false_reject": true,
+          "answer_availability": true
+        },
+        "e2e": {
+          "ordinary_retrieval": true,
+          "improvement_over_b0": true,
+          "oracle_value": true,
+          "oracle_gap": true
+        },
+        "stable": {
+          "G7_stable": true
+        },
+        "groups": {
+          "generalization": true,
+          "nomatch": true,
+          "e2e": true,
+          "stable": true
+        },
+        "all_primary_pass": true
+      },
+      "e1_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.5514354705810547,
+          "e2e_retrieval_accuracy": 0.9399999976158142,
+          "false_reject_rate": 0.05999999865889549,
+          "answer_availability": 0.9399999976158142,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.120307683944702,
+          "e2e_retrieval_accuracy": 0.6800000071525574,
+          "false_reject_rate": 0.3199999928474426,
+          "answer_availability": 0.6800000071525574,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 0.9866666793823242,
+          "mean_correct_key_rank": 1.0133333206176758,
+          "mean_top1_margin": 3.63020920753479,
+          "e2e_retrieval_accuracy": 0.9200000166893005,
+          "false_reject_rate": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.456425428390503,
+          "e2e_retrieval_accuracy": 0.9333333373069763,
+          "false_reject_rate": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G5_recombined": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 3.670030117034912,
+          "e2e_retrieval_accuracy": 0.9266666769981384,
+          "false_reject_rate": 0.07333333045244217,
+          "answer_availability": 0.9266666769981384,
+          "oracle_key_value_accuracy": 1.0
+        },
+        "G6_no_match": {
+          "n": 150,
+          "n_valid": 0,
+          "n_nomatch": 150,
+          "false_accept_rate": 0.09333333373069763,
+          "nomatch_accuracy": 0.9066666960716248,
+          "nomatch_confident_falseaccept_rate": 0.006666666828095913
+        },
+        "G7_stable": {
+          "n": 150,
+          "n_valid": 150,
+          "n_nomatch": 0,
+          "addressing_top1": 1.0,
+          "mean_correct_key_rank": 1.0,
+          "mean_top1_margin": 4.508676528930664,
+          "e2e_retrieval_accuracy": 0.9333333373069763,
+          "false_reject_rate": 0.06666667014360428,
+          "answer_availability": 0.9333333373069763,
+          "oracle_key_value_accuracy": 1.0
+        }
+      },
+      "b0_splits": {
+        "G1_unseen_identity": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03999999910593033,
+          "addressing_top1": 0.03999999910593033
+        },
+        "G2_paraphrase": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.03333333507180214,
+          "addressing_top1": 0.03333333507180214
+        },
+        "G3_hard_names": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G4_same_entity_diff_attr": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.046666666865348816,
+          "addressing_top1": 0.046666666865348816
+        },
+        "G5_recombined": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.02666666731238365,
+          "addressing_top1": 0.02666666731238365
+        },
+        "G6_no_match": {
+          "n": 150,
+          "false_accept_rate": 1.0,
+          "nomatch_accuracy": 0.0
+        },
+        "G7_stable": {
+          "n": 150,
+          "e2e_retrieval_accuracy": 0.0533333346247673,
+          "addressing_top1": 0.0533333346247673
+        }
+      },
+      "e1_param_sha256": "c0b5a5f765a9ddac2a7ce03d8055d7059420b9fc09d31445296477db3eca3bfc",
+      "b0_param_sha256": "8a71e96c67f046c4117473ea86a2bd3c6c2bda187729122edc35896aa116f76b"
+    }
+  ]
+}
