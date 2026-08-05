@@ -1,0 +1,10 @@
+{
+  "schema": "bindingslots_e1/determinism/v1",
+  "seed": 500,
+  "e1_hash_match": true,
+  "b0_hash_match": true,
+  "metrics_match": true,
+  "e1_param_sha256": "1fe32ee3cf67fbda67e4916058d3169d5019446d19728bdca332818763f58226",
+  "b0_param_sha256": "226642b8a54de641c52c0110cf8746004682440b984c268cb6c4e54c03063691",
+  "determinism_ok": true
+}
