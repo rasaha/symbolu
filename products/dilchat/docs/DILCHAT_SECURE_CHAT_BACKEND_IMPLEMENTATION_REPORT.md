@@ -18,15 +18,15 @@ Mobile Phase 2 PR #1343 (not modified, not used as a base).
   `chat_page_default=50`, `chat_page_max=100`).
 - **Docs** (this suite) + CI contract gate.
 
-## 2. Test evidence (local, real PostgreSQL 16 + Python 3.12)
+## 2. Test evidence (real PostgreSQL 16 + Python 3.12)
 
 | Gate | Result |
 |------|--------|
 | ruff | ✅ clean |
 | mypy | ✅ no issues (58 source files) |
 | Baseline suite (before) | 201 passed, 0 skipped |
-| **Full suite (after)** | **272 passed, 0 skipped** (71 new) |
-| PostgreSQL-marked tests collected | 38 (no silent skips) |
+| **Full suite (after)** | **274 passed, 0 skipped** (73 new) |
+| PostgreSQL-marked tests collected | 39 (no silent skips) |
 | Alembic: base→head, one head, downgrade/re-upgrade | ✅ head `c3d4e5f6a7b8` |
 | Backfill (active→1 ACTIVE conv; unpaired→0) | ✅ |
 | Idempotency (replay, conflict, concurrent duplicates) | ✅ |
@@ -35,9 +35,12 @@ Mobile Phase 2 PR #1343 (not modified, not used as a base).
 | Delete/read-state after revoke denied | ✅ |
 | Account-deletion effect blocks send | ✅ |
 | Cross-couple isolation (app + RLS layers) | ✅ |
-| RLS under non-owner runtime role | ✅ (7 SQL-level tests) |
+| RLS under non-owner runtime role | ✅ (8 SQL-level tests) |
+| **Outbox app-role UPDATE/DELETE denied; worker UPDATE allowed** | ✅ (`test_outbox_app_role_cannot_update_or_delete_worker_may_update`) |
 | Outbox atomicity (rollback removes state+event) | ✅ |
 | Outbox not on user API surface (worker-only read) | ✅ |
+| **Default page size (omit `limit` → exactly 50) + cursor traversal, gapless, no dup** | ✅ (`test_default_page_size_is_fifty_and_cursor_walks_remainder`) |
+| Page-size maximum bounded (`limit>100` → 422; service caps at 100) | ✅ |
 | Log-leak (body absent from logs/outbox/audit) | ✅ |
 | 10,000-message pagination + `EXPLAIN` index scan | ✅ `Index Scan` on `uq_chat_message_sequence`, no `Seq Scan` |
 | OpenAPI 3.1 valid; no Guna/compatibility/AI exposure | ✅ 23 paths |
@@ -49,6 +52,12 @@ New chat test files: `tests/unit/test_chat_cursor.py`,
 `…/test_chat_migrations.py`, `…/test_chat_pagination_perf.py`,
 `…/test_chat_contract.py`, `tests/security/test_chat_authz.py`,
 `…/test_chat_no_logging.py`, `…/test_chat_rls.py`.
+
+Two focused tests were added during the merge-readiness pass to close audit gaps:
+a behavioural **default page-size (50)** test through the public API boundary
+(`test_chat_flows.py`) and a real-PostgreSQL **outbox UPDATE/DELETE-denial** test
+under the non-owner runtime role (`test_chat_rls.py`). Suite: 272 → **274**;
+PostgreSQL-marked: 38 → **39**.
 
 ### 10k query plan (evidence)
 
@@ -69,39 +78,60 @@ suite runs in CI against a real FastAPI + PostgreSQL backend (see §4b).
 
 ## 4. Verdict
 
-**`DILCHAT_SECURE_CHAT_BACKEND_CORE_DRAFT_READY`**
+**`DILCHAT_SECURE_CHAT_BACKEND_CORE_MERGE_READY`**
 
-All draft-ready criteria are met and independently verified on the PR's current
-head via live GitHub CI (§4b): models/migrations complete with one Alembic head;
-all API behaviour, idempotency, and the send/unpair race pass; RLS passes under the
-real non-owner runtime role; cross-couple isolation and transactional-outbox
-consistency pass; full backend regression, existing mobile live integration,
-OpenAPI, and fail-closed guards pass; CI is green; no scope leakage.
+All merge-ready criteria are met and independently verified on the PR's final head
+via live GitHub CI (§4b): models/migrations complete with one Alembic head; all API
+behaviour, idempotency, and the send/unpair race pass; RLS passes under the real
+non-owner runtime role; cross-couple isolation, the outbox UPDATE/DELETE-denial,
+and transactional-outbox consistency pass; the default page-size behaviour and
+page-size maximum are directly asserted; full backend regression, existing mobile
+live integration, OpenAPI, and fail-closed guards pass; all required chat-relevant
+CI jobs are green on the final head; there are no requested changes or unresolved
+review threads; and no excluded scope is present.
 
-Per the operating rules, the PR remains **draft, open, and unmerged**; the next
-action is an independent backend merge-readiness audit. No auto-merge.
+This verdict follows an independent backend merge-readiness audit whose three
+bounded findings (CI-evidence accuracy, a default page-size assertion, and an
+outbox UPDATE-denial assertion) are resolved above and in §4b.
 
-## 4b. CI evidence (live GitHub, current head)
+## 4b. CI evidence (live GitHub, final head)
 
 - **PR:** #1347 · **base:** `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF`
-- **CI-verified head SHA:** `039304db3d6b8ad0d070f80a6d88bd89b91dc3fa`
-- All 8 current-head check runs completed with conclusion **success**:
+  (this branch is the repository's authoritative `default_branch`).
+- **Final head SHA:** recorded in the PR body; the chat-relevant gates below are
+  required to complete `success` on that exact head before merge.
 
-| Workflow · job | Result |
-|----------------|--------|
-| dilchat-ci · Static quality (ruff, mypy, import, app) | ✅ success |
-| dilchat-ci · **PostgreSQL migrations + full test suite** | ✅ success (RLS runtime-role denials visible in the PostgreSQL log confirm the chat RLS tests executed; no silent skip) |
-| dilchat-ci · OpenAPI 3.1 + Guna fail-closed guards (incl. **secure-chat contract gate**) | ✅ success |
-| dilchat-mobile-ci · Mobile lint / typecheck / test / guards (incl. **contract-drift**) | ✅ success (`secret scan: clean`) |
-| dilchat-mobile-ci · **Mobile ↔ live FastAPI + PostgreSQL integration** | ✅ success |
-| terminology-ci · terminology | ✅ success |
-| API stability registry | ✅ success |
-| Safety case + SBOM + traceability | ✅ success |
+### (A) Chat-relevant gates — these validate the secure-chat backend
 
-> Note: the doc-only commit that records this verdict changes no application code
-> (verdict/report/PR-body metadata only); it does not alter the CI-verified head's
-> behaviour. dilchat-ci re-runs on the docs commit (path `products/dilchat/**`) and
-> is expected green.
+| Workflow · job | Validates |
+|----------------|-----------|
+| dilchat-ci · Static quality (ruff, mypy, import, app) | lint/type/import/app-construction |
+| dilchat-ci · **PostgreSQL migrations + full test suite** | real `postgres:16`; full suite unfiltered with `--strict-markers`; anti-skip guards (a `--collect-only` count that fails if the PostgreSQL/RLS tests are not collected, and a `skipped\|xfail` grep that fails the job) prove the chat/RLS tests genuinely execute |
+| dilchat-ci · OpenAPI 3.1 + Guna fail-closed guards (incl. **secure-chat contract gate**) | routes present, `client_message_id` required, no message body in the conversation summary, nullable tombstone body, no Guna/AI/compatibility exposure |
+| dilchat-mobile-ci · Mobile lint / typecheck / test / guards (incl. **contract-drift**) | mobile toolchain + banned-route/contract-drift guard |
+| dilchat-mobile-ci · **Mobile ↔ live FastAPI + PostgreSQL integration** | real `postgres:16` + live FastAPI; fails loud if the backend is not ready |
+| terminology-ci · terminology | terminology validation over the changed docs (repo-level, applies here) |
+
+### (B) Repository-level checks that do NOT support the secure-chat verdict
+
+The following are green repository-level checks but exercise the unrelated
+`symbolu_robotics/bcvf_autonomous` module (workflow `bcvf-autonomous-ci.yml`).
+They are **explicitly not** counted as secure-chat evidence, and one
+(`Safety case + SBOM + traceability`) filters with `-k "safety_case"`:
+
+| Workflow · job | Why excluded |
+|----------------|--------------|
+| API stability registry | tests `symbolu_robotics` API stability; unrelated to DilChat chat |
+| Safety case + SBOM + traceability | `symbolu_robotics` safety-case + SBOM; `-k` filter; unrelated to DilChat chat |
+
+> **CI-trigger constraint (repository).** `dilchat-ci` and `dilchat-mobile-ci` are
+> bound to the current authoritative default branch
+> (`pull_request` → `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF`;
+> `push` → `claude/setup-symbolu-monorepo-**`). Because this PR targets that
+> default branch, all chat-relevant gates run. This is intentional and correct
+> today; if the default branch is ever **renamed**, these workflow triggers must be
+> updated to match or DilChat CI will not run. No CI trigger change is made here
+> (kept bounded to avoid duplicate workflow execution / behaviour change).
 
 ## 5. Confirmations
 
