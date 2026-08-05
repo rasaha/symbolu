@@ -1,0 +1,97 @@
+{
+  "schema": "bindingslots_e1_confirmation/protocol/v1",
+  "frozen": true,
+  "recipe_C1": {
+    "steps": 1200,
+    "tau": 0.07,
+    "train_no_match_frac": 0.3,
+    "batch": 48,
+    "lr": 0.001,
+    "D": 64,
+    "train_episodes": 1500,
+    "no_match": "learned_null_key",
+    "read": "hard_top1",
+    "score": "cosine",
+    "keys_per_episode": 32
+  },
+  "gates": {
+    "G1_unseen_identity_min_addr": 0.8,
+    "G2_paraphrase_min_addr": 0.8,
+    "G3_hard_names_min_addr": 0.8,
+    "G4_same_entity_diff_attr_min_addr": 0.75,
+    "G5_recombined_min_addr": 0.8,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_min_recall": 0.7,
+    "nomatch_min_precision": 0.7,
+    "nomatch_max_confident_false_accept": 0.2,
+    "valid_max_false_reject": 0.15,
+    "min_answer_availability": 0.8,
+    "min_ordinary_retrieval_accuracy": 0.7,
+    "min_improvement_over_b0": 0.5,
+    "min_oracle_key_value_accuracy": 0.99,
+    "max_oracle_to_predicted_gap": 0.3,
+    "min_G7_stable_addr": 0.9,
+    "worst_seed_min_G1_addr": 0.7
+  },
+  "dev_seeds": [
+    700,
+    701,
+    702
+  ],
+  "final_seeds": [
+    5140,
+    5141,
+    5142,
+    5143,
+    5144
+  ],
+  "train_episode_seed": 71,
+  "seed_disjoint_from_all_prior": true,
+  "prior_seeds": {
+    "v100_final": [
+      28,
+      29,
+      30,
+      31,
+      32
+    ],
+    "e1_dev": [
+      500,
+      501,
+      502
+    ],
+    "e1_burned": [
+      2028,
+      2029,
+      2030,
+      2031,
+      2032
+    ],
+    "e1_final": [
+      3140,
+      3141,
+      3142,
+      3143,
+      3144
+    ],
+    "e1_train_episode_seed": [
+      7
+    ]
+  },
+  "determinism_ok": true,
+  "leakage_all_pass": true,
+  "final_seeds_unused_before_lock": true,
+  "dataset_hashes": {
+    "identity_pools": "cd5579b3f16eeae72ad64e8b232cc84a1825a23cf6a0f84abf9b38bebc622329",
+    "pool_sizes": {
+      "train": 1101,
+      "dev": 245,
+      "final": 194
+    },
+    "train_episodes": "f588020dbaad4f8df56042c3dbbba6e44bf7e53cdc8a5326ec5751bdd1631b03",
+    "dev_eval_splits": "0b5428fa18dd6eaf05e3770de3064bfb7eaad0a9a4458ef71dc19169c374dc36"
+  },
+  "independent_task": true,
+  "independent_evaluator": true,
+  "recipe_reused_frozen_C1": true
+}
