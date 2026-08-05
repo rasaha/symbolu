@@ -1,0 +1,132 @@
+{
+  "added_params_per_arm": {
+    "R0": 0,
+    "R1": 4160,
+    "R2": 16576,
+    "R3": 16576
+  },
+  "always_preserve": [
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "arm_definitions": {
+    "R0": "frozen mean pooling; 0 params",
+    "R1": "single additive-attention head over frozen key-token embeddings, hidden=32",
+    "R2": "two independent attention heads (hidden=32) + linear proj(2d->d); heads discover separation",
+    "R3": "dual-head (hidden=32) with FIXED schema slot masks (entity {0,1} / temporal {2,3}); structural prior; upper-bound only"
+  },
+  "arms": [
+    "R0",
+    "R1",
+    "R2",
+    "R3"
+  ],
+  "byte_identical_readout_replay": true,
+  "conclusion_logic": {
+    "SIGNAL_NOT_FOUND": "neither learned arm partial and R3 not at present bars; integrity valid",
+    "SIGNAL_PARTIAL_learned": "R1 or R2: >=4/5 partial seeds, mean T4>=0.68, mean impr>=0.05, guards pass",
+    "SIGNAL_PARTIAL_structural_only": "R3 reaches PRESENT bars while no learned arm reaches partial -> STRUCTURAL_PRIOR_ONLY_SIGNAL",
+    "SIGNAL_PRESENT": "R1 or R2: >=4/5 seeds pass, mean T4>=0.75, mean impr over R0>=0.10, inherited+no-match+determinism+leakage pass; R3 can NEVER emit this"
+  },
+  "conclusion_vocabulary": [
+    "FROZEN_REPRESENTATION_READOUT_SIGNAL_PRESENT",
+    "FROZEN_REPRESENTATION_READOUT_SIGNAL_PARTIAL",
+    "FROZEN_REPRESENTATION_READOUT_SIGNAL_NOT_FOUND",
+    "FROZEN_REPRESENTATION_READOUT_PROTOCOL_VIOLATED",
+    "FROZEN_REPRESENTATION_READOUT_RESOURCE_BLOCKED"
+  ],
+  "dataset_generator_sha256": {
+    "models.py": "bb30b388baffc6f03b4877efd47a65a3b01826a91d57021b325bdf939bc703c8",
+    "temporal_task.py": "6e97e58fecfc9a13559ff10b687d8037038cbf0b3342ae25db9a9dd4b066bdd1"
+  },
+  "frozen_base_param_hash": "e2e247319d29d2a659985fc6207b780531e7e501b2d3ea5a8c40c49de1401e30",
+  "frozen_encoder_full_param_hash": "f81e72c8e41c78d75055669c5a6adf57bdbe212b48e24553f0cb682abcc4a625",
+  "frozen_encoder_seed": 6140,
+  "frozen_source_sha256": {
+    "readout_config.py": "c488a65207b5e92c663d56c075b2652f1f7441554f552e5aad59e156e5989aef",
+    "readout_gates.py": "6fd3b489a3125b21b51f71044a82774b42e7d4cc17494bccd3a444a532a2eed4",
+    "readout_leakage.py": "d7602b1a28434b5cf63809718ee56cdc1af7c3e54366ce984d5a512bbb44cc07",
+    "readout_model.py": "a275f67a514616d12dd753f059fc4a66cbf5439be7d6fd714e2d62a4731d6943",
+    "readout_run_lib.py": "15bf0bcb1c8604fdb8c131049e3f33d7c30445d577ff06a1b7714d29f78fc7f3",
+    "readout_train.py": "cced740d2be837fc9c6254adba96623944ba864760bbb4699732c908680fa9f8"
+  },
+  "gates": {
+    "T1_min": 0.8,
+    "T2_min": 0.8,
+    "T3_min": 0.8,
+    "T6_min": 0.8,
+    "T7_min": 0.8,
+    "T9_min_no_material_regression": 0.9,
+    "nomatch_max_false_accept": 0.3,
+    "nomatch_max_false_reject": 0.15,
+    "partial_mean_T4_min": 0.68,
+    "partial_mean_improvement_over_R0_min": 0.05,
+    "partial_min_seeds": 4,
+    "present_mean_T4_min": 0.75,
+    "present_mean_improvement_over_R0_min": 0.1,
+    "present_min_seeds": 4,
+    "shortcut_baseline_max": 0.15
+  },
+  "hidden_sizes": {
+    "R1": 32,
+    "R2": 32,
+    "R3": 32
+  },
+  "learned_arms": [
+    "R1",
+    "R2"
+  ],
+  "locked_before": "first final/reserved seed",
+  "metric_conventions": {
+    "T4_gated": "null-inclusive correct_latest",
+    "T5": "reported diagnostic only; excluded from gates and conclusion",
+    "improvement_baseline": "same-cohort R0 per seed",
+    "inherited_splits_gated": "null-excluded addressing_top1"
+  },
+  "never_emit": [
+    "E1_TEMPORAL_TRANSFER_VALIDATED",
+    "E1_STRUCTURAL_TRANSFER_CONFIRMED",
+    "E1_FOLLOW_ON_RESEARCH_ELIGIBLE"
+  ],
+  "no_final_seed_has_run": true,
+  "prior_seed_count": 46,
+  "schema": "bindingslots_e1_readout/protocol_lock/v1",
+  "seed_disjoint_from_prior": true,
+  "seeds": {
+    "dev": [
+      750,
+      751,
+      752
+    ],
+    "eval_n_per_split": 150,
+    "final": [
+      7150,
+      7151,
+      7152,
+      7153,
+      7154
+    ],
+    "required_seeds_pass": 4,
+    "train": 75
+  },
+  "selection_rule": [
+    "fewer added parameters",
+    "higher worst-seed T4",
+    "higher mean T4",
+    "R3 never selectable as primary learned readout"
+  ],
+  "structural_arm": "R3",
+  "structural_prior_only_flag": "STRUCTURAL_PRIOR_ONLY_SIGNAL",
+  "training_recipe": {
+    "base_optimizer_step": false,
+    "batch": 48,
+    "lr": 0.001,
+    "no_match_frac": 0.3,
+    "optimizer": "Adam",
+    "readout_only": true,
+    "steps": 1200,
+    "tau": 0.07,
+    "train_episodes": 1500
+  }
+}
