@@ -1,0 +1,51 @@
+{
+  "schema": "bindingslots_e1/selection/v1",
+  "dev_seed": 500,
+  "candidates": [
+    {
+      "candidate": "C1",
+      "steps": 1200,
+      "tau": 0.07,
+      "nmf": 0.3,
+      "mean_addressing": 1.0,
+      "nomatch_false_accept": 0.15333333611488342,
+      "score": 1.0
+    },
+    {
+      "candidate": "C2",
+      "steps": 1800,
+      "tau": 0.05,
+      "nmf": 0.3,
+      "mean_addressing": 0.9977777798970541,
+      "nomatch_false_accept": 0.1599999964237213,
+      "score": 0.9977777798970541
+    },
+    {
+      "candidate": "C3",
+      "steps": 1800,
+      "tau": 0.05,
+      "nmf": 0.4,
+      "mean_addressing": 0.9944444497426351,
+      "nomatch_false_accept": 0.13333334028720856,
+      "score": 0.9944444497426351
+    },
+    {
+      "candidate": "C4",
+      "steps": 1500,
+      "tau": 0.05,
+      "nmf": 0.4,
+      "mean_addressing": 0.9900000095367432,
+      "nomatch_false_accept": 0.1133333370089531,
+      "score": 0.9900000095367432
+    }
+  ],
+  "ranked": [
+    "C1",
+    "C2",
+    "C3",
+    "C4"
+  ],
+  "mechanical_winner": "C1",
+  "frozen_SELECTED": "C1",
+  "winner_matches_frozen": true
+}

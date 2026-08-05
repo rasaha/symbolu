@@ -1,0 +1,31 @@
+{
+  "schema": "bindingslots_e1/leakage/v1",
+  "no_exact_overlap": {
+    "pass": true,
+    "max_shared_tokens": 0
+  },
+  "pools_disjoint": {
+    "pass": true,
+    "train": 774,
+    "dev": 181,
+    "final": 173
+  },
+  "eval_ids_unseen": {
+    "pass": true,
+    "leaked_targets": 0
+  },
+  "no_answer_in_key": {
+    "pass": true,
+    "keys_with_value_token": 0
+  },
+  "lexical_overlap_uninformative": {
+    "pass": true,
+    "lexical_overlap_accuracy": 0.03333333333333333,
+    "chance": 0.03125
+  },
+  "no_table_import": {
+    "pass": true,
+    "banned_hits": []
+  },
+  "all_pass": true
+}
