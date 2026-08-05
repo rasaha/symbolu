@@ -95,7 +95,8 @@ provenance** — the broad categories of evidence, not raw model internals.
 | `guna_feature_version` | `structural_relationship_prior_v1` (or successor). |
 | `moon_calculation_version` | `moon_receptivity_context_v1` + astronomy-model version. |
 | `conversation_evidence_version` | `conversation_evidence_model_v1`. |
-| `fusion_policy_version` | `ai_assist_guidance_fusion_v1` weights/precedence version. |
+| `fusion_policy_version` | `ai_assist_guidance_fusion_v1` precedence/composition version (binding structure). |
+| `calibration_profile_version` | `ai_assist_calibration_profile_v1` — the versioned, tunable calibration defaults (sub-splits, Moon bound, thresholds) applied to this recommendation. |
 | `signal_categories_used` | Which provenance categories contributed. |
 | `confidence` | Confidence in the recommendation. |
 | `evidence_counts` | Qualified-evidence counts behind it. |

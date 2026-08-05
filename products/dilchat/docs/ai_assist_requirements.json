@@ -15,8 +15,34 @@
     { "name": "structural_relationship_prior_v1", "role": "baseline relational posture", "stability": "stable", "primary_input": "internal Guna Milan pattern features (hidden)" },
     { "name": "moon_receptivity_context_v1", "role": "temporary topic receptivity / climate", "stability": "temporary_bounded", "primary_input": "current sidereal Moon vs natal chart (deterministic)" },
     { "name": "conversation_evidence_model_v1", "role": "progressively dominant source of truth", "stability": "accumulating_recency_weighted", "primary_input": "shared conversations, explicit + inferred preferences, feedback" },
-    { "name": "ai_assist_guidance_fusion_v1", "role": "compose signals into user-reviewable guidance; LLM wording last", "stability": "policy_versioned", "primary_input": "the three components + explicit preferences + safety/privacy" }
+    { "name": "ai_assist_guidance_fusion_v1", "role": "compose signals into user-reviewable guidance; LLM wording last", "stability": "policy_versioned", "primary_input": "the three components + explicit preferences + safety/privacy" },
+    { "name": "ai_assist_calibration_profile_v1", "role": "holds versioned, tunable calibration defaults (sub-splits, Moon bound, thresholds)", "stability": "versioned_tunable_via_controlled_evaluation", "primary_input": "controlled-evaluation outcomes; never overrides binding invariants" }
   ],
+  "tiers": {
+    "binding_invariants": [
+      "guna_cold_start_weight_60",
+      "guna_floor_30",
+      "binding_totals_60_40_coldstart_and_30_70_mature",
+      "qualified_evidence_only_transition",
+      "hierarchical_guna_moon_composition_not_single_weighted_average",
+      "recommendation_precedence_order",
+      "safety_and_privacy_overrides",
+      "no_user_visible_guna_score",
+      "no_classical_authority_validation_claim"
+    ],
+    "binding_change_rule": "changeable only by a new founder decision; never by tuning/experimentation/configuration",
+    "calibration_defaults": [
+      "structural_posture_subsplit",
+      "moon_modifier_bound",
+      "decay_curve",
+      "evidence_event_thresholds",
+      "topic_confidence_thresholds",
+      "moon_expiration_period"
+    ],
+    "calibration_change_rule": "tunable through controlled evaluation without changing core architecture, provided every binding invariant still holds; bumps calibration_profile_version with recorded rationale",
+    "calibration_profile": "ai_assist_calibration_profile_v1",
+    "provenance_field": "calibration_profile_version"
+  },
   "structural_prior_weighting": {
     "cold_start_percent": 60,
     "mature_floor_percent": 30,
@@ -24,17 +50,21 @@
     "must_not_use": ["elapsed_time", "raw_message_count"],
     "moon_applied": "separately_as_bounded_temporary_modifier",
     "exact_curve": "OPEN (OQ-AIA-1)",
-    "illustrative_subsplit_note": "Binding totals: 60/40 (cold start) and 30/70 (mature). Internal split is tunable (subordinate to OQ-AIA-1).",
-    "illustrative_subsplit": {
+    "tier": "totals_binding__subsplit_calibration",
+    "subsplit_tier": "calibration_default_versioned",
+    "subsplit_note": "Binding totals: 60/40 (cold start) and 30/70 (mature), plus 60 start and 30 floor. The internal sub-split is a versioned calibration default, tunable via controlled evaluation (subordinate to OQ-AIA-1).",
+    "subsplit_default": {
       "cold_start": { "guna_structural_prior": 60, "explicit_preferences": 25, "conversation_evidence": 15 },
       "mature": { "guna_structural_prior": 30, "explicit_preferences": 20, "conversation_evidence": 50 }
     }
   },
   "moon_climate_modifier": {
     "formula": "TopicReceptivity = baseline_topic_affinity * moon_climate_modifier",
-    "proposed_initial_bound": [0.80, 1.20],
-    "bound_meaning": "Moon may raise/lower present topic suitability by up to ~20%; cannot overturn explicit preference or strong behavioral evidence (enforced by recommendation_precedence, not by this range).",
-    "exact_final_cap": "OPEN (OQ-AIA-4)"
+    "default_bound": [0.80, 1.20],
+    "default_bound_tier": "calibration_default_versioned",
+    "binding_constraint": "Must remain a bounded modifier; cannot overturn explicit preference or strong behavioral evidence and cannot create an avoid topic (enforced by recommendation_precedence, not by this range).",
+    "bound_meaning": "Moon may raise/lower present topic suitability by up to ~20%.",
+    "exact_final_cap": "OPEN (OQ-AIA-4); tuning bumps calibration_profile_version"
   },
   "signal_hierarchy": [
     "guna_structural_prior_sets_baseline_posture",
@@ -123,8 +153,12 @@
     { "id": "AIA-UX-7", "text": "Accessible touch targets + screen-reader labels; mobile-first cards." },
     { "id": "AIA-UX-8", "text": "Chat header avoids call and video-call icons." },
     { "id": "AIA-AUDIT-1", "text": "Every recommendation exposes provenance categories internally." },
-    { "id": "AIA-AUDIT-2", "text": "Record versions, signals, confidence, weight, reason, timestamps, action." },
+    { "id": "AIA-AUDIT-2", "text": "Record versions (incl. calibration_profile_version), signals, confidence, weight, reason, timestamps, action." },
     { "id": "AIA-AUDIT-3", "text": "Do not persist unnecessary chain-of-thought / private reasoning." },
+    { "id": "AIA-CALIB-1", "tier": "calibration", "text": "Sub-split defaults 60/25/15 (cold) and 30/20/50 (mature); tunable only within binding totals and 60 start / 30 floor." },
+    { "id": "AIA-CALIB-2", "tier": "calibration", "text": "Moon modifier default bound 0.80-1.20; tunable but must stay a bounded modifier subordinate to precedence; cannot create avoid topic." },
+    { "id": "AIA-CALIB-3", "tier": "calibration", "text": "Other numeric params (decay curve, thresholds, Moon expiration) are versioned defaults bounded by invariants; exact values open (OQ-AIA-1..5)." },
+    { "id": "AIA-CALIB-4", "tier": "calibration", "text": "Calibration defaults carried in ai_assist_calibration_profile_v1; any change bumps calibration_profile_version, records rationale, preserves all binding invariants." },
     { "id": "AIA-TEST-1", "text": "Prove 60% cold-start weight." },
     { "id": "AIA-TEST-2", "text": "Prove 30% floor." },
     { "id": "AIA-TEST-3", "text": "Prove weight declines only from qualified evidence." },
@@ -138,27 +172,33 @@
     { "id": "AIA-TEST-11", "text": "Prove unpairing revokes recommendation access." },
     { "id": "AIA-TEST-12", "text": "Prove Moon context expires and recalculates." },
     { "id": "AIA-TEST-13", "text": "Prove user corrections modify future inferred preferences." },
-    { "id": "AIA-TEST-14", "text": "Prove no deterministic mental-state claims generated." }
+    { "id": "AIA-TEST-14", "text": "Prove no deterministic mental-state claims generated." },
+    { "id": "AIA-TEST-15", "text": "Prove any calibration-profile change cannot violate a binding invariant across the full allowed range (60 start, 30 floor, binding totals, precedence, Moon-cannot-avoid)." }
   ],
-  "acceptance_criteria_count": 17,
+  "acceptance_criteria_count": 20,
+  "acceptance_criteria_binding_count": 17,
+  "acceptance_criteria_calibration_count": 3,
   "acceptance_criteria": [
-    { "n": 1, "text": "Guna weight begins at 60% for an eligible cold-start profile", "maps_to": ["AIA-SIGNAL-3"] },
-    { "n": 2, "text": "Guna weight never drops below 30%", "maps_to": ["AIA-SIGNAL-4"] },
-    { "n": 3, "text": "Weight declines only from qualified evidence", "maps_to": ["AIA-SIGNAL-5"] },
-    { "n": 4, "text": "Explicit boundaries override every astrological signal", "maps_to": ["AIA-SAFE-2", "AIA-SIGNAL-8"] },
-    { "n": 5, "text": "Moon context cannot independently create an avoid topic", "maps_to": ["AIA-MOON-2", "AIA-SAFE-4"] },
-    { "n": 6, "text": "Conversation evidence can override the static prior", "maps_to": ["AIA-SIGNAL-6"] },
-    { "n": 7, "text": "Recommendations expose provenance categories internally", "maps_to": ["AIA-AUDIT-1"] },
-    { "n": 8, "text": "Private content cannot cross into shared recommendations without consent", "maps_to": ["AIA-PRIV-1"] },
-    { "n": 9, "text": "AI never sends a message", "maps_to": ["AIA-FUNC-1"] },
-    { "n": 10, "text": "Only one recommendation appears in the overlay", "maps_to": ["AIA-UX-2"] },
-    { "n": 11, "text": "Good Topics are displayed one item per line", "maps_to": ["AIA-UX-4"] },
-    { "n": 12, "text": "Recommendation text is not duplicated", "maps_to": ["AIA-UX-3"] },
-    { "n": 13, "text": "Compatibility score is not shown", "maps_to": ["AIA-GUNA-3"] },
-    { "n": 14, "text": "Unpairing revokes relationship-derived recommendation access", "maps_to": ["AIA-PRIV-4"] },
-    { "n": 15, "text": "Temporary Moon context expires and is recalculated", "maps_to": ["AIA-MOON-3"] },
-    { "n": 16, "text": "User corrections modify future inferred preferences", "maps_to": ["AIA-PRIV-5"] },
-    { "n": 17, "text": "No deterministic mental-state claims are generated", "maps_to": ["AIA-SAFE-3", "AIA-MOON-4"] }
+    { "n": 1, "tier": "binding", "text": "Guna weight begins at 60% for an eligible cold-start profile", "maps_to": ["AIA-SIGNAL-3"] },
+    { "n": 2, "tier": "binding", "text": "Guna weight never drops below 30%", "maps_to": ["AIA-SIGNAL-4"] },
+    { "n": 3, "tier": "binding", "text": "Weight declines only from qualified evidence", "maps_to": ["AIA-SIGNAL-5"] },
+    { "n": 4, "tier": "binding", "text": "Explicit boundaries override every astrological signal", "maps_to": ["AIA-SAFE-2", "AIA-SIGNAL-8"] },
+    { "n": 5, "tier": "binding", "text": "Moon context cannot independently create an avoid topic", "maps_to": ["AIA-MOON-2", "AIA-SAFE-4"] },
+    { "n": 6, "tier": "binding", "text": "Conversation evidence can override the static prior", "maps_to": ["AIA-SIGNAL-6"] },
+    { "n": 7, "tier": "binding", "text": "Recommendations expose provenance categories internally", "maps_to": ["AIA-AUDIT-1"] },
+    { "n": 8, "tier": "binding", "text": "Private content cannot cross into shared recommendations without consent", "maps_to": ["AIA-PRIV-1"] },
+    { "n": 9, "tier": "binding", "text": "AI never sends a message", "maps_to": ["AIA-FUNC-1"] },
+    { "n": 10, "tier": "binding", "text": "Only one recommendation appears in the overlay", "maps_to": ["AIA-UX-2"] },
+    { "n": 11, "tier": "binding", "text": "Good Topics are displayed one item per line", "maps_to": ["AIA-UX-4"] },
+    { "n": 12, "tier": "binding", "text": "Recommendation text is not duplicated", "maps_to": ["AIA-UX-3"] },
+    { "n": 13, "tier": "binding", "text": "Compatibility score is not shown", "maps_to": ["AIA-GUNA-3"] },
+    { "n": 14, "tier": "binding", "text": "Unpairing revokes relationship-derived recommendation access", "maps_to": ["AIA-PRIV-4"] },
+    { "n": 15, "tier": "binding", "text": "Temporary Moon context expires and is recalculated", "maps_to": ["AIA-MOON-3"] },
+    { "n": 16, "tier": "binding", "text": "User corrections modify future inferred preferences", "maps_to": ["AIA-PRIV-5"] },
+    { "n": 17, "tier": "binding", "text": "No deterministic mental-state claims are generated", "maps_to": ["AIA-SAFE-3", "AIA-MOON-4"] },
+    { "n": 18, "tier": "calibration", "text": "Sub-split defaults 60/25/15 and 30/20/50; tunable only within binding totals", "maps_to": ["AIA-CALIB-1"] },
+    { "n": 19, "tier": "calibration", "text": "Moon modifier defaults to 0.80-1.20 and stays bounded when tuned", "maps_to": ["AIA-CALIB-2"] },
+    { "n": 20, "tier": "calibration", "text": "Calibration changes bump calibration_profile_version, record rationale, preserve all invariants", "maps_to": ["AIA-CALIB-4", "AIA-TEST-15"] }
   ],
   "open_questions_count": 17,
   "open_questions": [

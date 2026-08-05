@@ -77,20 +77,31 @@ frozen formula (the exact curve is an open question — OQ-AIA-1).
 | **Mature conversation profile** | **30 % floor** | **70 %** (explicit preferences + observed conversation evidence) |
 
 **Finer breakdown of the "explicit preferences + conversation evidence" share**
-(illustrative starting split; the totals above are binding, the internal split is
-tunable):
+— a **versioned initial calibration default**, not a founder invariant (see the
+binding/calibration split in §3.1):
 
 | Component | New user (cold start) | Mature profile |
 |-----------|-----------------------|----------------|
-| Birth-pattern (Guna) structural prior | **60 %** | **30 %** (floor) |
-| Explicit preferences | 25 % | 20 % |
-| Conversation evidence | 15 % (early) | 50 % (observed) |
+| Birth-pattern (Guna) structural prior | **60 %** *(binding)* | **30 %** *(binding floor)* |
+| Explicit preferences | 25 % *(calibration)* | 20 % *(calibration)* |
+| Conversation evidence | 15 % (early) *(calibration)* | 50 % (observed) *(calibration)* |
 
 This makes the progressive dominance concrete: the conversation-evidence share
 rises from ~15 % to ~50 % as qualified evidence accumulates, explicit preferences
-stay roughly steady, and the structural prior settles to its 30 % floor. The
-exact sub-split is a tuning parameter (subordinate to OQ-AIA-1); the 60→30 prior
-bound and the 30 % floor are binding.
+stay roughly steady, and the structural prior settles to its 30 % floor.
+
+### 3.1 Binding invariants vs. versioned calibration defaults
+
+| Tier | Items | May change how? |
+|------|-------|-----------------|
+| **Binding (founder decision, DEC-048)** | 60 % Guna cold-start weight; 30 % floor; the binding totals 60/40 (cold start) and 30/70 (mature); qualified-evidence-only transition; the hierarchical Guna–Moon composition; the precedence order; safety/privacy overrides | Only by a **new founder decision** — never by tuning. |
+| **Calibration default (versioned)** | The **60/25/15** and **30/20/50** sub-splits; the exact decay curve; evidence-event and topic-confidence thresholds | **Tunable through controlled evaluation** (offline eval, A/B or holdout, monitored rollout) **without changing the core architecture**, provided every binding invariant still holds. |
+
+Calibration defaults live in a **versioned calibration profile**
+(`ai_assist_calibration_profile_v1`, surfaced in provenance as
+`calibration_profile_version`). Any change **bumps the profile version**, records a
+rationale, and must leave the binding totals, the 60 % start, and the 30 % floor
+intact. See `DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md` §0 and `AIA-CALIB-*`.
 
 **Rules governing the transition:**
 
@@ -189,13 +200,18 @@ Each inferred preference should support fields such as:
   ```
 
 - It is a **bounded** modifier: its magnitude is capped so it can nudge
-  timing/tone/approachability but cannot dominate the guidance state. A **sensible
-  initial bound is `moon_climate_modifier ∈ [0.80, 1.20]`** — i.e. the Moon can
-  raise or lower a topic's present suitability by up to ~20 %, but cannot overturn
-  an explicit preference or strong behavioral evidence (those are enforced by the
-  precedence order in §7, not by the modifier range). The **exact final cap
-  remains open (OQ-AIA-4)**; 0.80–1.20 is the proposed starting value, not a frozen
-  decision.
+  timing/tone/approachability but cannot dominate the guidance state. The
+  **initial calibration default** is `moon_climate_modifier ∈ [0.80, 1.20]` —
+  i.e. the Moon can raise or lower a topic's present suitability by up to ~20 %.
+- **Binding (never tunable):** the modifier cannot overturn an explicit preference
+  or strong behavioral evidence, and cannot create an avoid topic — those are
+  enforced by the precedence order in §7, not by the modifier range.
+- **Calibration (versioned, tunable):** the exact bound (default 0.80–1.20) is a
+  versioned calibration default carried in `ai_assist_calibration_profile_v1`. It
+  may be tuned **through controlled evaluation without changing the core
+  architecture**, provided it stays a bounded modifier subordinate to the
+  precedence order. The exact final cap remains open (OQ-AIA-4); changing it bumps
+  `calibration_profile_version`.
 - It is **temporary**: each Moon context carries an **expiration timestamp** and
   is **recalculated** after expiry (expiration period is OQ-AIA-5).
 - It **may** alter timing or wording; it **must not** invent a dislike, create an
@@ -246,10 +262,15 @@ rolled back:
 - `conversation_evidence_model_v1`
 - `ai_assist_guidance_fusion_v1`
 
-Additionally, the **fusion policy** (the weights, the decay behavior, and the
-precedence order) is itself versioned (`fusion_policy_version`) and recorded in
-provenance for every recommendation (see the privacy/provenance doc). Feature-flag
-and rollback strategy is an open question (OQ-AIA-16).
+Additionally, the **fusion policy** (the precedence order and the composition
+structure) is versioned (`fusion_policy_version`), and the **tunable calibration
+defaults** (sub-splits, Moon bound, decay curve, thresholds — see §3.1) are
+carried in a separate **versioned calibration profile**
+(`ai_assist_calibration_profile_v1`, recorded as `calibration_profile_version`).
+Both are stamped in provenance for every recommendation (see the
+privacy/provenance doc). Separating them lets calibration defaults be tuned
+through controlled evaluation **without** touching the architecture or the binding
+invariants. Feature-flag and rollback strategy is an open question (OQ-AIA-16).
 
 ---
 

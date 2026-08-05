@@ -67,6 +67,21 @@ evidence accumulates.
 
 ---
 
+## Binding invariants vs. versioned calibration defaults
+
+The founder decisions above are **binding invariants**. A second tier of numbers
+exists to make the model runnable but is **explicitly not** a founder decision —
+it is a set of **versioned calibration defaults** that may be tuned through
+controlled evaluation without changing the core architecture.
+
+| Tier | What it covers | How it may change |
+|------|----------------|-------------------|
+| **Binding founder invariants (DEC-048)** | 60 % Guna cold-start weight; 30 % floor; qualified-evidence-only transition; hierarchical Guna–Moon composition (posture vs. bounded temporary climate, never one weighted average); the recommendation precedence order; safety and privacy overrides; no user-visible Guna score; no classical-authority validation claim | Only by a **new founder decision**. Never by tuning, experimentation, or configuration. |
+| **Versioned calibration defaults** | Structural-posture sub-splits (**60/25/15**, **30/20/50**); Moon modifier bound (**0.80–1.20**); decay curve; evidence-event and topic-confidence thresholds; Moon expiration | **Tunable through controlled evaluation** (offline eval, A/B or holdout, monitored rollout) **without changing the architecture** — provided every binding invariant still holds. Carried in `ai_assist_calibration_profile_v1`; any change bumps `calibration_profile_version` with a recorded rationale. |
+
+See `DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md` §0 (binding vs. calibration) and
+`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md` §3.1.
+
 ## Two tracks (unchanged classical status)
 
 | Track | Status | Effect |

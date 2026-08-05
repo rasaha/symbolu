@@ -847,6 +847,19 @@ receptivity → Guna prior. Four independently versioned components:
 `structural_relationship_prior_v1`, `moon_receptivity_context_v1`,
 `conversation_evidence_model_v1`, `ai_assist_guidance_fusion_v1` (LLM wording last).
 
+**Binding invariants vs. versioned calibration defaults.** The following are
+**binding** (changeable only by a new founder decision): the 60 % cold-start
+weight; the 30 % floor; the binding totals 60/40 (cold start) and 30/70 (mature);
+the qualified-evidence-only transition; the hierarchical Guna–Moon composition;
+the precedence order; safety/privacy overrides; no user-visible Guna score; no
+classical-authority claim. Separately, the **initial calibration defaults** — the
+**60/25/15** and **30/20/50** posture sub-splits and the **0.80–1.20** Moon
+modifier bound (plus decay curve and thresholds) — are **versioned, tunable
+through controlled evaluation without changing the core architecture**, carried in
+`ai_assist_calibration_profile_v1` (`calibration_profile_version`); any change must
+preserve every binding invariant. See `DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md`
+§0 and `DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md` §3.1.
+
 New documentation statuses (documentation only, **not** runtime enablement):
 `CLASSICAL_GUNA_AUTHORITY_VALIDATION_BLOCKED`, `CLASSICAL_RULE_PACK_NON_EXECUTABLE`,
 `HEURISTIC_GUNA_STRUCTURAL_PRIOR_V1_APPROVED_FOR_REQUIREMENTS`,
