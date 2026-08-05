@@ -48,6 +48,12 @@ Log wins.
 | [DILCHAT_MOBILE_SECURITY_AND_PRIVACY.md](DILCHAT_MOBILE_SECURITY_AND_PRIVACY.md) | Mobile security & privacy. |
 | [DILCHAT_MOBILE_PHASE1_IMPLEMENTATION_REPORT.md](DILCHAT_MOBILE_PHASE1_IMPLEMENTATION_REPORT.md) | Phase 1 implementation report. |
 | [DILCHAT_MOBILE_PHASE1_MERGE_READINESS_REPORT.md](DILCHAT_MOBILE_PHASE1_MERGE_READINESS_REPORT.md) | Phase 1 merge-readiness report. |
+| [DILCHAT_MOBILE_PHASE2_REQUIREMENTS.md](DILCHAT_MOBILE_PHASE2_REQUIREMENTS.md) | Phase 2 (device/deep-link/lifecycle/privacy/native) requirements + exclusions. |
+| [DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md](DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md) | Phase 2 implementation report + exact verdict. |
+| [DILCHAT_MOBILE_PHASE2_BUILD_AND_TOOLCHAIN_REPORT.md](DILCHAT_MOBILE_PHASE2_BUILD_AND_TOOLCHAIN_REPORT.md) | Phase 2 Expo toolchain fix, Metro export, native config/manifest. |
+| [DILCHAT_MOBILE_PHASE2_PRIVACY_AND_LIFECYCLE_TESTS.md](DILCHAT_MOBILE_PHASE2_PRIVACY_AND_LIFECYCLE_TESTS.md) | Phase 2 privacy/lifecycle/deep-link/offline test matrix. |
+| [DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md](DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md) | Phase 2 closed-pilot device harness (synthetic; execution pending). |
+| [DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md](DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md) | Phase 2 deferrals + traced security-advisory dispositions. |
 
 ## Guna authority (classical track — BLOCKED)
 

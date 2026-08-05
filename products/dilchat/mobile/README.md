@@ -1,12 +1,35 @@
-# DilChat Mobile (Phase 1)
+# DilChat Mobile (Phase 1 + Phase 2 hardening)
 
-Account, birth-profile, partner-invitation, pairing, and consent — the first
-DilChat mobile vertical slice.
+Account, birth-profile, partner-invitation, pairing, and consent — the DilChat
+mobile vertical slice, with Phase 2 device/deep-link/lifecycle/privacy/native
+hardening.
 
-> **Phase 1 provides account, profile, invitation, pairing, and consent only.
+> **This app provides account, profile, invitation, pairing, and consent only.
 > Guna Milan and compatibility analysis remain blocked and unavailable.** The app
 > shows no Guna score, Koota, compatibility report, astrology interpretation,
 > daily guidance, chat, or AI.
+
+## Phase 2 hardening (device / deep-link / lifecycle / privacy / native)
+
+- **Invitation deep links** — versioned, allowlisted `dilchat://invitation?v=1&token=…`
+  links (`src/deeplink`, `src/invitation`). Only the invitation intent is honored
+  (no open redirect / arbitrary route); context is preserved through
+  authentication; a signed-in link routes to the **consent** screen (consent is
+  never bypassed); the token is in-memory only and cleared on
+  accept/reject/invalidate/sign-out/switch.
+- **Session/lifecycle resilience** — single-flight refresh, resilient secure
+  storage (never throws / no infinite loading), cross-account cache + pending
+  clear.
+- **Offline** — accept/unpair never blind-retry an ambiguous response; neutral
+  recovery + refresh of authoritative server state.
+- **Privacy** — app-switcher shield (`src/privacy`), device-only Keychain/Keystore
+  tokens, Android backup off, minimized permissions (`INTERNET` only).
+- **Toolchain** — the Expo SDK 51 `ajv-keywords` crash is fixed (`ajv@^8` hoist);
+  `expo config` and Metro export run. See
+  [`docs/DILCHAT_MOBILE_PHASE2_BUILD_AND_TOOLCHAIN_REPORT.md`](../docs/DILCHAT_MOBILE_PHASE2_BUILD_AND_TOOLCHAIN_REPORT.md).
+
+See [`docs/DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md`](../docs/DILCHAT_MOBILE_PHASE2_IMPLEMENTATION_REPORT.md)
+and [`docs/DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md`](../docs/DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md).
 
 Stack: **Expo SDK 51 · React Native 0.74 · TypeScript (strict) · Expo Router ·
 @tanstack/react-query · expo-secure-store**. See

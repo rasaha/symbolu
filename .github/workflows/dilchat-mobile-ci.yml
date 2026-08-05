@@ -109,6 +109,66 @@ jobs:
           fi
           echo "secret scan: clean"
 
+  # Toolchain / native-config gates (Phase 2). Proves the Expo config resolves,
+  # Metro can export a bundle, and the generated Android manifest matches the
+  # hardened posture (deep-link scheme, minimal permissions, backup off, no
+  # cleartext). It does NOT compile an APK (no Android SDK) or touch iOS — those
+  # remain manual/device gates (see DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md).
+  toolchain:
+    name: Mobile toolchain (expo config / Metro export / native manifest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      - name: Install (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Expo config resolves (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npx expo config --json --full > /dev/null
+          echo "expo config: resolved"
+
+      - name: Metro export (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npm run toolchain:export
+          test -d dist/_expo/static/js/android
+
+      - name: Bundle safety — no leaked path / prod endpoint / secret (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          BUNDLE="$(find dist/_expo/static/js/android -name '*.hbc' | head -1)"
+          test -n "$BUNDLE"
+          if grep -aqE '/home/|/Users/|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}' "$BUNDLE"; then
+            echo "Leaked local path or secret in the exported bundle"; exit 1
+          fi
+          echo "bundle safety: clean"
+
+      - name: Generated Android manifest guard (mandatory)
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          npm run check:native
+
+      # Informational only: 3 of expo-doctor's checks fetch api.expo.dev and can
+      # fail behind restrictive network egress. It must NOT gate the build; the
+      # deterministic gates above are the enforced contract.
+      - name: Expo doctor (informational, non-blocking)
+        working-directory: products/dilchat/mobile
+        continue-on-error: true
+        run: npx expo-doctor || true
+
   # Live integration: drives the PRODUCTION mobile API client + session layer
   # (real HttpClient/endpoints, Node's real fetch) against the actual FastAPI
   # backend and a PostgreSQL 16 database. It exercises real JWT, rotating refresh
