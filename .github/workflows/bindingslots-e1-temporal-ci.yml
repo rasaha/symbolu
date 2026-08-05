@@ -1,0 +1,54 @@
+name: bindingslots-e1-temporal-ci
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_e1_temporal/**'
+      - 'docs/audits/bindingslots_e1_temporal/**'
+      - '.github/workflows/bindingslots-e1-temporal-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_e1_temporal/**'
+      - '.github/workflows/bindingslots-e1-temporal-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e1-temporal-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Temporal task / leakage / gate / verdict tests
+        run: python experiments/bindingslots_e1_temporal/tests/test_temporal.py
+
+      - name: Verdict invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_e1_temporal/results/aggregate_verdict.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              allowed = {"E1_TEMPORAL_TRANSFER_VALIDATED","E1_TEMPORAL_TRANSFER_PARTIAL",
+                "E1_TEMPORAL_TRANSFER_FAILED","E1_TEMPORAL_TRANSFER_NO_MATCH_FAILED",
+                "E1_TEMPORAL_TRANSFER_PROTOCOL_VIOLATED","E1_TEMPORAL_TRANSFER_RESOURCE_BLOCKED"}
+              assert d["primary_verdict"] in allowed, d["primary_verdict"]
+              for tok in ("ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED","KDA_VALIDATION_BLOCKED"):
+                  assert tok in d["co_emitted"], tok
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED"
+              print("verdict:", d["primary_verdict"])
+          else:
+              print("no temporal verdict yet")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"
