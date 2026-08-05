@@ -267,6 +267,56 @@
         "title": "ConsentResponse",
         "type": "object"
       },
+      "ConversationResponse": {
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "couple_id": {
+            "format": "uuid",
+            "title": "Couple Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "last_read_sequence": {
+            "title": "Last Read Sequence",
+            "type": "integer"
+          },
+          "latest_sequence": {
+            "title": "Latest Sequence",
+            "type": "integer"
+          },
+          "member_user_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Member User Ids",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "couple_id",
+          "status",
+          "created_at",
+          "latest_sequence",
+          "last_read_sequence",
+          "member_user_ids"
+        ],
+        "title": "ConversationResponse",
+        "type": "object"
+      },
       "CoupleResponse": {
         "properties": {
           "couple_id": {
@@ -440,6 +490,132 @@
         "title": "MemberModel",
         "type": "object"
       },
+      "MessageCreateRequest": {
+        "properties": {
+          "body": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "client_message_id": {
+            "pattern": "^[A-Za-z0-9._:\\-]{1,64}$",
+            "title": "Client Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_message_id",
+          "body"
+        ],
+        "title": "MessageCreateRequest",
+        "type": "object"
+      },
+      "MessageListResponse": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageResponse"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "messages",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "MessageListResponse",
+        "type": "object"
+      },
+      "MessageResponse": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "client_message_id": {
+            "title": "Client Message Id",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "sender_user_id": {
+            "format": "uuid",
+            "title": "Sender User Id",
+            "type": "string"
+          },
+          "server_sequence": {
+            "title": "Server Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "message_id",
+          "conversation_id",
+          "sender_user_id",
+          "client_message_id",
+          "server_sequence",
+          "body",
+          "created_at",
+          "deleted",
+          "deleted_at"
+        ],
+        "title": "MessageResponse",
+        "type": "object"
+      },
       "NatalMoonResponse": {
         "properties": {
           "authoritative": {
@@ -601,6 +777,51 @@
           "synthetic_calculation"
         ],
         "title": "ProvenanceModel",
+        "type": "object"
+      },
+      "ReadStateResponse": {
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "last_read_sequence": {
+            "title": "Last Read Sequence",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "user_id",
+          "last_read_sequence",
+          "updated_at"
+        ],
+        "title": "ReadStateResponse",
+        "type": "object"
+      },
+      "ReadStateUpdateRequest": {
+        "properties": {
+          "last_read_sequence": {
+            "minimum": 0.0,
+            "title": "Last Read Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "last_read_sequence"
+        ],
+        "title": "ReadStateUpdateRequest",
         "type": "object"
       },
       "RefreshRequest": {
@@ -839,7 +1060,7 @@
     }
   },
   "info": {
-    "description": "DilChat backend foundation (Ugence Labs): identity, birth profiles, deterministic natal-Moon derivation, three-scope authorization, and couple/consent/audit primitives. No user-facing Guna Milan, AI, daily transits, chat, or agreements are exposed in this phase.",
+    "description": "DilChat backend foundation (Ugence Labs): identity, birth profiles, deterministic natal-Moon derivation, three-scope authorization, couple/consent/audit primitives, and the Phase 3A secure shared chat core (relationship-scoped conversations, idempotent text messages, cursor pagination, read state, transactional outbox). No user-facing Guna Milan, AI Assist, daily transits, or agreements are exposed.",
     "title": "DilChat Backend (Phase A/B)",
     "version": "0.1.0"
   },
@@ -1135,6 +1356,261 @@
         "summary": "Create Consent",
         "tags": [
           "consent"
+        ]
+      }
+    },
+    "/v1/conversations/current": {
+      "get": {
+        "operationId": "current_conversation_v1_conversations_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Current Conversation",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}/messages": {
+      "get": {
+        "operationId": "list_messages_v1_conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Messages",
+        "tags": [
+          "chat"
+        ]
+      },
+      "post": {
+        "operationId": "create_message_v1_conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Message",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}/messages/{message_id}": {
+      "delete": {
+        "operationId": "delete_message_v1_conversations__conversation_id__messages__message_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Message",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}/read-state": {
+      "put": {
+        "operationId": "update_read_state_v1_conversations__conversation_id__read_state_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadStateUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Read State",
+        "tags": [
+          "chat"
         ]
       }
     },

@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 30  # 30 days
     token_issuer: str = "dilchat"
 
+    # --- Secure chat (Phase 3A) policy constants --------------------------- #
+    # Single source of truth for the message body bound and page limits so no
+    # layer duplicates the value. Body length is measured in Unicode code points.
+    chat_message_max_code_points: int = 4000
+    chat_page_default: int = 50
+    chat_page_max: int = 100
+
     # Birth-time confidence defaults (propagate to calculation provenance).
     confidence_exact: float = 1.0
     confidence_approximate: float = 0.5

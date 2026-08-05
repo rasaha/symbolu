@@ -183,3 +183,56 @@ class SharedArtifactResponse(BaseModel):
     payload_snapshot: str
     created_at: dt.datetime
     provenance: dict
+
+
+# --- secure chat (Phase 3A) ------------------------------------------------ #
+# Client idempotency key: bounded, opaque, printable token chosen by the client.
+_CLIENT_MESSAGE_ID_RE = r"^[A-Za-z0-9._:\-]{1,64}$"
+# Mirrors Settings.chat_message_max_code_points (single source of truth); the
+# service re-validates against configuration so the two never silently diverge.
+_MESSAGE_BODY_MAX = 4000
+
+
+class ConversationResponse(BaseModel):
+    conversation_id: uuid.UUID
+    couple_id: uuid.UUID
+    status: str
+    created_at: dt.datetime
+    latest_sequence: int
+    last_read_sequence: int
+    member_user_ids: list[uuid.UUID]
+
+
+class MessageCreateRequest(BaseModel):
+    client_message_id: str = Field(pattern=_CLIENT_MESSAGE_ID_RE)
+    body: str = Field(min_length=1, max_length=_MESSAGE_BODY_MAX)
+
+
+class MessageResponse(BaseModel):
+    message_id: uuid.UUID
+    conversation_id: uuid.UUID
+    sender_user_id: uuid.UUID
+    client_message_id: str
+    server_sequence: int
+    # ``None`` for a tombstoned (deleted) message — metadata is retained, body is not.
+    body: str | None
+    created_at: dt.datetime
+    deleted: bool
+    deleted_at: dt.datetime | None
+
+
+class MessageListResponse(BaseModel):
+    messages: list[MessageResponse]
+    next_cursor: str | None
+    has_more: bool
+
+
+class ReadStateUpdateRequest(BaseModel):
+    last_read_sequence: int = Field(ge=0)
+
+
+class ReadStateResponse(BaseModel):
+    conversation_id: uuid.UUID
+    user_id: uuid.UUID
+    last_read_sequence: int
+    updated_at: dt.datetime

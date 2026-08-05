@@ -9,8 +9,11 @@ Log wins.
 
 > **Product status (verified):** Mobile Phase 1 **merged** (account, birth profile,
 > invitation, pairing, consent, paired status, unpairing). Mobile Phase 2 not
-> started. Secure partner chat, AI Assist, and user-facing Guna scores **do not
-> exist**. Classical Guna authority remains **BLOCKED**; the classical rule pack is
+> started. Secure partner chat **backend core** (Phase 3A) exists as a
+> backend-only foundation (relationship-scoped conversations, idempotent text
+> messages, cursor pagination, read state, transactional outbox, RLS); there is
+> **no** chat UI, real-time transport, AI Assist, or user-facing Guna score.
+> Classical Guna authority remains **BLOCKED**; the classical rule pack is
 > **non-executable** and fail-closed.
 
 ## AI Assist (V1 direction — DEC-048, requirements only)
@@ -38,6 +41,17 @@ Log wins.
 | [DILCHAT_IMPLEMENTATION_ROADMAP.md](DILCHAT_IMPLEMENTATION_ROADMAP.md) | Phased delivery plan (Phases A–G). |
 | [DILCHAT_IMPLEMENTATION_READINESS_GATE.md](DILCHAT_IMPLEMENTATION_READINESS_GATE.md) | Implementation readiness gate. |
 | [DILCHAT_AI_INTEGRATION_SPEC.md](DILCHAT_AI_INTEGRATION_SPEC.md) | AI integration spec (provider ports, deterministic-astrology boundary). |
+
+## Secure chat (Phase 3A — backend core)
+
+| Doc | Purpose |
+|-----|---------|
+| [DILCHAT_SECURE_CHAT_BACKEND_REQUIREMENTS.md](DILCHAT_SECURE_CHAT_BACKEND_REQUIREMENTS.md) | Objective, in/out of scope, concurrency invariants, roadmap position. |
+| [DILCHAT_SECURE_CHAT_BACKEND_DATA_MODEL.md](DILCHAT_SECURE_CHAT_BACKEND_DATA_MODEL.md) | Conversations, messages, read-state, transactional outbox + event schema. |
+| [DILCHAT_SECURE_CHAT_BACKEND_API_CONTRACT.md](DILCHAT_SECURE_CHAT_BACKEND_API_CONTRACT.md) | Bounded REST surface, idempotency, cursor, error codes, anti-enumeration. |
+| [DILCHAT_SECURE_CHAT_BACKEND_SECURITY_AND_PRIVACY.md](DILCHAT_SECURE_CHAT_BACKEND_SECURITY_AND_PRIVACY.md) | Authorization, RLS, content confidentiality, account deletion baseline. |
+| [DILCHAT_SECURE_CHAT_BACKEND_MIGRATION_AND_ROLLBACK.md](DILCHAT_SECURE_CHAT_BACKEND_MIGRATION_AND_ROLLBACK.md) | Migration `c3d4e5f6a7b8`, backfill, downgrade, verified results. |
+| [DILCHAT_SECURE_CHAT_BACKEND_IMPLEMENTATION_REPORT.md](DILCHAT_SECURE_CHAT_BACKEND_IMPLEMENTATION_REPORT.md) | Evidence, test counts, verdict, confirmations. |
 
 ## Mobile
 

@@ -685,4 +685,33 @@ Ordered by recommended sequence after MVP launch:
 
 ---
 
+## Secure chat sequence (Phase 3)
+
+The secure-chat build is sequenced so that the security-critical backend
+foundation is delivered and audited before any transport or UI, and well before
+any AI. Each phase gates the next.
+
+```
+Phase 3A — Secure chat backend core     ← IMPLEMENTED (backend-only; this workstream)
+Phase 3B — Safety, block/report, retention/export policy
+Phase 3C — Real-time delivery transport (consumes the Phase 3A transactional outbox)
+Phase 3D — Mobile chat interface
+Phase 4A — Conversation evidence
+Phase 4B — Guna structural prior
+Phase 4C — Moon receptivity
+Phase 4D — AI Assist (DEC-048; privacy-gated, unchanged)
+```
+
+- **Phase 3A** (this workstream) delivers relationship-scoped conversations,
+  idempotent text messages, cursor pagination, read state, transactional
+  revocation at unpair, a transactional outbox, and forced RLS — backend only.
+  See the `DILCHAT_SECURE_CHAT_BACKEND_*` docs.
+- Phase 3A alone does **not** make the product production-ready.
+- Friends Finder / Relationship Discovery remains a **separate** requirements
+  track, not part of this sequence.
+- No message content is ever exposed to AI, analytics, or astrology systems;
+  DEC-048 and the AI Assist requirements are unchanged.
+
+---
+
 *End of `DILCHAT_IMPLEMENTATION_ROADMAP.md`. Design phase — no production code authored. This roadmap sequences and gates the DilChat build; it is subordinate to the Decision Log and updated in lockstep when a DEC or OQ changes. No production implementation begins until specs (documents 1–9) are approved and GATE-0 is signed.*

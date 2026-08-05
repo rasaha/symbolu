@@ -888,3 +888,99 @@ abuse/coercion safeguards; sensitive-language localization; recommendation-quali
 metrics; rollback/feature-flag strategy; whether "Avoid Topics" is renamed
 "Approach Carefully." See `DILCHAT_AI_ASSIST_ACCEPTANCE_CRITERIA.md` (Open
 questions).
+
+---
+
+# Secure chat backend core (DEC-049 … DEC-058)
+
+Phase 3A. Backend-only. Adds four relationship-scoped tables and a bounded REST
+surface on top of the existing couple model. Does **not** rewrite DEC-048 or the
+AI Assist requirements; no message content is exposed to any AI/analytics/astrology
+system. See the `DILCHAT_SECURE_CHAT_BACKEND_*` docs.
+
+## DEC-049 — One conversation per relationship instance
+**Status:** Accepted · **[Architecture]**
+
+A conversation belongs to exactly one `couples` row (`uq_chat_conversation_couple`).
+Because a later re-pair creates a **new** couple row, the same two people pairing
+again get a **new** conversation; a stale conversation id can never regain access.
+No arbitrary room creation; no group membership.
+
+## DEC-050 — Transactional conversation creation at pairing (+ backfill)
+**Status:** Accepted · **[Architecture]**
+
+The conversation is provisioned in the **same request transaction** as invitation
+acceptance; existing active pairs are backfilled by migration `c3d4e5f6a7b8`.
+Uniqueness makes concurrent acceptance safe (no duplicate conversation). Revoked
+couples receive no active conversation.
+
+## DEC-051 — Transactional revocation at unpair (consistent lock order)
+**Status:** Accepted · **[Security]**
+
+Unpair revokes the conversation in the authoritative transaction, **before**
+membership revocation (so RLS still permits the update). Send and unpair take the
+**same** conversation row lock (`SELECT … FOR UPDATE`); a send re-reads status under
+the lock. Guarantee: **no message commits after revocation is effective**. Proven by
+real-PostgreSQL concurrency tests.
+
+## DEC-052 — Idempotency scope `(conversation, sender, client_message_id)`
+**Status:** Accepted · **[Technical]**
+
+A required client message id makes creation idempotent; retries return the original
+(no new row/event); key reuse with a different body on a live message is a
+**409 conflict**. Backed by a unique constraint and serialised by the conversation lock.
+
+## DEC-053 — Cursor pagination (opaque, versioned, gapless sequence)
+**Status:** Accepted · **[Technical]**
+
+Ordering uses a monotonic per-conversation `server_sequence` (a counter incremented
+under the conversation lock). Pagination is cursor-only (no offset); the cursor is an
+opaque, versioned token bound to its conversation (cross-conversation → 400, fail
+closed). Default page 50, max 100. `EXPLAIN` confirms an index scan on
+`uq_chat_message_sequence`.
+
+## DEC-054 — Tombstone deletion (sender-only, body erased)
+**Status:** Accepted · **[Privacy]**
+
+Deletion is a tombstone: only the sender may delete; the body is **physically
+cleared**, and ids/sender/sequence/timestamps/deletion metadata are retained.
+Idempotent; denied after revocation. No administrator moderation deletion in 3A.
+
+## DEC-055 — Transactional outbox for deferred real-time delivery
+**Status:** Accepted · **[Architecture]**
+
+Every state change writes a versioned `chat_outbox` event in the **same** DB
+transaction (rollback removes both). Payloads carry stable ids + minimal metadata
+**only** (allow-listed) — never a body/token/email/birth data. No broker/WebSocket in
+3A; the relay/transport is Phase 3C.
+
+## DEC-056 — Message content excluded from logs, audit, and events
+**Status:** Accepted · **[Privacy]**
+
+The message body is SENSITIVE and lives only in `chat_messages.body`. It never
+appears in logs, audit rows, tracing, metrics, or outbox payloads. Proven by a
+log-capture test on success and error paths.
+
+## DEC-057 — Forced RLS on chat tables; outbox is internal-only
+**Status:** Accepted · **[Security]** · Extends DEC-034/DEC-038.
+
+`ENABLE`+`FORCE` RLS on all user-facing chat tables, keyed on active membership via
+`app_is_active_member(couple_id)`; writes are constrained to self (sender/user).
+The outbox is **not** exposed on the user API surface — the app role may only
+`INSERT`; only the `dilchat_worker` role may read/mark-published. Proven under a
+non-owner runtime role.
+
+## DEC-058 — Deferred real-time transport; account-deletion V1 baseline
+**Status:** Accepted · **[Architecture/Privacy]**
+
+Real-time delivery is deferred to Phase 3C (correctness never depends on
+WebSockets/push). Account deletion dissolves the active relationship (same
+revocation path as unpair); exact hard-erase vs retention-window semantics are an
+open question for Phase 3B.
+
+## New open questions
+
+| OQ | Question | Recommendation (bounded) |
+|----|----------|--------------------------|
+| OQ-CHAT-1 | Do ended couples retain a read-only export of prior messages? | **Recommend: no retained access** (parallels OQ-14). A retained-export policy, if adopted, is an explicit Phase 3B decision. |
+| OQ-CHAT-2 | Exact account-deletion semantics (hard-erase vs tombstone retention window)? | Deferred to Phase 3B safety/retention track. |

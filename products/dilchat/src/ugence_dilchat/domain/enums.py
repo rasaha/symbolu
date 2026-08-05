@@ -75,6 +75,27 @@ class CoupleStatus(str, enum.Enum):
     UNPAIRED = "UNPAIRED"
 
 
+class ConversationStatus(str, enum.Enum):
+    """Lifecycle of a relationship-scoped secure chat conversation (Phase 3A)."""
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
+class OutboxEventType(str, enum.Enum):
+    """Transactional-outbox event types for later real-time delivery (Phase 3A).
+
+    Payloads carry stable internal IDs and minimal metadata ONLY — never message
+    bodies, tokens, emails, or birth data.
+    """
+
+    CONVERSATION_CREATED = "CONVERSATION_CREATED"
+    MESSAGE_CREATED = "MESSAGE_CREATED"
+    MESSAGE_DELETED = "MESSAGE_DELETED"
+    READ_STATE_UPDATED = "READ_STATE_UPDATED"
+    CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
+
+
 class MembershipStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     REVOKED = "REVOKED"
@@ -116,6 +137,9 @@ class AuditAction(str, enum.Enum):
     INVITATION_EXPIRED = "INVITATION_EXPIRED"
     INVITATION_CANCELLED = "INVITATION_CANCELLED"
     COUPLE_UNPAIRED = "COUPLE_UNPAIRED"
+    CONVERSATION_CREATED = "CONVERSATION_CREATED"
+    CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
+    MESSAGE_DELETED = "MESSAGE_DELETED"
     CONSENT_CREATED = "CONSENT_CREATED"
     CONSENT_GRANTED = "CONSENT_GRANTED"
     CONSENT_REVOKED = "CONSENT_REVOKED"

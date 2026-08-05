@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ugence_dilchat.base import Base
 from ugence_dilchat.config import get_settings
+from ugence_dilchat.infrastructure import chat_orm as _chat_orm  # noqa: F401  (register models)
 from ugence_dilchat.infrastructure import orm as _orm  # noqa: F401  (register models)
 
 config = context.config
