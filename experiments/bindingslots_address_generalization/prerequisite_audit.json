@@ -1,0 +1,29 @@
+{
+  "schema": "bindingslots_address_generalization/prerequisite_audit/v1",
+  "result": "BINDINGSLOTS_INTERVENTION_PREREQUISITE_VERIFIED",
+  "checks": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_tip": "ee36e34a366b498e2be4759bbf4c0f964942aa8b",
+    "pr_1344_merged": true,
+    "value_path_merge_commit": "ee36e34a366b498e2be4759bbf4c0f964942aa8b",
+    "merge_reachable_from_default_tip": true,
+    "reconstructed_verdict": "BINDINGSLOTS_BOTH_FAILURE_FAMILIES_LOCALIZED",
+    "reconstructed_kda_readiness": "KDA_VALIDATION_BLOCKED",
+    "mechanisms": {
+      "value_path_address_distribution_failed": ["H2 s23", "R0 s23"],
+      "quality_gradient_conflict_localized": ["O1R s24", "O1R s25", "H2 s25"],
+      "conflict_group": "write_addr_proj",
+      "write_addr_proj_cosine_1200": {"O1R s24": -0.115, "O1R s25": -0.248, "H2 s25": -0.206}
+    },
+    "both_classifier_outputs_preserved": {
+      "original": "diagnosis_classify_preregistered_v1.py (sha256 db79114f…, verdict QUALITY_INTERFERENCE_LOCALIZED)",
+      "amended": "results/aggregate_conclusion.json (verdict BOTH_FAILURE_FAMILIES_LOCALIZED) + results/classifier_amendment_comparison.json"
+    },
+    "inherited_tests": {"test_diagnosis_classify": "21 passed"},
+    "inherited_verifiers": {"verify_diagnosis": "32 checks, 0 failures"},
+    "working_tree_clean": true,
+    "branch": "claude/bindingslots-address-generalization-gradient-isolation"
+  },
+  "base_architecture": "corrected H2 (source execution commit 9380bdb1) — exhibited BOTH localized failure families",
+  "phase_separation": "new intervention-development phase; separate directory + branch + PR from the completed diagnostic phase"
+}

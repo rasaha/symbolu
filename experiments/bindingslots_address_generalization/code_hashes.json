@@ -1,0 +1,15 @@
+{
+  "schema": "bindingslots_address_generalization/code_hashes/v1",
+  "sha256": {
+    "interventions_ag.py": "7e49e5f729e9aa1be242761e921cad41b655ede34b90bfce04bf0d6e9a1a40df",
+    "arms_ag.py": "3568d990abc079634a1fca84b7ceb2983a6d1822ad89b6793d91c832e08a646a",
+    "ag_classify.py": "c97786651595102cb1a56b2172fa0dee80d30f4313b8b4bfec15e0462b8c57a5",
+    "ag_meta.py": "2d0c7cbf9a6bf7262eab9411c735f85f3c5540e242c0e403ad282469928e9b01",
+    "run_ag_execution.py": "f119b7bce3841a518b55b18c83b8d83602459e507314b710e91f6bef412276fb",
+    "preregistration.json": "da9382b1615249152e158e42716f2feadb2f304836a02ed4c1e1049d32cb1ec5",
+    "arm_definitions.json": "526934bde81cd440f43eb602eb74dfadbdd74d4a39af13c9f7ff53ed9974d7b0",
+    "seed_registry.json": "386ef49d01acd4accd87ceb63837cb801faddcfdebe689dc8ded7bbef8a81289",
+    "tests/test_ag_classify.py": "3ff46f5dbb3937fe35c98433dd4cf754a4d17247c6738b36bd590ecfd4eab150",
+    "tests/test_ag_impl.py": "b50565717ca8d788033d9b7e66abaabfc5fdc91a01f27c78394ac4c209367ffb"
+  }
+}
