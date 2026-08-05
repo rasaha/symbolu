@@ -55,7 +55,8 @@ jobs:
               assert d["conclusion"] in allowed, d["conclusion"]
               for tok in ("E1_TEMPORAL_TRANSFER_PARTIAL","ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED","KDA_VALIDATION_BLOCKED"):
                   assert tok in d["preserved"], tok
-              blob = json.dumps(d)
+              scan = dict(d); scan.pop("never_emit", None)   # never_emit legitimately lists these tokens
+              blob = json.dumps(scan)
               for forbidden in ("E1_TEMPORAL_TRANSFER_VALIDATED","E1_STRUCTURAL_TRANSFER_CONFIRMED","E1_FOLLOW_ON_RESEARCH_ELIGIBLE"):
                   assert forbidden not in blob, forbidden
               # R3 may never be the selected primary learned readout
