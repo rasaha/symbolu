@@ -7,8 +7,9 @@ or **outside Phase 2 merge scope**. Nothing here is fabricated as passing.
 
 | Item | Why deferred | Evidence |
 |---|---|---|
-| Android **compiled build** (`gradle assembleDebug/Release`) | No Android SDK/NDK/emulator in this Linux CI | `expo prebuild` succeeds and the manifest is validated; gradle not present |
-| Android **emulator** run | No emulator/AVD available | — |
+| Android **debug compiled build** (`gradle assembleDebug`) | Now covered by the **Track A `android-build` CI job** (GitHub runner, official preinstalled Google SDK). The sandbox itself cannot compile locally — org egress policy denies `dl.google.com` (no SDK/AGP download) | `DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md` |
+| Android **release-like compile** (`assembleRelease`) | Needs a release signing config; production signing is out of scope | deferred to signing/device track |
+| Android **emulator** run + installed-app deep-link launch | No `/dev/kvm` (no hardware acceleration) on this host; emulator CI not in Track A's permitted additions | handoff in the native-validation report §6 |
 | **iOS** resolved-config-beyond, simulator build, Xcode | Linux host, no macOS/Xcode | iOS config validated via `expo config`; build **not** attempted (not fabricated) |
 | **Physical-device** two-device pilot | No devices attached | Harness ready: `DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md` |
 | VoiceOver / TalkBack, dynamic-type/landscape on-device | Requires a device/simulator | Automated a11y (roles/labels/announcements) passes; on-device deferred |

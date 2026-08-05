@@ -132,8 +132,11 @@ announcements), not component snapshots.
 16/17 in CI (the one failing check is a non-blocking SDK-version *suggestion* —
 `expo@51.0.28` vs `~51.0.39`, `expo-router@3.5.23` vs `~3.5.24`; locally 14/17
 because 3 checks additionally need `api.expo.dev`, which egress blocks) ·
-`expo prebuild --platform android` exit 0 (manifest validated & hardened). Android
-gradle build / emulator / all iOS / physical devices: **deferred** (environment).
+`expo prebuild --platform android` exit 0 (manifest validated & hardened).
+**Android Gradle debug build** now runs in CI (Track A `android-build` job, official
+Google SDK on a GitHub runner). Android emulator + installed-app launch (no
+`/dev/kvm` here), all iOS (no macOS/Xcode), and physical devices remain
+**deferred** — see `DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md`.
 
 ## 6. Verdict rationale
 

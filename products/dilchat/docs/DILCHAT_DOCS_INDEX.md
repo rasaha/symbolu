@@ -55,6 +55,7 @@ Log wins.
 | [DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md](DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md) | Phase 2 closed-pilot device harness (synthetic; execution pending). |
 | [DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md](DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md) | Phase 2 deferrals + traced security-advisory dispositions. |
 | [DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md](DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md) | Independent merge-readiness audit: re-verified gates, CI-red fix, install-safe-link infra dependency, exact verdict. |
+| [DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md](DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md) | Track A native/platform validation: Android generation + CI Gradle debug build; emulator/iOS host limitations + handoff. |
 
 ## Guna authority (classical track — BLOCKED)
 
