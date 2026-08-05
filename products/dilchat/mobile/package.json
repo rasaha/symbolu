@@ -2,7 +2,7 @@
   "name": "@ugence/dilchat-mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "DilChat mobile Phase 1 \u2014 account, birth profile, partner invitation, pairing, consent. No Guna/compatibility.",
+  "description": "DilChat mobile — account, birth profile, partner invitation, pairing, consent, and Phase 2 device/deep-link/lifecycle/privacy hardening. No Guna/compatibility.",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -14,12 +14,16 @@
     "test:integration": "bash scripts/run-integration.sh",
     "check:endpoint": "node scripts/check-no-prod-endpoint.js",
     "check:contract": "node scripts/check-contract-drift.js",
-    "check:config": "node scripts/check-config.js"
+    "check:config": "node scripts/check-config.js",
+    "check:native": "bash scripts/check-native-android.sh",
+    "toolchain:config": "expo config --json --full",
+    "toolchain:export": "expo export --platform android --output-dir dist"
   },
   "dependencies": {
     "@tanstack/react-query": "5.51.1",
     "expo": "51.0.28",
     "expo-constants": "16.0.2",
+    "expo-linking": "6.3.1",
     "expo-router": "3.5.23",
     "expo-secure-store": "13.0.2",
     "expo-status-bar": "1.12.1",
@@ -28,10 +32,12 @@
     "react-native-safe-area-context": "4.10.5",
     "react-native-screens": "3.31.1"
   },
+  "//dependency-notes": "ajv is pinned as a direct devDependency at ^8 so it hoists to the top of node_modules. This resolves an Expo SDK 51 toolchain failure: expo-router -> schema-utils@4 -> ajv-keywords@5 requires ajv@^8 (it imports 'ajv/dist/compile/codegen'), but eslint pulls ajv@^6, and npm otherwise hoisted the incompatible ajv@6 to the top, shadowing ajv@8 for ajv-keywords and crashing `expo config`/`expo-doctor`/Metro export. With ajv@8 at the top, eslint transparently nests its own ajv@6. Do not remove without re-verifying `npm run lint` AND `npx expo config --json`.",
   "devDependencies": {
     "@testing-library/react-native": "12.5.1",
     "@types/jest": "29.5.12",
     "@types/react": "18.2.79",
+    "ajv": "^8.17.1",
     "eslint": "8.57.0",
     "eslint-config-expo": "7.1.2",
     "jest": "29.7.0",
