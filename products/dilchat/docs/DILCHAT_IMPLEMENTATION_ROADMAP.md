@@ -55,6 +55,19 @@
 
 **MVP cut line runs between E and F** (justified in §2). Phase A performs the repo/requirements audit and locks decisions; **no production feature code is written in A beyond a throwaway ephemeris proof-of-concept** and skeletons — the audit's exit is *approved specs*, which is the precondition for all other phases.
 
+> **V1 AI Assist direction (DEC-048) — refinement of Phases E–F.** The founder has
+> approved a revised V1 direction for the AI-guidance surface: a **hidden** Guna
+> structural prior (no user-visible score) composed with a **separate, temporary**
+> Moon-receptivity signal and **progressively dominant** conversation evidence. The
+> mobile track adds **Phase 2 (device/native hardening)** and **Phase 3 (secure
+> shared chat)** ahead of AI Assist (Phases 4A–4D). This refines — and is
+> sequenced by — the dedicated
+> [`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](./DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md);
+> see also [`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](./DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md)
+> and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](./DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
+> No AI Assist implementation is authorized by this note; **AI Assist must not be
+> built before secure shared chat and privacy boundaries exist.**
+
 ### 1.2 Dependency graph (Mermaid)
 
 ```mermaid

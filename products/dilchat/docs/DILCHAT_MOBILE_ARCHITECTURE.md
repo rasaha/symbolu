@@ -72,6 +72,26 @@ Every screen action maps to an existing backend OpenAPI operation — see
 `DILCHAT_MOBILE_API_CONTRACT_MAP.md`. **No backend route, model, or migration was
 added or changed** for this phase.
 
+## Mobile phase sequence (post–Phase 1)
+
+Phase 1 (this doc) is **merged**. The approved forward sequence — documentation
+only; nothing below is implemented — is:
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **Phase 2** | Device & native hardening: native builds, physical-device validation, deep-link foundation, privacy hardening, network resilience, accessibility review | **Not started** (next engineering phase) |
+| **Phase 3** | Secure shared partner chat: persistence, sync, delivery states, relationship-scoped authorization, unpair revocation, retention/deletion, abuse/blocking/reporting | Blocked on Phase 2 |
+| **Phase 4A–4D** | AI Assist: conversation evidence → hidden Guna structural prior → Moon receptivity → AI Assist overlay | Blocked on Phase 3 + privacy boundaries |
+
+The AI Assist direction (hidden Guna prior at 60 %→30 %, separate temporary Moon
+receptivity, progressively dominant conversation evidence, no user-visible Guna
+score) is specified in
+[`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md),
+[`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md),
+and the [chat-overlay spec](DILCHAT_AI_ASSIST_CHAT_OVERLAY_SPEC.md), under founder
+decision **DEC-048**. **AI Assist must not be implemented before secure shared
+chat (Phase 3) and privacy boundaries exist.**
+
 ## Known limitations
 
 - CI runs lint/type-check/tests/config-validation only — it does **not** build

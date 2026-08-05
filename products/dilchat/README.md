@@ -25,10 +25,24 @@ parts of Phase B**).
 > This package deliberately contains **no** user-facing Guna Milan, Living
 > Compatibility, AI/LLM guidance, daily transits, shared/private chat,
 > agreements, mobile/web clients, billing, or production-deployment code. See the
-> design and audit documents under [`docs/`](docs/), the phase report
+> design and audit documents under [`docs/`](docs/) (indexed by
+> [`docs/DILCHAT_DOCS_INDEX.md`](docs/DILCHAT_DOCS_INDEX.md)), the phase report
 > [`docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md`](docs/DILCHAT_PHASE_A_B_IMPLEMENTATION_REPORT.md),
 > and the merge record
 > [`docs/DILCHAT_MERGE_READINESS_REPORT.md`](docs/DILCHAT_MERGE_READINESS_REPORT.md).
+
+> **AI Assist V1 direction — documentation only (DEC-048).** A founder-approved
+> requirements package describes DilChat's future *AI Assist* capability: a
+> **hidden** Guna structural prior (starting at **60 %**, declining to a **30 %**
+> floor on qualified evidence), a **separate, temporary** Moon-receptivity signal,
+> and **progressively dominant** conversation evidence — with **no user-visible
+> Guna score** and **no** claim of classical-authority validation. This is
+> **requirements/architecture only**; no AI Assist, chat, scoring, Moon
+> calculation, API, model, or migration is implemented, and no runtime Guna rule
+> pack is enabled. Start at
+> [`docs/DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](docs/DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md).
+> Next engineering phase remains **Mobile Phase 2 (device/native hardening)**, then
+> secure shared chat, then AI Assist.
 
 ## What this package implements
 
