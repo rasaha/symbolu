@@ -1,14 +1,15 @@
 """Aggregate v1 router.
 
-Deliberately excludes any Guna Milan, daily-transit, chat, agreement, or AI route
-(Phase A/B scope). A guard test asserts no ``guna`` path is ever registered.
+Includes the Phase 3A secure shared chat surface (``/conversations``). Deliberately
+excludes any Guna Milan, daily-transit, agreement, or AI route. A guard test asserts
+no ``guna``/compatibility path is ever registered.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .routes import auth, birth_profiles, consent, couples, health, natal, users
+from .routes import auth, birth_profiles, chat, consent, couples, health, natal, users
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -18,3 +19,4 @@ api_router.include_router(birth_profiles.router)
 api_router.include_router(natal.router)
 api_router.include_router(couples.router)
 api_router.include_router(consent.router)
+api_router.include_router(chat.router)

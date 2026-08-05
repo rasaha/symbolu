@@ -14,6 +14,12 @@ from ..config import Settings
 from ..db import get_session, set_transaction_context
 from ..errors import DilChatError, ErrorCode
 from ..repositories.birth_profiles import BirthProfileRepository, NatalRepository
+from ..repositories.chat import (
+    ConversationRepository,
+    MessageRepository,
+    OutboxRepository,
+    ReadStateRepository,
+)
 from ..repositories.consent import ConsentRepository, SharedArtifactRepository
 from ..repositories.couples import (
     CoupleRepository,
@@ -23,6 +29,7 @@ from ..repositories.couples import (
 from ..repositories.users import SessionRepository, UserRepository
 from ..security.tokens import TokenService
 from ..services.birth_profiles import BirthProfileService
+from ..services.chat import ChatService
 from ..services.consent import ConsentService
 from ..services.couples import CoupleService
 from ..services.identity import IdentityService
@@ -77,12 +84,14 @@ async def get_current_principal(
 @dataclass
 class ServiceRegistry:
     session: AsyncSession
+    settings: Settings
     audit: AuditService
     identity: IdentityService
     birth_profiles: BirthProfileService
     natal: NatalService
     couples: CoupleService
     consent: ConsentService
+    chat: ChatService
     membership_repo: MembershipRepository
     couple_repo: CoupleRepository
     birth_profile_repo: BirthProfileRepository
@@ -105,9 +114,14 @@ def get_services(
     invitation_repo = InvitationRepository(session)
     consent_repo = ConsentRepository(session)
     artifact_repo = SharedArtifactRepository(session)
+    conversation_repo = ConversationRepository(session)
+    message_repo = MessageRepository(session)
+    read_state_repo = ReadStateRepository(session)
+    outbox_repo = OutboxRepository(session)
 
     return ServiceRegistry(
         session=session,
+        settings=settings,
         audit=audit,
         identity=IdentityService(
             settings=settings, users=users, sessions=sessions, tokens=tokens, audit=audit
@@ -125,6 +139,15 @@ def get_services(
         consent=ConsentService(
             consent=consent_repo,
             artifacts=artifact_repo,
+            memberships=membership_repo,
+            audit=audit,
+        ),
+        chat=ChatService(
+            settings=settings,
+            conversations=conversation_repo,
+            messages=message_repo,
+            read_states=read_state_repo,
+            outbox=outbox_repo,
             memberships=membership_repo,
             audit=audit,
         ),
