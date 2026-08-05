@@ -1,0 +1,916 @@
+{
+  "schema": "bindingslots_address_generalization/gradient_projection_metrics/v1",
+  "runs": [
+    {
+      "arm": "B0",
+      "seed": 28,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.00011443324498834697,
+            "backbone": -0.15528082058072545,
+            "slot_keys": -0.14001514432288042,
+            "write_addr_proj": -0.0949763466580577,
+            "read_addr_proj": -2.1591050491189233e-05,
+            "write_value_proj": -0.32861729752442453,
+            "write_gate": -0.6528096421042714,
+            "memory_readout_Wo": -0.01732082751694082,
+            "slot_norm": -0.09406359263515163
+          },
+          "lm_vs_aux_cosine_wak": -0.0949763466580577
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.02132539684679749,
+            "backbone": -0.07557392566272379,
+            "slot_keys": 0.08657471343518067,
+            "write_addr_proj": 0.1249801016649966,
+            "read_addr_proj": 0.15024233589071964,
+            "write_value_proj": -0.09836191922853614,
+            "write_gate": 0.3544816812626471,
+            "memory_readout_Wo": -0.12472205238954771,
+            "slot_norm": 0.0024841107392202465
+          },
+          "lm_vs_aux_cosine_wak": 0.1249801016649966
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.000417811570339576,
+            "backbone": 0.00224053462191366,
+            "slot_keys": 0.007986293324236789,
+            "write_addr_proj": -0.023959374857871606,
+            "read_addr_proj": -0.010313928115533002,
+            "write_value_proj": -0.031698198416022144,
+            "write_gate": -0.041820434452233914,
+            "memory_readout_Wo": -0.003939847053320058,
+            "slot_norm": -0.05846857164531071
+          },
+          "lm_vs_aux_cosine_wak": -0.023959374857871606
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [],
+      "g1_negative_cosine_updates": 0
+    },
+    {
+      "arm": "B0",
+      "seed": 29,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.030979623204982227,
+            "backbone": -0.14983126796637025,
+            "slot_keys": -0.1262194202176852,
+            "write_addr_proj": 0.16960479263796774,
+            "read_addr_proj": -0.04114075922378183,
+            "write_value_proj": -0.14902726122985396,
+            "write_gate": -0.12225147254748493,
+            "memory_readout_Wo": -0.031073108930043756,
+            "slot_norm": 0.06215043742815551
+          },
+          "lm_vs_aux_cosine_wak": 0.16960479263796774
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.02555355953816677,
+            "backbone": -0.08936840009499888,
+            "slot_keys": -0.0010145351001399278,
+            "write_addr_proj": 0.4655294240753667,
+            "read_addr_proj": -0.023125743992676993,
+            "write_value_proj": -0.08117052275867853,
+            "write_gate": -0.04742997301639486,
+            "memory_readout_Wo": 0.12442235989853115,
+            "slot_norm": 0.08634029550483306
+          },
+          "lm_vs_aux_cosine_wak": 0.4655294240753667
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.0007478520143680914,
+            "backbone": 0.07090829996200704,
+            "slot_keys": -0.15156113478459662,
+            "write_addr_proj": 0.035735429370081166,
+            "read_addr_proj": -0.002771457845081136,
+            "write_value_proj": -0.009508208795478895,
+            "write_gate": -0.22942457673578212,
+            "memory_readout_Wo": 0.04566751086390228,
+            "slot_norm": 0.20870407116340411
+          },
+          "lm_vs_aux_cosine_wak": 0.035735429370081166
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [],
+      "g1_negative_cosine_updates": 0
+    },
+    {
+      "arm": "B0",
+      "seed": 30,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.0009736326868452407,
+            "backbone": -0.007118160803238756,
+            "slot_keys": 0.21367298642942467,
+            "write_addr_proj": -0.05350649015822069,
+            "read_addr_proj": -0.006260912581920589,
+            "write_value_proj": -0.31700089350674765,
+            "write_gate": -0.6429646573614377,
+            "memory_readout_Wo": 0.064870278957993,
+            "slot_norm": 0.05880378214971505
+          },
+          "lm_vs_aux_cosine_wak": -0.05350649015822069
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.06769828961770759,
+            "backbone": -0.4104832839509822,
+            "slot_keys": -0.03691869314567894,
+            "write_addr_proj": -0.05057357936558196,
+            "read_addr_proj": -0.006016743705185144,
+            "write_value_proj": -0.11585751203080963,
+            "write_gate": -0.24431126930267807,
+            "memory_readout_Wo": -0.5766632812973873,
+            "slot_norm": -0.15077869905008617
+          },
+          "lm_vs_aux_cosine_wak": -0.05057357936558196
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.003911447703508602,
+            "backbone": 0.007982954989947107,
+            "slot_keys": 0.01838938725977072,
+            "write_addr_proj": 0.12985095007609945,
+            "read_addr_proj": 0.019551956432464098,
+            "write_value_proj": 0.050427829473381154,
+            "write_gate": -0.08809997422421796,
+            "memory_readout_Wo": 0.10785949470949573,
+            "slot_norm": -0.13202783596851908
+          },
+          "lm_vs_aux_cosine_wak": 0.12985095007609945
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [],
+      "g1_negative_cosine_updates": 0
+    },
+    {
+      "arm": "B0",
+      "seed": 31,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.0037880093639145853,
+            "backbone": -0.1259376916143491,
+            "slot_keys": -0.060240991025642884,
+            "write_addr_proj": 0.041706325485824626,
+            "read_addr_proj": 0.002009797739088638,
+            "write_value_proj": -0.14238745197649302,
+            "write_gate": 0.7462327885504125,
+            "memory_readout_Wo": 0.020310753028201123,
+            "slot_norm": 0.01528104430117362
+          },
+          "lm_vs_aux_cosine_wak": 0.041706325485824626
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.014010675620230721,
+            "backbone": -0.007677109213837524,
+            "slot_keys": 0.017666888209934884,
+            "write_addr_proj": -0.11693282998852943,
+            "read_addr_proj": 0.004531686772092689,
+            "write_value_proj": -0.025361813902034375,
+            "write_gate": -0.07974853930840323,
+            "memory_readout_Wo": -0.22169851934952794,
+            "slot_norm": 0.10269148994638982
+          },
+          "lm_vs_aux_cosine_wak": -0.11693282998852943
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.00017799070109175282,
+            "backbone": -0.009650512046648274,
+            "slot_keys": 0.03065988474428612,
+            "write_addr_proj": 0.11961488446348299,
+            "read_addr_proj": 0.08921827034103705,
+            "write_value_proj": 0.038502563658988326,
+            "write_gate": -0.15713185317705866,
+            "memory_readout_Wo": 0.034603296194810576,
+            "slot_norm": -0.06331126552008473
+          },
+          "lm_vs_aux_cosine_wak": 0.11961488446348299
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [],
+      "g1_negative_cosine_updates": 0
+    },
+    {
+      "arm": "B0",
+      "seed": 32,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.001228825123855272,
+            "backbone": -0.1613441708515409,
+            "slot_keys": 0.0392963098916697,
+            "write_addr_proj": 0.03478435412655224,
+            "read_addr_proj": 0.0205708745847128,
+            "write_value_proj": -0.15051271788834494,
+            "write_gate": 0.6933155728673851,
+            "memory_readout_Wo": -0.021576077205191023,
+            "slot_norm": -0.11153323611519196
+          },
+          "lm_vs_aux_cosine_wak": 0.03478435412655224
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.02000051254135989,
+            "backbone": -0.0991430432266037,
+            "slot_keys": -0.0075224951460606026,
+            "write_addr_proj": -0.17161229629530048,
+            "read_addr_proj": 0.02667897388675414,
+            "write_value_proj": -0.2150010708318152,
+            "write_gate": -0.3284200578661057,
+            "memory_readout_Wo": -0.317571661374103,
+            "slot_norm": -0.04318241699890584
+          },
+          "lm_vs_aux_cosine_wak": -0.17161229629530048
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.009579300752470396,
+            "backbone": -0.0026845151987850077,
+            "slot_keys": 0.5423008633340469,
+            "write_addr_proj": -0.06817030790759344,
+            "read_addr_proj": 0.0002323712108886705,
+            "write_value_proj": 0.11034202903902438,
+            "write_gate": 0.030827262379976253,
+            "memory_readout_Wo": 0.12166625465719695,
+            "slot_norm": 0.1136906137018062
+          },
+          "lm_vs_aux_cosine_wak": -0.06817030790759344
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [],
+      "g1_negative_cosine_updates": 0
+    },
+    {
+      "arm": "G1",
+      "seed": 28,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.0011717682799970751,
+            "backbone": -0.10883886953373553,
+            "slot_keys": 0.034877075901515696,
+            "write_addr_proj": -0.11301145752830215,
+            "read_addr_proj": -0.003515708167470247,
+            "write_value_proj": -0.18607580075112556,
+            "write_gate": 0.6144612505704579,
+            "memory_readout_Wo": 0.0904967920686722,
+            "slot_norm": -0.03630191159739454
+          },
+          "lm_vs_aux_cosine_wak": -0.11301145752830215
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.01615975331175908,
+            "backbone": -0.1450672486368546,
+            "slot_keys": -0.008434870544222626,
+            "write_addr_proj": -0.0031356639199134066,
+            "read_addr_proj": 0.00410861557309456,
+            "write_value_proj": -0.09232965803343633,
+            "write_gate": 0.27436831247544996,
+            "memory_readout_Wo": -0.1379392421661774,
+            "slot_norm": -0.07975443323706093
+          },
+          "lm_vs_aux_cosine_wak": -0.0031356639199134066
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.051859123933889445,
+            "backbone": -0.004827823598024796,
+            "slot_keys": 0.03666550121197118,
+            "write_addr_proj": 0.001221752126315045,
+            "read_addr_proj": -0.00247091596757778,
+            "write_value_proj": -0.011516285149445088,
+            "write_gate": 0.021972798577717223,
+            "memory_readout_Wo": 0.20236798779876733,
+            "slot_norm": -0.02919965033137181
+          },
+          "lm_vs_aux_cosine_wak": 0.001221752126315045
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [
+        {
+          "step": 0,
+          "lm_norm_wak": 0.0001203056744998321,
+          "aux_norm_wak": 0.00021257145272102207,
+          "projected_norm_wak": 0.0002125638711731881,
+          "cosine_before": -0.00839188369314824,
+          "cosine_after": -6.51217294625953e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.008391881178390688,
+          "dot_before": -2.146102739963851e-10,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 60,
+          "lm_norm_wak": 0.0010601974790915847,
+          "aux_norm_wak": 0.005142505746334791,
+          "projected_norm_wak": 0.00505564222112298,
+          "cosine_before": -0.1830244585086164,
+          "cosine_after": 1.809038821165153e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.18302293881674453,
+          "dot_before": -9.978624575524009e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 100,
+          "lm_norm_wak": 0.0031291514169424772,
+          "aux_norm_wak": 0.004672536160796881,
+          "projected_norm_wak": 0.004672536160796881,
+          "cosine_before": 0.05726417255757895,
+          "cosine_after": 0.05726417255757895,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 8.372636557396618e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 120,
+          "lm_norm_wak": 0.0003059618466068059,
+          "aux_norm_wak": 0.00315307080745697,
+          "projected_norm_wak": 0.0030823631677776575,
+          "cosine_before": -0.2105896941840234,
+          "cosine_after": -1.6127970376310107e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.21058870486565454,
+          "dot_before": -2.0315995641340123e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 200,
+          "lm_norm_wak": 3.3041317237803014e-07,
+          "aux_norm_wak": 0.00014728127280250192,
+          "projected_norm_wak": 0.00014728127280250192,
+          "cosine_before": -0.10468421157958513,
+          "cosine_after": -0.10468421157958513,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": -5.094318196452452e-12,
+          "zero_lm_gradient": true
+        },
+        {
+          "step": 300,
+          "lm_norm_wak": 0.07872810959815979,
+          "aux_norm_wak": 8.545280434191227e-05,
+          "projected_norm_wak": 8.537177927792072e-05,
+          "cosine_before": -0.043542329960395504,
+          "cosine_after": -2.248818662068294e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.043542332317507385,
+          "dot_before": -2.929326683442923e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 400,
+          "lm_norm_wak": 0.003797198412939906,
+          "aux_norm_wak": 1.3043629223830067e-05,
+          "projected_norm_wak": 1.3015659533266444e-05,
+          "cosine_before": -0.06545084866891991,
+          "cosine_after": -1.0902778561150346e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.0654502801730973,
+          "dot_before": -3.2417313278187976e-09,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 500,
+          "lm_norm_wak": 0.02526528388261795,
+          "aux_norm_wak": 6.075573764974251e-06,
+          "projected_norm_wak": 6.0749766817025375e-06,
+          "cosine_before": -0.01402380605300708,
+          "cosine_after": 1.717928347909853e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.014023703734036271,
+          "dot_before": -2.1526695981322064e-09,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 700,
+          "lm_norm_wak": 0.08858007937669754,
+          "aux_norm_wak": 2.8463111334531277e-07,
+          "projected_norm_wak": 2.846311417670222e-07,
+          "cosine_before": -0.0004272973883918355,
+          "cosine_after": -2.3099331628925097e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.00042729597641209794,
+          "dot_before": -1.0773298052269009e-11,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 800,
+          "lm_norm_wak": 0.043370138853788376,
+          "aux_norm_wak": 4.6654246688149215e-08,
+          "projected_norm_wak": 4.482163618035884e-08,
+          "cosine_before": -0.27751932894104203,
+          "cosine_after": -2.7217709628215606e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.27751186451559584,
+          "dot_before": -5.615329312647077e-10,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 900,
+          "lm_norm_wak": 0.007083723787218332,
+          "aux_norm_wak": 0.00017212884267792106,
+          "projected_norm_wak": 0.0001720632571959868,
+          "cosine_before": -0.027624674120315433,
+          "cosine_after": -9.396993083299281e-10,
+          "projected": true,
+          "fraction_aux_removed": 0.027624450493199556,
+          "dot_before": -3.368312917473304e-08,
+          "zero_lm_gradient": false
+        }
+      ],
+      "g1_negative_cosine_updates": 444
+    },
+    {
+      "arm": "G1",
+      "seed": 29,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": -0.003176537665444138,
+            "backbone": -0.1457859598581606,
+            "slot_keys": 0.022339642737874338,
+            "write_addr_proj": -0.09069647204748041,
+            "read_addr_proj": 0.0017398336820276155,
+            "write_value_proj": -0.11533949499709324,
+            "write_gate": 0.17768717697144776,
+            "memory_readout_Wo": -0.014256876681750038,
+            "slot_norm": 0.009429331110920015
+          },
+          "lm_vs_aux_cosine_wak": -0.09069647204748041
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.0040922173740199465,
+            "backbone": -0.26529351125087475,
+            "slot_keys": 0.01994680199599939,
+            "write_addr_proj": 0.07860218755538083,
+            "read_addr_proj": -0.013193421323339017,
+            "write_value_proj": -0.0718823525721122,
+            "write_gate": -0.17558498691005017,
+            "memory_readout_Wo": 0.003295807557022826,
+            "slot_norm": -0.11426833473630689
+          },
+          "lm_vs_aux_cosine_wak": 0.07860218755538083
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.016977221229310883,
+            "backbone": 0.028770487800580814,
+            "slot_keys": -0.09232279459847263,
+            "write_addr_proj": -0.015495072646806414,
+            "read_addr_proj": -0.09259175197693453,
+            "write_value_proj": 0.07092801181170508,
+            "write_gate": -0.1999031856183937,
+            "memory_readout_Wo": 0.0010892763003320027,
+            "slot_norm": -0.1804322681550186
+          },
+          "lm_vs_aux_cosine_wak": -0.015495072646806414
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [
+        {
+          "step": 0,
+          "lm_norm_wak": 6.757144728908315e-05,
+          "aux_norm_wak": 0.00021113523689564317,
+          "projected_norm_wak": 0.00021110086527187377,
+          "cosine_before": -0.018032274570107965,
+          "cosine_after": -9.728973229320453e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.01803226989710059,
+          "dot_before": -2.572612955997755e-10,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 60,
+          "lm_norm_wak": 0.0002883010602090508,
+          "aux_norm_wak": 0.004031520336866379,
+          "projected_norm_wak": 0.004026529844850302,
+          "cosine_before": -0.049740426967588375,
+          "cosine_after": -1.0018250978242197e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.049740418808114466,
+          "dot_before": -5.781287981676542e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 100,
+          "lm_norm_wak": 0.0039733643643558025,
+          "aux_norm_wak": 6.994007708271965e-05,
+          "projected_norm_wak": 6.299845699686557e-05,
+          "cosine_before": -0.43434197301531535,
+          "cosine_after": -8.314780875132248e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.43433839785181444,
+          "dot_before": -1.2070250932083582e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 120,
+          "lm_norm_wak": 0.0013883773935958743,
+          "aux_norm_wak": 0.003756097983568907,
+          "projected_norm_wak": 0.003756097983568907,
+          "cosine_before": 0.17115090941361938,
+          "cosine_after": 0.17115090941361938,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 8.925317160901614e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 200,
+          "lm_norm_wak": 5.668368612532504e-05,
+          "aux_norm_wak": 0.0005733192665502429,
+          "projected_norm_wak": 0.0005733192665502429,
+          "cosine_before": 0.15144088924923288,
+          "cosine_after": 0.15144088924923288,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 4.921503204968758e-09,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 300,
+          "lm_norm_wak": 0.10276953130960464,
+          "aux_norm_wak": 2.8215825295774266e-05,
+          "projected_norm_wak": 2.8215825295774266e-05,
+          "cosine_before": 0.029130896424113296,
+          "cosine_after": 0.029130896424113296,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 8.4471651007334e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 400,
+          "lm_norm_wak": 0.0005244615022093058,
+          "aux_norm_wak": 4.111786620342173e-05,
+          "projected_norm_wak": 4.111786620342173e-05,
+          "cosine_before": 0.01951468882729505,
+          "cosine_after": 0.01951468882729505,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 4.208291493057459e-10,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 500,
+          "lm_norm_wak": 0.06999848037958145,
+          "aux_norm_wak": 6.486492566182278e-06,
+          "projected_norm_wak": 6.486492566182278e-06,
+          "cosine_before": 0.03644416931266948,
+          "cosine_after": 0.03644416931266948,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 1.654727910249676e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 700,
+          "lm_norm_wak": 0.1297226846218109,
+          "aux_norm_wak": 2.164628085665754e-06,
+          "projected_norm_wak": 2.1107161956024356e-06,
+          "cosine_before": -0.22179443076322286,
+          "cosine_after": 9.594996084769899e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.22179155280365617,
+          "dot_before": -6.228017923604057e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 800,
+          "lm_norm_wak": 0.050779685378074646,
+          "aux_norm_wak": 1.2735735253954772e-05,
+          "projected_norm_wak": 1.2491031156969257e-05,
+          "cosine_before": -0.19507721121832444,
+          "cosine_after": -8.664173318854233e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.19507662098776826,
+          "dot_before": -1.261596764834394e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 900,
+          "lm_norm_wak": 0.033559441566467285,
+          "aux_norm_wak": 9.418062290933449e-06,
+          "projected_norm_wak": 9.244311513612047e-06,
+          "cosine_before": -0.1911975237203188,
+          "cosine_after": 2.3619182833395902e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.19119700461443062,
+          "dot_before": -6.043082834139568e-08,
+          "zero_lm_gradient": false
+        }
+      ],
+      "g1_negative_cosine_updates": 474
+    },
+    {
+      "arm": "G1",
+      "seed": 30,
+      "grad_behaviour": [
+        {
+          "step": 300,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.004029703801897314,
+            "backbone": -0.07494141902191284,
+            "slot_keys": 0.312440246289043,
+            "write_addr_proj": 0.00018051525818366606,
+            "read_addr_proj": 0.0493607343076533,
+            "write_value_proj": -0.3456137407418215,
+            "write_gate": -0.7246201730960147,
+            "memory_readout_Wo": -0.2175525475667964,
+            "slot_norm": 0.008115956281777439
+          },
+          "lm_vs_aux_cosine_wak": 0.00018051525818366606
+        },
+        {
+          "step": 600,
+          "has_aux": false
+        },
+        {
+          "step": 700,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.01058340692128793,
+            "backbone": -0.030227006247306277,
+            "slot_keys": -0.021355412275094677,
+            "write_addr_proj": 0.280276171727782,
+            "read_addr_proj": 0.014013664450606837,
+            "write_value_proj": 0.00801789094299973,
+            "write_gate": 0.48746930649397047,
+            "memory_readout_Wo": -0.07104731170030772,
+            "slot_norm": -0.03807384765228367
+          },
+          "lm_vs_aux_cosine_wak": 0.280276171727782
+        },
+        {
+          "step": 900,
+          "has_aux": true,
+          "lm_vs_aux_cosine_by_group": {
+            "embeddings": 0.0012810116020352286,
+            "backbone": 0.04904769164916199,
+            "slot_keys": -0.00231483613001793,
+            "write_addr_proj": -0.08871561205186698,
+            "read_addr_proj": -0.0036519433988114274,
+            "write_value_proj": 0.06618092796995348,
+            "write_gate": 0.0023274459489349003,
+            "memory_readout_Wo": 0.07237339096019245,
+            "slot_norm": -0.006542970921304202
+          },
+          "lm_vs_aux_cosine_wak": -0.08871561205186698
+        },
+        {
+          "step": 1200,
+          "has_aux": false
+        }
+      ],
+      "g1_log": [
+        {
+          "step": 0,
+          "lm_norm_wak": 0.00011205959162907675,
+          "aux_norm_wak": 0.0002148921776097268,
+          "projected_norm_wak": 0.0002148921776097268,
+          "cosine_before": 0.02937444927173013,
+          "cosine_after": 0.02937444927173013,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 7.073581720362654e-10,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 60,
+          "lm_norm_wak": 0.0007460671477019787,
+          "aux_norm_wak": 0.006243135780096054,
+          "projected_norm_wak": 0.006241442169994116,
+          "cosine_before": -0.023296058282207006,
+          "cosine_after": -2.86107082146457e-10,
+          "projected": true,
+          "fraction_aux_removed": 0.023295934827333324,
+          "dot_before": -1.0850834541997756e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 100,
+          "lm_norm_wak": 0.00041273783426731825,
+          "aux_norm_wak": 0.00018715385522227734,
+          "projected_norm_wak": 0.00017953520000446588,
+          "cosine_before": -0.28241707836819924,
+          "cosine_after": 4.202728164050613e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.28241538393775056,
+          "dot_before": -2.1815441897388155e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 120,
+          "lm_norm_wak": 0.003855958115309477,
+          "aux_norm_wak": 0.011444722302258015,
+          "projected_norm_wak": 0.011296437121927738,
+          "cosine_before": -0.16045552124834983,
+          "cosine_after": -5.219950504010493e-09,
+          "projected": true,
+          "fraction_aux_removed": 0.16045538301866932,
+          "dot_before": -7.080961495375959e-06,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 200,
+          "lm_norm_wak": 0.00017828702402766794,
+          "aux_norm_wak": 0.00419255206361413,
+          "projected_norm_wak": 0.00419255206361413,
+          "cosine_before": 0.4370147880269958,
+          "cosine_after": 0.4370147880269958,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 3.266587782491115e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 300,
+          "lm_norm_wak": 0.3020820617675781,
+          "aux_norm_wak": 9.83695008471841e-06,
+          "projected_norm_wak": 9.81486573436996e-06,
+          "cosine_before": -0.06697337035391007,
+          "cosine_after": -2.0220630348354678e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.0669731023562842,
+          "dot_before": -1.9901580117220874e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 400,
+          "lm_norm_wak": 0.0013419294264167547,
+          "aux_norm_wak": 6.424387538572773e-05,
+          "projected_norm_wak": 6.424387538572773e-05,
+          "cosine_before": 0.14967687752905806,
+          "cosine_after": 0.14967687752905806,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 1.2903755397530858e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 500,
+          "lm_norm_wak": 3.6711408029077575e-05,
+          "aux_norm_wak": 3.9634169297642075e-06,
+          "projected_norm_wak": 3.6922790513926884e-06,
+          "cosine_before": -0.36351129004460847,
+          "cosine_after": 7.59868288346534e-08,
+          "projected": true,
+          "fraction_aux_removed": 0.36351051323469624,
+          "dot_before": -5.289184368262312e-11,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 700,
+          "lm_norm_wak": 0.44968181848526,
+          "aux_norm_wak": 4.1611392589402385e-06,
+          "projected_norm_wak": 4.1611392589402385e-06,
+          "cosine_before": 0.006582940445592339,
+          "cosine_after": 0.006582940445592339,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 1.2317923570037692e-08,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 800,
+          "lm_norm_wak": 0.11886115372180939,
+          "aux_norm_wak": 9.922922799887601e-06,
+          "projected_norm_wak": 9.922922799887601e-06,
+          "cosine_before": 0.5184789478705568,
+          "cosine_after": 0.5184789478705568,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 6.115200221756822e-07,
+          "zero_lm_gradient": false
+        },
+        {
+          "step": 900,
+          "lm_norm_wak": 0.0019024715293198824,
+          "aux_norm_wak": 4.0779369214760663e-07,
+          "projected_norm_wak": 4.0779369214760663e-07,
+          "cosine_before": 0.039886249270498365,
+          "cosine_after": 0.039886249270498365,
+          "projected": false,
+          "fraction_aux_removed": 0.0,
+          "dot_before": 3.0944385942532904e-11,
+          "zero_lm_gradient": false
+        }
+      ],
+      "g1_negative_cosine_updates": 508
+    }
+  ]
+}

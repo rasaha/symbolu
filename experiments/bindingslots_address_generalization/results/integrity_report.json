@@ -1,0 +1,20 @@
+{
+  "schema": "bindingslots_address_generalization/integrity_report/v1",
+  "checks": {
+    "no_evaluation_template_leakage": true,
+    "no_coefficient_tuning": true,
+    "no_architecture_change": true,
+    "arm_differs_from_b0_only_by_declared_lever": true,
+    "g1_modifies_gradients_only_in_write_addr_proj": "verified by test_projection_makes_cosine_nonnegative_and_wak_only",
+    "a1_uses_ordinary_task_query_read_distribution": true,
+    "fixed_probe_not_primary_endpoint": true,
+    "every_run_has_arm_seed": true,
+    "b0_equivalence": "verified by tests/test_ag_impl.py::test_b0_equivalence_short",
+    "seeds_28_to_32_no_replacement": true,
+    "interrupted_runs_restart_from_zero": true,
+    "verdict_reconstructs_mechanically": true,
+    "kda_validation_blocked": true,
+    "ready_for_kda_validation_emitted": false,
+    "all_pass": true
+  }
+}

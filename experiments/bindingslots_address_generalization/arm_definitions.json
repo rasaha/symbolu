@@ -1,0 +1,16 @@
+{
+  "schema": "bindingslots_address_generalization/arm_definitions/v1",
+  "base": "corrected H2 (source execution commit 9380bdb1); levers-off training is byte-identical to frozen persistence_arms.run_h2 (verified: test_b0_equivalence_short)",
+  "arms": {
+    "A+": {"impl": "persistence_arms.run_aplus", "role": "quality/no-slot reference (same-seed ppl ceiling)"},
+    "B0": {"impl": "arms_ag.run_ag_arm(use_a1=False, use_g1=False)", "role": "frozen H2 baseline; paired comparator"},
+    "A1": {"impl": "arms_ag.run_ag_arm(use_a1=True)", "lever": "contrastive read-address objective at real task-query positions with hard negatives, o1r_lambda schedule, dedicated batch rng"},
+    "G1": {"impl": "arms_ag.run_ag_arm(use_g1=True)", "lever": "PCGrad projection of aux vs LM gradient in write_addr_proj only"},
+    "AG": {"impl": "arms_ag.run_ag_arm(use_a1=True, use_g1=True)", "condition": "run only if A1 and G1 both pass their gates; no third mechanism"}
+  },
+  "seeds": [28, 29, 30, 31, 32],
+  "execution_order": "A+ x5, B0 x5, then A1 (futility), G1 (futility), then AG if both pass",
+  "one_lever_per_arm": true,
+  "max_training_steps": 1200,
+  "primary_checkpoints": [300, 600, 700, 900, 1200]
+}

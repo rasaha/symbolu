@@ -1,0 +1,31 @@
+{
+  "schema": "bindingslots_address_generalization/futility_decisions/v1",
+  "rule": "stop an arm after the 2nd seed making 4/5 impossible",
+  "arms": {
+    "A1": {
+      "ran_seeds": [
+        28,
+        29
+      ],
+      "n_run": 2,
+      "failures": 2,
+      "futile": true,
+      "decision": "ARM_FUTILITY_REACHED"
+    },
+    "G1": {
+      "ran_seeds": [
+        28,
+        29,
+        30
+      ],
+      "n_run": 3,
+      "failures": 2,
+      "futile": true,
+      "decision": "ARM_FUTILITY_REACHED"
+    },
+    "AG": {
+      "ran_seeds": [],
+      "decision": "NOT_RUN"
+    }
+  }
+}

@@ -1,0 +1,616 @@
+{
+  "schema": "bindingslots_address_generalization/evaluation_routing_metrics/v1",
+  "note": "PRIMARY endpoint on the HELD-OUT eval queries (base needle template); fixed-probe is secondary",
+  "runs": [
+    {
+      "arm": "A1",
+      "seed": 28,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9995602965354919,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.999526858329773,
+          "read_entropy": 0.004812127910554409,
+          "ordinary_needle": 0.7916666666666666,
+          "oracle_address_needle": 0.8,
+          "ordinary_vs_oracle_gap": 0.008333333333333415,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.8301500678062439,
+          "correct_slot_top1": 0.831250011920929,
+          "correct_slot_rank_mean": 5.206250190734863,
+          "correct_vs_best_competitor_margin": 0.6613224148750305,
+          "read_entropy": 0.010935726575553417,
+          "ordinary_needle": 0.725,
+          "oracle_address_needle": 0.7833333333333333,
+          "ordinary_vs_oracle_gap": 0.05833333333333335,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.7864452004432678,
+          "correct_slot_top1": 0.7875000238418579,
+          "correct_slot_rank_mean": 6.4083333015441895,
+          "correct_vs_best_competitor_margin": 0.5739670991897583,
+          "read_entropy": 0.011690226383507252,
+          "ordinary_needle": 0.6666666666666666,
+          "oracle_address_needle": 0.7333333333333333,
+          "ordinary_vs_oracle_gap": 0.06666666666666665,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.22168557345867157,
+          "correct_slot_top1": 0.8479166626930237,
+          "correct_slot_rank_mean": 3.070833444595337,
+          "correct_vs_best_competitor_margin": 0.1656133085489273,
+          "read_entropy": 3.05111026763916,
+          "ordinary_needle": 0.008333333333333333,
+          "oracle_address_needle": 0.95,
+          "ordinary_vs_oracle_gap": 0.9416666666666667,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.2620331645011902,
+          "correct_slot_top1": 0.59375,
+          "correct_slot_rank_mean": 10.841666221618652,
+          "correct_vs_best_competitor_margin": 0.17593829333782196,
+          "read_entropy": 2.7752091884613037,
+          "ordinary_needle": 0.025,
+          "oracle_address_needle": 0.9833333333333333,
+          "ordinary_vs_oracle_gap": 0.9583333333333333,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "A1",
+      "seed": 29,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9512941837310791,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9487427473068237,
+          "read_entropy": 0.2893017530441284,
+          "ordinary_needle": 0.825,
+          "oracle_address_needle": 0.9916666666666667,
+          "ordinary_vs_oracle_gap": 0.16666666666666674,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9843695163726807,
+          "correct_slot_top1": 0.9979166388511658,
+          "correct_slot_rank_mean": 0.06458333134651184,
+          "correct_vs_best_competitor_margin": 0.981428861618042,
+          "read_entropy": 0.10944095999002457,
+          "ordinary_needle": 0.95,
+          "oracle_address_needle": 0.9583333333333334,
+          "ordinary_vs_oracle_gap": 0.008333333333333415,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.8055412769317627,
+          "correct_slot_top1": 0.8708333373069763,
+          "correct_slot_rank_mean": 2.866666555404663,
+          "correct_vs_best_competitor_margin": 0.7482711672782898,
+          "read_entropy": 0.6610976457595825,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.18653109669685364,
+          "correct_slot_top1": 0.6000000238418579,
+          "correct_slot_rank_mean": 10.9375,
+          "correct_vs_best_competitor_margin": -0.06967732310295105,
+          "read_entropy": 2.4422125816345215,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.9833333333333333,
+          "ordinary_vs_oracle_gap": 0.9833333333333333,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.17257219552993774,
+          "correct_slot_top1": 0.47083333134651184,
+          "correct_slot_rank_mean": 6.272916793823242,
+          "correct_vs_best_competitor_margin": -0.05717436224222183,
+          "read_entropy": 2.750696897506714,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 1.0,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "B0",
+      "seed": 28,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.99984210729599,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9997914433479309,
+          "read_entropy": 0.0018449393101036549,
+          "ordinary_needle": 0.625,
+          "oracle_address_needle": 0.625,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9977388978004456,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9973782896995544,
+          "read_entropy": 0.020121432840824127,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.987427294254303,
+          "correct_slot_top1": 0.9958333373069763,
+          "correct_slot_rank_mean": 0.12916666269302368,
+          "correct_vs_best_competitor_margin": 0.9821750521659851,
+          "read_entropy": 0.06512830406427383,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.5832148194313049,
+          "correct_slot_top1": 0.7749999761581421,
+          "correct_slot_rank_mean": 5.683333396911621,
+          "correct_vs_best_competitor_margin": 0.5513365864753723,
+          "read_entropy": 1.568371295928955,
+          "ordinary_needle": 0.525,
+          "oracle_address_needle": 0.5583333333333333,
+          "ordinary_vs_oracle_gap": 0.033333333333333326,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.8239466547966003,
+          "correct_slot_top1": 0.8479166626930237,
+          "correct_slot_rank_mean": 3.9229166507720947,
+          "correct_vs_best_competitor_margin": 0.6789281368255615,
+          "read_entropy": 0.17699380218982697,
+          "ordinary_needle": 0.9916666666666667,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.008333333333333304,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "B0",
+      "seed": 29,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9997975826263428,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9997374415397644,
+          "read_entropy": 0.002302679466083646,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9930866360664368,
+          "correct_slot_top1": 0.9937499761581421,
+          "correct_slot_rank_mean": 0.02500000037252903,
+          "correct_vs_best_competitor_margin": 0.9867216944694519,
+          "read_entropy": 0.006579583045095205,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.9940043091773987,
+          "correct_slot_top1": 0.9979166388511658,
+          "correct_slot_rank_mean": 0.0416666679084301,
+          "correct_vs_best_competitor_margin": 0.9913691878318787,
+          "read_entropy": 0.03372351452708244,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.17003634572029114,
+          "correct_slot_top1": 0.3125,
+          "correct_slot_rank_mean": 21.089582443237305,
+          "correct_vs_best_competitor_margin": 0.09228347986936569,
+          "read_entropy": 2.8298563957214355,
+          "ordinary_needle": 0.025,
+          "oracle_address_needle": 0.75,
+          "ordinary_vs_oracle_gap": 0.725,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.35966816544532776,
+          "correct_slot_top1": 0.46666666865348816,
+          "correct_slot_rank_mean": 14.439583778381348,
+          "correct_vs_best_competitor_margin": 0.21466785669326782,
+          "read_entropy": 1.8550044298171997,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.8416666666666667,
+          "ordinary_vs_oracle_gap": 0.8416666666666667,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "B0",
+      "seed": 30,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9996369481086731,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9995582103729248,
+          "read_entropy": 0.004006990231573582,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9998058080673218,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9997523427009583,
+          "read_entropy": 0.0021842948626726866,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.9986969828605652,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.998400866985321,
+          "read_entropy": 0.012105540372431278,
+          "ordinary_needle": 0.975,
+          "oracle_address_needle": 0.975,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.1609083116054535,
+          "correct_slot_top1": 0.3541666567325592,
+          "correct_slot_rank_mean": 18.487499237060547,
+          "correct_vs_best_competitor_margin": 0.05714263394474983,
+          "read_entropy": 2.905071973800659,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.5666666666666667,
+          "ordinary_vs_oracle_gap": 0.5666666666666667,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.5089541077613831,
+          "correct_slot_top1": 0.6229166388511658,
+          "correct_slot_rank_mean": 11.331250190734863,
+          "correct_vs_best_competitor_margin": 0.28976309299468994,
+          "read_entropy": 1.2890830039978027,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.9916666666666667,
+          "ordinary_vs_oracle_gap": 0.9916666666666667,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "B0",
+      "seed": 31,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9996458292007446,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9995319843292236,
+          "read_entropy": 0.003910088445991278,
+          "ordinary_needle": 0.8833333333333333,
+          "oracle_address_needle": 0.8833333333333333,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9989690184593201,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.998761773109436,
+          "read_entropy": 0.010088454000651836,
+          "ordinary_needle": 0.9833333333333333,
+          "oracle_address_needle": 0.9833333333333333,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.9972200393676758,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9967241287231445,
+          "read_entropy": 0.024236628785729408,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.5957898497581482,
+          "correct_slot_top1": 0.7583333253860474,
+          "correct_slot_rank_mean": 6.512499809265137,
+          "correct_vs_best_competitor_margin": 0.4934425354003906,
+          "read_entropy": 1.2531647682189941,
+          "ordinary_needle": 0.525,
+          "oracle_address_needle": 0.5166666666666667,
+          "ordinary_vs_oracle_gap": -0.008333333333333304,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.3862963318824768,
+          "correct_slot_top1": 0.5375000238418579,
+          "correct_slot_rank_mean": 14.266666412353516,
+          "correct_vs_best_competitor_margin": 0.28477656841278076,
+          "read_entropy": 1.746575117111206,
+          "ordinary_needle": 0.016666666666666666,
+          "oracle_address_needle": 0.6833333333333333,
+          "ordinary_vs_oracle_gap": 0.6666666666666666,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "B0",
+      "seed": 32,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9994637370109558,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9993326663970947,
+          "read_entropy": 0.005586102604866028,
+          "ordinary_needle": 0.26666666666666666,
+          "oracle_address_needle": 0.26666666666666666,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9977719783782959,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9974880814552307,
+          "read_entropy": 0.019279031082987785,
+          "ordinary_needle": 0.9416666666666667,
+          "oracle_address_needle": 0.9416666666666667,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.984051525592804,
+          "correct_slot_top1": 0.987500011920929,
+          "correct_slot_rank_mean": 0.3541666567325592,
+          "correct_vs_best_competitor_margin": 0.9715162515640259,
+          "read_entropy": 0.030724627897143364,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.23382115364074707,
+          "correct_slot_top1": 0.3125,
+          "correct_slot_rank_mean": 11.508333206176758,
+          "correct_vs_best_competitor_margin": 0.1268778294324875,
+          "read_entropy": 2.4339704513549805,
+          "ordinary_needle": 0.025,
+          "oracle_address_needle": 0.025,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.26983171701431274,
+          "correct_slot_top1": 0.4520833194255829,
+          "correct_slot_rank_mean": 12.3125,
+          "correct_vs_best_competitor_margin": 0.2331211417913437,
+          "read_entropy": 2.497145175933838,
+          "ordinary_needle": 0.03333333333333333,
+          "oracle_address_needle": 0.03333333333333333,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "G1",
+      "seed": 28,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9999085068702698,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9998770356178284,
+          "read_entropy": 0.0011126174358651042,
+          "ordinary_needle": 0.9333333333333333,
+          "oracle_address_needle": 0.9333333333333333,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.9998515844345093,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9998165369033813,
+          "read_entropy": 0.0017619014251977205,
+          "ordinary_needle": 0.9916666666666667,
+          "oracle_address_needle": 0.9916666666666667,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.9996721148490906,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9996050000190735,
+          "read_entropy": 0.003605152480304241,
+          "ordinary_needle": 0.9916666666666667,
+          "oracle_address_needle": 0.9916666666666667,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.3090116083621979,
+          "correct_slot_top1": 0.44583332538604736,
+          "correct_slot_rank_mean": 13.606249809265137,
+          "correct_vs_best_competitor_margin": 0.2648059129714966,
+          "read_entropy": 2.3831868171691895,
+          "ordinary_needle": 0.20833333333333334,
+          "oracle_address_needle": 0.21666666666666667,
+          "ordinary_vs_oracle_gap": 0.008333333333333331,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.7301401495933533,
+          "correct_slot_top1": 0.8854166865348816,
+          "correct_slot_rank_mean": 2.866666555404663,
+          "correct_vs_best_competitor_margin": 0.6882867217063904,
+          "read_entropy": 1.035453200340271,
+          "ordinary_needle": 0.9833333333333333,
+          "oracle_address_needle": 0.9833333333333333,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "G1",
+      "seed": 29,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.9999189376831055,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.999894380569458,
+          "read_entropy": 0.0009985236683860421,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.999299943447113,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.9991481304168701,
+          "read_entropy": 0.007215145509690046,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.9981737732887268,
+          "correct_slot_top1": 1.0,
+          "correct_slot_rank_mean": 0.0,
+          "correct_vs_best_competitor_margin": 0.997715413570404,
+          "read_entropy": 0.01706467941403389,
+          "ordinary_needle": 1.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 0.0,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.016180438920855522,
+          "correct_slot_top1": 0.15208333730697632,
+          "correct_slot_rank_mean": 24.412500381469727,
+          "correct_vs_best_competitor_margin": -0.10964322090148926,
+          "read_entropy": 3.0291199684143066,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.09166666666666666,
+          "ordinary_vs_oracle_gap": 0.09166666666666666,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.49978458881378174,
+          "correct_slot_top1": 0.5791666507720947,
+          "correct_slot_rank_mean": 11.929166793823242,
+          "correct_vs_best_competitor_margin": 0.20758621394634247,
+          "read_entropy": 1.0938011407852173,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 1.0,
+          "ordinary_vs_oracle_gap": 1.0,
+          "step": 1200
+        }
+      ]
+    },
+    {
+      "arm": "G1",
+      "seed": 30,
+      "eval_time_routing": [
+        {
+          "correct_slot_prob": 0.7311670780181885,
+          "correct_slot_top1": 0.8520833253860474,
+          "correct_slot_rank_mean": 4.293749809265137,
+          "correct_vs_best_competitor_margin": 0.7142374515533447,
+          "read_entropy": 1.0762170553207397,
+          "ordinary_needle": 0.5666666666666667,
+          "oracle_address_needle": 0.575,
+          "ordinary_vs_oracle_gap": 0.008333333333333304,
+          "step": 300
+        },
+        {
+          "correct_slot_prob": 0.7491207122802734,
+          "correct_slot_top1": 0.75,
+          "correct_slot_rank_mean": 7.3416666984558105,
+          "correct_vs_best_competitor_margin": 0.4990076720714569,
+          "read_entropy": 0.006251525599509478,
+          "ordinary_needle": 0.275,
+          "oracle_address_needle": 0.16666666666666666,
+          "ordinary_vs_oracle_gap": -0.10833333333333336,
+          "step": 600
+        },
+        {
+          "correct_slot_prob": 0.8509129285812378,
+          "correct_slot_top1": 0.856249988079071,
+          "correct_slot_rank_mean": 3.862499952316284,
+          "correct_vs_best_competitor_margin": 0.7063187956809998,
+          "read_entropy": 0.042116276919841766,
+          "ordinary_needle": 0.7666666666666667,
+          "oracle_address_needle": 0.8583333333333333,
+          "ordinary_vs_oracle_gap": 0.09166666666666656,
+          "step": 700
+        },
+        {
+          "correct_slot_prob": 0.13493826985359192,
+          "correct_slot_top1": 0.3541666567325592,
+          "correct_slot_rank_mean": 18.10416603088379,
+          "correct_vs_best_competitor_margin": 0.00585865369066596,
+          "read_entropy": 2.902587413787842,
+          "ordinary_needle": 0.2833333333333333,
+          "oracle_address_needle": 0.24166666666666667,
+          "ordinary_vs_oracle_gap": -0.04166666666666666,
+          "step": 900
+        },
+        {
+          "correct_slot_prob": 0.011816540732979774,
+          "correct_slot_top1": 0.04374999925494194,
+          "correct_slot_rank_mean": 25.995832443237305,
+          "correct_vs_best_competitor_margin": -0.07143699377775192,
+          "read_entropy": 3.2208220958709717,
+          "ordinary_needle": 0.0,
+          "oracle_address_needle": 0.7916666666666666,
+          "ordinary_vs_oracle_gap": 0.7916666666666666,
+          "step": 1200
+        }
+      ]
+    }
+  ]
+}
