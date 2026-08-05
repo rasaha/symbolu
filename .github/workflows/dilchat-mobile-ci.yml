@@ -226,3 +226,78 @@ jobs:
           DILCHAT_INTEGRATION_RUN_ID: ci-${{ github.run_id }}
           PORT: "8091"
         run: npm run test:integration
+
+  # Android COMPILED-BUILD gate (Phase 2 / Track A). Generates the native Android
+  # project via Expo prebuild and runs a real Gradle **debug** compile on GitHub's
+  # Linux runner using the preinstalled, official Google Android SDK. It proves the
+  # app compiles to an installable debug APK and that the generated manifest keeps
+  # the hardened posture (dilchat:// scheme, minimal permissions, backup off, no
+  # cleartext). It does NOT sign a release, run an emulator, or touch iOS — those
+  # remain host/device gates (see DILCHAT_MOBILE_PHASE2_NATIVE_VALIDATION_REPORT.md).
+  # No production signing, credentials, or deployment.
+  android-build:
+    name: Android native gen + Gradle debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: products/dilchat/mobile/package-lock.json
+
+      # React Native 0.74 / Expo SDK 51 officially target JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install (clean)
+        working-directory: products/dilchat/mobile
+        run: npm ci
+
+      - name: Expo prebuild (generate android/)
+        working-directory: products/dilchat/mobile
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "1"
+        run: |
+          set -o pipefail
+          npx expo prebuild --platform android --no-install
+          test -f android/app/src/main/AndroidManifest.xml
+
+      - name: Generated Android manifest hardening guard
+        working-directory: products/dilchat/mobile
+        run: |
+          set -o pipefail
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="dilchat"' "$M"
+          grep -q 'android:allowBackup="false"' "$M"
+          if grep -q 'usesCleartextTraffic="true"' "$M"; then
+            echo "cleartext opt-in present"; exit 1
+          fi
+          for p in READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE SYSTEM_ALERT_WINDOW VIBRATE; do
+            if grep -E "android.permission.${p}\"" "$M" | grep -qv 'tools:node="remove"'; then
+              echo "permission ${p} is active (should be blocked)"; exit 1
+            fi
+          done
+          echo "android manifest guard: OK"
+
+      - name: Gradle debug build (assembleDebug)
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          test -n "$APK"
+          echo "built debug APK: $APK ($(wc -c < "$APK") bytes)"
+
+      - name: Debug APK sanity (valid archive, non-empty)
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+          echo "apk sanity: OK (valid zip with manifest)"
