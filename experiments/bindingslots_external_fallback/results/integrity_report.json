@@ -1,0 +1,22 @@
+{
+  "schema": "bindingslots_external_fallback/integrity/v1",
+  "gates": {
+    "1_within_1pp_of_T0": false,
+    "2_rescue_ge_90pct": false,
+    "3_incorrect_fallback_le_1pct": true,
+    "4_cross_session_leakage_zero": true,
+    "5_cross_tenant_leakage_zero": true,
+    "6_expired_or_deleted_never_returned": true,
+    "7_provenance_on_every_fallback": true,
+    "8_bindingslots_byte_identical_fallback_disabled": true,
+    "9_no_model_weight_or_gradient_change": true,
+    "10_p95_latency_within_ceiling": true,
+    "reproduction_matches_committed_b0": true,
+    "all_pass": false
+  },
+  "scenarios_all_pass": true,
+  "reproduction_matches_committed_b0": true,
+  "kda_validation_blocked": true,
+  "ready_for_kda_validation_emitted": false,
+  "no_model_weight_change": true
+}
