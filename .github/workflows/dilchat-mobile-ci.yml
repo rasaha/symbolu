@@ -284,6 +284,16 @@ jobs:
           done
           echo "android manifest guard: OK"
 
+      # Expo's generated gradle.properties defaults to -Xmx2048m, which can OOM
+      # during the Hermes AAR JetifyTransform on a loaded runner. Pin a larger,
+      # deterministic build-JVM heap (later gradle.properties keys win on load).
+      - name: Pin deterministic Gradle heap
+        working-directory: products/dilchat/mobile/android
+        run: |
+          set -o pipefail
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> gradle.properties
+          echo "gradle heap pinned:"; grep 'org.gradle.jvmargs' gradle.properties
+
       - name: Gradle debug build (assembleDebug)
         working-directory: products/dilchat/mobile/android
         run: |
