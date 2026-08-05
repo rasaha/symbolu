@@ -65,24 +65,43 @@ compatible** — existing Phase 1 routes are unchanged (confirmed: all 201 basel
 backend tests still pass, and `test_chat_contract.py` asserts Phase 1 routes
 remain). The mobile CI's contract-drift guard is a **subset** check (required
 routes present, no banned routes) and stays green; the mobile live-integration
-suite (`mobile/integration/live.backend.test.ts`, run via `test:integration`,
-excluded from `npm test`) requires the mobile toolchain + a running backend and is
-validated in CI, not in this backend session.
+suite runs in CI against a real FastAPI + PostgreSQL backend (see §4b).
 
 ## 4. Verdict
 
-**`DILCHAT_SECURE_CHAT_BACKEND_CORE_IMPLEMENTED_VALIDATION_PENDING`**
+**`DILCHAT_SECURE_CHAT_BACKEND_CORE_DRAFT_READY`**
 
-Rationale: implementation is complete and **all backend evidence is green locally**
-(pytest 272, migrations, concurrency, RLS under the runtime role, cross-couple
-isolation, outbox atomicity, log-leak, 10k query plan, OpenAPI + guards). The
-remaining validation that has **not yet run in this session** is the authoritative
-**CI pipeline execution** on the draft PR and the **mobile live-integration suite**
-(mobile toolchain not available here). Those run on the PR; on their green result
-the workstream advances to `DILCHAT_SECURE_CHAT_BACKEND_CORE_DRAFT_READY`.
+All draft-ready criteria are met and independently verified on the PR's current
+head via live GitHub CI (§4b): models/migrations complete with one Alembic head;
+all API behaviour, idempotency, and the send/unpair race pass; RLS passes under the
+real non-owner runtime role; cross-couple isolation and transactional-outbox
+consistency pass; full backend regression, existing mobile live integration,
+OpenAPI, and fail-closed guards pass; CI is green; no scope leakage.
 
-The draft PR is opened after this green backend evidence, per the operating rules,
-and is **not** merged.
+Per the operating rules, the PR remains **draft, open, and unmerged**; the next
+action is an independent backend merge-readiness audit. No auto-merge.
+
+## 4b. CI evidence (live GitHub, current head)
+
+- **PR:** #1347 · **base:** `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF`
+- **CI-verified head SHA:** `039304db3d6b8ad0d070f80a6d88bd89b91dc3fa`
+- All 8 current-head check runs completed with conclusion **success**:
+
+| Workflow · job | Result |
+|----------------|--------|
+| dilchat-ci · Static quality (ruff, mypy, import, app) | ✅ success |
+| dilchat-ci · **PostgreSQL migrations + full test suite** | ✅ success (RLS runtime-role denials visible in the PostgreSQL log confirm the chat RLS tests executed; no silent skip) |
+| dilchat-ci · OpenAPI 3.1 + Guna fail-closed guards (incl. **secure-chat contract gate**) | ✅ success |
+| dilchat-mobile-ci · Mobile lint / typecheck / test / guards (incl. **contract-drift**) | ✅ success (`secret scan: clean`) |
+| dilchat-mobile-ci · **Mobile ↔ live FastAPI + PostgreSQL integration** | ✅ success |
+| terminology-ci · terminology | ✅ success |
+| API stability registry | ✅ success |
+| Safety case + SBOM + traceability | ✅ success |
+
+> Note: the doc-only commit that records this verdict changes no application code
+> (verdict/report/PR-body metadata only); it does not alter the CI-verified head's
+> behaviour. dilchat-ci re-runs on the docs commit (path `products/dilchat/**`) and
+> is expected green.
 
 ## 5. Confirmations
 
