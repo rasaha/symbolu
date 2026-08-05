@@ -52,6 +52,7 @@ def analyze_seed(model, seed):
     K = kt.size(1)
     key_scores = scores[:, :K]
     pred_all = scores.argmax(-1)
+    pred_key = key_scores.argmax(-1)     # addressing decision (null excluded) — matches the failed gate
     rows = []
     for i, e in enumerate(eps):
         records = [decode(k) for k in e["key_tokens"]]
@@ -79,8 +80,16 @@ def analyze_seed(model, seed):
                 cat = "RIGHT_ENTITY_WRONG_OLDER_STEP" if pr["step"] < tgt["step"] else "INVALID_OR_OTHER"
             else:
                 cat = "WRONG_ENTITY"
+        # supplementary ADDRESSING-ONLY view (null-excluded), matching the failed T4 gate metric
+        pk = int(pred_key[i].item())
+        if pk == ti:
+            addr_cat = "ADDR_CORRECT"
+        elif records[pk]["ent"] == tgt["ent"]:
+            addr_cat = "ADDR_RIGHT_ENTITY_WRONG_OLDER" if records[pk]["step"] < tgt["step"] else "ADDR_INVALID"
+        else:
+            addr_cat = "ADDR_WRONG_ENTITY"
         control = at_step_control(model, e, tgt["ent"], ti, records) if not correct else None
-        rows.append({"seed": seed, "category": cat, "correct": correct,
+        rows.append({"seed": seed, "category": cat, "addr_category": addr_cat, "correct": correct,
                      "pred_entity": None if pred == K else records[pred]["ent"], "correct_entity": tgt["ent"],
                      "pred_step": None if pred == K else records[pred]["step"], "correct_latest_step": tgt["step"],
                      "pred_status": None if pred == K else T.status_of(e["key_values"][pred]),
@@ -136,6 +145,20 @@ def main():
             b[k][r["category"]] = b[k].get(r["category"], 0) + 1
         return {str(k): v for k, v in sorted(b.items())}
     control_recovered = sum(1 for r in failures if r["at_step_control_recovers_target"])
+    # supplementary addressing-only (null-excluded) view = the "minimum additional instrumentation":
+    # separates the abstention decision from the key-ranking decision that the T4 gate measured.
+    addr_fail = [r for r in all_rows if r["addr_category"] != "ADDR_CORRECT"]
+    addr_counts = {}
+    for r in addr_fail:
+        addr_counts[r["addr_category"]] = addr_counts.get(r["addr_category"], 0) + 1
+    n_af = len(addr_fail)
+    supplementary = {
+        "note": "null-EXCLUDED addressing view (matches the T4 addressing_top1 gate); NOT part of the frozen conclusion",
+        "addressing_failures": n_af, "counts": addr_counts,
+        "pct_right_entity_wrong_older": (addr_counts.get("ADDR_RIGHT_ENTITY_WRONG_OLDER", 0) / n_af) if n_af else 0.0,
+        "pct_wrong_entity": (addr_counts.get("ADDR_WRONG_ENTITY", 0) / n_af) if n_af else 0.0,
+        "abstention_rate_over_all_T4": sum(1 for r in failures if r["category"] == "NULL_OR_ABSTAIN") / len(all_rows) if all_rows else 0.0,
+    }
 
     out = {
         "schema": "bindingslots_e1_temporal/t4_error_analysis/v1",
@@ -156,6 +179,7 @@ def main():
         "breakdown_by_events_per_entity": breakdown("n_records_for_entity"),
         "breakdown_by_temporal_distance": breakdown("temporal_distance"),
         "per_seed": per_seed,
+        "supplementary_addressing_only_view": supplementary,
         "conclusion": conclusion, "co_emitted": SPEC.ALWAYS,
         "recommendation": SPEC.RECOMMENDATION.get(conclusion),
         "t5_note": "T5 predecessor/successor performance is explicitly OUTSIDE this conclusion",
