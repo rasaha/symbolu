@@ -54,6 +54,7 @@ Log wins.
 | [DILCHAT_MOBILE_PHASE2_PRIVACY_AND_LIFECYCLE_TESTS.md](DILCHAT_MOBILE_PHASE2_PRIVACY_AND_LIFECYCLE_TESTS.md) | Phase 2 privacy/lifecycle/deep-link/offline test matrix. |
 | [DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md](DILCHAT_MOBILE_PHASE2_DEVICE_TEST_PLAN.md) | Phase 2 closed-pilot device harness (synthetic; execution pending). |
 | [DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md](DILCHAT_MOBILE_PHASE2_KNOWN_LIMITATIONS.md) | Phase 2 deferrals + traced security-advisory dispositions. |
+| [DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md](DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md) | Independent merge-readiness audit: re-verified gates, CI-red fix, install-safe-link infra dependency, exact verdict. |
 
 ## Guna authority (classical track — BLOCKED)
 

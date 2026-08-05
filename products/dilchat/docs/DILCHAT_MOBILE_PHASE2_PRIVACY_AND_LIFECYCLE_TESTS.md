@@ -3,7 +3,7 @@
 Maps each Phase 2 privacy / lifecycle / deep-link / offline requirement to its
 automated coverage (A = automated test, file in `products/dilchat/mobile/__tests__/`
 or `integration/`) or its deferred manual/device gate (M = manual on device). All
-automated tests pass (`npm test` → 122/122; `npm run test:integration` → 9/9).
+automated tests pass (`npm test` → 127/127; `npm run test:integration` → 9/9).
 
 ## Deep-link invitation (Workstream C)
 

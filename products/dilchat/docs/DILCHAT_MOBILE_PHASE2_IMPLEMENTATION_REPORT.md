@@ -107,8 +107,13 @@ state+hint. Existing roles/labels/touch-targets retained.
 
 | Suite | Count |
 |-------|-------|
-| Unit/component (`jest`) | **122 tests / 19 suites** (was 53/10; **+69**) |
+| Unit/component (`jest`) | **127 tests / 19 suites** (was 53/10; **+74**) |
 | Live integration (real FastAPI + PostgreSQL 16.13) | **9/9** |
+
+> Merge-audit update: the count rose from 122 → **127** when the independent
+> merge audit added 5 deep-link canonicalization regression tests (mixed-case
+> host, port stripping, duplicate-token first-wins, trailing-segment / backslash
+> route-escape). See `DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md`.
 | Backend regression | unchanged (no backend files touched) |
 
 New/expanded test files: `deeplink.parse` (route allowlist, versioning, host
@@ -123,10 +128,12 @@ announcements), not component snapshots.
 
 ## 5. Toolchain / build results
 
-`expo config` exit 0 · Metro export exit 0 (873 modules, 2.26 MB) · `expo-doctor`
-14/17 (3 network-blocked) · `expo prebuild --platform android` exit 0 (manifest
-validated & hardened). Android gradle build / emulator / all iOS / physical devices:
-**deferred** (environment).
+`expo config` exit 0 · Metro export exit 0 (2.28 MB Hermes bundle) · `expo-doctor`
+16/17 in CI (the one failing check is a non-blocking SDK-version *suggestion* —
+`expo@51.0.28` vs `~51.0.39`, `expo-router@3.5.23` vs `~3.5.24`; locally 14/17
+because 3 checks additionally need `api.expo.dev`, which egress blocks) ·
+`expo prebuild --platform android` exit 0 (manifest validated & hardened). Android
+gradle build / emulator / all iOS / physical devices: **deferred** (environment).
 
 ## 6. Verdict rationale
 
@@ -134,8 +141,17 @@ Not `BLOCKED` (no security/privacy/contract/lifecycle/isolation defect). Not
 `DEVICE_PILOT_READY` (no emulator/simulator or compiled build ran here). Not
 `MERGE_READY` (native compiled-build + device evidence are merge-relevant and
 unavailable). **`MOBILE_PHASE2_IMPLEMENTED_VALIDATION_PENDING`** is the accurate
-verdict: implementation complete, all runnable gates green, native-platform and
-physical-device evidence pending on capable hardware.
+verdict: implementation complete, all runnable gates green **as of the
+merge-audit head** (see below), native-platform and physical-device evidence
+pending on capable hardware.
+
+> Merge-audit correction: at the originally reported head the mandatory
+> `Mobile lint / typecheck / test / guards` CI job was **red** — a single
+> cold-cache test (`authContext.isolation` sign-out) exceeded Jest's 5 s default
+> on the first, transform-heavy suite render (~8–10 s cold, <0.5 s warm). The
+> audit raised the default Jest timeout to 20 s (`jest.setup.ts`); the suite now
+> passes 127/127 across repeated cold runs. No behavior assertion changed. Full
+> record in `DILCHAT_MOBILE_PHASE2_MERGE_AUDIT.md`.
 
 ## 7. Confirmations
 

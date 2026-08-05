@@ -39,7 +39,7 @@ ajv v6 ships `lib/` (no `dist/compile/codegen`); ajv v8 ships the compiled `dist
 | Deterministic install | `npm ci` | exit 0, 1394 packages |
 | Lint | `npm run lint` | 0 warnings |
 | Strict types | `npm run typecheck` (`tsc --noEmit`) | 0 errors |
-| Unit/component | `npm test` | **122 tests / 19 suites** passed |
+| Unit/component | `npm test` | **127 tests / 19 suites** passed (was 122; +5 deep-link canonicalization tests from the merge audit) |
 | **Expo config** | `npx expo config --json --full` | **exit 0** (previously crashed) |
 | **Metro export** | `npx expo export --platform android` | **exit 0**, 873 modules, 2.26 MB Hermes bundle |
 | Expo doctor | `npx expo-doctor` | **14/17** pass (see §1.1) |
