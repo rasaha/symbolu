@@ -1,0 +1,20 @@
+{
+  "schema": "bindingslots_external_fallback/calibration/v1",
+  "cohort": [
+    "R0 s24",
+    "H2 s23"
+  ],
+  "n_correct": 120,
+  "n_incorrect": 120,
+  "grid_search": true,
+  "fp_cap": 0.3,
+  "frozen_thresholds": {
+    "prob_min": 0.1,
+    "margin_min": 0.05,
+    "entropy_max": 1.0,
+    "calib_recall": 1.0,
+    "calib_fp_rate": 0.14166666666666666
+  },
+  "calibration_hash": "7421fbfb5c106e31b70682ff39f14114cadf32b06de0d720682985d24b66cfdd",
+  "procedure": "grid search maximizing (failure recall, -unnecessary rate) on the calibration cohort only, fp_rate<=0.30"
+}

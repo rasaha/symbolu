@@ -1,0 +1,61 @@
+name: bindingslots-external-fallback-ci
+
+# Torch-free CI: adapter/lifecycle/isolation/trigger tests + (when present) verdict invariants.
+# No model inference here (that requires torch and runs offline).
+
+on:
+  push:
+    paths:
+      - 'experiments/bindingslots_external_fallback/**'
+      - 'docs/audits/bindingslots_external_fallback/**'
+      - '.github/workflows/bindingslots-external-fallback-ci.yml'
+  pull_request:
+    paths:
+      - 'experiments/bindingslots_external_fallback/**'
+      - '.github/workflows/bindingslots-external-fallback-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fallback-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - name: Frozen abc.json digest (pre)
+        run: sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_before.txt
+
+      - name: Adapter / lifecycle / isolation / trigger tests
+        run: python experiments/bindingslots_external_fallback/tests/test_fallback_table.py
+
+      - name: Model tests (RESOURCE_BLOCKED without torch -> green)
+        run: python experiments/bindingslots_external_fallback/tests/test_fallback_model.py
+
+      - name: Verdict invariants (if evidence present)
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          agg = pathlib.Path("experiments/bindingslots_external_fallback/results/aggregate_verdict.json")
+          if agg.exists():
+              d = json.loads(agg.read_text())
+              allowed = {"EXTERNAL_EPHEMERAL_FALLBACK_SYSTEM_CANDIDATE","EXTERNAL_TABLE_RELIABILITY_VERIFIED_HYBRID_TRIGGER_FAILED",
+                "HYBRID_FALLBACK_RELIABLE_BUT_OPERATIONALLY_UNQUALIFIED","NO_EXTERNAL_MEMORY_FALLBACK_SELECTED",
+                "EXTERNAL_MEMORY_LOOKUP_KEY_NOT_AVAILABLE","EXTERNAL_MEMORY_FALLBACK_RESULTS_INCONCLUSIVE",
+                "EXTERNAL_MEMORY_FALLBACK_PROTOCOL_VIOLATED","EXTERNAL_MEMORY_FALLBACK_INTEGRITY_FAILED",
+                "EXTERNAL_MEMORY_FALLBACK_RESOURCE_BLOCKED"}
+              assert d["primary_verdict"] in allowed, d["primary_verdict"]
+              assert "BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED" in d["co_emitted"]
+              assert d["kda_readiness"] == "KDA_VALIDATION_BLOCKED"
+              print("verdict:", d["primary_verdict"], "| routing unresolved + KDA blocked")
+          else:
+              print("no verdict yet")
+          PY
+
+      - name: Frozen abc.json unchanged
+        run: |
+          sha256sum experiments/phase_lc/results/abc.json | tee /tmp/abc_after.txt
+          diff /tmp/abc_before.txt /tmp/abc_after.txt && echo "abc.json unchanged"

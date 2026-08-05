@@ -1,0 +1,12 @@
+{
+  "schema": "bindingslots_external_fallback/code_hashes/v1",
+  "sha256": {
+    "ephemeral_table.py": "c4d59b70b9cac15dda82d018c07d6bd9f4175c98b455bcb8461bca17f3b4a161",
+    "fallback.py": "2dd6c1b40412a6c968f61e0ef0afd079f8ac0cd6601eceb170edd20a85edfb6e",
+    "fallback_gates.py": "70463daf4884c955f40d146a7aa03eb220aa52f2217e6661442bd26af721e539",
+    "run_fallback.py": "4351c97d90b5b3e2aa6a84b4717371a56c0533123f2b086e175118778bbd195d",
+    "preregistration.json": "1aa91729e5d9c4045b021bb7381b8d665b1972ad3d71b5f208b58007c1a905a6",
+    "tests/test_fallback_table.py": "00a1403782eee5e9401ddaad5fc88bfe4028d52a3b6c9b18abb69a78f171e1bc",
+    "tests/test_fallback_model.py": "3c259aa05504c45dd72a798c02036d9580eb1fff9203fd472c4a65e15b23515e"
+  }
+}

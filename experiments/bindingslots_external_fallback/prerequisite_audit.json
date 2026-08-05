@@ -1,0 +1,26 @@
+{
+  "schema": "bindingslots_external_fallback/prerequisite_audit/v1",
+  "result": "EXTERNAL_MEMORY_FALLBACK_PREREQUISITE_VERIFIED",
+  "checks": {
+    "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
+    "default_tip": "6e4ba3e851f675398278c7914b3e11e55c9ff492",
+    "pr_1345_closed_merged": true,
+    "pr_1345_merge_commit": "6e4ba3e851f675398278c7914b3e11e55c9ff492",
+    "merge_reachable_from_default_tip": true,
+    "reconstructed_verdict": "NO_BINDINGSLOTS_INTERVENTION_SELECTED",
+    "reconstructed_kda_readiness": "KDA_VALIDATION_BLOCKED",
+    "conclusions_from_1344_1345": {
+      "internal_slot_values_intact_and_usable": true,
+      "eval_time_read_address_selection_unreliable": true,
+      "a1_address_generalization_failed": true,
+      "g1_gradient_isolation_preserved_quality_but_did_not_rescue_retrieval": true,
+      "ag_correctly_not_run": true,
+      "fresh_b0_clean_stable_rate": "1/5"
+    },
+    "inherited_tests": {"test_ag_classify": "11 passed", "value_path": "verify_diagnosis 32/0"},
+    "working_tree_clean": true,
+    "branch": "claude/bindingslots-external-ephemeral-fallback"
+  },
+  "phase_nature": "SYSTEM-LEVEL reliability evaluation of an external ephemeral fallback; NOT a neural BindingSlots repair. BindingSlots training/architecture/routing/weights are NOT modified.",
+  "always_emits": ["BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED", "KDA_VALIDATION_BLOCKED"]
+}
