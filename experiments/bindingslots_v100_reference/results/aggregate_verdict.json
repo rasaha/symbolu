@@ -1,0 +1,85 @@
+{
+  "schema": "bindingslots_v100_reference/aggregate_verdict/v1",
+  "primary_verdict": "ALWAYS_VERIFY_RELIABILITY_VERIFIED_OPERATIONAL_COST_UNRESOLVED",
+  "co_emitted": [
+    "KEY_CONSISTENCY_SIGNAL_NOT_AVAILABLE",
+    "BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "forbidden_verdict_not_emitted": "ALWAYS_VERIFY_OPERATIONALLY_QUALIFIED",
+  "kda_readiness": "KDA_VALIDATION_BLOCKED",
+  "gates": {
+    "1_accuracy_within_0.1pp_of_T0": true,
+    "2_incorrect_verified_returns_zero": true,
+    "3_incorrect_corrections_zero": true,
+    "4_all_disagreements_detected": true,
+    "5_all_disagreements_corrected": true,
+    "6_provenance_completeness_100pct": true,
+    "7_cross_session_leakage_zero": true,
+    "8_cross_tenant_leakage_zero": true,
+    "9_stale_returns_zero": true,
+    "10_expired_returns_zero": true,
+    "11_deleted_returns_zero": true,
+    "12_incorrect_version_returns_zero": true,
+    "13_table_unavailable_abstains": true,
+    "14_injected_failures_fail_closed": true,
+    "15_no_model_state_change": true,
+    "16_deterministic_replay_succeeds": true,
+    "17_cleanup_zero_live_session_records": true,
+    "exactly_one_read_per_v100_query": true,
+    "all_pass": true
+  },
+  "aggregate": {
+    "n": 600,
+    "M0_accuracy": 0.20833333333333334,
+    "T0_accuracy": 1.0,
+    "M0_failures": 475,
+    "V100_accuracy": 1.0,
+    "V100_returned": 600,
+    "V100_answer_availability": 1.0,
+    "V100_incorrect_verified": 0,
+    "V100_disagreements": 475,
+    "V100_corrections": 475,
+    "V100_incorrect_corrections": 0,
+    "V100_abstain": 0,
+    "V100_abstention_rate": 0.0,
+    "V100_provenance_completeness": 1.0,
+    "V100_reads": 600,
+    "V100_reads_equal_n": true,
+    "V100_categories": {
+      "verified_agreement_correct": 125,
+      "verified_correction_correct": 475,
+      "verified_return_incorrect": 0,
+      "abstained_missing_record": 0,
+      "abstained_invalid_record": 0,
+      "abstained_table_unavailable": 0,
+      "abstained_integrity_failure": 0,
+      "system_failure": 0
+    },
+    "F0": {
+      "correct": 505,
+      "fallback_invoked": 394,
+      "rescued": 380,
+      "unnecessary": 14,
+      "incorrect_fallback": 0,
+      "abstain": 0
+    },
+    "F0_confusion": {
+      "tp": 380,
+      "fp": 14,
+      "tn": 111,
+      "fn": 95
+    },
+    "F0_accuracy": 0.8416666666666667,
+    "F0_recall": 0.8,
+    "F0_precision": 0.9644670050761421,
+    "F0_confidently_wrong_missed": 95,
+    "F0_incorrect_fallback_rate": 0.0
+  },
+  "frozen_gates": {
+    "WITHIN_T0_PP": 0.001,
+    "forbidden_verdict_this_phase": "ALWAYS_VERIFY_OPERATIONALLY_QUALIFIED",
+    "hard_gate_count": 17
+  },
+  "scope": "system-level reliability characterization of the SQLite reference backend; NOT a neural-routing intervention; does NOT claim to solve routing or approach KDA"
+}
