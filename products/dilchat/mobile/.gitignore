@@ -1,0 +1,26 @@
+# Dependencies & build output — never committed
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Native
+ios/
+android/
+*.orig.*
+
+# Local env / secrets — never committed
+.env
+.env.*
+!.env.example
+
+# Logs & OS
+npm-debug.*
+yarn-error.*
+*.log
+.DS_Store
+
+# Test output
+coverage/
+junit.xml
