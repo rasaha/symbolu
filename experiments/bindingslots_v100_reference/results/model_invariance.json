@@ -1,0 +1,128 @@
+{
+  "schema": "bindingslots_v100_reference/model_invariance/v1",
+  "per_seed": [
+    {
+      "seed": 28,
+      "param_sha256_before_eval": "e4e7e1b78c5ebb6863ac28f1f83cda35d813e01e38d839f93d582029c7c434e6",
+      "param_sha256_after_eval": "e4e7e1b78c5ebb6863ac28f1f83cda35d813e01e38d839f93d582029c7c434e6",
+      "params_unchanged_across_eval": true,
+      "eval_optimizer_steps": 0,
+      "m0_matches_merged_fallback": true,
+      "merged_fallback_m0_accuracy": 0.9916666666666667,
+      "reproduction": {
+        "seed": 28,
+        "reconstruction_optimizer_steps": 1200,
+        "trajectory_matches_committed_b0": true,
+        "needle_by_dist": {
+          "16": 1.0,
+          "96": 0.9916666666666667,
+          "220": 1.0
+        },
+        "ppl": {
+          "256": 123.85844162655692,
+          "512": 128.0137170411162
+        },
+        "reconstructed_param_sha256": "e4e7e1b78c5ebb6863ac28f1f83cda35d813e01e38d839f93d582029c7c434e6"
+      }
+    },
+    {
+      "seed": 29,
+      "param_sha256_before_eval": "a1e548ca0f9a18fe65548f4209cedd9e2f6de9d0c3e603e16a81190715c82ae6",
+      "param_sha256_after_eval": "a1e548ca0f9a18fe65548f4209cedd9e2f6de9d0c3e603e16a81190715c82ae6",
+      "params_unchanged_across_eval": true,
+      "eval_optimizer_steps": 0,
+      "m0_matches_merged_fallback": true,
+      "merged_fallback_m0_accuracy": 0.0,
+      "reproduction": {
+        "seed": 29,
+        "reconstruction_optimizer_steps": 1200,
+        "trajectory_matches_committed_b0": true,
+        "needle_by_dist": {
+          "16": 0.008333333333333333,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 139.43050820121502,
+          "512": 142.4925601967048
+        },
+        "reconstructed_param_sha256": "a1e548ca0f9a18fe65548f4209cedd9e2f6de9d0c3e603e16a81190715c82ae6"
+      }
+    },
+    {
+      "seed": 30,
+      "param_sha256_before_eval": "4e8d5efa74afc1369c31a3435fc85c1afaf65a5480ad32eb2add670e2bec3f7b",
+      "param_sha256_after_eval": "4e8d5efa74afc1369c31a3435fc85c1afaf65a5480ad32eb2add670e2bec3f7b",
+      "params_unchanged_across_eval": true,
+      "eval_optimizer_steps": 0,
+      "m0_matches_merged_fallback": true,
+      "merged_fallback_m0_accuracy": 0.0,
+      "reproduction": {
+        "seed": 30,
+        "reconstruction_optimizer_steps": 1200,
+        "trajectory_matches_committed_b0": true,
+        "needle_by_dist": {
+          "16": 0.008333333333333333,
+          "96": 0.0,
+          "220": 0.0
+        },
+        "ppl": {
+          "256": 148.15604862336053,
+          "512": 153.45729244474074
+        },
+        "reconstructed_param_sha256": "4e8d5efa74afc1369c31a3435fc85c1afaf65a5480ad32eb2add670e2bec3f7b"
+      }
+    },
+    {
+      "seed": 31,
+      "param_sha256_before_eval": "a9f2f3f40905887246f21ce17fc6df3c0c144b4dded27773b10d65041eaa3da9",
+      "param_sha256_after_eval": "a9f2f3f40905887246f21ce17fc6df3c0c144b4dded27773b10d65041eaa3da9",
+      "params_unchanged_across_eval": true,
+      "eval_optimizer_steps": 0,
+      "m0_matches_merged_fallback": true,
+      "merged_fallback_m0_accuracy": 0.016666666666666666,
+      "reproduction": {
+        "seed": 31,
+        "reconstruction_optimizer_steps": 1200,
+        "trajectory_matches_committed_b0": true,
+        "needle_by_dist": {
+          "16": 0.008333333333333333,
+          "96": 0.016666666666666666,
+          "220": 0.008333333333333333
+        },
+        "ppl": {
+          "256": 204.2041085257691,
+          "512": 202.32736971685398
+        },
+        "reconstructed_param_sha256": "a9f2f3f40905887246f21ce17fc6df3c0c144b4dded27773b10d65041eaa3da9"
+      }
+    },
+    {
+      "seed": 32,
+      "param_sha256_before_eval": "8984c30fc7ca75a8daa26e73e8614ce006b967bb0f8d477ab017c510d66421b4",
+      "param_sha256_after_eval": "8984c30fc7ca75a8daa26e73e8614ce006b967bb0f8d477ab017c510d66421b4",
+      "params_unchanged_across_eval": true,
+      "eval_optimizer_steps": 0,
+      "m0_matches_merged_fallback": true,
+      "merged_fallback_m0_accuracy": 0.03333333333333333,
+      "reproduction": {
+        "seed": 32,
+        "reconstruction_optimizer_steps": 1200,
+        "trajectory_matches_committed_b0": true,
+        "needle_by_dist": {
+          "16": 0.16666666666666666,
+          "96": 0.03333333333333333,
+          "220": 0.025
+        },
+        "ppl": {
+          "256": 143.62832200632826,
+          "512": 148.2980026331409
+        },
+        "reconstructed_param_sha256": "8984c30fc7ca75a8daa26e73e8614ce006b967bb0f8d477ab017c510d66421b4"
+      }
+    }
+  ],
+  "all_params_unchanged_across_eval": true,
+  "all_m0_match_merged_fallback": true,
+  "all_trajectories_match_committed_b0": true
+}

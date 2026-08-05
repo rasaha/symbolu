@@ -1,0 +1,91 @@
+{
+  "schema": "bindingslots_v100_reference/reliability_categories/v1",
+  "categories_total": {
+    "verified_agreement_correct": 125,
+    "verified_correction_correct": 475,
+    "verified_return_incorrect": 0,
+    "abstained_missing_record": 0,
+    "abstained_invalid_record": 0,
+    "abstained_table_unavailable": 0,
+    "abstained_integrity_failure": 0,
+    "system_failure": 0
+  },
+  "per_seed": [
+    {
+      "seed": 28,
+      "categories": {
+        "verified_agreement_correct": 119,
+        "verified_correction_correct": 1,
+        "verified_return_incorrect": 0,
+        "abstained_missing_record": 0,
+        "abstained_invalid_record": 0,
+        "abstained_table_unavailable": 0,
+        "abstained_integrity_failure": 0,
+        "system_failure": 0
+      }
+    },
+    {
+      "seed": 29,
+      "categories": {
+        "verified_agreement_correct": 0,
+        "verified_correction_correct": 120,
+        "verified_return_incorrect": 0,
+        "abstained_missing_record": 0,
+        "abstained_invalid_record": 0,
+        "abstained_table_unavailable": 0,
+        "abstained_integrity_failure": 0,
+        "system_failure": 0
+      }
+    },
+    {
+      "seed": 30,
+      "categories": {
+        "verified_agreement_correct": 0,
+        "verified_correction_correct": 120,
+        "verified_return_incorrect": 0,
+        "abstained_missing_record": 0,
+        "abstained_invalid_record": 0,
+        "abstained_table_unavailable": 0,
+        "abstained_integrity_failure": 0,
+        "system_failure": 0
+      }
+    },
+    {
+      "seed": 31,
+      "categories": {
+        "verified_agreement_correct": 2,
+        "verified_correction_correct": 118,
+        "verified_return_incorrect": 0,
+        "abstained_missing_record": 0,
+        "abstained_invalid_record": 0,
+        "abstained_table_unavailable": 0,
+        "abstained_integrity_failure": 0,
+        "system_failure": 0
+      }
+    },
+    {
+      "seed": 32,
+      "categories": {
+        "verified_agreement_correct": 4,
+        "verified_correction_correct": 116,
+        "verified_return_incorrect": 0,
+        "abstained_missing_record": 0,
+        "abstained_invalid_record": 0,
+        "abstained_table_unavailable": 0,
+        "abstained_integrity_failure": 0,
+        "system_failure": 0
+      }
+    }
+  ],
+  "category_names": [
+    "verified_agreement_correct",
+    "verified_correction_correct",
+    "verified_return_incorrect",
+    "abstained_missing_record",
+    "abstained_invalid_record",
+    "abstained_table_unavailable",
+    "abstained_integrity_failure",
+    "system_failure"
+  ],
+  "note": "each of n queries lands in exactly one category; abstention never merged with incorrect"
+}

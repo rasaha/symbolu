@@ -1,0 +1,8 @@
+{
+  "schema": "bindingslots_v100_reference/coverage/v1",
+  "intended_write_coverage_pct": 100,
+  "realized_write_coverage_pct": 100,
+  "queries_with_valid_record": 600,
+  "queries_without_valid_record": 0,
+  "note": "V100 phase runs at 100% legitimate write coverage only; V75/V50 are NOT run"
+}
