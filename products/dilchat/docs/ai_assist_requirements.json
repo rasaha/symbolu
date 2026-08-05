@@ -23,7 +23,18 @@
     "transition_driver": "qualified_evidence_only",
     "must_not_use": ["elapsed_time", "raw_message_count"],
     "moon_applied": "separately_as_bounded_temporary_modifier",
-    "exact_curve": "OPEN (OQ-AIA-1)"
+    "exact_curve": "OPEN (OQ-AIA-1)",
+    "illustrative_subsplit_note": "Binding totals: 60/40 (cold start) and 30/70 (mature). Internal split is tunable (subordinate to OQ-AIA-1).",
+    "illustrative_subsplit": {
+      "cold_start": { "guna_structural_prior": 60, "explicit_preferences": 25, "conversation_evidence": 15 },
+      "mature": { "guna_structural_prior": 30, "explicit_preferences": 20, "conversation_evidence": 50 }
+    }
+  },
+  "moon_climate_modifier": {
+    "formula": "TopicReceptivity = baseline_topic_affinity * moon_climate_modifier",
+    "proposed_initial_bound": [0.80, 1.20],
+    "bound_meaning": "Moon may raise/lower present topic suitability by up to ~20%; cannot overturn explicit preference or strong behavioral evidence (enforced by recommendation_precedence, not by this range).",
+    "exact_final_cap": "OPEN (OQ-AIA-4)"
   },
   "signal_hierarchy": [
     "guna_structural_prior_sets_baseline_posture",

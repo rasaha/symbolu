@@ -249,9 +249,13 @@ In brief:
 
 Structural-prior weighting (conceptual): **60 %** at eligible cold start,
 declining to a **30 % floor** as *qualified* conversation evidence accumulates —
-gradually, and never on elapsed time or raw message count alone. Moon receptivity
-is applied **separately** as a **bounded, temporary modifier** and never replaces
-the Guna signal.
+gradually, and never on elapsed time or raw message count alone. An illustrative
+finer split of the remaining share is 25 %/15 % (explicit preferences / early
+evidence) at cold start moving to 20 %/50 % at maturity — see
+[fusion §3](DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md#3-structural-prior-weighting-60--30).
+Moon receptivity is applied **separately** as a **bounded, temporary modifier**
+(`TopicReceptivity = baseline_topic_affinity × moon_climate_modifier`, proposed
+initial bound 0.80–1.20) and never replaces the Guna signal.
 
 ---
 
