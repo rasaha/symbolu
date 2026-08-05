@@ -4,19 +4,25 @@
 **Always co-emitted: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `KDA_VALIDATION_BLOCKED`.**
 **On pass, additionally: `INDEPENDENT_NEURAL_MEMORY_CONFIRMATION_REQUIRED`.**
 
-A bounded, preregistered B0-vs-E1 capability probe. **Not** a repair of anonymous BindingSlots, **not** a
-reliability requirement (the external table already provides reliability), and **KDA remains blocked**.
-The verdict reconstructs mechanically from committed evidence; all 17 frozen artifact hashes match; the
-frozen `abc.json` (`b31989a3…`) is unchanged.
+A bounded, preregistered B0-vs-E1 capability probe run under strict discipline (bounded dev-calibration
+plan committed before selection; mechanical config selection; effect-size gates; fresh blind final
+seeds). **Not** a repair of anonymous BindingSlots, **not** a reliability requirement (the external
+table already provides reliability), and **KDA remains blocked**. The verdict reconstructs mechanically
+from committed evidence; all artifact hashes match; the frozen `abc.json` (`b31989a3…`) is unchanged.
 
-## Frozen protocol (locked in Stage 2)
-`E1_PROTOCOL_LOCKED`. Shared compositional semantic-matching task (identity = pair of entity primitives;
-attribute = one primitive; fact → value). Keys use canonical surface forms; queries use different
-synonym surface forms + reorder + filler (no verbatim overlap), so success requires **learned semantic
-matching**, not surface overlap. Identities partitioned disjointly into train/dev/**final(reserved)**
-(774/181/173). Frozen: `D=64`, 1500 train episodes, `STEPS=1800`, `BATCH=48`, `LR=1e-3`, `TAU=0.05`,
-32 keys/episode, learned-null-key no-match, hard top-1 value read. Reserved seeds `[2028..2032]`, ≥4/5
-must pass, worst-seed G1 floor 0.70.
+## Process discipline (important)
+- A **bounded development-calibration plan** (`DEV_CALIBRATION_PLAN.md` / `dev_calibration_plan.json`)
+  was committed and pushed **before** the selection run: exact dev seeds (500–502), a fixed candidate
+  set `{C1..C4}` (max 4), max runs/steps/wall-clock/budget, and a mechanical selection rule.
+- The rule (`run_dev_selection.py`) selected **C1** = `steps=1200, tau=0.07, train_no_match_frac=0.30`
+  (mean dev addressing 1.000), **overriding** an earlier hand-guess — the intended behaviour of a
+  mechanical selector.
+- **Gates are absolute competence bars** grounded in the frozen B0 baseline (anonymous slots at chance
+  ≈0.031) and a meaningful minimum effect size (improvement over B0 ≥ 0.50), **not** thresholds set at
+  observed dev performance (`GATE_RATIONALE.md`).
+- The final cohort uses **fresh seeds `[3140–3144]`**, disjoint from V100 seeds (28–32), dev seeds, and
+  the **burned** seeds `[2028–2032]` (observed in an earlier premature, non-preregistered run and
+  explicitly discarded as the final cohort).
 
 ## Determinism & integrity (pre-reserved gates, both passed)
 - **Determinism:** repeated dev fixture byte-identical (E1+B0 param hashes + metrics equal).
@@ -24,21 +30,21 @@ must pass, worst-seed G1 floor 0.70.
   eval identities unseen in training; no value token in any key; a **lexical-overlap matcher scores at
   chance** (surface hashing cannot solve the task); no external-table import in E1 inference.
 
-## Reserved go/no-go (final pool, 5 fresh seeds)
+## Reserved go/no-go (final pool, 5 fresh seeds, config C1)
 
 | seed | E1 G1 addr | E1 G1 e2e | B0 G1 e2e | no-match false-accept | all gates |
 |---|---|---|---|---|---|
-| 2028 | 0.987 | 0.947 | 0.060 | 0.127 | ✅ |
-| 2029 | 1.000 | 0.920 | 0.027 | 0.073 | ✅ |
-| 2030 | 1.000 | 0.947 | 0.040 | 0.100 | ✅ |
-| 2031 | 0.980 | 0.907 | 0.020 | 0.120 | ✅ |
-| 2032 | 1.000 | 0.940 | 0.040 | 0.093 | ✅ |
-| **all** | **≥0.98** | **~0.93** | **~0.04** | **≤0.13** | **5/5** |
+| 3140 | 0.993 | 0.927 | 0.027 | 0.140 | ✅ |
+| 3141 | 1.000 | 0.947 | 0.033 | 0.173 | ✅ |
+| 3142 | 0.993 | 0.947 | 0.027 | 0.160 | ✅ |
+| 3143 | 1.000 | 0.947 | 0.047 | 0.107 | ✅ |
+| 3144 | 1.000 | 0.907 | 0.033 | 0.147 | ✅ |
+| **all** | **≥0.99** | **~0.93** | **~0.03** | **≤0.17** | **5/5** |
 
-Held-out generalization (mean across seeds, E1): unseen-identity ~0.99, paraphrase ~0.98, hard-names
-~0.99, same-entity/diff-attribute ~0.97, recombined ~0.99, stable ~0.99. No-match recall ~0.89,
-precision ~0.93. **Mean E1-over-B0 improvement = 0.895.** B0 (anonymous slots) is at chance on every
-generalization split and has no abstention.
+Held-out addressing (mean across seeds, E1): unseen-identity **0.997**, paraphrase **0.996**, hard-names
+**0.993**, same-entity/diff-attribute **0.999**, recombined **0.995**, stable **0.997**. No-match recall
+≈0.85, precision ≈0.95. **Mean E1-over-B0 improvement = 0.901**; worst-seed G1 = 0.993. B0 (anonymous
+slots) is at chance on every generalization split and has no abstention.
 
 ## What this supports (only)
 "The frozen E1 explicit-key dual-encoder bundle learned semantic episode-local key matching with hard
