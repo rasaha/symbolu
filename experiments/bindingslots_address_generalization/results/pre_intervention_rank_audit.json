@@ -1,0 +1,42 @@
+{
+  "schema": "bindingslots_address_generalization/pre_intervention_rank_audit/v1",
+  "diagnostic_only": true,
+  "note": "must NOT be used to add a sharpening intervention (\u00a77)",
+  "eval": {
+    "seed": 123,
+    "n": 120,
+    "distance": 96,
+    "template": "base needle (held-out)"
+  },
+  "per_seed": [
+    {
+      "arm": "H2",
+      "seed": 23,
+      "optimizer_steps": 1200,
+      "correct_slot_top1": 0.48750001192092896,
+      "correct_slot_rank_mean": 15.539583206176758,
+      "correct_slot_prob": 0.2527453899383545,
+      "correct_vs_best_competitor_margin": -0.01438898965716362,
+      "read_entropy": 2.045046329498291,
+      "ordinary_needle": 0.0,
+      "oracle_address_needle": 1.0,
+      "ordinary_vs_oracle_gap": 1.0,
+      "failure_mode": "mixed"
+    },
+    {
+      "arm": "R0",
+      "seed": 23,
+      "optimizer_steps": 1200,
+      "correct_slot_top1": 0.3812499940395355,
+      "correct_slot_rank_mean": 18.545833587646484,
+      "correct_slot_prob": 0.19802485406398773,
+      "correct_vs_best_competitor_margin": 0.09332846850156784,
+      "read_entropy": 2.553135871887207,
+      "ordinary_needle": 0.0,
+      "oracle_address_needle": 0.9916666666666667,
+      "ordinary_vs_oracle_gap": 0.9916666666666667,
+      "failure_mode": "mixed"
+    }
+  ],
+  "failure_characterization": "mixed"
+}
