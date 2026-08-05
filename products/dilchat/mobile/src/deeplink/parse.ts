@@ -110,9 +110,11 @@ function parseVersion(raw: string | undefined): InvitationLinkVersion | null {
  * with a machine-readable reason. Never throws. Never logs the token.
  *
  * Accepted shapes (query order irrelevant):
- *   dilchat://invite?v=1&token=<token>
- *   https://<trusted-host>/invite?v=1&token=<token>
- * Aliases: `version` for `v`, `t` for `token`.
+ *   dilchat://invitation?v=1&token=<token>
+ *   https://<trusted-host>/invitation?v=1&token=<token>
+ * Aliases: `version` for `v`, `t` for `token`. (The route segment is
+ * `invitation` — see INVITATION_PATH_SEGMENT — never `invite`, which is a real
+ * in-app screen and must not be reachable from an external link.)
  */
 export function parseDeepLink(
   input: string | null | undefined,

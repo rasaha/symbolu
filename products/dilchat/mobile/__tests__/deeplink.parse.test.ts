@@ -79,6 +79,40 @@ describe("parseDeepLink — route allowlist (no arbitrary internal routes)", () 
   });
 });
 
+describe("parseDeepLink — host & query canonicalization (security-relevant)", () => {
+  it("canonicalizes a mixed-case trusted host", () => {
+    const r = parseDeepLink(`https://Links.DilChat.App/invitation?v=1&token=${TOKEN}`, ["links.dilchat.app"]);
+    expect(r).toEqual({ kind: "invitation", version: 1, token: TOKEN });
+  });
+
+  it("ignores an explicit port when matching the trusted host", () => {
+    const r = parseDeepLink(`https://links.dilchat.app:8443/invitation?v=1&token=${TOKEN}`, [
+      "links.dilchat.app",
+    ]);
+    expect(r).toEqual({ kind: "invitation", version: 1, token: TOKEN });
+  });
+
+  it("takes the FIRST value of a duplicated token param (never tries both)", () => {
+    const first = "AAAAAAAAAAAAAAAAfirsttoken0123456789";
+    const second = "BBBBBBBBBBBBBBBBsecondtoken0123456789";
+    const r = parseDeepLink(`${APP_SCHEME}://invitation?v=1&token=${first}&token=${second}`);
+    expect(r).toEqual({ kind: "invitation", version: 1, token: first });
+  });
+
+  it("ignores trailing path segments after the invitation route (no route escape)", () => {
+    // Extra/dot segments after `invitation` cannot redirect to another screen;
+    // the first segment decides the intent and the rest are discarded.
+    const r = parseDeepLink(`${APP_SCHEME}://invitation/../settings?v=1&token=${TOKEN}`);
+    expect(r).toEqual({ kind: "invitation", version: 1, token: TOKEN });
+  });
+
+  it("a backslash cannot forge a settings route", () => {
+    const r = parseDeepLink(`${APP_SCHEME}://invitation\\..\\settings?v=1&token=${TOKEN}`);
+    // The whole thing is one non-matching segment → not the invitation route.
+    expect(r).toEqual({ kind: "ignored", reason: "not-an-invitation-route" });
+  });
+});
+
 describe("parseDeepLink — malformed / version / token errors", () => {
   it("rejects an unsupported (newer) version", () => {
     expect(parseDeepLink(`${APP_SCHEME}://invitation?v=2&token=${TOKEN}`)).toEqual({
