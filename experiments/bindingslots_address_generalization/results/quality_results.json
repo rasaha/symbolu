@@ -1,0 +1,76 @@
+{
+  "schema": "bindingslots_address_generalization/quality_results/v1",
+  "quality_ratio": 1.2,
+  "runs": [
+    {
+      "arm": "A1",
+      "seed": 28,
+      "ppl256": 130.3794278847998,
+      "aplus_ppl256": 129.06748071130764,
+      "quality_qualified": true
+    },
+    {
+      "arm": "A1",
+      "seed": 29,
+      "ppl256": 127.01069585247939,
+      "aplus_ppl256": 136.29119408862516,
+      "quality_qualified": true
+    },
+    {
+      "arm": "B0",
+      "seed": 28,
+      "ppl256": 123.85844162655692,
+      "aplus_ppl256": 129.06748071130764,
+      "quality_qualified": true
+    },
+    {
+      "arm": "B0",
+      "seed": 29,
+      "ppl256": 139.43050820121502,
+      "aplus_ppl256": 136.29119408862516,
+      "quality_qualified": true
+    },
+    {
+      "arm": "B0",
+      "seed": 30,
+      "ppl256": 148.15604862336053,
+      "aplus_ppl256": 134.8875381476663,
+      "quality_qualified": true
+    },
+    {
+      "arm": "B0",
+      "seed": 31,
+      "ppl256": 204.2041085257691,
+      "aplus_ppl256": 98.3282678545609,
+      "quality_qualified": false
+    },
+    {
+      "arm": "B0",
+      "seed": 32,
+      "ppl256": 143.62832200632826,
+      "aplus_ppl256": 109.18450731580242,
+      "quality_qualified": false
+    },
+    {
+      "arm": "G1",
+      "seed": 28,
+      "ppl256": 146.99828757160762,
+      "aplus_ppl256": 129.06748071130764,
+      "quality_qualified": true
+    },
+    {
+      "arm": "G1",
+      "seed": 29,
+      "ppl256": 134.5815646058512,
+      "aplus_ppl256": 136.29119408862516,
+      "quality_qualified": true
+    },
+    {
+      "arm": "G1",
+      "seed": 30,
+      "ppl256": 150.43822675897988,
+      "aplus_ppl256": 134.8875381476663,
+      "quality_qualified": true
+    }
+  ]
+}
