@@ -15,7 +15,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 RES = HERE / "results"
 
 SOURCE_FILES = ["task.py", "models.py", "engine.py", "gates.py", "config.py",
-                "harness.py", "leakage.py", "run_dev.py", "run_reserved.py", "protocol_lock.py"]
+                "harness.py", "leakage.py", "run_dev.py", "run_dev_selection.py",
+                "run_reserved.py", "protocol_lock.py"]
 
 # Any of these existing means a reserved run already happened -> lock must refuse.
 RESERVED_ARTIFACTS = ["reserved_eval.json", "aggregate_verdict.json", "per_seed_reserved.json"]
@@ -52,9 +53,11 @@ def main():
     lk = json.loads((RES / "leakage_report.json").read_text()) if (RES / "leakage_report.json").exists() else {}
     dev = json.loads((RES / "dev_calibration.json").read_text()) if (RES / "dev_calibration.json").exists() else {}
 
+    sel = json.loads((RES / "selection_result.json").read_text()) if (RES / "selection_result.json").exists() else {}
     determinism_ok = bool(det.get("determinism_ok"))
     leakage_ok = bool(lk.get("all_pass"))
     dev_pass = dev.get("dev_seeds_passing_all_primary", 0) >= 1
+    selection_ok = bool(sel.get("winner_matches_frozen"))
     no_approval_required = all("APPROVAL_REQUIRED" not in str(v) for v in C.GATES.values())
     reserved_not_run = not any((RES / a).exists() for a in RESERVED_ARTIFACTS)
 
@@ -64,7 +67,7 @@ def main():
         result = "E1_SHORTCUT_OR_LEAKAGE_DETECTED"
     elif not determinism_ok:
         result = "E1_DETERMINISM_NOT_ESTABLISHED"
-    elif determinism_ok and leakage_ok and dev_pass and no_approval_required:
+    elif determinism_ok and leakage_ok and dev_pass and selection_ok and no_approval_required:
         result = "E1_PROTOCOL_LOCKED"
     else:
         result = "E1_PROTOCOL_NOT_READY"
@@ -75,8 +78,11 @@ def main():
         "determinism_ok": determinism_ok,
         "leakage_all_pass": leakage_ok,
         "dev_seeds_passing_all_primary": dev.get("dev_seeds_passing_all_primary", 0),
+        "selection_winner_matches_frozen": selection_ok,
+        "mechanical_winner": sel.get("mechanical_winner"),
         "no_approval_required_remaining": no_approval_required,
         "reserved_not_run": reserved_not_run,
+        "burned_seeds_not_final_cohort": C.BURNED_SEEDS,
         "reserved_seeds_declared": C.RESERVED_SEEDS,
         "frozen_gates": C.GATES,
         "frozen_config": {k: getattr(C, k) for k in ("D", "STEPS", "BATCH", "LR", "TAU",

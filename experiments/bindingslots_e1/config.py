@@ -15,23 +15,40 @@ POOL_SALT = "e1_pool_v1"
 D = 64
 TRAIN_EPISODES = 1500
 TRAIN_SEED_FOR_EPISODES = 7
-TRAIN_NO_MATCH_FRAC = 0.40
-STEPS = 1800
 BATCH = 48
 LR = 1e-3
-TAU = 0.05                       # frozen cosine temperature
-INIT_SEED = 100                  # model init/training RNG seed (per model run; reserved runs vary seed)
+
+# ---- bounded candidate set (frozen in DEV_CALIBRATION_PLAN.md, committed before selection) ----
+# each candidate = (steps, tau, train_no_match_frac)
+CANDIDATES = {
+    "C1": (1200, 0.07, 0.30),
+    "C2": (1800, 0.05, 0.30),
+    "C3": (1800, 0.05, 0.40),
+    "C4": (1500, 0.05, 0.40),
+}
+MAX_CANDIDATES = 4
+# frozen single configuration = the mechanical winner of the selection rule (run_dev_selection.py
+# asserts the rule picks this candidate). Selection rule: on dev seed 500, maximize mean held-out
+# addressing over {G1,G2,G3,G4,G5,G7} minus a penalty max(0, nomatch_false_accept - 0.30), subject to
+# determinism_ok and leakage all_pass; tie-break lower nomatch_false_accept, then fewer steps.
+SELECTED = "C3"
+STEPS, TAU, TRAIN_NO_MATCH_FRAC = CANDIDATES[SELECTED]
 
 # ---- frozen cohort -------------------------------------------------------------------
 DEV_EVAL_N_PER_SPLIT = 150
 RESERVED_EVAL_N_PER_SPLIT = 150
 DEV_SEED_BASE = 500
-# reserved final evaluation seeds (fresh; disjoint from dev; identities from the FINAL pool only)
-RESERVED_SEEDS = [2028, 2029, 2030, 2031, 2032]
+# reserved final evaluation seeds: FRESH, previously-unevaluated, disjoint from dev, from V100 seeds
+# 28-32, and from the burned set below. Identities drawn from the FINAL(reserved) pool only.
+RESERVED_SEEDS = [3140, 3141, 3142, 3143, 3144]
+BURNED_SEEDS = [2028, 2029, 2030, 2031, 2032]   # observed in a premature non-preregistered run; NOT the final cohort
 RESERVED_SEEDS_REQUIRED_TO_PASS = 4          # of 5
 DEV_SEED_FOR_TABLES = 500
 
-# ---- frozen numerical gates (grounded in dev calibration; margins below dev) ----------
+# ---- frozen numerical gates (rationale in GATE_RATIONALE.md) --------------------------
+# Gates are ABSOLUTE competence bars motivated by the frozen B0 baseline (anonymous slots are at
+# chance, ~1/32 = 0.031 addressing) and a meaningful minimum effect size, NOT thresholds set at
+# observed dev performance. A partially-generalizing or shortcut model FAILS these bars (see rationale).
 GATES = {
     # generalization: min correct-key top-1 addressing accuracy
     "G1_unseen_identity_min_addr": 0.80,
