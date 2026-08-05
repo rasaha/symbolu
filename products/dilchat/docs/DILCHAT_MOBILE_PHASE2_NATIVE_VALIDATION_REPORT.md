@@ -72,7 +72,7 @@ committed.
 
 | Classification | Result |
 |---|---|
-| `ANDROID_GRADLE_DEBUG_BUILD` | Runs in the `android-build` CI job on head `3155c2a1` (run 30985596724). Native generation + manifest hardening guard passed; the `assembleDebug` compile result is confirmed in this doc once the run completes. |
+| `ANDROID_GRADLE_DEBUG_BUILD_PASS` | **PASS** — `android-build` job **green** on head `3a3fc2c6` (run `30985814565`, job `92240243881`). `./gradlew --no-daemon assembleDebug` on JDK 17.0.19 (Temurin) produced `app/build/outputs/apk/debug/app-debug.apk` (142,440,484 bytes; ~6.7 min compile); manifest hardening guard passed; APK sanity OK (valid zip with `AndroidManifest.xml`). |
 | `ANDROID_RELEASE_LIKE_COMPILE` | **bounded — not run.** `assembleRelease` requires a release `signingConfig`; production signing is explicitly out of Track A scope. A debug-signed release compile is deferred to the device/signing track. |
 
 ## 5. NOT executable on this host (recorded, not fabricated)
