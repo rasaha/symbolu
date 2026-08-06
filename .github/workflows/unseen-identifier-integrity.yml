@@ -12,6 +12,7 @@ on:
       - "tests/experiments/unseen_identifier_copy_selection/**"
       - ".github/workflows/unseen-identifier-integrity.yml"
       - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_*.md"
+      - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_*.md"
   workflow_dispatch:
 
 permissions:
@@ -40,7 +41,37 @@ jobs:
       - name: Compile package
         run: python -m compileall -q experiments/unseen_identifier_copy_selection tests/experiments/unseen_identifier_copy_selection
 
-      - name: Run bounded integrity tests (fixture seeds only; no training, no cohort, no reserved seed)
+      - name: Static guard — no top-level torch import in the package
+        run: |
+          if grep -REn '^[[:space:]]*(import torch|from torch)' experiments/unseen_identifier_copy_selection/*.py ; then
+            echo "forbidden top-level torch import found (torch must be imported lazily inside functions)"; exit 1
+          fi
+          echo "OK: no module-load torch import"
+
+      - name: Static guard — CLI --help runs without a model, data, or writes
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m experiments.unseen_identifier_copy_selection build-cohort --help >/dev/null
+          python -m experiments.unseen_identifier_copy_selection --help >/dev/null
+          echo "OK: --help is inert"
+
+      - name: Static guard — reserved seeds fail closed at the command boundary
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          from experiments.unseen_identifier_copy_selection.cli import main, EXIT_AUTH_REFUSED
+          # A reserved seed with no valid record must be auth-refused (no training, no cohort).
+          code = main(["build-cohort", "--seed", "9070", "--cohort", "unseen",
+                       "--authorization-record", "/nonexistent.json", "--output-dir", "/tmp/should-not-appear"])
+          assert code == EXIT_AUTH_REFUSED, code
+          import os
+          assert not os.path.exists("/tmp/should-not-appear"), "reserved seed produced output"
+          print("OK: reserved seed fails closed")
+          PY
+
+      - name: Run bounded integrity tests (fixture seeds only; no training, no cohort, no reserved seed, no verdict)
         env:
           PYTHONPATH: .
         run: pytest -q tests/experiments/unseen_identifier_copy_selection
