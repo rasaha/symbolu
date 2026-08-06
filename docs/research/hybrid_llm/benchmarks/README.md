@@ -15,10 +15,17 @@ follow-on unseen-identifier copy/selection probe (draft). Preserves
 - **[UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md)**
   · **[…_PROTOCOL_LOCK_CHECKLIST.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK_CHECKLIST.md)** —
   protocol lock freezing Decisions 1–12 (axes, task/representation/identifier/output contracts,
-  **numeric gates**, verdict mapping, shortcut gates, model recipe reconstructed from merged source,
-  frozen seeds, compute limits, iterative-diagnosis rule). Verdict
+  **numeric gates**, verdict mapping **+ frozen verdict precedence**, shortcut gates, model recipe
+  reconstructed from merged source, frozen seeds, compute limits, iterative-diagnosis rule). Verdict
   **`UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCKED`** — implementation and execution **not**
-  authorized.
+  authorized. (Merged.)
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_PLAN.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_PLAN.md)**
+  · **[…_IMPLEMENTATION_AUTHORIZATION.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_AUTHORIZATION.md)**
+  · **[…_IMPLEMENTATION_CHECKLIST.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_CHECKLIST.md)** —
+  documentation-only implementation-authorization package: a bounded plan (sibling package importing
+  the frozen recipe; exact file paths; identifier/dataset/serializer/parser/model/metrics/verdict/
+  shortcut/fingerprint contracts; fixture-only test matrix; CI; 18-step lifecycle). Status
+  **`…_IMPLEMENTATION_AUTHORIZATION_DRAFT_READY`** — **no implementation or execution authorized.**
 
 ## Completed: single-hop typed-vs-prose benchmark
 
