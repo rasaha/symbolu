@@ -1,0 +1,46 @@
+name: unseen-identifier-integrity
+
+# Experiment-specific integrity CI for the unseen-identifier copy/selection diagnostic.
+# Runs ONLY bounded unit/integrity checks on fixture-only seeds. It never trains the model,
+# never generates smoke/development/final cohorts, never consumes a reserved seed, never produces
+# scientific evidence, and never issues a scientific verdict.
+
+on:
+  pull_request:
+    paths:
+      - "experiments/unseen_identifier_copy_selection/**"
+      - "tests/experiments/unseen_identifier_copy_selection/**"
+      - ".github/workflows/unseen-identifier-integrity.yml"
+      - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unseen-identifier-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Compile package
+        run: python -m compileall -q experiments/unseen_identifier_copy_selection tests/experiments/unseen_identifier_copy_selection
+
+      - name: Run bounded integrity tests (fixture seeds only; no training, no cohort, no reserved seed)
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/experiments/unseen_identifier_copy_selection
