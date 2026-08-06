@@ -68,31 +68,41 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--cohort", choices=("seen", "unseen"), required=True)
         sub.add_argument("--authorization-record", required=True,
                          help="path to the JSON execution authorization record (validated before generation)")
+        sub.add_argument("--authorization-artifact", default=None,
+                         help="path to the approved authorization artifact (required only for scientific "
+                              "states; a future merged execution-authorization document)")
         sub.add_argument("--output-dir", required=True,
                          help="explicit output directory; artifacts are written ONLY under it")
     return parser
 
 
-def _load_and_validate(args) -> dict:
-    from .execution import load_authorization_record, validate_authorization_record
+def _authorize(args):
+    """Validate the record (+ optional approved artifact) into an immutable AuthorizationContext."""
+    from .execution import authorize, load_authorization_artifact, load_authorization_record
 
     record = load_authorization_record(args.authorization_record)
-    validate_authorization_record(record, seed=args.seed, cohort=args.cohort)
-    return record
+    artifact = (
+        load_authorization_artifact(args.authorization_artifact)
+        if args.authorization_artifact is not None
+        else None
+    )
+    return authorize(record, seed=args.seed, cohort=args.cohort, authorization_artifact=artifact)
 
 
 def _handle(args) -> int:
-    from .execution import AuthorizationRecordError, ExecutionNotAuthorized
+    from .execution import AuthorizationRecordError, ExecutionNotAuthorized, active_authorization
     from .evidence import EvidenceError
 
     try:
-        _load_and_validate(args)
+        context = _authorize(args)
     except (AuthorizationRecordError, ExecutionNotAuthorized) as exc:
         print(f"authorization refused: {exc}")
         return EXIT_AUTH_REFUSED
 
     try:
-        # Torch-bearing orchestration is imported lazily, only after authorization passes.
+        # Torch-bearing orchestration is imported lazily, only after authorization passes. Every
+        # generation runs inside `active_authorization`, so the primitive guards see the validated
+        # capability (and only for the duration of this one command).
         from .runner import build_cohort
 
         if args.subcommand == "build-cohort":
@@ -100,7 +110,8 @@ def _handle(args) -> int:
             from .manifest import dataset_digest
             from .serializer import serialize
 
-            cohort = build_cohort(args.seed, args.cohort)
+            with active_authorization(context):
+                cohort = build_cohort(args.seed, args.cohort, token=context.capability)
             serialized = [serialize(e) for split in sorted(cohort) for e in cohort[split]]
             summary = {"seed": args.seed, "cohort": args.cohort,
                        "dataset_digest": dataset_digest(serialized),
@@ -114,7 +125,8 @@ def _handle(args) -> int:
             from .evidence import write_run_evidence
             from .shortcuts import shortcut_scores
 
-            cohort = build_cohort(args.seed, args.cohort)
+            with active_authorization(context):
+                cohort = build_cohort(args.seed, args.cohort, token=context.capability)
             examples = [e for split in sorted(cohort) for e in cohort[split]]
             result = shortcut_scores(examples)
             write_run_evidence(args.output_dir, seed=args.seed, cohort=args.cohort,
@@ -123,13 +135,14 @@ def _handle(args) -> int:
             return EXIT_OK if result["all_pass"] else EXIT_CONTRACT
 
         # train / evaluate / replay / assemble-manifest run the frozen model for one authorized seed.
-        # No scientific seed can reach here (reserved seeds already failed closed above); a fixture
-        # seed would run locally. These handlers are intentionally thin wrappers over the orchestration
-        # modules and are exercised only through mocks in fixture tests.
+        # No scientific seed can reach here (scientific states fail closed at _authorize without an
+        # approved artifact); a fixture seed would run locally. These handlers are thin wrappers over
+        # the orchestration modules and are exercised only through mocks in fixture tests.
         if args.subcommand == "train":
             from .training import train_cohort
 
-            cohort = build_cohort(args.seed, args.cohort)
+            with active_authorization(context):
+                cohort = build_cohort(args.seed, args.cohort, token=context.capability)
             examples = [e for split in sorted(cohort) for e in cohort[split]]
             artifacts = train_cohort(args.seed, args.cohort, examples, args.output_dir)
             print(f"train complete: checkpoint at {artifacts.checkpoint_path}")
@@ -139,7 +152,8 @@ def _handle(args) -> int:
             from .evaluation import evaluate_cohort
             import os
 
-            cohort = build_cohort(args.seed, args.cohort)
+            with active_authorization(context):
+                cohort = build_cohort(args.seed, args.cohort, token=context.capability)
             checkpoint_path = os.path.join(args.output_dir, "checkpoint.pt")
             ev = evaluate_cohort(checkpoint_path, cohort)
             print(f"evaluate complete: {len(ev.traces)} traces")
