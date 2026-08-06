@@ -132,3 +132,30 @@ results · resource measurements · protocol-compliance report. **No aggregate-o
 source commit · authorization commit · protocol-lock commit · implementation commit · environment.**
 The merged `manifest` module already emits actual digest values; the run must record them (not a
 `determinism_ok: true` boolean).
+
+## Decision 9 — Frozen failure handling
+**No selective restart.** Rerun is allowed **only** for documented infrastructure failure (host
+termination · disk failure · scheduler interruption · unrecoverable dependency outage). **Model
+underperformance is not infrastructure failure.** Implementation defects require: stop · corrective
+PR · independent audit · invalidation of affected evidence · fresh execution authorization. No
+failed seed may be silently replaced. **No budget extension after observing results.**
+
+## Decision 12 — Frozen next lifecycle (this session authorizes none of it)
+After a future smoke/development run: 1. stop all compute → 2. commit raw evidence and manifests →
+3. open a development-evidence PR → 4. independently reconstruct every result → 5. audit shortcuts
+and determinism → 6. merge only if evidence is complete → 7. separately draft reserved-final
+execution authorization → 8. independently audit that authorization → 9. **only then** permit final
+seeds 90760–90764. **This session performs and authorizes none of steps 1–9.**
+
+## Claim boundary
+No smoke/development outcome supports typed structure over prose · enterprise reasoning · tenant
+competence · evidence grounding generally · multi-hop · temporal · BindingSlots · KDA · production
+readiness. Development metrics are non-final. Preserved:
+`ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·
+`KDA_VALIDATION_BLOCKED`.
+
+## Draft status
+When complete, this package emits only **`SMOKE_DEV_EXECUTION_AUTHORIZATION_DRAFT_READY`** — the
+smoke/development scope and controls are fully specified for independent review; **no execution is
+authorized.** `SMOKE_EXECUTION_AUTHORIZED`, `DEVELOPMENT_EXECUTION_AUTHORIZED`,
+`FINAL_EXECUTION_AUTHORIZED`, `EXECUTION_AUTHORIZED`, and any capability verdict are **not** emitted.
