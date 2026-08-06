@@ -1,7 +1,19 @@
-# Hybrid LLM benchmarks — typed-vs-prose (single-hop) index
+# Hybrid LLM benchmarks index
 
-Controlled single-hop typed-structure-vs-flattened-prose relational benchmark (B0 vs B1). Preserves
+Controlled single-hop typed-structure-vs-flattened-prose relational benchmark (B0 vs B1), plus a
+follow-on unseen-identifier copy/selection probe (draft). Preserves
 `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` · `KDA_VALIDATION_BLOCKED`.
+
+## Follow-on: unseen-identifier copy/selection probe (DRAFT, documentation-only, unmerged)
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_PREREGISTRATION.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PREREGISTRATION.md)**
+  — representation-neutral probe of whether the frozen small recipe can copy/select **unseen**
+  identifiers from context at all (splits C1–C8), testing whether the typed-vs-prose null was
+  floor-limited by a missing base capability. Numeric gates `APPROVAL_REQUIRED_BEFORE_EXECUTION`;
+  proposed disjoint seeds (not consumed); no implementation/execution authorized.
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_SHORTCUT_ANALYSIS.md](UNSEEN_IDENTIFIER_COPY_SELECTION_SHORTCUT_ANALYSIS.md)**
+  — structure-blind baselines to measure before reserved execution.
+
+## Completed: single-hop typed-vs-prose benchmark
 
 - **[SINGLE_HOP_TYPED_VS_PROSE_PREREGISTRATION.md](SINGLE_HOP_TYPED_VS_PROSE_PREREGISTRATION.md)** — the draft
   design (question, hypothesis, arms, splits S1–S8, ablations A1–A6, ground-truth/info-equivalence, gate

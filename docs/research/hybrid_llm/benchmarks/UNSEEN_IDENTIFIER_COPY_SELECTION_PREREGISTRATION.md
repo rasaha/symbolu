@@ -145,3 +145,45 @@ dataset digest, checkpoint digests, execution-environment id) are labelled
 
 None of these is emitted by this draft; they are the vocabulary a future, separately-authorized
 execution could emit. No verdict here.
+
+## Proposed seed roles (proposed only — NOT consumed)
+Mechanically verified disjoint from every seed used or proposed elsewhere in the repository
+(typed-vs-prose 76 / 760–762 / 7160–7164; readout 7150–7154; 3-factor 91 / 7140–7144; functional
+routing 18–22; unit/test 99001/99173/99201; legacy 0/1/2):
+
+| Role | Proposed seeds |
+|---|---|
+| smoke | 9070 |
+| development | 9071, 9072, 9073 |
+| reserved final | 90760, 90761, 90762, 90763, 90764 |
+
+These are **proposals**. They are **not consumed** by this draft — no data is generated and no
+model is initialized. Disjointness must be re-verified mechanically at protocol-lock, and a
+frozen domain-separated sub-seed derivation must be specified there.
+
+## Advancement rules
+- This draft authorizes **nothing**: no implementation, no smoke, no development, no reserved run.
+- Implementation must be a **separate authorized step**, reviewed and merged on its own before any
+  run, reusing the exact audited frozen recipe.
+- Numeric gates are fixed at a later **protocol-lock**, before any data generation, and are never
+  adjusted after inspecting reserved results.
+- **No outcome** of this probe automatically authorizes capacity scaling, a new architecture, or
+  any downstream experiment. Each next step is separately proposed and authorized.
+
+## Claim boundary
+This probe can support **only** a narrow statement about base copy/selection of opaque identifiers
+at the frozen recipe. It must **never** be read as, and does not claim:
+- typed superiority;
+- enterprise reasoning;
+- evidence grounding;
+- tenant-aware selection;
+- multi-hop reasoning;
+- temporal reasoning;
+- BindingSlots repair;
+- real-model transfer;
+- production readiness;
+- KDA eligibility.
+
+Preserved regardless of any future outcome:
+`ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·
+`KDA_VALIDATION_BLOCKED`.
