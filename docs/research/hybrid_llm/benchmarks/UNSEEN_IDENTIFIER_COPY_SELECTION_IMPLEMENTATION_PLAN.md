@@ -106,3 +106,39 @@ Requirements:
   cohorts are generated only under a separate reserved-final execution authorization).
 
 Every generator is a pure function of (split, cohort, seed); repeated calls are byte-identical.
+
+## Decision 5 — Serializer and parser implementation contract
+`serializer.py` implements **exactly** the merged protocol templates (`TASK = …`, `QUERY_SOURCE`,
+`FACTS:`, `-> `, `| EVIDENCE = `, `ANSWER =`, `TASK = DIRECT_COPY`/`TARGET`, `TASK = MISSING_KEY`).
+Requirements: **byte-identical** output under repeated generation · fixed newlines · fixed
+capitalization · fixed whitespace · fixed fact ordering · fixed answer prefix · **no** optional
+formatting · **no** serializer search · **no** candidate-index representation.
+
+`parser.py` must classify each model output into exactly one category: exact-correct-ID ·
+token-level-partial-match · malformed · wrong-in-context-ID · fabricated-out-of-context-ID ·
+correct-abstention · false-abstention. **No post-processing may silently repair a malformed ID**;
+**no constrained decoding may be added**. The parser is a pure function of (raw output, example
+context).
+
+## Decision 6 — Model / training implementation contract
+The training harness **reuses the exact merged recipe by import** (`build_model`, `LexicalTokenizer`,
+`train_in_memory`, `FROZEN_MODEL_RECIPE`, `FROZEN_TRAIN_RECIPE`). It names: model class
+`StructuredOutputModel` (`SoftmaxTransformerLM`), wrapper/build path
+`single_hop_typed_vs_prose.model.build_model`, tokenizer `LexicalTokenizer`, initialization
+(`torch.manual_seed` under `fork_rng`), optimizer AdamW (3e-4, β 0.9/0.95, eps 1e-8, wd 0.01, clip
+1.0), training loop `train_in_memory`, update count 2000, batch size 8, checkpoint policy (final
+parameter digest), deterministic flags (no dropout; fixed batch order), device CPU / precision
+float32.
+
+**Mechanical assertions the implementation must include (fail-closed):**
+- parameter count **== 209,728**;
+- recipe source hashes **match** the frozen lock values (`config.py`, `tokenizer.py`, `model.py`,
+  `trainer.py`);
+- tokenizer behavior matches the lock (identifiers character-visible; round-trip exact);
+- **no** new trainable module; **no** task-specific head; **no** copy/pointer/ranking component;
+  **no** candidate-index output.
+
+Training code may be written under a future merged authorization, but **no training command may be
+executed** in this or the authorization-draft session. The bare-identifier grader reuses the existing
+greedy decoder; any decode-length bound must be arm-neutral and unable to truncate a valid
+identifier (pinned at implementation).
