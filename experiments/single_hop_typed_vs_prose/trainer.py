@@ -54,9 +54,9 @@ def train_in_memory(
     the model. This function intentionally performs no filesystem or network I/O.
     """
     recipe.validate()
-    n_updates = recipe.max_updates if updates is None else int(updates)
-    if n_updates <= 0 or n_updates > recipe.max_updates:
-        raise ValueError("updates must lie in [1, frozen max_updates]")
+    n_updates = recipe.maximum_updates if updates is None else int(updates)
+    if n_updates <= 0 or n_updates > recipe.maximum_updates:
+        raise ValueError("updates must lie in [1, frozen maximum_updates]")
     order = deterministic_batch_order(len(examples), n_updates, recipe.batch_size, seed)
     model = model.to(device).train()
     optimizer = torch.optim.AdamW(
