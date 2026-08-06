@@ -112,3 +112,36 @@ and the **number of tokenizer tokens per identifier**. Report, for every result:
 Constraints: identifiers are **opaque** (carry no lawful signal about the answer). Do **not** encode
 labels in prefixes or identifier shape; the answer must be obtainable only by reading the queried
 fact from context, never from the surface form of any identifier.
+
+## Metrics & gates
+Per-split metrics (exact-sequence primary; token-level secondary; both reported by tokenizer
+length). All **numeric thresholds** for competence, generalization, abstention, and position
+robustness are deliberately left as:
+
+**`APPROVAL_REQUIRED_BEFORE_EXECUTION`**
+
+— to be fixed at a later protocol-lock, before any run and before any data is generated. This draft
+commits the **structure** of the gates (which quantities are gated and how outcomes map), not the
+numbers. The gate structure:
+- **Copy competence gate** (C1): exact-sequence accuracy on unseen IDs ≥ `APPROVAL_REQUIRED`.
+- **Lookup competence gate** (C2/C3): exact-sequence accuracy on unseen IDs ≥ `APPROVAL_REQUIRED`.
+- **Generalization gate** (C6 vs C7): seen−unseen gap ≤ `APPROVAL_REQUIRED` (a large gap = memorization).
+- **Abstention gate** (C8): correct-abstention rate ≥ `APPROVAL_REQUIRED`; false-answer rate ≤ `APPROVAL_REQUIRED`.
+- **Position-robustness gate** (C4): max−min accuracy across positions ≤ `APPROVAL_REQUIRED`.
+- **Shortcut gate**: every baseline in the shortcut analysis ≤ chance + `APPROVAL_REQUIRED` on its
+  split, checked **before** reserved execution.
+
+Operational identifiers that cannot exist before implementation (future implementation commit hash,
+dataset digest, checkpoint digests, execution-environment id) are labelled
+`NOT_YET_CREATED — DOES_NOT_AUTHORIZE_EXECUTION`.
+
+## Suggested future verdicts (not emitted now)
+- `UNSEEN_IDENTIFIER_COPY_SELECTION_CONFIRMED`
+- `UNSEEN_IDENTIFIER_COPY_ONLY_PARTIAL`
+- `UNSEEN_IDENTIFIER_COPY_SELECTION_NOT_FOUND`
+- `UNSEEN_IDENTIFIER_ABSTENTION_GATE_FAILED`
+- `UNSEEN_IDENTIFIER_PROTOCOL_VIOLATED`
+- `UNSEEN_IDENTIFIER_RESOURCE_BLOCKED`
+
+None of these is emitted by this draft; they are the vocabulary a future, separately-authorized
+execution could emit. No verdict here.
