@@ -1,68 +1,150 @@
-"""Fixed reversible lexical tokenizer with ASCII-character fallback."""
+"""Fixed, reversible, data-independent lexical tokenizer.
+
+IDs 0..127 are literal ASCII characters. IDs 128..130 are PAD/BOS/EOS.
+IDs 131..199 are immutable protocol lexemes. Encoding uses deterministic
+longest-match lexeme recognition and falls back to one ASCII character.
+"""
 from __future__ import annotations
 
-from collections.abc import Iterable
-import re
+from dataclasses import dataclass
+from typing import Final, Iterable
 
-from .config import (
-    ASCII_VOCAB_SIZE,
-    BOS_ID,
-    EOS_ID,
-    FROZEN_LEXEMES,
-    LEXEME_BASE_ID,
-    PAD_ID,
-    VOCAB_SIZE,
+ASCII_SIZE: Final[int] = 128
+PAD_ID: Final[int] = 128
+BOS_ID: Final[int] = 129
+EOS_ID: Final[int] = 130
+LEXEME_START: Final[int] = 131
+
+LEXEMES: Final[tuple[str, ...]] = (
+    "\n<OUTPUT>\n",
+    "Within tenant ",
+    ", the following records are authorized.",
+    "The question concerns ",
+    " is a ",
+    " with ",
+    " is associated with ",
+    " through the relation ",
+    "Evidence reference ",
+    " supports the relation between ",
+    " contradicts the relation between ",
+    " and ",
+    " belongs to a different tenant and is not authorized here.",
+    "No relation of type ",
+    " is recorded for ",
+    "no listed attributes",
+    '"tenant_id":',
+    '"query":',
+    '"entities":',
+    '"relations":',
+    '"evidence":',
+    '"operation":',
+    '"entity_type":',
+    '"entity_id":',
+    '"display_name":',
+    '"attributes":',
+    '"relation_type":',
+    '"source_entity_type":',
+    '"source_entity_id":',
+    '"target_entity_type":',
+    '"target_entity_id":',
+    '"evidence_ref":',
+    '"supports_relation":',
+    '"stance":',
+    '"admissible":',
+    '"status":',
+    '"selected_entity_id":',
+    '"selected_relation_type":',
+    '"relation_supported":',
+    '"evidence_refs":',
+    '"reason_code":',
+    '"ANSWERED"',
+    '"INSUFFICIENT_EVIDENCE"',
+    '"supports"',
+    '"contradicts"',
+    "true",
+    "false",
+    "null",
+    '"select_entity"',
+    '"select_relation_target"',
+    '"validate_relation"',
+    '"select_evidence"',
+    '"invoice"',
+    '"contract"',
+    '"vendor"',
+    '"employee"',
+    '"department"',
+    '"belongs_to_contract"',
+    '"approved_vendor"',
+    '"assigned_to"',
+    '"member_of"',
+    '"MATCH_FOUND"',
+    '"RELATION_SUPPORTED"',
+    '"EVIDENCE_FOUND"',
+    '"NO_AUTHORIZED_RELATION"',
+    '"RELATION_UNSUPPORTED"',
+    '"TENANT_BLOCKED"',
+    '"CONFLICT"',
+    '"IDENTITY_MATCH"',
 )
 
-_CHUNK_RE = re.compile(r"[A-Za-z_]+|\d+|\s+|.", flags=re.DOTALL)
-_LEXEME_TO_ID = {text: LEXEME_BASE_ID + index for index, text in enumerate(FROZEN_LEXEMES)}
-_ID_TO_LEXEME = {token_id: text for text, token_id in _LEXEME_TO_ID.items()}
+if len(LEXEMES) != 69 or len(set(LEXEMES)) != 69:
+    raise RuntimeError("the frozen tokenizer requires exactly 69 unique lexemes")
 
 
+@dataclass(frozen=True)
 class LexicalTokenizer:
-    """Tokenize frozen protocol lexemes atomically and all other ASCII as characters.
+    """Lossless tokenizer with no learned or corpus-derived state."""
 
-    The mapping is fixed at import time, data-independent, and exactly reversible.
-    Inputs outside 7-bit ASCII are rejected rather than silently normalized.
-    """
+    pad_id: int = PAD_ID
+    bos_id: int = BOS_ID
+    eos_id: int = EOS_ID
 
-    vocab_size = VOCAB_SIZE
-    pad_id = PAD_ID
-    bos_id = BOS_ID
-    eos_id = EOS_ID
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "_ordered",
+            tuple(sorted(enumerate(LEXEMES), key=lambda item: (-len(item[1]), item[0]))),
+        )
 
-    def encode(self, text: str, *, add_bos: bool = False, add_eos: bool = False) -> list[int]:
-        if not isinstance(text, str):
-            raise TypeError("text must be str")
+    @property
+    def vocab_size(self) -> int:
+        return 200
+
+    def encode(self, text: str) -> list[int]:
         try:
-            text.encode("ascii", errors="strict")
+            text.encode("ascii")
         except UnicodeEncodeError as exc:
-            raise ValueError("tokenizer accepts only 7-bit ASCII") from exc
-        tokens: list[int] = []
-        for chunk in _CHUNK_RE.findall(text):
-            lexeme_id = _LEXEME_TO_ID.get(chunk)
-            if lexeme_id is not None:
-                tokens.append(lexeme_id)
+            raise ValueError("model-visible text must be ASCII") from exc
+        ids: list[int] = []
+        cursor = 0
+        while cursor < len(text):
+            match: tuple[int, str] | None = None
+            for index, lexeme in self._ordered:
+                if text.startswith(lexeme, cursor):
+                    match = (index, lexeme)
+                    break
+            if match is None:
+                ids.append(ord(text[cursor]))
+                cursor += 1
             else:
-                tokens.extend(ord(char) for char in chunk)
-        if add_bos:
-            tokens.insert(0, self.bos_id)
-        if add_eos:
-            tokens.append(self.eos_id)
-        return tokens
+                index, lexeme = match
+                ids.append(LEXEME_START + index)
+                cursor += len(lexeme)
+        return ids
 
-    def decode(self, ids: Iterable[int], *, skip_special: bool = True) -> str:
+    def decode(self, ids: Iterable[int], *, skip_special: bool = False) -> str:
         parts: list[str] = []
         for token_id in ids:
-            token = int(token_id)
-            if token in {self.pad_id, self.bos_id, self.eos_id}:
-                if skip_special:
-                    continue
-                raise ValueError("special tokens are not text")
-            if 0 <= token < ASCII_VOCAB_SIZE:
-                parts.append(chr(token))
-            elif token in _ID_TO_LEXEME:
-                parts.append(_ID_TO_LEXEME[token])
+            if 0 <= token_id < ASCII_SIZE:
+                parts.append(chr(token_id))
+            elif LEXEME_START <= token_id < self.vocab_size:
+                parts.append(LEXEMES[token_id - LEXEME_START])
+            elif token_id in (self.pad_id, self.bos_id, self.eos_id):
+                if not skip_special:
+                    raise ValueError("special tokens have no textual decoding")
             else:
-                raise ValueError(f"unknown token ID: {token}")
+                raise ValueError(f"token ID outside frozen vocabulary: {token_id}")
         return "".join(parts)
+
+    def round_trip(self, text: str) -> str:
+        return self.decode(self.encode(text))
