@@ -24,9 +24,10 @@ class ShortcutGateError(RuntimeError):
 
 
 def build_cohort(seed: int, cohort: str, token: str | None = None):
-    """Build all C1-C8 examples for a (seed, cohort). Reserved seeds fail closed."""
+    """Build all C1-C8 examples for a (seed, cohort). Reserved seeds fail closed (the primitive
+    generators are independently guarded too, so the token is threaded through)."""
     require_execution_authorization(seed, token)  # raises for reserved seeds without a valid token
-    return {split: generate_split(split, cohort, seed) for split in SPLIT_IDS}
+    return {split: generate_split(split, cohort, seed, token=token) for split in SPLIT_IDS}
 
 
 def serialize_cohort(cohort_examples) -> dict:
