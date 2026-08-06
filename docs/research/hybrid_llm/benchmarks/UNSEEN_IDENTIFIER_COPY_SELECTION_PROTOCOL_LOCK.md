@@ -245,3 +245,68 @@ task-label leakage. For every heuristic:
 A shortcut anomaly must be **resolved before reserved execution**. **Do not repeat the prior process
 deviation** (typed-vs-prose) where the shortcut baseline was only investigated after final runs —
 the shortcut precheck is a hard pre-reserved-execution gate here.
+
+## Decision 6 — Frozen model recipe (reconstructed from merged source; NOT blocked)
+Reconstructed mechanically from the merged typed-vs-prose implementation on the authoritative
+default (source commit `872c034c…`); **no code or architecture change** is required, so
+`UNSEEN_IDENTIFIER_PROTOCOL_LOCK_BLOCKED_MODEL_RECIPE` does **not** apply.
+
+| Property | Frozen value (verified from merged source) |
+|---|---|
+| Model class | `symbolu_neural.clean_softmax.backbone.SoftmaxTransformerLM` (via `StructuredOutputModel`) |
+| Trainable parameters | **209,728** |
+| Layers | 2 |
+| Hidden dimension (`d_model`) | 64 |
+| Attention heads | 4 |
+| Feed-forward (`d_ff`) | 256 |
+| Dropout | 0.0 |
+| Vocabulary | 200 (fixed reversible lexical tokenizer; identifiers character-visible) |
+| Max sequence | 1024 |
+| Input / output token allowance | 512 / 384 |
+| Optimizer | AdamW, lr 3e-4, β (0.9, 0.95), eps 1e-8, weight-decay 0.01, grad-clip 1.0 |
+| Batch size / updates | 8 / 2000 |
+| Objective | output-only next-token cross-entropy (shifted causal alignment) |
+| Init policy | `torch.manual_seed` under `fork_rng` (no global RNG mutation) |
+
+Recipe-bearing source hashes (SHA-256, first 32 hex, from merged source; to be re-pinned exactly at
+implementation authorization): `config.py` `324be79d9cefaada9e09ddfae3b325aa` · `tokenizer.py`
+`1849fd1f3d27e5d681d56e19ab099681` · `model.py` `39a2a128824137924ef041fb3d1dc251` · `trainer.py`
+`ea0af36e4b3843296ee7d46b3f1228a3`.
+
+**Do not modify** any recipe value. **No** pointer head · copy head · candidate-ranking head ·
+constrained decoding · candidate-index output · memory · new encoder · larger model · pretrained
+replacement · hyperparameter sweep. One frozen recipe only. (Evaluation-time output decoding for the
+bare-identifier grader reuses the existing greedy decoder; any decode-length bound must be
+arm-neutral and unable to truncate a valid identifier — to be pinned at implementation.)
+
+## Decision 10 — Frozen seeds (proposed roles; NOT consumed)
+Mechanically re-checked against the entire repository at lock time (excluding the copy/selection
+docs' own proposal): **0 external mentions** for every proposed seed → disjoint.
+
+| Role | Seeds | May contribute to scientific gates? |
+|---|---|---|
+| smoke | 9070 | **No** — shapes, parsing, dataset generation, tokenizer behavior, deterministic replay, resource feasibility only |
+| development | 9071, 9072, 9073 | **No** — implementation correctness, compute feasibility, determinism, shortcut baselines, gate mechanics only |
+| reserved final | 90760, 90761, 90762, 90763, 90764 | Yes (only after the full authorization chain below) |
+
+Development seeds **may not** change: representation · identifier design · numeric gates · model
+recipe · output contract · verdict mapping · final pools. Any bug fix after development begins must
+invalidate and rerun all affected development evidence.
+
+**No final seed** may be opened or generated until, in order: (1) PR #1368 merged [done]; (2) this
+protocol-lock PR independently audited and merged; (3) implementation separately authorized;
+(4) implementation completed; (5) smoke + development integrity pass; (6) implementation-integrity
+audit merged; (7) final execution separately authorized.
+
+A **frozen domain-separated sub-seed derivation** (for identifier pools, dataset generation,
+initialization, batch order, perturbations, position allocation) is specified at implementation
+authorization, following the same domain-separation discipline as the typed-vs-prose lock.
+
+## Decision 11 — Frozen compute limits
+Model recipes: **1** · representations: **1** · tokenizer: **1** · optimizer configurations: **1** ·
+max training steps per run: **2000** (same as the prior frozen recipe) · max wall-clock: **24 h**.
+Maximum arm/task runs and maximum aggregate optimizer steps are derived **mechanically** from the
+chosen implementation plan at implementation authorization (one run per task-split × arm × seed;
+no more). **No** selective restart · **no** failed-run replacement except documented infrastructure
+failure · **no** post-result budget extension · **no** hyperparameter sweep · **no** capacity change.
+The execution environment manifest is recorded before any future run.
