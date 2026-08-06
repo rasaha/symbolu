@@ -189,3 +189,50 @@ def test_cli_missing_record_file_is_auth_refused(tmp_path):
                  "--authorization-record", os.path.join(str(tmp_path), "nope.json"),
                  "--output-dir", out])
     assert code == EXIT_AUTH_REFUSED
+
+
+def _scientific_record_no_doc(seed=9070):
+    from experiments.unseen_identifier_copy_selection.execution import SMOKE_EXECUTION_STATE
+    from experiments.unseen_identifier_copy_selection.manifest import frozen_recipe_source_hashes
+    record = {
+        "authorization_state": SMOKE_EXECUTION_STATE, "cohort": "unseen", "permitted_seeds": [seed],
+        "protocol_lock_commit": "PL", "implementation_authorization_commit": "a" * 40,
+        "implementation_commit": "b" * 40, "model_recipe_hashes": frozen_recipe_source_hashes(),
+        "parameter_count": 209_728, "scope": "one-run",
+        "authorization_document_commit": "a" * 40,
+        "authorization_document_path":
+            "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_EXECUTION_AUTHORIZATION.json",
+        "authorization_document_digest": "c" * 64,
+    }
+    record["record_digest"] = compute_record_digest(record)
+    return record
+
+
+def test_cli_scientific_state_requires_committed_document_and_refuses_before_output(tmp_path):
+    # A scientific record whose document is not committed in the real repo is refused, and refusal
+    # occurs before the output directory is created (authorization precedes side effects).
+    record_path = _write_record(str(tmp_path), _scientific_record_no_doc())
+    out = os.path.join(str(tmp_path), "out")
+    code = main(["build-cohort", "--seed", "9070", "--cohort", "unseen",
+                 "--authorization-record", record_path, "--output-dir", out])
+    assert code == EXIT_AUTH_REFUSED
+    assert not os.path.exists(out)  # no output dir; no cohort generated
+
+
+def test_cli_arbitrary_authority_ref_without_committed_doc_still_refused(tmp_path):
+    # Even pointing --authority-ref/--repo-dir at the real repo, no committed authorization document
+    # exists, so seed 9070 remains refused (present-day denial preserved).
+    record_path = _write_record(str(tmp_path), _scientific_record_no_doc())
+    out = os.path.join(str(tmp_path), "out")
+    code = main(["build-cohort", "--seed", "9070", "--cohort", "unseen",
+                 "--authorization-record", record_path, "--repo-dir", ".",
+                 "--authority-ref", "HEAD", "--output-dir", out])
+    assert code == EXIT_AUTH_REFUSED
+    assert not os.path.exists(out)
+
+
+def test_cli_one_seed_only_unchanged():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["build-cohort", "--seed", "9070,9071", "--cohort", "unseen",
+                           "--authorization-record", "r.json", "--output-dir", "o"])
