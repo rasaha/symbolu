@@ -64,3 +64,33 @@ thread authorization through **every** generation primitive (`build_pools`/`gene
 cohort · reject any unlisted seed · reject final seeds unless a later explicit final authorization
 exists. Fixture tests may use **fixture-only** authorization records bound exclusively to fixture
 seeds `993000–993004`. **No scientific authorization record is created in this session.**
+
+## Decision 4 — Frozen training orchestration
+Reuses **by import**: frozen model (`build_model`), tokenizer (`LexicalTokenizer`), trainer
+(`train_in_memory`), config (`FROZEN_MODEL_RECIPE`/`FROZEN_TRAIN_RECIPE`). Freeze: model
+construction path · tokenizer path · optimizer recipe · update count (2000) · batch size (8) ·
+clipping · initialization (`fork_rng` + `manual_seed(sub_seed(seed,'init'))`) · checkpoint format ·
+checkpoint naming (`<output-dir>/<seed>/checkpoint.*`) · device (CPU) / precision (float32) ·
+deterministic flags · output-directory structure. Fail-closed assertions (raise): parameter count
+**= 209,728** · frozen source hashes match · frozen tokenizer behavior · **no** new trainable
+module / task-specific head / changed loss / changed optimizer / architecture branch. **No training
+occurs during implementation or fixture tests**; training orchestration is tested only via mocks,
+dry structural checks, or fixture-safe refusal tests.
+
+## Decision 5 — Frozen evaluation and decoding
+Path: checkpoint load · frozen tokenizer · frozen input allowance (512) · frozen output allowance
+(384) · **greedy** decoding · **no** constrained decoding · **no** candidate-index output · exact
+`parser` · exact `metrics` · per-example trace production. Freeze: decode stopping condition
+(EOS / max length) · maximum generated length (arm-neutral, cannot truncate a valid identifier) ·
+malformed-output handling (classified, **not** repaired) · in-context-wrong-ID classification ·
+fabricated-ID classification · abstention classification · trace schema · metric schema. **No
+post-processing may repair malformed identifiers. No evaluation occurs during this session.**
+
+## Decision 6 — Frozen deterministic replay
+Replay reconstructs, for one explicitly-authorized seed: identifier pools · datasets · serialization
+· initialization · batch order · training · checkpoint · predictions · parsing · metrics · manifest.
+**Definition (per merged protocol + prior benchmark practice):** replay = **complete deterministic
+retraining and re-evaluation** from the frozen recipe and authorized seed, compared against the
+original run by **actual digest values** (not booleans). A replay digest mismatch **fails closed**
+and blocks evidence acceptance. Replay may be implemented later but is **not run** during
+fixture-only implementation work.
