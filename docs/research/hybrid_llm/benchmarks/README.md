@@ -29,6 +29,14 @@ Controlled single-hop typed-structure-vs-flattened-prose relational benchmark (B
   typed structure gave no single-hop advantage at the frozen recipe, and neither representation solved
   copy-from-context on unseen identities.
 
+- **[SINGLE_HOP_TYPED_VS_PROSE_AUDIT_REPORT.md](SINGLE_HOP_TYPED_VS_PROSE_AUDIT_REPORT.md)** ·
+  **[…_AUDIT_PROVENANCE.md](SINGLE_HOP_TYPED_VS_PROSE_AUDIT_PROVENANCE.md)** ·
+  **[…_AUDIT_ANALYSIS.md](SINGLE_HOP_TYPED_VS_PROSE_AUDIT_ANALYSIS.md)** — independent Stage-2 audit
+  (provenance, protocol-lock fidelity, authorization ordering, arm-fairness, decode-cap,
+  information-equivalence hard path, deterministic replay, fingerprint manifest, constant-output and
+  shortcut analysis). Decision: `MERGE_READY_AFTER_SCOPED_CORRECTIONS`; the frozen result
+  reconstructs exactly.
+
 **Current state:** the benchmark was implemented, frozen, owner-authorized, and executed
 (smoke 76 → dev 760–762 → reserved final 7160–7164). Verdict is a clean preregistered null
 (`TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_NOT_FOUND`). No transfer, efficiency, multi-hop, temporal, memory,

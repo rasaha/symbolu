@@ -103,7 +103,22 @@ superiority · real-model transfer · production readiness · KDA eligibility. T
 that typed records/edges are superior to prose remains, on this evidence, an **unproven
 hypothesis** — consistent with the current evidence-aligned position.
 
+## Independent audit (Stage 2)
+This result was independently audited from Git ground truth (`…_AUDIT_REPORT.md`,
+`…_AUDIT_PROVENANCE.md`, `…_AUDIT_ANALYSIS.md`). Deterministic replay of the frozen implementation
+reconstructed the reported means, per-seed and per-split values, and verdict **exactly**
+(`runs/audit/audit_manifest.json`, `runs/audit/audit_replay_traces.json`); information-equivalence
+held over all 960 paired final examples (0 mismatches); arm-fairness (shared initialization),
+decode-cap neutrality (max emitted 38 ≪ 96 cap, zero truncation), and provenance were verified.
+Audit decision: `MERGE_READY_AFTER_SCOPED_CORRECTIONS`.
+
+Audit-only non-constant diagnostic (mean of the varying-content primary components {S1, S2, S5-F1},
+excluding the two constant-gold components S3 and S6): **B0 = 0.094, B1 = 0.058** — both at or near
+floor. This does not replace the locked primary (B0 0.457 / B1 0.435); it isolates that the
+copy/selection signal, where the real work is, is near floor for both arms.
+
 ## Reproduction
 `python -m experiments.single_hop_typed_vs_prose.driver <out_dir>` (reserved seeds require the
-owner-authorized token resolved by the fail-closed gate). Raw artifacts:
+owner-authorized token resolved by the fail-closed gate). Audit reconstruction:
+`python -m experiments.single_hop_typed_vs_prose.audit_replay <out_dir>`. Raw artifacts:
 `experiments/single_hop_typed_vs_prose/runs/final_7160_7164/{smoke,dev,final,verdict}.json`.
