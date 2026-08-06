@@ -106,3 +106,49 @@ serialization (sorted keys, ASCII, fixed separators) · **atomic-write** behavio
 **overwrite refusal** · an **incomplete-run marker** cleared only on success · provenance labels.
 **No aggregate-only evidence package.** No evidence file may be written outside the explicit
 `--output-dir`.
+
+## Decision 8 — Complete the shortcut suite (8 present → 12 frozen)
+Currently implemented (verified in merged `shortcuts._baselines_on`, 8): first-target · last-target ·
+middle-target · most-frequent-target · lexical-similarity · prefix-match · character-overlap ·
+constant-abstention. Authorize implementation of exactly the **4 missing** frozen baselines, each
+defined **mechanically from existing task metadata** (`pairs`, `query_source`, `cohort`,
+`task_name`, `seen_unseen`) — no new scientific rule:
+
+- **source–target co-occurrence** — for each example, among its candidate targets pick the target
+  whose `(query_source, target)` pair count is highest across the (seed, split) cohort; deterministic
+  lexicographic tie-break. (Memorization baseline; opaque unique IDs → ~chance.)
+- **seen-ID frequency** — pick the candidate target with the highest occurrence count across the
+  (seed, split) cohort's identifier multiset; lexicographic tie-break. (Frequency prior.)
+- **output-template leakage** — exploit only the output contract's structure; the bare-identifier
+  output fixes no answer position, so the heuristic returns the candidate at the frozen output
+  position (index 0); lexicographic tie-break. (Verifies the output template encodes no answer.)
+- **task-label leakage** — exploit only the `TASK` label; map `task_name` deterministically to a
+  candidate index (`hash(task_name) mod candidate_count`, frozen hash). (Label is constant per split
+  and answer-independent → ~chance; verifies the task label leaks nothing.)
+
+For **all twelve** baselines freeze: exact input information available to the heuristic · applicable
+tasks/splits · prediction rule · deterministic tie-breaking · chance calculation · non-applicable
+handling · malformed handling · score formula · competence-floor comparison. **Do not alter** task
+construction · candidate count · split size · seeds · thresholds · protocol scope. (All four missing
+baselines are mechanically definable from merged metadata; **`SHORTCUT_BASELINE_DEFINITION_BLOCKED`
+does not apply.**)
+
+## Decision 9 — Frozen shortcut aggregation (implementation must not infer)
+1. Generate heuristic predictions separately for **each seed and applicable split**.
+2. Derive frequency-based state (incl. `most_frequent_target`, co-occurrence, seen-ID frequency)
+   **separately within that seed and split**.
+3. **Never** recompute a frequency-based heuristic from a combined multi-seed pool.
+4. Record per-seed, per-split: correct count · example count · score · chance · threshold · pass/fail.
+5. Aggregate across development seeds as
+   `sum(seed-local correct counts) / sum(seed-local applicable example counts)` — an
+   **example-count-weighted mean of seed-local scores**.
+6. Do not silently include non-applicable examples.
+7. Missing heuristic output is an **implementation defect**, not an omitted example.
+8. Threshold equality **passes**: `score <= chance + 0.05`.
+9. Compare each heuristic to the frozen competence floor for the corresponding task/split.
+10. Any applicable split whose frozen aggregate shortcut bound fails **blocks further execution**.
+11. Per-seed values remain visible descriptively even when the aggregate is the primary gate.
+
+This clarification changes **no** frozen numeric threshold, cohort, candidate count, seed, or
+scientific claim; it fixes the aggregation the earlier smoke/dev plan left underspecified and forbids
+the combined-pool frequency artifact.
