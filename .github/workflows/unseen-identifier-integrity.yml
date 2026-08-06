@@ -13,6 +13,7 @@ on:
       - ".github/workflows/unseen-identifier-integrity.yml"
       - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_*.md"
       - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_*.md"
+      - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_AUTHORIZATION_SECURITY_HARDENING.md"
   workflow_dispatch:
 
 permissions:
@@ -69,6 +70,44 @@ jobs:
           import os
           assert not os.path.exists("/tmp/should-not-appear"), "reserved seed produced output"
           print("OK: reserved seed fails closed")
+          PY
+
+      - name: Security guard — authorization forgery is closed (no committed scientific document exists)
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import os
+          from experiments.unseen_identifier_copy_selection import execution as ex
+          from experiments.unseen_identifier_copy_selection.execution import (
+              AuthorizationContext, AuthorizationRecordError, ExecutionNotAuthorized,
+              SMOKE_EXECUTION_STATE, active_authorization, authorize, compute_record_digest,
+              require_execution_authorization)
+          from experiments.unseen_identifier_copy_selection.manifest import frozen_recipe_source_hashes
+          # Provenance forgery: a fabricated record naming a non-committed doc must fail closed.
+          rec = {"authorization_state": SMOKE_EXECUTION_STATE, "cohort": "unseen", "permitted_seeds": [9070],
+                 "protocol_lock_commit": "PL", "implementation_authorization_commit": "a"*40,
+                 "implementation_commit": "b"*40, "model_recipe_hashes": frozen_recipe_source_hashes(),
+                 "parameter_count": 209728, "scope": "one-run",
+                 "authorization_document_commit": "a"*40,
+                 "authorization_document_path": "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_EXECUTION_AUTHORIZATION.json",
+                 "authorization_document_digest": "c"*64}
+          rec["record_digest"] = compute_record_digest(rec)
+          try:
+              authorize(rec, seed=9070, cohort="unseen"); raise SystemExit("FAIL: fabricated artifact accepted")
+          except AuthorizationRecordError:
+              pass
+          # Context forgery: a directly-constructed context must never satisfy the guard.
+          try:
+              AuthorizationContext(mint_key=object(), authorization_state=SMOKE_EXECUTION_STATE, seed=9070,
+                  cohort="unseen", record_digest="x", document_commit="c", document_digest="d",
+                  protocol_lock_commit="p", implementation_authorization_commit="i", implementation_commit="j",
+                  model_recipe_hashes=(), parameter_count=209728, scope="one-run")
+              raise SystemExit("FAIL: direct context construction succeeded")
+          except AuthorizationRecordError:
+              pass
+          assert ex._ACTIVE_CAPABILITIES == {}
+          print("OK: provenance and context forgery are closed; no scientific document committed")
           PY
 
       - name: Run bounded integrity tests (fixture seeds only; no training, no cohort, no reserved seed, no verdict)
