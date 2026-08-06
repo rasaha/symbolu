@@ -21,6 +21,16 @@ Controlled single-hop typed-structure-vs-flattened-prose relational benchmark (B
 - **[PR1362_AUDIT_AND_MERGE.md](PR1362_AUDIT_AND_MERGE.md)** · **[PR1363_AUDIT_AND_MERGE.md](PR1363_AUDIT_AND_MERGE.md)**
   — audit records for the thesis-V1.1 and preregistration merges.
 
-**Current state:** implementation is authorized, but benchmark execution is not. The implementation must be a
-separate draft PR, use no benchmark seed, and remain unmerged until independent audit. No smoke, development,
-reserved, scientific, transfer, efficiency, or production conclusion is authorized.
+- **[SINGLE_HOP_TYPED_VS_PROSE_EXECUTION_AUTHORIZATION.md](SINGLE_HOP_TYPED_VS_PROSE_EXECUTION_AUTHORIZATION.md)**
+  — owner authorization record for building the real dataset and executing the frozen protocol.
+- **[SINGLE_HOP_TYPED_VS_PROSE_RESULTS.md](SINGLE_HOP_TYPED_VS_PROSE_RESULTS.md)** — executed results and
+  verdict: **`TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_NOT_FOUND`** (B1 JSON − B0 prose = −0.022 primary; 0/5
+  seeds pass; tenant isolation held; information-equivalence and determinism verified). A preregistered null:
+  typed structure gave no single-hop advantage at the frozen recipe, and neither representation solved
+  copy-from-context on unseen identities.
+
+**Current state:** the benchmark was implemented, frozen, owner-authorized, and executed
+(smoke 76 → dev 760–762 → reserved final 7160–7164). Verdict is a clean preregistered null
+(`TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_NOT_FOUND`). No transfer, efficiency, multi-hop, temporal, memory,
+or production conclusion is drawn. Preserves `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED`,
+`E1_TEMPORAL_TRANSFER_PARTIAL`, `KDA_VALIDATION_BLOCKED`.
