@@ -12,11 +12,11 @@ from .serializers import serialize_b0, serialize_b1
 from .tokenizer import LexicalTokenizer
 
 __all__ = [
-    "LexicalTokenizer",
     "CanonicalEpisode",
     "ExecutionNotAuthorized",
     "FROZEN_MODEL_RECIPE",
     "FROZEN_TRAIN_RECIPE",
+    "LexicalTokenizer",
     "PairedEpisode",
     "StructuredOutput",
     "StructuredOutputModel",
