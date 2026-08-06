@@ -94,3 +94,15 @@ retraining and re-evaluation** from the frozen recipe and authorized seed, compa
 original run by **actual digest values** (not booleans). A replay digest mismatch **fails closed**
 and blocks evidence acceptance. Replay may be implemented later but is **not run** during
 fixture-only implementation work.
+
+## Decision 7 — Frozen evidence and manifest emission
+The interface must produce **actual files** for: source digest · config digest · tokenizer digest ·
+authorization-record digest · identifier-pool digest · dataset digest · serializer digest ·
+initialization digest · batch-order digest · checkpoint/parameter digest · prediction digest ·
+evaluator digest · environment digest · per-example prediction traces · parser-category counts ·
+per-task metrics · shortcut results · resource measurements · protocol-compliance report. Freeze:
+exact file names · directory layout (`<output-dir>/<seed>/<cohort>/…`) · JSON schemas · canonical
+serialization (sorted keys, ASCII, fixed separators) · **atomic-write** behavior (temp + rename) ·
+**overwrite refusal** · an **incomplete-run marker** cleared only on success · provenance labels.
+**No aggregate-only evidence package.** No evidence file may be written outside the explicit
+`--output-dir`.
