@@ -1,239 +1,308 @@
-"""Paired episode construction and deterministic synthetic fixtures."""
+"""Deterministic in-memory S1-S8 paired episode construction and encoding."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import random
-from typing import Iterable, Sequence
+from dataclasses import dataclass
+from typing import Literal
 
-import torch
-
-from .config import BOS_ID, EOS_ID, FROZEN_MODEL_RECIPE, OUTPUT_MARKER, PAD_ID, ModelRecipe
+from .config import FROZEN_TRAIN_RECIPE, SCENARIO_IDS
+from .execution import ExecutionAuthorization, guard_seed
 from .schema import CanonicalEpisode, Entity, Evidence, Query, Relation, StructuredOutput
 from .serializers import assert_information_equivalent, serialize_b0, serialize_b1
 from .tokenizer import LexicalTokenizer
+
+Arm = Literal["B0", "B1"]
 
 
 @dataclass(frozen=True)
 class PairedEpisode:
     episode: CanonicalEpisode
-    b0_text: str
-    b1_text: str
+    b0: str
+    b1: str
     fact_hash: str
 
-    def text_for_arm(self, arm: str) -> str:
-        if arm == "B0":
-            return self.b0_text
-        if arm == "B1":
-            return self.b1_text
-        raise ValueError("arm must be B0 or B1")
+    @property
+    def output_json(self) -> str:
+        return self.episode.authoritative_output.canonical_json()
 
 
 @dataclass(frozen=True)
-class EncodedExample:
-    episode_id: str
-    arm: str
+class EncodedArm:
+    arm: Arm
     input_ids: tuple[int, ...]
     labels: tuple[int, ...]
-    prompt_tokens: int
-    output_tokens: int
+    prompt_token_count: int
+    output_token_count: int
     fact_hash: str
 
 
-def make_pair(episode: CanonicalEpisode) -> PairedEpisode:
-    digest = assert_information_equivalent(episode)
-    return PairedEpisode(
-        episode=episode,
-        b0_text=serialize_b0(episode),
-        b1_text=serialize_b1(episode),
-        fact_hash=digest,
-    )
-
-
-def encode_pair_arm(
-    pair: PairedEpisode,
-    arm: str,
-    *,
-    tokenizer: LexicalTokenizer | None = None,
-    recipe: ModelRecipe = FROZEN_MODEL_RECIPE,
-) -> EncodedExample:
-    tokenizer = tokenizer or LexicalTokenizer()
-    prompt = pair.text_for_arm(arm) + OUTPUT_MARKER
-    output = pair.episode.authoritative_output.to_json()
-    prompt_ids = tokenizer.encode(prompt)
-    output_ids = tokenizer.encode(output)
-    if len(prompt_ids) > recipe.max_input_tokens:
-        raise ValueError(
-            f"{pair.episode.episode_id}/{arm} input has {len(prompt_ids)} tokens; "
-            f"limit is {recipe.max_input_tokens}"
-        )
-    if len(output_ids) > recipe.max_output_tokens:
-        raise ValueError(
-            f"{pair.episode.episode_id} output has {len(output_ids)} tokens; "
-            f"limit is {recipe.max_output_tokens}"
-        )
-    sequence = [BOS_ID, *prompt_ids, *output_ids, EOS_ID]
-    if len(sequence) > recipe.max_seq:
-        raise ValueError("complete sequence exceeds frozen model context")
-    input_ids = sequence[:-1]
-    labels = sequence[1:]
-    first_output_target = len(prompt_ids)
-    labels = [-100] * first_output_target + labels[first_output_target:]
-    if len(input_ids) != len(labels):
-        raise AssertionError("input/label length mismatch")
-    return EncodedExample(
-        episode_id=pair.episode.episode_id,
-        arm=arm,
-        input_ids=tuple(input_ids),
-        labels=tuple(labels),
-        prompt_tokens=len(prompt_ids),
-        output_tokens=len(output_ids),
-        fact_hash=pair.fact_hash,
-    )
-
-
-def collate_encoded(examples: Sequence[EncodedExample]) -> tuple[torch.Tensor, torch.Tensor]:
-    if not examples:
-        raise ValueError("cannot collate an empty batch")
-    max_len = max(len(item.input_ids) for item in examples)
-    inputs = torch.full((len(examples), max_len), PAD_ID, dtype=torch.long)
-    labels = torch.full((len(examples), max_len), -100, dtype=torch.long)
-    for row, item in enumerate(examples):
-        length = len(item.input_ids)
-        inputs[row, :length] = torch.tensor(item.input_ids, dtype=torch.long)
-        labels[row, :length] = torch.tensor(item.labels, dtype=torch.long)
-    return inputs, labels
-
-
 class SyntheticEpisodeGenerator:
-    """Deterministic in-memory episode generator.
+    """Local-RNG deterministic generator. It never mutates global RNG state."""
 
-    The generator uses a private ``random.Random`` instance and never mutates global
-    Python or PyTorch RNG state. It emits no files and performs no training.
-    """
+    def __init__(
+        self,
+        seed: int,
+        authorization: ExecutionAuthorization | None = None,
+    ) -> None:
+        guard_seed(seed, authorization)
+        self.seed = seed
+        self._rng = random.Random(seed)
 
-    SPLITS = tuple(f"S{i}" for i in range(1, 9))
+    def _suffix(self) -> str:
+        return f"{self._rng.randrange(100, 999):03d}"
 
-    def __init__(self, seed: int):
-        self.seed = int(seed)
-        self._rng = random.Random(self.seed)
+    def _base_ids(self) -> tuple[str, str, str]:
+        suffix = self._suffix()
+        return f"i{suffix}", f"v{suffix}", f"c{suffix}"
 
-    def generate(self, split: str, index: int = 0) -> CanonicalEpisode:
-        if split not in self.SPLITS:
-            raise ValueError(f"unsupported split: {split}")
-        nonce = self._rng.randrange(1_000_000)
-        suffix = f"{index % 100:02d}{nonce % 10000:04d}"
-        tenant = f"t{(index % 7) + 1:02d}"
-        other_tenant = f"x{(index % 5) + 1:02d}"
-        invoice_id = f"i{suffix}"
-        contract_a = f"c{suffix}a"
-        contract_b = f"c{suffix}b"
-        evidence_a = f"e{suffix}a"
-        evidence_b = f"e{suffix}b"
-        vendor_a = f"v{suffix}a"
-        vendor_b = f"v{suffix}b"
+    def build(self, scenario_id: str) -> CanonicalEpisode:
+        if scenario_id not in SCENARIO_IDS:
+            raise ValueError(f"unknown scenario: {scenario_id}")
+        builder = getattr(self, f"_{scenario_id.lower()}")
+        return builder()
 
-        if split in {"S1", "S4"}:
-            entities = (
-                Entity("vendor", vendor_a, {"name": "atlas", "suffix": "41"}, tenant),
-                Entity("vendor", vendor_b, {"name": "atlas", "suffix": "42"}, tenant),
-            )
-            return CanonicalEpisode(
-                episode_id=f"{split.lower()}-{suffix}",
-                split=split,
-                tenant_id=tenant,
-                query=Query("vendor", vendor_b, None),
-                entities=entities,
-                relations=(),
-                evidence=(),
-                authoritative_output=StructuredOutput(
-                    "ANSWERED", vendor_b, None, None, (), tenant, "EXACT_ENTITY_ID"
+    def generate_all(self) -> tuple[CanonicalEpisode, ...]:
+        return tuple(self.build(scenario_id) for scenario_id in SCENARIO_IDS)
+
+    def _s1(self) -> CanonicalEpisode:
+        invoice_id, vendor_a, _ = self._base_ids()
+        vendor_b = f"v{int(vendor_a[1:]) + 1}"
+        tenant = "t01"
+        evidence_ref = "e101"
+        output = StructuredOutput(
+            "ANSWERED", vendor_b, "approved_vendor", True, (evidence_ref,), tenant, "MATCH_FOUND"
+        )
+        return CanonicalEpisode(
+            "s1-duplicate-name",
+            "S1",
+            tenant,
+            Query("select_relation_target", "invoice", invoice_id, "approved_vendor"),
+            (
+                Entity("invoice", invoice_id, tenant, attributes=(("amount", "4200"),)),
+                Entity("vendor", vendor_a, tenant, "atlas", (("suffix", "41"),)),
+                Entity("vendor", vendor_b, tenant, "atlas", (("suffix", "42"),)),
+            ),
+            (
+                Relation(
+                    "approved_vendor", "invoice", invoice_id, "vendor", vendor_b, evidence_ref, tenant
                 ),
-            )
-
-        base_entities = [
-            Entity("invoice", invoice_id, {"amount": str(4200 + index)}, tenant),
-            Entity("contract", contract_a, {"status": "active"}, tenant),
-            Entity("contract", contract_b, {"status": "pending"}, tenant),
-        ]
-        relation_a = Relation(
-            "belongs_to_contract",
-            "invoice",
-            invoice_id,
-            "contract",
-            contract_a,
-            evidence_a,
-            tenant,
+            ),
+            (Evidence(evidence_ref, "approved_vendor", tenant),),
+            output,
         )
-        relation_b = Relation(
-            "references_contract",
-            "invoice",
-            invoice_id,
-            "contract",
-            contract_b,
-            evidence_b,
-            tenant,
+
+    def _s2(self) -> CanonicalEpisode:
+        invoice_id, _, contract_id = self._base_ids()
+        tenant, evidence_ref = "t01", "e202"
+        output = StructuredOutput(
+            "ANSWERED", contract_id, "belongs_to_contract", True, (evidence_ref,), tenant, "MATCH_FOUND"
         )
-        evidence = [Evidence(evidence_a, "belongs_to_contract", tenant)]
-        relations = [relation_a]
-
-        if split == "S5":
-            relations.append(relation_b)
-            evidence.append(Evidence(evidence_b, "references_contract", tenant))
-        if split == "S6":
-            relations = [relation_b]
-            evidence = [Evidence(evidence_b, "references_contract", tenant)]
-            output = StructuredOutput(
-                "INSUFFICIENT_EVIDENCE", None, "belongs_to_contract", None, (), tenant, "RELATION_MISSING"
-            )
-        else:
-            output = StructuredOutput(
-                "ANSWERED",
-                contract_a,
-                "belongs_to_contract",
-                True,
-                (evidence_a,),
-                tenant,
-                {
-                    "S2": "FOREIGN_KEY_TARGET",
-                    "S3": "RELATION_SUPPORTED",
-                    "S5": "EVIDENCE_SELECTED",
-                    "S7": "TENANT_SAFE_TARGET",
-                    "S8": "DIRECT_RELATION",
-                }.get(split, "DIRECT_RELATION"),
-            )
-
-        if split == "S7":
-            base_entities = base_entities[:2]
-            cross_id = f"c{suffix}x"
-            cross_evidence = f"e{suffix}x"
-            base_entities.append(Entity("contract", cross_id, {}, other_tenant))
-            relations.append(
+        return CanonicalEpisode(
+            "s2-foreign-key",
+            "S2",
+            tenant,
+            Query("select_relation_target", "invoice", invoice_id, "belongs_to_contract"),
+            (
+                Entity("invoice", invoice_id, tenant, attributes=(("amount", "4200"),)),
+                Entity("contract", contract_id, tenant, attributes=(("status", "active"),)),
+            ),
+            (
                 Relation(
                     "belongs_to_contract",
                     "invoice",
                     invoice_id,
                     "contract",
-                    cross_id,
-                    cross_evidence,
-                    other_tenant,
-                )
-            )
-            evidence.append(Evidence(cross_evidence, "belongs_to_contract", other_tenant))
-
-        return CanonicalEpisode(
-            episode_id=f"{split.lower()}-{suffix}",
-            split=split,
-            tenant_id=tenant,
-            query=Query("invoice", invoice_id, "belongs_to_contract"),
-            entities=tuple(base_entities),
-            relations=tuple(relations),
-            evidence=tuple(evidence),
-            authoritative_output=output,
+                    contract_id,
+                    evidence_ref,
+                    tenant,
+                ),
+            ),
+            (Evidence(evidence_ref, "belongs_to_contract", tenant),),
+            output,
         )
 
-    def generate_all(self, *, index: int = 0) -> tuple[CanonicalEpisode, ...]:
-        return tuple(self.generate(split, index=index) for split in self.SPLITS)
+    def _s3(self) -> CanonicalEpisode:
+        suffix = self._suffix()
+        employee_id, department_id = f"u{suffix}", f"d{suffix}"
+        tenant, evidence_ref = "t01", "e303"
+        output = StructuredOutput(
+            "ANSWERED", department_id, "member_of", True, (evidence_ref,), tenant, "RELATION_SUPPORTED"
+        )
+        return CanonicalEpisode(
+            "s3-supported-relation",
+            "S3",
+            tenant,
+            Query("validate_relation", "employee", employee_id, "member_of"),
+            (
+                Entity("employee", employee_id, tenant, "mira"),
+                Entity("department", department_id, tenant, "research"),
+            ),
+            (Relation("member_of", "employee", employee_id, "department", department_id, evidence_ref, tenant),),
+            (Evidence(evidence_ref, "member_of", tenant),),
+            output,
+        )
+
+    def _s4(self) -> CanonicalEpisode:
+        invoice_id, vendor_a, _ = self._base_ids()
+        vendor_b = f"v{int(vendor_a[1:]) + 2}"
+        tenant, evidence_ref = "t01", "e404"
+        output = StructuredOutput(
+            "ANSWERED", vendor_a, "approved_vendor", True, (evidence_ref,), tenant, "IDENTITY_MATCH"
+        )
+        return CanonicalEpisode(
+            "s4-attribute-disambiguation",
+            "S4",
+            tenant,
+            Query("select_entity", "invoice", invoice_id, "approved_vendor"),
+            (
+                Entity("invoice", invoice_id, tenant, attributes=(("region", "west"),)),
+                Entity("vendor", vendor_a, tenant, "nova", (("region", "west"),)),
+                Entity("vendor", vendor_b, tenant, "nova", (("region", "east"),)),
+            ),
+            (Relation("approved_vendor", "invoice", invoice_id, "vendor", vendor_a, evidence_ref, tenant),),
+            (Evidence(evidence_ref, "approved_vendor", tenant),),
+            output,
+        )
+
+    def _s5(self) -> CanonicalEpisode:
+        invoice_id, _, contract_id = self._base_ids()
+        tenant, evidence_ref = "t01", "e505"
+        output = StructuredOutput(
+            "ANSWERED", contract_id, "belongs_to_contract", True, (evidence_ref,), tenant, "EVIDENCE_FOUND"
+        )
+        return CanonicalEpisode(
+            "s5-evidence-selection",
+            "S5",
+            tenant,
+            Query("select_evidence", "invoice", invoice_id, "belongs_to_contract"),
+            (Entity("invoice", invoice_id, tenant), Entity("contract", contract_id, tenant)),
+            (
+                Relation(
+                    "belongs_to_contract",
+                    "invoice",
+                    invoice_id,
+                    "contract",
+                    contract_id,
+                    evidence_ref,
+                    tenant,
+                ),
+            ),
+            (Evidence(evidence_ref, "belongs_to_contract", tenant, "supports", True),),
+            output,
+        )
+
+    def _s6(self) -> CanonicalEpisode:
+        invoice_id, _, contract_id = self._base_ids()
+        tenant = "t01"
+        output = StructuredOutput(
+            "INSUFFICIENT_EVIDENCE",
+            None,
+            "belongs_to_contract",
+            None,
+            (),
+            tenant,
+            "NO_AUTHORIZED_RELATION",
+        )
+        return CanonicalEpisode(
+            "s6-no-match",
+            "S6",
+            tenant,
+            Query("select_relation_target", "invoice", invoice_id, "belongs_to_contract"),
+            (Entity("invoice", invoice_id, tenant), Entity("contract", contract_id, tenant)),
+            (),
+            (),
+            output,
+        )
+
+    def _s7(self) -> CanonicalEpisode:
+        invoice_id, _, contract_id = self._base_ids()
+        tenant, foreign_tenant, evidence_ref = "t01", "t99", "e707"
+        output = StructuredOutput(
+            "INSUFFICIENT_EVIDENCE",
+            None,
+            "belongs_to_contract",
+            None,
+            (),
+            tenant,
+            "TENANT_BLOCKED",
+        )
+        return CanonicalEpisode(
+            "s7-cross-tenant",
+            "S7",
+            tenant,
+            Query("select_relation_target", "invoice", invoice_id, "belongs_to_contract"),
+            (
+                Entity("invoice", invoice_id, tenant),
+                Entity("contract", contract_id, foreign_tenant, attributes=(("status", "active"),)),
+            ),
+            (
+                Relation(
+                    "belongs_to_contract",
+                    "invoice",
+                    invoice_id,
+                    "contract",
+                    contract_id,
+                    evidence_ref,
+                    foreign_tenant,
+                ),
+            ),
+            (Evidence(evidence_ref, "belongs_to_contract", foreign_tenant),),
+            output,
+        )
+
+    def _s8(self) -> CanonicalEpisode:
+        suffix = self._suffix()
+        employee_id, department_id = f"u{suffix}", f"d{suffix}"
+        tenant, evidence_ref = "t01", "e808"
+        output = StructuredOutput(
+            "ANSWERED", department_id, "member_of", False, (evidence_ref,), tenant, "RELATION_UNSUPPORTED"
+        )
+        return CanonicalEpisode(
+            "s8-contradicted-relation",
+            "S8",
+            tenant,
+            Query("validate_relation", "employee", employee_id, "member_of"),
+            (Entity("employee", employee_id, tenant), Entity("department", department_id, tenant)),
+            (Relation("member_of", "employee", employee_id, "department", department_id, evidence_ref, tenant),),
+            (Evidence(evidence_ref, "member_of", tenant, "contradicts", True),),
+            output,
+        )
 
 
-def paired_arm_order(pairs: Iterable[PairedEpisode]) -> tuple[str, ...]:
-    return tuple(pair.episode.episode_id for pair in pairs)
+def make_pair(episode: CanonicalEpisode) -> PairedEpisode:
+    fact_hash = assert_information_equivalent(episode)
+    return PairedEpisode(episode, serialize_b0(episode), serialize_b1(episode), fact_hash)
+
+
+def encode_pair_arm(
+    pair: PairedEpisode,
+    arm: Arm,
+    tokenizer: LexicalTokenizer | None = None,
+) -> EncodedArm:
+    tokenizer = tokenizer or LexicalTokenizer()
+    serialized = pair.b0 if arm == "B0" else pair.b1
+    prompt = serialized + FROZEN_TRAIN_RECIPE.output_marker
+    prompt_ids = tokenizer.encode(prompt)
+    output_ids = tokenizer.encode(pair.output_json)
+    if len(prompt_ids) > FROZEN_TRAIN_RECIPE.input_token_limit:
+        raise ValueError(f"{arm} prompt exceeds common 512-token limit")
+    if len(output_ids) > FROZEN_TRAIN_RECIPE.output_token_limit:
+        raise ValueError("canonical output exceeds 384-token limit")
+    input_ids = (tokenizer.bos_id, *prompt_ids, *output_ids, tokenizer.eos_id)
+    if len(input_ids) > 1024:
+        raise ValueError("complete sequence exceeds frozen model context")
+    labels = (
+        *(FROZEN_TRAIN_RECIPE.ignore_index for _ in range(1 + len(prompt_ids))),
+        *output_ids,
+        tokenizer.eos_id,
+    )
+    if len(labels) != len(input_ids):
+        raise AssertionError("input/label length mismatch")
+    return EncodedArm(
+        arm,
+        tuple(input_ids),
+        tuple(labels),
+        len(prompt_ids),
+        len(output_ids),
+        pair.fact_hash,
+    )
