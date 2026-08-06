@@ -108,3 +108,69 @@ in-context wrong ID · out-of-context fabricated ID · correct abstention · fal
 requirement being diagnosed. (Candidate-index and constrained decoding are output-format
 interventions that route *around* copying; a candidate-ranking objective is what changes selection.
 Both belong only to later, separately-authorized programs.)
+
+## Decision 2 — Frozen representation-neutral input format
+One deterministic plain-text representation only. **No prose-vs-JSON comparison, no serializer /
+paraphrase / representation search, no task-specific output formatting beyond the locked target
+type.** Canonical formats:
+
+```text
+TASK = <task_name>
+QUERY_SOURCE = <source_id>
+FACTS:
+<source_id_1> -> <target_id_1>
+<source_id_2> -> <target_id_2>
+...
+ANSWER =
+```
+Direct copy:
+```text
+TASK = DIRECT_COPY
+TARGET = <target_id>
+ANSWER =
+```
+Evidence-like lookup:
+```text
+TASK = EVIDENCE_LOOKUP
+QUERY_RELATION = <source_id> -> <target_id>
+FACTS:
+<source_id_1> -> <target_id_1> | EVIDENCE = <evidence_id_1>
+<source_id_2> -> <target_id_2> | EVIDENCE = <evidence_id_2>
+ANSWER =
+```
+Missing-key abstention:
+```text
+TASK = MISSING_KEY
+QUERY_SOURCE = <absent_source_id>
+FACTS:
+...
+ANSWER =
+```
+Frozen exactly: field names · capitalization · separators · whitespace · newline layout · fact
+ordering · query placement · answer prefix · distractor syntax · evidence syntax · abstention token.
+
+## Decision 3 — Frozen identifier design
+**Verified from merged source:** identifiers are **character-visible** under the frozen 200-id
+lexical tokenizer — e.g. `Q7X2` encodes to `[81, 55, 88, 50]` (4 tokens = 4 characters, exact
+round-trip), and uppercase letters / digits are plain ASCII. A four-character opaque ID therefore
+occupies four tokenizer tokens; the copy operation is **not** obscured by subword fragmentation.
+
+Frozen: identifier alphabet · identifier length · allowed prefixes · case · digit/letter balance ·
+collision rules · train/dev/final pool sizes · pool-generation algorithm · tokenizer-length strata ·
+position distribution · source–target independence.
+
+Recommended identifier form (to be fixed at implementation authorization):
+- fixed **four-character** opaque identifiers;
+- uppercase ASCII letters and digits;
+- **no** semantically meaningful prefix, **no** task-specific prefix, **no** label-correlated shape;
+- example: `Q7X2`.
+
+Requirements:
+- train, development, and final identifier pools are **disjoint**;
+- source and target pools must not leak task labels;
+- evidence IDs use the same complexity class but a **distinct domain-separated pool**;
+- **no** identifier may encode task type, correct position, answerability, seen/unseen status, or
+  relation identity;
+- tokenizer decomposition is measured and reported; metrics are reported **by tokenizer length** if
+  identifier token lengths vary;
+- collision freedom is mechanically verified at generation.
