@@ -58,7 +58,11 @@ class StructuredOutputModel(nn.Module):
             digest.update(name.encode("utf-8"))
             digest.update(str(parameter.dtype).encode("ascii"))
             digest.update(str(tuple(parameter.shape)).encode("ascii"))
-            digest.update(parameter.detach().cpu().contiguous().numpy().tobytes())
+            # Numpy-free raw-byte extraction (torch-only environments): reinterpreting a
+            # contiguous CPU tensor as uint8 yields the exact same little-endian bytes as
+            # numpy().tobytes(), so recorded digest values are unchanged.
+            raw = parameter.detach().cpu().contiguous().flatten().view(torch.uint8)
+            digest.update(bytes(raw.tolist()))
         return digest.hexdigest()
 
 
