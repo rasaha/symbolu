@@ -24,6 +24,7 @@ from .config import (
     POSITIONS,
     sub_seed,
 )
+from .execution import require_execution_authorization
 from .identifiers import (
     assert_character_visible,
     assert_collision_free,
@@ -93,17 +94,22 @@ def _lexical_neighbor(rng: random.Random, base: str, edits: int) -> str:
     return "".join(chars)
 
 
-def generate_split(split: str, cohort: str, seed: int, n: int = EXAMPLES_PER_SPLIT) -> list[Example]:
+def generate_split(split: str, cohort: str, seed: int, n: int = EXAMPLES_PER_SPLIT,
+                   token: str | None = None) -> list[Example]:
     if split not in TASK_NAME:
         raise ValueError(f"unknown split: {split}")
     if cohort not in ("seen", "unseen"):
         raise ValueError(f"unknown cohort: {cohort} (use 'seen' or 'unseen')")
+    # Fail-closed: reserved diagnostic seeds cannot generate a cohort without a valid execution
+    # token (there is none) even via this primitive; a direct call cannot bypass the runner's gate.
+    require_execution_authorization(seed, token)
     tokenizer = LexicalTokenizer()
     ds = sub_seed(int(seed), "dataset") * 17 + int(split[1:])
     rng = random.Random(ds)
     # Disjoint master pools (train/final/evidence disjoint by construction); each split takes its
     # own non-overlapping window so splits never share identifiers.
-    master = build_pools(seed, per_split_window=_PER_SPLIT_WINDOW, evidence_window=_EVIDENCE_WINDOW)
+    master = build_pools(seed, per_split_window=_PER_SPLIT_WINDOW, evidence_window=_EVIDENCE_WINDOW,
+                         token=token)
     idx = int(split[1:]) - 1
     base = master["train"] if cohort == "seen" else master["final"]
     pool = base[idx * _PER_SPLIT_WINDOW:(idx + 1) * _PER_SPLIT_WINDOW]

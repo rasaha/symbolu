@@ -14,6 +14,7 @@ from typing import Iterable
 from experiments.single_hop_typed_vs_prose.tokenizer import LexicalTokenizer
 
 from .config import IDENTIFIER_ALPHABET, IDENTIFIER_LENGTH, sub_seed
+from .execution import require_execution_authorization
 
 
 class IdentifierIntegrityError(ValueError):
@@ -38,10 +39,14 @@ def _draw_distinct(rng: random.Random, count: int, used: set[str]) -> tuple[str,
 
 
 def build_pools(seed: int, per_split_window: int = 512, n_splits: int = 8,
-                evidence_window: int = 256) -> dict[str, tuple[str, ...]]:
+                evidence_window: int = 256, token: str | None = None) -> dict[str, tuple[str, ...]]:
     """Build train / final / evidence master pools from ONE rng stream, so the three pools are
     DISJOINT BY CONSTRUCTION (drawn without replacement from a shared `used` set). Each pool is
-    sized to give every split its own disjoint window (`per_split_window` per split)."""
+    sized to give every split its own disjoint window (`per_split_window` per split).
+
+    Fail-closed: reserved diagnostic seeds cannot build a pool without a valid execution token
+    (there is none), so a direct primitive call cannot bypass the runner's gate."""
+    require_execution_authorization(seed, token)
     rng = random.Random(sub_seed(int(seed), "identifier_pools"))
     used: set[str] = set()
     train = _draw_distinct(rng, per_split_window * n_splits, used)
@@ -50,8 +55,11 @@ def build_pools(seed: int, per_split_window: int = 512, n_splits: int = 8,
     return {"train": train, "final": final, "evidence": evidence}
 
 
-def generate_pool(seed: int, cohort: str, size: int) -> tuple[str, ...]:
-    """Convenience: a single distinct pool of `size` identifiers for one named cohort/stream."""
+def generate_pool(seed: int, cohort: str, size: int, token: str | None = None) -> tuple[str, ...]:
+    """Convenience: a single distinct pool of `size` identifiers for one named cohort/stream.
+
+    Fail-closed on reserved seeds (see build_pools)."""
+    require_execution_authorization(seed, token)
     if size <= 0:
         raise IdentifierIntegrityError("pool size must be positive")
     tag = {"train": 1, "development": 2, "final": 3, "evidence": 4}.get(cohort)

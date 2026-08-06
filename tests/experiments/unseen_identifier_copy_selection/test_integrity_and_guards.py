@@ -72,6 +72,23 @@ def test_reserved_seeds_fail_closed():
             build_cohort(seed, "unseen")
 
 
+def test_data_primitives_fail_closed_on_reserved_seeds():
+    # A direct primitive call must NOT bypass the reserved-seed gate (fail-closed guard
+    # strengthening; the runner is not the only enforcement point).
+    from experiments.unseen_identifier_copy_selection.identifiers import build_pools, generate_pool
+    from experiments.unseen_identifier_copy_selection.tasks import generate_split
+    for seed in (9070, 9071, 9072, 9073, 90760, 90761, 90762, 90763, 90764):
+        with pytest.raises(ExecutionNotAuthorized):
+            generate_split("C2", "unseen", seed, n=2)
+        with pytest.raises(ExecutionNotAuthorized):
+            build_pools(seed)
+        with pytest.raises(ExecutionNotAuthorized):
+            generate_pool(seed, "train", 8)
+    # fixture seeds remain ungated
+    generate_split("C2", "unseen", FS, n=2)
+    build_pools(FS)
+
+
 def test_fixture_seed_is_ungated():
     require_execution_authorization(FS)  # must not raise
     cohort = build_cohort(FS, "unseen")
