@@ -128,9 +128,23 @@ def test_missing_keys_rejected():
         validate_authorization_record(incomplete, seed=FS, cohort="unseen")
 
 
-def test_recognized_state_is_only_the_fixture_state():
-    from experiments.unseen_identifier_copy_selection.execution import RECOGNIZED_STATES
-    assert RECOGNIZED_STATES == frozenset({FIXTURE_AUTHORIZATION_STATE})
+def test_all_four_states_recognized_only_fixture_usable_without_artifact():
+    from experiments.unseen_identifier_copy_selection.execution import (
+        DEVELOPMENT_EXECUTION_STATE,
+        FINAL_EXECUTION_STATE,
+        RECOGNIZED_STATES,
+        SCIENTIFIC_STATES,
+        SMOKE_EXECUTION_STATE,
+    )
+    assert RECOGNIZED_STATES == frozenset({
+        FIXTURE_AUTHORIZATION_STATE, SMOKE_EXECUTION_STATE,
+        DEVELOPMENT_EXECUTION_STATE, FINAL_EXECUTION_STATE,
+    })
+    assert SCIENTIFIC_STATES == frozenset({
+        SMOKE_EXECUTION_STATE, DEVELOPMENT_EXECUTION_STATE, FINAL_EXECUTION_STATE,
+    })
+    # recognition is not activation: only the fixture state is usable with no approved artifact
+    assert FIXTURE_AUTHORIZATION_STATE not in SCIENTIFIC_STATES
 
 
 # ---- CLI end-to-end on fixture seeds (data only; no model) ----------------
