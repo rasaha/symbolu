@@ -22,10 +22,20 @@ follow-on unseen-identifier copy/selection probe (draft). Preserves
 - **[UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_PLAN.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_PLAN.md)**
   · **[…_IMPLEMENTATION_AUTHORIZATION.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_AUTHORIZATION.md)**
   · **[…_IMPLEMENTATION_CHECKLIST.md](UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_CHECKLIST.md)** —
-  documentation-only implementation-authorization package: a bounded plan (sibling package importing
-  the frozen recipe; exact file paths; identifier/dataset/serializer/parser/model/metrics/verdict/
-  shortcut/fingerprint contracts; fixture-only test matrix; CI; 18-step lifecycle). Status
-  **`…_IMPLEMENTATION_AUTHORIZATION_DRAFT_READY`** — **no implementation or execution authorized.**
+  documentation-only implementation-authorization package (merged). Implementation delivered in
+  `experiments/unseen_identifier_copy_selection/` (fixture-only; execution not authorized).
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_POST_MERGE_IMPLEMENTATION_AUDIT.md](UNSEEN_IDENTIFIER_COPY_SELECTION_POST_MERGE_IMPLEMENTATION_AUDIT.md)**
+  — independent post-merge implementation-integrity audit (A–P). Verdict
+  **`IMPLEMENTATION_INTEGRITY_CONFIRMED_AFTER_SCOPED_CORRECTIONS`** (fail-closed guard bypass found +
+  fixed in PR #1372; re-audit confirmed on default `773a7c93`).
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_SMOKE_DEV_EXECUTION_PLAN.md](UNSEEN_IDENTIFIER_COPY_SELECTION_SMOKE_DEV_EXECUTION_PLAN.md)**
+  · **[…_SMOKE_DEV_EXECUTION_AUTHORIZATION.md](UNSEEN_IDENTIFIER_COPY_SELECTION_SMOKE_DEV_EXECUTION_AUTHORIZATION.md)**
+  · **[…_SMOKE_DEV_EXECUTION_CHECKLIST.md](UNSEEN_IDENTIFIER_COPY_SELECTION_SMOKE_DEV_EXECUTION_CHECKLIST.md)** —
+  documentation-only smoke/development execution-authorization draft (Decisions 1–12: commands, run
+  matrix, generation order, pre-execution checks, smoke/development gates, shortcut aggregation,
+  evidence/fingerprint contract, failure handling, stopping rules, lifecycle). Status
+  **`SMOKE_DEV_EXECUTION_AUTHORIZATION_DRAFT_READY`** — **no execution authorized; reserved final
+  seeds 90760–90764 prohibited.**
 
 ## Completed: single-hop typed-vs-prose benchmark
 
