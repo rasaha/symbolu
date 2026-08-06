@@ -64,3 +64,45 @@ scoped authorization correction first.
 **Dependency direction:** `identifiers → tasks → serializer/parser → metrics → verdict`; `shortcuts`
 consumes `tasks`+`parser`; `runner`/`manifest` sit at the top and import the frozen recipe. No cycle;
 nothing in this package is imported by the frozen `single_hop_typed_vs_prose` package.
+
+## Decision 3 — Identifier-pool implementation contract
+`identifiers.py` must generate training / development / final / evidence / source / target
+identifiers deterministically. Requirements:
+- **fixed alphabet** (uppercase ASCII letters + digits) and **fixed length** (four characters,
+  per the protocol lock);
+- **deterministic** generation from a domain-separated seed; **collision-free** pools;
+- **no** semantic prefixes and **no** task-correlated shape (opaque);
+- **train / dev / final pools disjoint**; **evidence IDs from a distinct domain-separated pool**;
+- **tokenizer round-trip verified** (each ID re-encodes/decodes exactly; character-visible, e.g. a
+  four-character ID occupies four tokens);
+- **domain-separated sub-seeds** for {identifier pools, dataset generation, initialization, batch
+  order, perturbations, position allocation} — the exact derivation rule is fixed at implementation
+  and mirrors the typed-vs-prose domain-separation discipline.
+
+**Fail-closed checks (raise before any use):** empty/degenerate alphabet · length mismatch ·
+collision detected · train∩final ≠ ∅ · evidence pool overlaps ID pools · tokenizer round-trip
+mismatch · any label/position/answerability/seen-status/relation signal detectable from surface
+form.
+
+**Fixture seeds:** unit fixtures use the reserved testing namespace **`993000–993004`** (mechanically
+verified 0 external mentions) — **never** 9070, 9071–9073, or 90760–90764. Implementation tests must
+**not** partially generate any reserved cohort.
+
+## Decision 4 — Dataset implementation contract
+`tasks.py` exposes a deterministic generator per split (C1–C8) returning examples with metadata (as
+applicable): task name · cohort · base seed · derived sub-seed · source ID · target ID · candidate
+IDs · correct position · evidence ID · seen/unseen classification · tokenizer length · lexical-decoy
+class · expected exact output · expected abstention state · canonical example hash.
+
+Requirements:
+- **balanced position allocation** (first/middle/last) and **balanced answerable/unanswerable**
+  allocation where applicable;
+- **deterministic candidate count** and **deterministic lexical-decoy construction**;
+- **no constant-output leakage into the primary competence score** (C8 abstention reported
+  separately, matching the protocol lock);
+- **exact split counts frozen from the protocol** (fixed at implementation from the locked
+  per-split counts);
+- **no train/final identifier overlap**; **no final-pool generation during implementation** (final
+  cohorts are generated only under a separate reserved-final execution authorization).
+
+Every generator is a pure function of (split, cohort, seed); repeated calls are byte-identical.
