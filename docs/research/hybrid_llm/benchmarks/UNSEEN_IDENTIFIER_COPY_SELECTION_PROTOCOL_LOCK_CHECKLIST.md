@@ -19,6 +19,7 @@ Documentation-only. Pass/fail record for the protocol lock. Maximum permitted st
 | 12 | No intervention added (no candidate-index / constrained decoding / pointer / copy / ranking head / capacity change) | ✅ pass |
 | 13 | Numeric gates frozen (Decision 7) | ✅ pass |
 | 14 | Verdict mapping frozen (Decision 8; none emitted now) | ✅ pass |
+| 14a | Verdict **precedence** frozen — total order, first-match-wins, deterministic on co-occurring failures (Decision 8) | ✅ pass |
 | 15 | Shortcut thresholds frozen (Decision 9; ≤ chance + 0.05) | ✅ pass |
 | 16 | Shortcut precheck required **before** final execution (hard pre-reserved gate) | ✅ pass |
 | 17 | Seed disjointness mechanically confirmed (0 external mentions) | ✅ pass |

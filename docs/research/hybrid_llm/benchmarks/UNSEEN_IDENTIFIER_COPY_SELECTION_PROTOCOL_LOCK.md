@@ -232,6 +232,48 @@ Exactly one primary verdict at a future authorized execution:
 
 **No verdict automatically authorizes an intervention.**
 
+### Verdict precedence (frozen; exactly one primary verdict, first match wins)
+When more than one condition holds, the verdict engine evaluates this **total order top-to-bottom
+and emits the first match**; any lower-priority failure is recorded as a **secondary gate note** in
+the same result but does **not** change the single primary verdict. No implementation may infer the
+primary verdict from report prose.
+
+1. **`UNSEEN_IDENTIFIER_PROTOCOL_VIOLATED`** — any material post-lock deviation, a determinism/
+   integrity failure, **or an unresolved shortcut anomaly that nonetheless reached execution**
+   (the shortcut precheck is a hard pre-reserved gate; a shortcut failure blocks execution, and if
+   execution proceeded regardless that is a protocol violation). Integrity outranks every capability
+   verdict.
+2. **`UNSEEN_IDENTIFIER_RESOURCE_BLOCKED`** — the frozen protocol could not complete within the
+   compute/environment limits (no capability metric is interpretable).
+3. **Copy / generalization base (Axis A C1 + Axis B C6/C7)** — evaluated before selection, evidence,
+   and abstention because copying is prerequisite to all of them:
+   - **`UNSEEN_IDENTIFIER_GENERALIZATION_FAILED`** — C6 (seen) clears its gate but C7 (unseen)
+     fails (copy operation exists but does not generalize);
+   - **`UNSEEN_IDENTIFIER_COPY_CAPABILITY_NOT_FOUND`** — C6 fails **and** C7 fails **and** direct-copy
+     is below gate (no demonstrated copy operation under seen or unseen conditions). Never emitted
+     when C6 (seen) is competent.
+   - **Copy-masks-selection rule:** while direct-copy competence (C1) is below its gate, the engine
+     may **not** emit any selection verdict; the primary verdict is one of the two above.
+4. **`UNSEEN_IDENTIFIER_SELECTION_FAILED`** — C1 clears its gate **and** C2 fails. This is the single
+   primary verdict for the "copy exists, selection not established" outcome;
+   `UNSEEN_IDENTIFIER_COPY_ONLY_PARTIAL` denotes the **same** outcome as a partial-framing synonym
+   and is **not** emitted as a second primary verdict.
+5. **`UNSEEN_IDENTIFIER_EVIDENCE_LOOKUP_FAILED`** — C1 and C2 sufficient **and** C3 fails.
+6. **`UNSEEN_IDENTIFIER_ABSTENTION_GATE_FAILED`** — the copy/selection/evidence ladder is otherwise
+   sufficient **and** C8 fails.
+7. **`UNSEEN_IDENTIFIER_COPY_SELECTION_CONFIRMED`** — every gate (C1–C5, C7-generalization, C8,
+   determinism/protocol/shortcut/compute) passes.
+
+**Worked co-occurrence cases (all deterministic under the order above):**
+- *C1 fails and C8 fails* → primary from step 3 (`COPY_CAPABILITY_NOT_FOUND`, or
+  `GENERALIZATION_FAILED` if C6 is competent); the C8 failure is a secondary note.
+- *C6 passes and C7 fails* → `GENERALIZATION_FAILED` (step 3).
+- *C1 passes and C2 fails* → `SELECTION_FAILED` (step 4).
+- *C1/C2 pass and C3 fails* → `EVIDENCE_LOOKUP_FAILED` (step 5).
+- *shortcut failure* → `PROTOCOL_VIOLATED` / execution blocked (step 1).
+- *protocol deviation* → `PROTOCOL_VIOLATED` (step 1).
+- *resource failure* → `RESOURCE_BLOCKED` (step 2).
+
 ## Decision 9 — Frozen shortcut checks
 Baselines required, each on its relevant split: first-target · last-target · middle-target ·
 most-frequent-target · lexical-similarity · prefix-matching · character-overlap · source–target
