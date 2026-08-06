@@ -66,3 +66,24 @@ source hashes match · **parameter count = 209,728** · scientific seeds still u
 removed or isolated · environment recorded · disk/memory budget sufficient · no training process
 running · no stale checkpoint · no stale run directory · execution-authorization record/token
 present. **Any failure blocks smoke.**
+
+## Decision 5 — Frozen smoke gates (integrity/feasibility, NOT scientific)
+Smoke requires: command completes without infrastructure failure · all C1–C8 cohorts generated ·
+no pool collisions · no train/dev/final contamination · serializer byte stability · manifest
+complete · all required digests present · parser categories operational · checkpoint readable ·
+deterministic replay exact · no reserved-final artifact · no protocol deviation · wall-clock
+projection ≤ frozen budget · shortcut machinery produces valid baselines and chance values.
+**Smoke does NOT require positive model accuracy.**
+
+Smoke outcomes (exactly one): `SMOKE_INTEGRITY_PASS` · `SMOKE_IMPLEMENTATION_DEFECT` ·
+`SMOKE_PROTOCOL_DEVIATION` · `SMOKE_RESOURCE_BLOCKED` · `SMOKE_NONDETERMINISTIC` ·
+`SMOKE_AUTHORIZATION_VIOLATION`. **Only `SMOKE_INTEGRITY_PASS`** may permit a later
+development-execution authorization/continuation, per the frozen lifecycle.
+
+## Decision 10 — Frozen stopping rules
+Stop immediately if: any reserved final seed is touched · source hash differs · parameter count
+differs · protocol digest differs · a shortcut anomaly exceeds its bound · identifier pools overlap ·
+the serializer changes · deterministic replay fails · a manifest is incomplete · an artifact path is
+contaminated · an unauthorized process starts · the wall-clock budget cannot be met · implementation
+code changes during execution. **Do not proceed from smoke to development without
+`SMOKE_INTEGRITY_PASS`. Do not proceed from development to final authorization within this session.**
