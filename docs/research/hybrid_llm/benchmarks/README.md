@@ -26,6 +26,22 @@ follow-on unseen-identifier copy/selection probe (draft). Preserves
   the frozen recipe; exact file paths; identifier/dataset/serializer/parser/model/metrics/verdict/
   shortcut/fingerprint contracts; fixture-only test matrix; CI; 18-step lifecycle). Status
   **`…_IMPLEMENTATION_AUTHORIZATION_DRAFT_READY`** — **no implementation or execution authorized.**
+- **[UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_BLOCKER.md](UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_BLOCKER.md)**
+  — blocker record keeping PR #1373 (smoke/dev execution authorization) unmerged: its frozen commands
+  need an execution interface the merged fixture-only package lacks (no CLI / train / evaluate /
+  replay / manifest entry points), and the shortcut suite implements 8 of the 12 frozen baselines.
+  Verdict **`EXECUTION_INTERFACE_SHORTCUT_COMPLETION_REQUIRED`**.
+- **[UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_AUTHORIZATION.md](UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_AUTHORIZATION.md)**
+  · **[…_IMPLEMENTATION_PLAN.md](UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_IMPLEMENTATION_PLAN.md)**
+  · **[…_CHECKLIST.md](UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_SHORTCUT_CHECKLIST.md)** —
+  documentation-only corrective authorization for completing the execution interface and the four
+  missing shortcut baselines: Decisions 1–12 freezing the exact file set (CLI / `__main__` / training
+  / evaluation / replay / evidence / manifest / shortcut / runner mods), the single-explicit-seed
+  command contract, authorization-record schema, greedy-decode evaluation, deterministic replay,
+  manifest/trace emission, the four missing baselines, aggregation hierarchy, fail-closed rejection,
+  and fixture-only tests/CI. Status
+  **`EXECUTION_INTERFACE_SHORTCUT_COMPLETION_AUTHORIZATION_DRAFT_READY`** — **no implementation or
+  execution authorized; PR #1373 unchanged; reserved final seeds remain prohibited.**
 
 ## Completed: single-hop typed-vs-prose benchmark
 
