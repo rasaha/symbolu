@@ -142,3 +142,34 @@ Training code may be written under a future merged authorization, but **no train
 executed** in this or the authorization-draft session. The bare-identifier grader reuses the existing
 greedy decoder; any decode-length bound must be arm-neutral and unable to truncate a valid
 identifier (pinned at implementation).
+
+## Decision 7 — Metrics and verdict implementation contract
+`metrics.py` provides **pure deterministic** functions: exact-sequence accuracy · token-level
+accuracy · malformed rate · wrong-in-context-ID rate · fabricated-out-of-context-ID rate ·
+abstention accuracy · false-answer rate · first/middle/last accuracy · lexical-decoy degradation ·
+seen-ID accuracy · unseen-ID accuracy · seen−unseen gap · per-seed gate evaluation · 4-of-5
+replication counts.
+
+`verdict.py` implements the merged **verdict precedence exactly** (Decision 8 of the protocol lock:
+first-match-wins total order — `PROTOCOL_VIOLATED` → `RESOURCE_BLOCKED` → copy/generalization base
+(`GENERALIZATION_FAILED` / `COPY_CAPABILITY_NOT_FOUND`, with the copy-masks-selection rule) →
+`SELECTION_FAILED` (`COPY_ONLY_PARTIAL` synonym) → `EVIDENCE_LOOKUP_FAILED` → `ABSTENTION_GATE_FAILED`
+→ `CONFIRMED`). The verdict is computed **mechanically from metrics**, never inferred from report
+prose.
+
+**Required unit tests for every boundary:** exactly equal to threshold · one value below · one value
+above · co-occurring failure modes · protocol violation overriding capability verdicts · resource
+block · shortcut block · C1 failure masking C2 selection interpretation · C6-pass/C7-fail →
+generalization failure · C6/C7-fail → copy-capability-not-found.
+
+## Decision 8 — Shortcut implementation contract
+`shortcuts.py` implements every frozen baseline (first/last/middle target · most-frequent target ·
+lexical-similarity · prefix-match · character-overlap · source–target co-occurrence · seen-ID
+frequency · constant-abstention · output-template leakage · task-label leakage). For each it computes
+**task-specific chance**, the shortcut score, the competence-floor comparison, and a pass/fail status
+(threshold chance + 0.05).
+
+The **shortcut precheck runs before any reserved-final authorization record can be created**; a
+shortcut failure must produce a **blocking artifact** and prevent final execution. The plan requires
+tests proving that **final execution cannot proceed while shortcut status is unresolved** (the runner
+refuses to enter the final phase unless a passing shortcut-precheck artifact exists).
