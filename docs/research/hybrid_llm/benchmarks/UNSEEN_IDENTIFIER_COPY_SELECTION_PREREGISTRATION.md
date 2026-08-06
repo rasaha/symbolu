@@ -1,8 +1,9 @@
-# Unseen-identifier copy & selection probe — preregistration (DRAFT, documentation-only)
+# Unseen-identifier copy & selection probe — preregistration (documentation-only)
 
 **Documentation-only. Nothing here is implemented, generated, trained, executed, or seeded.**
-This is a draft preregistration. Numeric gates are marked `APPROVAL_REQUIRED_BEFORE_EXECUTION`.
-The probe must be implemented, reviewed, protocol-locked, and separately authorized before any run.
+Numeric gates in this preregistration were left `APPROVAL_REQUIRED_BEFORE_EXECUTION`; they are now
+**frozen** in the protocol lock (`UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md`, Decision 7).
+The probe must still be implemented, reviewed, and **separately authorized** before any run.
 
 Always preserved, and untouched by this probe or any future outcome:
 `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·

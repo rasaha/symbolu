@@ -4,14 +4,21 @@ Controlled single-hop typed-structure-vs-flattened-prose relational benchmark (B
 follow-on unseen-identifier copy/selection probe (draft). Preserves
 `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` · `KDA_VALIDATION_BLOCKED`.
 
-## Follow-on: unseen-identifier copy/selection probe (DRAFT, documentation-only, unmerged)
+## Follow-on: unseen-identifier copy/selection diagnostic (documentation-only; implementation NOT authorized)
 - **[UNSEEN_IDENTIFIER_COPY_SELECTION_PREREGISTRATION.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PREREGISTRATION.md)**
   — representation-neutral probe of whether the frozen small recipe can copy/select **unseen**
-  identifiers from context at all (splits C1–C8), testing whether the typed-vs-prose null was
-  floor-limited by a missing base capability. Numeric gates `APPROVAL_REQUIRED_BEFORE_EXECUTION`;
-  proposed disjoint seeds (not consumed); no implementation/execution authorized.
+  identifiers from context at all (splits C1–C8; two orthogonal axes: copy-vs-selection and
+  seen-vs-unseen; iterative-diagnosis rule), testing whether the typed-vs-prose null was
+  floor-limited by a missing base capability. (Merged.)
 - **[UNSEEN_IDENTIFIER_COPY_SELECTION_SHORTCUT_ANALYSIS.md](UNSEEN_IDENTIFIER_COPY_SELECTION_SHORTCUT_ANALYSIS.md)**
   — structure-blind baselines to measure before reserved execution.
+- **[UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md)**
+  · **[…_PROTOCOL_LOCK_CHECKLIST.md](UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK_CHECKLIST.md)** —
+  protocol lock freezing Decisions 1–12 (axes, task/representation/identifier/output contracts,
+  **numeric gates**, verdict mapping, shortcut gates, model recipe reconstructed from merged source,
+  frozen seeds, compute limits, iterative-diagnosis rule). Verdict
+  **`UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCKED`** — implementation and execution **not**
+  authorized.
 
 ## Completed: single-hop typed-vs-prose benchmark
 

@@ -1,10 +1,11 @@
 # Unseen-identifier copy & selection probe — shortcut analysis (DRAFT, documentation-only)
 
 **Documentation-only.** Enumerates the structure-blind baselines that must be measured **before**
-reserved execution and shown to sit at chance on their relevant split (numeric bound
-`APPROVAL_REQUIRED_BEFORE_EXECUTION`, fixed at protocol-lock). Any baseline exceeding
-chance + bound requires investigation **before** reserved execution; the probe is **not** adjusted
-after inspecting reserved results.
+reserved execution and shown to sit at chance on their relevant split. The numeric bound is now
+**frozen at chance + 0.05** in the protocol lock
+(`UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCK.md`, Decision 9), and the shortcut precheck is a
+**hard pre-reserved-execution gate**. Any baseline exceeding chance + 0.05 requires investigation
+**before** reserved execution; the probe is **not** adjusted after inspecting reserved results.
 
 Preserves `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·
 `KDA_VALIDATION_BLOCKED`.
