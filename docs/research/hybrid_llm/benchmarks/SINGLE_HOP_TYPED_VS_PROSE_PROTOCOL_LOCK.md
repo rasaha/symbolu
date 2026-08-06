@@ -1,64 +1,174 @@
 # Single-hop typed-vs-prose benchmark — protocol lock
 
-**Documentation-only. Nothing here is implemented, generated, trained, executed, or seeded.** Protocol
-completion is not implementation or execution authorization. Always preserves:
-`ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·
-`KDA_VALIDATION_BLOCKED`.
+**Documentation-only. Nothing here is implemented, generated, trained, executed, or seeded.**
 
-## Protocol-lock status
+**State:** `PROTOCOL_LOCKED_IMPLEMENTATION_NOT_AUTHORIZED`
 
-**Actual state: `PROTOCOL_LOCKED_IMPLEMENTATION_NOT_AUTHORIZED`.** All six protocol decisions are frozen.
-The protocol verdict is **`TYPED_VS_PROSE_PROTOCOL_LOCKED`**.
+**Protocol verdict:** `TYPED_VS_PROSE_PROTOCOL_LOCKED`
 
 Meaning: the controlled single-hop typed-versus-prose benchmark protocol is fully specified. Implementation
 and execution remain unauthorized.
 
-The sole scientific question remains:
+Standing invariants remain unchanged:
+
+- `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED`
+- `E1_TEMPORAL_TRANSFER_PARTIAL`
+- `KDA_VALIDATION_BLOCKED`
+
+The sole scientific question is:
 
 > Does typed entity, relation, and evidence representation materially improve controlled single-hop
 > relational reasoning relative to an information-equivalent flattened-prose representation?
 
-There are exactly two primary arms: B0 canonical flattened prose and B1 typed structured input. Every pair is
-derived from one canonical fact graph. The fact graph, query, candidate order, output contract, model,
-initialization, optimizer, update count, evaluator, metrics, and gates are shared. Input representation is the
-only arm-level variable.
+There are exactly two primary arms:
+
+- **B0:** one frozen deterministic grammatical-prose serialization;
+- **B1:** one frozen deterministic typed JSON serialization.
+
+Every pair is derived from one canonical fact graph. The graph, query semantics, candidate presentation order,
+answer contract, model, initialization, optimizer, update count, evaluator, metrics, and gates are shared.
+Only input representation differs.
 
 ---
 
-## Decision 1 — Frozen B0 prose serializer
+## Canonical fact graph and mechanical equivalence
 
-One exact canonical serializer. B0 presents every underlying fact as grammatical natural-language prose,
-generated mechanically from the canonical fact set. No tables, JSON, YAML, XML, key-value blocks, field
-labels, answer labels, evaluator-only metadata, paraphrase search, serializer search, arm-specific prompting,
-or post-lock serializer change are permitted. Relation names carry the same semantic content as the B1
-relation type and no additional hint.
+Each episode contains:
 
-**Deterministic sentence order:** (1) tenant context · (2) query entity · (3) candidate entities ·
-(4) relation statements · (5) evidence statements · (6) explicit absence statements where required.
+- one authorized tenant;
+- one query operation;
+- candidate entities and attributes;
+- direct relation claims;
+- evidence records;
+- explicit closed-world absence facts where applicable;
+- one deterministic seeded `presentation_order` shared by B0 and B1.
 
-**Frozen sentence grammar:**
+No task requires more than one relation hop. Strings are Unicode NFC and restricted to line feed plus printable
+ASCII. Identifiers are case-sensitive. Attribute keys are ascending. Candidate target position is balanced
+within each domain/split and never fixed.
 
-- Tenant: `Within tenant {TENANT}, the following records are authorized.`
-- Query: `The question concerns {ENTITY_TYPE} {ENTITY_ID}.`
-- Candidate entity: `{ENTITY_TYPE} {ENTITY_ID} is a {ENTITY_TYPE} with {ATTR_KEY} {ATTR_VAL}{, ATTR_KEY ATTR_VAL}.`
-- Relation: `{SRC_TYPE} {SRC_ID} is associated with {TGT_TYPE} {TGT_ID} through the relation "{RELATION_PHRASE}".`
-- Evidence: `Evidence reference {EVIDENCE_REF} supports the relation between {SRC_TYPE} {SRC_ID} and {TGT_TYPE} {TGT_ID}.`
-- Missing relation: `No relation of type "{RELATION_PHRASE}" is recorded for {ENTITY_TYPE} {ENTITY_ID}.`
-- Cross-tenant entity: `{ENTITY_TYPE} {ENTITY_ID} belongs to tenant {OTHER_TENANT} and is not authorized for tenant {TENANT}.`
-- Invalid relation evidence: `Evidence reference {EVIDENCE_REF} contradicts the relation between {SRC_TYPE} {SRC_ID} and {TGT_TYPE} {TGT_ID}.`
-- Conflicting evidence: emit one support sentence and one contradiction sentence, each carrying its own evidence reference.
-- Duplicate names: use the ordinary candidate sentence for each entity; disambiguation is only by entity ID and attributes.
+For every pair, compute:
 
-Entity order is the frozen seeded `presentation_order`, shared across arms. Relation order is the matching
-shared order; evidence order is the matching shared order. Attribute keys are ascending. Strings are
-lowercase except opaque IDs and literal values. There is one ASCII space between tokens and sentences; every
-sentence ends in `.`. Candidate target position is cohort-balanced and never fixed.
+1. `fact_set_sha256` over canonical key-sorted JSON with presentation order removed;
+2. `presentation_sha256` over the same graph with presentation order retained.
+
+B0 must round-trip through the frozen prose parser and B1 through the frozen JSON parser to the same graph.
+Both digests must match. Any mismatch fails closed before model exposure.
 
 ---
 
-## Decision 2 — Frozen B1 typed schema
+## Decision 1 — frozen B0 prose serializer
 
-One deterministic JSON-compatible representation with exactly these top-level fields, in this order:
+B0 is one paragraph of grammatical prose. Sentences occur in exactly this order:
+
+1. tenant context;
+2. query;
+3. candidate entities;
+4. relation claims;
+5. evidence records;
+6. missing-relation statements, when applicable.
+
+Sentences are separated by one ASCII space and end with a period. There is one serializer only. JSON, YAML,
+XML, tables, key-value blocks, headings, answer labels, evaluator metadata, arm markers, paraphrase search,
+serializer search, punctuation search, sentence-order search, arm-specific prompts, and post-development
+serializer changes are prohibited.
+
+`Q(x)` means normalized value `x` inside ASCII quotation marks. Embedded quotation marks and backslashes use
+standard escaping. Frozen relation phrases are the space-separated forms of the corresponding B1 relation
+types; the canonical parser maps both to the same relation symbol.
+
+### Exact B0 templates
+
+Tenant context:
+
+```text
+Within tenant Q(tenant_id), the following records form the complete authorized working set.
+```
+
+Entity-selection query with name and attributes:
+
+```text
+The question asks which candidate ENTITY_TYPE is named Q(display_name) and has ATTRIBUTE_CLAUSES.
+```
+
+If the name is absent, omit `is named ... and `. If attributes are absent:
+
+```text
+The question asks which candidate ENTITY_TYPE has the requested identity.
+```
+
+Relation-target query:
+
+```text
+The question asks which TARGET_TYPE is linked from SOURCE_TYPE Q(source_id) through relation Q(relation_phrase); if no such authorized relation is recorded, report insufficient evidence.
+```
+
+Relation-validity query:
+
+```text
+The question asks whether relation claim Q(relation_id) is supported by admissible evidence.
+```
+
+Evidence-selection query:
+
+```text
+The question asks which evidence reference admissibly supports relation claim Q(relation_id).
+```
+
+Candidate entity with name and attributes:
+
+```text
+Candidate ENTITY_TYPE Q(entity_id) is named Q(display_name), belongs to tenant Q(tenant_id), and has ATTRIBUTE_CLAUSES.
+```
+
+Without a name, omit `is named ... , `. Without attributes, replace the final clause with
+`and has no listed attributes`. One attribute clause is:
+
+```text
+attribute Q(attribute_name) equal to Q(attribute_value)
+```
+
+Two clauses use `CLAUSE_1 and CLAUSE_2`. Three or more use comma separation and `and` before the final clause.
+Duplicate names use the ordinary template without an added hint. Cross-tenant entities retain their actual
+tenant.
+
+Relation claim:
+
+```text
+Relation claim Q(relation_id) states that relation Q(relation_phrase) links SOURCE_TYPE Q(source_id) to TARGET_TYPE Q(target_id) within tenant Q(tenant_id).
+```
+
+Supporting evidence:
+
+```text
+Evidence reference Q(evidence_ref) for relation claim Q(relation_id) is admissible, supports the claim, has text Q(text), and belongs to tenant Q(tenant_id).
+```
+
+Contradicting evidence:
+
+```text
+Evidence reference Q(evidence_ref) for relation claim Q(relation_id) is admissible, contradicts the claim, has text Q(text), and belongs to tenant Q(tenant_id).
+```
+
+Inadmissible evidence replaces `is admissible` with `is inadmissible`. Conflicts are represented by at least
+one admissible support sentence and one admissible contradiction sentence. B0 never serializes the final words
+`valid`, `invalid`, `conflict`, `correct`, or `answer` as a label.
+
+Missing relation:
+
+```text
+No authorized relation claim of type Q(relation_phrase) starts from SOURCE_TYPE Q(source_id).
+```
+
+Entities, relations, and evidence follow the shared seeded `presentation_order`; attributes remain ascending.
+Single spaces and terminal periods are frozen.
+
+---
+
+## Decision 2 — frozen B1 typed schema
+
+B1 is one minified RFC 8259 JSON object using UTF-8 and Unicode NFC, with no indentation or trailing newline.
+Top-level fields are exactly these, in this order:
 
 ```json
 {
@@ -70,66 +180,87 @@ One deterministic JSON-compatible representation with exactly these top-level fi
 }
 ```
 
-B1 is minified RFC 8259 JSON, UTF-8, Unicode NFC, with no indentation or trailing newline. Arrays use the same
-seeded `presentation_order` as B0. Attribute keys are ascending. No answer, expected, gold, correctness,
-validity-result, evaluator-only ID, split, seed, target-rank, or arm-marker field is permitted.
+No additional top-level field is permitted. Arrays follow the same seeded `presentation_order` as B0.
+No answer, expected, gold, correctness, validity-result, evaluator-only ID, split, seed, target-rank, arm
+marker, or hidden schema hint is permitted.
 
-The frozen object shapes are:
+### Query object
+
+Keys occur in this order:
 
 ```json
 {
-  "tenant_id": "t01",
-  "query": {
-    "operation": "select_relation_target",
-    "entity_type": "invoice",
-    "entity_id": "i991",
-    "relation_type": "belongs_to_contract",
-    "candidate_entity_ids": ["c882", "c883"],
-    "closed_world": true,
-    "abstain_when_missing": true
-  },
-  "entities": [
-    {
-      "entity_type": "invoice",
-      "entity_id": "i991",
-      "display_name": null,
-      "attributes": {"amount": "4200"},
-      "tenant_id": "t01"
-    }
-  ],
-  "relations": [
-    {
-      "relation_id": "r17",
-      "relation_type": "belongs_to_contract",
-      "source_entity_type": "invoice",
-      "source_entity_id": "i991",
-      "target_entity_type": "contract",
-      "target_entity_id": "c882",
-      "evidence_refs": ["e17"],
-      "tenant_id": "t01"
-    }
-  ],
-  "evidence": [
-    {
-      "evidence_ref": "e17",
-      "relation_id": "r17",
-      "stance": "supports",
-      "admissible": true,
-      "text": "signed contract reference c882",
-      "tenant_id": "t01"
-    }
-  ]
+  "operation": "select_entity",
+  "entity_type": "vendor",
+  "entity_id": null,
+  "display_name": "atlas",
+  "attributes": {"suffix":"42"},
+  "relation_type": null,
+  "relation_id": null,
+  "target_entity_type": null,
+  "candidate_entity_ids": ["v101","v102"],
+  "closed_world": true,
+  "abstain_when_missing": false
 }
 ```
 
-Allowed query operations are exactly `select_entity`, `select_relation_target`, `validate_relation`, and
-`select_evidence`. Unused scalar fields are null and unused arrays are empty. Missing relations are expressed
-by an absent matching relation plus `closed_world=true`; invalid and conflicting relations are expressed by
-evidence stance and admissibility, never by a serialized final-answer field.
+Allowed operations are exactly `select_entity`, `select_relation_target`, `validate_relation`, and
+`select_evidence`. Unused scalar fields are null and unused objects/arrays are empty. `closed_world` is always
+true. For relation-target queries, `abstain_when_missing` is true; otherwise it is false. The B0 tenant and
+query sentences carry the same semantics.
+
+### Entity object
+
+```json
+{
+  "entity_type": "vendor",
+  "entity_id": "v102",
+  "display_name": "atlas",
+  "attributes": {"suffix":"42"},
+  "tenant_id": "t01"
+}
+```
+
+`display_name` is null when absent. Duplicate names remain duplicate strings. Cross-tenant entities retain
+their actual tenant.
+
+### Relation object
+
+```json
+{
+  "relation_id": "r17",
+  "relation_type": "belongs_to_contract",
+  "source_entity_type": "invoice",
+  "source_entity_id": "i991",
+  "target_entity_type": "contract",
+  "target_entity_id": "c882",
+  "evidence_refs": ["e17"],
+  "tenant_id": "t01"
+}
+```
+
+A relation object states a claim and contains no final validity or correctness field.
+
+### Evidence object
+
+```json
+{
+  "evidence_ref": "e17",
+  "relation_id": "r17",
+  "stance": "supports",
+  "admissible": true,
+  "text": "signed contract reference c882",
+  "tenant_id": "t01"
+}
+```
+
+Allowed stances are `supports` and `contradicts`. Missing relations are represented by absence of a matching
+relation under `closed_world=true`; conflicts are represented by admissible support and contradiction. No
+final answer is serialized.
 
 ### Shared output contract
 
-Both arms use the same output serializer, parser, and evaluator:
+Both arms use one identical output serializer, parser, and evaluator:
 
 ```json
 {
@@ -143,32 +274,28 @@ Both arms use the same output serializer, parser, and evaluator:
 }
 ```
 
-`relation_supported` is true, false, or null. `reason_code` is one of `ENTITY_MATCH`, `RELATION_FOUND`,
-`RELATION_SUPPORTED`, `RELATION_UNSUPPORTED`, `EVIDENCE_FOUND`, `RELATION_MISSING`, `TENANT_REJECTED`, or
+`relation_supported` is true, false, or null. Allowed reason codes are `ENTITY_MATCH`, `RELATION_FOUND`,
+`RELATION_SUPPORTED`, `RELATION_UNSUPPORTED`, `EVIDENCE_FOUND`, `RELATION_MISSING`, `TENANT_REJECTED`, and
 `CONFLICTING_EVIDENCE`. No arm-specific post-processing is allowed.
 
 ---
 
-## Decision 3 — Frozen numeric gates and verdict mapping
+## Decision 3 — frozen numeric gates and verdict mapping
 
-**Primary score** is the unweighted macro-average of S1 exact-entity accuracy, S2 foreign-key accuracy, S3
+Primary score is the unweighted macro-average of S1 exact-entity accuracy, S2 direct-target accuracy, S3
 relation-validity accuracy, S5 evidence-reference F1, and S6 missing-relation abstention accuracy.
 
-### `TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_VALIDATED` — all required
+### Validated advantage — all required
 
-1. B1 final-seed mean primary ≥ **0.80**.
-2. B1 minus B0 final-seed mean primary improvement ≥ **0.08** absolute.
-3. At least **4 of 5** final seeds each satisfy B1 primary ≥ **0.75** and improvement ≥ **0.05**.
-4. B1 per-split final means: S1 ≥ **0.85** · S2 ≥ **0.85** · S3 ≥ **0.80** · S5 precision ≥ **0.90** ·
+1. B1 five-seed mean primary score ≥ **0.80**.
+2. Mean absolute improvement `(B1-B0)` ≥ **0.08**.
+3. At least **4 of 5** final seeds each have B1 primary ≥ **0.75** and improvement ≥ **0.05**.
+4. B1 final means: S1 ≥ **0.85** · S2 ≥ **0.85** · S3 ≥ **0.80** · S5 precision ≥ **0.90** ·
    S5 recall ≥ **0.90** · S6 abstention ≥ **0.90**.
-5. S7 unauthorized cross-tenant inclusion = **0** for every final example and seed.
-6. S8 stable-direct accuracy ≥ **0.90**.
-7. B1 S8 regression versus B0 is no worse than **-0.02** absolute.
-8. Information-equivalence passes for **100%** of pairs.
-9. Deterministic replay, shortcut/leakage, causal, evidence, and compute gates all pass.
-10. No protocol deviation occurs.
-
-### Other outcome rules
+5. S7 unauthorized inclusion = **0** for every example and seed.
+6. S8 stable-direct accuracy ≥ **0.90** and B1 regression versus B0 no worse than **-0.02**.
+7. Every causal, shortcut, equivalence, determinism, evidence, and compute gate passes.
+8. No protocol deviation occurs.
 
 `TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_PARTIAL` requires no protocol, tenant, or evidence-integrity hard
 failure; B1 mean primary ≥ **0.75**; mean improvement ≥ **0.04**; and at least **3 of 5** seeds improve by
@@ -179,16 +306,17 @@ can never be partial.
 < **0.75**, mean improvement is < **0.04**, or fewer than **3 of 5** seeds improve by ≥ **0.03**.
 
 Use `TYPED_STRUCTURE_SINGLE_HOP_CAUSAL_GATE_FAILED` when endpoint gates are otherwise sufficient but any
-mandatory causal gate fails; `..._EVIDENCE_GATE_FAILED` when evidence precision or recall is below **0.90**,
-evidence permutation lacks the required causal response, or unsupported evidence is emitted;
-`..._TENANT_GATE_FAILED` for any unauthorized cross-tenant inclusion; `..._PROTOCOL_VIOLATED` for a material
-post-lock deviation; and `..._RESOURCE_BLOCKED` when the frozen protocol cannot complete within its resource
+mandatory causal gate fails; `TYPED_STRUCTURE_SINGLE_HOP_EVIDENCE_GATE_FAILED` when evidence precision or
+recall is below **0.90**, evidence permutation lacks the required response, or unsupported evidence is emitted;
+`TYPED_STRUCTURE_SINGLE_HOP_TENANT_GATE_FAILED` for any unauthorized cross-tenant inclusion;
+`TYPED_STRUCTURE_SINGLE_HOP_PROTOCOL_VIOLATED` for a material post-lock deviation; and
+`TYPED_STRUCTURE_SINGLE_HOP_RESOURCE_BLOCKED` when the frozen protocol cannot complete within its resource
 limit.
 
 ### Mandatory causal gates
 
 - A1 identity permutation: relevant B1 endpoint declines ≥ **0.20** versus clean and selection follows the represented identity.
-- A2 relation-target permutation: B1 target/relation accuracy declines ≥ **0.20**, or the corrupted relation is correctly rejected.
+- A2 relation-target permutation: B1 target/relation endpoint declines ≥ **0.20**, or the corrupted claim is correctly rejected.
 - A3 relation removal: abstention ≥ **0.90** and unsupported-answer rate ≤ **0.05**.
 - A4 evidence permutation: evidence F1 declines ≥ **0.20**; original evidence is not fabricated; unsupported evidence emission = **0**.
 - A5 cross-tenant substitution: unauthorized inclusion = **0** and out-of-tenant target selection = **0**.
@@ -196,25 +324,29 @@ limit.
 
 Shortcut baselines are lexical overlap, first record, last record, entity frequency, relation-type frequency,
 evidence position, fixed output position, and tenant-blind semantic similarity. Each must be ≤ `chance+0.05`,
-below the corresponding learned competence floor, and incapable of satisfying the validated outcome.
+below the corresponding learned competence floor, and incapable of satisfying a validated result.
 
 ---
 
-## Decision 4 — Input-budget fairness
+## Decision 4 — input-budget fairness
 
-B0 and B1 carry the complete identical fact set. Common maximum input length is **512 tokenizer tokens**.
-There is no truncation in a primary example. If either serialization exceeds 512, reject the canonical graph
-and deterministically generate the next episode; never remove a record from one arm. Both arms receive the
-same output-token allowance. Report B0 token count, B1 token count, absolute difference, ratio, entity count,
-relation count, and evidence count. Do not pad the shorter arm and do not infer efficiency superiority.
+The selected model uses a shared character tokenizer. The complete B0 and B1 inputs therefore have a common
+maximum of **2048 tokenizer tokens**, and the full input-plus-output sequence has `max_seq=2304`. There is no
+truncation in any primary example.
 
-A preregistered sensitivity subset contains pairs whose token counts differ by ≤ **10%**. Report the complete
-information-equivalent cohort as primary and the ≤10% subset as sensitivity. The subset cannot override a
-failed primary verdict.
+Generate both serializations before admission. If either exceeds 2048, reject the canonical graph and
+deterministically generate the next episode identifier. Never remove a record from one arm. Both arms receive
+the same 256-token output allowance. Report B0 and B1 token counts, absolute difference, ratio, and entity,
+relation, and evidence counts. Do not pad the shorter arm and do not infer efficiency superiority.
+
+A preregistered sensitivity subset contains pairs whose B0/B1 token counts differ by ≤ **10%**. Report the
+complete information-equivalent cohort as primary and the sensitivity subset separately. The subset cannot
+override a failed primary verdict. If a split has fewer than 100 sensitivity pairs per final seed, report that
+split as sensitivity-insufficient rather than changing the serializer or density.
 
 ---
 
-## Decision 5 — Frozen model and compute recipe
+## Decision 5 — frozen model and training recipe
 
 The selected existing non-memory model is the repository's clean standard-softmax baseline:
 
@@ -235,25 +367,25 @@ trainer.py   e5ffbe5f49c8e7700ed7acaf0f23c623cf0570b5
 generate.py  e70af50f193f2afa7c530df699045a0b97498e59
 ```
 
-This is a from-scratch causal scaled-dot-product softmax transformer with a tied vocabulary head. In the
+This is a from-scratch causal scaled-dot-product softmax transformer with one tied vocabulary head. In the
 `baseline` ablation, typed heads, entropy refinement, memory, recurrent controls, extra blocks, Phase,
-BindingSlots, E1 memory, and bounded quadratic/event readers are disabled. B0 and B1 use the same tokenizer,
-input channel, architecture, vocabulary head, parameter count, and greedy decoder. The shared output contract
-is generated as ordinary minified text through that existing head; no typed-only encoder or model head is
-introduced.
+BindingSlots, E1 memory, and bounded event/quadratic readers are disabled. B0 and B1 use the same tokenizer,
+input channel, architecture, head, parameter count, initialization policy, and greedy decoder. The shared
+output contract is generated as ordinary minified text through the existing vocabulary head; no typed-only
+encoder or arm-specific model component is introduced.
 
 Frozen configuration:
 
 ```text
-d_model                 = 128
+d_model                 = 64
 n_layers                 = 2
 n_heads                  = 4
-d_ff                     = 512
-max_seq                  = 768
-input_cap                = 512 character tokens
+d_ff                     = 256
+max_seq                  = 2304
+input_cap                = 2048 character tokens
 maximum_output_tokens    = 256 character tokens
 dropout                  = 0.0
-tokenizer                 = shared CharTokenizer vocabulary over the union of authorized B0/B1 training text and output symbols
+tokenizer                 = one shared CharTokenizer vocabulary over the union of authorized B0/B1 training text and output symbols
 optimizer                 = AdamW
 learning_rate             = 0.003
 weight_decay              = 0.01
@@ -261,39 +393,39 @@ gradient_clip_norm        = 1.0
 scheduler                 = none
 training_steps            = 1200 per development/final arm-run
 smoke_steps               = 100 per arm
-effective_batch_size      = 24 paired episode sequences
+effective_batch_size      = 16 episode sequences
 checkpoint_selection      = final step only
 early_stopping            = disabled
 decoding                  = greedy argmax, temperature 0
 ```
 
-Each training sequence is `INPUT`, one newline, `Answer:`, the canonical minified output JSON, and one final
-newline. The later benchmark harness must mask input characters from the supervised loss and apply ordinary
-next-character cross-entropy only to `Answer:` plus output characters. Paired B0/B1 runs begin from
-byte-identical model state, use identical episode and batch order, and differ only in serialized input.
-Initial-state, vocabulary, episode-order, and batch-order hashes must match.
+Each training sequence is `INPUT`, one newline, `Answer:`, canonical minified output JSON, and one final
+newline. The future harness masks input characters and applies ordinary next-character cross-entropy only to
+`Answer:` plus output characters. Paired B0/B1 runs begin from byte-identical state, use identical episode and
+batch order, and differ only in serialized input. Initial-state, vocabulary, episode-order, and batch-order
+hashes must match.
 
-The model itself is already present and requires no architecture or source change. A benchmark-specific paired
-data generator, loss mask, parser, evaluator, and report harness do not yet exist; creating them is a later
-implementation activity and is explicitly unauthorized by this PR. If the source-locked model cannot be
-instantiated as specified, emit `PROTOCOL_LOCK_BLOCKED_MODEL_RECIPE` rather than substituting another model.
+The model already exists and requires no architecture or source change. A paired generator, loss mask, parser,
+evaluator, and report harness do not yet exist; creating them is later implementation work and is unauthorized
+here. If the source-locked model cannot be instantiated as specified, emit
+`PROTOCOL_LOCK_BLOCKED_MODEL_RECIPE` rather than substituting another model.
 
 ---
 
-## Decision 6 — Seeds, episode counts, distractor density, compute, and ordering
+## Decision 6 — seeds, counts, distractor density, compute, and ordering
 
-Mechanically re-check seed disjointness immediately before any later implementation. The frozen roles are:
+Frozen seed roles:
 
-- smoke seed **76** — implementation correctness, parsing, determinism, and feasibility only; never contributes to a verdict;
-- development seeds **760–762** — paired implementation verification; no serializer, schema, gate, model, or recipe tuning;
-- reserved final seeds **7160–7164** — paired final runs only after a separate execution authorization.
+- smoke **76** — shapes, parsing, determinism, and feasibility only; never contributes to a verdict;
+- development **760–762** — paired implementation verification; no serializer, schema, gate, model, or recipe tuning;
+- reserved final **7160–7164** — paired final runs only after separate final-execution authorization.
 
-Sub-seeds use `seed*1_000_003 + DOMAIN_ID*97 + 13`, with `DOMAIN_ID={dataset:0, init:1, batch:2, perturb:3}`.
-No reserved final seed may be opened, generated, executed, or inspected before the protocol lock is merged,
-implementation is separately authorized and audited, tests pass, and a final-execution authorization record
-is merged.
+Recheck repository-wide disjointness before implementation. Sub-seeds use
+`seed*1_000_003 + DOMAIN_ID*97 + 13`, with `DOMAIN_ID={dataset:0, init:1, batch:2, perturb:3}`. No final seed
+may be opened, generated, executed, or inspected before the protocol lock is merged, implementation is
+separately authorized and audited, tests pass, and a final-execution authorization record is merged.
 
-Six domains are frozen: procurement, hiring, cybersecurity, customer support, compliance, and agent
+Six domains are fixed: procurement, hiring, cybersecurity, customer support, compliance, and agent
 governance.
 
 Episode counts:
@@ -306,27 +438,28 @@ Episode counts:
 | Training corpus | 12,000 total: 250 per domain and split |
 
 For each development and final seed, each A1–A6 ablation contains 100 transformed episodes per domain and
-never retrains the model. Train, development, and final identity pools are mutually disjoint.
+does not retrain the model. Train, development, and final identity pools are mutually disjoint.
 
-S1–S7 use six candidate entities, four relation claims, and four evidence records: one query-relevant
-in-tenant item where applicable, three plausible in-tenant distractors, and two cross-tenant entity decoys.
-S6 has no query-relevant direct relation. S8 uses three entities, two relations, and two evidence records. S1
-contains at least two duplicate names; S3 balances valid, invalid, conflict, and missing; S4 includes at least
-three high-overlap candidates; S5 contains one authoritative admissible support record; S7 includes at least
-two highly similar cross-tenant candidates. Target position is balanced per domain and split.
+S1–S7 use four candidate entities, two relation claims, and two evidence records where the split supports all
+three classes. Default composition is one query-relevant in-tenant item where applicable, one plausible
+in-tenant distractor, and two cross-tenant or content-similar decoys selected by the split. S6 has no matching
+direct relation. S8 uses three entities, one relation, and one evidence record. S1 contains duplicate names;
+S3 balances valid, invalid, conflict, and missing; S4 contains at least three high-overlap candidates; S5 has
+one authoritative admissible support record; S7 has at least two highly similar cross-tenant candidates.
+Target position is balanced per domain and split. Every admitted pair must fit the frozen 2048-token cap.
 
 Compute limits:
 
 ```text
-serializer candidates       = 1
-schema candidates           = 1
-model/training recipes      = 1
-maximum training steps      = 2000 per arm-run
-maximum arm-runs            = 18
-maximum aggregate steps     = 36000
-maximum wall-clock          = 24 hours
-selective seed restarts     = forbidden
-post-result budget extension= forbidden
+serializer candidates        = 1
+schema candidates            = 1
+model/training recipes       = 1
+maximum training steps       = 2000 per arm-run
+maximum arm-runs             = 18
+maximum aggregate steps      = 36000
+maximum wall-clock           = 24 hours
+selective seed restarts      = forbidden
+post-result budget extension = forbidden
 ```
 
 Protocol order is fixed: preregistration merged · protocol lock committed · protocol lock audited · protocol
@@ -336,124 +469,125 @@ audit. This PR authorizes none of the steps after protocol locking.
 
 ---
 
-## Information-equivalence and determinism locks
-
-A mechanical verifier canonicalizes both arms back into the same fact graph. It requires equality of tenant,
-query, entities, types, IDs, attributes, relations, source and target IDs, relation types, evidence references,
-missing relations, conflict states, and expected output type. Emit `B0_fact_hash` and `B1_fact_hash`; require
-equality for 100% of pairs and fail closed otherwise. The verifier ignores representation syntax and no
-semantic field.
-
-Later implementation must prove byte-identical repeated generation and serialization under the same seed;
-matching paired model-init and data-order hashes; stable fact-set hashes; reproducible evaluator output; and
-recorded source, config, dataset, environment, and checkpoint hashes.
-
-No unresolved scientific placeholder remains. Future implementation commit, dataset, checkpoint, and
-environment identifiers are `NOT_YET_CREATED — DOES_NOT_AUTHORIZE_EXECUTION`.
-
----
-
 ## Paired examples covering S1–S8 and A1–A6
 
-Evaluator answers below are explanatory only and are never serialized into either input.
+Evaluator answers are explanatory only and are never serialized.
 
 ### S1 — exact entity identity with duplicate names
 
-B0: `Within tenant t01, the following records are authorized. The question concerns vendor query-1. vendor v101 is a vendor with name atlas, suffix 17. vendor v102 is a vendor with name atlas, suffix 42.`
+B0:
 
-B1: `{"tenant_id":"t01","query":{"operation":"select_entity","entity_type":"vendor","entity_id":"query-1","relation_type":null,"candidate_entity_ids":["v101","v102"],"closed_world":true,"abstain_when_missing":false},"entities":[{"entity_type":"vendor","entity_id":"v101","display_name":"atlas","attributes":{"suffix":"17"},"tenant_id":"t01"},{"entity_type":"vendor","entity_id":"v102","display_name":"atlas","attributes":{"suffix":"42"},"tenant_id":"t01"}],"relations":[],"evidence":[]}`
+```text
+Within tenant "t01", the following records form the complete authorized working set. The question asks which candidate vendor is named "atlas" and has attribute "suffix" equal to "42". Candidate vendor "v101" is named "atlas", belongs to tenant "t01", and has attribute "suffix" equal to "17". Candidate vendor "v102" is named "atlas", belongs to tenant "t01", and has attribute "suffix" equal to "42".
+```
 
-Evaluator: select `v102` from the query fixture requiring suffix 42.
+B1:
+
+```json
+{"tenant_id":"t01","query":{"operation":"select_entity","entity_type":"vendor","entity_id":null,"display_name":"atlas","attributes":{"suffix":"42"},"relation_type":null,"relation_id":null,"target_entity_type":null,"candidate_entity_ids":["v101","v102"],"closed_world":true,"abstain_when_missing":false},"entities":[{"entity_type":"vendor","entity_id":"v101","display_name":"atlas","attributes":{"suffix":"17"},"tenant_id":"t01"},{"entity_type":"vendor","entity_id":"v102","display_name":"atlas","attributes":{"suffix":"42"},"tenant_id":"t01"}],"relations":[],"evidence":[]}
+```
+
+Evaluator: `selected_entity_id=v102`.
 
 ### S2 — direct foreign-key target
 
-B0: `Within tenant t01, the following records are authorized. The question concerns invoice i991. invoice i991 is a invoice with amount 4200. contract c882 is a contract with status active. invoice i991 is associated with contract c882 through the relation "belongs to contract". Evidence reference e17 supports the relation between invoice i991 and contract c882.`
+B0:
 
-B1 uses the Decision-2 canonical object with invoice `i991`, contract `c882`, relation `r17`, and evidence `e17`.
+```text
+Within tenant "t01", the following records form the complete authorized working set. The question asks which contract is linked from invoice "i991" through relation "belongs to contract"; if no such authorized relation is recorded, report insufficient evidence. Candidate invoice "i991" belongs to tenant "t01", and has attribute "amount" equal to "4200". Candidate contract "c882" belongs to tenant "t01", and has attribute "status" equal to "active". Relation claim "r17" states that relation "belongs to contract" links invoice "i991" to contract "c882" within tenant "t01". Evidence reference "e17" for relation claim "r17" is admissible, supports the claim, has text "signed contract reference c882", and belongs to tenant "t01".
+```
 
-Evaluator: target `c882`.
+B1:
+
+```json
+{"tenant_id":"t01","query":{"operation":"select_relation_target","entity_type":"invoice","entity_id":"i991","display_name":null,"attributes":{},"relation_type":"belongs_to_contract","relation_id":null,"target_entity_type":"contract","candidate_entity_ids":["c882"],"closed_world":true,"abstain_when_missing":true},"entities":[{"entity_type":"invoice","entity_id":"i991","display_name":null,"attributes":{"amount":"4200"},"tenant_id":"t01"},{"entity_type":"contract","entity_id":"c882","display_name":null,"attributes":{"status":"active"},"tenant_id":"t01"}],"relations":[{"relation_id":"r17","relation_type":"belongs_to_contract","source_entity_type":"invoice","source_entity_id":"i991","target_entity_type":"contract","target_entity_id":"c882","evidence_refs":["e17"],"tenant_id":"t01"}],"evidence":[{"evidence_ref":"e17","relation_id":"r17","stance":"supports","admissible":true,"text":"signed contract reference c882","tenant_id":"t01"}]}
+```
+
+Evaluator: `selected_entity_id=c882`.
 
 ### S3 — valid versus invalid relation
 
-B0: `Within tenant t01, the following records are authorized. The question concerns account a1. account a1 is a account with status open. owner o1 is a owner with name mira. account a1 is associated with owner o1 through the relation "owned by". Evidence reference e3 contradicts the relation between account a1 and owner o1.`
-
-B1 contains the same relation claim and `{"evidence_ref":"e3","relation_id":"r3","stance":"contradicts","admissible":true,"text":"registry rejects o1","tenant_id":"t01"}`.
-
-Evaluator: relation unsupported.
+B0 uses query `whether relation claim "r3" is supported by admissible evidence`, the same account/owner
+relation claim in both arms, and admissible contradiction evidence `e3`. B1 contains the corresponding
+relation and `{"evidence_ref":"e3","relation_id":"r3","stance":"contradicts","admissible":true,
+"text":"registry rejects o1","tenant_id":"t01"}`. Evaluator: `relation_supported=false`.
 
 ### S4 — content-similar decoys
 
-B0: `Within tenant t01, the following records are authorized. The question concerns applicant query-4. applicant p1 is a applicant with name mira, requisition q6. applicant p2 is a applicant with name mira, requisition q7. applicant p3 is a applicant with name mira, requisition q8.`
-
-B1 contains the same three entity objects in the shared presentation order.
-
-Evaluator: select `p2` for requisition q7.
+B0 asks for applicant named `mira` with requisition `q7` and serializes candidates `p1/q6`, `p2/q7`, and
+`p3/q8`. B1 serializes the same query attributes and entity objects in the shared order. Evaluator:
+`selected_entity_id=p2`.
 
 ### S5 — evidence-reference selection
 
-B0: `Within tenant t01, the following records are authorized. The question concerns case k1. case k1 is a case with status pending. policy p1 is a policy with version 4. case k1 is associated with policy p1 through the relation "governed by". Evidence reference e5 supports the relation between case k1 and policy p1.`
-
-B1 contains relation `r5` and support evidence `e5` over the same facts.
-
-Evaluator: evidence `e5`.
+B0 asks which evidence reference admissibly supports relation claim `r5`, then serializes case `k1`, policy
+`p1`, relation `r5`, and support evidence `e5`. B1 serializes the same facts and query operation
+`select_evidence`. Evaluator: `evidence_refs=["e5"]`.
 
 ### S6 — missing relation and abstention
 
-B0: `Within tenant t01, the following records are authorized. The question concerns ticket t1a. ticket t1a is a ticket with status open. No relation of type "assigned to" is recorded for ticket t1a.`
-
-B1 contains the ticket, an empty matching relation set, `closed_world=true`, and `abstain_when_missing=true`.
-
-Evaluator: `INSUFFICIENT_EVIDENCE` with reason `RELATION_MISSING`.
+B0 asks for the target of `assigned to` from ticket `t1a`, includes the frozen insufficient-evidence clause,
+and emits `No authorized relation claim of type "assigned to" starts from ticket "t1a".` B1 has the same
+query, no matching relation, `closed_world=true`, and `abstain_when_missing=true`. Evaluator:
+`status=INSUFFICIENT_EVIDENCE`, `reason_code=RELATION_MISSING`.
 
 ### S7 — cross-tenant decoy
 
-B0: `Within tenant t01, the following records are authorized. The question concerns asset as1. asset as1 is a asset with class server. team tm1 is a team with name core. team tm2 belongs to tenant t02 and is not authorized for tenant t01. asset as1 is associated with team tm1 through the relation "owned by".`
-
-B1 contains `tm1` in `t01`, similar `tm2` in `t02`, and the direct relation to `tm1`.
-
-Evaluator: select `tm1`; any `tm2` inclusion is a hard failure.
+B0 serializes authorized team `tm1` in `t01`, similarly named `tm2` in `t02`, and relation `r7` from asset
+`as1` to `tm1`. B1 contains the same objects, tenant IDs, and relation. Evaluator:
+`selected_entity_id=tm1`; selecting `tm2` is a hard failure.
 
 ### S8 — stable direct case
 
-B0: `Within tenant t01, the following records are authorized. The question concerns agent ag1. agent ag1 is a agent with state active. model m1 is a model with tier standard. agent ag1 is associated with model m1 through the relation "uses model".`
-
-B1 contains the identical direct relation from `ag1` to `m1`.
-
-Evaluator: target `m1`.
+B0 asks for the model linked from agent `ag1` through `uses model`, then serializes direct relation `r8` to
+`m1`. B1 serializes the same query and relation. Evaluator: `selected_entity_id=m1`.
 
 ### A1 — primary-key permutation
 
 B0 swaps IDs `v101` and `v102` while retaining their attributes; B1 performs the identical object-ID swap.
-Evaluator target follows the represented key and changes accordingly.
+The evaluator target follows the represented key.
 
 ### A2 — relation-target permutation
 
-B0 changes the S2 relation target from `c882` to plausible `c883`; B1 changes only the same target field.
-Evaluator target changes to `c883`.
+B0 changes S2 relation `r17` from `c882` to plausible `c883`; B1 changes the same target field. The evaluator
+target changes to `c883`.
 
 ### A3 — relation removal
 
-B0 removes the S2 relation and emits the frozen missing-relation sentence; B1 removes the same relation and
-retains `closed_world=true`. Evaluator requires abstention.
+B0 removes S2 relation `r17` and emits the frozen absence sentence; B1 removes the same relation under
+`closed_world=true`. The evaluator requires abstention.
 
 ### A4 — evidence permutation
 
-B0 swaps evidence references between a support and a plausible contradiction; B1 makes the identical evidence
-object swap. Evaluator follows the new authoritative evidence and forbids fabrication of the clean reference.
+B0 swaps evidence references between an admissible support and plausible contradiction; B1 makes the identical
+evidence-object swap. The evaluator follows the new authoritative evidence and forbids fabrication of the
+clean reference.
 
 ### A5 — cross-tenant substitution
 
-B0 replaces the valid target and evidence with highly similar tenant-t02 facts; B1 performs the identical
-substitution. Evaluator requires zero unauthorized selection and abstention when no authorized target remains.
+B0 replaces the valid target and evidence with highly similar tenant-`t02` facts; B1 performs the identical
+substitution. The evaluator requires zero unauthorized selection and abstention when no authorized target
+remains.
 
 ### A6 — lexical decoy control
 
 B0 adds reviewer `rev2` named `req6 approval board` beside correct `rev1`, while relation and evidence remain
-pointed to `rev1`; B1 adds the identical decoy object. Evaluator target remains `rev1`.
+pointed to `rev1`; B1 adds the identical entity object. The evaluator target remains `rev1`.
 
 ---
 
-## Verdict
+## Determinism, unresolved items, and change control
+
+Later implementation must prove byte-identical repeated generation and serialization under the same seed;
+matching paired model-init, vocabulary, episode-order, and batch-order hashes; stable fact-set hashes;
+reproducible evaluator output; and recorded source, config, dataset, environment, and checkpoint hashes.
+
+No unresolved scientific placeholder remains. Future implementation commit, dataset, checkpoint, and
+environment identifiers are `NOT_YET_CREATED — DOES_NOT_AUTHORIZE_EXECUTION`.
+
+Any change to a serializer template, JSON field, ordering, model source/configuration, tokenizer, optimizer,
+threshold, input cap, seed, episode count, distractor density, compute cap, or conclusion rule requires a new
+documentation-only protocol-lock revision.
 
 `TYPED_VS_PROSE_PROTOCOL_LOCKED`
 
@@ -462,5 +596,4 @@ execution remain unauthorized.
 
 This lock does not support typed-structure advantage, enterprise transfer, multi-hop reasoning, temporal
 reasoning, memory value, real-model transfer, quality preservation, efficiency superiority, production
-readiness, or KDA eligibility. It preserves `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED`,
-`E1_TEMPORAL_TRANSFER_PARTIAL`, and `KDA_VALIDATION_BLOCKED`.
+readiness, or KDA eligibility.
