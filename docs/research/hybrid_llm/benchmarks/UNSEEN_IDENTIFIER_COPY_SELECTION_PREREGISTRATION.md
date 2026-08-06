@@ -67,6 +67,40 @@ Reading of outcomes:
 
 No outcome automatically authorizes capacity scaling or any further experiment.
 
+## Two orthogonal diagnostic axes & the iterative-diagnosis rule
+The probe carries **two orthogonal reads** on every run; a full diagnosis needs both:
+
+**Axis A — copy vs selection.** C1 (direct copy, no selection) isolates contextual copying; C2
+(relation lookup = selection + copy) adds the selection burden.
+- high C1 + high C2 → copying and basic relation selection are demonstrated;
+- high C1 + low C2 → **selection** is the bottleneck;
+- **low C1 → C2 cannot independently diagnose selection, because every correct selection must still
+  pass through the broken copying stage.** Low C1 + low C2 supports a **copy** failure and says
+  little about selection.
+
+**Axis B — seen vs unseen generalization.** C6 (seen-pool IDs) vs C7 (disjoint unseen-pool IDs),
+same task mechanics.
+- C6 high + C7 low → the operation **exists but does not generalize** to unseen IDs;
+- C6 low + C7 low → **no demonstrated copy operation** (or a protocol/implementation issue);
+- C6 high + C7 high → seen→unseen generalization is supported under the tested protocol.
+
+**Rules (frozen intent, gates fixed at protocol-lock):**
+- **Do not classify a selection failure unless C1 competence clears its frozen gate.** A low C1
+  result forbids reading C2 as a selection verdict.
+- **Do not collapse "copy mechanism absent" and "copy does not generalize" into one verdict** —
+  Axis B distinguishes them.
+- **Diagnosis may be an iterative loop, not a single pass.** Because copy failure can *mask*
+  selection failure, the sequence is: diagnose → if a copy-side or generalization failure is found,
+  apply **at most one** matching intervention **in a later separately-authorized program** →
+  **re-diagnose selection under a new preregistered diagnostic** (a fix can unmask a second failure
+  that was previously unmeasurable). Copy and selection are exposed and addressed **sequentially**,
+  never bundled into one architecture change.
+- **This probe keeps exact-identifier generation and does NOT add candidate-index output.** A
+  candidate-index output would remove the very copying operation being diagnosed; it belongs to a
+  later, separate operational program, not to this probe. (Output-format interventions such as
+  candidate-index or constrained decoding route *around* copying; a candidate-ranking training
+  objective is what improves *selection* — different failures, different fixes.)
+
 ## Frozen model constraint
 Use the **exact same audited model** as the typed-vs-prose benchmark: same architecture
 (`symbolu_neural.clean_softmax.backbone.SoftmaxTransformerLM`, 64-dim, 2 layers, 4 heads, 256
