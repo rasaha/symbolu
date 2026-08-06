@@ -3,29 +3,39 @@
 **Status: `IMPLEMENTATION_AUTHORIZED_EXECUTION_NOT_AUTHORIZED`.**
 
 This document authorizes one bounded implementation step that removes the model-recipe blocker recorded in
-`SINGLE_HOP_TYPED_VS_PROSE_PROTOCOL_LOCK.md`. It does **not** authorize dataset materialization, smoke,
-development, reserved-seed execution, result inspection, threshold changes, or scientific conclusions.
+`SINGLE_HOP_TYPED_VS_PROSE_PROTOCOL_LOCK.md`. It also records two fail-closed mechanical corrections found
+before implementation publication. It does **not** authorize dataset materialization, training, smoke,
+development, reserved execution, result inspection, threshold changes, or scientific conclusions.
 
-Standing invariants remain unchanged:
+Standing invariants remain:
 
 - `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED`
 - `E1_TEMPORAL_TRANSFER_PARTIAL`
 - `KDA_VALIDATION_BLOCKED`
 
-No implementation result may emit `E1_STRUCTURAL_TRANSFER_CONFIRMED`,
-`E1_FOLLOW_ON_RESEARCH_ELIGIBLE`, `KDA_VALIDATION_ELIGIBLE`, or `PRODUCTION_READY`.
+Never emit `E1_STRUCTURAL_TRANSFER_CONFIRMED`, `E1_FOLLOW_ON_RESEARCH_ELIGIBLE`,
+`KDA_VALIDATION_ELIGIBLE`, or `PRODUCTION_READY`.
 
-## 1. Authorized objective
+## 1. Pre-implementation integrity corrections
 
-Implement the smallest deterministic, non-memory, tokenizer-based, from-scratch sequence-model harness that
-can train and evaluate both preregistered arms through one shared text channel and one shared autoregressive
-output head:
+Mechanical review of the blocked draft found two load-bearing defects:
 
-- **B0:** frozen grammatical-prose serialization;
-- **B1:** frozen canonical typed JSON serialization;
-- **output:** the same canonical seven-field JSON object for both arms.
+1. the entity-selection query exposed the authoritative entity ID; and
+2. relation-target, relation-validation, and stable-direct examples could present indistinguishable query
+   semantics while requiring different `reason_code` labels.
 
-Input representation must be the only arm-specific variable.
+The implementation must correct both defects symmetrically in B0 and B1:
+
+- `select_entity` never exposes the authoritative entity ID;
+- every query carries one explicit operation from the shared operation vocabulary;
+- S2 and S8 use the same operation and the same outcome-derived output contract;
+- S3 includes both supported and unsupported relation claims;
+- `reason_code` is determined by operation and represented outcome, never by hidden split identity;
+- split, domain, episode ID, seed, and authoritative output remain model-invisible.
+
+These corrections do not create an arm-specific feature: the identical query semantics are serialized into
+both B0 and B1. Until independently audited, the protocol remains
+`PROTOCOL_LOCK_BLOCKED_MODEL_RECIPE`; `TYPED_VS_PROSE_PROTOCOL_LOCKED` is not emitted.
 
 ## 2. Authorized package and dependency boundary
 
@@ -35,85 +45,112 @@ Create exactly one isolated package:
 experiments/single_hop_typed_vs_prose/
 ```
 
-The package may import the existing generic baseline classes
+It may import only the existing generic baseline classes
 `symbolu_neural.clean_softmax.backbone.BackboneConfig` and
-`symbolu_neural.clean_softmax.backbone.SoftmaxTransformerLM` without modifying those files. No other model
-architecture or research subsystem may enter the model path.
+`symbolu_neural.clean_softmax.backbone.SoftmaxTransformerLM` into the model path. Those files remain
+unmodified. No other research architecture may enter the model path.
 
-## 3. Frozen reversible lexical tokenizer
+## 3. Shared query contract
 
-A raw-byte tokenizer was rejected during authorization review because the verbose frozen B1 JSON exceeded the
-common 512-token window. The authorized tokenizer is instead a fixed, data-independent, reversible lexical
-tokenizer shared by both arms.
+The canonical query fields occur in exactly this order:
 
-Frozen mapping:
+```json
+{
+  "operation": "select_entity | select_relation_target | validate_relation | select_evidence",
+  "entity_type": "...",
+  "entity_id": "... | null",
+  "relation_type": "... | null",
+  "target_entity_id": "... | null",
+  "attributes": {}
+}
+```
+
+Rules:
+
+- `select_entity`: `entity_id`, `relation_type`, and `target_entity_id` are null; `attributes` contains the
+  non-answer identifying criteria.
+- `select_relation_target`: source `entity_id` and `relation_type` are present; `target_entity_id` is null.
+- `validate_relation`: source, relation, and proposed `target_entity_id` are present.
+- `select_evidence`: source, relation, and relation target are present.
+- unused attributes are `{}`; keys are ascending.
+
+The deterministic B0 query sentences are operation-specific and carry the same semantics without field labels:
+
+```text
+The question asks which {ENTITY_TYPE} has {ATTRIBUTE_CLAUSES}.
+The question asks which target is linked from {ENTITY_TYPE} {ENTITY_ID} through relation "{RELATION_PHRASE}"; if none is authorized, report insufficient evidence.
+The question asks whether {ENTITY_TYPE} {ENTITY_ID} is linked to {TARGET_ENTITY_ID} through relation "{RELATION_PHRASE}".
+The question asks which evidence reference supports {ENTITY_TYPE} {ENTITY_ID} linked to {TARGET_ENTITY_ID} through relation "{RELATION_PHRASE}".
+```
+
+No B0 or B1 query may include an answer, gold label, validity result, target rank, split, or evaluator field.
+
+## 4. Frozen reversible lexical tokenizer
+
+Raw-byte tokenization was rejected before implementation because the verbose B1 representation exceeded the
+common 512-token window. Use one fixed, data-independent, reversible tokenizer for both arms:
 
 | Field | Frozen value |
 |---|---:|
 | ASCII character IDs | 0–127 |
 | PAD / BOS / EOS | 128 / 129 / 130 |
-| frozen protocol lexeme IDs | 131–199 |
-| total vocabulary | 200 IDs |
+| frozen protocol lexeme IDs | 131–204 |
+| frozen protocol lexemes | 74 |
+| total vocabulary | 205 IDs |
 
-Tokenizer algorithm:
+Algorithm:
 
-1. require 7-bit ASCII; reject non-ASCII rather than normalize or replace it;
-2. scan with the fixed chunk rule `[A-Za-z_]+|\d+|\s+|.`;
-3. encode any exact member of the frozen 69-item protocol lexeme tuple as one token;
-4. encode every other chunk as its constituent ASCII character IDs;
-5. decode by concatenating lexeme strings and ASCII characters exactly;
-6. no fitting, corpus-derived vocabulary, BPE training, arm marker, arm-specific token, hashing, or unknown-token
-   substitution.
+1. require 7-bit ASCII and reject non-ASCII;
+2. scan with `[A-Za-z_]+|\d+|\s+|.`;
+3. encode an exact frozen lexeme as one token;
+4. encode every other chunk as constituent ASCII character IDs;
+5. decode by exact concatenation;
+6. prohibit fitting, BPE training, hashing, unknown substitution, corpus-derived vocabulary, arm markers, and
+   arm-specific tokens.
 
-The lexeme tuple is immutable and contains only protocol grammar words, JSON field names, output literals, and
-frozen relation names. Entity IDs and unforeseen ASCII values fall back losslessly to characters, so unseen
-identities remain representable.
+The added atomic lexemes are shared query-operation terms only. Entity IDs and unforeseen ASCII remain
+losslessly representable through character fallback.
 
-## 4. Frozen model recipe
+## 5. Frozen model recipe
 
-Instantiate the unmodified plain causal softmax decoder-only Transformer with:
+Instantiate the unmodified plain causal softmax decoder-only Transformer:
 
 | Field | Frozen value |
 |---|---:|
-| tokenizer vocabulary | 200 IDs |
+| vocabulary | 205 |
 | `d_model` | 64 |
 | layers | 2 |
 | heads | 4 |
 | feed-forward width | 256 |
 | maximum sequence length | 1024 |
 | dropout | 0.0 |
-| output head | existing weight-tied vocabulary head |
-| attention | ordinary causal softmax attention |
+| output head | existing tied vocabulary head |
+| attention | ordinary causal softmax token attention |
 
-The model is trained from scratch. No pretrained checkpoint, adapter, retrieval table, external model API,
-phase mechanism, recurrent state, slot memory, episodic memory, typed-only encoder, typed-only head, event
-reader, bounded quadratic relation reader, or answer-time correction is permitted.
+The model is trained from scratch. The same class, tokenizer, vocabulary, head, parameter count,
+initialization policy, optimizer, update count, batch order, parser, and evaluator are used for B0 and B1.
 
-The same model class, configuration, tokenizer, vocabulary, output head, loss, optimizer, update count,
-initialization seed, batch order, and evaluator are used for B0 and B1.
+Prohibited: pretrained checkpoints, adapters, external model APIs, BindingSlots, E1, recurrent or prefix
+memory, typed-only encoders or heads, Phase, KDA, event readers, bounded quadratic relational readers,
+retrieval tables, and answer-time correction.
 
-## 5. Shared input and output channel
+## 6. Shared input, output, and objective
 
-Both arms use the fixed lexical tokenizer. There is no arm ID, arm token, arm-specific prefix, field-specific
-embedding, or arm-specific prompt.
-
-The complete model prompt is:
+The common prompt is:
 
 ```text
 {SERIALIZED_INPUT}\n<OUTPUT>\n
 ```
 
-The marker is identical in both arms and is included in the common input-token budget.
+There is no arm ID or arm-specific prompt. Limits:
 
-Frozen limits:
-
-- maximum input tokens, including the shared marker: **512**;
-- maximum output tokens, excluding EOS: **384**;
-- complete sequence: BOS + input + output + EOS;
-- any over-budget example fails closed before model exposure;
+- maximum input including marker: **512 tokens**;
+- maximum output excluding EOS: **384 tokens**;
+- sequence: BOS + input + canonical output + EOS;
+- fail closed on over-budget input/output;
 - no truncation, arm-specific compression, or padding-based information equalization.
 
-The output is canonical minified ASCII JSON with exactly these fields in this order:
+The output is minified ASCII JSON with exactly these fields and order:
 
 ```json
 {
@@ -127,15 +164,10 @@ The output is canonical minified ASCII JSON with exactly these fields in this or
 }
 ```
 
-`relation_supported` is one of `true`, `false`, or `null`. No additional output field is accepted.
+`relation_supported` is `true`, `false`, or `null`. Train with next-token cross entropy only on canonical
+output tokens and EOS; mask every prompt target with `ignore_index=-100`.
 
-## 6. Objective and optimization recipe
-
-The decoder-only sequence is trained with next-token cross entropy. Targets before the first output token are
-masked with `ignore_index=-100`; loss is applied only to canonical output tokens and EOS. Input reconstruction
-is never an optimization target.
-
-Frozen optimizer recipe:
+## 7. Frozen optimization recipe
 
 | Field | Frozen value |
 |---|---:|
@@ -148,99 +180,54 @@ Frozen optimizer recipe:
 | batch size | 8 paired episode indices per arm |
 | maximum updates | 2000 per arm and seed |
 | scheduler | none |
-| selective restarts | prohibited |
-| post-result extension | prohibited |
+| selective restarts / post-result extension | prohibited |
 
-The implementation may expose these values as immutable configuration fields but may not introduce a search
-space or representation-specific override.
+No search space or arm-specific override is authorized.
 
-## 7. Canonical fact graph and serializers
-
-Implement immutable typed records for tenant, query, entities, relations, evidence, explicit missing-relation
-facts, and authoritative structured output.
+## 8. Canonical graph, generator, and ablations
 
 For every episode:
 
-1. construct one canonical fact graph;
-2. serialize B0 and B1 from that same graph;
-3. compute one semantic SHA-256 digest from the model-visible canonical graph;
-4. require `B0_fact_hash == B1_fact_hash` before tokenization;
-5. require byte-identical serializer replay;
-6. fail closed on semantic mismatch, forbidden field, duplicate identity, invalid relation/evidence reference,
-   tenant inconsistency, malformed output, non-ASCII text, or budget breach.
+1. construct one immutable canonical graph;
+2. serialize B0 and B1 from that graph;
+3. compute one SHA-256 semantic digest from the model-visible graph;
+4. require deterministic serializer replay and shared fact digest;
+5. fail closed on duplicate identity, invalid references, tenant inconsistency, forbidden keys, malformed
+   output, non-ASCII text, or budget breach.
 
-B0 grammar, B1 schema, ordering, punctuation, and output schema remain those frozen in the protocol document.
-Any scientific or representational change requires a new authorization document.
+Implement deterministic in-memory S1–S8 fixtures and evaluation-only A1–A6 transformations with a caller-
+supplied local RNG. Do not mutate global Python or PyTorch RNG state. Do not write datasets during import or
+unit tests.
 
-## 8. Deterministic synthetic generator
+S3 must construct both supported and unsupported proposed targets. A6 must add a high-similarity but
+non-identical decoy, not a second exact answer.
 
-Implement a local deterministic generator for S1–S8 and evaluation-only transformations A1–A6.
+## 9. Shared evaluator and determinism
 
-The generator shall:
+One strict parser/evaluator must enforce exact field set and order, duplicate rejection, types, entity and
+relation correctness, relation support, evidence precision/recall, abstention, tenant equality, unsupported
+evidence, and unauthorized cross-tenant selection.
 
-- use a caller-supplied local RNG and never mutate global Python or PyTorch RNG state;
-- derive paired arms from one canonical episode object;
-- balance candidate position mechanically in future dataset materialization;
-- keep domain, split identity, episode identity, and authoritative output outside model-visible serializations;
-- emit no saved dataset during import or unit tests;
-- expose canonical in-memory fixtures for integrity tests;
-- treat ablations as evaluation-only and preserve both the clean authoritative output and the output implied
-  by the perturbed representation where causal movement must be measured.
+Mechanical integrity utilities must prove:
 
-Unit tests may use a clearly labelled non-benchmark test seed that is not 76, 760–762, or 7160–7164. Such
-fixtures are ephemeral test data and are not admissible benchmark evidence.
-
-## 9. Evaluator
-
-Implement one strict parser and evaluator shared by both arms. Required checks include:
-
-- exact output-schema field set and order;
-- duplicate-field rejection;
-- status and value type validity;
-- selected entity and relation exact match;
-- `relation_supported` exact match;
-- evidence precision and recall;
-- tenant exact match;
-- abstention correctness;
-- unsupported evidence emission;
-- unauthorized cross-tenant inclusion;
-- deterministic aggregate reconstruction;
-- causal-ablation movement, abstention, rejection, and lexical-robustness metadata.
-
-The implementation may encode frozen thresholds but must not run or reconstruct a scientific verdict in this
-authorization PR.
-
-## 10. Determinism and paired-run integrity
-
-Implement utilities that prove, before any future run:
-
-- identical parameter count for B0 and B1;
-- byte-identical initial parameter digest under the same initialization seed;
-- identical paired episode order;
-- identical optimizer hyperparameters and update count;
-- byte-identical serialization replay;
-- stable canonical fact hashes;
-- exact tokenizer round-trip;
-- deterministic evaluator output;
+- identical B0/B1 parameter count and initialization digest;
+- identical paired episode and batch order;
+- stable serializer, tokenizer, fact, evaluator, and parameter digests;
+- causal no-future leakage;
 - package import does not advance global Python or PyTorch RNG state.
 
-The harness must record source, configuration, dataset, initialization, batch-order, and final-parameter
-digests in future run manifests.
+## 10. Execution gate
 
-## 11. Execution gate
+Reserved seeds are rejected before generation or model initialization unless the exact later authorization is
+supplied:
 
-Reserved benchmark seeds are hard-gated in code:
+- 76 → `SMOKE_EXECUTION_AUTHORIZED`
+- 760–762 → `DEVELOPMENT_EXECUTION_AUTHORIZED`
+- 7160–7164 → `FINAL_EXECUTION_AUTHORIZED`
 
-- seed 76 requires exact `SMOKE_EXECUTION_AUTHORIZED`;
-- seeds 760–762 require exact `DEVELOPMENT_EXECUTION_AUTHORIZED`;
-- seeds 7160–7164 require exact `FINAL_EXECUTION_AUTHORIZED`.
+This document supplies none of these tokens.
 
-Without the corresponding token, a future run entrypoint must reject before generation, model initialization,
-or output-directory creation. This implementation authorization supplies **none** of those execution tokens.
-
-## 12. Required implementation files
-
-The implementation PR is authorized to add:
+## 11. Authorized implementation files
 
 ```text
 experiments/single_hop_typed_vs_prose/
@@ -267,57 +254,37 @@ tests/experiments/single_hop_typed_vs_prose/
 .github/workflows/typed-vs-prose-implementation-ci.yml
 ```
 
-Small file-name adjustments are permitted only when they do not expand scope or alter the frozen recipe.
+## 12. Required tests
 
-## 13. Required tests
+Without a benchmark seed, test:
 
-The implementation PR must demonstrate, without consuming benchmark seeds:
+- S1 answer ID absent from both query serializations;
+- explicit operation disambiguation and outcome-derived reason codes;
+- supported and unsupported S3 claims;
+- deterministic S1–S8 and A1–A6 construction;
+- B0/B1 deterministic replay and shared fact hash;
+- no answer/gold/evaluator leakage;
+- exact tokenizer round-trip, fixed IDs, and non-ASCII rejection;
+- all primary fixtures fit the common 512-token window without truncation;
+- output-only masking and budget rejection;
+- identical parameter count and initialization digest;
+- causal no-future leakage, forward shape, and one backward pass;
+- strict parser, tenant/evidence failures, and reserved-seed rejection;
+- no import-time generation, model initialization, RNG mutation, training, writes, or network access.
 
-1. B0 and B1 determinism;
-2. semantic fact-hash equality;
-3. no answer/gold/evaluator leakage in B1;
-4. strict output parsing and duplicate/order rejection;
-5. lexical-tokenizer exact round-trip;
-6. fixed IDs, non-ASCII rejection, and budget rejection;
-7. all S1–S8 unit fixtures fit the 512-token common window without truncation;
-8. identical parameter count and initialization digest across arms;
-9. causal no-future leakage;
-10. output-only loss masking;
-11. forward shape and one backward pass on a tiny mechanical test configuration;
-12. S1–S8 fixture construction;
-13. A1–A6 transformation construction and expectation metadata;
-14. tenant and evidence hard-failure detection;
-15. reserved-seed rejection without authorization;
-16. no import-time generation, initialization, RNG mutation, training, filesystem writes, or network access.
+An explicitly labelled non-benchmark seed may be used for ephemeral tests. Such tests are not scientific
+benchmark evidence.
 
-The tests are implementation evidence only. They are not smoke, development, final, or scientific evidence.
+## 13. Explicitly unauthorized
 
-## 14. Explicitly unauthorized
+No dataset artifact, seed 76 run, development run, reserved final run, result inspection, serializer/tokenizer/
+schema search, positive typed-structure claim, protocol-lock claim, BindingSlots, E1, temporal, multi-hop,
+Phase, KDA, MLA, T5, real-model, capacity, pilot, enterprise-transfer, efficiency, production, or merge without
+independent audit.
 
-This authorization does not permit:
+## 14. Completion condition
 
-- merging PR #1364 or this authorization PR without independent audit;
-- altering the preregistered question, arms, gates, seeds, or conclusion vocabulary;
-- benchmark dataset materialization;
-- training or evaluating seed 76, 760–762, or 7160–7164;
-- inspecting any reserved result;
-- hyperparameter, tokenizer, serializer, schema, prompt, or output-format search;
-- BindingSlots, E1, memory, multi-hop, temporal, successor, Phase, KDA, MLA, T5, real-model, capacity, pilot,
-  enterprise-transfer, efficiency, or production work;
-- a positive typed-structure claim;
-- implementation merge without independent audit.
-
-## 15. Completion condition
-
-The implementation step is complete only when a separate implementation PR:
-
-- contains only the authorized package, tests, workflow, and bounded documentation updates;
-- passes its dedicated unit CI plus existing terminology/pipeline/invariance checks;
-- has zero unresolved review threads;
-- is independently audited;
-- remains explicit that execution is unauthorized.
-
-Until that PR is audited and merged, the protocol remains `PROTOCOL_LOCK_BLOCKED_MODEL_RECIPE` and
-`TYPED_VS_PROSE_PROTOCOL_LOCKED` is not emitted.
+The separate implementation PR must remain draft and unmerged until its authorized scope, dedicated tests,
+existing CI, and review state are independently audited. Passing mechanical tests authorizes no execution.
 
 **Authorization verdict: `IMPLEMENTATION_AUTHORIZED_EXECUTION_NOT_AUTHORIZED`.**
