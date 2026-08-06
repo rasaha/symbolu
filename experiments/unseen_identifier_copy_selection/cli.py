@@ -68,25 +68,35 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--cohort", choices=("seen", "unseen"), required=True)
         sub.add_argument("--authorization-record", required=True,
                          help="path to the JSON execution authorization record (validated before generation)")
-        sub.add_argument("--authorization-artifact", default=None,
-                         help="path to the approved authorization artifact (required only for scientific "
-                              "states; a future merged execution-authorization document)")
+        sub.add_argument("--authority-ref", default=None,
+                         help="operator-controlled authoritative-default Git reference used to prove a "
+                              "scientific authorization document is merged (defaults to the frozen "
+                              "reference or the UNSEEN_ID_AUTHORITATIVE_REF environment value)")
+        sub.add_argument("--repo-dir", default=None,
+                         help="repository directory whose local Git provides the authority root "
+                              "(defaults to the current working directory)")
         sub.add_argument("--output-dir", required=True,
                          help="explicit output directory; artifacts are written ONLY under it")
     return parser
 
 
 def _authorize(args):
-    """Validate the record (+ optional approved artifact) into an immutable AuthorizationContext."""
-    from .execution import authorize, load_authorization_artifact, load_authorization_record
+    """Validate the record into a MINTED, non-forgeable AuthorizationContext.
+
+    Scientific states are proven against LOCAL Git (the authoritative-default reference and repo come
+    from frozen config / operator-controlled flags, NEVER from the record). A caller-supplied
+    authorization artifact is no longer trusted: the authorization document is read from the committed
+    tree by the record's bound commit + allow-listed path."""
+    from .execution import authorize, load_authorization_record
 
     record = load_authorization_record(args.authorization_record)
-    artifact = (
-        load_authorization_artifact(args.authorization_artifact)
-        if args.authorization_artifact is not None
-        else None
+    return authorize(
+        record,
+        seed=args.seed,
+        cohort=args.cohort,
+        repo_dir=args.repo_dir,
+        authoritative_ref=args.authority_ref,
     )
-    return authorize(record, seed=args.seed, cohort=args.cohort, authorization_artifact=artifact)
 
 
 def _handle(args) -> int:
