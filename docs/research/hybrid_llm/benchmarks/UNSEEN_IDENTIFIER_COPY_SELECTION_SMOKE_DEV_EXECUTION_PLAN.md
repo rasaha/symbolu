@@ -87,3 +87,37 @@ the serializer changes · deterministic replay fails · a manifest is incomplete
 contaminated · an unauthorized process starts · the wall-clock budget cannot be met · implementation
 code changes during execution. **Do not proceed from smoke to development without
 `SMOKE_INTEGRITY_PASS`. Do not proceed from development to final authorization within this session.**
+
+## Decision 6 — Frozen development gates
+Development must verify: all three seeds complete · deterministic replay · manifest completeness ·
+**no shortcut baseline above its frozen bound** · no task-construction imbalance · no identifier
+leakage · no position leakage · no output-template leakage · no seed collision · no protocol
+deviation · resource use within budget. Development results are labeled
+**`DEVELOPMENT_ONLY_NOT_FINAL_EVIDENCE`**; **no final capability verdict may be emitted.**
+
+If a shortcut anomaly occurs: block further execution · do **not** inspect final seeds · diagnose
+using development evidence only · any protocol/implementation change invalidates affected
+development evidence and requires a corrective PR + fresh development authorization.
+
+## Decision 7 — Frozen shortcut precheck (aggregation contract explicit)
+Future shortcut artifacts: per-task chance · per-split heuristic score · per-seed heuristic score ·
+aggregate heuristic score · threshold (**chance + 0.05**) · competence-floor comparison · blocking
+status. **Aggregation contract (explicit, so execution code never infers it):**
+- chance is computed **mechanically per split** (1 / candidate-count for selection splits);
+- each heuristic is scored **per split, per seed**;
+- the gate is evaluated on the **per-split score pooled across the development seeds** (9071–9073)
+  to reduce single-cohort sampling noise, and additionally reported per seed;
+- a split fails if its pooled score exceeds chance + 0.05 **or** falls at/above the learned
+  competence floor.
+This matches the merged implementation (`shortcuts.shortcut_scores` computes per-split baselines).
+A shortcut precheck must occur **before** development results can be accepted and **before** any
+future final authorization can be drafted.
+
+## Decision 11 — Frozen development-report vocabulary
+Allowed development-status outputs: `DEVELOPMENT_INTEGRITY_PASS` · `DEVELOPMENT_SHORTCUT_BLOCKED` ·
+`DEVELOPMENT_IMPLEMENTATION_DEFECT` · `DEVELOPMENT_PROTOCOL_DEVIATION` ·
+`DEVELOPMENT_RESOURCE_BLOCKED` · `DEVELOPMENT_NONDETERMINISTIC` ·
+`DEVELOPMENT_AUTHORIZATION_VIOLATION`. **Do not emit** `UNSEEN_IDENTIFIER_COPY_SELECTION_CONFIRMED`,
+`UNSEEN_IDENTIFIER_SELECTION_FAILED`, `UNSEEN_IDENTIFIER_GENERALIZATION_FAILED`,
+`UNSEEN_IDENTIFIER_COPY_CAPABILITY_NOT_FOUND`, or any final scientific verdict. Development metrics
+may be reported descriptively but remain **non-final**.
