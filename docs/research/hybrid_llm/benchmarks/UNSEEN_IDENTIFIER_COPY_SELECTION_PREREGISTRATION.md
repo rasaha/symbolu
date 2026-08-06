@@ -66,3 +66,49 @@ Reading of outcomes:
   this recipe** (the null was capability-limited, not representation-limited).
 
 No outcome automatically authorizes capacity scaling or any further experiment.
+
+## Frozen model constraint
+Use the **exact same audited model** as the typed-vs-prose benchmark: same architecture
+(`symbolu_neural.clean_softmax.backbone.SoftmaxTransformerLM`, 64-dim, 2 layers, 4 heads, 256
+d_ff, vocab 200, dropout 0), same tokenizer, same parameter count (209,728), same initialization
+policy, same optimizer family and hyperparameters (AdamW 3e-4, batch 8, 2000 updates), same
+next-token output-only objective. Do **not**:
+- increase capacity;
+- change the tokenizer;
+- add copy attention;
+- add a pointer network;
+- add memory;
+- add a typed-only encoder;
+- add a relational reader;
+- invent a new architecture.
+If the exact recipe cannot be reconstructed from the audited implementation, mark the
+preregistration **blocked** (do not substitute a different recipe).
+
+## Representation-neutral format (single deterministic representation)
+Exactly **one** minimal deterministic representation — **no prose-vs-JSON comparison, no serializer
+search.** Illustrative form (final syntax frozen at protocol-lock, not here):
+```text
+QUERY_SOURCE = Q7X2
+FACTS:
+Q7X2 -> M4P9
+R8K1 -> Z3N6
+A5D0 -> V2T4
+ANSWER_TARGET =
+```
+Freeze at protocol-lock (all fixed, no search): separators · ordering · whitespace · query syntax ·
+distractor syntax · output syntax · identifier alphabet · identifier lengths · candidate counts ·
+position distribution. The output is the bare identifier (or the abstention token for C8), parsed
+by one exact grader.
+
+## Identifier design (frozen at protocol-lock)
+Freeze: the identifier **alphabet**; the **length distribution**; the **tokenizer decomposition**
+(how many tokenizer tokens each identifier occupies under the fixed 200-id lexical tokenizer);
+train / dev / final **pools**; **collision prevention**; **disjointness** (train ∩ final = ∅);
+and the **number of tokenizer tokens per identifier**. Report, for every result:
+- exact-sequence accuracy;
+- token-level accuracy;
+- results broken down **by tokenizer length** of the identifier.
+
+Constraints: identifiers are **opaque** (carry no lawful signal about the answer). Do **not** encode
+labels in prefixes or identifier shape; the answer must be obtainable only by reading the queried
+fact from context, never from the surface form of any identifier.
