@@ -32,3 +32,35 @@ duplicating the frozen model/tokenizer/trainer/config. Every file it may add or 
 correction.** Fewer files are acceptable if sufficient (e.g., `training.py`/`evaluation.py`/
 `replay.py`/`evidence.py` could be consolidated), provided every capability below is delivered and
 every guard is preserved.
+
+## Decision 2 — Frozen CLI surface (real, not illustrative)
+Invocation: `python -m experiments.unseen_identifier_copy_selection <subcommand> ...`. Required
+subcommands, each with frozen name / required args / optional args / accepted values / output
+artifacts / exit codes / refusal conditions:
+
+| Subcommand | Required args | Output | Refuses when |
+|---|---|---|---|
+| `build-cohort` | `--seed` `--cohort` `--authorization-record` `--output-dir` | cohort + dataset digests | reserved seed w/o valid record; existing output-dir |
+| `shortcut-precheck` | `--seed` `--cohort` `--authorization-record` `--output-dir` | shortcut results (per-split, per-seed) | same |
+| `train` | `--seed` `--cohort` `--authorization-record` `--output-dir` | checkpoint + init/batch digests | same; missing dataset |
+| `evaluate` | `--seed` `--cohort` `--authorization-record` `--output-dir` | per-example traces + metrics | same; missing checkpoint |
+| `replay` | `--seed` `--cohort` `--authorization-record` `--output-dir` | replay manifest + digest compare | same; digest mismatch |
+| `assemble-manifest` | `--seed` `--cohort` `--authorization-record` `--output-dir` | run manifest | same; incomplete run |
+
+Every scientific-facing subcommand requires **exactly one explicit `--seed`**, explicit `--cohort`,
+explicit `--authorization-record`, explicit `--output-dir`, and verifies frozen
+source/config/protocol identity. **No wildcard · no range · no seed list · no implicit
+"all development seeds" mode · no environment-variable-only authorization.** A command must be
+**incapable** of including a final seed via range/glob/alias/default. The CLI may be implemented
+later; **no valid scientific authorization record or token is created under this authorization.**
+
+## Decision 3 — Frozen authorization-record contract (fail-closed)
+A future authorization record binds: authorization state · exact permitted cohort · exact permitted
+seed(s) · protocol-lock commit · implementation-authorization commit · implementation commit ·
+model-recipe hashes · parameter count · one-run/expiry scope (if repo practice supports it) · record
+digest. The CLI must: require the record explicitly · validate it **before any pool generation** ·
+thread authorization through **every** generation primitive (`build_pools`/`generate_pool`/
+`generate_split`) · reject unknown/malformed records · reject mismatched commits · reject mismatched
+cohort · reject any unlisted seed · reject final seeds unless a later explicit final authorization
+exists. Fixture tests may use **fixture-only** authorization records bound exclusively to fixture
+seeds `993000–993004`. **No scientific authorization record is created in this session.**
