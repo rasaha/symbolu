@@ -310,3 +310,41 @@ chosen implementation plan at implementation authorization (one run per task-spl
 no more). **No** selective restart · **no** failed-run replacement except documented infrastructure
 failure · **no** post-result budget extension · **no** hyperparameter sweep · **no** capacity change.
 The execution environment manifest is recorded before any future run.
+
+## Decision 12 — Frozen iterative-diagnosis rule
+**Copy failure can mask selection failure. A low C1 result prevents an independent selection
+diagnosis from C2.**
+
+If copy failure or unseen-generalization failure is found:
+- **do not** infer that selection is competent or incompetent;
+- **do not** bundle a copy-side intervention with a ranking objective;
+- authorize **at most one** matching intervention in a **later, separately-authorized program**;
+- after the copy-side intervention, run a **separately preregistered diagnostic** to expose
+  selection (a fix can unmask a second failure that was previously unmeasurable).
+
+Copy and selection are exposed and addressed **sequentially**, never bundled into one architecture
+change. Possible later interventions (**not authorized here**):
+- **Copy / fabrication:** constrained decoding · candidate-index output — route *around*
+  open-vocabulary copying; they do **not** improve selection.
+- **Selection:** candidate-ranking objective with hard negatives — changes the *training signal*;
+  it does **not** follow automatically from adding candidate-index output.
+- **Generalization:** disjoint-ID curriculum · operation-level supervision.
+- Capacity or architecture changes remain **deferred** and separately authorized.
+
+## Claim boundary
+No probe outcome supports: typed structure over prose · exact-ID capability when candidate-index
+output is later used · enterprise relational reasoning · tenant-aware competence · evidence grounding
+generally · multi-hop reasoning · temporal reasoning · BindingSlots · KDA · production readiness.
+
+Always preserved: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL`
+· `KDA_VALIDATION_BLOCKED`.
+
+## Emission
+This lock emits exactly one status verdict:
+**`UNSEEN_IDENTIFIER_COPY_SELECTION_PROTOCOL_LOCKED`** — the diagnostic is fully specified across
+Decisions 1–12; **implementation and execution remain unauthorized.** `IMPLEMENTATION_AUTHORIZED`,
+`EXECUTION_AUTHORIZED`, and any scientific result verdict are **not** emitted.
+
+Operational identifiers that cannot exist before implementation (future implementation commit hash,
+dataset digest, checkpoint digests, execution-environment id) are labelled
+`NOT_YET_CREATED — DOES_NOT_AUTHORIZE_EXECUTION`.
