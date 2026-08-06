@@ -223,7 +223,7 @@ def test_build_run_manifest_rejects_missing_digest():
 # ---- frozen orchestration order + rejection list -------------------------
 
 def test_orchestration_order_is_frozen_and_has_no_auto_transition():
-    assert ORCHESTRATION_ORDER[0] == "validate_authorization_record"
+    assert ORCHESTRATION_ORDER[0] == "validate_phase_seed"
     assert ORCHESTRATION_ORDER[-1] == "stop"
     assert "replay" in ORCHESTRATION_ORDER and "compare_digests" in ORCHESTRATION_ORDER
     # no automatic smoke->development transition is encoded

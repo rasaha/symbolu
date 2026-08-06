@@ -13,6 +13,7 @@ on:
       - ".github/workflows/unseen-identifier-integrity.yml"
       - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_COPY_SELECTION_IMPLEMENTATION_*.md"
       - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_EXECUTION_INTERFACE_*.md"
+      - "docs/research/hybrid_llm/benchmarks/UNSEEN_IDENTIFIER_PROTOCOL_CONTROL.md"
   workflow_dispatch:
 
 permissions:
@@ -56,19 +57,20 @@ jobs:
           python -m experiments.unseen_identifier_copy_selection --help >/dev/null
           echo "OK: --help is inert"
 
-      - name: Static guard — reserved seeds fail closed at the command boundary
+      - name: Static guard — reserved seeds refused under a non-matching phase (no output)
         env:
           PYTHONPATH: .
         run: |
           python - <<'PY'
-          from experiments.unseen_identifier_copy_selection.cli import main, EXIT_AUTH_REFUSED
-          # A reserved seed with no valid record must be auth-refused (no training, no cohort).
-          code = main(["build-cohort", "--seed", "9070", "--cohort", "unseen",
-                       "--authorization-record", "/nonexistent.json", "--output-dir", "/tmp/should-not-appear"])
-          assert code == EXIT_AUTH_REFUSED, code
           import os
+          from experiments.unseen_identifier_copy_selection.cli import main, EXIT_PROTOCOL_REFUSED
+          # A reserved seed named under the fixture phase is a cross-role protocol violation: refused
+          # before any generation, and nothing is written.
+          code = main(["build-cohort", "--phase", "fixture", "--seed", "9070", "--cohort", "unseen",
+                       "--output-dir", "/tmp/should-not-appear"])
+          assert code == EXIT_PROTOCOL_REFUSED, code
           assert not os.path.exists("/tmp/should-not-appear"), "reserved seed produced output"
-          print("OK: reserved seed fails closed")
+          print("OK: reserved seed refused under a non-matching phase")
           PY
 
       - name: Run bounded integrity tests (fixture seeds only; no training, no cohort, no reserved seed, no verdict)

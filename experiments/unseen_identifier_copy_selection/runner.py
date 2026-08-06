@@ -1,12 +1,11 @@
-"""Future command interface for the unseen-identifier diagnostic — FAIL-CLOSED, UNEXECUTED.
+"""Command interface for the unseen-identifier diagnostic — phase-scoped, fail-closed.
 
-This module wires the pipeline but performs no reserved-seed cohort generation or training in the
-implementation/authorization phase. Reserved seeds require an execution-authorization token (none
-exists → they fail closed), and the final phase additionally requires a passing shortcut precheck.
-Non-reserved (fixture) seeds may build cohorts for unit tests only.
+This module wires the pipeline. Reserved seeds are generated only when their phase is declared for the
+invocation (the phase is threaded as `token` to the primitive guards); the final phase additionally
+requires a passing shortcut precheck. Non-reserved (fixture) seeds build cohorts for unit tests.
 
-No `main()` is invoked during implementation or CI. Running the model / reserved cohorts is a
-separate, later execution authorization.
+No `main()` is invoked during CI. Running the model / reserved cohorts is a separate, operator-directed
+phase-named invocation.
 """
 from __future__ import annotations
 
@@ -18,14 +17,14 @@ from .serializer import serialize
 from .shortcuts import shortcut_precheck
 from .tasks import generate_split
 
-# Frozen orchestration order (protocol-lock Decision 10). Every scientific seed requires a SEPARATE
-# explicit command + authorization check; there is NO automatic smoke->development transition.
+# Orchestration order (protocol-lock Decision 10). Every reserved seed requires a SEPARATE explicit
+# phase-named command; there is NO automatic smoke->development transition.
 ORCHESTRATION_ORDER: tuple[str, ...] = (
-    "validate_authorization_record",
+    "validate_phase_seed",
     "verify_source_identity",
     "verify_recipe_hashes_and_parameter_count",
     "create_explicit_run_directory",
-    "generate_one_authorized_cohort",
+    "generate_one_phase_cohort",
     "serialize",
     "shortcut_precheck",
     "train",
@@ -39,17 +38,14 @@ ORCHESTRATION_ORDER: tuple[str, ...] = (
     "stop",
 )
 
-# Frozen fail-closed rejection conditions (protocol-lock Decision 11), recorded for review/tests.
+# Fail-closed rejection conditions (protocol-lock Decision 11), recorded for review/tests.
 FAIL_CLOSED_REJECTIONS: tuple[str, ...] = (
-    "missing/malformed/unknown-state authorization record",
+    "unknown phase",
     "wrong seed",
     "wrong cohort",
-    "final seed under smoke/development authorization",
-    "mismatched protocol commit",
-    "mismatched implementation commit",
-    "mismatched model hashes",
-    "parameter-count mismatch",
-    "source-hash mismatch",
+    "final seed under a non-final phase",
+    "cross-role phase/seed combination",
+    "reserved seed without its phase declared",
     "non-empty output directory",
     "overwrite attempt",
     "stale checkpoint",
@@ -66,9 +62,10 @@ class ShortcutGateError(RuntimeError):
 
 
 def build_cohort(seed: int, cohort: str, token: str | None = None):
-    """Build all C1-C8 examples for a (seed, cohort). Reserved seeds fail closed (the primitive
-    generators are independently guarded too, so the token is threaded through)."""
-    require_execution_authorization(seed, token)  # raises for reserved seeds without a valid token
+    """Build all C1-C8 examples for a (seed, cohort). `token` carries the declared phase; reserved
+    seeds fail closed unless their phase is named (the primitive generators are guarded too, so the
+    phase is threaded through)."""
+    require_execution_authorization(seed, token)  # raises for a reserved seed without its phase
     return {split: generate_split(split, cohort, seed, token=token) for split in SPLIT_IDS}
 
 
@@ -83,17 +80,17 @@ class FinalPhaseGuard:
 
 
 def enter_final_phase(seed: int, token: str | None, shortcut_examples) -> FinalPhaseGuard:
-    """Fail-closed entry to the reserved-final phase: needs authorization AND a passing shortcut precheck."""
+    """Fail-closed entry to the final phase: needs the 'final' phase declared AND a passing shortcut precheck."""
     status = shortcut_precheck(shortcut_examples)
     if not status.passed:
         raise ShortcutGateError(
-            "shortcut precheck failed or unresolved; reserved-final execution is blocked"
+            "shortcut precheck failed or unresolved; final-phase execution is blocked"
         )
-    require_execution_authorization(seed, token)  # raises for reserved seeds without a valid token
+    require_execution_authorization(seed, token)  # raises for a reserved seed without its phase
     return FinalPhaseGuard(shortcut_passed=True, authorized=True)
 
 
-def main(argv=None):  # pragma: no cover - never invoked during implementation/CI
+def main(argv=None):  # pragma: no cover - use the CLI (cli.main) with an explicit --phase
     raise ExecutionNotAuthorized(
-        "the unseen-identifier runner is not authorized to execute; implementation phase only"
+        "use the phase-scoped CLI (python -m experiments.unseen_identifier_copy_selection) with --phase"
     )
