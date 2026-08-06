@@ -161,8 +161,8 @@ def build_ablation(clean: PairedEpisode, code: str) -> AblationCase:
         cross = Entity(
             relation.target_entity_type,
             f"{relation.target_entity_id}-cross",
-            {"status": "active"},
             "unauthorized-tenant",
+            attributes=(("status", "active"),),
         )
         cross_evidence = Evidence(
             f"{relation.evidence_ref}-cross", relation.relation_type, "unauthorized-tenant"

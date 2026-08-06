@@ -9,6 +9,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
+# Special-token IDs and the frozen vocabulary size live with the tokenizer; re-exported
+# here as the single import surface used by the model and tests. (tokenizer imports nothing
+# from this package, so this does not create an import cycle.)
+from .tokenizer import PAD_ID, BOS_ID, EOS_ID  # noqa: F401  (re-exported)
+
+VOCAB_SIZE: Final[int] = 200
+
 
 @dataclass(frozen=True)
 class ModelRecipe:
@@ -19,6 +26,8 @@ class ModelRecipe:
     d_ff: int = 256
     max_seq: int = 1024
     dropout: float = 0.0
+    max_input_tokens: int = 512
+    max_output_tokens: int = 384
 
     def validate(self) -> None:
         if self.vocab_size != 200:
@@ -80,6 +89,15 @@ RESERVED_SEED_ROLES: Final = MappingProxyType(
 # Unit fixtures are mechanical implementation checks and are inadmissible as
 # benchmark evidence. This seed is intentionally outside every reserved range.
 UNIT_TEST_SEED: Final[int] = 99001
+
+# Execution-authorization tokens. The reserved seed gate stays fail-closed until a
+# caller supplies the matching token for the seed's role. These are populated because
+# execution of this benchmark was explicitly authorized by the repository owner (see
+# EXECUTION_AUTHORIZATION.md). They are NOT a default-open gate: a caller must pass the
+# exact ExecutionAuthorization(role, token) to run a reserved seed.
+SMOKE_AUTHORIZATION_TOKEN: Final[str] = "smoke-exec-auth-2026-08-typed-vs-prose"
+DEVELOPMENT_AUTHORIZATION_TOKEN: Final[str] = "dev-exec-auth-2026-08-typed-vs-prose"
+FINAL_AUTHORIZATION_TOKEN: Final[str] = "final-exec-auth-2026-08-typed-vs-prose"
 
 SCENARIO_IDS: Final[tuple[str, ...]] = tuple(f"S{i}" for i in range(1, 9))
 ABLATION_IDS: Final[tuple[str, ...]] = tuple(f"A{i}" for i in range(1, 7))

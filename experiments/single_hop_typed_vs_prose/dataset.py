@@ -5,8 +5,8 @@ import random
 from dataclasses import dataclass
 from typing import Literal
 
-from .config import FROZEN_TRAIN_RECIPE, SCENARIO_IDS
-from .execution import ExecutionAuthorization, guard_seed
+from .config import FROZEN_MODEL_RECIPE, FROZEN_TRAIN_RECIPE, ModelRecipe, SCENARIO_IDS
+from .execution import guard_seed
 from .schema import CanonicalEpisode, Entity, Evidence, Query, Relation, StructuredOutput
 from .serializers import assert_information_equivalent, serialize_b0, serialize_b1
 from .tokenizer import LexicalTokenizer
@@ -22,6 +22,14 @@ class PairedEpisode:
     fact_hash: str
 
     @property
+    def b0_text(self) -> str:
+        return self.b0
+
+    @property
+    def b1_text(self) -> str:
+        return self.b1
+
+    @property
     def output_json(self) -> str:
         return self.episode.authoritative_output.canonical_json()
 
@@ -35,6 +43,18 @@ class EncodedArm:
     output_token_count: int
     fact_hash: str
 
+    @property
+    def prompt_tokens(self) -> int:
+        return self.prompt_token_count
+
+    @property
+    def output_tokens(self) -> int:
+        return self.output_token_count
+
+
+# The trainer consumes encoded arms as training examples.
+EncodedExample = EncodedArm
+
 
 class SyntheticEpisodeGenerator:
     """Local-RNG deterministic generator. It never mutates global RNG state."""
@@ -42,9 +62,9 @@ class SyntheticEpisodeGenerator:
     def __init__(
         self,
         seed: int,
-        authorization: ExecutionAuthorization | None = None,
+        token: str | None = None,
     ) -> None:
-        guard_seed(seed, authorization)
+        guard_seed(seed, token)
         self.seed = seed
         self._rng = random.Random(seed)
 
@@ -60,6 +80,9 @@ class SyntheticEpisodeGenerator:
             raise ValueError(f"unknown scenario: {scenario_id}")
         builder = getattr(self, f"_{scenario_id.lower()}")
         return builder()
+
+    def generate(self, scenario_id: str) -> CanonicalEpisode:
+        return self.build(scenario_id)
 
     def generate_all(self) -> tuple[CanonicalEpisode, ...]:
         return tuple(self.build(scenario_id) for scenario_id in SCENARIO_IDS)
@@ -93,6 +116,7 @@ class SyntheticEpisodeGenerator:
 
     def _s2(self) -> CanonicalEpisode:
         invoice_id, _, contract_id = self._base_ids()
+        contract_b = f"c{int(contract_id[1:]) + 1}"
         tenant, evidence_ref = "t01", "e202"
         output = StructuredOutput(
             "ANSWERED", contract_id, "belongs_to_contract", True, (evidence_ref,), tenant, "MATCH_FOUND"
@@ -105,6 +129,7 @@ class SyntheticEpisodeGenerator:
             (
                 Entity("invoice", invoice_id, tenant, attributes=(("amount", "4200"),)),
                 Entity("contract", contract_id, tenant, attributes=(("status", "active"),)),
+                Entity("contract", contract_b, tenant, attributes=(("status", "draft"),)),
             ),
             (
                 Relation(
@@ -165,29 +190,29 @@ class SyntheticEpisodeGenerator:
         )
 
     def _s5(self) -> CanonicalEpisode:
-        invoice_id, _, contract_id = self._base_ids()
-        tenant, evidence_ref = "t01", "e505"
+        invoice_id, vendor_id, contract_id = self._base_ids()
+        tenant, ev1, ev2 = "t01", "e505", "e515"
         output = StructuredOutput(
-            "ANSWERED", contract_id, "belongs_to_contract", True, (evidence_ref,), tenant, "EVIDENCE_FOUND"
+            "ANSWERED", contract_id, "belongs_to_contract", True, (ev1,), tenant, "EVIDENCE_FOUND"
         )
         return CanonicalEpisode(
             "s5-evidence-selection",
             "S5",
             tenant,
             Query("select_evidence", "invoice", invoice_id, "belongs_to_contract"),
-            (Entity("invoice", invoice_id, tenant), Entity("contract", contract_id, tenant)),
             (
-                Relation(
-                    "belongs_to_contract",
-                    "invoice",
-                    invoice_id,
-                    "contract",
-                    contract_id,
-                    evidence_ref,
-                    tenant,
-                ),
+                Entity("invoice", invoice_id, tenant),
+                Entity("contract", contract_id, tenant),
+                Entity("vendor", vendor_id, tenant),
             ),
-            (Evidence(evidence_ref, "belongs_to_contract", tenant, "supports", True),),
+            (
+                Relation("belongs_to_contract", "invoice", invoice_id, "contract", contract_id, ev1, tenant),
+                Relation("approved_vendor", "invoice", invoice_id, "vendor", vendor_id, ev2, tenant),
+            ),
+            (
+                Evidence(ev1, "belongs_to_contract", tenant, "supports", True),
+                Evidence(ev2, "approved_vendor", tenant, "supports", True),
+            ),
             output,
         )
 
@@ -278,21 +303,32 @@ def encode_pair_arm(
     pair: PairedEpisode,
     arm: Arm,
     tokenizer: LexicalTokenizer | None = None,
+    recipe: ModelRecipe = FROZEN_MODEL_RECIPE,
 ) -> EncodedArm:
     tokenizer = tokenizer or LexicalTokenizer()
+    ignore = FROZEN_TRAIN_RECIPE.ignore_index
     serialized = pair.b0 if arm == "B0" else pair.b1
     prompt = serialized + FROZEN_TRAIN_RECIPE.output_marker
     prompt_ids = tokenizer.encode(prompt)
     output_ids = tokenizer.encode(pair.output_json)
-    if len(prompt_ids) > FROZEN_TRAIN_RECIPE.input_token_limit:
-        raise ValueError(f"{arm} prompt exceeds common 512-token limit")
-    if len(output_ids) > FROZEN_TRAIN_RECIPE.output_token_limit:
-        raise ValueError("canonical output exceeds 384-token limit")
+    n_prompt, n_output = len(prompt_ids), len(output_ids)
+    input_prefix = 1 + n_prompt  # bos + prompt (the model-visible input before generation)
+    if input_prefix > recipe.max_input_tokens:
+        raise ValueError(
+            f"{arm} input has {input_prefix} tokens, exceeds the common {recipe.max_input_tokens}-token limit"
+        )
+    if n_output + 1 > recipe.max_output_tokens:
+        raise ValueError(
+            f"output has {n_output + 1} tokens, exceeds the {recipe.max_output_tokens}-token limit"
+        )
+    # input:  [bos, prompt..., output..., eos]
     input_ids = (tokenizer.bos_id, *prompt_ids, *output_ids, tokenizer.eos_id)
-    if len(input_ids) > 1024:
+    if len(input_ids) > recipe.max_seq:
         raise ValueError("complete sequence exceeds frozen model context")
+    # labels == the full sequence with bos+prompt masked; loss shifts internally so
+    # logits[i] predict input_ids[i+1]. labels[-1] == eos; first supervised label at input_prefix.
     labels = (
-        *(FROZEN_TRAIN_RECIPE.ignore_index for _ in range(1 + len(prompt_ids))),
+        *(ignore for _ in range(input_prefix)),
         *output_ids,
         tokenizer.eos_id,
     )
@@ -302,7 +338,26 @@ def encode_pair_arm(
         arm,
         tuple(input_ids),
         tuple(labels),
-        len(prompt_ids),
-        len(output_ids),
+        input_prefix,
+        n_output,
         pair.fact_hash,
+    )
+
+
+def collate_encoded(batch):
+    """Pad a batch of encoded examples: input_ids with PAD, labels with the ignore index."""
+    import torch
+
+    from .tokenizer import PAD_ID
+
+    ignore = FROZEN_TRAIN_RECIPE.ignore_index
+    width = max(len(item.input_ids) for item in batch)
+    input_rows, label_rows = [], []
+    for item in batch:
+        pad = width - len(item.input_ids)
+        input_rows.append(list(item.input_ids) + [PAD_ID] * pad)
+        label_rows.append(list(item.labels) + [ignore] * pad)
+    return (
+        torch.tensor(input_rows, dtype=torch.long),
+        torch.tensor(label_rows, dtype=torch.long),
     )

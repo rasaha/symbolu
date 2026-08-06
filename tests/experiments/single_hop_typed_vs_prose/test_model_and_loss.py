@@ -22,7 +22,7 @@ def _tiny_recipe() -> ModelRecipe:
         n_heads=4,
         d_ff=32,
         max_seq=400,
-        max_input_tokens=256,
+        max_input_tokens=384,
         max_output_tokens=128,
     )
 

@@ -110,12 +110,12 @@ class LexicalTokenizer:
     def vocab_size(self) -> int:
         return 200
 
-    def encode(self, text: str) -> list[int]:
+    def encode(self, text: str, *, add_bos: bool = False, add_eos: bool = False) -> list[int]:
         try:
             text.encode("ascii")
         except UnicodeEncodeError as exc:
-            raise ValueError("model-visible text must be ASCII") from exc
-        ids: list[int] = []
+            raise ValueError("model-visible text must be 7-bit ASCII") from exc
+        ids: list[int] = [self.bos_id] if add_bos else []
         cursor = 0
         while cursor < len(text):
             match: tuple[int, str] | None = None
@@ -130,18 +130,20 @@ class LexicalTokenizer:
                 index, lexeme = match
                 ids.append(LEXEME_START + index)
                 cursor += len(lexeme)
+        if add_eos:
+            ids.append(self.eos_id)
         return ids
 
-    def decode(self, ids: Iterable[int], *, skip_special: bool = False) -> str:
+    def decode(self, ids: Iterable[int]) -> str:
+        """Reversible decode of content tokens; PAD/BOS/EOS carry no text and are skipped."""
         parts: list[str] = []
         for token_id in ids:
+            if token_id in (self.pad_id, self.bos_id, self.eos_id):
+                continue
             if 0 <= token_id < ASCII_SIZE:
                 parts.append(chr(token_id))
             elif LEXEME_START <= token_id < self.vocab_size:
                 parts.append(LEXEMES[token_id - LEXEME_START])
-            elif token_id in (self.pad_id, self.bos_id, self.eos_id):
-                if not skip_special:
-                    raise ValueError("special tokens have no textual decoding")
             else:
                 raise ValueError(f"token ID outside frozen vocabulary: {token_id}")
         return "".join(parts)

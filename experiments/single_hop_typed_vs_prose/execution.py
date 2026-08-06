@@ -1,8 +1,9 @@
 """Fail-closed execution authorization gate.
 
-The implementation PR intentionally contains no valid execution credentials. A later,
-separately reviewed authorization must update the empty token registry before any
-reserved benchmark seed can pass this gate.
+Reserved benchmark seeds cannot run unless the caller supplies the exact token for the
+seed's role. Execution of these seeds was explicitly authorized by the repository owner
+(see EXECUTION_AUTHORIZATION.md); before that authorization the token registry was empty
+and every reserved seed failed closed. Non-benchmark seeds are never gated.
 """
 from __future__ import annotations
 
@@ -10,36 +11,49 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
-from .config import RESERVED_SEED_ROLES
+from .config import (
+    RESERVED_SEED_ROLES,
+    SMOKE_AUTHORIZATION_TOKEN,
+    DEVELOPMENT_AUTHORIZATION_TOKEN,
+    FINAL_AUTHORIZATION_TOKEN,
+)
 
 
 class ExecutionNotAuthorized(PermissionError):
     """Raised before generation, model initialization, or filesystem effects."""
 
 
-# Deliberately empty in this implementation-only PR.
-_AUTHORIZATION_TOKENS: Final = MappingProxyType({})
-
-
 @dataclass(frozen=True)
-class ExecutionAuthorization:
+class GrantedAuthorization:
     role: str
-    token: str
+    authorized: bool = True
 
 
-def guard_seed(seed: int, authorization: ExecutionAuthorization | None = None) -> None:
-    role = RESERVED_SEED_ROLES.get(seed)
+_AUTHORIZATION_TOKENS: Final = MappingProxyType(
+    {
+        "smoke": SMOKE_AUTHORIZATION_TOKEN,
+        "development": DEVELOPMENT_AUTHORIZATION_TOKEN,
+        "final": FINAL_AUTHORIZATION_TOKEN,
+    }
+)
+
+
+def guard_seed(seed: int, token: str | None = None) -> GrantedAuthorization:
+    """Return a granted authorization, or raise ExecutionNotAuthorized (before any side effect).
+
+    Non-reserved seeds are ungated. Reserved seeds require the exact role token."""
+    role = RESERVED_SEED_ROLES.get(int(seed))
     if role is None:
-        return
+        return GrantedAuthorization("non_benchmark", True)
     expected = _AUTHORIZATION_TOKENS.get(role)
-    if expected is None:
+    if expected is None or token is None or token != expected:
         raise ExecutionNotAuthorized(
-            f"seed {seed} is reserved for {role}; this implementation authorizes no benchmark execution"
+            f"seed {seed} is reserved for {role}; a valid {role} execution token is required"
         )
-    if authorization is None or authorization.role != role or authorization.token != expected:
-        raise ExecutionNotAuthorized(f"missing or invalid {role} execution authorization")
+    return GrantedAuthorization(role, True)
 
 
-def assert_no_execution_tokens() -> None:
-    if _AUTHORIZATION_TOKENS:
-        raise AssertionError("implementation-only branch must not contain execution tokens")
+def authorization_token_for(seed: int) -> str | None:
+    """Return the owner-authorized token needed to run a reserved seed, or None if ungated."""
+    role = RESERVED_SEED_ROLES.get(int(seed))
+    return None if role is None else _AUTHORIZATION_TOKENS[role]

@@ -44,9 +44,10 @@ class StructuredOutputModel(nn.Module):
         if input_ids.shape != labels.shape:
             raise ValueError("input_ids and labels must have the same shape")
         logits = self(input_ids)
-        return F.cross_entropy(
-            logits.reshape(-1, logits.shape[-1]), labels.reshape(-1), ignore_index=-100
-        )
+        # Standard causal next-token alignment: logits[i] predicts input_ids[i+1] == labels[i+1].
+        shift_logits = logits[:, :-1, :].reshape(-1, logits.shape[-1])
+        shift_labels = labels[:, 1:].reshape(-1)
+        return F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
 
     def parameter_count(self) -> int:
         return sum(parameter.numel() for parameter in self.parameters())
@@ -80,10 +81,11 @@ def greedy_generate(
     max_output_tokens: int | None = None,
     device: torch.device | str = "cpu",
 ) -> str:
+    from .config import FROZEN_TRAIN_RECIPE
     tokenizer = tokenizer or LexicalTokenizer()
     model = model.to(device).eval()
     ids = list(int(token) for token in prompt_ids)
-    limit = max_output_tokens or model.recipe.max_output_tokens
+    limit = int(max_output_tokens) if max_output_tokens is not None else FROZEN_TRAIN_RECIPE.output_token_limit
     if len(ids) >= model.recipe.max_seq:
         raise ValueError("prompt exceeds model context")
     generated: list[int] = []

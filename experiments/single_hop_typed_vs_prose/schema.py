@@ -179,12 +179,9 @@ class StructuredOutput:
         object.__setattr__(self, "evidence_refs", refs)
         object.__setattr__(self, "tenant_id", _ascii(self.tenant_id, "tenant_id"))
         object.__setattr__(self, "reason_code", _ascii(self.reason_code, "reason_code"))
-        if self.status == "INSUFFICIENT_EVIDENCE" and (
-            self.selected_entity_id is not None or self.evidence_refs
-        ):
-            raise ValueError(
-                "insufficient-evidence output cannot select an entity or evidence"
-            )
+        # Note: no abstain-consistency constraint here. StructuredOutput is also used to hold
+        # arbitrary model PREDICTIONS (which may be inconsistent); consistency of the
+        # authoritative gold output is guaranteed by the generators, not by this container.
 
     def payload(self) -> dict[str, Any]:
         return {
@@ -199,6 +196,9 @@ class StructuredOutput:
 
     def canonical_json(self) -> str:
         return json.dumps(self.payload(), ensure_ascii=True, separators=(",", ":"))
+
+    def to_json(self) -> str:
+        return self.canonical_json()
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "StructuredOutput":
@@ -233,6 +233,10 @@ class CanonicalEpisode:
     relations: tuple[Relation, ...]
     evidence: tuple[Evidence, ...]
     authoritative_output: StructuredOutput
+
+    @property
+    def split(self) -> str:
+        return self.scenario_id
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "episode_id", _ascii(self.episode_id, "episode_id"))
