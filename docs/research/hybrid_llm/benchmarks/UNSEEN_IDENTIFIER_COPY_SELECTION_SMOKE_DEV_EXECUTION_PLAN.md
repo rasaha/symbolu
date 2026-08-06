@@ -121,3 +121,14 @@ Allowed development-status outputs: `DEVELOPMENT_INTEGRITY_PASS` · `DEVELOPMENT
 `UNSEEN_IDENTIFIER_SELECTION_FAILED`, `UNSEEN_IDENTIFIER_GENERALIZATION_FAILED`,
 `UNSEEN_IDENTIFIER_COPY_CAPABILITY_NOT_FOUND`, or any final scientific verdict. Development metrics
 may be reported descriptively but remain **non-final**.
+
+## Decision 8 — Frozen evidence artifacts (actual digest values, not booleans)
+Every future smoke/development run must produce: source digest · config digest · tokenizer digest ·
+identifier-pool digest · dataset digest · serializer digest · initialization digest · batch-order
+digest · checkpoint/parameter digest · prediction digest · evaluator digest · environment digest ·
+**per-example traces** · per-task metrics · per-seed metrics · parser-category counts · shortcut
+results · resource measurements · protocol-compliance report. **No aggregate-only result package**
+(this closes the typed-vs-prose aggregate-only gap). Every artifact must identify: **seed · cohort ·
+source commit · authorization commit · protocol-lock commit · implementation commit · environment.**
+The merged `manifest` module already emits actual digest values; the run must record them (not a
+`determinism_ok: true` boolean).
