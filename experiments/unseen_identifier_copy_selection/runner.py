@@ -18,6 +18,48 @@ from .serializer import serialize
 from .shortcuts import shortcut_precheck
 from .tasks import generate_split
 
+# Frozen orchestration order (protocol-lock Decision 10). Every scientific seed requires a SEPARATE
+# explicit command + authorization check; there is NO automatic smoke->development transition.
+ORCHESTRATION_ORDER: tuple[str, ...] = (
+    "validate_authorization_record",
+    "verify_source_identity",
+    "verify_recipe_hashes_and_parameter_count",
+    "create_explicit_run_directory",
+    "generate_one_authorized_cohort",
+    "serialize",
+    "shortcut_precheck",
+    "train",
+    "checkpoint",
+    "evaluate",
+    "emit_traces_and_metrics",
+    "assemble_manifest",
+    "replay",
+    "compare_digests",
+    "emit_integrity_status",
+    "stop",
+)
+
+# Frozen fail-closed rejection conditions (protocol-lock Decision 11), recorded for review/tests.
+FAIL_CLOSED_REJECTIONS: tuple[str, ...] = (
+    "missing/malformed/unknown-state authorization record",
+    "wrong seed",
+    "wrong cohort",
+    "final seed under smoke/development authorization",
+    "mismatched protocol commit",
+    "mismatched implementation commit",
+    "mismatched model hashes",
+    "parameter-count mismatch",
+    "source-hash mismatch",
+    "non-empty output directory",
+    "overwrite attempt",
+    "stale checkpoint",
+    "incomplete prior run",
+    "unsupported subcommand",
+    "wildcard/range/list seed input",
+    "unresolved shortcut state",
+    "replay mismatch",
+)
+
 
 class ShortcutGateError(RuntimeError):
     """Raised when the final phase is attempted while the shortcut precheck is unresolved/failing."""
