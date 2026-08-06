@@ -174,3 +174,74 @@ Requirements:
 - tokenizer decomposition is measured and reported; metrics are reported **by tokenizer length** if
   identifier token lengths vary;
 - collision freedom is mechanically verified at generation.
+
+## Decision 7 — Frozen numeric gates
+Frozen before any implementation, data generation, or run; **never adjusted after inspecting
+reserved results.** Any future departure must be justified from the frozen task design alone, never
+from probe results.
+
+**Direct-copy competence (C1, unseen):** mean exact-match ≥ **0.85**; ≥ **4/5** final seeds ≥ **0.80**;
+token-level accuracy ≥ **0.95**; fabricated out-of-context ID rate ≤ **0.02**.
+
+**Relation-selection + copy competence (C2):** mean exact-match ≥ **0.80**; ≥ **4/5** final seeds ≥
+**0.75**; position-group minimum ≥ **0.70**; in-context wrong-ID rate ≤ **0.15**; fabricated
+out-of-context ID rate ≤ **0.02**. *Selection failure may be declared only when C1 passes but C2
+fails.*
+
+**Evidence-like lookup (C3):** mean exact-match ≥ **0.80**; ≥ **4/5** final seeds ≥ **0.75**;
+fabricated evidence-ID rate = **0**.
+
+**Position robustness (C4):** first ≥ **0.75**; middle ≥ **0.75**; last ≥ **0.75**; max spread across
+positions ≤ **0.10**.
+
+**Lexical-decoy robustness (C5):** accuracy degradation vs matched non-decoy cases ≤ **0.05**;
+lexical-similarity heuristic must remain below the competence floor.
+
+**Seen-vs-unseen generalization (C6/C7):**
+- *Confirmed:* C6 ≥ **0.90**; C7 ≥ **0.80**; C6 − C7 gap ≤ **0.10**; ≥ **4/5** final seeds meet the
+  unseen floor.
+- *Generalization failure:* C6 ≥ **0.85** and C7 < **0.70**, **or** gap > **0.15**.
+- *No demonstrated copy operation:* C6 < **0.70** and C7 < **0.70**. **Do not emit "copy mechanism
+  absent" when C6 (seen) is competent.**
+
+**Missing-key abstention (C8):** abstention accuracy ≥ **0.90**; false-answer rate ≤ **0.05**;
+fabricated-ID rate ≤ **0.02**.
+
+**Determinism & integrity:** byte-identical dataset regeneration; byte-identical serialization;
+stable source/config/tokenizer/dataset/init/data-order/checkpoint/prediction digests; no seed
+overlap; no final-cohort inspection before authorization; no protocol deviation; compute limits
+respected.
+
+## Decision 8 — Frozen verdict vocabulary (future execution only; none emitted now)
+Exactly one primary verdict at a future authorized execution:
+- **`UNSEEN_IDENTIFIER_COPY_SELECTION_CONFIRMED`** — C1, C2, C3, C4, C5, C7-generalization, C8, and
+  determinism/protocol gates all pass. Supports **only**: *the frozen small-model recipe can copy
+  and select unseen opaque identifiers from a bounded controlled context under the preregistered
+  protocol.*
+- **`UNSEEN_IDENTIFIER_COPY_ONLY_PARTIAL`** — C1 passes, C2 fails, protocol/integrity pass. *Direct
+  copying exists; relation selection not established.*
+- **`UNSEEN_IDENTIFIER_GENERALIZATION_FAILED`** — C6 passes, C7 fails under the frozen gates. *Works
+  on seen IDs; does not generalize adequately to unseen.*
+- **`UNSEEN_IDENTIFIER_COPY_CAPABILITY_NOT_FOUND`** — C6 fails and C7 fails and direct-copy below
+  gate, protocol/integrity pass. *No copy operation under seen or unseen conditions.* **Not** used
+  when seen performance is competent.
+- **`UNSEEN_IDENTIFIER_SELECTION_FAILED`** — C1 passes, C2 fails (selection isolated).
+- **`UNSEEN_IDENTIFIER_EVIDENCE_LOOKUP_FAILED`** — C1/C2 sufficient, C3 fails.
+- **`UNSEEN_IDENTIFIER_ABSTENTION_GATE_FAILED`** — C8 fails.
+- **`UNSEEN_IDENTIFIER_PROTOCOL_VIOLATED`** · **`UNSEEN_IDENTIFIER_RESOURCE_BLOCKED`**.
+
+**No verdict automatically authorizes an intervention.**
+
+## Decision 9 — Frozen shortcut checks
+Baselines required, each on its relevant split: first-target · last-target · middle-target ·
+most-frequent-target · lexical-similarity · prefix-matching · character-overlap · source–target
+co-occurrence memorization · seen-ID frequency · constant-abstention · output-template leakage ·
+task-label leakage. For every heuristic:
+- compute **task-specific chance** mechanically;
+- require heuristic ≤ **chance + 0.05**;
+- require it **below** the relevant learned competence floor;
+- require it **incapable** of satisfying a positive verdict.
+
+A shortcut anomaly must be **resolved before reserved execution**. **Do not repeat the prior process
+deviation** (typed-vs-prose) where the shortcut baseline was only investigated after final runs —
+the shortcut precheck is a hard pre-reserved-execution gate here.
