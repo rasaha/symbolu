@@ -152,3 +152,48 @@ does not apply.**)
 This clarification changes **no** frozen numeric threshold, cohort, candidate count, seed, or
 scientific claim; it fixes the aggregation the earlier smoke/dev plan left underspecified and forbids
 the combined-pool frequency artifact.
+
+## Decision 10 — Frozen orchestration order
+The interface must support the later sequence **without manual Python intervention**: 1. validate
+authorization record → 2. verify authoritative source identity → 3. verify recipe hashes +
+parameter count → 4. create explicit run directory → 5. generate one authorized cohort →
+6. serialize → 7. shortcut precheck (where applicable) → 8. train → 9. checkpoint → 10. evaluate →
+11. emit traces + metrics → 12. assemble manifest → 13. replay → 14. compare digests → 15. emit
+integrity status → 16. stop. **No automatic smoke→development transition.** Every seed requires a
+**separate explicit command** and authorization check.
+
+## Decision 11 — Frozen fail-closed behavior
+The interface must reject: missing/malformed/unknown-state authorization record · wrong seed · wrong
+cohort · a final seed under smoke/dev authorization · mismatched protocol commit · mismatched
+implementation commit · mismatched model hashes · parameter-count mismatch · source-hash mismatch ·
+non-empty output directory · overwrite attempt · stale checkpoint · incomplete prior run ·
+unsupported subcommand · wildcard/range/list seed input · unresolved shortcut state · replay
+mismatch. **No command begins cohort generation before all preconditions pass.** Direct
+internal-function calls remain protected by the primitive-level guards (already merged in PR #1372).
+
+## Decision 12 — Frozen fixture-only test & CI plan
+Corrective implementation runs only fixture tests using seeds `993000–993004`, covering: CLI parser
++ `--help` · every subcommand's argument schema · rejection of missing authorization · rejection of
+scientific seeds · rejection of final seeds · one-seed-only enforcement · no wildcard/range/list ·
+primitive guard threading · model-recipe assertions · training-orchestrator structure **without
+training** · evaluation-path structure **without model execution** · replay-orchestration structure
+**without replay execution** · manifest schema + atomic writes · per-example trace schema · **all
+twelve** shortcut baselines · aggregation weighting · per-split frequency isolation · competence-
+floor comparison · threshold equality · missing-output blocking · no scientific-artifact generation ·
+no model training · no scientific verdict. CI (`unseen-identifier-integrity`) remains fixture-only
+and must **not** instantiate a scientific run · generate a scientific pool · train · evaluate
+scientific data · replay · emit scientific evidence · mint a scientific authorization record.
+
+## Corrective lifecycle (this session performs only step 1's authoring)
+1. this documentation-only authorization draft opened → 2. separate session independently audits it →
+3. authorization PR conditionally merged → 4. the implementing session builds only the authorized
+scope and opens a draft corrective implementation PR, then stops → 5. separate session independently
+audits the implementation → 6. conditional merge → 7. PR #1373 updated/replaced with real executable
+commands → 8. separate session independently audits the updated smoke/dev authorization →
+9. conditional merge → 10. only then may smoke seed 9070 be considered.
+
+## Claim boundary
+No outcome of this corrective program supports typed superiority · unseen-ID competence · selection ·
+generalization · evidence grounding · tenant competence · multi-hop · temporal · BindingSlots · KDA ·
+production readiness. Preserved: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` ·
+`E1_TEMPORAL_TRANSFER_PARTIAL` · `KDA_VALIDATION_BLOCKED`.
