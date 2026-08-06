@@ -1,0 +1,204 @@
+{
+  "label": "AUDIT_DERIVED_FROM_UNCHANGED_ARTIFACT",
+  "source_fingerprints": {
+    "config.py": "324be79d9cefaada9e09ddfae3b325aa93c39eb4ba84ec34e98f68d86eab91f5",
+    "tokenizer.py": "1849fd1f3d27e5d681d56e19ab0996817157cedcc1670d18fcbf66dcd008db3c",
+    "serializers.py": "38b6bc061e34f74ec29876af93c0d41cec506dca9e1f0f0e1b41ae88ad53b028",
+    "schema.py": "6c84b9d9eec85ba4f446c75c809020e93e8e9f49693900061653b148e735fa57",
+    "evaluator.py": "6ab7c1a62ac0c1c99343697df930c5004f6b9e3d585637620072b3a8498c5515",
+    "model.py": "87d3fc3577ff2d449f1da404a30fcf972cfae8281aabd0433849d4d022c7ae37",
+    "dataset.py": "e3a5b4597cb8606b056318b74b1ab5a3a707112f4f2b7d0afe2251ac57000283",
+    "trainer.py": "ea0af36e4b3843296ee7d46b3f1228a33e8db69b27c62c0b00f6a741db561f27",
+    "benchmark.py": "46a15c077cd0b23057e7148ee9f347b077418b2613d8d98b104f6e747048a682",
+    "driver.py": "4c1ba1a5ec27f1f1598c3e83e11daa86225ca66a456b072b8f571a1f502c98c6",
+    "ablations.py": "d724ab1992fab25e55e3ab202face05073915097f8975ae471f8630805745a07"
+  },
+  "frozen_recipe": {
+    "vocab_size": 200,
+    "d_model": 64,
+    "n_layers": 2,
+    "n_heads": 4,
+    "d_ff": 256,
+    "max_seq": 1024,
+    "max_input_tokens": 512,
+    "max_output_tokens": 384,
+    "eval_output_tokens": 96
+  },
+  "seeds": {
+    "7160": {
+      "seed": 7160,
+      "init_sub_seed": 7160021590,
+      "batch_sub_seed": 7160021687,
+      "init_param_digest": "c62e98cc05534c2fec68a3ab32f1c959e73f1de1627c24b297527a447e8e8a76",
+      "batch_order_digest": "495ec46d25278aa1b6051e8a0643aee4c77c054b87266c3c919c2de237abeb87",
+      "n_pairs": 192,
+      "cohort_fact_digest": "88de705219570cfe307af9bb42f245d5659d836a080ee3c84529de6119cb135b",
+      "b0_serialization_digest": "2bcf9aded9a43b6c351d4204c6842026ce70c21d0f072414004ecfa081f6871e",
+      "b1_serialization_digest": "f641b33641ecb3abb958e36972f1a42cba3c120b4cfcc5b371af46c3f8becd9d",
+      "info_equiv_mismatches": 0,
+      "arms": {
+        "B0": {
+          "final_param_digest": "a3e54f3e9df0b0938f57627bdb17aabb143924d922575c8b51f2090b830fe538",
+          "primary": 0.5333333333333333,
+          "b0_shares_init_with_b1": true
+        },
+        "B1": {
+          "final_param_digest": "cff9fed2bd7c863046f8feaa97e330a0802158c6fac879400c0b1a1628128e87",
+          "primary": 0.4666666666666666,
+          "b0_shares_init_with_b1": true
+        }
+      }
+    },
+    "7161": {
+      "seed": 7161,
+      "init_sub_seed": 7161021593,
+      "batch_sub_seed": 7161021690,
+      "init_param_digest": "333eeff5d59e2c61dc15d0e8991996edc7b1ebe69d161ed45604e68dddcd38f2",
+      "batch_order_digest": "9fcd848d7a9b25e613e6701fe2a762e9ddd8cf329b790052dedd9b883ee563e1",
+      "n_pairs": 192,
+      "cohort_fact_digest": "5f6f8db4f3b08cbe5385e7db3860ef17abc26406418653e6f4b4aaf13e9e3f00",
+      "b0_serialization_digest": "c9870319a7daee4fbf6ff4e1828a5c4aba7af9ad9c0769e91da3073c96924a44",
+      "b1_serialization_digest": "3f89b155ae1cb5d50f42b711e319789358b0f0440910a5c44b698f240f07dd8d",
+      "info_equiv_mismatches": 0,
+      "arms": {
+        "B0": {
+          "final_param_digest": "942da08e31c0f1b84a50ef103ea8c6d88f0b74c2d3c7194198dcbf467f43f385",
+          "primary": 0.4,
+          "b0_shares_init_with_b1": true
+        },
+        "B1": {
+          "final_param_digest": "0d5c6dbd199c539e00eb5966297f1077e8637bf5f4ac6705b7d8b64d830161b8",
+          "primary": 0.4,
+          "b0_shares_init_with_b1": true
+        }
+      }
+    },
+    "7162": {
+      "seed": 7162,
+      "init_sub_seed": 7162021596,
+      "batch_sub_seed": 7162021693,
+      "init_param_digest": "fd5901d06958e1552b74507955a5f6452866891482b1703199a2dcdcdea0048c",
+      "batch_order_digest": "a24166cf707e6ecdd32d62ab762a57c0eb97f305cfb1815004849a679a27a6a6",
+      "n_pairs": 192,
+      "cohort_fact_digest": "53b580e861e756b41619fb7f8891f85d36d1f88d9fcbdc60c025313c4f89bed0",
+      "b0_serialization_digest": "585979d48bc566a8b5bebcc0e6f31b593ae7304ddd0146131151a11bed36e02d",
+      "b1_serialization_digest": "90abbf3f522518cd2a65fed0d6cbd9fd3afa22d9ff7992bd87924f09f2315109",
+      "info_equiv_mismatches": 0,
+      "arms": {
+        "B0": {
+          "final_param_digest": "1402e27a298374308819283237db7b9fe9cfa013587575de8d82ae1edd6e8e60",
+          "primary": 0.4,
+          "b0_shares_init_with_b1": true
+        },
+        "B1": {
+          "final_param_digest": "c876e21518ae31aee98ed67ddcb46a51f4128e865b5d1832ef4f58df7f57e581",
+          "primary": 0.4083333333333334,
+          "b0_shares_init_with_b1": true
+        }
+      }
+    },
+    "7163": {
+      "seed": 7163,
+      "init_sub_seed": 7163021599,
+      "batch_sub_seed": 7163021696,
+      "init_param_digest": "8d008a7329d878bbc58a07546058a226ac5ab65caf515901302f34d8cf3fcfb7",
+      "batch_order_digest": "3ddf71bba026a07aa4095b3a0ac9e22c319c67b07c92af30a1675343afe05892",
+      "n_pairs": 192,
+      "cohort_fact_digest": "7e19bf9b0262f308f9a89c8bb3e189b7ac8b7a5dff579647d8e0be0d66725ce2",
+      "b0_serialization_digest": "0d802456c3d3dde0da96289cd6a203f53f393318a27b8104e40b7cf92a21b21a",
+      "b1_serialization_digest": "ecb45521b3d0a0b3de150e0f98458e080f8fce1fd9944414b36279f4ab33f5d4",
+      "info_equiv_mismatches": 0,
+      "arms": {
+        "B0": {
+          "final_param_digest": "196052b6eaaad2fc4f6319fa9cf5c84466125e8e6d59f05b8142c44b99651f42",
+          "primary": 0.4,
+          "b0_shares_init_with_b1": true
+        },
+        "B1": {
+          "final_param_digest": "05e7d470064bab11ac1ea06b277a41b6ba5dc102660fc4202b7d5265cc886ef1",
+          "primary": 0.5,
+          "b0_shares_init_with_b1": true
+        }
+      }
+    },
+    "7164": {
+      "seed": 7164,
+      "init_sub_seed": 7164021602,
+      "batch_sub_seed": 7164021699,
+      "init_param_digest": "04c2fe943ee59a4f442fe5c98be1fa37e8bdace9e3f196b72826e564c224c3dc",
+      "batch_order_digest": "960e8d344aa90ad5f2a3405892e45ec627854c07ccd575f1c724da69a71d2ae8",
+      "n_pairs": 192,
+      "cohort_fact_digest": "3e424f1e617a43a93ace20cba84d871e9f762c24d639df90194485593b5b6f55",
+      "b0_serialization_digest": "172c02584de8254f0c0694f3ddaea2a6c133e7969b7f94dd4365b0ee71b45c92",
+      "b1_serialization_digest": "733854ae28bf39f38d65c7fcf01fbffa5b7d1b9ce647137027a5f487a1466c5a",
+      "info_equiv_mismatches": 0,
+      "arms": {
+        "B0": {
+          "final_param_digest": "ffe8784e800a09f8e02ed8ce4de5e8234cbc100450b49ddd68b5394c7f3f6839",
+          "primary": 0.55,
+          "b0_shares_init_with_b1": true
+        },
+        "B1": {
+          "final_param_digest": "424ff86de10f965a8b55d26de61ddfcef2eef8a6bd41c3343cb5bee07206566f",
+          "primary": 0.4,
+          "b0_shares_init_with_b1": true
+        }
+      }
+    }
+  },
+  "reconstructed": {
+    "b0_mean_primary": 0.45666666666666667,
+    "b1_mean_primary": 0.43500000000000005,
+    "b1_minus_b0": -0.021666666666666612,
+    "per_seed": [
+      {
+        "seed": 7160,
+        "b0": 0.5333333333333333,
+        "b1": 0.4666666666666666,
+        "diff": -0.06666666666666671
+      },
+      {
+        "seed": 7161,
+        "b0": 0.4,
+        "b1": 0.4,
+        "diff": 0.0
+      },
+      {
+        "seed": 7162,
+        "b0": 0.4,
+        "b1": 0.4083333333333334,
+        "diff": 0.00833333333333336
+      },
+      {
+        "seed": 7163,
+        "b0": 0.4,
+        "b1": 0.5,
+        "diff": 0.09999999999999998
+      },
+      {
+        "seed": 7164,
+        "b0": 0.55,
+        "b1": 0.4,
+        "diff": -0.15000000000000002
+      }
+    ],
+    "seeds_passing": 0
+  },
+  "prediction_evaluation_digest": {
+    "label": "AUDIT_DERIVED_FROM_UNCHANGED_ARTIFACT",
+    "sha256_of_replay_traces_file": "064567719452887d59e0fee34e2f773db756158bd4957c0064adf3a1e6c303a6",
+    "n_traces": 1920
+  },
+  "environment_manifest": {
+    "label": "AUDIT_DERIVED_FROM_UNCHANGED_ARTIFACT",
+    "python": "3.11.15",
+    "torch": "2.2.2+cu121",
+    "platform": "Linux-6.18.5-fc-v18-x86_64-with-glibc2.39",
+    "torch_num_threads": 4
+  },
+  "git_provenance": {
+    "result_head": "422ab3e51ab669231dee1160f128364d4e5d58b4",
+    "default_base": "0c63d1f2400716ab23249c9d76805ac517e70956",
+    "scoped_branch": "claude/typed-vs-prose-result-audit"
+  }
+}

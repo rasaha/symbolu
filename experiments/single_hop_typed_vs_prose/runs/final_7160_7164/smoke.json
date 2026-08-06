@@ -1,0 +1,19 @@
+{
+  "seed": 76,
+  "arms": {
+    "B0": {
+      "first_loss": 5.313233852386475,
+      "final_loss": 0.005323188845068216,
+      "param_count": 209728,
+      "primary_partial": 0.025,
+      "mean_parse_fail": 0.0
+    },
+    "B1": {
+      "first_loss": 5.3000807762146,
+      "final_loss": 0.019602546468377113,
+      "param_count": 209728,
+      "primary_partial": 0.0,
+      "mean_parse_fail": 0.0
+    }
+  }
+}

@@ -1,0 +1,41 @@
+name: typed-vs-prose-implementation-ci
+
+on:
+  pull_request:
+    paths:
+      - "experiments/single_hop_typed_vs_prose/**"
+      - "tests/experiments/single_hop_typed_vs_prose/**"
+      - ".github/workflows/typed-vs-prose-implementation-ci.yml"
+      - "docs/research/hybrid_llm/benchmarks/SINGLE_HOP_TYPED_VS_PROSE_IMPLEMENTATION_*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mechanical-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Compile implementation
+        run: python -m compileall -q experiments/single_hop_typed_vs_prose tests/experiments/single_hop_typed_vs_prose
+
+      - name: Run bounded mechanical tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/experiments/single_hop_typed_vs_prose

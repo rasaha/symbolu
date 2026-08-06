@@ -1,0 +1,22 @@
+{
+  "label": "TYPED_STRUCTURE_SINGLE_HOP_ADVANTAGE_NOT_FOUND",
+  "reasons": [
+    "B1 mean primary=0.4350, B0 mean primary=0.4567, improvement=-0.0217",
+    "per-split B1 means S1=0.092 S2=0.067 S3=1.000 S5p=0.017 S5r=0.017 S6=1.000 S8=1.000",
+    "seeds passing (B1>=0.75 & impr>=0.05): 0/5",
+    "gate results: 1_b1_mean>=0.80=FAIL, 2_improvement>=0.08=FAIL, 3_>=4of5_seeds=FAIL, 4_persplit=FAIL, 5_tenant_zero=PASS, 6_s8>=0.90=PASS, 7_s8_no_regress=PASS, 8_info_equiv=PASS, 9_determinism=PASS, 10_shortcut=FAIL, 11_causal=FAIL, 12_compute=PASS, 13_no_deviation=PASS",
+    "evidence gate: S5 precision=0.017, recall=0.017 (need >=0.90 each)"
+  ],
+  "shortcut": {
+    "first_sorted_id_accuracy": 0.4444444444444444,
+    "lexical_overlap_accuracy": 0.6388888888888888,
+    "chance": 0.5,
+    "n_scored": 72
+  },
+  "integrity": {
+    "information_equivalence_ok": true,
+    "determinism_ok": true,
+    "compute_ok": true,
+    "no_deviation": true
+  }
+}
