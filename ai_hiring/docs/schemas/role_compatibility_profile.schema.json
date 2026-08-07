@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/role_compatibility_profile.schema.json",
+  "title": "RoleCompatibilityProfile",
+  "description": "Versioned, per-role parameterization of hiring compatibility. There is NO universal weighting model; every Job Definition owns its own profile. Weights shape only the advisory Overall Fit Index and never gate eligibility.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_id",
+    "role_ref",
+    "version",
+    "status",
+    "dimensions",
+    "dimension_weights",
+    "mandatory_gate_refs",
+    "required_evidence",
+    "minimum_confidence",
+    "decision_contract_version",
+    "lifecycle"
+  ],
+  "properties": {
+    "profile_id": { "type": "string", "description": "Stable RCP identifier." },
+    "role_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_definition_id", "role_title"],
+      "properties": {
+        "job_definition_id": { "type": "string" },
+        "role_title": { "type": "string" }
+      }
+    },
+    "version": { "type": "integer", "minimum": 1, "description": "Immutable once PUBLISHED; a change is a new version." },
+    "status": { "type": "string", "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "DEPRECATED"] },
+    "dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Role-scoped compatibility axes selected for this role. NOT a fixed universal set.",
+      "items": {
+        "type": "string",
+        "examples": [
+          "TECHNICAL",
+          "LEADERSHIP",
+          "DOMAIN",
+          "BEHAVIOR",
+          "LEARNING",
+          "OPERATING_ENVIRONMENT_COMPATIBILITY",
+          "ROLE_SUSTAINABILITY_AND_ADAPTATION"
+        ]
+      }
+    },
+    "dimension_weights": {
+      "type": "object",
+      "description": "Weights over this role's dimensions. MUST sum to 1.0 (within tolerance). Advisory only: feeds the non-binding Overall Fit Index; never gates.",
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+      "x-constraint": "sum(values) == 1.0 +/- 1e-6; keys must equal `dimensions`."
+    },
+    "mandatory_gate_refs": {
+      "type": "array",
+      "description": "References into the gate catalog. Non-compensatory; evaluated by the Decision Authority. See mandatory_gate.schema.json.",
+      "items": { "type": "string" }
+    },
+    "required_evidence": {
+      "type": "object",
+      "description": "Per dimension, evidence types that must be ADMITTED before the dimension may be scored at all.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["RESUME", "PORTFOLIO", "INTERVIEW", "CODING_ASSESSMENT", "REFERENCE_CHECK", "BACKGROUND_CHECK", "CERTIFICATION", "EMPLOYMENT_HISTORY"]
+        }
+      }
+    },
+    "minimum_confidence": {
+      "type": "object",
+      "description": "Per dimension confidence floor in [0,1]. Below the floor the dimension reports INSUFFICIENT_EVIDENCE instead of a score.",
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "decision_contract_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_by", "created_at"],
+      "properties": {
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "reviewed_by": { "type": "string" },
+        "approved_by": { "type": "string" },
+        "published_by": { "type": "string" },
+        "published_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

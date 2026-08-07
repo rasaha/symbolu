@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_recommendation.schema.json",
+  "title": "HiringRecommendation",
+  "description": "The governed, explainable output of the Decision Authority under a specific Hiring Decision Contract version. Advisory: it proposes but does not bind. NOT_ELIGIBLE is forced whenever eligibility != ELIGIBLE, regardless of fit. Contains everything needed to reconstruct the reasoning; never a black-box ranking.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recommendation_id",
+    "candidate_id",
+    "role_id",
+    "decision_contract_version",
+    "compatibility_assessment",
+    "eligibility",
+    "mandatory_gates",
+    "evidence_lineage",
+    "confidence",
+    "overall_fit_range",
+    "recommendation",
+    "explanation",
+    "approval_chain",
+    "actor_type",
+    "advisory_only"
+  ],
+  "properties": {
+    "recommendation_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "role_id": { "type": "string" },
+    "decision_contract_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "compatibility_assessment": {
+      "type": "array",
+      "items": { "$ref": "dimension_assessment.schema.json" }
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["ELIGIBLE", "NOT_ELIGIBLE", "ELIGIBILITY_PENDING"] },
+        "blocking_gate_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "mandatory_gates": {
+      "type": "array",
+      "items": { "$ref": "mandatory_gate.schema.json" }
+    },
+    "evidence_lineage": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lineage node ids backing every claim in this recommendation."
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aggregate"],
+      "properties": {
+        "aggregate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "per_dimension": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 } }
+      }
+    },
+    "overall_fit_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["range"],
+      "description": "NON-BINDING. Range label only on the policy path; the numeric value (if present) is display metadata never consumed by policy.",
+      "properties": {
+        "range": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+        "confidence_qualifier": { "type": "string", "enum": ["", "low confidence"], "default": "" },
+        "display_value": { "type": ["number", "null"], "minimum": 0, "maximum": 100, "description": "Display only. MUST NOT be read by any gate/eligibility/recommendation rule." }
+      }
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["ADVANCE", "HOLD", "DECLINE", "NOT_ELIGIBLE"],
+      "description": "Advisory. Forced to NOT_ELIGIBLE when eligibility != ELIGIBLE. ADVANCE/HOLD/DECLINE only proposed among eligible candidates."
+    },
+    "explanation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "reason_tree"],
+      "properties": {
+        "summary": { "type": "string" },
+        "reason_tree": {
+          "type": "array",
+          "description": "Structured, human-readable reasons linking eligibility, gates, and dimensions to the recommendation.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["claim", "basis"],
+            "properties": {
+              "claim": { "type": "string" },
+              "basis": { "type": "array", "items": { "type": "string" }, "description": "Lineage node ids / gate ids / dimension ids." }
+            }
+          }
+        }
+      }
+    },
+    "approval_chain": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Human approver roles required to bind (from the HDC)."
+    },
+    "actor_type": { "const": "AI", "description": "A recommendation is authored by the AI/Decision-Authority pipeline; it is never a binding decision." },
+    "advisory_only": { "const": true }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/dimension_assessment.schema.json",
+  "title": "DimensionAssessment",
+  "description": "AI-produced, advisory assessment of one role-scoped compatibility dimension. There are no bare scores: every score carries confidence and the admitted evidence lineage it consumed. The Decision Authority reasons over (evidence, confidence), not score alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dimension", "outcome", "confidence", "evidence", "reason_codes", "advisory_only"],
+  "properties": {
+    "dimension": { "type": "string", "description": "Role-scoped dimension id, e.g. TECHNICAL, OPERATING_ENVIRONMENT_COMPATIBILITY." },
+    "outcome": {
+      "type": "string",
+      "enum": ["SCORED", "INSUFFICIENT_EVIDENCE"],
+      "description": "SCORED when required evidence admitted AND confidence >= RCP floor; otherwise INSUFFICIENT_EVIDENCE."
+    },
+    "score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Present only when outcome==SCORED. Null when INSUFFICIENT_EVIDENCE."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "How much the assessor trusts this dimension's score. Low confidence is a request for more evidence, never a reason to lower the score."
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 0,
+      "description": "Admitted evidence items cited for this dimension, by lineage node.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_type", "lineage_node_id"],
+        "properties": {
+          "evidence_type": {
+            "type": "string",
+            "enum": ["RESUME", "PORTFOLIO", "INTERVIEW", "CODING_ASSESSMENT", "REFERENCE_CHECK", "BACKGROUND_CHECK", "CERTIFICATION", "EMPLOYMENT_HISTORY"]
+          },
+          "lineage_node_id": { "type": "string", "description": "Evidence Lineage DAG node this claim consumed." }
+        }
+      }
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Structured, controlled-vocabulary reasons supporting the outcome."
+    },
+    "gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "What evidence, if admitted, would raise confidence or resolve INSUFFICIENT_EVIDENCE."
+    },
+    "advisory_only": {
+      "const": true,
+      "description": "Hard invariant: a dimension assessment is advisory and can never be a decision."
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/evidence_record.schema.json",
+  "title": "EvidenceRecord",
+  "description": "An immutable evidence item and its TAP admission decision. Evidence enters scoring ONLY if admitted. Rejected evidence must have no effect on any assessment, gate, index, or recommendation, and its rejection is itself recorded. Protected/prohibited fields are quarantined at admission (fail-closed) and can never reach a dimension, gate, or index.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "candidate_id", "role_id", "evidence_type", "content_hash", "admission", "lineage"],
+  "properties": {
+    "evidence_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "role_id": { "type": "string" },
+    "evidence_type": {
+      "type": "string",
+      "enum": ["RESUME", "PORTFOLIO", "INTERVIEW", "CODING_ASSESSMENT", "REFERENCE_CHECK", "BACKGROUND_CHECK", "CERTIFICATION", "EMPLOYMENT_HISTORY"]
+    },
+    "content_hash": { "type": "string", "description": "Hash of normalized content for reconstruction/tamper-evidence." },
+    "version": { "type": "integer", "minimum": 1, "default": 1 },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "tap_stage_results"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["ADMITTED", "REJECTED", "QUARANTINED", "MANUAL_REVIEW"] },
+        "reason": { "type": "string" },
+        "tap_stage_results": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-stage TAP outcome (E1 Intent, E2 Trusted Retrieval, E3 Relationship Truth, E4 Governance Resolution, E5 Evidence Assembly).",
+          "properties": {
+            "e1_intent": { "type": "string" },
+            "e2_trusted_retrieval": { "type": "string" },
+            "e3_relationship_truth": { "type": "string" },
+            "e4_governance_resolution": { "type": "string" },
+            "e5_evidence_assembly": { "type": "string" }
+          }
+        },
+        "prohibited_fields_quarantined": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Protected-attribute / prohibited fields stripped at admission. Never reach scoring."
+        }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "parents"],
+      "properties": {
+        "node_id": { "type": "string", "description": "This item's Evidence Lineage DAG node id." },
+        "parents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Upstream lineage nodes (raw submission -> normalization -> admission)."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "admission": { "properties": { "decision": { "not": { "const": "ADMITTED" } } } } } },
+      "then": { "description": "Non-admitted evidence MUST NOT be cited by any DimensionAssessment.evidence[], MandatoryGate.deciding_evidence[], or recommendation claim." }
+    }
+  ]
+}

@@ -1,3 +1,26 @@
+> ## → Reconstructed as **Hiring Decision Authority**
+>
+> This module is being re-founded from an "AI Hiring" / universal
+> candidate-scoring product into an **Enterprise Hiring Decision Authority**,
+> aligned with Ugence Decision Governance (Decision Authority, ActionGate, TAP,
+> Runtime Assurance, Decision Contracts, Evidence Lineage, Reconciliation).
+> **AI assists; the Decision Authority decides the governed recommendation; a
+> human holds binding authority.**
+>
+> The reconstruction specification is
+> [`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md),
+> with normative data contracts in [`docs/schemas/`](docs/schemas/). It removes
+> universal candidate scoring; introduces per-role **Role Compatibility
+> Profiles** and **Hiring Decision Contracts**; replaces *Culture Fit* with
+> **Operating Environment Compatibility** and *Resilience* with **Role
+> Sustainability & Adaptation**; separates **Compatibility from Eligibility**;
+> makes the **Overall Fit Index non-binding**; enforces **non-compensatory
+> mandatory gates**; admits evidence only through **TAP**; and closes the loop
+> with **1/3/6/12-month calibration**. The Phase 1–4C notes below document the
+> already-implemented governed spine (advisory/binding split, evidence pipeline,
+> decision cases, action requests, CER, reconciliation) that the reconstruction
+> builds on; see spec §19 for the migration mapping.
+
 # AI-Assisted Hiring Framework — Module (Phase 1: Foundation)
 
 An **isolated** module implementing the *foundation* of the AI-Assisted Hiring
