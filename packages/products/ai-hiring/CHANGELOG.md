@@ -7,6 +7,46 @@ the **distribution** (wheel packaging) version, which is distinct from the
 The format follows [Keep a Changelog](https://keepachangelog.com/); the
 distribution uses pre-1.0 semantic versioning.
 
+## [Unreleased] — Hiring Decision Authority: policy plane (PWC → IR → Contract)
+
+Implements spec §21 step 1 of
+[`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md).
+Additive only: new `ugence_ai_hiring.hiring_policy` package (canonical re-export
+at `ugence_ai_hiring.hiring.policy`); no existing API changed; no product
+behavior changed; `production_certified` remains `False`.
+
+### Added
+- **`hiring_policy` package** — the governance-first authoring surface, mirroring
+  the platform Policy Workflow Compiler / WorkflowIR / Decision Contract pattern:
+  - `HiringPolicy` — declarative, human-authored policy source (HR declares
+    requirements, not weights).
+  - `HiringPolicyCompiler` (PWC) — compiles a policy into a signed,
+    content-addressed `HiringWorkflowIR` (`hiring_workflow_ir.v1`); derivation is
+    deterministic (same policy → same digest).
+  - `HiringWorkflowIR` — canonical compiled artifact (dimensions, normalized
+    weights summing to 1.0, mandatory gates, per-dimension required evidence,
+    confidence thresholds, action constraints, runtime-assurance checks, human
+    approval chain), with a SHA-256 content digest over its semantic body and a
+    detached signature (offline `DeterministicHMACSigner`).
+  - `HiringDecisionContract` + `project_contract()` — a deployable projection of
+    one IR digest, carrying `compiled_from` provenance; projection verifies the
+    IR digest (and signature when a signer is supplied) and refuses a tampered IR.
+- **Compile-time rejections** enforcing the invariants: (a) no Overall Fit Index
+  reference and no forbidden legacy dimension (`CULTURE_FIT`→Operating Environment
+  Compatibility, `RESILIENCE`→Role Sustainability & Adaptation); (b) mandatory
+  requirements are gates, never weighted/compensable dimensions; (c) every
+  weighted dimension declares required evidence; (d) human-only approval chain;
+  (e) action constraints within some approver's authority; (f) constrained actions
+  carry the required runtime-assurance checks. All violations are reported at once.
+- 22 tests (`tests/test_hiring_policy_compiler.py`).
+
+### Notes
+- The Overall Fit Index is structurally absent from the IR and contract (it is
+  analytics-only and never enters policy). This layer authors/compiles/signs/
+  projects policy only — it does not evaluate gates, score candidates, gate
+  actions, run runtime assurance, write to any HRIS/ATS, or make/authorize a
+  decision (later spine stages; spec §21 steps 2–7).
+
 ## [0.1.1] — Canonical TAP / ActionGate dependency normalization
 
 A **packaging / dependency-metadata change only.** The AI Hiring **product
