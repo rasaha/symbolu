@@ -77,7 +77,12 @@
         "salary": { "type": "number", "minimum": 0 },
         "salary_currency": { "type": "string", "default": "USD" },
         "role": { "type": "string" },
-        "location": { "type": "string" }
+        "location": { "type": "string" },
+        "employment_type": {
+          "type": "string",
+          "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "TEMPORARY"],
+          "default": "FULL_TIME"
+        }
       }
     },
     "recommendation": {
@@ -112,6 +117,10 @@
       "description": "Human approver roles required to bind (from the HDC)."
     },
     "actor_type": { "const": "AI", "description": "A recommendation is authored by the AI/Decision-Authority pipeline; it is never a binding decision." },
-    "advisory_only": { "const": true }
+    "advisory_only": { "const": true },
+    "binding": {
+      "const": false,
+      "description": "A recommendation is always advisory here. It becomes binding only when the external shared Decision Authority adjudicates it (DecisionAuthorityPort), which yields a separate HUMAN-authored BindingDecision — never a mutation of this object."
+    }
   }
 }

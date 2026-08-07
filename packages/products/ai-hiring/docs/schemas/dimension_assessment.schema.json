@@ -2,16 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ugence.ai/schemas/hiring/dimension_assessment.schema.json",
   "title": "DimensionAssessment",
-  "description": "AI-produced, advisory assessment of one role-scoped compatibility dimension. There are no bare scores: every score carries confidence and the admitted evidence lineage it consumed. The Decision Authority reasons over (evidence, confidence), not score alone.",
+  "description": "AI-produced, advisory assessment of one role-scoped compatibility dimension. There are no bare scores: every scored dimension carries confidence, the admitted evidence it consumed (by lineage node), an assessment version, and rationale/provenance. The Decision Authority reasons over (evidence, confidence), not score alone. This schema tracks the implemented domain model ugence_ai_hiring.hiring_decision.assessment.DimensionAssessment.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["dimension", "outcome", "confidence", "evidence", "reason_codes", "advisory_only"],
+  "required": ["dimension", "outcome", "confidence", "evidence_refs", "assessment_version", "provenance", "advisory_only"],
   "properties": {
-    "dimension": { "type": "string", "description": "Role-scoped dimension id, e.g. TECHNICAL, OPERATING_ENVIRONMENT_COMPATIBILITY." },
+    "dimension": { "type": "string", "description": "Role-scoped dimension id, e.g. TECHNICAL, OPERATING_ENVIRONMENT_COMPATIBILITY. CULTURE_FIT and RESILIENCE are forbidden." },
     "outcome": {
       "type": "string",
       "enum": ["SCORED", "INSUFFICIENT_EVIDENCE"],
-      "description": "SCORED when required evidence admitted AND confidence >= RCP floor; otherwise INSUFFICIENT_EVIDENCE."
+      "description": "SCORED when required evidence admitted AND confidence >= floor; otherwise INSUFFICIENT_EVIDENCE."
     },
     "score": {
       "type": ["number", "null"],
@@ -25,32 +25,44 @@
       "maximum": 1,
       "description": "How much the assessor trusts this dimension's score. Low confidence is a request for more evidence, never a reason to lower the score."
     },
-    "evidence": {
+    "evidence_refs": {
       "type": "array",
       "minItems": 0,
-      "description": "Admitted evidence items cited for this dimension, by lineage node.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["evidence_type", "lineage_node_id"],
-        "properties": {
-          "evidence_type": {
-            "type": "string",
-            "enum": ["RESUME", "PORTFOLIO", "INTERVIEW", "CODING_ASSESSMENT", "REFERENCE_CHECK", "BACKGROUND_CHECK", "CERTIFICATION", "EMPLOYMENT_HISTORY"]
-          },
-          "lineage_node_id": { "type": "string", "description": "Evidence Lineage DAG node this claim consumed." }
-        }
-      }
+      "items": { "type": "string" },
+      "description": "Admitted Evidence Lineage node ids this assessment consumed. A SCORED assessment must cite at least one."
     },
-    "reason_codes": {
+    "assessment_version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Version of this candidate/dimension assessment; a re-assessment increments it."
+    },
+    "rationale": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Structured, controlled-vocabulary reasons supporting the outcome."
+      "description": "Structured reasons supporting the outcome."
     },
     "gaps": {
       "type": "array",
       "items": { "type": "string" },
       "description": "What evidence, if admitted, would raise confidence or resolve INSUFFICIENT_EVIDENCE."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine"],
+      "description": "Where the assessment came from (engine/model identity + time).",
+      "properties": {
+        "engine": { "type": "string" },
+        "model_id": { "type": "string" },
+        "model_version": { "type": "string" },
+        "produced_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "pre_hire_justified": {
+      "type": "boolean",
+      "default": false,
+      "description": "ROLE_SUSTAINABILITY_AND_ADAPTATION is post-hire-oriented; it may be SCORED pre-hire only when this is true, backed by job-relevant evidence."
     },
     "advisory_only": {
       "const": true,

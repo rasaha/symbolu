@@ -36,6 +36,7 @@ Authority → ActionGate → Runtime Assurance → Execution Receipt → Reconci
 
 | Schema | Contract | Spec §|
 |---|---|---|
+| [`hiring_action_request.schema.json`](hiring_action_request.schema.json) | **HiringActionRequest** — hiring-domain action contract (candidate/role/level/comp/location/employment-type + decision & contract provenance); `to_cer_payload()` translates to the shared ActionGate / CER. | 9 |
 | [`hiring_actiongate.schema.json`](hiring_actiongate.schema.json) | **Hiring ActionGate** — final action must match contract constraints (salary/level/role/location/approvals) or `DENY_REAUTH`. | 9 |
 | [`hiring_runtime_assurance.schema.json`](hiring_runtime_assurance.schema.json) | **Runtime Assurance** — pre-write checks (approvals, references, bg-check, offer, salary policy, req) before HRIS/ATS. | 10 |
 | [`hiring_execution_receipt.schema.json`](hiring_execution_receipt.schema.json) | **Execution Receipt** — attempted vs observed HRIS/ATS write. | 11 |

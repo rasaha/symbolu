@@ -759,6 +759,45 @@ reconciliation planes**; it does not rewrite the kernel.
    reviews to a calibration proposal that recompiles the policy.
 7. Deprecate universal-scoring surfaces and hand-authored profiles.
 
+### 21.1 Build status (implemented increments)
+
+The reconstruction is being landed additively in the canonical package
+(`ugence_ai_hiring`), leaving the legacy universal-scoring modules untouched
+until step 7.
+
+- **Step 1 — DONE.** `ugence_ai_hiring.hiring_policy`: `HiringPolicy` →
+  `HiringPolicyCompiler` (PWC) → signed, content-addressed `HiringWorkflowIR`
+  (`hiring_workflow_ir.v1`) → projected `HiringDecisionContract`, with the six
+  compile-time rejections (§3.2).
+- **Steps 2–3, 4, 6 (models), 9 — DONE.** `ugence_ai_hiring.hiring_decision`:
+  - `DimensionAssessment` (score, confidence, evidence_refs, assessment_version,
+    rationale, provenance; forbids CULTURE_FIT/RESILIENCE; keeps Role
+    Sustainability post-hire unless explicitly justified).
+  - `MandatoryGateEvaluator` — deterministic, admitted-evidence-only, fail-closed
+    (`PASS`/`FAIL`/`INDETERMINATE`); unadmitted evidence is inert.
+  - `Eligibility` + `derive_eligibility` — from gates only; no score input.
+  - `HiringRecommendation` + `build_recommendation` — advisory
+    (`actor_type=AI`, `binding=False`); forces `NOT_ELIGIBLE` on gate failure;
+    never reads the OFI.
+  - `HiringDecisionCase` — aggregate root; binding only via a
+    `DecisionAuthorityOutcome` (HUMAN, binding=True).
+  - `HiringActionRequest` + `to_cer_payload()` — hiring-domain action contract
+    translated to the neutral CER / shared-ActionGate payload.
+  - Post-hire `ReviewRecord` / `ReviewObservation` and `CalibrationProposal`
+    (recompiles a policy into the next contract version; **no hidden-weight
+    retraining**).
+  - **Analytics-only** `OverallFitIndex` in `hiring_decision.analytics`, not
+    importable from gate/eligibility/policy code (enforced by tests).
+- **Integration ports (interfaces only).** `EvidenceAdmissionPort` → TAP;
+  `DecisionAuthorityPort`; `ActionAuthorizationPort` → ActionGate;
+  `RuntimeAssurancePort` → Runtime Assurance / ACP; `ReconciliationPort`. Shared
+  capabilities are **referenced, never copied**; the package imports and runs
+  standalone with test adapters (no platform required at import).
+- **Not yet built (later increments):** the shared-side ActionGate/Runtime
+  Assurance/Execution/Reconciliation *implementations* (they are platform
+  services behind the ports), production HRIS/ATS adapters, and the deprecation
+  of the legacy universal-scoring surfaces (step 7).
+
 ---
 
 ## 22. Glossary
