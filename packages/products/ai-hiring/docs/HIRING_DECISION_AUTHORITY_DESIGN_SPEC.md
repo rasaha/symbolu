@@ -788,15 +788,36 @@ until step 7.
     retraining**).
   - **Analytics-only** `OverallFitIndex` in `hiring_decision.analytics`, not
     importable from gate/eligibility/policy code (enforced by tests).
+- **Step 5 — DONE (orchestration, ports only).**
+  `ugence_ai_hiring.hiring_decision.service.HiringDecisionService`: the thin spine
+  `build action request → ActionGate authorization → Runtime Assurance → HRIS
+  execution handoff → Execution Receipt → Reconciliation`. Ordering is enforced
+  structurally (`assure` takes only an `AuthorizedAction`; `execute` takes only a
+  `ClearedAction`) and fail-closed at every hop: no binding decision / not
+  eligible / wrong disposition → no action; ActionGate denial → assurance never
+  runs; assurance not clear → no HRIS execution; any action mutation after
+  authorization → reject.
+  - `HiringExecutionReceipt` — immutable record (case id, contract digest+version,
+    binding decision + authority, action-request digest, ActionGate ref, assurance
+    ref, HRIS ref, actor, authorized/assured/executed timestamps, status, result
+    digest).
+  - `HiringReconciliationRecord` — **execution reconciliation** (authorized vs
+    executed action + HRIS state → RECONCILED/DEVIATION/PARTIAL/FAILED/UNKNOWN);
+    distinct from the post-hire predicted-vs-actual reconciliation of step 6.
+    The shared cross-system reconciliation engine stays external
+    (`ReconciliationPort`); this record is the hiring-domain view.
 - **Integration ports (interfaces only).** `EvidenceAdmissionPort` → TAP;
   `DecisionAuthorityPort`; `ActionAuthorizationPort` → ActionGate;
-  `RuntimeAssurancePort` → Runtime Assurance / ACP; `ReconciliationPort`. Shared
-  capabilities are **referenced, never copied**; the package imports and runs
-  standalone with test adapters (no platform required at import).
+  `RuntimeAssurancePort` → Runtime Assurance / ACP; `HRISExecutionPort` → HRIS/ATS
+  (execution handoff); `ReconciliationPort`. Shared capabilities are
+  **referenced, never copied**; the package imports and runs standalone with test
+  adapters (no platform required at import).
 - **Not yet built (later increments):** the shared-side ActionGate/Runtime
-  Assurance/Execution/Reconciliation *implementations* (they are platform
-  services behind the ports), production HRIS/ATS adapters, and the deprecation
-  of the legacy universal-scoring surfaces (step 7).
+  Assurance/Execution/Reconciliation *implementations* (platform services behind
+  the ports), production HRIS/ATS provider connectors, the **post-hire
+  1/3/6/12-month closed-loop calibration path** (step 6 — the recommended next
+  major work), and the deprecation of the legacy universal-scoring surfaces
+  (step 7).
 
 ---
 

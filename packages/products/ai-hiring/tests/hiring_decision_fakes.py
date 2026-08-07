@@ -7,10 +7,12 @@ Ugence service. They are test doubles, not the real capabilities.
 
 from __future__ import annotations
 
+from ugence_ai_hiring.hiring_decision.action_request import HiringActionSnapshot
 from ugence_ai_hiring.hiring_decision.enums import (
     ActionAuthorizationVerdict,
     AssuranceResult,
     DecisionDisposition,
+    ExecutionStatus,
     Trajectory,
 )
 from ugence_ai_hiring.hiring_decision.ports import (
@@ -20,6 +22,7 @@ from ugence_ai_hiring.hiring_decision.ports import (
     AssuranceOutcome,
     DecisionAuthorityOutcome,
     EvidenceSubmission,
+    ExecutionOutcome,
     ReconciliationOutcome,
 )
 from ugence_ai_hiring.hiring_decision.refs import ContractRef
@@ -93,3 +96,38 @@ class FakeRuntimeAssurancePort:
 class FakeReconciliationPort:
     def reconcile(self, case_id: str, review_record_id: str) -> ReconciliationOutcome:
         return ReconciliationOutcome(case_id=case_id, trajectory=Trajectory.ON_TRACK)
+
+
+class FakeHRISExecutionPort:
+    """Echoes the authorized action as executed (RECONCILED path) by default."""
+
+    def __init__(
+        self,
+        *,
+        status: ExecutionStatus = ExecutionStatus.SUCCEEDED,
+        mirror: bool = True,
+        hris_state: dict | None = None,
+    ) -> None:
+        self._status = status
+        self._mirror = mirror
+        self._hris_state = {"worker_id": "W123"} if hris_state is None else hris_state
+
+    def execute(self, cer_payload: dict) -> ExecutionOutcome:
+        a = cer_payload["action"]
+        executed = None
+        if self._mirror and self._status is ExecutionStatus.SUCCEEDED:
+            executed = HiringActionSnapshot(
+                level=a["level"],
+                salary=a["salary_ceiling"],
+                salary_currency=a["currency"],
+                role_id=cer_payload["subject"]["role_id"],
+                location=a["location"],
+                employment_type=a["employment_type"],
+            )
+        return ExecutionOutcome(
+            execution_reference="hris-exec-1",
+            status=self._status,
+            result_digest="result-digest-1",
+            executed_action=executed,
+            hris_state=dict(self._hris_state),
+        )

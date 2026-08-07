@@ -7,6 +7,49 @@ the **distribution** (wheel packaging) version, which is distinct from the
 The format follows [Keep a Changelog](https://keepachangelog.com/); the
 distribution uses pre-1.0 semantic versioning.
 
+## [Unreleased] — Hiring Decision Authority: action-assurance orchestration spine
+
+Implements spec §21 step 5. Additive only: new orchestrator + artifacts inside
+`ugence_ai_hiring.hiring_decision`; no existing API changed; no product behavior
+changed; `production_certified` remains `False`. Full suite 864 passed / 12
+skipped (22 new tests); `python -m ugence_ai_hiring verify` PASS.
+
+### Added
+- **`HiringDecisionService`** (`hiring_decision.service`) — thin orchestrator:
+  `build action request → ActionGate authorization → Runtime Assurance → HRIS
+  execution handoff → Execution Receipt → Reconciliation`. Ordering is enforced
+  structurally (`assure` accepts only an `AuthorizedAction`; `execute` accepts
+  only a `ClearedAction`).
+- **Fail-closed guards:** no binding decision / not eligible / eligibility pending
+  / wrong disposition / contract mismatch → no action request; ActionGate denial →
+  runtime assurance never runs; runtime not clear → no HRIS execution; action
+  payload mutation after authorization → reject.
+- **`HiringExecutionReceipt`** (`hiring_decision.execution`) — immutable record:
+  decision case id, contract digest+version, binding decision + authority ref,
+  action-request digest, ActionGate ref, Runtime Assurance ref, HRIS/ATS ref,
+  actor, authorized/assured/executed timestamps, execution status, result digest.
+- **`HiringReconciliationRecord`** + `classify_reconciliation` /
+  `build_reconciliation_record` — execution reconciliation comparing authorized vs
+  executed action + HRIS state → `RECONCILED` / `DEVIATION` / `PARTIAL` /
+  `FAILED` / `UNKNOWN`. The shared cross-system reconciliation engine stays
+  external (`ReconciliationPort`).
+- **`HRISExecutionPort`** + `ExecutionOutcome` — execution-handoff integration
+  boundary (no provider-specific connectors). `ActionAuthorizationOutcome` /
+  `AssuranceOutcome` gained reference ids + `authorized_action_digest` (additive).
+- **`HiringActionRequest.content_digest`** (semantic action digest, excludes the
+  random id) + `.snapshot()`; `to_cer_payload()` now carries `action_digest`.
+- 22 tests (`tests/test_hiring_action_assurance.py`) covering sequencing,
+  fail-closed behavior, payload binding, port-call ordering, standalone operation,
+  receipt integrity, and reconciliation classification.
+
+### Changed (design contracts)
+- `docs/schemas/hiring_execution_receipt.schema.json` — aligned to the implemented
+  execution receipt.
+- `docs/schemas/hiring_reconciliation_record.schema.json` — repurposed to the
+  implemented **execution** reconciliation (authorized vs executed + status);
+  post-hire predicted-vs-actual stays in `review_and_calibration.schema.json`.
+- `docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md` §21.1 — step 5 build status.
+
 ## [Unreleased] — Hiring Decision Authority: decision plane (assessment → gates → eligibility → recommendation)
 
 Implements spec §21 steps 2–4, 6 (models), and 9. Additive only: new

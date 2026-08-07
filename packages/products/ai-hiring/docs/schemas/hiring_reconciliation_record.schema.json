@@ -2,17 +2,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ugence.ai/schemas/hiring/hiring_reconciliation_record.schema.json",
   "title": "HiringReconciliationRecord",
-  "description": "Closes the governance loop, mirroring the platform Reconciliation pattern. Links a decision's PREDICTED dimension compatibility to ACTUAL outcomes observed at 1/3/6/12 months (incl. the 90-day trajectory), and yields a governed calibration proposal that RECOMPILES the policy into a new contract version. Never tunes hidden model weights; never edits history. Answers: why hired, did the prediction hold, which evidence was wrong, which dimension failed, should the policy/weight/gate change.",
+  "description": "Execution-time reconciliation: the hiring-domain comparison of the AUTHORIZED action against the EXECUTED action and the resulting HRIS state, emitting RECONCILED / DEVIATION / PARTIAL / FAILED / UNKNOWN. The shared cross-system reconciliation ENGINE stays external (ReconciliationPort); this record is the hiring-domain view only, optionally referencing the external run. (Post-hire 1/3/6/12-month predicted-vs-actual reconciliation and calibration is a separate concern — see review_and_calibration.schema.json.) Tracks ugence_ai_hiring.hiring_decision.execution.HiringReconciliationRecord.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["record_id", "candidate_id", "role_id", "decision_id", "execution_receipt_id", "contract_ref", "checkpoint", "predicted_vs_actual", "questions_answered"],
+  "required": ["record_id", "decision_case_id", "contract_ref", "receipt_id", "authorized_action", "status"],
+  "$defs": {
+    "actionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "salary", "role_id", "location", "employment_type"],
+      "properties": {
+        "level": { "type": "string" },
+        "salary": { "type": "number", "minimum": 0 },
+        "salary_currency": { "type": "string", "default": "USD" },
+        "role_id": { "type": "string" },
+        "location": { "type": "string" },
+        "employment_type": { "type": "string", "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "TEMPORARY"] }
+      }
+    }
+  },
   "properties": {
     "record_id": { "type": "string" },
-    "candidate_id": { "type": "string" },
-    "role_id": { "type": "string" },
-    "decision_id": { "type": "string" },
-    "execution_receipt_id": { "type": "string" },
-    "source_recommendation_id": { "type": "string" },
+    "decision_case_id": { "type": "string" },
     "contract_ref": {
       "type": "object",
       "additionalProperties": false,
@@ -23,54 +34,16 @@
         "ir_digest": { "type": "string" }
       }
     },
-    "checkpoint": { "type": "string", "enum": ["ONE_MONTH", "THREE_MONTH", "SIX_MONTH", "TWELVE_MONTH"] },
-    "trajectory": {
+    "receipt_id": { "type": "string" },
+    "authorized_action": { "$ref": "#/$defs/actionSnapshot" },
+    "executed_action": { "anyOf": [{ "$ref": "#/$defs/actionSnapshot" }, { "type": "null" }] },
+    "hris_state": { "type": "object" },
+    "status": {
       "type": "string",
-      "enum": ["ON_TRACK", "OUTPERFORMING", "UNDERPERFORMING", "AT_RISK", "EXITED"],
-      "description": "Rollup trajectory (90-day and beyond)."
+      "enum": ["RECONCILED", "DEVIATION", "PARTIAL", "FAILED", "UNKNOWN"],
+      "description": "RECONCILED: executed == authorized and HRIS state confirms. DEVIATION: executed differs. PARTIAL: executed matches but HRIS state unconfirmed. FAILED: execution failed. UNKNOWN: outcome unknown / no executed action."
     },
-    "predicted_vs_actual": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["dimension", "predicted", "actual", "outcome_evidence"],
-        "properties": {
-          "dimension": { "type": "string" },
-          "predicted": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-          "actual": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-          "delta": { "type": ["number", "null"], "description": "actual - predicted." },
-          "verdict": { "type": "string", "enum": ["HELD", "OVER_PREDICTED", "UNDER_PREDICTED"] },
-          "outcome_evidence": {
-            "type": "array",
-            "items": { "type": "string", "enum": ["ONBOARDING", "MANAGER_REVIEW", "PERFORMANCE_GOAL", "COLLABORATION", "DELIVERY", "RETENTION"] }
-          }
-        }
-      }
-    },
-    "questions_answered": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "The closed-loop governance questions this record makes answerable.",
-      "properties": {
-        "why_hired": { "type": "string", "description": "Reason tree / recommendation ref." },
-        "did_prediction_hold": { "type": "boolean" },
-        "which_evidence_was_wrong": { "type": "array", "items": { "type": "string" } },
-        "which_dimension_failed": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "calibration_proposal": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Governed proposal to recompile the policy. Applies to the NEXT contract version only.",
-      "properties": {
-        "targets": { "type": "array", "items": { "type": "string", "enum": ["DIMENSION_WEIGHTS", "CONFIDENCE_THRESHOLDS", "EVIDENCE_REQUIREMENTS", "MANDATORY_GATES", "ACTION_CONSTRAINTS"] } },
-        "rationale": { "type": "string" },
-        "recompile_policy_id": { "type": "string" },
-        "proposed_ir_version": { "type": "string" },
-        "status": { "type": "string", "enum": ["PROPOSED", "IN_REVIEW", "APPROVED", "RECOMPILED", "REJECTED"], "default": "PROPOSED" }
-      }
-    }
+    "external_reconciliation_ref": { "type": ["string", "null"], "description": "Reference from the shared Reconciliation engine (ReconciliationPort), when invoked." },
+    "reconciled_at": { "type": "string", "format": "date-time" }
   }
 }

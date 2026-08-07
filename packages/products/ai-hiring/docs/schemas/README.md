@@ -45,8 +45,8 @@ Authority → ActionGate → Runtime Assurance → Execution Receipt → Reconci
 
 | Schema | Contract | Spec §|
 |---|---|---|
-| [`hiring_reconciliation_record.schema.json`](hiring_reconciliation_record.schema.json) | **Reconciliation Record** — predicted vs actual at 1/3/6/12 months → recompile the policy. | 11, 12 |
-| [`review_and_calibration.schema.json`](review_and_calibration.schema.json) | Per-checkpoint review observations feeding reconciliation. | 12 |
+| [`hiring_reconciliation_record.schema.json`](hiring_reconciliation_record.schema.json) | **Execution Reconciliation Record** — authorized vs executed action + HRIS state → RECONCILED/DEVIATION/PARTIAL/FAILED/UNKNOWN (shared engine stays external via `ReconciliationPort`). | 11 |
+| [`review_and_calibration.schema.json`](review_and_calibration.schema.json) | **Post-hire** 1/3/6/12-month predicted-vs-actual reviews + calibration proposal (recompiles the policy). Distinct from execution reconciliation above. | 12 |
 
 ## API
 

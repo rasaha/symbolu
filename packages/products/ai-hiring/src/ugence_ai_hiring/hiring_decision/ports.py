@@ -18,10 +18,12 @@ from pydantic import Field
 
 from ..domain.base import DomainModel
 from ..hiring_policy.enums import HiringEvidenceClass, RuntimeAssuranceCheck
+from .action_request import HiringActionSnapshot
 from .enums import (
     ActionAuthorizationVerdict,
     AssuranceResult,
     DecisionDisposition,
+    ExecutionStatus,
     Trajectory,
 )
 from .refs import ContractRef
@@ -81,6 +83,16 @@ class ActionAuthorizationOutcome(DomainModel):
     verdict: ActionAuthorizationVerdict
     reason: str = ""
     constraints: tuple[str, ...] = ()
+    authorization_id: str = ""
+    # The action digest the shared gate actually authorized; the orchestrator
+    # compares it to the presented action to detect any mutation.
+    authorized_action_digest: str = ""
+
+    def is_authorized(self) -> bool:
+        return self.verdict in (
+            ActionAuthorizationVerdict.AUTHORIZED,
+            ActionAuthorizationVerdict.AUTHORIZED_WITH_CONSTRAINTS,
+        )
 
 
 @runtime_checkable
@@ -104,6 +116,10 @@ class AssuranceCheckResult(DomainModel):
 class AssuranceOutcome(DomainModel):
     result: AssuranceResult
     check_results: tuple[AssuranceCheckResult, ...] = ()
+    assurance_id: str = ""
+
+    def is_clear(self) -> bool:
+        return self.result is AssuranceResult.ASSURED
 
     def failed_checks(self) -> tuple[RuntimeAssuranceCheck, ...]:
         return tuple(c.check for c in self.check_results if not c.passed)
@@ -130,3 +146,31 @@ class ReconciliationPort(Protocol):
     """Reconciles predicted vs observed outcomes via shared Reconciliation."""
 
     def reconcile(self, case_id: str, review_record_id: str) -> ReconciliationOutcome: ...
+
+
+# --- HRISExecutionPort → HRIS/ATS (execution handoff) --------------------
+class ExecutionOutcome(DomainModel):
+    """The result of handing an authorized, assured action off to the HRIS/ATS.
+
+    Authorization + assurance permit an execution *attempt*; this is what the
+    external system reported back. ``executed_action`` is what the HRIS actually
+    wrote (for reconciliation vs the authorized action).
+    """
+
+    execution_reference: str
+    status: ExecutionStatus
+    result_digest: str = ""
+    executed_action: Optional[HiringActionSnapshot] = None
+    hris_state: dict = {}
+
+
+@runtime_checkable
+class HRISExecutionPort(Protocol):
+    """Hands off an authorized + assured action to the HRIS/ATS.
+
+    Interface only — provider-specific connectors are NOT implemented here. The
+    orchestrator calls this exactly once, and only after both action
+    authorization and runtime assurance pass.
+    """
+
+    def execute(self, cer_payload: dict) -> ExecutionOutcome: ...

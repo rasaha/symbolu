@@ -120,3 +120,26 @@ class ActionAuthorizationVerdict(str, Enum):
 class AssuranceResult(str, Enum):
     ASSURED = "ASSURED"
     BLOCKED = "BLOCKED"
+
+
+class ExecutionStatus(str, Enum):
+    """Outcome of an HRIS/ATS execution *attempt*. Authorization != execution:
+    a timeout yields OUTCOME_UNKNOWN, never SUCCEEDED."""
+
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
+
+
+class ReconciliationStatus(str, Enum):
+    """Local hiring-domain equivalence of authorized vs executed action + HRIS state.
+
+    The shared, cross-system reconciliation engine stays external (ReconciliationPort);
+    this status is the hiring-domain view only.
+    """
+
+    RECONCILED = "RECONCILED"
+    DEVIATION = "DEVIATION"
+    PARTIAL = "PARTIAL"
+    FAILED = "FAILED"
+    UNKNOWN = "UNKNOWN"

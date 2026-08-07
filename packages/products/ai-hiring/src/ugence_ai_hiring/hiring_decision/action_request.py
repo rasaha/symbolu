@@ -13,11 +13,27 @@ from typing import Optional
 
 from pydantic import Field, model_validator
 
-from ..common import new_id
+from ..common import canonical_hash, new_id
 from ..domain.base import DomainModel
 from ..errors import DomainValidationError
 from .enums import EmploymentType
 from .refs import ContractRef
+
+
+class HiringActionSnapshot(DomainModel):
+    """A comparable snapshot of a concrete hiring action.
+
+    Used to compare the *authorized* action against the *executed* action during
+    reconciliation. Frozen models compare by value, so ``==`` is the equivalence
+    test.
+    """
+
+    level: str
+    salary: float = Field(ge=0)
+    salary_currency: str = "USD"
+    role_id: str
+    location: str
+    employment_type: EmploymentType
 
 
 class CompensationBounds(DomainModel):
@@ -57,14 +73,9 @@ class HiringActionRequest(DomainModel):
                 raise DomainValidationError(f"{field} is required")
         return self
 
-    def to_cer_payload(self) -> dict:
-        """Translate to the neutral CER / shared-ActionGate payload.
-
-        Deliberately platform-agnostic (a plain dict): an adapter maps this onto
-        the concrete Context Envelope Record / ActionGate request. Carries full
-        decision + contract provenance so the shared gate can bind the action to
-        the authority that approved it.
-        """
+    def _digest_body(self) -> dict:
+        """The semantic action payload the content digest covers (excludes the
+        random ``action_request_id`` so the digest is a pure function of the action)."""
         return {
             "action_type": "HIRING_OFFER",
             "subject": {"candidate_id": self.candidate_id, "role_id": self.role_id},
@@ -83,5 +94,36 @@ class HiringActionRequest(DomainModel):
                 "decision_id": self.decision_id,
                 "recommendation_id": self.recommendation_id,
             },
+        }
+
+    @property
+    def content_digest(self) -> str:
+        """SHA-256 over the semantic action payload. Binds authorization to the
+        exact action; any post-authorization mutation changes this digest."""
+        return canonical_hash(self._digest_body())
+
+    def snapshot(self) -> HiringActionSnapshot:
+        """A comparable snapshot of the authorized action (salary = ceiling)."""
+        return HiringActionSnapshot(
+            level=self.level,
+            salary=self.compensation.salary_ceiling,
+            salary_currency=self.compensation.currency,
+            role_id=self.role_id,
+            location=self.location,
+            employment_type=self.employment_type,
+        )
+
+    def to_cer_payload(self) -> dict:
+        """Translate to the neutral CER / shared-ActionGate payload.
+
+        Deliberately platform-agnostic (a plain dict): an adapter maps this onto
+        the concrete Context Envelope Record / ActionGate request. Carries full
+        decision + contract provenance and the action digest so the shared gate
+        can bind its authorization to the exact action presented.
+        """
+        body = self._digest_body()
+        return {
+            **body,
             "action_request_id": self.action_request_id,
+            "action_digest": self.content_digest,
         }

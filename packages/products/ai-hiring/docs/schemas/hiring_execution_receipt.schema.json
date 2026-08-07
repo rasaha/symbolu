@@ -2,16 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ugence.ai/schemas/hiring/hiring_execution_receipt.schema.json",
   "title": "HiringExecutionReceipt",
-  "description": "Immutable record of a governed HRIS/ATS write. Dispatched only after a passing ActionGate AND Runtime Assurance. Records attempted vs observed. Authorization != execution: a timeout yields OUTCOME_UNKNOWN, not success; compensation is a governed proposal, never an automatic rollback.",
+  "description": "Immutable record of a governed HRIS/ATS execution attempt, produced by the orchestrator ONLY after action authorization (ActionGate) AND runtime assurance both passed. Authorization != execution: a timeout yields OUTCOME_UNKNOWN, never SUCCEEDED. Tracks the implemented domain model ugence_ai_hiring.hiring_decision.execution.HiringExecutionReceipt.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["receipt_id", "candidate_id", "decision_id", "action_gate_verdict_id", "assurance_id", "contract_ref", "target_system", "attempted", "observed_outcome"],
+  "required": ["receipt_id", "decision_case_id", "contract_ref", "binding_decision_id", "binding_authority_id", "action_request_id", "action_request_digest", "authorization_ref", "assurance_ref", "hris_execution_ref", "actor", "authorized_at", "assured_at", "executed_at", "execution_status"],
   "properties": {
     "receipt_id": { "type": "string" },
-    "candidate_id": { "type": "string" },
-    "decision_id": { "type": "string" },
-    "action_gate_verdict_id": { "type": "string" },
-    "assurance_id": { "type": "string" },
+    "decision_case_id": { "type": "string" },
     "contract_ref": {
       "type": "object",
       "additionalProperties": false,
@@ -22,33 +19,18 @@
         "ir_digest": { "type": "string" }
       }
     },
-    "target_system": { "type": "string", "enum": ["SERVICENOW", "WORKDAY", "SAP_SUCCESSFACTORS", "ORACLE_RECRUITING", "OTHER"] },
-    "attempted": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["operation", "payload_hash"],
-      "properties": {
-        "operation": { "type": "string", "examples": ["CREATE_OFFER", "UPDATE_CANDIDATE_STATUS", "CREATE_WORKER"] },
-        "payload_hash": { "type": "string" },
-        "external_ref": { "type": "string", "description": "Idempotency key / external correlation id." }
-      }
-    },
-    "observed_outcome": {
-      "type": "string",
-      "enum": ["SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN"],
-      "description": "OUTCOME_UNKNOWN on timeout/ack-without-confirmation; never coerced to SUCCEEDED."
-    },
-    "observed_detail": { "type": "string" },
-    "external_record_id": { "type": "string", "description": "System-of-record id when SUCCEEDED (e.g. Workday worker id)." },
-    "compensation": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Governed proposal when reconciliation of the write is required; never an automatic rollback.",
-      "properties": {
-        "required": { "type": "boolean" },
-        "proposal": { "type": "string" },
-        "status": { "type": "string", "enum": ["NONE", "PROPOSED", "APPROVED", "APPLIED", "REJECTED"], "default": "NONE" }
-      }
-    }
+    "binding_decision_id": { "type": "string", "description": "The binding Employment Decision this action realizes." },
+    "binding_authority_id": { "type": "string", "description": "The HUMAN Decision Authority that bound the decision." },
+    "action_request_id": { "type": "string" },
+    "action_request_digest": { "type": "string", "description": "SHA-256 over the semantic action payload; binds the receipt to the exact authorized action." },
+    "authorization_ref": { "type": "string", "description": "ActionGate authorization reference (authorization_id)." },
+    "assurance_ref": { "type": "string", "description": "Runtime Assurance clearance reference (assurance_id)." },
+    "hris_execution_ref": { "type": "string", "description": "HRIS/ATS execution reference returned by the execution port." },
+    "actor": { "type": "string" },
+    "authorized_at": { "type": "string", "format": "date-time" },
+    "assured_at": { "type": "string", "format": "date-time" },
+    "executed_at": { "type": "string", "format": "date-time" },
+    "execution_status": { "type": "string", "enum": ["SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN"] },
+    "result_digest": { "type": "string", "default": "" }
   }
 }

@@ -20,10 +20,24 @@ re-exported here, so importing this plane never loads the analytics path.
 
 from __future__ import annotations
 
-from .action_request import CompensationBounds, HiringActionRequest
+from .action_request import CompensationBounds, HiringActionRequest, HiringActionSnapshot
 from .assessment import AssessmentProvenance, DimensionAssessment
 from .decision_case import BindingDecision, HiringDecisionCase
 from .eligibility import Eligibility, derive_eligibility
+from .errors import (
+    ActionAssuranceError,
+    ActionAuthorizationDenied,
+    ContractBindingError,
+    FailClosedError,
+    PayloadMutationError,
+    RuntimeAssuranceNotClear,
+)
+from .execution import (
+    HiringExecutionReceipt,
+    HiringReconciliationRecord,
+    build_reconciliation_record,
+    classify_reconciliation,
+)
 from .enums import (
     ActionAuthorizationVerdict,
     AssessmentOutcome,
@@ -33,9 +47,11 @@ from .enums import (
     DecisionDisposition,
     EligibilityStatus,
     EmploymentType,
+    ExecutionStatus,
     GateState,
     OutcomeEvidenceType,
     RecommendationDisposition,
+    ReconciliationStatus,
     ReviewCheckpoint,
     Trajectory,
 )
@@ -51,9 +67,18 @@ from .ports import (
     DecisionAuthorityPort,
     EvidenceAdmissionPort,
     EvidenceSubmission,
+    ExecutionOutcome,
+    HRISExecutionPort,
     ReconciliationOutcome,
     ReconciliationPort,
     RuntimeAssurancePort,
+)
+from .service import (
+    AuthorizedAction,
+    ClearedAction,
+    ExecutionResult,
+    HiringDecisionService,
+    HiringSpineResult,
 )
 from .recommendation import (
     Confidence,
@@ -96,8 +121,30 @@ __all__ = [
     "DecisionDisposition",
     # action
     "HiringActionRequest",
+    "HiringActionSnapshot",
     "CompensationBounds",
     "EmploymentType",
+    # orchestration spine
+    "HiringDecisionService",
+    "AuthorizedAction",
+    "ClearedAction",
+    "ExecutionResult",
+    "HiringSpineResult",
+    "HiringExecutionReceipt",
+    "HiringReconciliationRecord",
+    "build_reconciliation_record",
+    "classify_reconciliation",
+    "ExecutionStatus",
+    "ReconciliationStatus",
+    "ExecutionOutcome",
+    "HRISExecutionPort",
+    # orchestration errors
+    "ActionAssuranceError",
+    "FailClosedError",
+    "ContractBindingError",
+    "ActionAuthorizationDenied",
+    "RuntimeAssuranceNotClear",
+    "PayloadMutationError",
     # reviews / calibration
     "ReviewRecord",
     "ReviewObservation",
